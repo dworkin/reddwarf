@@ -44,9 +44,9 @@
  */
 typedef struct {
   int socket_fd;             // file descriptor of the socket to the server
-  SGS_ID session_id;
-  SGS_ID reconnect_key;
-  SGS_ChannelList channel_list;
+  SGS_ID *session_id;
+  SGS_ID *reconnect_key;
+  SGS_ChannelList *channel_list;
   uint8_t expecting_disconnect;
   
   /*
@@ -56,12 +56,10 @@ typedef struct {
    */
   uint8_t inbuf[SESSION_BUFSIZE];
   uint8_t outbuf[SESSION_BUFSIZE];
-  uint32_t inbuf_bytes;  // number of bytes read into inbuf[] so far
+  size_t inbuf_bytes;  // number of bytes read into inbuf[] so far
   
   // buffer used during performing callbacks when messages are received
   SGS_Message *msgBuf;
-  
-  // TODO - way for client to register function hooks:
   
   // function pointers
   void (*channelJoinedF)(SGS_ID*);
@@ -84,14 +82,17 @@ typedef struct {
  * FUNCTION DECLARATIONS
  * (implementations are in ServerSession.c)
  */
-SGS_Session *SGS_createSession(uint32_t msgBufSize);
+int SGS_channelSend(SGS_Session *session, SGS_ID *channelId, const uint8_t *data, const uint16_t datalen, SGS_ID *recipients[], const uint16_t reciplen);
+SGS_Session *SGS_createSession(size_t msgBufSize);
 void SGS_destroySession(SGS_Session *session);
-SGS_ID SGS_getSessionId(const SGS_Session *session);
+SGS_ChannelList *SGS_getChannelList(const SGS_Session *session);
+SGS_ID *SGS_getReconnectKey(const SGS_Session *session);
+SGS_ID *SGS_getSessionId(const SGS_Session *session);
 int SGS_isConnected(const SGS_Session *session);
 int SGS_login(const char *hostname, const int port, char* (*auth)(uint8_t), SGS_Session *session);
 int SGS_logout(SGS_Session *session, const int force);
 int SGS_receive(SGS_Session *session, const uint32_t timeout);
-int SGS_send(SGS_Session *session, const uint8_t *data, const uint32_t len);
+int SGS_sessionSend(SGS_Session *session, const uint8_t *data, const uint16_t datalen);
 
 // registration functions for event callbacks (for simplicity, they are just implemented here)
 void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*));

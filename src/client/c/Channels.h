@@ -31,9 +31,11 @@
 typedef struct SGS_Channel SGS_Channel;
 
 struct SGS_Channel {
-  SGS_ID id;
-  uint8_t *name;
-  uint16_t namelen;
+  // these are declared seperately so that we can use pointer access to the
+  //  SGS_ID struct, to be consistent with other structs
+  SGS_ID *id;
+  SGS_ID idBuf;
+  char *name;
   SGS_Channel *next;
 };
 
@@ -46,9 +48,10 @@ typedef struct {
  * (implementations are in Channels.c)
  */
 void SGS_emptyChannelList(SGS_ChannelList *list);
-SGS_Channel *SGS_getChannel(SGS_ChannelList *list, SGS_ID *channel);
+SGS_Channel *SGS_getChannel(SGS_ChannelList *list, SGS_ID *channelId);
 void SGS_initChannelList(SGS_ChannelList *list);
-int SGS_putChannelIfAbsent(SGS_ChannelList *list, SGS_ID *channel, uint8_t *name, uint16_t namelen);
-int SGS_removeChannel(SGS_ChannelList *list, SGS_ID *channel);
+SGS_Channel *SGS_nextChannel(SGS_ChannelList *list, SGS_Channel *channel);
+int SGS_putChannelIfAbsent(SGS_ChannelList *list, SGS_ID *channelId, char *name, int namelen);
+int SGS_removeChannel(SGS_ChannelList *list, SGS_ID *channelId);
 
 #endif

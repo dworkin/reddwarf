@@ -16,11 +16,10 @@
 
 #include "MessageProtocol.h"
 
-
 /*
  * function: SGS_addArbMsgContent()
  *
- * This function adds an "arbitrary" chunk of data to an existing SGS message.
+ * Adds an "arbitrary" chunk of data to an existing SGS message.
  *
  * args:
  *      msg: the SGS_Message to add data to; it may have any amount of optional data already
@@ -48,10 +47,10 @@ int SGS_addArbMsgContent(SGS_Message *msg, const uint8_t *content, const uint16_
   }
   
   // copy the content over (note pointer arithmetic)
-  memcpy(msg->data + (msg->data_len), content, clen);
+  memcpy(msg->data + msg->data_len, content, clen);
   
   // update the data_len field with the new total length
-  msg->data_len = newDataLen;
+  msg->data_len += clen;
   
   return 0;
 }
@@ -59,8 +58,8 @@ int SGS_addArbMsgContent(SGS_Message *msg, const uint8_t *content, const uint16_
 /*
  * function: SGS_addFixedMsgContent()
  *
- * This function adds a byte-array of data to an existing SGS message that is preceded by a
- *  2-byte field containing the length of the data being added.
+ * Adds a byte-array of data to an existing SGS message that is preceded by a 2-byte field
+ *  containing the length of the data being added.
  *
  * args:
  *      msg: the SGS_Message to add data to; it may have any amount of optional data already
@@ -90,12 +89,13 @@ int SGS_addFixedMsgContent(SGS_Message *msg, const uint8_t *content, const uint1
   // copy the content's length over
   msg->data[msg->data_len] = clen / 256;
   msg->data[msg->data_len + 1] = clen % 256;
+  msg->data_len += 2;
   
   // copy the content over (note pointer arithmetic)
-  memcpy(msg->data + (msg->data_len + 2), content, clen);
+  memcpy(msg->data + msg->data_len, content, clen);
   
   // update the data_len field with the new total length
-  msg->data_len = newDataLen;
+  msg->data_len += clen;
   
   return 0;
 }
@@ -103,17 +103,17 @@ int SGS_addFixedMsgContent(SGS_Message *msg, const uint8_t *content, const uint1
 /*
  * function: SGS_createMsg()
  *
- * This function creates an empty SGS message.  Any struct created (returned) by this function
- *  should be destroyed by calling SGS_destroyMsg() before it goes out of scope.
+ * Creates an empty SGS message.  Any struct created (returned) by this function should be destroyed 
+ *  by calling SGS_destroyMsg() before it goes out of scope to avoid memory leaks.
  *
  * args:
  *    bufsize: maximum buffer size for optional data (how much memory to allocate)
  *
  * returns:
  *   On any error, errno is set to the specfific error code and NULL is returned.  Otherwise,
- *    a pointer to a SGS_Message is returned.
+ *    a pointer to a newly allocated SGS_Message is returned.
  */
-SGS_Message *SGS_createMsg(const uint32_t bufsize) {
+SGS_Message *SGS_createMsg(const size_t bufsize) {
   SGS_Message *msg;
   
   msg = (SGS_Message *)malloc(sizeof(SGS_Message));
@@ -142,7 +142,7 @@ SGS_Message *SGS_createMsg(const uint32_t bufsize) {
 /*
  * function: SGS_deserializeMsg()
  *
- * This function creates an SGS message struct from a byte array representation.
+ * Creates an SGS message struct from a byte array representation.
  *
  * args:
  *     msg: the SGS_Message struct to fill with data
@@ -154,7 +154,7 @@ SGS_Message *SGS_createMsg(const uint32_t bufsize) {
  *   -1: failure (errno is set to specific error code)
  *   -2: failure (buffer does not contain a complete SGS_Message; need more data)
  */
-int SGS_deserializeMsg(SGS_Message *msg, const uint8_t *buffer, const uint32_t buflen) {
+int SGS_deserializeMsg(SGS_Message *msg, const uint8_t *buffer, const size_t buflen) {
   int msgLen, i;
   void *ptmp;
   
@@ -212,10 +212,10 @@ int SGS_deserializeMsg(SGS_Message *msg, const uint8_t *buffer, const uint32_t b
 /*
  * function: SGS_destroyMsg()
  *
- * This function takes care of any/all cleanup when an SGS_Message struct is going to be thrown away.
+ * Takes care of any/all cleanup when an SGS_Message struct is going to be thrown away.
  *
  * args:
- *   msg: the SGS_Message to destroy
+ *   msg: pointer to the SGS_Message to destroy
  *
  * returns: nothing
  */
@@ -230,7 +230,7 @@ void SGS_destroyMsg(SGS_Message *msg) {
 /*
  * function: SGS_initMsg()
  *
- * This function initializes the fields of an SGS message without any optional content.
+ * Initializes the fields of an SGS message without any optional content.
  *
  * args:
  *     opCode: operation code for this message
@@ -254,7 +254,7 @@ int SGS_initMsg(SGS_Message *msg, const SGS_OpCode opCode, const SGS_ServiceId s
 /*
  * function: SGS_serializeMsg()
  *
- * This function writes a SGS message to a byte array representation.
+ * Writes a SGS message to a byte array representation.
  *
  * args:
  *     msg: the SGS_Message struct to serialize
@@ -265,20 +265,20 @@ int SGS_initMsg(SGS_Message *msg, const SGS_OpCode opCode, const SGS_ServiceId s
  *   >0: success (returned value is the number of bytes of buffer that were used)
  *   -1: failure (errno is set to specific error code)
  */
-int SGS_serializeMsg(const SGS_Message *msg, uint8_t *buffer, const uint32_t buflen) {
-  uint32_t msgLen = msg->data_len + 3;
+int SGS_serializeMsg(const SGS_Message *msg, uint8_t *buffer, const size_t buflen) {
+  uint32_t msglen = msg->data_len + 3;
   
   // buffer is not big enough to hold this message in deserialized format
-  if (buflen < (4 + msgLen)) {
+  if (buflen < (4 + msglen)) {
     errno = ENOBUFS;
     return -1;
   }
   
   // write message-length field (4 bytes) into buffer
-  buffer[0] = msgLen / 16777216L;        // note: 16777216 = 256*256*256
-  buffer[1] = (msgLen / 65536) & 2556;   // note: 65536 = 256*256
-  buffer[2] = (msgLen / 256) & 2556;
-  buffer[3] = msgLen & 255;
+  buffer[0] = msglen / 16777216L;        // note: 16777216 = 256*256*256
+  buffer[1] = (msglen / 65536) & 2556;   // note: 65536 = 256*256
+  buffer[2] = (msglen / 256) & 2556;
+  buffer[3] = msglen & 255;
   
   buffer[4] = msg->version_id;
   buffer[5] = msg->service_id;

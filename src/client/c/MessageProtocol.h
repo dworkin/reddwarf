@@ -7,6 +7,7 @@
  * Date Created: June 1, 2007
  *
  * This file provides functions relating to the Sun Gaming Server (SGS) wire protocol.
+ *
  */
 
 #ifndef _MESSAGEPROTOCOL_H
@@ -32,9 +33,9 @@ typedef struct {
   uint8_t version_id;
   uint8_t service_id;
   uint8_t op_code;
-  uint8_t *data;      // buffer for optional message data
-  uint32_t data_len;  // number of bytes of data written into the "data" field
-  uint32_t buf_size;   // total size of buffer allocated and assigned to "data" field
+  uint8_t *data;    // buffer for optional message data
+  size_t data_len;  // number of bytes of data written into the "data" field
+  size_t buf_size;  // total size of buffer allocated and assigned to "data" field
 } SGS_Message;
 
 
@@ -44,10 +45,10 @@ typedef struct {
  */
 int SGS_addArbMsgContent(SGS_Message *msg, const uint8_t *content, const uint16_t clen);
 int SGS_addFixedMsgContent(SGS_Message *msg, const uint8_t *content, const uint16_t clen);
-SGS_Message *SGS_createMsg(const uint32_t bufsize);
-int SGS_deserializeMsg(SGS_Message *msg, const uint8_t *buffer, const uint32_t len);
+SGS_Message *SGS_createMsg(const size_t bufsize);
+int SGS_deserializeMsg(SGS_Message *msg, const uint8_t *buffer, const size_t buflen);
 void SGS_destroyMsg(SGS_Message *msg);
 int SGS_initMsg(SGS_Message *msg, const SGS_OpCode opCode, const SGS_ServiceId serviceId);
-int SGS_serializeMsg(const SGS_Message *msg, uint8_t *buffer, const uint32_t buflen);
+int SGS_serializeMsg(const SGS_Message *msg, uint8_t *buffer, const size_t buflen);
 
 #endif
