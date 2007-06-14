@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>     // included for FILE typedef
-#include <string.h>    // included for memcpy
+#include <string.h>    // included for memcpy(), memset()
 #include "HexUtils.h"
 #include "SimpleSgsProtocol.h"
 

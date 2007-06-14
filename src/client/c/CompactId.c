@@ -290,7 +290,7 @@ static int calcCompressedFromBytes(SGS_ID *id) {
   // copy id into destination byte array and apply mask
   id->compressedlen = size;
   
-  bzero(id->compressed, id->compressedlen);
+  memset(id->compressed, '\0', id->compressedlen);
   memcpy(id->compressed + size - id->datalen, id->data, id->datalen);
   
   id->compressed[0] |= mask;
