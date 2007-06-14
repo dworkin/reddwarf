@@ -18,10 +18,11 @@
  * INCLUDES
  */
 #include <stdint.h>
-#include <string.h>   // included for strlen(), memcpy(), memmove(), memset()
-#include <netdb.h>    // included for gethostbyname()
-#include <fcntl.h>    // included for F_GETFL, F_SETFL and O_NONBLOCK constants
-#include <unistd.h>   // included for write(), fsync()
+#include <string.h>    // included for strlen(), memcpy(), memmove(), memset()
+#include <netdb.h>     // included for gethostbyname()
+#include <fcntl.h>     // included for F_GETFL, F_SETFL and O_NONBLOCK constants
+#include <unistd.h>    // included for write(), fsync()
+#include <sys/time.h>  // included for fd_set
 #include "Channels.h"
 #include "CompactId.h"
 #include "MessageProtocol.h"
