@@ -187,7 +187,7 @@ char *SGS_printableCompactId(SGS_ID *id) {
  *   -1: failure (errno is set to specific error code)
  */
 static int calcBytesFromCompressed(SGS_ID *id) {
-  int8_t size, first;
+  int size, first;
   uint8_t firstByte;
   
   if (SGS_COMPACT_IDS) {
