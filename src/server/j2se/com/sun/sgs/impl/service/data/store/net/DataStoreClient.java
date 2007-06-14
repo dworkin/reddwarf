@@ -28,29 +28,34 @@ import java.util.logging.Logger;
  * The {@link #DataStoreClient constructor} supports the following properties:
  * <p>
  *
- * <ul>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
- *	<br>
- *	<i>Default:</i> {@code 100} <br>
- *	The number of object IDs to allocate at one time.  This value must be
- *	greater than {@code 0}. <p>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 100}
  *
- *	<i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
- *	<br>
- *	<i>No default &mdash; required</i> <br>
- *	The name of the host running the {@code DataStoreServer}. <p>
+ * <dd style="padding-top: .5em">The number of object IDs to allocate at one
+ *	time.  This value must be greater than {@code 0}. <p>
  *
- *	<i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
- *	<br>
- *	<i>Default:</i> {@code 44530} <br>
- *	The network port for the {@code DataStoreServer}.  This value must
- *	be greater than {@code 0} and no greater than {@code 65535}.
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
+ *	</b></code><br>
+ *	<i>Required</i>
  *
- * </ul> <p>
+ * <dd style="padding-top: .5em">The name of the host running the {@code
+ *	DataStoreServer}. <p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44530}
+ *
+ * <dd style="padding-top: .5em">The network port for the {@code
+ *	DataStoreServer}.  This value must be greater than {@code 0} and no
+ *	greater than {@code 65535}. <p>
+ *
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named {@code
  * com.sun.sgs.impl.service.data.store.net.DataStoreClient} to log information

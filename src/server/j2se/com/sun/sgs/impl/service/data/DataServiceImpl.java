@@ -42,47 +42,37 @@ import java.util.logging.Logger;
  * Provides an implementation of <code>DataService</code> based on {@link
  * DataStoreImpl}. <p>
  *
- * The {@link #DataServiceImpl constructor} supports the following properties:
- * <p>
+ * The {@link #DataServiceImpl constructor} requires the <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> property, and supports both these
+ * public configuration <a
+ * href="../../../app/doc-files/config-properties.html#DataService">
+ * properties</a> and the following additional properties: <p>
  *
- * <ul>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.app.name</code> <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the name of the application using this
- *	<code>DataService</code>. <p>
- *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
- *	</code> <br>
- *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
- *	Specifies the number of <code>DataService</code> operations to skip
- *	between checks of the consistency of the managed references table.
- *	Note that the number of operations is measured separately for each
- *	transaction.  This property is intended for use in debugging. <p>
- *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications
- *	</code> <br>
- *	<i>Default:</i> <code>true</code> <br>
- *	Specifies whether to automatically detect modifications to managed
- *	objects.  If set to something other than <code>true</code>, then
- *	applications need to call {@link DataManager#markForUpdate
- *	DataManager.markForUpdate} or {@link ManagedReference#getForUpdate
- *	ManagedReference.getForUpdate} for any modified objects to make sure
- *	that the modifications are recorded by the
- *	<code>DataService</code>. <p>
- *
- * <li> <i>Key:</i> <code>
+ * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
- *	</code> <br>
+ *	</b></code> <br>
  *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> <br>
- *	The name of the class that implements {@link DataStore}.  The class
- *	should be public, not abstract, and should provide a public constructor
- *	with a {@link Properties} parameter.
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
- * </ul> <p>
+ * <dd style="padding-top: .5em">The name of the class that implements {@link
+ *	DataStore}.  The class should be public, not abstract, and should
+ *	provide a public constructor with a {@link Properties} parameter. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>Integer.MAX_VALUE</code>
+ *
+ * <dd style="padding-top: .5em">The number of <code>DataService</code>
+ *	operations to skip between checks of the consistency of the managed
+ *	references table.  Note that the number of operations is measured
+ *	separately for each transaction.  This property is intended for use in
+ *	debugging. <p>
+ *
+ * </dl> <p>
  *
  * The constructor also passes the properties to the {@link DataStoreImpl}
  * constructor, which supports additional properties. <p>

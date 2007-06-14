@@ -58,16 +58,9 @@ import java.util.logging.Logger;
 /**
  * Simple ChannelService implementation. <p>
  * 
- * The {@link #ChannelServiceImpl constructor} supports the
- * following properties: <p>
- *
- * <ul>
- *
- * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the application name. <p>
- *
- * </ul> <p>
+ * The {@link #ChannelServiceImpl constructor} requires the <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> property. <p>
  */
 public class ChannelServiceImpl implements ChannelManager, Service {
     /** The name of this class. */

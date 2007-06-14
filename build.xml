@@ -32,6 +32,9 @@
   <tstamp>
     <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
   </tstamp>
+
+  <property name="javadoc.excludepackages" value="com.sun.sgs.example.hack.*"/>
+
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
@@ -152,52 +155,32 @@
   <target name="javadoc" depends="javadoc-api,javadoc-internal"
 	  description="Builds javadoc"/>
 
-  <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
-	  description="Builds internal (full) javadoc"/>
-
   <target name="javadoc-api" depends="javadoc-api-server,javadoc-api-client"
 	  description="Builds public API javadoc"/>
 
-  <!-- Build the internal server JavaDoc -->
-  <target name="javadoc-server" depends="build-server, project-version"
-	  description="Builds internal (full) server javadoc">
-    <javadoc sourcepath="src/server/j2se:src/shared/j2se"
-             destdir="${build.dir}/javadoc/server"
-             classpathref="server.classpath"
+  <!-- Build the internal JavaDoc -->
+  <target name="javadoc-internal" depends="build, project-version"
+          description="Builds internal (full) javadoc">
+    <javadoc destdir="${build.dir}/javadoc/internal"
              packagenames="com.sun.*"
+             excludepackagenames="${javadoc.excludepackages}"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
-	     author="no">
-      <link href="${jdk.doc.api.url}"
-	    offline="true"
-	    packagelistLoc="${jdk.package.list}"/>
-      <link href="${mina.doc.api.url}"
-            offline="true"
-            packagelistLoc="${mina.package.list}"/>
-      <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
-        ${project.version}<br>${project.build}</font>]]>
-      </footer>
-      <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
-        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
-        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
-        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
-      </bottom>
-    </javadoc>
-  </target>
-
-  <!-- Build the internal client JavaDoc -->
-  <target name="javadoc-client" depends="build-client, project-version"
-	  description="Builds internal (full) client javadoc">
-    <javadoc sourcepath="src/client/j2se"
-             destdir="${build.dir}/javadoc/client"
-             classpathref="client.classpath"
-             packagenames="com.sun.*"
-             overview="src/client/j2se/overview.html"
-             windowtitle="${project.name}" doctitle="${project.name}"
-	     author="no">
+	     author="no" access="package">
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="server.classpath"/>
+        <path refid="client.classpath"/>
+        <pathelement location="lib/junit-4.1.jar"/>
+      </classpath>
+      <sourcepath>
+        <dirset dir="src" includes="*/j2se"/>
+        <dirset dir="test" includes="*/j2se"/>
+        <dirset dir="example" includes="*/src"/>
+      </sourcepath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
@@ -249,14 +232,17 @@
   <!-- Build the public Client API JavaDoc -->
   <target name="javadoc-api-client" depends="build-client, project-version"
 	  description="Builds public client API javadoc">
-    <javadoc sourcepath="src/client/j2se"
-             destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
+    <javadoc destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
              classpathref="client.classpath"
-             packagenames="com.sun.sgs.client,com.sun.sgs.client.simple"
+             packagenames="com.sun.sgs.client,com.sun.sgs.client.simple,com.sun.sgs.protocol.simple"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name} Client API"
              doctitle="${project.name} Client API"
              public="true" author="no">
+      <sourcepath>
+        <dirset dir="src/client/j2se"/>
+        <dirset dir="src/shared/j2se"/>
+      </sourcepath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
@@ -947,7 +933,7 @@
           description="Creates the tutorial distribution">
     <copy todir="${build.dir}/sgs/tutorial">
       <fileset dir="example/tutorial" includes="*.properties"/>
-      <fileset file="build/example/tutorial/tutorial.jar"/>
+      <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
     </copy>
     <copy todir="${build.dir}/sgs/tutorial/src">
       <fileset dir="example/tutorial/src" includes="**/*.java"/>
