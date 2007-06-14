@@ -24,9 +24,9 @@
  */
 static int connectToServer(const char *hostname, const int port);
 static int consumeData(SGS_Session *session);
-static inline void disconnect(SGS_Session *session);
+static void disconnect(SGS_Session *session);
 static int processMessage(SGS_Session *session, SGS_Message *msg);
-static inline uint16_t readLenHeader(uint8_t *data);
+static uint16_t readLenHeader(uint8_t *data);
 static int writeMsg(SGS_Session *session, const SGS_Message *msg);
 
 
@@ -193,7 +193,7 @@ void SGS_destroySession(SGS_Session *session) {
  * args:
  *   session: pointer to the current user session
  */
-inline SGS_ChannelList *SGS_getChannelList(const SGS_Session *session) {
+SGS_ChannelList *SGS_getChannelList(const SGS_Session *session) {
   return session->channel_list;
 }
 
@@ -205,7 +205,7 @@ inline SGS_ChannelList *SGS_getChannelList(const SGS_Session *session) {
  * args:
  *   session: pointer to the current user session
  */
-inline SGS_ID *SGS_getReconnectKey(const SGS_Session *session) {
+SGS_ID *SGS_getReconnectKey(const SGS_Session *session) {
   return session->reconnect_key;
 }
 
@@ -217,7 +217,7 @@ inline SGS_ID *SGS_getReconnectKey(const SGS_Session *session) {
  * args:
  *   session: pointer to the current user session
  */
-inline SGS_ID *SGS_getSessionId(const SGS_Session *session) {
+SGS_ID *SGS_getSessionId(const SGS_Session *session) {
   return session->session_id;
 }
 
@@ -233,7 +233,7 @@ inline SGS_ID *SGS_getSessionId(const SGS_Session *session) {
  *    1: session is connected
  *    0: session is not connected
  */
-inline int SGS_isConnected(const SGS_Session *session) {
+int SGS_isConnected(const SGS_Session *session) {
   if (session->socket_fd == 0)
     return 0;
   else
@@ -462,7 +462,7 @@ int SGS_sessionSend(SGS_Session *session, const uint8_t *data, const uint16_t da
  * parameters to callback() function:
  *  1) ID of channel that was joined
  */
-inline void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
+void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
   session->channelJoinedF = callback;
 }
 
@@ -470,7 +470,7 @@ inline void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(
  * parameters to callback() function:
  *  1) ID of channel that was left
  */
-inline void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
+void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
   session->channelLeftF = callback;
 }
 
@@ -481,21 +481,21 @@ inline void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SG
  *  3) byte-array containing message
  *  4) length of message byte-array
  */
-inline void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t)) {
+void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t)) {
   session->channelRecvMsgF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-inline void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)()) {
+void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)()) {
   session->disconnectedF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-inline void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
+void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
   session->loggedInF = callback;
 }
 
@@ -504,14 +504,14 @@ inline void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
  *  1) error message
  *  2) length of error message
  */
-inline void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
+void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
   session->loginFailedF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-inline void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)()) {
+void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)()) {
   session->reconnectedF = callback;
 }
 
@@ -520,7 +520,7 @@ inline void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)())
  *  1) message received from server
  *  2) length of message
  */
-inline void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
+void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
   session->recvMessageF = callback;
 }
 
@@ -637,7 +637,7 @@ static int consumeData(SGS_Session *session) {
  *
  * Closes the network connection of a session.
  */
-static inline void disconnect(SGS_Session *session) {
+static void disconnect(SGS_Session *session) {
   close(session->socket_fd);
   session->socket_fd = 0;
 }
@@ -786,7 +786,7 @@ static int processMessage(SGS_Session *session, SGS_Message *msg) {
  * Reads two bytes from data argument and interprets them as a 2-byte integer field,
  *  returning the result.
  */
-static inline uint16_t readLenHeader(uint8_t *data) {
+static uint16_t readLenHeader(uint8_t *data) {
   uint16_t tmp;
   tmp = data[0];
   tmp = tmp*256 + data[1];

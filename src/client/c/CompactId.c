@@ -22,9 +22,9 @@
  */
 static int8_t getByteCount(uint8_t lengthByte);
 static int calcBytesFromCompressed(SGS_ID *id);
-static inline int calcBytesFromHex(SGS_ID *id);
+static int calcBytesFromHex(SGS_ID *id);
 static int calcCompressedFromBytes(SGS_ID *id);
-static inline int calcHexFromBytes(SGS_ID *id);
+static int calcHexFromBytes(SGS_ID *id);
 
 /*
  * EXTERNAL FUNCTION IMPLEMENTATIONS
@@ -156,7 +156,7 @@ int SGS_initCompactIdFromHex(const char* hexStr, SGS_ID *id) {
  *    1: if the ID equals the server's ID
  *    0: if the ID does not equal the server's ID
  */
-inline int SGS_equalsServerId(SGS_ID *id) {
+int SGS_equalsServerId(SGS_ID *id) {
   if ((id->datalen = 1) && (id->data[0] == 0))
     return 1;
   
@@ -168,7 +168,7 @@ inline int SGS_equalsServerId(SGS_ID *id) {
  *
  * Returns a hex-string representation of an SGS_ID value.
  */
-inline char *SGS_printableCompactId(SGS_ID *id) {
+char *SGS_printableCompactId(SGS_ID *id) {
   return id->hexstr;
 }
 
@@ -243,7 +243,7 @@ static int calcBytesFromCompressed(SGS_ID *id) {
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-static inline int calcBytesFromHex(SGS_ID *id) {
+static int calcBytesFromHex(SGS_ID *id) {
   if (hextobytes(id->hexstr, id->data) == -1) return -1;
   id->datalen = strlen(id->hexstr)/2;
   return 0;
@@ -307,7 +307,7 @@ static int calcCompressedFromBytes(SGS_ID *id) {
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-static inline int calcHexFromBytes(SGS_ID *id) {
+static int calcHexFromBytes(SGS_ID *id) {
   bytestohex(id->data, id->datalen, id->hexstr);
   return 0;
 }
