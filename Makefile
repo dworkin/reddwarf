@@ -1,14 +1,14 @@
 #
 #
 OS = $(shell uname)
-
 CC = gcc
-CFLAGS = -Wall -O -std=c99 -pedantic
 
 ifeq ($(OS),SunOS)
+  CFLAGS = -Wall -O -std=c99 -pedantic -D __EXTENSIONS__
   LINKFLAGS = -lnsl -lsocket
 else
-  LINKFLAGS = 
+  CFLAGS = -Wall -O -std=c99 -pedantic
+  LINKFLAGS =
 endif
 
 ODIR = obj

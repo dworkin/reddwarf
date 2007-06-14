@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <getopt.h>  // included for optarg (declared in unistd.h on some, but not all systems)
 #include "ServerSession.h"
 
 #define RECV_TIMEOUT    0     // ms
@@ -76,8 +77,8 @@ int main(int argc, char *argv[]) {
   // stdout and stderr are normally line-buffered, but if they are redirected to a file (instead
   //  of the console) this may not be true; this annoys me so force them both to be line-buffered
   //  no matter what
-  setlinebuf(stdout);
-  setlinebuf(stderr);
+  setvbuf(stdout, (char *)NULL, _IOLBF, 0);
+  setvbuf(stderr, (char *)NULL, _IOLBF, 0);
   
   if (initVars() == -1) die("Error initializing variables");
   
