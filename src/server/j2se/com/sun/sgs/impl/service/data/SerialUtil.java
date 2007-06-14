@@ -278,7 +278,7 @@ final class SerialUtil {
 	    if (object != topLevelObject && object instanceof ManagedObject) {
 		throw new ObjectIOException(
 		    "ManagedObject was not referenced through a " +
-		    "ManagedReference: " + object,
+		    "ManagedReference: " + safeToString(object),
 		    false);
 	    } else if (object != null) {
 		Class<?> cl = object.getClass();
@@ -288,14 +288,14 @@ final class SerialUtil {
 			    Level.FINE,
 			    "Storing an instance of an anonymous class: " +
 			    "{0}, {1}",
-			    object, cl);
+			    safeToString(object), cl);
 		    }
 		} else if (cl.isLocalClass()) {
 		    if (logger.isLoggable(Level.FINE)) {
 			logger.log(
 			    Level.FINE,
 			    "Storing an instance of a local class: {0}, {1}",
-			    object, cl);
+			    safeToString(object), cl);
 		    }
 		}
 	    }
@@ -385,7 +385,7 @@ final class SerialUtil {
 		Class<?> cl = object.getClass();
 		if (object != topObject && object instanceof ManagedObject) {
 		    stack.push("object (class \"" + cl.getName() + "\", " +
-			       object + ")");
+			       safeToString(object) + ")");
 		    throw new ObjectIOException(
 			"ManagedObject was not referenced through a " +
 			"ManagedReference:\n" + stack,
@@ -420,8 +420,8 @@ final class SerialUtil {
 	/** Checks an non-array for bad reference. */
 	private void checkNonArray(Object object) {
 	    Class<?> cl = object.getClass();
-	    stack.push("object (class \"" + cl.getName() + "\", " + object +
-		       ")");
+	    stack.push("object (class \"" + cl.getName() + "\", " +
+		       safeToString(object) + ")");
 	    for ( ; cl != null; cl = cl.getSuperclass()) {
 		for (Field f : cl.getDeclaredFields()) {
 		    if (!Modifier.isStatic(f.getModifiers()) &&
@@ -456,5 +456,23 @@ final class SerialUtil {
 	    sb.insert(0, className);
 	    return sb.toString();
 	}
+    }
+
+    /**
+     * Returns a string representing the object, returning a failsafe value if
+     * the toString or hashCode methods throw exceptions.
+     */
+    private static String safeToString(Object object) {
+	try {
+	    return object.toString();
+	} catch (Exception e) {
+	}
+	try {
+	    return object.getClass().getName() + '@' +
+		Integer.toHexString(object.hashCode());
+	} catch (Exception e) {
+	}
+	return "identityHashCode=0x" +
+	    Integer.toHexString(System.identityHashCode(object));
     }
 }

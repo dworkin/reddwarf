@@ -2152,6 +2152,32 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testSerializeReferenceToEnclosing() throws Exception {
+	serializeReferenceToEnclosingInternal();
+    }
+
+    public void testSerializeReferenceToEnclosingToStringFails()
+	throws Exception
+    {
+	MaybeFails.fails = Failures.TOSTRING;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    MaybeFails.fails = Failures.NONE;
+	}
+    }
+
+    public void testSerializeReferenceToEnclosingHashCodeFails()
+	throws Exception
+    {
+	MaybeFails.fails = Failures.TOSTRING_AND_HASHCODE;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    MaybeFails.fails = Failures.NONE;
+	}
+    }
+
+    private void serializeReferenceToEnclosingInternal() throws Exception {
 	service.setBinding("a", NonManaged.staticLocal);
 	service.setBinding("b", NonManaged.staticAnonymous);
 	service.setBinding("c", new NonManaged().createMember());
@@ -2196,76 +2222,131 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static class NonManaged implements Serializable {
+    enum Failures {
+	NONE, TOSTRING, TOSTRING_AND_HASHCODE;
+    }
+
+    static class MaybeFails {
+	static Failures fails = Failures.NONE;
+	public String toString() {
+	    return toString(this);
+	}
+	public int hashCode() {
+	    return hashCode(super.hashCode());
+	}
+	static String toString(Object object) {
+	    if (fails != Failures.NONE ) {
+		throw new RuntimeException("toString fails");
+	    }
+	    String className = object.getClass().getName();
+	    int dot = className.lastIndexOf('.');
+	    if (dot > 0) {
+		className = className.substring(dot + 1);
+	    }
+	    return className + "[hashCode=" + object.hashCode() + "]";
+	}
+	static int hashCode(int hashCode) {
+	    if (fails == Failures.TOSTRING_AND_HASHCODE) {
+		throw new RuntimeException("hashCode fails");
+	    }
+	    return hashCode;
+	}
+    }
+
+    static class DummyManagedObjectMaybeFails extends DummyManagedObject {
+	private static final long serialVersionUID = 1;	
+	public String toString() {
+	    return MaybeFails.toString(this);
+	}
+	public int hashCode() {
+	    return MaybeFails.hashCode(super.hashCode());
+	}
+    }
+
+    static class NonManaged extends MaybeFails implements Serializable {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends MaybeFails
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectMaybeFails() {
 	        private static final long serialVersionUID = 1L;
 	    };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends MaybeFails
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends MaybeFails implements ManagedObject, Serializable {
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
 	}
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectMaybeFails() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends MaybeFails
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
 	}
     }
 
-    static class Managed implements ManagedObject, Serializable {
+    static class Managed extends MaybeFails
+	implements ManagedObject, Serializable
+    {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends MaybeFails
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectMaybeFails() {
                 private static final long serialVersionUID = 1L;
             };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends MaybeFails
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends MaybeFails implements ManagedObject, Serializable {
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
         }
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectMaybeFails() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends MaybeFails
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
