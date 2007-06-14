@@ -49,7 +49,7 @@ typedef struct {
  */
 void SGS_emptyChannelList(SGS_ChannelList *list);
 SGS_Channel *SGS_getChannel(SGS_ChannelList *list, SGS_ID *channelId);
-void SGS_initChannelList(SGS_ChannelList *list);
+void inline SGS_initChannelList(SGS_ChannelList *list);
 SGS_Channel *SGS_nextChannel(SGS_ChannelList *list, SGS_Channel *channel);
 int SGS_putChannelIfAbsent(SGS_ChannelList *list, SGS_ID *channelId, char *name, int namelen);
 int SGS_removeChannel(SGS_ChannelList *list, SGS_ID *channelId);

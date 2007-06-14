@@ -53,7 +53,7 @@ SGS_Channel *SGS_getChannel(SGS_ChannelList *list, SGS_ID *channelId) {
  *
  * Initializes the fields of a new channel list.
  */
-void SGS_initChannelList(SGS_ChannelList *list) {
+void inline SGS_initChannelList(SGS_ChannelList *list) {
   list->head = NULL;
 }
 

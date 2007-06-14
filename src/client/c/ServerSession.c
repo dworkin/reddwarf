@@ -24,9 +24,9 @@
  */
 static int connectToServer(const char *hostname, const int port);
 static int consumeData(SGS_Session *session);
-static void disconnect(SGS_Session *session);
+static inline void disconnect(SGS_Session *session);
 static int processMessage(SGS_Session *session, SGS_Message *msg);
-static uint16_t readLenHeader(uint8_t *data);
+static inline uint16_t readLenHeader(uint8_t *data);
 static int writeMsg(SGS_Session *session, const SGS_Message *msg);
 
 
@@ -63,9 +63,8 @@ int SGS_channelSend(SGS_Session *session, SGS_ID *channelId, const uint8_t *data
   if (SGS_addArbMsgContent(session->msgBuf, channelId->compressed, channelId->compressedlen) == -1) return -1;
     
   // add sequence number to message
-  // TODO - first 8 bytes of session->msgBuf->data should be a sequence number (for now we just copy
-  //  from session->msgBuf->data back to itself)
-  if (SGS_addArbMsgContent(session->msgBuf, session->msgBuf->data, 8) == -1) return -1;
+  if (SGS_addArbMsgContent(session->msgBuf, (uint8_t*)(&session->seqNum), 8) == -1) return -1;
+  session->seqNum++;
   
   // add recipient-count to message
   tmp[0] = reciplen / 256;
@@ -146,6 +145,7 @@ SGS_Session *SGS_createSession(size_t msgBufSize) {
   session->reconnect_key->datalen = 0;
   SGS_initChannelList(session->channel_list);
   session->expecting_disconnect = 0;
+  session->seqNum = 0;
   session->inbuf_bytes = 0;
   
   // function pointers:
@@ -233,7 +233,7 @@ inline SGS_ID *SGS_getSessionId(const SGS_Session *session) {
  *    1: session is connected
  *    0: session is not connected
  */
-int SGS_isConnected(const SGS_Session *session) {
+inline int SGS_isConnected(const SGS_Session *session) {
   if (session->socket_fd == 0)
     return 0;
   else
@@ -434,9 +434,8 @@ int SGS_sessionSend(SGS_Session *session, const uint8_t *data, const uint16_t da
   if (SGS_initMsg(session->msgBuf, SGS_SESSION_MESSAGE, SGS_APPLICATION_SERVICE) == -1) return -1;
   
   // add sequence number to message
-  // TODO - first 8 bytes of session->msgBuf->data should be a sequence number (for now we just copy
-  //  from session->msgBuf->data back to itself)
-  if (SGS_addArbMsgContent(session->msgBuf, session->msgBuf->data, 8) == -1) return -1;
+  if (SGS_addArbMsgContent(session->msgBuf, (uint8_t*)(&session->seqNum), 8) == -1) return -1;
+  session->seqNum++;
   
   // add data to message
   if (datalen > 0) {
@@ -463,7 +462,7 @@ int SGS_sessionSend(SGS_Session *session, const uint8_t *data, const uint16_t da
  * parameters to callback() function:
  *  1) ID of channel that was joined
  */
-void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
+inline void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
   session->channelJoinedF = callback;
 }
 
@@ -471,7 +470,7 @@ void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*
  * parameters to callback() function:
  *  1) ID of channel that was left
  */
-void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
+inline void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*)) {
   session->channelLeftF = callback;
 }
 
@@ -482,21 +481,21 @@ void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*))
  *  3) byte-array containing message
  *  4) length of message byte-array
  */
-void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t)) {
+inline void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t)) {
   session->channelRecvMsgF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)()) {
+inline void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)()) {
   session->disconnectedF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
+inline void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
   session->loggedInF = callback;
 }
 
@@ -505,14 +504,14 @@ void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)()) {
  *  1) error message
  *  2) length of error message
  */
-void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
+inline void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
   session->loginFailedF = callback;
 }
 
 /*
  * parameters to callback() function:   (none)
  */
-void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)()) {
+inline void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)()) {
   session->reconnectedF = callback;
 }
 
@@ -521,7 +520,7 @@ void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)()) {
  *  1) message received from server
  *  2) length of message
  */
-void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
+inline void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t)) {
   session->recvMessageF = callback;
 }
 
@@ -638,7 +637,7 @@ static int consumeData(SGS_Session *session) {
  *
  * Closes the network connection of a session.
  */
-static void disconnect(SGS_Session *session) {
+static inline void disconnect(SGS_Session *session) {
   close(session->socket_fd);
   session->socket_fd = 0;
 }
@@ -787,7 +786,7 @@ static int processMessage(SGS_Session *session, SGS_Message *msg) {
  * Reads two bytes from data argument and interprets them as a 2-byte integer field,
  *  returning the result.
  */
-static uint16_t readLenHeader(uint8_t *data) {
+static inline uint16_t readLenHeader(uint8_t *data) {
   uint16_t tmp;
   tmp = data[0];
   tmp = tmp*256 + data[1];

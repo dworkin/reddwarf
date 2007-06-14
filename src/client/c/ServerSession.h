@@ -48,6 +48,7 @@ typedef struct {
   SGS_ID *reconnect_key;
   SGS_ChannelList *channel_list;
   uint8_t expecting_disconnect;
+  uint64_t seqNum;
   
   /*
    * Rather than redeclaring memory every time we want to send or receive a message, we just declare
@@ -88,20 +89,20 @@ void SGS_destroySession(SGS_Session *session);
 SGS_ChannelList *SGS_getChannelList(const SGS_Session *session);
 SGS_ID *SGS_getReconnectKey(const SGS_Session *session);
 SGS_ID *SGS_getSessionId(const SGS_Session *session);
-int SGS_isConnected(const SGS_Session *session);
+inline int SGS_isConnected(const SGS_Session *session);
 int SGS_login(const char *hostname, const int port, char* (*auth)(uint8_t), SGS_Session *session);
 int SGS_logout(SGS_Session *session, const int force);
 int SGS_receive(SGS_Session *session, const uint32_t timeout);
 int SGS_sessionSend(SGS_Session *session, const uint8_t *data, const uint16_t datalen);
 
-// registration functions for event callbacks (for simplicity, they are just implemented here)
-void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*));
-void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*));
-void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t));
-void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)());
-void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)());
-void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t));
-void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)());
-void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t));
+// functions for registering event callbacks:
+inline void SGS_regChannelJoinedCallback(SGS_Session *session, void (*callback)(SGS_ID*));
+inline void SGS_regChannelLeftCallback(SGS_Session *session, void (*callback)(SGS_ID*));
+inline void SGS_regChannelRecvMsgCallback(SGS_Session *session, void (*callback)(SGS_ID*, SGS_ID*, uint8_t*, uint16_t));
+inline void SGS_regDisconnectedCallback(SGS_Session *session, void (*callback)());
+inline void SGS_regLoggedInCallback(SGS_Session *session, void (*callback)());
+inline void SGS_regLoginFailedCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t));
+inline void SGS_regReconnectedCallback(SGS_Session *session, void (*callback)());
+inline void SGS_regRecvMsgCallback(SGS_Session *session, void (*callback)(uint8_t*, uint16_t));
 
 #endif

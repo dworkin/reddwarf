@@ -41,7 +41,7 @@ static void recvMsgCallback(uint8_t* msg, uint16_t msglen);
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
-static void cleanup();
+static inline void cleanup();
 static void die(const char *msg);
 static int fprintFixedLenString(FILE *stream, uint8_t *data, int datalen);
 static char *getCredential(const uint8_t index);
@@ -231,7 +231,7 @@ static char* getCredential(const uint8_t index) {
  *
  * Takes care of any and all housekeeping before the program exits.
  */
-static void cleanup() {
+static inline void cleanup() {
   SGS_destroySession(session);
 }
 

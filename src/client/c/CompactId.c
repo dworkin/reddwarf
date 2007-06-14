@@ -22,9 +22,9 @@
  */
 static int8_t getByteCount(uint8_t lengthByte);
 static int calcBytesFromCompressed(SGS_ID *id);
-static int calcBytesFromHex(SGS_ID *id);
+static inline int calcBytesFromHex(SGS_ID *id);
 static int calcCompressedFromBytes(SGS_ID *id);
-static int calcHexFromBytes(SGS_ID *id);
+static inline int calcHexFromBytes(SGS_ID *id);
 
 /*
  * EXTERNAL FUNCTION IMPLEMENTATIONS
@@ -243,7 +243,7 @@ static int calcBytesFromCompressed(SGS_ID *id) {
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-static int calcBytesFromHex(SGS_ID *id) {
+static inline int calcBytesFromHex(SGS_ID *id) {
   if (hextobytes(id->hexstr, id->data) == -1) return -1;
   id->datalen = strlen(id->hexstr)/2;
   return 0;
@@ -307,7 +307,7 @@ static int calcCompressedFromBytes(SGS_ID *id) {
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-static int calcHexFromBytes(SGS_ID *id) {
+static inline int calcHexFromBytes(SGS_ID *id) {
   bytestohex(id->data, id->datalen, id->hexstr);
   return 0;
 }
