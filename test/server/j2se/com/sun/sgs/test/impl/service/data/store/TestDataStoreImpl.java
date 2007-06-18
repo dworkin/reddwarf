@@ -385,8 +385,9 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testGetObjectTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(1);
-	Thread.sleep(2);
+	txn = new DummyTransaction(100);
+	store.setObject(txn, id, new byte[] { 0 });
+	Thread.sleep(200);
 	try {
 	    store.getObject(txn, id, false);
 	    fail("Expected TransactionTimeoutException");
@@ -1144,9 +1145,9 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testPrepareTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.NO, 10);
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 100);
 	store.setObject(txn, id, new byte[] { 1 });
-	Thread.sleep(12);
+	Thread.sleep(200);
 	try {
 	    txn.commit();
 	    fail("Expected TransactionTimeoutException");
@@ -1206,9 +1207,9 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testPrepareAndCommitTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.YES, 10);
+	txn = new DummyTransaction(UsePrepareAndCommit.YES, 100);
 	store.setObject(txn, id, new byte[] { 1 });
-	Thread.sleep(12);
+	Thread.sleep(200);
 	try {
 	    txn.commit();
 	    fail("Expected TransactionTimeoutException");
@@ -1275,7 +1276,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Make sure that commits don't timeout. */
     public void testCommitNoTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.NO) {
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 1000) {
 	    public void join(final TransactionParticipant participant) {
 		super.join(new TransactionParticipant() {
 		    public boolean prepare(Transaction txn) throws Exception {
@@ -1300,9 +1301,12 @@ public class TestDataStoreImpl extends TestCase {
 		});
 	    }
 	};
- 	store.setBinding(txn, "foo", id);
-	txn.commit();
-	txn = null;
+	store.setBinding(txn, "foo", id);
+	try {
+	    txn.commit();
+	} finally {
+	    txn = null;
+	}
     }
 
     /* -- Unusual states -- */
@@ -1567,14 +1571,16 @@ public class TestDataStoreImpl extends TestCase {
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = new DummyTransaction(
+		    UsePrepareAndCommit.ARBITRARY, 1000);
 	    }
 	    final long id = store.createObject(txn);
 	    store.setObject(txn, id, new byte[] { 0 });
 	    final long id2 = store.createObject(txn);
 	    store.setObject(txn, id2, new byte[] { 0 });
 	    txn.commit();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = new DummyTransaction(
+		UsePrepareAndCommit.ARBITRARY, 1000);
 	    store.getObject(txn, id, false);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -1585,7 +1591,7 @@ public class TestDataStoreImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			store.getObject(txn2, id2, false);
 			flag.release();
 			store.getObject(txn2, id, true);

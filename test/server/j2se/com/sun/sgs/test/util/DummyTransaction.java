@@ -32,7 +32,7 @@ public class DummyTransaction implements Transaction {
 
     /** The default timeout. */
     private static long DEFAULT_TIMEOUT =
-	Long.getLong(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, 1000);
+	Long.getLong(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, 100);
 
     /** The possible transaction states. */
     public enum State {

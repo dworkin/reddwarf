@@ -48,7 +48,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
  *	</b></code>
- *      <i>Default:</i> {@code 60000}
+ *      <i>Default:</i> {@code 600000}
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that a transaction will be permitted to run before it is a candidate

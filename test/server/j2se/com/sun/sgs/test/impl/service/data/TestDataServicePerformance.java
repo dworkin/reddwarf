@@ -170,17 +170,17 @@ public class TestDataServicePerformance extends TestCase {
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
-	createTransaction();
+	createTransaction(10000);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.registerAppContext();
 	txn.commit();
-	createTransaction();
+	createTransaction(10000);
 	service.setBinding("counters", new Counters(items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		createTransaction();
+		createTransaction(10000);
 		Counters counters =
 		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {
@@ -296,6 +296,13 @@ public class TestDataServicePerformance extends TestCase {
     /** Creates a new transaction. */
     private DummyTransaction createTransaction() {
 	txn = new DummyTransaction();
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Creates a new transaction with the specified timeout. */
+    DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }

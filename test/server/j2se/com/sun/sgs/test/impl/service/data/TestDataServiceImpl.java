@@ -107,7 +107,7 @@ public class TestDataServiceImpl extends TestCase {
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
-	    createTransaction();
+	    createTransaction(10000);
 	    service.configure(componentRegistry, txnProxy);
 	    txn.commit();
 	}
@@ -1473,7 +1473,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testMarkForUpdateLocking() throws Exception {
 	dummy.setValue("a");
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	assertEquals("a", dummy.value);
 	final Semaphore mainFlag = new Semaphore(0);
@@ -1941,7 +1941,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateLocking() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	dummy.getNext();
 	final Semaphore mainFlag = new Semaphore(0);
@@ -2276,7 +2276,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.setBinding("dummy2", new DummyManagedObject());
 	txn.commit();
 	for (int i = 0; i < 5; i++) {
-	    createTransaction();
+	    createTransaction(1000);
 	    dummy = service.getBinding("dummy", DummyManagedObject.class);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -2287,7 +2287,7 @@ public class TestDataServiceImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			txnProxy.setCurrentTransaction(txn2);
 			componentRegistry.registerAppContext();
 			service.getBinding("dummy2", DummyManagedObject.class);
@@ -2498,6 +2498,13 @@ public class TestDataServiceImpl extends TestCase {
     /** Creates a new transaction. */
     DummyTransaction createTransaction() {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Creates a new transaction with the specified timeout. */
+    DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
