@@ -6,6 +6,7 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import java.io.File;
@@ -72,8 +73,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    DataStoreServerImplClassName + ".port", "0");
 	server = getDataStoreServer();
-	tid = server.createTransaction();
-	oid = server.allocateObjects(1);
+	tid = server.createTransaction(1000);
+	oid = server.allocateObjects(tid, 1);
     }
 
     /** Sets passed if the test passes. */
@@ -186,7 +187,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	server.prepareAndCommit(tid);
 	tid = -1;
 	tearDown();
-	props.setProperty("com.sun.sgs.txnTimeout", "2");
+	props.setProperty("com.sun.sgs.txn.timeout", "2");
 	props.setProperty(DataStoreServerImplClassName + ".reap.delay", "2");
 	server = getDataStoreServer();
 	List<TestReaperConcurrencyThread> threads =
@@ -237,7 +238,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
 	public void run() {
 	    try {
-		long tid = server.createTransaction();
+		long tid = server.createTransaction(1000);
 		int succeeds = 0;
 		int aborted = 0;
 		int notActive = 0;
@@ -264,7 +265,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			notActive++;
 		    }
 		    if (abort) {
-			tid = server.createTransaction();
+			tid = server.createTransaction(1000);
 		    }
 		}
 		System.err.println(getName() +
@@ -279,6 +280,66 @@ public class TestDataStoreServerImpl extends TestCase {
 		    notifyAll();
 		}
 	    }
+	}
+    }
+
+    /* -- Other tests -- */
+
+    /**
+     * Test that the maximum transaction timeout overrides the standard
+     * timeout.
+     */
+    public void testGetObjectMaxTxnTimeout() throws Exception {
+	server.shutdown();
+	props.setProperty(
+	    DataStoreServerImplClassName + ".max.txn.timeout", "50");
+	server = getDataStoreServer();
+	tid = server.createTransaction(2000);
+	oid = server.allocateObjects(tid, 1);
+	Thread.sleep(1000);
+	try {
+	    server.getObject(tid, oid, false);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    tid = -1;
+	    System.err.println(e);
+	} catch (TransactionNotActiveException e) {
+	    tid = -1;
+	    System.err.println(e);
+	}
+    }
+
+    /** Test that the standard transaction timeout gets applied. */
+    public void testGetObjectTimeout() throws Exception {
+	server.prepareAndCommit(tid);
+	tid = server.createTransaction(100);
+	server.setBinding(tid, "dummy", oid);
+	Thread.sleep(200);
+	try {
+	    server.getBinding(tid, "dummy");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} finally {
+	    tid = -1;
+	}
+    }
+
+    /** Test illegal argument for bad transaction timeout. */
+    public void testCreateTransactionBadTimeout() {
+	try {
+	    server.createTransaction(-3);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    server.createTransaction(0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -416,9 +477,9 @@ public class TestDataStoreServerImpl extends TestCase {
 	/* Create an object */
 	server.setObject(tid, oid, new byte[0]);
 	server.prepareAndCommit(tid);
-	tid = server.createTransaction();
+	tid = server.createTransaction(1000);
 	/* Get write lock in txn 2 */
-	final long tid2 = server.createTransaction();
+	final long tid2 = server.createTransaction(1000);
 	server.setObject(tid2, oid, new byte[0]);
 	/* Block getting read lock in txn 1 */
 	final Semaphore flag = new Semaphore(0);

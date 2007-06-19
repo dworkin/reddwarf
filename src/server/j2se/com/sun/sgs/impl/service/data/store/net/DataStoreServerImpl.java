@@ -46,6 +46,15 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
+ *	</b></code>
+ *      <i>Default:</i> {@code 600000}
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that a transaction will be permitted to run before it is a candidate
+ *	for being aborted. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
  *	</b></code><br>
  *      <i>Default:</i> {@code 500}
@@ -93,12 +102,12 @@ public class DataStoreServerImpl implements DataStoreServer {
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** The property that specifies the transaction timeout in milliseconds. */
-    private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txn.timeout";
+    /** The property that specifies the maximum transaction timeout. */
+    private static final String MAX_TXN_TIMEOUT_PROPERTY =
+	CLASSNAME + ".max.txn.timeout";
 
-    /** The default transaction timeout in milliseconds. */
-    private static final long DEFAULT_TXN_TIMEOUT = 1000;
+    /** The default maximum transaction timeout in milliseconds. */
+    private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
 
     /**
      * The property that specifies the delay in milliseconds between attempts
@@ -134,8 +143,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
 
-    /** The transaction timeout in milliseconds. */
-    private final long txnTimeout;
+    /** The maximum transaction timeout in milliseconds. */
+    private final long maxTxnTimeout;
 
     /** The object used to export the server. */
     private final Exporter exporter;
@@ -255,9 +264,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	public void checkTimeout() {
 	    long runningTime = System.currentTimeMillis() - getCreationTime();
-	    if (runningTime > getTimeout())
-		throw new TransactionTimeoutException("transaction timed out: "
-						      + runningTime + " ms");
+	    if (runningTime > getTimeout()) {
+		throw new TransactionTimeoutException(
+		    "Transaction timed out: " + runningTime + " ms");
+	    }
 	}
 
 	public void join(TransactionParticipant participant) {
@@ -354,9 +364,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Returns all expired transactions that are not in use, marking their
 	 * states as REAPING.
 	 */
-	Collection<Transaction> getExpired(long txnTimeout) {
+	Collection<Transaction> getExpired() {
+	    long now = System.currentTimeMillis();
 	    Collection<Transaction> result = new ArrayList<Transaction>();
-	    long last = System.currentTimeMillis() - txnTimeout;
 	    Long nextId;
 	    /* Get the first key */
 	    try {
@@ -367,13 +377,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    /* Loop while there is another potentially expired entry */
 	    while (nextId != null) {
 		Txn txn = table.get(nextId);
-		if (txn != null) {
-		    if (txn.getCreationTime() >= last) {
-			break;
-		    }
-		    if (txn.setReaping()) {
-			result.add(txn);
-		    }
+		if (txn != null
+		    && txn.getCreationTime() + txn.getTimeout() < now 
+		    && txn.setReaping())
+		{
+		    result.add(txn);
 		}
 		/* Search for the next entry */
 		Long startingId = Long.valueOf(nextId + 1);
@@ -478,25 +486,40 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	/** Creates a new transaction. */
-	long createTransaction() {
-	    logger.log(Level.FINER, "createTransaction");
+	long createTransaction(long timeout) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "createTransaction timeout:{0,number,#}",
+			   timeout);
+	    }
 	    try {
 		long tid;
 		synchronized (tidLock) {
 		    if (nextTxnId > lastTxnId) {
 			logger.log(
 			    Level.FINE, "Allocate more transaction IDs");
-			nextTxnId = getNextTxnId(TXN_ALLOCATION_BLOCK_SIZE);
+			nextTxnId = getNextTxnId(
+			    TXN_ALLOCATION_BLOCK_SIZE, timeout);
 			lastTxnId = nextTxnId + TXN_ALLOCATION_BLOCK_SIZE - 1;
 		    }
 		    tid = nextTxnId++;
 		}
-		joinNewTransaction(new Txn(tid, txnTimeout));
-		logger.log(Level.FINER,
-			   "createTransaction returns stid:{0,number,#}", tid);
+		joinNewTransaction(new Txn(tid, timeout));
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(
+			Level.FINER,
+			"createTransaction timeout:{0,number,#} returns " +
+			"stid:{1,number,#}",
+			timeout, tid);
+		}
 		return tid;
 	    } catch (RuntimeException e) {
-		logger.logThrow(Level.FINER, e, "createTransaction throws");
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(
+			Level.FINER, e,
+			"createTransaction timeout:{0,number,#} throws",
+			timeout);
+		}
 		throw e;
 	    }
 	}
@@ -653,16 +676,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	store = new CustomDataStoreImpl(properties);
-	txnTimeout = wrappedProps.getLongProperty(
-	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
+	maxTxnTimeout = wrappedProps.getLongProperty(
+	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT,
+	    1, Long.MAX_VALUE);
 	int requestedPort = wrappedProps.getIntProperty(
-	    PORT_PROPERTY, DEFAULT_PORT);
-	if (requestedPort < 0 || requestedPort > 65535) {
-	    throw new IllegalArgumentException(
-		"The " + PORT_PROPERTY + " property value must be " +
-		"greater than or equal to 0 and less than 65535: " +
-		requestedPort);
-	}
+	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
 	exporter = noRmi ? new SocketExporter() : new Exporter();
 	port = exporter.export(this, requestedPort);
 	if (requestedPort == 0) {
@@ -689,8 +707,13 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Implement DataStoreServer -- */
 
     /** {@inheritDoc} */
-    public long allocateObjects(int count) {
-	return store.allocateObjects(count);
+    public long allocateObjects(long tid, int count) {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.allocateObjects(txn, count);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
@@ -806,8 +829,12 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
-    public long createTransaction() {
-	return store.createTransaction();
+    public long createTransaction(long timeout) {
+	if (timeout <= 0) {
+	    throw new IllegalArgumentException(
+		"Timeout must be greater than zero: " + timeout);
+	}
+	return store.createTransaction(Math.min(timeout, maxTxnTimeout));
     }
 
     /** {@inheritDoc} */
@@ -822,7 +849,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public void commit(long tid) {
-	Txn txn = getTxn(tid);
+	Txn txn = getTxn(tid, false);
 	try {
 	    store.commit(txn);
 	} finally {
@@ -842,7 +869,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public void abort(long tid) {
-	Txn txn = getTxn(tid);
+	Txn txn = getTxn(tid, false);
 	try {
 	    store.abort(txn);
 	} finally {
@@ -907,7 +934,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * atomically removes the transaction from the transaction table.
 	 * -tjb@sun.com (02/14/2007)
 	 */
-	Collection<Transaction> expired = txnTable.getExpired(txnTimeout);
+	Collection<Transaction> expired = txnTable.getExpired();
 	for (Transaction txn : expired) {
 	    try {
 		store.abort(txn);
@@ -929,11 +956,25 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * Returns the transaction for the specified ID, throwing
-     * TransactionNotActiveException if the transaction is not active.
+     * TransactionNotActiveException if the transaction is not active, and
+     * checking whether the transaction has timed out.
      */
     private Txn getTxn(long tid) {
+	return getTxn(tid, true);
+    }
+
+    /**
+     * Returns the transaction for the specified ID, throwing
+     * TransactionNotActiveException if the transaction is not active, and
+     * checking, if requested, whether the transaction has timed out.
+     */
+    private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
-	    return txnTable.get(tid);
+	    Txn txn = txnTable.get(tid);
+	    if (checkTimeout) {
+		txn.checkTimeout();
+	    }
+	    return txn;
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
 			    "Getting transaction stid:{0,number,#} failed",

@@ -12,6 +12,7 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -107,7 +108,7 @@ public class TestDataServiceImpl extends TestCase {
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
-	    createTransaction();
+	    createTransaction(10000);
 	    service.configure(componentRegistry, txnProxy);
 	    txn.commit();
 	}
@@ -658,6 +659,27 @@ public class TestDataServiceImpl extends TestCase {
 	result =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	assertEquals(serviceDummy, result);
+    }
+
+    public void testGetBindingTimeout() throws Exception {
+	testGetBindingTimeout(true);
+    }
+    public void testGetServiceBindingTimeout() throws Exception {
+	testGetBindingTimeout(false);
+    }
+    private void testGetBindingTimeout(boolean app) throws Exception {
+	setBinding(app, service, "dummy", dummy);
+	txn.commit();
+	createTransaction(100);
+	Thread.sleep(200);
+	try {
+	    getBinding(app, service, "dummy", Object.class);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
     }
 
     /* -- Test setBinding and setServiceBinding -- */
@@ -1473,7 +1495,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testMarkForUpdateLocking() throws Exception {
 	dummy.setValue("a");
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	assertEquals("a", dummy.value);
 	final Semaphore mainFlag = new Semaphore(0);
@@ -1809,6 +1831,22 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetReferenceTimeout() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction(100);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	Thread.sleep(200);
+	try {
+	    dummy.getNext();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNullType() throws Exception {
@@ -1941,7 +1979,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateLocking() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	dummy.getNext();
 	final Semaphore mainFlag = new Semaphore(0);
@@ -2357,7 +2395,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.setBinding("dummy2", new DummyManagedObject());
 	txn.commit();
 	for (int i = 0; i < 5; i++) {
-	    createTransaction();
+	    createTransaction(1000);
 	    dummy = service.getBinding("dummy", DummyManagedObject.class);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -2368,7 +2406,7 @@ public class TestDataServiceImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			txnProxy.setCurrentTransaction(txn2);
 			componentRegistry.registerAppContext();
 			service.getBinding("dummy2", DummyManagedObject.class);
@@ -2378,10 +2416,12 @@ public class TestDataServiceImpl extends TestCase {
 			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
 		    } catch (TransactionAbortedException e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 		    } catch (Exception e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 			if (txn2 != null) {
 			    txn2.abort(null);
@@ -2398,10 +2438,10 @@ public class TestDataServiceImpl extends TestCase {
 	    try {
 		service.getBinding("dummy2", DummyManagedObject.class)
 		    .setValue(i);
-		System.err.println(i + " txn1: commit");
+		System.err.println(i + " txn1 (" + txn + "): commit");
 		txn.commit();
 	    } catch (TransactionAbortedException e) {
-		System.err.println(i + " txn1: " + e);
+		System.err.println(i + " txn1 (" + txn + "): " + e);
 		exception = e;
 	    }
 	    thread.join();
@@ -2577,6 +2617,13 @@ public class TestDataServiceImpl extends TestCase {
     /** Creates a new transaction. */
     DummyTransaction createTransaction() {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Creates a new transaction with the specified timeout. */
+    DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }

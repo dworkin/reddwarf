@@ -4,6 +4,8 @@
 
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
@@ -28,6 +30,10 @@ public class DummyTransaction implements Transaction {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(DummyTransaction.class.getName()));
 
+    /** The default timeout. */
+    private static long DEFAULT_TIMEOUT =
+	Long.getLong(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, 100);
+
     /** The possible transaction states. */
     public enum State {
 	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
@@ -51,6 +57,9 @@ public class DummyTransaction implements Transaction {
     /** The creation time of this transaction. */
     private final long creationTime = System.currentTimeMillis();
 
+    /** The length of time this transaction is allowed to run. */
+    private final long timeout;
+
     /** The state of this transaction. */
     private State state = State.ACTIVE;
 
@@ -69,9 +78,15 @@ public class DummyTransaction implements Transaction {
 
     /** Creates an instance of this class that always uses prepareAndCommit. */
     public DummyTransaction() {
-	usePrepareAndCommit = true;
-	logger.log(Level.FINER, "create {0}", this);
-        DummyProfileCoordinator.startTask();
+	this(UsePrepareAndCommit.YES, DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Creates an instance of this class that always uses prepareAndCommit and
+     * uses the specified timeout.
+     */
+    public DummyTransaction(long timeout) {
+	this(UsePrepareAndCommit.YES, timeout);
     }
 
     /**
@@ -79,6 +94,16 @@ public class DummyTransaction implements Transaction {
      * the argument.
      */
     public DummyTransaction(UsePrepareAndCommit usePrepareAndCommit) {
+	this(usePrepareAndCommit, DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Creates an instance of this class that uses prepareAndCommit based on
+     * the argument and uses the specified timeout.
+     */
+    public DummyTransaction(UsePrepareAndCommit usePrepareAndCommit,
+			    long timeout)
+    {
 	switch (usePrepareAndCommit) {
 	case YES:
 	    this.usePrepareAndCommit = true;
@@ -92,6 +117,8 @@ public class DummyTransaction implements Transaction {
 	default:
 	    throw new AssertionError();
 	}
+	this.timeout = timeout;
+	logger.log(Level.FINER, "create {0}", this);
         DummyProfileCoordinator.startTask();
     }
 
@@ -106,9 +133,15 @@ public class DummyTransaction implements Transaction {
 
     public long getCreationTime() { return creationTime; }
 
-    public long getTimeout() { return Long.MAX_VALUE; }
+    public long getTimeout() { return timeout; }
 
-    public void checkTimeout() { }
+    public void checkTimeout() {
+	long runningTime = System.currentTimeMillis() - creationTime;
+	if (runningTime > timeout) {
+	    throw new TransactionTimeoutException(
+		"Transaction timed out after " + runningTime + " ms");
+	}
+    }
 
     public synchronized void join(TransactionParticipant participant) {
 	if (logger.isLoggable(Level.FINEST)) {
