@@ -76,7 +76,7 @@ public class TestKernelSimpleApp extends TestCase {
      * Runs a process specified by a ProcessBuilder, checking standard input
      * and standard error to determine if the process succeeded.
      */
-    private static abstract class RunProcess {
+    static abstract class RunProcess {
 	private final ProcessBuilder processBuilder;
 	private final long stop;
 	private boolean done;
