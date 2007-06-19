@@ -849,7 +849,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public void commit(long tid) {
-	Txn txn = getTxn(tid);
+	Txn txn = getTxn(tid, false);
 	try {
 	    store.commit(txn);
 	} finally {
@@ -869,7 +869,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public void abort(long tid) {
-	Txn txn = getTxn(tid);
+	Txn txn = getTxn(tid, false);
 	try {
 	    store.abort(txn);
 	} finally {
@@ -956,11 +956,25 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * Returns the transaction for the specified ID, throwing
-     * TransactionNotActiveException if the transaction is not active.
+     * TransactionNotActiveException if the transaction is not active, and
+     * checking whether the transaction has timed out.
      */
     private Txn getTxn(long tid) {
+	return getTxn(tid, true);
+    }
+
+    /**
+     * Returns the transaction for the specified ID, throwing
+     * TransactionNotActiveException if the transaction is not active, and
+     * checking, if requested, whether the transaction has timed out.
+     */
+    private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
-	    return txnTable.get(tid);
+	    Txn txn = txnTable.get(tid);
+	    if (checkTimeout) {
+		txn.checkTimeout();
+	    }
+	    return txn;
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
 			    "Getting transaction stid:{0,number,#} failed",

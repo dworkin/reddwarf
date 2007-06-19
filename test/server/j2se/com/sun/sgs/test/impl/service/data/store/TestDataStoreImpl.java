@@ -383,20 +383,6 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testGetObjectTimeout() throws Exception {
-	txn.commit();
-	txn = new DummyTransaction(100);
-	store.setObject(txn, id, new byte[] { 0 });
-	Thread.sleep(200);
-	try {
-	    store.getObject(txn, id, false);
-	    fail("Expected TransactionTimeoutException");
-	} catch (TransactionTimeoutException e) {
-	    txn = null;
-	    System.err.println(e);
-	}
-    }
-
     /* -- Unusual states -- */
     private final Action getObject = new Action() {
 	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }

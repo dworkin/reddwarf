@@ -12,6 +12,7 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -658,6 +659,27 @@ public class TestDataServiceImpl extends TestCase {
 	result =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	assertEquals(serviceDummy, result);
+    }
+
+    public void testGetBindingTimeout() throws Exception {
+	testGetBindingTimeout(true);
+    }
+    public void testGetServiceBindingTimeout() throws Exception {
+	testGetBindingTimeout(false);
+    }
+    private void testGetBindingTimeout(boolean app) throws Exception {
+	setBinding(app, service, "dummy", dummy);
+	txn.commit();
+	createTransaction(100);
+	Thread.sleep(200);
+	try {
+	    getBinding(app, service, "dummy", Object.class);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
     }
 
     /* -- Test setBinding and setServiceBinding -- */
@@ -1806,6 +1828,22 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceTimeout() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction(100);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	Thread.sleep(200);
+	try {
+	    dummy.getNext();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
 	}
     }
 

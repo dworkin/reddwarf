@@ -309,6 +309,24 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
+    /** Test that the standard transaction timeout gets applied. */
+    public void testGetObjectTimeout() throws Exception {
+	server.prepareAndCommit(tid);
+	tid = server.createTransaction(100);
+	server.setBinding(tid, "dummy", oid);
+	Thread.sleep(200);
+	try {
+	    server.getBinding(tid, "dummy");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} finally {
+	    tid = -1;
+	}
+    }
+
     /** Test illegal argument for bad transaction timeout. */
     public void testCreateTransactionBadTimeout() {
 	try {

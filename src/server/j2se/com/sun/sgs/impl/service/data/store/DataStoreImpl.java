@@ -1676,8 +1676,6 @@ public class DataStoreImpl
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
-	} else {
-	    txn.checkTimeout();
 	}
         if (op != null) {
             op.report();
