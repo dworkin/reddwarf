@@ -868,6 +868,7 @@
     <java classname="com.sun.sgs.impl.kernel.Kernel"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="com.sun.sgs.impl.io.reuseaddress" value="true" />
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>

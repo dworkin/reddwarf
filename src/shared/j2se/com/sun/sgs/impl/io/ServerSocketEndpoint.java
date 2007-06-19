@@ -1,7 +1,6 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
-
 package com.sun.sgs.impl.io;
 
 import java.net.SocketAddress;
@@ -10,7 +9,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.mina.common.IoAcceptor;
+import org.apache.mina.common.IoServiceConfig;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
+import org.apache.mina.transport.socket.nio.SocketAcceptorConfig;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Acceptor;
@@ -23,6 +24,10 @@ import com.sun.sgs.io.ServerEndpoint;
 public class ServerSocketEndpoint extends AbstractSocketEndpoint
         implements ServerEndpoint<SocketAddress>
 {
+    /** The System property for whether to set the reuse-address property */
+    public static final String REUSE_ADDRESS_PROPERTY = 
+        "com.sun.sgs.impl.io.reuseaddress";
+    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(
@@ -86,11 +91,36 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
      */
     public Acceptor<SocketAddress> createAcceptor() {
         IoAcceptor minaAcceptor;
+        
         if (transportType.equals(TransportType.RELIABLE)) {
-            minaAcceptor =
+            org.apache.mina.transport.socket.nio.SocketAcceptor minaSocketAcceptor = 
                 new org.apache.mina.transport.socket.nio.SocketAcceptor(
                     numProcessors, executor);
-        } else {
+            
+            IoServiceConfig ioConfig = minaSocketAcceptor.getDefaultConfig();
+            
+            /**
+             * Note: I assume that this object will always be of type
+             * "SocketAcceptConfig," but the javadocs do not guarantee this so I
+             * will be cautious and test first before casting it...
+             */
+            if (ioConfig instanceof SocketAcceptorConfig) {
+                SocketAcceptorConfig socketConfig =
+                    (SocketAcceptorConfig)ioConfig;
+                
+                socketConfig.setReuseAddress(Boolean.parseBoolean(
+                        System.getProperty(REUSE_ADDRESS_PROPERTY, "true")));
+            }
+            else {
+                logger.log(Level.WARNING,
+                    "IoServiceConfig object from mina SocketAcceptor object" +
+                    " was not a subclass of SocketAcceptorConfig as expected;" +
+                           " setReuseAddress() was not called.  {0}", ioConfig);
+            }
+	    
+            minaAcceptor = minaSocketAcceptor;
+        }
+        else {
             minaAcceptor = new DatagramAcceptor(executor);
         }
         SocketAcceptor acceptor = new SocketAcceptor(this, minaAcceptor);
