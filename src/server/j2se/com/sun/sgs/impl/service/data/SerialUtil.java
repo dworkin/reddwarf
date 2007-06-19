@@ -472,7 +472,7 @@ final class SerialUtil {
 		Integer.toHexString(object.hashCode());
 	} catch (Exception e) {
 	}
-	return "identityHashCode=0x" +
-	    Integer.toHexString(System.identityHashCode(object));
+	return object.getClass().getName() + "[identityHashCode=0x" +
+	    Integer.toHexString(System.identityHashCode(object)) + "]";
     }
 }

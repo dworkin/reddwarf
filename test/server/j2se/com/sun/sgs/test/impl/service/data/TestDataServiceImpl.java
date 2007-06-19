@@ -2196,22 +2196,22 @@ public class TestDataServiceImpl extends TestCase {
     public void testSerializeReferenceToEnclosingToStringFails()
 	throws Exception
     {
-	MaybeFails.fails = Failures.TOSTRING;
+	FailingMethods.failures = Failures.TOSTRING;
 	try {
 	    serializeReferenceToEnclosingInternal();
 	} finally {
-	    MaybeFails.fails = Failures.NONE;
+	    FailingMethods.failures = Failures.NONE;
 	}
     }
 
     public void testSerializeReferenceToEnclosingHashCodeFails()
 	throws Exception
     {
-	MaybeFails.fails = Failures.TOSTRING_AND_HASHCODE;
+	FailingMethods.failures = Failures.TOSTRING_AND_HASHCODE;
 	try {
 	    serializeReferenceToEnclosingInternal();
 	} finally {
-	    MaybeFails.fails = Failures.NONE;
+	    FailingMethods.failures = Failures.NONE;
 	}
     }
 
@@ -2260,12 +2260,20 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /** Which methods should fail. */
     enum Failures {
 	NONE, TOSTRING, TOSTRING_AND_HASHCODE;
     }
 
-    static class MaybeFails {
-	static Failures fails = Failures.NONE;
+    /**
+     * Defines facilities for creating objects whose toString and hashCode
+     * methods will fail on demand.  The toString methods will fail if the
+     * failures field is set to Failures.TOSTRING.  Both the toString and
+     * hashCode methods will fail if the field is set to
+     * Failures.TOSTRING_AND_HASHCODE.
+     */
+    static class FailingMethods {
+	static Failures failures = Failures.NONE;
 	public String toString() {
 	    return toString(this);
 	}
@@ -2273,7 +2281,7 @@ public class TestDataServiceImpl extends TestCase {
 	    return hashCode(super.hashCode());
 	}
 	static String toString(Object object) {
-	    if (fails != Failures.NONE ) {
+	    if (failures != Failures.NONE) {
 		throw new RuntimeException("toString fails");
 	    }
 	    String className = object.getClass().getName();
@@ -2284,28 +2292,28 @@ public class TestDataServiceImpl extends TestCase {
 	    return className + "[hashCode=" + object.hashCode() + "]";
 	}
 	static int hashCode(int hashCode) {
-	    if (fails == Failures.TOSTRING_AND_HASHCODE) {
+	    if (failures == Failures.TOSTRING_AND_HASHCODE) {
 		throw new RuntimeException("hashCode fails");
 	    }
 	    return hashCode;
 	}
     }
 
-    static class DummyManagedObjectMaybeFails extends DummyManagedObject {
+    static class DummyManagedObjectFailingMethods extends DummyManagedObject {
 	private static final long serialVersionUID = 1;	
 	public String toString() {
-	    return MaybeFails.toString(this);
+	    return FailingMethods.toString(this);
 	}
 	public int hashCode() {
-	    return MaybeFails.hashCode(super.hashCode());
+	    return FailingMethods.hashCode(super.hashCode());
 	}
     }
 
-    static class NonManaged extends MaybeFails implements Serializable {
+    static class NonManaged extends FailingMethods implements Serializable {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal extends MaybeFails
+	    class StaticLocal extends FailingMethods
 		implements ManagedObject, Serializable
 	    {
 		private static final long serialVersionUID = 1;
@@ -2313,10 +2321,10 @@ public class TestDataServiceImpl extends TestCase {
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObjectMaybeFails() {
+	    new DummyManagedObjectFailingMethods() {
 	        private static final long serialVersionUID = 1L;
 	    };
-	static class Member extends MaybeFails
+	static class Member extends FailingMethods
 	    implements ManagedObject, Serializable
 	{
 	    private static final long serialVersionUID = 1;
@@ -2324,19 +2332,21 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner extends MaybeFails implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
 	}
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObjectMaybeFails() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local extends MaybeFails
+	    class Local extends FailingMethods
 		implements ManagedObject, Serializable
 	    {
 		private static final long serialVersionUID = 1;
@@ -2345,13 +2355,13 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static class Managed extends MaybeFails
+    static class Managed extends FailingMethods
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal extends MaybeFails
+	    class StaticLocal extends FailingMethods
 		implements ManagedObject, Serializable
 	    {
 		private static final long serialVersionUID = 1;
@@ -2359,10 +2369,10 @@ public class TestDataServiceImpl extends TestCase {
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObjectMaybeFails() {
+	    new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
-	static class Member extends MaybeFails
+	static class Member extends FailingMethods
 	    implements ManagedObject, Serializable
 	{
 	    private static final long serialVersionUID = 1;
@@ -2370,19 +2380,21 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner extends MaybeFails implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
         }
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObjectMaybeFails() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local extends MaybeFails
+	    class Local extends FailingMethods
 		implements ManagedObject, Serializable
 	    {
 		private static final long serialVersionUID = 1;
