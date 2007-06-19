@@ -63,10 +63,10 @@ class DataStoreClientRemote implements DataStoreServer {
 
     /* -- Implement DataStoreServer -- */
 
-    public long allocateObjects(int count) throws IOException {
+    public long allocateObjects(long tid, int count) throws IOException {
 	DataStoreProtocol h = getHandler();
 	try {
-	    return h.allocateObjects(count);
+	    return h.allocateObjects(tid, count);
 	} finally {
 	    returnHandler(h);
 	}
@@ -177,10 +177,10 @@ class DataStoreClientRemote implements DataStoreServer {
 	}
     }
 
-    public long createTransaction() throws IOException {
+    public long createTransaction(long timeout) throws IOException {
 	DataStoreProtocol h = getHandler();
 	try {
-	    return h.createTransaction();
+	    return h.createTransaction(timeout);
 	} finally {
 	    returnHandler(h);
 	}

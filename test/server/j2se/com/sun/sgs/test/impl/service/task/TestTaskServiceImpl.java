@@ -100,7 +100,7 @@ public class TestTaskServiceImpl extends TestCase {
         // configure the main service instances that will be used throughout
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
-        txn = createTransaction();
+        txn = createTransaction(10000);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
@@ -778,6 +778,12 @@ public class TestTaskServiceImpl extends TestCase {
 
     private DummyTransaction createTransaction() {
         DummyTransaction txn = new DummyTransaction();
+        txnProxy.setCurrentTransaction(txn);
+        return txn;
+    }
+
+    private DummyTransaction createTransaction(long timeout) {
+        DummyTransaction txn = new DummyTransaction(timeout);
         txnProxy.setCurrentTransaction(txn);
         return txn;
     }

@@ -57,6 +57,31 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	}
     }
 
+    public void testConstructorIllegalPropertyValues() {
+	Properties[] allProperties = {
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "foo"),
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0"),
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "-33"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "foo"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "0"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "-200")
+	};
+	for (Properties props : allProperties) {
+	    try {
+		new TransactionCoordinatorImpl(props, null);
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(props + ": " + e);
+	    }
+	}
+    }
+
     /* -- Test TransactionHandle.commit -- */
 
     public void testCommitActive() throws Exception {
@@ -1324,5 +1349,17 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     private static boolean retryable(Throwable t) {
 	return t instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
     }
 }

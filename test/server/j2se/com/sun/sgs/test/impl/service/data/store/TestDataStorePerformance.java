@@ -128,7 +128,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -138,7 +138,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], false);
 		}
@@ -171,7 +171,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -181,7 +181,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    byte[] result = store.getObject(txn, ids[i], update);
@@ -203,7 +203,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -211,7 +211,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getBinding(txn, "name" + i);
 		}
@@ -228,7 +228,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -236,7 +236,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    long result = store.getBinding(txn, "name" + i);
