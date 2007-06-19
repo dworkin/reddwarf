@@ -152,7 +152,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
 	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
 
-	createTransaction();
+	createTransaction(10000);
 
 	// configure data service
         txnProxy.setComponent(DataService.class, dataService);
@@ -186,7 +186,7 @@ public class TestChannelServiceImpl extends TestCase {
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
     }
 
     /** Sets passed if the test passes. */
@@ -1345,6 +1345,15 @@ public class TestChannelServiceImpl extends TestCase {
 	return txn;
     }
     
+    /**
+     * Creates a new transaction with the specified timeout, and sets
+     * transaction proxy's current transaction.
+     */
+    private DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(timeout);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
     
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {

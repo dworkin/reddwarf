@@ -181,7 +181,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    DummyProfileCoordinator.startProfiling(
 		((ProfileProducer) service));
 	}
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(10000);
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.registerAppContext();
@@ -189,13 +189,13 @@ public class TestDataServiceConcurrency extends TestCase {
 	int perThread = objects + objectsBuffer;
 	/* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
-	    txn = new DummyTransaction();
+	    txn = new DummyTransaction(10000);
 	    txnProxy.setCurrentTransaction(txn);
 	    int start = t * perThread;
 	    for (int i = 0; i < perThread; i++) {
 		if (i > 0 && i % 100 == 0) {
 		    txn.commit();
-		    txn = new DummyTransaction();
+		    txn = new DummyTransaction(10000);
 		    txnProxy.setCurrentTransaction(txn);
 		}
 		service.setBinding(

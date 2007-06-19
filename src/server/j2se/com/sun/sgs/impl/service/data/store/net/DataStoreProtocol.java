@@ -118,8 +118,9 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Implement methods for the client and server sides -- */
 
-    public long allocateObjects(int count) throws IOException {
+    public long allocateObjects(long tid, int count) throws IOException {
 	out.writeShort(ALLOCATE_OBJECTS);
+	out.writeLong(tid);
 	out.writeInt(count);
 	checkResult();
 	return in.readLong();
@@ -129,8 +130,9 @@ class DataStoreProtocol implements DataStoreServer {
 	throws IOException
     {
 	try {
+	    long tid = in.readLong();
 	    int count = in.readInt();
-	    long result = server.allocateObjects(count);
+	    long result = server.allocateObjects(tid, count);
 	    out.writeBoolean(true);
 	    out.writeLong(result);
 	    out.flush();
@@ -393,8 +395,9 @@ class DataStoreProtocol implements DataStoreServer {
 	}
     }
 
-    public long createTransaction() throws IOException {
+    public long createTransaction(long timeout) throws IOException {
 	out.writeShort(CREATE_TRANSACTION);
+	out.writeLong(timeout);
 	checkResult();
 	return in.readLong();
     }
@@ -403,7 +406,8 @@ class DataStoreProtocol implements DataStoreServer {
 	throws IOException
     {
 	try {
-	    long tid = server.createTransaction();
+	    long timeout = in.readLong();
+	    long tid = server.createTransaction(timeout);
 	    out.writeBoolean(true);
 	    out.writeLong(tid);
 	    out.flush();

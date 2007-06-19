@@ -78,9 +78,7 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl constructor} supports the <a
- * href="../../../../app/doc-files/config-properties.html#com.sun.sgs.txn.timeout">
- * <code>com.sun.sgs.txn.timeout</code></a> property, these public <a
+ * The {@link #DataStoreImpl constructor} supports these public <a
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>, and the following additional properties: <p>
  *
@@ -122,13 +120,6 @@ import java.util.logging.Logger;
 public class DataStoreImpl
     implements DataStore, TransactionParticipant, ProfileProducer
 {
-    /** The property that specifies the transaction timeout in milliseconds. */
-    private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txn.timeout";
-
-    /** The default transaction timeout in milliseconds. */
-    private static final long DEFAULT_TXN_TIMEOUT = 1000;
-
     /** The name of this class. */
     private static final String CLASSNAME = DataStoreImpl.class.getName();
 
@@ -222,9 +213,6 @@ public class DataStoreImpl
      * checkpoint.
      */
     private final long checkpointSize;
-
-    /** The transaction timeout in milliseconds. */
-    private final long txnTimeout;
 
     /** Stores information about transactions. */
     private final TxnInfoTable<TxnInfo> txnInfoTable;
@@ -439,7 +427,7 @@ public class DataStoreImpl
 
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
-	    bdbTxn = env.beginTransaction(null, null);
+	    bdbTxn = createBdbTxn(env, txn.getTimeout());
 	}
 
 	/** Prepares the transaction, first closing the cursor, if present. */
@@ -666,13 +654,8 @@ public class DataStoreImpl
 	 */
 	directory = new File(specifiedDirectory).getAbsolutePath();
 	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
-	if (allocationBlockSize < 1) {
-	    throw new IllegalArgumentException(
-		"The allocation block size must be greater than zero");
-	}
-	txnTimeout = wrappedProps.getLongProperty(
-	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
+	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
+	    1, Integer.MAX_VALUE);
 	checkpointInterval = wrappedProps.getLongProperty(
 	    CHECKPOINT_INTERVAL_PROPERTY, DEFAULT_CHECKPOINT_INTERVAL);
 	checkpointSize = wrappedProps.getLongProperty(
@@ -682,7 +665,7 @@ public class DataStoreImpl
 	boolean done = false;
 	try {
 	    env = getEnvironment(properties);
-	    bdbTxn = env.beginTransaction(null, null);
+	    bdbTxn = createBdbTxn(env, Long.MAX_VALUE);
 	    Databases dbs = getDatabases(bdbTxn);
 	    infoDb = dbs.info;
 	    classesDb = dbs.classes;
@@ -718,11 +701,8 @@ public class DataStoreImpl
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long cacheSize = wrappedProps.getLongProperty(
-	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE);
-	if (cacheSize < MIN_CACHE_SIZE) {
-	    throw new IllegalArgumentException(
-		"The cache size must not be less than " + MIN_CACHE_SIZE);
-	}
+	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
+	    Long.MAX_VALUE);
 	boolean removeLogs = wrappedProps.getBooleanProperty(
 	    REMOVE_LOGS_PROPERTY, false);
         EnvironmentConfig config = new EnvironmentConfig();
@@ -733,12 +713,10 @@ public class DataStoreImpl
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
         config.setLockDetectMode(LockDetectMode.YOUNGEST);
-	config.setLockTimeout(1000 * txnTimeout);
 	config.setLogAutoRemove(removeLogs);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
         config.setTransactional(true);
-	config.setTxnTimeout(1000 * txnTimeout);
 	config.setTxnWriteNoSync(!flushToDisk);
 	try {
 	    return new Environment(new File(directory), config);
@@ -823,7 +801,8 @@ public class DataStoreImpl
 		if (nextObjectId > lastObjectId) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
 		    long newNextObjectId = getNextId(
-			DataStoreHeader.NEXT_OBJ_ID_KEY, allocationBlockSize);
+			DataStoreHeader.NEXT_OBJ_ID_KEY, allocationBlockSize,
+			txn.getTimeout());
 		    nextObjectId = newNextObjectId;
 		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
@@ -1284,7 +1263,7 @@ public class DataStoreImpl
 	     * improve concurrency.  -tjb@sun.com (05/23/2007)
 	     */
 	    com.sleepycat.db.Transaction bdbTxn =
-		env.beginTransaction(null, null);
+		createBdbTxn(env, txn.getTimeout());
 	    try {
 		if (get(classesDb, bdbTxn, hashKey, hashValue, operation)) {
 		    result = IntegerBinding.entryToInt(hashValue);
@@ -1351,7 +1330,7 @@ public class DataStoreImpl
 	    boolean found;
 	    boolean done = false;
 	    com.sleepycat.db.Transaction bdbTxn =
-		env.beginTransaction(null, null);
+		createBdbTxn(env, txn.getTimeout());
 	    try {
 		found = get(classesDb, bdbTxn, key, value, operation);
 		done = true;
@@ -1395,7 +1374,7 @@ public class DataStoreImpl
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    checkTxnTimeout(txn);
+	    txn.checkTimeout();
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1483,7 +1462,7 @@ public class DataStoreImpl
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    checkTxnTimeout(txn);
+	    txn.checkTimeout();
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1526,11 +1505,6 @@ public class DataStoreImpl
 	    }
 	    try {
 		txnInfo.abort();
-		/*
-		 * Check the timeout after performing the abort to insure that
-		 * the Berkeley DB transaction gets aborted now.
-		 */
-		checkTxnTimeout(txn);
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
 		return;
 	    } finally {
@@ -1589,20 +1563,25 @@ public class DataStoreImpl
      * Returns the next available object ID, and reserves the specified number
      * of IDs.
      *
+     * @param	txn the transaction
      * @param	count the number of IDs to reserve
      * @return	the next available object ID
      */
-    public long allocateObjects(int count) {
-	logger.log(Level.FINE, "allocateObjects count:{0,number,#}", count);
+    public long allocateObjects(Transaction txn, int count) {
+	if (logger.isLoggable(Level.FINE)) {
+	    logger.log(Level.FINE,
+		       "allocateObjects txn:{0}, count:{1,number,#}",
+		       txn, count);
+	}
 	Exception exception;
 	try {
 	    long result = getNextId(
-		DataStoreHeader.NEXT_OBJ_ID_KEY, count);
+		DataStoreHeader.NEXT_OBJ_ID_KEY, count, txn.getTimeout());
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE,
-			   "allocateObjects count:{0,number,#} " +
-			   "returns oid:{1,number,#}",
-			   count, result);
+			   "allocateObjects txn:{0}, count:{1,number,#} " +
+			   "returns oid:{2,number,#}",
+			   txn, count, result);
 	    }
 	    return result;
 	} catch (DatabaseException e) {
@@ -1611,7 +1590,8 @@ public class DataStoreImpl
 	    exception = e;
 	}
 	throw convertException(
-	    null, Level.FINE, exception, "allocateObjects count:" + count);
+	    txn, Level.FINE, exception,
+	    "allocateObjects txn:" + txn + ", count:" + count);
     }
 
     /* -- Protected methods -- */
@@ -1634,12 +1614,13 @@ public class DataStoreImpl
      * number of IDs.
      *
      * @param	count the number of IDs to reserve
+     * @param	timeout the transaction timeout in milliseconds
      * @return	the next available transaction ID
      */
-    protected long getNextTxnId(int count) {
+    protected long getNextTxnId(int count, long timeout) {
 	Exception exception;
 	try {
-	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count);
+	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count, timeout);
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
@@ -1691,12 +1672,10 @@ public class DataStoreImpl
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    return joinTransaction(txn);
+	    txnInfo = joinTransaction(txn);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
-	} else {
-	    checkTxnTimeout(txn);
 	}
         if (op != null) {
             op.report();
@@ -1806,14 +1785,7 @@ public class DataStoreImpl
 	 * aborted, then make sure to abort the transaction now.
 	 */
 	if (re instanceof TransactionAbortedException && txn != null) {
-	    try {
-		txn.abort(re);
-	    } catch (TransactionAbortedException e2) {
-		/*
-		 * Discard this exception and return the original one, for
-		 * better error reporting.
-		 */
-	    }
+	    txn.abort(re);
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
 	return re;
@@ -1841,11 +1813,14 @@ public class DataStoreImpl
 
     /**
      * Returns the next available ID stored under the specified key, and
-     * increments the stored value by the specified amount.
+     * increments the stored value by the specified amount.  Uses the specified
+     * timeout when creating a BDB transaction.
      */
-    private long getNextId(long key, int blockSize) throws DatabaseException {
+    private long getNextId(long key, int blockSize, long timeout)
+	throws DatabaseException
+    {
 	assert blockSize > 0;
-	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
+	com.sleepycat.db.Transaction bdbTxn = createBdbTxn(env, timeout);
 	boolean done = false;
 	try {
 	    long id = DataStoreHeader.getNextId(
@@ -1857,17 +1832,6 @@ public class DataStoreImpl
 	    if (!done) {
 		bdbTxn.abort();
 	    }
-	}
-    }
-
-    /**
-     * Throws a TransactionTimeoutException if the transaction has timed out.
-     */
-    private void checkTxnTimeout(Transaction txn) {
-	long duration = System.currentTimeMillis() - txn.getCreationTime();
-	if (duration > txnTimeout) {
-	    throw new TransactionTimeoutException(
-		"Transaction timed out after " + duration + " ms");
 	}
     }
 
@@ -1951,4 +1915,24 @@ public class DataStoreImpl
 	    throw new DataStoreException(operation + " failed: " + status);
 	}
     }	
+
+    /**
+     * Creates a Berkeley DB transaction with the specified timeout, measured
+     * in milliseconds.
+     */
+    private static com.sleepycat.db.Transaction createBdbTxn(
+	Environment env, long timeout)
+	throws DatabaseException
+    {
+	assert timeout > 0;
+	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
+	long timeoutMicros = 1000 * timeout;
+	if (timeoutMicros < 0) {
+	    /* Berkeley DB treats a zero timeout as unlimited */
+	    timeoutMicros = 0;
+	}
+	bdbTxn.setLockTimeout(timeoutMicros);
+	bdbTxn.setTxnTimeout(timeoutMicros);
+	return bdbTxn;
+    }
 }

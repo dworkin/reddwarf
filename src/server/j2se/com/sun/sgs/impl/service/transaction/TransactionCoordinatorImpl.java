@@ -93,6 +93,8 @@ public final class TransactionCoordinatorImpl
      * @param	collector the <code>ProfileCollector</code> used to report
      *       	participant detail or <code>null</code> if profiling is
      *       	disabled
+     * @throws	IllegalArgumentException if the bounded or
+     *		unbounded timeout properties are less than {@code 1}
      */
     public TransactionCoordinatorImpl(Properties properties,
 				      ProfileCollector collector) {
@@ -104,11 +106,12 @@ public final class TransactionCoordinatorImpl
 	PropertiesWrapper props = new PropertiesWrapper(properties);
 	this.boundedTimeout =
 	    props.getLongProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
-				  BOUNDED_TIMEOUT_DEFAULT);
+				  BOUNDED_TIMEOUT_DEFAULT, 1, Long.MAX_VALUE);
 	this.unboundedTimeout =
 	    props.getLongProperty(TransactionCoordinator.
 				  TXN_UNBOUNDED_TIMEOUT_PROPERTY,
-				  UNBOUNDED_TIMEOUT_DEFAULT);
+				  UNBOUNDED_TIMEOUT_DEFAULT, 1,
+				  Long.MAX_VALUE);
     }
 
     /** {@inheritDoc} */
