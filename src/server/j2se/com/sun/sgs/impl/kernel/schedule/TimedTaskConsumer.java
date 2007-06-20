@@ -8,9 +8,6 @@ package com.sun.sgs.impl.kernel.schedule;
 /**
  * Simple interface used by classes that want to consume delayed tasks managed
  * by a <code>TimedTaskHandler</code>
- *
- * @since 1.0
- * @author Seth Proctor
  */
 interface TimedTaskConsumer {
 

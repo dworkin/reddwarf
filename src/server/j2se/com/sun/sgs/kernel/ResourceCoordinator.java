@@ -12,9 +12,6 @@ import com.sun.sgs.app.TaskRejectedException;
  * thread or a select loop) that need their own thread of control. Unlike
  * tasks submitted to <code>TaskScheduler</code>, no attempt is made to
  * re-try long-running tasks.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface ResourceCoordinator
 {

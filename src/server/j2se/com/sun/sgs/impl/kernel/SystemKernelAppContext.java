@@ -21,9 +21,6 @@ import java.util.logging.Logger;
 /**
  * This class represents the context of the system. It contains no managers
  * nor services, since neither are available in the system context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 final class SystemKernelAppContext extends AbstractKernelAppContext
 {
