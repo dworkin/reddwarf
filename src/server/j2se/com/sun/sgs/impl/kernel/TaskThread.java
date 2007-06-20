@@ -21,9 +21,6 @@ import com.sun.sgs.kernel.TaskOwner;
  * thread, which starts as the owner of the initial task, but will be
  * re-set with each task run out of the scheduler. See
  * <code>TaskHandler</code> for details on this process.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 abstract class TaskThread extends Thread {
 

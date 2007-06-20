@@ -12,9 +12,6 @@ import java.io.Serializable;
 /**
  * This is a basic implementation of <code>Identity</code> that maps a name
  * to the identity.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class IdentityImpl implements Identity, Serializable
 {

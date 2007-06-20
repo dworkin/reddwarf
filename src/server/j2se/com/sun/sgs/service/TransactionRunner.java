@@ -14,9 +14,6 @@ import com.sun.sgs.kernel.KernelRunnable;
  * task in a transactional context. This class handles creating the
  * transaction state, running a task, and committing the transaction
  * once the task has finished.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class TransactionRunner implements KernelRunnable {
 

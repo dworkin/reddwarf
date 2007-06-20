@@ -23,9 +23,6 @@ import javax.security.auth.login.LoginException;
  * their <code>IdentityManager</code> until <code>configure</code> is
  * called, because before this point the underlying context is not
  * valid and available to the <code>IdentityManager</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface IdentityManager
 {
