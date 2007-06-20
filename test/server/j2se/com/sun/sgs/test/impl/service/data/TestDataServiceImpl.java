@@ -12,11 +12,14 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -61,7 +64,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+	MinimalTestKernel.getTransactionProxy();
 
     /** An instance of the data service, to test. */
     static DataServiceImpl service;
@@ -97,13 +100,17 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = getProperties();
 	if (service == null) {
-	    service = createDataServiceImpl();
-	    createTransaction();
+	    service = getDataServiceImpl();
+	    createTransaction(10000);
 	    service.configure(componentRegistry, txnProxy);
 	    txn.commit();
-	    componentRegistry.setComponent(DataManager.class, service);
 	}
 	componentRegistry.registerAppContext();
 	createTransaction();
@@ -295,7 +302,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	service.shutdown();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -314,7 +321,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
 	txn = null;
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
@@ -336,7 +343,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConfigureAborted() throws Exception {
 	txn.commit();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.abort(null);
@@ -652,6 +659,27 @@ public class TestDataServiceImpl extends TestCase {
 	result =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	assertEquals(serviceDummy, result);
+    }
+
+    public void testGetBindingTimeout() throws Exception {
+	testGetBindingTimeout(true);
+    }
+    public void testGetServiceBindingTimeout() throws Exception {
+	testGetBindingTimeout(false);
+    }
+    private void testGetBindingTimeout(boolean app) throws Exception {
+	setBinding(app, service, "dummy", dummy);
+	txn.commit();
+	createTransaction(100);
+	Thread.sleep(200);
+	try {
+	    getBinding(app, service, "dummy", Object.class);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
     }
 
     /* -- Test setBinding and setServiceBinding -- */
@@ -1467,7 +1495,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testMarkForUpdateLocking() throws Exception {
 	dummy.setValue("a");
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	assertEquals("a", dummy.value);
 	final Semaphore mainFlag = new Semaphore(0);
@@ -1762,18 +1790,7 @@ public class TestDataServiceImpl extends TestCase {
     }
     /* Can't get a reference as the first operation in a new transaction */
     public void testGetReferenceShutdown() throws Exception {
-	/* Expect TransactionNotActiveException */
-	getReference.setUp();
-	txn.abort(null);
-	service.shutdown();
-	try {
-	    getReference.run();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	txn = null;
-	service = null;
+	testShutdown(getReference);
     }
 
     public void testGetReferenceDeserializationFails() throws Exception {
@@ -1811,6 +1828,22 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceTimeout() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction(100);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	Thread.sleep(200);
+	try {
+	    dummy.getNext();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
 	}
     }
 
@@ -1902,18 +1935,7 @@ public class TestDataServiceImpl extends TestCase {
     }
     /* Can't get a reference as the first operation in a new transaction */
     public void testGetReferenceUpdateShutdown() throws Exception {
-	/* Expect TransactionNotActiveException */
-	getReferenceUpdate.setUp();
-	txn.abort(null);
-	service.shutdown();
-	try {
-	    getReferenceUpdate.run();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	txn = null;
-	service = null;
+	testShutdown(getReferenceUpdate);
     }
 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
@@ -1957,7 +1979,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateLocking() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	dummy.getNext();
 	final Semaphore mainFlag = new Semaphore(0);
@@ -2091,7 +2113,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testShutdownRestart() throws Exception {
 	txn.commit();
 	service.shutdown();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -2168,6 +2190,32 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testSerializeReferenceToEnclosing() throws Exception {
+	serializeReferenceToEnclosingInternal();
+    }
+
+    public void testSerializeReferenceToEnclosingToStringFails()
+	throws Exception
+    {
+	FailingMethods.failures = Failures.TOSTRING;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    FailingMethods.failures = Failures.NONE;
+	}
+    }
+
+    public void testSerializeReferenceToEnclosingHashCodeFails()
+	throws Exception
+    {
+	FailingMethods.failures = Failures.TOSTRING_AND_HASHCODE;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    FailingMethods.failures = Failures.NONE;
+	}
+    }
+
+    private void serializeReferenceToEnclosingInternal() throws Exception {
 	service.setBinding("a", NonManaged.staticLocal);
 	service.setBinding("b", NonManaged.staticAnonymous);
 	service.setBinding("c", new NonManaged().createMember());
@@ -2212,76 +2260,143 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static class NonManaged implements Serializable {
+    /** Which methods should fail. */
+    enum Failures {
+	NONE, TOSTRING, TOSTRING_AND_HASHCODE;
+    }
+
+    /**
+     * Defines facilities for creating objects whose toString and hashCode
+     * methods will fail on demand.  The toString methods will fail if the
+     * failures field is set to Failures.TOSTRING.  Both the toString and
+     * hashCode methods will fail if the field is set to
+     * Failures.TOSTRING_AND_HASHCODE.
+     */
+    static class FailingMethods {
+	static Failures failures = Failures.NONE;
+	public String toString() {
+	    return toString(this);
+	}
+	public int hashCode() {
+	    return hashCode(super.hashCode());
+	}
+	static String toString(Object object) {
+	    if (failures != Failures.NONE) {
+		throw new RuntimeException("toString fails");
+	    }
+	    String className = object.getClass().getName();
+	    int dot = className.lastIndexOf('.');
+	    if (dot > 0) {
+		className = className.substring(dot + 1);
+	    }
+	    return className + "[hashCode=" + object.hashCode() + "]";
+	}
+	static int hashCode(int hashCode) {
+	    if (failures == Failures.TOSTRING_AND_HASHCODE) {
+		throw new RuntimeException("hashCode fails");
+	    }
+	    return hashCode;
+	}
+    }
+
+    static class DummyManagedObjectFailingMethods extends DummyManagedObject {
+	private static final long serialVersionUID = 1;	
+	public String toString() {
+	    return FailingMethods.toString(this);
+	}
+	public int hashCode() {
+	    return FailingMethods.hashCode(super.hashCode());
+	}
+    }
+
+    static class NonManaged extends FailingMethods implements Serializable {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectFailingMethods() {
 	        private static final long serialVersionUID = 1L;
 	    };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
 	}
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
 	}
     }
 
-    static class Managed implements ManagedObject, Serializable {
+    static class Managed extends FailingMethods
+	implements ManagedObject, Serializable
+    {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
         }
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
@@ -2292,7 +2407,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.setBinding("dummy2", new DummyManagedObject());
 	txn.commit();
 	for (int i = 0; i < 5; i++) {
-	    createTransaction();
+	    createTransaction(1000);
 	    dummy = service.getBinding("dummy", DummyManagedObject.class);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -2303,7 +2418,7 @@ public class TestDataServiceImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			txnProxy.setCurrentTransaction(txn2);
 			componentRegistry.registerAppContext();
 			service.getBinding("dummy2", DummyManagedObject.class);
@@ -2313,10 +2428,12 @@ public class TestDataServiceImpl extends TestCase {
 			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
 		    } catch (TransactionAbortedException e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 		    } catch (Exception e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 			if (txn2 != null) {
 			    txn2.abort(null);
@@ -2333,10 +2450,10 @@ public class TestDataServiceImpl extends TestCase {
 	    try {
 		service.getBinding("dummy2", DummyManagedObject.class)
 		    .setValue(i);
-		System.err.println(i + " txn1: commit");
+		System.err.println(i + " txn1 (" + txn + "): commit");
 		txn.commit();
 	    } catch (TransactionAbortedException e) {
-		System.err.println(i + " txn1: " + e);
+		System.err.println(i + " txn1 (" + txn + "): " + e);
 		exception = e;
 	    }
 	    thread.join();
@@ -2487,6 +2604,20 @@ public class TestDataServiceImpl extends TestCase {
 	return new DataServiceImpl(props, componentRegistry);
     }
 
+    /**
+     * Returns a DataServiceImpl that has been registered with the component
+     * registry, but not configured.
+     */
+    private DataServiceImpl getDataServiceImpl() throws Exception {
+	DataServiceImpl service = createDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.setComponent(DataService.class, service);
+	componentRegistry.setComponent(DataServiceImpl.class, service);
+	txnProxy.setComponent(DataService.class, service);
+	txnProxy.setComponent(DataServiceImpl.class, service);
+	return service;
+    }
+
     /** Returns the default properties to use for creating data services. */
     protected Properties getProperties() throws Exception {
 	return createProperties(
@@ -2498,6 +2629,13 @@ public class TestDataServiceImpl extends TestCase {
     /** Creates a new transaction. */
     DummyTransaction createTransaction() {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Creates a new transaction with the specified timeout. */
+    DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
@@ -2586,7 +2724,7 @@ public class TestDataServiceImpl extends TestCase {
 	action.setUp();
 	txn.commit();
 	createTransaction();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    action.run();
 	    fail("Expected IllegalStateException");
@@ -2712,21 +2850,32 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Tests running the action with a new transaction while shutting down. */
-    private void testShuttingDownNewTxn(Action action) throws Exception {
+    private void testShuttingDownNewTxn(final Action action) throws Exception {
+	txn.commit();
+	createTransaction();
+	service.createReference(new DummyManagedObject());
 	action.setUp();
-	DummyTransaction originalTxn = txn;
 	ShutdownAction shutdownAction = new ShutdownAction();
 	shutdownAction.assertBlocked();
-	createTransaction();
-	try {
-	    action.run();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+	ThreadAction threadAction = new ThreadAction<Void>() {
+	    protected Void action() {
+		DummyTransaction txn = new DummyTransaction(
+		    UsePrepareAndCommit.ARBITRARY);
+		txnProxy.setCurrentTransaction(txn);
+		try {
+		    action.run();
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    assertEquals("Service is shutting down", e.getMessage());
+		} finally {
+		    txn.abort(null);
+		}
+		return null;
+	    }
+	};
+	threadAction.assertDone();
 	txn.abort(null);
 	txn = null;
-	originalTxn.abort(null);
 	shutdownAction.assertResult(true);
 	service = null;
     }
@@ -2746,21 +2895,52 @@ public class TestDataServiceImpl extends TestCase {
 	service = null;
     }
 
-    /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends Thread {
-	private boolean done;
-	private Throwable exception;
-	private boolean result;
+    /**
+     * A utility class for running an operation in a separate thread and
+     * insuring that it either completes or blocks.
+     *
+     * @param	<T> the return type of the operation
+     */
+    abstract static class ThreadAction<T> extends Thread {
 
-	/** Creates an instance of this class and starts the thread. */
-	ShutdownAction() {
+	/**
+	 * The number of milliseconds to wait to see if an operation is
+	 * blocked.
+	 */
+	private static final long BLOCKED = 5;
+
+	/**
+	 * The number of milliseconds to wait to see if an operation will
+	 * complete.
+	 */
+	private static final long COMPLETED = 2000;
+
+	/** Set to true when the operation is complete. */
+	private boolean done = false;
+
+	/**
+	 * Set when the operation is complete to the exception thrown by the
+	 * operation or null if no exception was thrown.
+	 */
+	private Throwable exception;
+
+	/**
+	 * Set to the result of the operation when the operation is complete.
+	 */
+	private T result;
+
+	/**
+	 * Creates an instance of this class and starts the operation in a
+	 * separate thread.
+	 */
+	ThreadAction() {
 	    start();
 	}
 
-	/** Performs the shutdown and collects the results. */
+	/** Performs the operation and collects the results. */
 	public void run() {
 	    try {
-		result = service.shutdown();
+		result = action();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2770,20 +2950,37 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	}
 
-	/** Asserts that the shutdown call is blocked. */
+	/**
+	 * The operation to be performed.
+	 *
+	 * @return	the result of the operation
+	 * @throws	Exception if the operation fails
+	 */
+	abstract T action() throws Exception;
+
+	/**
+	 * Asserts that the operation is blocked.
+	 *
+	 * @throws	InterruptedException if the operation is interrupted
+	 */
 	synchronized void assertBlocked() throws InterruptedException {
-	    Thread.sleep(5);
+	    Thread.sleep(BLOCKED);
 	    assertEquals("Expected no exception", null, exception);
-	    assertFalse("Expected shutdown to be blocked", done);
+	    assertFalse("Expected operation to be blocked", done);
 	}
 	
-	/** Waits a while for the shutdown call to complete. */
+	/**
+	 * Waits for the operation to complete.
+	 *
+	 * @return	whether the operation completed
+	 * @throws	Exception if the operation failed
+	 */
 	synchronized boolean waitForDone() throws Exception {
 	    waitForDoneInternal();
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
@@ -2792,23 +2989,40 @@ public class TestDataServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
+	 * Asserts that the operation completed with the specified result.
+	 *
+	 * @param	expectedResult the expected result
+	 * @throws	Exception if the operation failed
 	 */
-	synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
+	synchronized void assertResult(Object expectedResult)
+	    throws Exception
 	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
+	    assertDone();
 	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
-	/** Wait until done, but give up after a while. */
+	/**
+	 * Asserts that the operation completed.
+	 *
+	 * @throws	Exception if the operation failed
+	 */
+	synchronized void assertDone() throws Exception {
+	    waitForDoneInternal();
+	    assertTrue("Expected operation to be done", done);
+	    if (exception != null) {
+		if (exception instanceof Exception) {
+		    throw (Exception) exception;
+		} else {
+		    throw (Error) exception;
+		}
+	    }
+	}
+
+	/** Wait for the operation to complete. */
 	private synchronized void waitForDoneInternal()
 	    throws InterruptedException
 	{
-	    long wait = 2000;
+	    long wait = COMPLETED;
 	    long start = System.currentTimeMillis();
 	    while (!done && wait > 0) {
 		wait(wait);
@@ -2816,6 +3030,14 @@ public class TestDataServiceImpl extends TestCase {
 		wait -= (now - start);
 		start = now;
 	    }
+	}
+    }
+
+    /** Use this thread to control a call to shutdown that may block. */
+    class ShutdownAction extends ThreadAction<Boolean> {
+	ShutdownAction() { }
+	protected Boolean action() throws Exception {
+	    return service.shutdown();
 	}
     }
 

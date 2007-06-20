@@ -1,0 +1,556 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--NewPage-->
+<HTML>
+<HEAD>
+<TITLE>
+SimpleSgsProtocol (Sun Game Server)
+</TITLE>
+
+<META NAME="keywords" CONTENT="com.sun.sgs.protocol.simple.SimpleSgsProtocol interface">
+
+<STYLE TYPE="text/css">
+<!--
+/* Javadoc style sheet */
+
+/* Define colors, fonts and other style attributes here to override the defaults */
+
+/* Page background color */
+body { background-color: #FFFFFF }
+
+/* Headings */
+h2 { margin-top: 0pt }
+
+/* Table colors */
+.TableHeadingColor     { background: #CCCCFF } /* Dark mauve */
+.TableSubHeadingColor  { background: #EEEEFF } /* Light mauve */
+.TableRowColor         { background: #FFFFFF } /* White */
+-->
+</STYLE>
+
+</HEAD>
+
+<BODY BGCOLOR="white">
+
+<!-- ======== START OF CLASS DATA ======== -->
+<H2><FONT SIZE="-1">com.sun.sgs.protocol.simple</FONT>
+<BR>
+Interface SimpleSgsProtocol</H2>
+<HR>
+<DL>
+<DT><PRE>public interface <B>SimpleSgsProtocol</B></DL>
+</PRE>
+
+<P>
+SGS Protocol constants for SGS 0.9.2 (protocol version 1).
+ <p>
+ A protocol message is constructed as follows:
+ <ul>
+ <li> (int) payload length, not including this int
+ <li> (byte) version number
+ <li> (byte) service id
+ <li> (byte) operation code
+ <li> optional content, depending on the operation code.
+ </ul>
+ <p>
+ A <code>ByteArray</code> is encoded as follows:
+ <ul>
+ <li> (unsigned short) number of bytes in the array
+ <li> (byte[]) the bytes in the array
+ </ul>
+ <p>
+ A <code>String</code> is encoded as follows:
+ <ul>
+ <li> (unsigned short) number of bytes of modified UTF-8 encoded String
+ <li> (byte[]) String encoded in modified UTF-8 as described
+ in <A HREF="http://java.sun.com/j2se/1.5/docs/api/java/io/DataInput.html" title="class or interface in java.io"><CODE>DataInput</CODE></A>
+ </ul>
+ <p>
+ A <code>CompactId</code> is encoded as follows:
+ <ul>
+ <p>The first byte of the ID's external form contains a length field
+ of variable size.  If the first two bits of the length byte are not
+ #b11, then the size of the ID is indicated as follows:
+
+ <ul>
+ <li>#b00: 14 bit ID (2 bytes total)</li>
+ <li>#b01: 30 bit ID (4 bytes total)</li>
+ <li>#b10: 62 bit ID (8 bytes total)</li>
+ </ul>
+
+ <p>If the first byte has the following format:
+ <ul><li>1100<i>nnnn</i></li></ul> <p>then, the ID is contained in
+ the next <code>8 + nnnn</code> bytes.
+ </ul>
+<P>
+
+<P>
+<HR>
+
+<P>
+<!-- =========== FIELD SUMMARY =========== -->
+
+<A NAME="field_summary"><!-- --></A>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+<TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+<TH ALIGN="left" COLSPAN="2"><FONT SIZE="+2">
+<B>Field Summary</B></FONT></TH>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#APPLICATION_SERVICE">APPLICATION_SERVICE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Application service ID, <code>0x01</code>.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#CHANNEL_JOIN">CHANNEL_JOIN</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Channel join.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#CHANNEL_LEAVE">CHANNEL_LEAVE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Channel leave.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#CHANNEL_MESSAGE">CHANNEL_MESSAGE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Channel message (sent from server to recipient on channel).</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#CHANNEL_SEND_REQUEST">CHANNEL_SEND_REQUEST</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Channel send request from a client to a server.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#CHANNEL_SERVICE">CHANNEL_SERVICE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Channel service ID, <code>0x02</code>.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGIN_FAILURE">LOGIN_FAILURE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Login failure.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGIN_REQUEST">LOGIN_REQUEST</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Login request from a client to a server.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGIN_SUCCESS">LOGIN_SUCCESS</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Login success.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGOUT_REQUEST">LOGOUT_REQUEST</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Logout request from a client to a server.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGOUT_SUCCESS">LOGOUT_SUCCESS</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Logout success.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;int</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#MAX_MESSAGE_LENGTH">MAX_MESSAGE_LENGTH</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The maximum length of any protocol message field defined as a
+ <code>String</code> or <code>byte[]</code>: 65535 bytes.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#RECONNECT_FAILURE">RECONNECT_FAILURE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reconnect failure.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#RECONNECT_REQUEST">RECONNECT_REQUEST</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reconnection request.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#RECONNECT_SUCCESS">RECONNECT_SUCCESS</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Reconnect success.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#SESSION_MESSAGE">SESSION_MESSAGE</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Session message.</TD>
+</TR>
+<TR BGCOLOR="white" CLASS="TableRowColor">
+<TD ALIGN="right" VALIGN="top" WIDTH="1%"><FONT SIZE="-1">
+<CODE>static&nbsp;byte</CODE></FONT></TD>
+<TD><CODE><B><A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#VERSION">VERSION</A></B></CODE>
+
+<BR>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The version number, <code>0x01</code> for SGS 0.9.2 and prior.</TD>
+</TR>
+</TABLE>
+&nbsp;
+<P>
+
+<!-- ============ FIELD DETAIL =========== -->
+
+<A NAME="field_detail"><!-- --></A>
+<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+<TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+<TH ALIGN="left" COLSPAN="1"><FONT SIZE="+2">
+<B>Field Detail</B></FONT></TH>
+</TR>
+</TABLE>
+
+<A NAME="MAX_MESSAGE_LENGTH"><!-- --></A><H3>
+MAX_MESSAGE_LENGTH</H3>
+<PRE>
+static final int <B>MAX_MESSAGE_LENGTH</B></PRE>
+<DL>
+<DD>The maximum length of any protocol message field defined as a
+ <code>String</code> or <code>byte[]</code>: 65535 bytes.
+</DL>
+<HR>
+
+<A NAME="VERSION"><!-- --></A><H3>
+VERSION</H3>
+<PRE>
+static final byte <B>VERSION</B></PRE>
+<DL>
+<DD>The version number, <code>0x01</code> for SGS 0.9.2 and prior.
+</DL>
+<HR>
+
+<A NAME="APPLICATION_SERVICE"><!-- --></A><H3>
+APPLICATION_SERVICE</H3>
+<PRE>
+static final byte <B>APPLICATION_SERVICE</B></PRE>
+<DL>
+<DD>The Application service ID, <code>0x01</code>.
+</DL>
+<HR>
+
+<A NAME="CHANNEL_SERVICE"><!-- --></A><H3>
+CHANNEL_SERVICE</H3>
+<PRE>
+static final byte <B>CHANNEL_SERVICE</B></PRE>
+<DL>
+<DD>The Channel service ID, <code>0x02</code>.
+</DL>
+<HR>
+
+<A NAME="LOGIN_REQUEST"><!-- --></A><H3>
+LOGIN_REQUEST</H3>
+<PRE>
+static final byte <B>LOGIN_REQUEST</B></PRE>
+<DL>
+<DD>Login request from a client to a server.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x10</code>
+ <br>
+ Payload:
+ <ul>
+ <li>(String) name
+ <li>(String) password
+ </ul>
+</DL>
+<HR>
+
+<A NAME="LOGIN_SUCCESS"><!-- --></A><H3>
+LOGIN_SUCCESS</H3>
+<PRE>
+static final byte <B>LOGIN_SUCCESS</B></PRE>
+<DL>
+<DD>Login success.  Server response to a client's <A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGIN_REQUEST"><CODE>LOGIN_REQUEST</CODE></A>.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x11</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (ByteArray) sessionId
+ <li> (ByteArray) reconnectionKey
+ </ul>
+</DL>
+<HR>
+
+<A NAME="LOGIN_FAILURE"><!-- --></A><H3>
+LOGIN_FAILURE</H3>
+<PRE>
+static final byte <B>LOGIN_FAILURE</B></PRE>
+<DL>
+<DD>Login failure.  Server response to a client's <A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGIN_REQUEST"><CODE>LOGIN_REQUEST</CODE></A>.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x12</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (String) reason
+ </ul>
+</DL>
+<HR>
+
+<A NAME="RECONNECT_REQUEST"><!-- --></A><H3>
+RECONNECT_REQUEST</H3>
+<PRE>
+static final byte <B>RECONNECT_REQUEST</B></PRE>
+<DL>
+<DD>Reconnection request.  Client requesting reconnect to a server.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x20</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (ByteArray) reconnectionKey
+ </ul>
+</DL>
+<HR>
+
+<A NAME="RECONNECT_SUCCESS"><!-- --></A><H3>
+RECONNECT_SUCCESS</H3>
+<PRE>
+static final byte <B>RECONNECT_SUCCESS</B></PRE>
+<DL>
+<DD>Reconnect success.  Server response to a client's <A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#RECONNECT_REQUEST"><CODE>RECONNECT_REQUEST</CODE></A>.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x21</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (ByteArray) reconnectionKey
+ </ul>
+</DL>
+<HR>
+
+<A NAME="RECONNECT_FAILURE"><!-- --></A><H3>
+RECONNECT_FAILURE</H3>
+<PRE>
+static final byte <B>RECONNECT_FAILURE</B></PRE>
+<DL>
+<DD>Reconnect failure.  Server response to a client's <A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#RECONNECT_REQUEST"><CODE>RECONNECT_REQUEST</CODE></A>.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x22</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (String) reason
+ </ul>
+</DL>
+<HR>
+
+<A NAME="SESSION_MESSAGE"><!-- --></A><H3>
+SESSION_MESSAGE</H3>
+<PRE>
+static final byte <B>SESSION_MESSAGE</B></PRE>
+<DL>
+<DD>Session message.  May be sent by the client or the server.
+ Maximum length is 64 KB minus one byte.
+ Larger messages require fragmentation and reassembly above
+ this protocol layer.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x30</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (long) sequence number
+ <li> (ByteArray) message
+ </ul>
+</DL>
+<HR>
+
+<A NAME="LOGOUT_REQUEST"><!-- --></A><H3>
+LOGOUT_REQUEST</H3>
+<PRE>
+static final byte <B>LOGOUT_REQUEST</B></PRE>
+<DL>
+<DD>Logout request from a client to a server.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x40</code>
+ <br>
+ No payload.
+</DL>
+<HR>
+
+<A NAME="LOGOUT_SUCCESS"><!-- --></A><H3>
+LOGOUT_SUCCESS</H3>
+<PRE>
+static final byte <B>LOGOUT_SUCCESS</B></PRE>
+<DL>
+<DD>Logout success.  Server response to a client's <A HREF="../../../../../com/sun/sgs/protocol/simple/SimpleSgsProtocol.html#LOGOUT_REQUEST"><CODE>LOGOUT_REQUEST</CODE></A>.
+ <br>
+ ServiceId: <code>0x01</code> (Application)
+ <br>
+ Opcode: <code>0x41</code>
+ <br>
+ No payload.
+</DL>
+<HR>
+
+<A NAME="CHANNEL_JOIN"><!-- --></A><H3>
+CHANNEL_JOIN</H3>
+<PRE>
+static final byte <B>CHANNEL_JOIN</B></PRE>
+<DL>
+<DD>Channel join.  Server notifying a client that it has joined a channel.
+ <br>
+ ServiceId: <code>0x02</code> (Channel)
+ <br>
+ Opcode: <code>0x50</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (String) channel name
+ <li> (CompactId) channel ID
+ </ul>
+</DL>
+<HR>
+
+<A NAME="CHANNEL_LEAVE"><!-- --></A><H3>
+CHANNEL_LEAVE</H3>
+<PRE>
+static final byte <B>CHANNEL_LEAVE</B></PRE>
+<DL>
+<DD>Channel leave.  Server notifying a client that it has left a channel.
+ <br>
+ ServiceId: <code>0x02</code> (Channel)
+ <br>
+ Opcode: <code>0x52</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (CompactId) channel ID
+ </ul>
+</DL>
+<HR>
+
+<A NAME="CHANNEL_SEND_REQUEST"><!-- --></A><H3>
+CHANNEL_SEND_REQUEST</H3>
+<PRE>
+static final byte <B>CHANNEL_SEND_REQUEST</B></PRE>
+<DL>
+<DD>Channel send request from a client to a server.
+ <br>
+ ServiceId: <code>0x02</code> (Channel)
+ <br>
+ Opcode: <code>0x53</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (CompactId) channel ID
+ <li> (long) sequence number
+ <li> (short) number of recipients (0 = all)
+ <li> If number of recipients &gt; 0, for each recipient:
+ <ul>
+ <li> (ByteArray) sessionId
+ </ul>
+ <li> (ByteArray) message
+ </ul>
+</DL>
+<HR>
+
+<A NAME="CHANNEL_MESSAGE"><!-- --></A><H3>
+CHANNEL_MESSAGE</H3>
+<PRE>
+static final byte <B>CHANNEL_MESSAGE</B></PRE>
+<DL>
+<DD>Channel message (sent from server to recipient on channel).
+ <br>
+ ServiceId: <code>0x02</code> (Channel)
+ <br>
+ Opcode: <code>0x54</code>
+ <br>
+ Payload:
+ <ul>
+ <li> (CompactId) channel ID
+ <li> (long) sequence number
+ <li> (ByteArray) sender's sessionId
+                (zero-length if sent by server)
+ <li> (ByteArray) message
+ </ul>
+</DL>
+<!-- ========= END OF CLASS DATA ========= -->
+<HR>
+
+
+<!-- ======= START OF BOTTOM NAVBAR ====== -->
+<TABLE BORDER="0" WIDTH="100%" CELLPADDING="1" CELLSPACING="0" SUMMARY="">
+<TR>
+<TD ALIGN="right" VALIGN="top"><EM>
+
+        <font size=-1>Sun Game Server, Version
+        0.9.2-r2216<br>May-3-2007</font>
+      </EM>
+</TD>
+</TR>
+</TABLE>
+<!-- ======== END OF BOTTOM NAVBAR ======= -->
+
+<HR>
+
+        <font size=-1>Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
+        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
+        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
+        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>
+      
+</BODY>
+</HTML>

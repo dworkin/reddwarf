@@ -152,15 +152,15 @@ public class TestChannelServiceImpl extends TestCase {
 	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
 	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
 
-	createTransaction();
+	createTransaction(10000);
 
 	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+        dataService.configure(serviceRegistry, txnProxy);
 
 	// configure task service
         taskService.configure(serviceRegistry, txnProxy);
@@ -186,7 +186,7 @@ public class TestChannelServiceImpl extends TestCase {
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	txn.commit();
-	createTransaction();
+	createTransaction(1000);
     }
 
     /** Sets passed if the test passes. */
@@ -1345,6 +1345,15 @@ public class TestChannelServiceImpl extends TestCase {
 	return txn;
     }
     
+    /**
+     * Creates a new transaction with the specified timeout, and sets
+     * transaction proxy's current transaction.
+     */
+    private DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(timeout);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
     
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
@@ -2113,9 +2122,10 @@ public class TestChannelServiceImpl extends TestCase {
 	    
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    ManagedReference listenerRef =
-		txnProxy.getService(DataService.class).
-		createReference(listener);
+		dataManager.createReference(listener);
 	    sessions.put(session, listenerRef);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
@@ -2163,6 +2173,7 @@ public class TestChannelServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
+	    AppContext.getDataManager().markForUpdate(this);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
 		this.wasGracefulDisconnect = graceful;
