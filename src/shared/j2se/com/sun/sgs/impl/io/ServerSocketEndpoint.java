@@ -24,9 +24,12 @@ import com.sun.sgs.io.ServerEndpoint;
 public class ServerSocketEndpoint extends AbstractSocketEndpoint
         implements ServerEndpoint<SocketAddress>
 {
-    /** The System property for whether to set the reuse-address property */
+    /** The System property for whether to set the reuse-address property. */
     public static final String REUSE_ADDRESS_PROPERTY = 
-        "com.sun.sgs.impl.io.reuseaddress";
+        "com.sun.sgs.impl.io.ServerSocketEndpoint.reuseAddress";
+    
+    /** Default value for the reuse-address property if not specified. */
+    public static final String DEFAULT_REUSE_ADDRESS = "true";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -109,9 +112,9 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
                     (SocketAcceptorConfig)ioConfig;
                 
                 socketConfig.setReuseAddress(Boolean.parseBoolean(
-                        System.getProperty(REUSE_ADDRESS_PROPERTY, "true")));
-            }
-            else {
+                        System.getProperty(REUSE_ADDRESS_PROPERTY,
+                                           DEFAULT_REUSE_ADDRESS)));
+            } else {
                 logger.log(Level.WARNING,
                     "IoServiceConfig object from mina SocketAcceptor object" +
                     " was not a subclass of SocketAcceptorConfig as expected;" +
