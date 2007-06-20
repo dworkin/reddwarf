@@ -11,9 +11,6 @@ import java.util.MissingResourceException;
  * This is a general registry interface used to provide access to a collection
  * of components by type. It is used by the kernel during startup to
  * configure system components and <code>Service</code>s.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface ComponentRegistry
 {

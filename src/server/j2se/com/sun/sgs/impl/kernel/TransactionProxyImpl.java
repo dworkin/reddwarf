@@ -17,9 +17,6 @@ import com.sun.sgs.service.TransactionProxy;
  * the only components outside of the kernel that should have visibility into
  * this state, they are the only components in the system that are provided
  * a reference to the usable proxy.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 final class TransactionProxyImpl implements TransactionProxy {
 

@@ -14,9 +14,6 @@ import com.sun.sgs.kernel.TaskReservation;
  * use them to actually reserve any space. If your scheduler is bound, or
  * needs to explicitly reserve space, then it will need to define its own
  * implementation of <code>TaskReservation</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class SimpleTaskReservation implements TaskReservation {
 

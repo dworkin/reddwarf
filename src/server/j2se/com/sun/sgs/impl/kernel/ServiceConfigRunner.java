@@ -26,9 +26,6 @@ import java.util.logging.Logger;
  * scheduling a <code>AppStartupRunner</code> to start the application.
  * <p>
  * This runnable must be run in a transactional context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class ServiceConfigRunner implements KernelRunnable {
 

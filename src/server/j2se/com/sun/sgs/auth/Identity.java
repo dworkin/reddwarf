@@ -19,9 +19,6 @@ package com.sun.sgs.auth;
  * <code>notifyLoggedIn</code> and <code>notifyLoggedOut</code> are
  * valid. Note that an application may still enforce that its users are not
  * allowed to login multiple times, or may only logout if they are logged in.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface Identity {
 

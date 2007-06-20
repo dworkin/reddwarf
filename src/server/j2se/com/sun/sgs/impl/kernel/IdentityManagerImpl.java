@@ -33,9 +33,6 @@ import javax.security.auth.login.LoginException;
  * This implementation is kept private to this package so that the context
  * can be assigned, safely, after the manager is created. An instance of the
  * manager is needed before the context can be created.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class IdentityManagerImpl implements IdentityManager
 {

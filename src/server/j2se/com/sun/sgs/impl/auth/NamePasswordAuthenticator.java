@@ -40,9 +40,6 @@ import javax.security.auth.login.CredentialException;
  * that consists of one entry per line, where each entry has a name, some
  * whitespace, a SHA-256 hashed password that is encoded via
  * <code>encodeBytes</code>, and finally a newline.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class NamePasswordAuthenticator implements IdentityAuthenticator
 {
