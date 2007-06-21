@@ -281,14 +281,24 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
-    @SuppressWarnings("fallthrough")
     public <T> T get(Class<T> type) {
+	return get(type, true);
+    }
+
+    /**
+     * Like get, but with optional checking of the context.  Suppress the check
+     * if the reference was just obtained from the context.
+     */
+    @SuppressWarnings("fallthrough")
+    <T> T get(Class<T> type, boolean checkContext) {
 	if (type == null) {
 	    throw new NullPointerException(
 		"The type argument must not be null");
 	}
 	try {
-	    DataServiceImpl.checkContext(context);
+	    if (checkContext) {
+		DataServiceImpl.checkContext(context);
+	    }
 	    switch (state) {
 	    case EMPTY:
 		ManagedObject tempObject = deserialize(

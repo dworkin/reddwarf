@@ -14,9 +14,6 @@ import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.Writer;
 import java.util.Properties;
 
 /**
@@ -25,10 +22,7 @@ import java.util.Properties;
  * configuration and work properly for the channel service, which uses the data
  * service.
  */
-public class TestKernelSimpleAppLongStartup extends TestKernelSimpleApp {
-
-    /** The number of milliseconds to let the kernel run */
-    private static final long RUN_PROCESS_MILLIS = 10000;
+public class TestKernelSimpleAppLongStartup extends KernelSimpleAppTestCase {
 
     /** How long to delay the channel service configure method. */
     private static final long CONFIGURE_DELAY = 2000;
@@ -39,13 +33,23 @@ public class TestKernelSimpleAppLongStartup extends TestKernelSimpleApp {
     /** The status of the call to the channel service configure method. */
     private Status delayedConfigureStatus = Status.NOT_DONE;
 
+    /** Creates the test. */
+    public TestKernelSimpleAppLongStartup(String name) {
+	super(name);
+    }
+
+    /** Returns the port to use for this application. */
+    int getPort() {
+	return 33334;
+    }
+
     /** Run a simple application with long enough configure timeout. */
-    public void testRunSimpleApp() throws Exception {
+    public void testLongTimeout() throws Exception {
 	assertTrue(runWithUnboundedTimeout(3000));
     }
 
     /** Run a simple application with a short configure timeout. */
-    public void testRunSimpleAppShortTimeout() throws Exception {
+    public void testShortTimeout() throws Exception {
 	assertFalse(runWithUnboundedTimeout(1000));
     }
 
@@ -55,42 +59,12 @@ public class TestKernelSimpleAppLongStartup extends TestKernelSimpleApp {
      * out.  Uses the DelayedChannelService as the channel service.
      */
     private boolean runWithUnboundedTimeout(long timeout) throws Exception {
-	/* Create the application directory */
-	File dir = File.createTempFile("SimpleApp", "dir");
-	dir.delete();
-	dir.mkdir();
-	/* Create the DataStore subdirectory */
-	new File(dir, "dsdb").mkdir();
-	/* Create the application properties file */
-	File props = File.createTempFile("SimpleApp", "properties");
-	Writer out = new FileWriter(props);
-	out.write(
-	    "com.sun.sgs.app.listener =" +
-	    " com.sun.sgs.test.impl.kernel.SimpleApp\n" +
-	    "com.sun.sgs.app.name = SimpleApp\n" +
-	    "com.sun.sgs.app.port = 33334\n" +
-	    "com.sun.sgs.app.root = " + dir.toURI().toURL().getPath() + "\n" +
-	    CHANNEL_SERVICE + " = " + DelayedChannelService.class.getName());
-	out.close();
-	/* Create a logging file at WARNING or higher */
-	File logging = File.createTempFile("SimpleApp", "logging");
-	out = new FileWriter(logging);
-	out.write(".level = WARNING\n" +
-		  "handlers = java.util.logging.ConsoleHandler\n" +
-		  "java.util.logging.ConsoleHandler.formatter =" +
-		  " java.util.logging.SimpleFormatter\n" +
-		  "java.util.logging.ConsoleHandler.level = WARNING");
-	out.close();
+	config.setProperty(
+	    CHANNEL_SERVICE, DelayedChannelService.class.getName());
+	system.setProperty(
+	    "com.sun.sgs.txn.timeout.unbounded", String.valueOf(timeout));
 	/* Run the Kernel */
-	ProcessBuilder pb = new ProcessBuilder(
-            System.getProperty("java.home") + "/bin/java",
-	    "-cp", System.getProperty("java.class.path"),
-	    "-Djava.util.logging.config.file=" + logging,
-	    "-Djava.library.path=" + System.getProperty("java.library.path"),
-	    "-Dcom.sun.sgs.txn.timeout.unbounded=" + timeout,
-	    "com.sun.sgs.impl.kernel.Kernel",
-	    props.toURI().toURL().getPath());
-	new RunProcess(pb, RUN_PROCESS_MILLIS) {
+	new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
 	    void handleInput(String line) {
 		System.out.println("stdout: " + line);
 		if (line.equals("DelayedChannelService.configure returned")) {
