@@ -53,6 +53,7 @@ public class TransactionContextMap<T extends TransactionContext> {
     * context as the current context for the current thread, and joins
     * the transaction.  Returns the context for the current transaction.
     *
+    * @param	contextFactory the context factory
     * @return 	the context for the current transaction
     * @throws	TransactionNotActiveException if no transaction is active
     * @throws	IllegalStateException if there is a problem with the
