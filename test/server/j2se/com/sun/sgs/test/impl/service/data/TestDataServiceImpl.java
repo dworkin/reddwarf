@@ -2191,6 +2191,32 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testSerializeReferenceToEnclosing() throws Exception {
+	serializeReferenceToEnclosingInternal();
+    }
+
+    public void testSerializeReferenceToEnclosingToStringFails()
+	throws Exception
+    {
+	FailingMethods.failures = Failures.TOSTRING;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    FailingMethods.failures = Failures.NONE;
+	}
+    }
+
+    public void testSerializeReferenceToEnclosingHashCodeFails()
+	throws Exception
+    {
+	FailingMethods.failures = Failures.TOSTRING_AND_HASHCODE;
+	try {
+	    serializeReferenceToEnclosingInternal();
+	} finally {
+	    FailingMethods.failures = Failures.NONE;
+	}
+    }
+
+    private void serializeReferenceToEnclosingInternal() throws Exception {
 	service.setBinding("a", NonManaged.staticLocal);
 	service.setBinding("b", NonManaged.staticAnonymous);
 	service.setBinding("c", new NonManaged().createMember());
@@ -2235,76 +2261,143 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static class NonManaged implements Serializable {
+    /** Which methods should fail. */
+    enum Failures {
+	NONE, TOSTRING, TOSTRING_AND_HASHCODE;
+    }
+
+    /**
+     * Defines facilities for creating objects whose toString and hashCode
+     * methods will fail on demand.  The toString methods will fail if the
+     * failures field is set to Failures.TOSTRING.  Both the toString and
+     * hashCode methods will fail if the field is set to
+     * Failures.TOSTRING_AND_HASHCODE.
+     */
+    static class FailingMethods {
+	static Failures failures = Failures.NONE;
+	public String toString() {
+	    return toString(this);
+	}
+	public int hashCode() {
+	    return hashCode(super.hashCode());
+	}
+	static String toString(Object object) {
+	    if (failures != Failures.NONE) {
+		throw new RuntimeException("toString fails");
+	    }
+	    String className = object.getClass().getName();
+	    int dot = className.lastIndexOf('.');
+	    if (dot > 0) {
+		className = className.substring(dot + 1);
+	    }
+	    return className + "[hashCode=" + object.hashCode() + "]";
+	}
+	static int hashCode(int hashCode) {
+	    if (failures == Failures.TOSTRING_AND_HASHCODE) {
+		throw new RuntimeException("hashCode fails");
+	    }
+	    return hashCode;
+	}
+    }
+
+    static class DummyManagedObjectFailingMethods extends DummyManagedObject {
+	private static final long serialVersionUID = 1;	
+	public String toString() {
+	    return FailingMethods.toString(this);
+	}
+	public int hashCode() {
+	    return FailingMethods.hashCode(super.hashCode());
+	}
+    }
+
+    static class NonManaged extends FailingMethods implements Serializable {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectFailingMethods() {
 	        private static final long serialVersionUID = 1L;
 	    };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
 	}
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
 	}
     }
 
-    static class Managed implements ManagedObject, Serializable {
+    static class Managed extends FailingMethods
+	implements ManagedObject, Serializable
+    {
 	private static final long serialVersionUID = 1;
 	static final ManagedObject staticLocal;
 	static {
-	    class StaticLocal implements ManagedObject, Serializable {
+	    class StaticLocal extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    staticLocal = new StaticLocal();
 	}
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() {
+	    new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
-	static class Member implements ManagedObject, Serializable {
+	static class Member extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createMember() {
 	    return new Inner();
 	}
-	class Inner implements ManagedObject, Serializable {
+	class Inner extends FailingMethods
+	    implements ManagedObject, Serializable
+	{
 	    private static final long serialVersionUID = 1;
 	}
 	ManagedObject createInner() {
 	    return new Inner();
         }
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() {
+	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
             };
 	}
 	ManagedObject createLocal() {
-	    class Local implements ManagedObject, Serializable {
+	    class Local extends FailingMethods
+		implements ManagedObject, Serializable
+	    {
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();

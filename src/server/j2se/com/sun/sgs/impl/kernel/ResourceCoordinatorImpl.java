@@ -35,9 +35,6 @@ import java.util.logging.Logger;
  * an initial testing system, but will need to be profiled and understood
  * better in the final production system. For the present, this is meant
  * be a simple coordinator that provides correct behavior.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class ResourceCoordinatorImpl implements ResourceCoordinator
 {

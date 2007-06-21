@@ -20,9 +20,6 @@ import com.sun.sgs.service.Service;
  * actions run in either the context of an application or the system. The
  * former is represented by <code>AppKernelAppContext</code> and the latter
  * by <code>SystemKernelAppContext</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 abstract class AbstractKernelAppContext implements KernelAppContext {
 

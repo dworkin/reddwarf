@@ -11,9 +11,6 @@ import java.util.TimerTask;
  * Simple implementation of <code>RecurringTaskHandle</code> that lets
  * the handle be associated with a <code>TimerTask</code> so that cancelling
  * the handle also cancels the associated <code>TimerTask</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
 
