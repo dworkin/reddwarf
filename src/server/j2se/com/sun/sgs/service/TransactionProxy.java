@@ -14,9 +14,6 @@ import com.sun.sgs.kernel.TaskOwner;
  * This is a proxy that provides access to the current transaction and
  * its owner. Note that there is only ever one instance of
  * <code>TransactionProxy</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TransactionProxy {
 

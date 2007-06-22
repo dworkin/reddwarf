@@ -34,9 +34,6 @@ import java.util.logging.Logger;
  * This implementation of <code>TaskScheduler</code> is provided for testing
  * only. Note that it ignores task owners, since the tests are run with only
  * one owner present.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class DummyTaskScheduler implements TaskScheduler {
 
