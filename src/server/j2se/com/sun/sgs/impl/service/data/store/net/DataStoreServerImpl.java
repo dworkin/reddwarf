@@ -9,6 +9,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
@@ -134,7 +135,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     private final long txnTimeout;
 
     /** The object used to export the server. */
-    private final Exporter exporter;
+    private final Exporter<DataStoreServer> exporter;
 
     /** The port for running the server. */
     private final int port;
@@ -484,105 +485,19 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Provides for making the server available on the network, and removing it
-     * from the network during shutdown.
-     */
-    private static class Exporter {
-
-	/** The server for handling inbound requests. */
-	private DataStoreServer server;
-
-	/** The RMI registry for advertising the server. */
-	private Registry registry;
-
-	/** Creates an instance. */
-	Exporter() { }
-
-	/**
-	 * Makes the server available on the network on the specified port.  If
-	 * the port is 0, chooses an anonymous port.  Returns the actual port
-	 * on which the server is available.
-	 */
-	int export(DataStoreServer server, int port) throws IOException {
-	    this.server = server;
-	    assert server != null;
-	    ServerSocketFactory ssf = new ServerSocketFactory();
-	    registry = LocateRegistry.createRegistry(port, null, ssf);
-	    registry.rebind(
-		"DataStoreServer",
-		UnicastRemoteObject.exportObject(server, port, null, ssf));
-	    return ssf.getLocalPort();
-	}
-
-	/**
-	 * Removes the server from the network, returning true if successful.
-	 * Throws IllegalStateException if the server has already been removed
-	 * from the network.
-	 */
-	boolean unexport() {
-	    if (registry == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
-	    }
-	    if (server != null) {
-		try {
-		    UnicastRemoteObject.unexportObject(server, true);
-		    server = null;
-		} catch (NoSuchObjectException e) {
-		    logger.logThrow(
-			Level.FINE, e, "Problem unexporting server");
-		    return false;
-		}
-	    }
-	    try {
-		UnicastRemoteObject.unexportObject(registry, true);
-		registry = null;
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(
-		    Level.FINE, e, "Problem unexporting registry");
-		return false;
-	    }
-	    return true;
-	}
-    }   
-
-    /**
-     * Defines a server socket factory that provides access to the server
-     * socket's local port.
-     */
-    private static class ServerSocketFactory
-	implements RMIServerSocketFactory
-    {
-	/** The last server socket created. */
-	private ServerSocket serverSocket;
-
-	/** Creates an instance. */
-	ServerSocketFactory() { }
-
-	/** {@inheritDoc} */
-	public ServerSocket createServerSocket(int port) throws IOException {
-	    serverSocket = new ServerSocket(port);
-	    return serverSocket;
-	}
-
-	/** Returns the local port of the last server socket created. */
-	int getLocalPort() {
-	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
-	}
-    }
-
-    /**
      * An alternative exporter that uses an experimental socket-based facility
      * instead of Java RMI.
      */
-    private static class SocketExporter extends Exporter {
+    private static class SocketExporter extends Exporter<DataStoreServer> {
 	private DataStoreServerRemote remote;
 	SocketExporter() { }
-	int export(DataStoreServer server, int port) throws IOException {
+	public int export(DataStoreServer server, int port)
+	    throws IOException
+	{
 	    remote = new DataStoreServerRemote(server, port);
 	    return remote.serverSocket.getLocalPort();
 	}
-	boolean unexport() {
+	public boolean unexport() {
 	    if (remote == null) {
 		throw new IllegalStateException(
 		    "The server is already shut down");
@@ -644,7 +559,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 		"greater than or equal to 0 and less than 65535: " +
 		requestedPort);
 	}
-	exporter = noRmi ? new SocketExporter() : new Exporter();
+	exporter = noRmi ?
+	    new SocketExporter() :
+	    new Exporter<DataStoreServer>();
 	port = exporter.export(this, requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
