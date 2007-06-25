@@ -57,6 +57,12 @@ public class StandardProperties {
     public static final String APP_LISTENER = NS + "app.listener";
 
     /**
+     * The value for the null <code>AppListener</code>, used to start an
+     * application context with no running application.
+     */
+    public static final String APP_LISTENER_NONE = "NONE";
+
+    /**
      * A required key specifying the listening port for an application.
      */
     public static final String APP_PORT = NS + "app.port";
@@ -124,6 +130,25 @@ public class StandardProperties {
      * associated manager.
      */
     public static final String MANAGERS = NS + "app.managers";
+
+    /**
+     * An optional property to specify that no <code>Service</code>s should
+     * be configured past the one specified. This may only be used if the
+     * <code>AppListener</code> has the value <code>APP_LISTENER_NONE</code>.
+     * Valid values for this property are specified by
+     * <code>StandardService</code>.
+     */
+    public static final String FINAL_SERVICE = NS + "app.finalService";
+
+    /**
+     * An enumeration of the known, standard <code>Service</code>s.
+     */
+    public enum StandardService {
+        DataService, WatchdogService, RegistrationService, TaskService,
+            ClientSessionService, ChannelService;
+
+        public static final StandardService LAST_SERVICE = ChannelService;
+    }
 
     /**
      * An optional colon-separated key that specifies which

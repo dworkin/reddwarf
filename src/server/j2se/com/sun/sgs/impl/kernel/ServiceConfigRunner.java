@@ -124,20 +124,27 @@ class ServiceConfigRunner implements KernelRunnable {
 
         // At this point the services are now configured, so the final step
         // is to try booting the application after setting the services
-        // available in our context. Boot the app is done by running a
-        // special KernelRunnable in a new transaction
-        AppStartupRunner startupRunner =
-            new AppStartupRunner(appContext, appProperties, kernel);
-        UnboundedTransactionRunner unboundedTransactionRunner =
-            new UnboundedTransactionRunner(startupRunner);
-        try {
-            appContext.getService(TaskService.class).
-                scheduleNonDurableTask(unboundedTransactionRunner);
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.CONFIG))
-                logger.logThrow(Level.CONFIG, e, "{0}: failed to schedule " +
-                                "app startup task", appName);
-            throw e;
+        // available in our context. Booting the app is done by running a
+        // special KernelRunnable in a new transaction. Note that if we're
+        // running as a "server" then we don't actually start an app
+        if (! appProperties.getProperty(StandardProperties.APP_LISTENER).
+            equals(StandardProperties.APP_LISTENER_NONE)) {
+            AppStartupRunner startupRunner =
+                new AppStartupRunner(appContext, appProperties, kernel);
+            UnboundedTransactionRunner unboundedTransactionRunner =
+                new UnboundedTransactionRunner(startupRunner);
+            try {
+                appContext.getService(TaskService.class).
+                    scheduleNonDurableTask(unboundedTransactionRunner);
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.CONFIG))
+                    logger.logThrow(Level.CONFIG, e, "{0}: failed to " +
+                                    "schedule app startup task", appName);
+                throw e;
+            }
+        } else {
+            // we're running without an application, so we're finished
+            kernel.applicationReady(appContext);
         }
 
         if (logger.isLoggable(Level.CONFIG))
