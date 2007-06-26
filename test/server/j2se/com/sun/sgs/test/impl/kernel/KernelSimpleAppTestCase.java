@@ -19,8 +19,10 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 /**
- * Provide utilities for writing simple end-to-end tests of the server by
- * calling the Kernel with a simple application class.
+ * Provides utilities for writing simple end-to-end tests of the server by
+ * calling the Kernel with a simple application class.  Test classes should
+ * extend this class, and use its methods to implement tests that run
+ * applications as external processes.
  */
 abstract class KernelSimpleAppTestCase extends TestCase {
 

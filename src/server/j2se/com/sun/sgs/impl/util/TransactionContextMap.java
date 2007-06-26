@@ -100,10 +100,6 @@ public class TransactionContextMap<T extends TransactionContext> {
      */
     public T getContext() {
         Transaction txn = txnProxy.getCurrentTransaction();
-        if (txn == null) {
-            throw new TransactionNotActiveException(
-                "No transaction is active");
-        }
         T context = currentContext.get();
         if (context == null) {
 	    throw new IllegalStateException(

@@ -193,7 +193,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
-    /** The transaction context factory. */
+    /**
+     * The transaction context factory.  Note that this field is only set
+     * once, so it can be accessed outside of synchronization on stateLock once
+     * the value of the state field has been checked.
+     */
     private TransactionContextFactory<Context> contextFactory;
 
     /**
@@ -852,10 +856,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * service.
      */
     private TransactionContextFactory<Context> getContextFactory() {
-	synchronized (stateLock) {
-	    checkState();
-	    return contextFactory;
-	}
+	checkState();
+	return contextFactory;
     }
 
     /**
