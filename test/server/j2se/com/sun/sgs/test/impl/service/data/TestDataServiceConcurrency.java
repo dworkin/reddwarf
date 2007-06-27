@@ -184,6 +184,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	DummyTransaction txn = new DummyTransaction(10000);
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	int perThread = objects + objectsBuffer;
@@ -412,14 +413,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	Properties props, DummyComponentRegistry componentRegistry)
 	throws Exception
     {
-	DataServiceImpl service =
-	    new DataServiceImpl(props, componentRegistry);
-	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.setComponent(DataService.class, service);
-	componentRegistry.setComponent(DataServiceImpl.class, service);
-	txnProxy.setComponent(DataService.class, service);
-	txnProxy.setComponent(DataServiceImpl.class, service);
-	return service;
+	return new DataServiceImpl(props, componentRegistry);
     }
 
     /** Returns the binding name to use for the i'th object. */

@@ -172,6 +172,7 @@ public class TestDataServicePerformance extends TestCase {
 	}
 	createTransaction(10000);
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction(10000);
@@ -222,6 +223,7 @@ public class TestDataServicePerformance extends TestCase {
 	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction();
@@ -338,13 +340,6 @@ public class TestDataServicePerformance extends TestCase {
 	Properties props, DummyComponentRegistry componentRegistry)
 	throws Exception
     {
-	DataServiceImpl service =
-	    new DataServiceImpl(props, componentRegistry);
-	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.setComponent(DataService.class, service);
-	componentRegistry.setComponent(DataServiceImpl.class, service);
-	txnProxy.setComponent(DataService.class, service);
-	txnProxy.setComponent(DataServiceImpl.class, service);
-	return service;
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

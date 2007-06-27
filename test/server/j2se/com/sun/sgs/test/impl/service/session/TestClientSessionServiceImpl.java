@@ -157,12 +157,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction(10000);
 
 	// configure data service
+        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        dataService.configure(serviceRegistry, txnProxy);
 
 	// configure task service
         taskService.configure(serviceRegistry, txnProxy);
