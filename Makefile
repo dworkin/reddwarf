@@ -12,30 +12,56 @@ else
 endif
 
 ODIR = obj
+BINDIR = bin
 SRCDIR = src/client/c
-MAIN_EXE = bin/SimpleChatClient
 
-DEPS = $(wildcard $(SRCDIR)/*.h)
-SRCS = Channels.c CompactId.c HexUtils.c MessageProtocol.c ServerSession.c
+API_HEADERS = $(wildcard $(SRCDIR)/*.h)
+SRCS = $(wildcard $(SRCDIR)/*.c) $(wildcard $(SRCDIR)/*/*.c)
+OLDSRCS = Channel.c CompactId.c HexUtils.c MessageProtocol.c ServerSession.c SessionCallbacks.c
 OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
+
+# automatic variable reminders:
+#  $@ = rule target
+#  $< = first prerequisite
+#  $? = all prerequisites that are newer than the target
+#  $^ = all prerequisites
 
 .PHONY:	clean tar run
 
-$(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS)
-	@mkdir -p obj
-	$(CC) $(CFLAGS) -c $< -o $@
+all:
+	@echo "'all' target not yet implemented in Makefile..."
 
-all: $(MAIN_EXE)
+$(ODIR)/%.o: $(SRCDIR)/%.c $(API_HEADERS) $(SRCDIR)/%.h
+	@mkdir -p $(ODIR)
+	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
 
-$(MAIN_EXE): client
+$(ODIR)/example/%.o: $(SRCDIR)/example/%.c $(API_HEADERS)
+	@mkdir -p $(ODIR)/example
+	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
 
-client:	$(OBJS) $(DEPS) $(ODIR)/ChatClientImpl.o
-	@mkdir -p bin
-	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(MAIN_EXE) $(OBJS) $(ODIR)/ChatClientImpl.o
+$(ODIR)/impl/%.o: $(SRCDIR)/impl/%.c $(API_HEADERS) $(SRCDIR)/impl/%.h
+	@mkdir -p $(ODIR)/impl
+	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
 
-tar: client
+$(ODIR)/test/%.o: $(SRCDIR)/test/%.c $(API_HEADERS)
+	@mkdir -p $(ODIR)/test
+	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
+
+chatclient: $(ODIR)/example/sgs_chat_client.o $(DEPS) $(ODIR)/impl/sgs_connection_impl.o $(ODIR)/impl/sgs_context_impl.o $(ODIR)/impl/sgs_session_impl.o $(ODIR)/sgs_id.o $(ODIR)/sgs_buffer.o $(ODIR)/sgs_message.o $(ODIR)/sgs_hex_utils.o
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/chatclient $^
+
+idtest: $(ODIR)/sgs_id.o $(ODIR)/test/sgs_id_test.o $(ODIR)/sgs_hex_utils.o
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/idtest $^
+
+messagetest: $(ODIR)/impl/sgs_message_impl.o $(ODIR)/test/sgs_message_test.o
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/messagetest $^
+
+tar:
 	mv -f c_backups.tar c_backups.tar.prev
 	tar cf c_backups.tar $(SRCDIR)
 
 clean:
-	rm -f *~ core callbacks.out $(SRCDIR)/*~ $(ODIR)/*.o $(SRCDIR)/*.gch
+	rm -f *~ core callbacks.out $(SRCDIR)/*~ $(SRCDIR)/*/*~ $(ODIR)/*.o $(ODIR)/*/*.o $(SRCDIR)/*.gch $(SRCDIR)/*/*.gch
