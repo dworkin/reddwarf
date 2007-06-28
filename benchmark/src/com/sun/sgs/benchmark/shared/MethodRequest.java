@@ -108,7 +108,7 @@ public class MethodRequest {
      */
     public MethodRequest(String method) {
 	this((method == null) ? null : method.getBytes(), 
-	     new Object[] {}, false);
+	     serializeArgs(new Object[] {}), false);
     }
 
     /**
