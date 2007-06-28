@@ -7,13 +7,14 @@
 #include <stdint.h>
 #include "sgs_message.h"
 
-static void printBuf(uint8_t buf[], size_t len) {
+static void printMsg(sgs_message *pmsg) {
+  const uint8_t *data = sgs_msg_get_bytes(pmsg);
   int i;
   
   printf("{ ");
   
-  for (i=0; i < len; i++) {
-    printf("%d ", buf[i]);
+  for (i=0; i < sgs_msg_get_size(pmsg); i++) {
+    printf("%d ", data[i]);
   }
   
   printf(" }\n");
@@ -28,14 +29,9 @@ int main(int argc, char *argv[]) {
   uint8_t content[100];
   int result;
   
-  msg = sgs_msg_create(1024);
+  result = sgs_msg_init(&msg, buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST,
+                        SGS_APPLICATION_SERVICE);
   
-  if (msg == NULL) {
-    fprintf(stderr, "Could not create sgs_message.\n");
-    exit(-1);
-  }
-  
-  result = sgs_msg_init(msg, SGS_OPCODE_LOGIN_REQUEST, SGS_APPLICATION_SERVICE);
   printf("INIT() == %d\n", result);
   
   content[0] = 10;
@@ -44,32 +40,17 @@ int main(int argc, char *argv[]) {
   content[3] = 13;
   content[4] = 14;
   
-  result = sgs_msg_serialize(msg, buf, sizeof(buf));
-  printf("SER == %d\n", result);
-  printBuf(buf, result);
-  
-  result = sgs_msg_add_arb_content(msg, content, 5);
+  result = sgs_msg_add_arb_content(&msg, content, 5);
   printf("ADD-ARB() == %d\n", result);
+  printMsg(&msg);
   
-  result = sgs_msg_serialize(msg, buf, sizeof(buf));
-  printf("SER == %d\n", result);
-  printBuf(buf, result);
-  
-  result = sgs_msg_add_fixed_content(msg, content, 5);
+  result = sgs_msg_add_fixed_content(&msg, content, 5);
   printf("ADD-FIXED() == %d\n", result);
+  printMsg(&msg);
   
-  result = sgs_msg_serialize(msg, buf, sizeof(buf));
-  printf("SER == %d\n", result);
-  printBuf(buf, result);
-  
-  result = sgs_msg_deserialize(msg, buf, sizeof(buf));
+  result = sgs_msg_deserialize(&msg, buf, sizeof(buf));
   printf("DESER == %d\n", result);
-  
-  result = sgs_msg_serialize(msg, buf, sizeof(buf));
-  printf("SER == %d\n", result);
-  printBuf(buf, result);
-  
-  sgs_msg_destroy(msg);
+  printMsg(&msg);
   
   printf("Goodbye!\n");
   
