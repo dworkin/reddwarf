@@ -35,9 +35,6 @@ struct sgs_buffer {
   
   /* Array of the actual data. */
   uint8_t *buf;
-  
-  /* Used in mark() and reset() methods.*/
-  size_t marked_position, marked_size;
 };
 
 /*
@@ -45,29 +42,11 @@ struct sgs_buffer {
  */
 
 /*
- * function: sgs_buffer_can_read()
- *
- * Returns whether the specified number of bytes can be safely read from the
- * head of the buffer.  May rearrange the internals of the buffer, invalidating
- * any previously held head or tail pointers.
- */
-int sgs_buffer_can_read(sgs_buffer buffer, size_t len);
-
-/*
- * function: sgs_buffer_can_write()
- *
- * Returns whether the specified number of bytes can be safely written to the
- * tail of the buffer.  May rearrange the internals of the buffer, invalidating
- * any previously held head or tail pointers.
- */
-int sgs_buffer_can_write(sgs_buffer buffer, size_t len);
-
-/*
  * function: sgs_buffer_capacity()
  *
  * Returns the total capacity of a buffer.
  */
-size_t sgs_buffer_capacity(sgs_buffer buffer);
+size_t sgs_buffer_capacity(const sgs_buffer buffer);
 
 /*
  * function: sgs_buffer_create()
@@ -94,37 +73,34 @@ void sgs_buffer_destroy(sgs_buffer buffer);
 void sgs_buffer_empty(sgs_buffer buffer);
 
 /*
- * function: sgs_buffer_head()
+ * function: sgs_buffer_peek()
  *
- * Returns a pointer to the first byte of data in the buffer.
+ * Copies len bytes of data out of the buffer into the specified array, but does
+ * not update the buffer's internal state (such that subsequent calls to
+ * sgs_buffer_peek() or sgs_buffer_write() will reread the same bytes again).
+ * Returns 0 on success or -1 if the buffer does not contain enough data to
+ * satisfy the request.
  */
-uint8_t *sgs_buffer_head(sgs_buffer buffer);
+int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len);
+
 
 /*
- * function: sgs_buffer_mark()
+ * function: sgs_buffer_read()
  *
- * Marks the current head and tail positions.
+ * Copies len bytes of data out of the buffer into the specified array.  Returns
+ * 0 on success or -1 if the buffer does not contain enough data to satisfy the
+ * request.
  */
-void sgs_buffer_mark(sgs_buffer buffer);
+int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len);
 
 /*
- * function: sgs_buffer_read_update()
+ * function: sgs_buffer_read_from_fd()
  *
- * Informs the buffer that len bytes have been read from the head of the buffer.
- * If this update would result in an underflow of the buffer size (meaning the
- * user read more bytes than were actually available), -1 is returned.
- * Otherwise, 0 is returned.
+ * Copies data from the specified file descriptor into the buffer.  Copying
+ * stops if (a) the buffer runs out of room, or (b) a call to read() on the file
+ * descriptor returns any value other than the requested length.  TODO - returns?
  */
-int sgs_buffer_read_update(sgs_buffer buffer, size_t len);
-
-/*
- * function: sgs_buffer_reset()
- *
- * Resets the head and tail positions to their positions when sgs_buffer_mark()
- * was last called.  If sgs_buffer_mark() has never been called, the result is
- * undefined.
- */
-void sgs_buffer_reset(sgs_buffer buffer);
+int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd);
 
 /*
  * function: sgs_buffer_remaining_capacity()
@@ -134,31 +110,32 @@ void sgs_buffer_reset(sgs_buffer buffer);
  * to the tail of the buffer (since the buffer is circular).  For this function,
  * use sgs_buffer_writable_len().
  */
-size_t sgs_buffer_remaining_capacity(sgs_buffer buffer);
+size_t sgs_buffer_remaining_capacity(const sgs_buffer buffer);
 
 /*
  * function: sgs_buffer_size()
  *
  * Returns the current size of the stored data.
  */
-size_t sgs_buffer_size(sgs_buffer buffer);
+size_t sgs_buffer_size(const sgs_buffer buffer);
 
 /*
- * function: sgs_buffer_tail()
+ * function: sgs_buffer_write()
  *
- * Returns a pointer to the first free element of the buffer (i.e. where new
- * data should be written to add it to the buffer).
+ * Copies data into the buffer as long as the length of the data is less than
+ * the remaining capacity of the buffer, returning 0.  Otherwise, returns -1 and
+ * errno is set to ENOBUFS.
  */
-uint8_t *sgs_buffer_tail(sgs_buffer buffer);
+int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len);
 
 /*
- * function: sgs_buffer_write_update()
+ * function: sgs_buffer_write_to_fd()
  *
- * Informs the buffer that len bytes have been written to the tail of the
- * buffer.  If this update would result in an overflow of the buffer (meaning
- * the user wrote more bytes than there was room for), -1 is returned.
- * Otherwise, 0 is returned.
+ * Copies len bytes of data out of the buffer and writes them to the specified
+ * file descriptor.  Writing stops if (a) the buffer runs out of data, or (b) a
+ * call to write() on the file descriptor returns any value other than the
+ * requested length.  TODO - retuirns?
  */
-int sgs_buffer_write_update(sgs_buffer buffer, size_t len);
+int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd);
 
 #endif  /** #ifndef SGS_BUFFER_H */

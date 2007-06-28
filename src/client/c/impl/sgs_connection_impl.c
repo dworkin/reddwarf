@@ -75,9 +75,7 @@ void sgs_connection_destroy(sgs_connection_impl connection) {
 
 int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
   int result;
-  size_t len;
   socklen_t optlen;
-  uint8_t *ptr;
   
   if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
     /** Error: should not call do_io() when disconnected. */
@@ -93,25 +91,12 @@ int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
   
   if ((events & POLLIN) == POLLIN) {
     /** Read stuff off the socket and write it to the in-buffer. */
-    ptr = sgs_buffer_tail(connection->inbuf);
+    result = sgs_buffer_read_from_fd(connection->inbuf, connection->socket_fd);
+    if (result == -1) return -1;
     
-    if (sgs_buffer_can_write(connection->inbuf, SGS_CONNECTION_READ_BLOCK)) {
-      len = SGS_CONNECTION_READ_BLOCK;
-    } else {
-      len = sgs_buffer_remaining_capacity(connection->inbuf);
-    }
-    
-    if (len > 0) {
-      result = read(connection->socket_fd, ptr, len);
-      if (result == -1) return -1;
-      
-      if (result == 0) {
-        conn_closed(connection);   /** The server closed the socket. */
-        return 0;
-      }
-      
-      /** Update buffer since data was written into it. */
-      sgs_buffer_write_update(connection->inbuf, result);
+    if (result == 0) {
+      conn_closed(connection);   /** The server closed the socket. */
+      return 0;
     }
     
     /** Try to pull out messages from the inbuf and process them. */
@@ -125,21 +110,8 @@ int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
     }
     
     /** Read stuff out of the out-buffer and write it to the socket. */
-    ptr = sgs_buffer_head(connection->outbuf);
-    
-    if (sgs_buffer_can_read(connection->outbuf, SGS_CONNECTION_WRITE_BLOCK)) {
-      len = SGS_CONNECTION_WRITE_BLOCK;
-    } else {
-      len = sgs_buffer_size(connection->outbuf);
-    }
-    
-    if (len > 0) {
-      result = write(connection->socket_fd, ptr, len);
-      if (result == -1) return -1;
-      
-      /** Update buffer since (if) data was read out of it. */
-      sgs_buffer_read_update(connection->outbuf, result);
-    }
+    result = sgs_buffer_write_to_fd(connection->outbuf, connection->socket_fd);
+    if (result == -1) return -1;
   }
   
   if ((events & POLLERR) == POLLERR) {
@@ -270,26 +242,22 @@ void sgs_connection_impl_disconnect(sgs_connection_impl connection) {
   connection->expecting_disconnect = 0;
 }
 
+
 /*
  * sgs_connection_impl_io_write()
  */
 int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
                                  size_t buflen)
 {
-  if (sgs_buffer_can_write(connection->outbuf, buflen)) {
-    memcpy(sgs_buffer_tail(connection->outbuf), buf, buflen);
-    sgs_buffer_write_update(connection->outbuf, buflen);
-    
-    /**
-     * Make sure that we have registered interest in writing to the socket
-     * (unless we have not yet connected).
-     */
-    if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
-      connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1, POLLOUT);
-    }
-  } else {
-    errno = ENOBUFS;
-    return -1;
+  if (buflen == 0) return 0;
+  if (sgs_buffer_write(connection->outbuf, buf, buflen) == -1) return -1;
+  
+  /**
+   * Make sure that we have registered interest in writing to the socket
+   * (unless we have not yet connected).
+   */
+  if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
+    connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1, POLLOUT);
   }
   
   return 0;
@@ -327,25 +295,15 @@ static void conn_closed(sgs_connection_impl connection) {
  *   -1: failure (errno is set to specific error code)
  */
 static int consume_data(sgs_connection_impl connection) {
-  int8_t result;
+  uint8_t *msgbuf = connection->session->msg_buf;
   uint32_t len;
-  uint32_t *ptr;
-  sgs_message msg;
   
-  while (sgs_buffer_size(connection->inbuf) > 0) {
-    if (! sgs_buffer_can_read(connection->inbuf, 4)) break;
-    ptr = (uint32_t*)sgs_buffer_head(connection->inbuf);
-    len = ntohl(*ptr);
+  while (sgs_buffer_peek(connection->inbuf, (uint8_t*)&len, 4) != -1) {
+    len = ntohl(len);
+    if (sgs_buffer_read(connection->inbuf, msgbuf, len + 4) == -1)
+      break;  /* no room */
     
-    if (! sgs_buffer_can_read(connection->inbuf, len + 4)) break;
-    result = sgs_msg_deserialize(&msg, sgs_buffer_head(connection->inbuf), len + 4);
-    if (result == -1) return -1;
-    
-    /** Else, a full message was deserialized from buffer and read into msgbuf
-        */
-    sgs_buffer_read_update(connection->inbuf, result);
-    
-    if (sgs_session_impl_recv_msg(connection->session, &msg) == -1) return -1;
+    if (sgs_session_impl_recv_msg(connection->session) == -1) return -1;
   }
   
   return 0;

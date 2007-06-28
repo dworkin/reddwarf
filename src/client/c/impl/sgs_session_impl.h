@@ -59,6 +59,6 @@ void sgs_session_impl_destroy(sgs_session_impl session);
 void sgs_session_impl_incr_seqnum(sgs_session_impl session);
 int sgs_session_impl_login(sgs_session_impl session, const char *login, const char *password);
 int sgs_session_impl_logout(sgs_session_impl session);
-int sgs_session_impl_recv_msg(sgs_session_impl session, sgs_message *msg);
+int sgs_session_impl_recv_msg(sgs_session_impl session);
 
 #endif  /** #ifndef SGS_SESSION_IMPL_H */

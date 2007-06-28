@@ -200,21 +200,28 @@ int sgs_session_impl_logout(sgs_session_impl session) {
   return 0;
 }
 
-int sgs_session_impl_recv_msg(sgs_session_impl session, sgs_message *pmsg) {
+int sgs_session_impl_recv_msg(sgs_session_impl session) {
   int8_t result;
   uint16_t namelen, offset;
   sgs_id channel_id, sender_id;
   sgs_id *psender;
-  const uint8_t *msg_data = sgs_msg_get_data(pmsg);
-  size_t msg_datalen = sgs_msg_get_datalen(pmsg);
+  sgs_message msg;
+  const uint8_t *msg_data;
+  size_t msg_datalen;
   
-  if (sgs_msg_get_version(pmsg) != SGS_MSG_VERSION) {
+  if (sgs_msg_deserialize(&msg, session->msg_buf, sizeof(session->msg_buf)) == -1)
+    return -1;
+  
+  msg_datalen = sgs_msg_get_datalen(&msg);
+  msg_data = sgs_msg_get_data(&msg);
+  
+  if (sgs_msg_get_version(&msg) != SGS_MSG_VERSION) {
     errno = SGS_ERR_BAD_MSG_VERSION;
     return -1;
   }
   
-  if (sgs_msg_get_service(pmsg) == SGS_APPLICATION_SERVICE) {
-    switch (sgs_msg_get_opcode(pmsg)) {
+  if (sgs_msg_get_service(&msg) == SGS_APPLICATION_SERVICE) {
+    switch (sgs_msg_get_opcode(&msg)) {
     case SGS_OPCODE_LOGIN_SUCCESS:
       /** field 1: session-id (compact-id format) */
       result = sgs_id_init_from_compressed(msg_data, msg_datalen, &session->session_id);
@@ -268,8 +275,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session, sgs_message *pmsg) {
       return -1;
     }
   }
-  else if (sgs_msg_get_service(pmsg) == SGS_CHANNEL_SERVICE) {
-    switch (sgs_msg_get_opcode(pmsg)) {
+  else if (sgs_msg_get_service(&msg) == SGS_CHANNEL_SERVICE) {
+    switch (sgs_msg_get_opcode(&msg)) {
     case SGS_OPCODE_CHANNEL_JOIN:
       /**field 1: channel name (first 2 bytes = length of string) */
       namelen = read_len_header(msg_data);

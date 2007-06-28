@@ -6,16 +6,18 @@
  * This file provides an implementation of a circular byte-buffer.
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "sgs_buffer.h"
 
 /*
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
-static int realign(sgs_buffer buffer);
 static size_t readable_len(const sgs_buffer buffer);
+static size_t tailpos (const sgs_buffer buffer);
 static size_t writable_len(const sgs_buffer buffer);
 
 /*
@@ -23,37 +25,9 @@ static size_t writable_len(const sgs_buffer buffer);
  */
 
 /*
- * sgs_buffer_can_read()
- */
-int sgs_buffer_can_read(sgs_buffer buffer, size_t len) {
-  if (sgs_buffer_size(buffer) < len)
-    return 0;
-  
-  if (readable_len(buffer) < len) {
-    if (realign(buffer) == -1) return 0;
-  }
-  
-  return 1;
-}
-
-/*
- * sgs_buffer_can_write()
- */
-int sgs_buffer_can_write(sgs_buffer buffer, size_t len) {
-  if (sgs_buffer_remaining_capacity(buffer) < len)
-    return 0;
-  
-  if (writable_len(buffer) < len) {
-    if (realign(buffer) == -1) return 0;
-  }
-  
-  return 1;
-}
-
-/*
  * sgs_buffer_capacity()
  */
-size_t sgs_buffer_capacity(sgs_buffer buffer) {
+size_t sgs_buffer_capacity(const sgs_buffer buffer) {
   return buffer->capacity;
 }
 
@@ -98,74 +72,106 @@ void sgs_buffer_empty(sgs_buffer buffer) {
 }
 
 /*
- * sgs_buffer_head()
+ * sgs_buffer_peek()
  */
-uint8_t *sgs_buffer_head(sgs_buffer buffer) {
-  return buffer->buf + buffer->position;
-}
-
-/*
- * sgs_buffer_mark()
- */
-void sgs_buffer_mark(sgs_buffer buffer) {
-  buffer->marked_position = buffer->position;
-  buffer->marked_size = buffer->size;
-}
-
-/*
- * sgs_buffer_read_update()
- */
-int sgs_buffer_read_update(sgs_buffer buffer, size_t len) {
-  /* Check for underflow. */
-  if (len > readable_len(buffer)) return -1;
+int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len) {
+  size_t readable = readable_len(buffer);
   
-  /** Advance head pointer to new position. */
-  buffer->position = (buffer->position + len) % buffer->capacity;
-  buffer->size -= len;
+  if (len > buffer->size) return -1;
   
-  /** Note necessary, but convenient and more efficient... */
-  if (buffer->size == 0) buffer->position = 0;
+  if (readable >= len) {
+    memcpy(data, buffer->buf + buffer->position, len);
+  } else {
+    memcpy(data, buffer->buf + buffer->position, readable);
+    memcpy(data + readable, buffer->buf, len - readable);
+  }
   
   return 0;
 }
 
 /*
- * sgs_buffer_reset()
+ * sgs_buffer_read()
  */
-void sgs_buffer_reset(sgs_buffer buffer) {
-  buffer->position = buffer->marked_position;
-  buffer->size = buffer->marked_size;
+int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len) {
+  if (sgs_buffer_peek(buffer, data, len) == -1) return -1;
+  
+  buffer->position = (buffer->position + len) % buffer->capacity;
+  buffer->size -= len;
+  return 0;
+}
+
+/*
+ * sgs_buffer_read_from_fd()
+ */
+int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd) {
+  size_t result, total = 0, writable = writable_len(buffer);
+  
+  while (writable > 0) {
+    result = read(fd, buffer->buf + tailpos(buffer), writable);
+    if (result == -1) return -1;  /* error */
+    if (result == 0) return 0;    /* EOF */
+    total += result;
+    buffer->size += result;
+    if (result != writable) return total;  /* partial read */
+    writable = writable_len(buffer);
+  }
+  
+  return total;  /* buffer is full */
 }
 
 /*
  * sgs_buffer_remaining_capacity()
  */
-size_t sgs_buffer_remaining_capacity(sgs_buffer buffer) {
+size_t sgs_buffer_remaining_capacity(const sgs_buffer buffer) {
   return buffer->capacity - buffer->size;
 }
 
 /*
  * sgs_buffer_size()
  */
-size_t sgs_buffer_size(sgs_buffer buffer) {
+size_t sgs_buffer_size(const sgs_buffer buffer) {
   return buffer->size;
 }
 
 /*
- * sgs_buffer_tail()
+ * sgs_buffer_write()
  */
-uint8_t *sgs_buffer_tail(sgs_buffer buffer) {
-  return buffer->buf + (buffer->position + buffer->size) % buffer->capacity;
-}
-
-/*
- * sgs_buffer_write_update()
- */
-int sgs_buffer_write_update(sgs_buffer buffer, size_t len) {
-  if (len > writable_len(buffer)) return -1;
+int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len) {
+  size_t writable = writable_len(buffer);
+  
+  if (len > sgs_buffer_remaining_capacity(buffer)) {
+    errno = ENOBUFS;
+    return -1;
+  }
+  
+  if (writable >= len) {
+    memcpy(buffer->buf + tailpos(buffer), data, len);
+  } else {
+    memcpy(buffer->buf + tailpos(buffer), data, writable);
+    memcpy(buffer->buf, data + writable, len - writable);
+  }
   
   buffer->size += len;
   return 0;
+}
+
+/*
+ * sgs_buffer_write_to_fd()
+ */
+int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd) {
+  size_t result, total = 0, readable = readable_len(buffer);
+  
+  while (readable > 0) {
+    result = write(fd, buffer->buf + buffer->position, readable);
+    if (result == -1) return -1;  /* error */
+    total += result;
+    buffer->position = (buffer->position + result) % buffer->capacity;
+    buffer->size -= result;
+    if (result != readable) return total;  /* partial write */
+    readable = readable_len(buffer);
+  }
+  
+  return total;  /* buffer is empty */
 }
 
 /*
@@ -173,41 +179,10 @@ int sgs_buffer_write_update(sgs_buffer buffer, size_t len) {
  */
 
 /*
- * realign()
- */
-static int realign(sgs_buffer buffer) {
-  size_t tailpos = (buffer->position + buffer->size) % buffer->capacity;
-  uint8_t *copybuf;
-  size_t readable = readable_len(buffer);
-  
-  if (tailpos >= buffer->position) {
-    /** The stored data has not wrapped yet. */
-    memmove(buffer->buf, buffer->buf + buffer->position, buffer->size);
-  } else {
-    /**
-     * The stored data HAS wrapped, which makes this trickier; an easy solution
-     * is to just reallocate the buffer and copy over the data.
-     */
-    copybuf = (uint8_t*)malloc(buffer->capacity);
-    if (copybuf == NULL) return -1;
-    
-    memcpy(copybuf, buffer->buf + buffer->position, readable);
-    memcpy(copybuf + readable, buffer->buf, tailpos);
-    
-    free(buffer->buf);
-    buffer->buf = copybuf;
-  }
-  
-  return 0;
-}
-
-/*
  * readable_len()
  */
 static size_t readable_len(const sgs_buffer buffer) {
-  size_t tailpos = (buffer->position + buffer->size) % buffer->capacity;
-  
-  if (tailpos >= buffer->position) {
+  if (tailpos(buffer) >= buffer->position) {
     /*
      * The stored data has not wrapped yet, so we can read until we read the
      * tail.
@@ -223,19 +198,26 @@ static size_t readable_len(const sgs_buffer buffer) {
 }
 
 /*
+ * tailpos()
+ */
+static size_t tailpos(const sgs_buffer buffer) {
+  return (buffer->position + buffer->size) % buffer->capacity;
+}
+
+/*
  * writable_len()
  */
 static size_t writable_len(const sgs_buffer buffer) {
-  size_t tailpos = (buffer->position + buffer->size) % buffer->capacity;
+  size_t mytailpos = tailpos(buffer);
   
-  if (tailpos >= buffer->position) {
+  if (mytailpos >= buffer->position) {
     /*
      * The stored data has not wrapped yet, so we can write until we reach the
      * end of the memory block.
      */
-    return buffer->capacity - tailpos;
+    return buffer->capacity - mytailpos;
   } else {
     /** The stored data HAS wrapped, so we can write until we reach the head. */
-    return buffer->position - tailpos;
+    return buffer->position - mytailpos;
   }
 }
