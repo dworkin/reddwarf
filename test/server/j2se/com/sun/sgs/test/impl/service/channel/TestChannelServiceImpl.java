@@ -60,6 +60,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -99,6 +100,8 @@ public class TestChannelServiceImpl extends TestCase {
     private static final int WAIT_TIME = 2000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
+
+    private static final Set<CompactId> ALL_MEMBERS = new HashSet<CompactId>();
     
     private static Object disconnectedCallbackLock = new Object();
     
@@ -185,7 +188,7 @@ public class TestChannelServiceImpl extends TestCase {
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
-	txn.commit();
+	commitTransaction();
 	createTransaction(1000);
     }
 
@@ -332,7 +335,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testCreateChannelNoTxn() throws Exception { 
-	txn.commit();
+	commitTransaction();
 	try {
 	    createChannel();
 	    fail("Expected TransactionNotActiveException");
@@ -385,7 +388,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testGetChannelNoTxn() throws Exception {
-	txn.commit();
+	commitTransaction();
 	try {
 	    channelService.getChannel("foo");
 	    fail("Expected TransactionNotActiveException");
@@ -410,7 +413,7 @@ public class TestChannelServiceImpl extends TestCase {
 	
     public void testCreateAndGetChannelDifferentTxn() throws Exception {
 	Channel channel1 = createChannel("testy");
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	Channel channel2 = channelService.getChannel("testy");
 	if (channel1 == channel2) {
@@ -443,7 +446,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetNameNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.getName();
 	    fail("Expected TransactionNotActiveException");
@@ -454,7 +457,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetNameMismatchedTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel.getName();
@@ -487,7 +490,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetDeliveryNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.getDeliveryRequirement();
 	    fail("Expected TransactionNotActiveException");
@@ -498,7 +501,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetDeliveryMismatchedTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel.getDeliveryRequirement();
@@ -537,7 +540,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelJoinNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.join(new DummyClientSession("dummy"), null);
 	    fail("Expected TransactionNotActiveException");
@@ -589,7 +592,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    savedSessions.add(session);
 	    channel.join(session, new DummyChannelListener(channel));
 	}
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
@@ -609,7 +612,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	} finally {
 	    channel.close();
-	    txn.commit();
+	    commitTransaction();
 	}
     }
 
@@ -624,7 +627,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    savedSessions.add(session);
 	    channel.join(session, new DummyChannelListener());
 	}
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
@@ -644,7 +647,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	} finally {
 	    channel.close();
-	    txn.commit();
+	    commitTransaction();
 	}
     }
 
@@ -652,7 +655,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelLeaveNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.leave(new DummyClientSession("dummy"));
 	    fail("Expected TransactionNotActiveException");
@@ -701,7 +704,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    savedSessions.add(session);
 	    channel.join(session, new DummyChannelListener());
 	}
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
@@ -729,7 +732,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	} finally {
 	    channel.close();
-	    txn.commit();
+	    commitTransaction();
 	}
     }
 
@@ -737,7 +740,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelLeaveAllNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.leaveAll();
 	    fail("Expected TransactionNotActiveException");
@@ -774,7 +777,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    savedSessions.add(session);
 	    channel.join(session, new DummyChannelListener());
 	}
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
@@ -800,7 +803,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	} finally {
 	    channel.close();
-	    txn.commit();
+	    commitTransaction();
 	}
     }
 
@@ -808,7 +811,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelHasSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.hasSessions();
 	    fail("Expected TransactionNotActiveException");
@@ -849,7 +852,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.getSessions();
 	    fail("Expected TransactionNotActiveException");
@@ -900,7 +903,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.send(testMessage);
 	    fail("Expected TransactionNotActiveException");
@@ -925,7 +928,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendToOneNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.send(new DummyClientSession("dummy"), testMessage);
 	    fail("Expected TransactionNotActiveException");
@@ -949,7 +952,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendToMultiplelNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	Set<ClientSession> sessions = new HashSet<ClientSession>();
 	sessions.add(new DummyClientSession("dummy"));
 	try {
@@ -977,7 +980,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelCloseNoTxn() throws Exception {
 	Channel channel = createChannel();
-	txn.commit();
+	commitTransaction();
 	try {
 	    channel.close();
 	    fail("Expected TransactionNotActiveException");
@@ -989,7 +992,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelClose() throws Exception {
 	String name = "closeTest";
 	Channel channel = createChannel(name);
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	channel = channelService.getChannel(name);
 	channel.close();
@@ -999,13 +1002,13 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (NameNotBoundException e) {
 	    System.err.println(e);
 	}
-	txn.commit();
+	commitTransaction();
     }
 
     public void testChannelCloseTwice() throws Exception {
 	String name = "closeTest";
 	Channel channel = createChannel(name);
-	txn.commit();
+	commitTransaction();
 	createTransaction();
 	channel = channelService.getChannel(name);
 	channel.close();
@@ -1017,11 +1020,11 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	channel.close();
 	System.err.println("Channel closed twice");
-	txn.commit();
+	commitTransaction();
     }
 
     public void testChannelJoinReceivedByClient() throws Exception {
-	txn.commit();
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
 	    createChannelAndClientGroup(name,
@@ -1045,13 +1048,13 @@ public class TestChannelServiceImpl extends TestCase {
     {
 	createTransaction();
 	createChannel(name);
-	txn.commit();
+	commitTransaction();
 	registerAppListener();
 	return new ClientGroup(users);
     }
 
     public void testChannelLeaveReceivedByClient() throws Exception {
-	txn.commit();
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
 	    createChannelAndClientGroup(name,
@@ -1071,7 +1074,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
-	txn.commit();
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
 	    createChannelAndClientGroup(name,
@@ -1093,7 +1096,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testChannelSetsRemovedOnLogout() throws Exception {
-	txn.commit();
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
 	    createChannelAndClientGroup(name,
@@ -1117,7 +1120,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionsRemovedOnCrash() throws Exception {
-	txn.commit();
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
 	    createChannelAndClientGroup(name,
@@ -1145,16 +1148,17 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
-    
-    public void testSendFromSessionToChannel() throws Exception {
-	txn.commit();
+
+    public void testSendFromSessionToSession() throws Exception {
+	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
-	    createChannelAndClientGroup(name, "moe", "larry");
+	    createChannelAndClientGroup(name, "moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    DummyClient moe = group.getClient("moe");
 	    DummyClient larry = group.getClient("larry");
+	    DummyClient curly = group.getClient("curly");
 	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
 	    int numMessages = 3;
 	    Set<CompactId> recipientIds = new HashSet<CompactId>();
@@ -1195,6 +1199,10 @@ public class TestChannelServiceImpl extends TestCase {
 		fail("sender received channel message");
 	    }
 
+	    if (curly.nextChannelMessage() != null) {
+		fail("non-recipient received channel message");
+	    }
+
 	    
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
@@ -1202,6 +1210,115 @@ public class TestChannelServiceImpl extends TestCase {
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
+	}
+    }
+    
+    public void testSendtoAllChannelMembers() throws Exception {
+	commitTransaction();
+	ClientGroup group =
+	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry", "curly");
+
+	try {
+	    boolean failed = false;
+	    group.join(CHANNEL_NAME);
+	    String senderName = "moe";
+	    DummyClient sender = group.getClient(senderName);
+	    CompactId channelId = sender.channelNameToId.get(CHANNEL_NAME);
+	    String messageString = "from moe";
+	    MessageBuffer buf =
+		new MessageBuffer(MessageBuffer.getSize(messageString) + 4);
+	    buf.putString(messageString).
+		putInt(0);
+	    
+	    sender.sendChannelMessage(channelId, ALL_MEMBERS, buf.getBuffer());
+
+	    for (DummyClient client : group.getClients()) {
+		MessageInfo info = client.nextChannelMessage();
+		if (senderName.equals(client.name)) {
+		    if (info != null) {
+			failed = true;
+			System.err.println(
+			    "sender:" + senderName + " recieved message");
+		    }
+		} else {
+		    if (info != null) {
+			buf = new MessageBuffer(info.message);
+			String message = buf.getString();
+			if (!message.equals(messageString)) {
+			    fail("Got message: " + message + ", Expected: " +
+				 messageString);
+			}
+			System.err.println(
+			    client.name + " got channel message: " + message);
+		    } else {
+			failed = true;
+			System.err.println(
+ 			    "member:" + client.name + " did not get message");
+		    }
+		}
+	    }
+
+	    if (failed) {
+		fail("test failed");
+	    }
+	    
+	} catch (RuntimeException e) {
+	    System.err.println("unexpected failure");
+	    e.printStackTrace();
+	    fail("unexpected failure: " + e);
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
+    public void testSendFromNonMemberSession() throws Exception {
+	commitTransaction();
+	ClientGroup group =
+	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry");
+	ClientGroup outcast = new ClientGroup("curly");
+
+	try {
+	    boolean failed = false;
+	    group.join(CHANNEL_NAME);
+	    DummyClient moe = group.getClient("moe");
+	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
+	    DummyClient curly = outcast.getClient("curly");
+	    String messageString = "from curly";
+	    MessageBuffer buf =
+		new MessageBuffer(MessageBuffer.getSize(messageString) + 4);
+	    buf.putString(messageString).
+		putInt(0);
+	    
+	    curly.sendChannelMessage(channelId, ALL_MEMBERS, buf.getBuffer());
+
+	    for (DummyClient client : group.getClients()) {
+		MessageInfo info = client.nextChannelMessage();
+		if (info != null) {
+		    buf = new MessageBuffer(info.message);
+		    String message = buf.getString();
+		    System.err.println(
+			client.name + " got channel message: " + message);
+		    failed = true;
+		}
+	    }
+
+	    if (failed) {
+		fail("one or more clients got channel message");
+	    }
+	    
+	} catch (RuntimeException e) {
+	    System.err.println("unexpected failure");
+	    e.printStackTrace();
+	    fail("unexpected failure: " + e);
+	} finally {
+	    try {
+		group.disconnect(false);
+	    } catch (Exception e) {
+	    }
+	    try {
+		outcast.disconnect(false);
+	    } catch (Exception e) {
+	    }
 	}
     }
     
@@ -1217,7 +1334,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final Map<String, DummyClient> clients =
 	    new HashMap<String, DummyClient>();
 
-	ClientGroup(String[] users) {
+	ClientGroup(String... users) {
 	    this.users = users;
 	    for (String user : users) {
 		DummyClient client = new DummyClient();
@@ -1261,7 +1378,7 @@ public class TestChannelServiceImpl extends TestCase {
 		}
 	    }
 
-	    txn.commit();
+	    commitTransaction();
 	}
 
 	void checkChannelSets(boolean exists) throws Exception {
@@ -1282,11 +1399,15 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		}
 	    }
-	    txn.commit();
+	    commitTransaction();
 	}
 
 	DummyClient getClient(String name) {
 	    return clients.get(name);
+	}
+
+	Collection<DummyClient> getClients() {
+	    return clients.values();
 	}
 	
 	void disconnect(boolean graceful) {
@@ -1353,6 +1474,12 @@ public class TestChannelServiceImpl extends TestCase {
 	txn = new DummyTransaction(timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
+    }
+
+    private void commitTransaction() throws Exception {
+	txn.commit();
+	txnProxy.setCurrentTransaction(null);
+	txn = null;
     }
     
     /** Creates a property list with the specified keys and values. */
@@ -1531,7 +1658,7 @@ public class TestChannelServiceImpl extends TestCase {
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
 	    StandardProperties.APP_LISTENER, appListener);
-	txn.commit();
+	commitTransaction();
     }
     
     private DummyAppListener getAppListener() {
