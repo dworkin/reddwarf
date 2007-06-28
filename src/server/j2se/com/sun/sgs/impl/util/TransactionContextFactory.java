@@ -160,18 +160,22 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	public void commit(Transaction txn) {
 	    try {
 		T context = contextMap.checkTransaction(txn);
-		if (! context.isPrepared()) {
-		    RuntimeException e = 
-			new IllegalStateException("transaction not prepared");
-		    if (logger.isLoggable(Level.WARNING)) {
-			logger.logThrow(
-			    Level.WARNING, e,
-			    "commit: not yet prepared txn:{0}",
-			    txn);
+		try {
+		    if (! context.isPrepared()) {
+			RuntimeException e = 
+			    new IllegalStateException(
+				"transaction not prepared");
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.logThrow(
+				Level.WARNING, e,
+				"commit: not yet prepared txn:{0}",
+				txn);
+			}
+			throw e;
 		    }
-		    throw e;
+		} finally {
+		    contextMap.clearContext();
 		}
-		contextMap.clearContext();
 		context.commit();
 		logger.log(Level.FINER, "commit txn:{0} returns", txn);
 
