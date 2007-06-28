@@ -51,13 +51,19 @@ chatclient: $(ODIR)/example/sgs_chat_client.o $(DEPS) $(ODIR)/impl/sgs_connectio
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/chatclient $^
 
+buffertest: $(ODIR)/sgs_buffer.o $(ODIR)/test/sgs_buffer_test.o
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/buffertest $^
+
 idtest: $(ODIR)/sgs_id.o $(ODIR)/test/sgs_id_test.o $(ODIR)/sgs_hex_utils.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/idtest $^
 
-messagetest: $(ODIR)/impl/sgs_message_impl.o $(ODIR)/test/sgs_message_test.o
+messagetest: $(ODIR)/sgs_message.o $(ODIR)/test/sgs_message_test.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/messagetest $^
+
+tests: buffertest idtest messagetest
 
 tar:
 	mv -f c_backups.tar c_backups.tar.prev
