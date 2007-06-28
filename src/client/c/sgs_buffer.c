@@ -182,7 +182,9 @@ int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd) {
  * readable_len()
  */
 static size_t readable_len(const sgs_buffer buffer) {
-  if (tailpos(buffer) >= buffer->position) {
+  if (buffer->size == 0) return 0;
+  
+  if (tailpos(buffer) > buffer->position) {
     /*
      * The stored data has not wrapped yet, so we can read until we read the
      * tail.
