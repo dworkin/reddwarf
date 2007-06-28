@@ -146,9 +146,8 @@ public class MethodRequest {
 	}
 	// fail silently
 	catch (IOException ioe) { }
-	finally {
-	    return new byte[]{ };
-	}
+	
+	return new byte[]{ };
     }
 
     /**
@@ -177,9 +176,8 @@ public class MethodRequest {
 	catch (StreamCorruptedException sce) { }
 	catch (OptionalDataException ode) { }
 	catch (IOException ioe) { }
-	finally {
-	    return new Object[] { };
-	}
+
+	return new Object[] { };
     } 
 
     /**
