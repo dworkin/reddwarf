@@ -15,10 +15,10 @@ import java.math.BigInteger;
 
 /**
  * Encapsulates the layout of meta data stored at the start of the info
- * database.  This class cannot be instantiated.
+ * database, and in the classes database.  This class cannot be instantiated.
  *
- * The value for key 0 stores a magic number common to all DataStoreImpl
- * databases.
+ * In the info database, the value for key 0 stores a magic number common to
+ * all DataStoreImpl databases.
  *
  * Key 1 stores the major version number, which must match the value in the
  * current version of the implementation.
@@ -32,10 +32,38 @@ import java.math.BigInteger;
  * Key 4 stores the ID of the next free transaction ID number for the network
  * version to use in allocating transactions.
  *
+ * In the classes database, keys whose initial byte is 1 map the SHA-1 hash of
+ * the serialized form of a class descriptor (a ObjectStreamClass) to the class
+ * ID, which is 4 byte integer.
+ *
+ * Keys whose initial byte is 2 map a class ID to the bytes making up the
+ * serialized form of the associated class descriptor.  Since these entries
+ * come at the end, we can find the next class ID by using a cursor to find the
+ * last entry.
+ *
+ * In the names database, keys are the UTF8 encoding of binding names, and
+ * values are the object IDs of the associated objects.
+ *
+ * In the oids database, keys are object IDs, and values are the bytes
+ * representing the associated objects.
+ *
+ * As of version 3, the serialized forms used for the object values are
+ * compressed as follows:
+ *
+ * - If the first byte is 1, then the value was created by serialization
+ *   protocol version 2, and the 4 bytes at the start of that format have been
+ *   elided.  Otherwise, the first byte is 2, and is followed by the
+ *   uncompressed data.
+ *
+ * - Class descriptors in the serialized form have been replaced by an integer
+ *   which refers to a class ID stored in the classes database.  The class IDs
+ *   themselves have been compressed using the Int30 class
+ *
  * Version history:
  *
  * Version 1.0: Initial version, 11/3/2006
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
+ * Version 3.0: Add classes DB, compress object values, 5/18/2007
  */
 final class DataStoreHeader {
 
@@ -61,7 +89,7 @@ final class DataStoreHeader {
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 2;
+    static final short MAJOR_VERSION = 3;
 
     /** The minor version number. */
     static final short MINOR_VERSION = 0;
@@ -71,6 +99,16 @@ final class DataStoreHeader {
 
     /** The first free transaction ID. */
     static final long INITIAL_NEXT_TXN_ID = 1;
+
+    /** The first byte stored in keys for the classes database hash keys. */
+    static final byte CLASS_HASH_PREFIX = 1;
+
+    /**
+     * The first byte value stored in class ID keys.  This value should be
+     * greater than CLASS_HASH, to insure that class ID keys come after class
+     * hash ones.
+     */
+    static final byte CLASS_ID_PREFIX = 2;
 
     /** This class cannot be instantiated. */
     private DataStoreHeader() {

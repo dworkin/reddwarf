@@ -10,9 +10,6 @@ import com.sun.sgs.auth.IdentityCredentials;
 /**
  * This simple implementation of <code>IdentityCredentials</code> is used to
  * represent a name and password pair.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class NamePasswordCredentials implements IdentityCredentials
 {

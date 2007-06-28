@@ -20,7 +20,6 @@ public class TestSimpleClient extends TestCase {
 	    new DummySimpleClientListener();
 
 	SimpleClient client = new SimpleClient(listener);
-	String connectFailureMessage = "oops";
 	long timeout = 1000;
 	Properties props =
 	    createProperties(

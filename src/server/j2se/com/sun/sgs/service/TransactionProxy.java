@@ -5,6 +5,7 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 
 import com.sun.sgs.kernel.TaskOwner;
 
@@ -13,9 +14,6 @@ import com.sun.sgs.kernel.TaskOwner;
  * This is a proxy that provides access to the current transaction and
  * its owner. Note that there is only ever one instance of
  * <code>TransactionProxy</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TransactionProxy {
 
@@ -28,6 +26,8 @@ public interface TransactionProxy {
      *                                       transaction, or if the current
      *                                       transaction has already started
      *                                       preparing or aborting
+     * @throws TransactionTimeoutException if the current transaction has
+     *                                     timed out
      */
     public Transaction getCurrentTransaction();
 

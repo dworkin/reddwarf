@@ -9,10 +9,13 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
@@ -41,7 +44,7 @@ public class TestDataStoreImpl extends TestCase {
 	"TestDataStoreImpl.db";
 
     /** An instance of the data store, to test. */
-    static DataStore store;
+    protected static DataStore store;
 
     /** Make sure an empty version of the directory exists. */
     static {
@@ -55,10 +58,10 @@ public class TestDataStoreImpl extends TestCase {
     protected Properties props;
 
     /** An initial, open transaction. */
-    DummyTransaction txn;
+    protected DummyTransaction txn;
 
     /** The object ID of a newly created object. */
-    long id;
+    protected long id;
 
     /** Creates the test. */
     public TestDataStoreImpl(String name) {
@@ -68,7 +71,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Prints the test case, and creates the data store and an object. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
 	props = getProperties();
 	if (store == null) {
 	    store = createDataStore();
@@ -104,6 +107,8 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
     }
+
+    /* -- Tests -- */
 
     /* -- Test constructor -- */
 
@@ -1124,6 +1129,20 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testPrepareTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 100);
+	store.setObject(txn, id, new byte[] { 1 });
+	Thread.sleep(200);
+	try {
+	    txn.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    txn = null;
+	    System.err.println(e);
+	}
+    }
+
     /* -- Unusual states -- */
     private final Action prepare = new Action() {
 	private TransactionParticipant participant;
@@ -1168,6 +1187,20 @@ public class TestDataStoreImpl extends TestCase {
 	    participant.prepareAndCommit(null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPrepareAndCommitTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.YES, 100);
+	store.setObject(txn, id, new byte[] { 1 });
+	Thread.sleep(200);
+	try {
+	    txn.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    txn = null;
 	    System.err.println(e);
 	}
     }
@@ -1223,6 +1256,42 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
+	}
+    }
+
+    /** Make sure that commits don't timeout. */
+    public void testCommitNoTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 1000) {
+	    public void join(final TransactionParticipant participant) {
+		super.join(new TransactionParticipant() {
+		    public boolean prepare(Transaction txn) throws Exception {
+			return participant.prepare(txn);
+		    }
+		    public void commit(Transaction txn) {
+			try {
+			    Thread.sleep(1100);
+			    participant.commit(txn);
+			} catch (Exception e) {
+			    fail("Unexpected exception: " + e);
+			}
+		    }
+		    public void prepareAndCommit(Transaction txn)
+			throws Exception
+		    {
+			participant.prepareAndCommit(txn);
+		    }
+		    public void abort(Transaction txn) {
+			participant.abort(txn);
+		    }
+		});
+	    }
+	};
+	store.setBinding(txn, "foo", id);
+	try {
+	    txn.commit();
+	} finally {
+	    txn = null;
 	}
     }
 
@@ -1347,19 +1416,157 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue(Arrays.equals(bytes, value));
     }
 
+    /* -- Test getClassId -- */
+
+    public void testGetClassIdNullArgs() {
+	byte[] bytes = { 0, 1, 2, 3, 4 };
+	try {
+	    store.getClassId(null, bytes);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassId(txn, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassIdNonStandardBytes() throws Exception {
+	testGetClassIdBytes();
+	testGetClassIdBytes((byte) 1);
+	testGetClassIdBytes((byte) 2);
+	testGetClassIdBytes((byte) 3, (byte) 4);
+	testGetClassIdBytes((byte) 5, (byte) 6, (byte) 0xff);
+	testGetClassIdBytes((byte) 0xac, (byte) 0xed, (byte) 0, (byte) 5);
+	testGetClassIdBytes((byte) 0xac, (byte) 0xed, (byte) 0, (byte) 4);
+    }
+	
+    private void testGetClassIdBytes(byte... bytes) throws Exception {
+	int id = store.getClassId(txn, bytes);
+	assertTrue(id > 0);
+	byte[] storedBytes = store.getClassInfo(txn, id);
+	assertEquals(Arrays.toString(bytes), Arrays.toString(storedBytes));
+    }
+
+    /* -- Unusual states: getClassId -- */
+    private final Action getClassId = new Action() {
+	void run() { store.getClassId(txn, new byte[0]); };
+    };
+    public void testGetClassIdAborted() throws Exception {
+	testAborted(getClassId);
+    }
+    public void testGetClassIdPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getClassId);
+    }
+    public void testGetClassIdPreparedModified() throws Exception {
+	testPreparedModified(getClassId);
+    }
+    public void testGetClassIdCommitted() throws Exception {
+	testCommitted(getClassId);
+    }
+    public void testGetClassIdWrongTxn() throws Exception {
+	testWrongTxn(getClassId);
+    }
+    public void testGetClassIdShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getClassId);
+    }
+    public void testGetClassIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getClassId);
+    }
+    public void testGetClassIdShutdown() throws Exception {
+	testShutdown(getClassId);
+    }
+
+    /* -- Test getClassInfo -- */
+
+    public void testGetClassInfoBadArgs() throws Exception {
+	try {
+	    store.getClassInfo(null, 1);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassInfo(txn, 0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassInfo(txn, -1);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassInfoNotFound() {
+	try {
+	    store.getClassInfo(txn, 56789);
+	    fail("Expected ClassInfoNotFoundException");
+	} catch (ClassInfoNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassInfoAfterRestart() throws Exception {
+	byte[] bytes = { 1, 2, 3, 4, 5, 6 };
+	int id = store.getClassId(txn, bytes);
+	txn.commit();
+	store.shutdown();
+	store = createDataStore();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertEquals(Arrays.toString(bytes),
+		     Arrays.toString(store.getClassInfo(txn, id)));
+    }
+
+    /* -- Unusual states: getClassInfo -- */
+    private final Action getClassInfo = new Action() {
+	void run() throws Exception { store.getClassInfo(txn, 1); };
+    };
+    public void testGetClassInfoAborted() throws Exception {
+	testAborted(getClassInfo);
+    }
+    public void testGetClassInfoPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getClassInfo);
+    }
+    public void testGetClassInfoPreparedModified() throws Exception {
+	testPreparedModified(getClassInfo);
+    }
+    public void testGetClassInfoCommitted() throws Exception {
+	testCommitted(getClassInfo);
+    }
+    public void testGetClassInfoWrongTxn() throws Exception {
+	testWrongTxn(getClassInfo);
+    }
+    public void testGetClassInfoShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getClassInfo);
+    }
+    public void testGetClassInfoShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getClassInfo);
+    }
+    public void testGetClassInfoShutdown() throws Exception {
+	testShutdown(getClassInfo);
+    }
+
     /* -- Test deadlock -- */
     @SuppressWarnings("hiding")
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = new DummyTransaction(
+		    UsePrepareAndCommit.ARBITRARY, 1000);
 	    }
 	    final long id = store.createObject(txn);
 	    store.setObject(txn, id, new byte[] { 0 });
 	    final long id2 = store.createObject(txn);
 	    store.setObject(txn, id2, new byte[] { 0 });
 	    txn.commit();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = new DummyTransaction(
+		UsePrepareAndCommit.ARBITRARY, 1000);
 	    store.getObject(txn, id, false);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -1370,7 +1577,7 @@ public class TestDataStoreImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			store.getObject(txn2, id2, false);
 			flag.release();
 			store.getObject(txn2, id, true);

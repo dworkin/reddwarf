@@ -7,12 +7,17 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
+import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
-import com.sun.sgs.service.TransactionProxy;
+import java.util.LinkedList;
+import java.util.List;
 
 /** Stores information for a specific transaction. */
-final class Context {
+final class Context extends TransactionContext {
+
+    /** The data service. */
+    private final DataServiceImpl service;
 
     /** The data store. */
     final DataStore store;
@@ -25,9 +30,6 @@ final class Context {
      */
     final TxnTrampoline txn;
 
-    /** The transaction proxy, for obtaining the current active transaction. */
-    final TransactionProxy txnProxy;
-
     /**
      * The number of operations to skip between checks of the consistency of
      * the reference table.
@@ -36,6 +38,9 @@ final class Context {
 
     /** Whether to detect modifications. */
     final boolean detectModifications;
+
+    /** Controls serializing classes. */
+    final ClassSerialization classSerial;
 
     /**
      * The number of operations performed -- used to determine when to make
@@ -55,20 +60,29 @@ final class Context {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /**
+     * A list of operations to run after abort, or null if there are no abort
+     * actions.
+     */
+    private List<Runnable> abortActions = null;
+
     /** Creates an instance of this class. */
-    Context(DataStore store,
+    Context(DataServiceImpl service,
+	    DataStore store,
 	    Transaction txn,
-	    TransactionProxy txnProxy,
 	    int debugCheckInterval,
-	    boolean detectModifications)
+	    boolean detectModifications,
+	    ClassesTable classesTable)
     {
-	assert store != null && txn != null && txnProxy != null
-	    : "Store, txn, or txnProxy is null";
+	super(txn);
+	assert service != null && store != null && txn != null &&
+	    classesTable != null;
+	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
-	this.txnProxy = txnProxy;
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	classSerial = classesTable.createClassSerialization(this.txn);
     }
 
     /**
@@ -98,6 +112,14 @@ final class Context {
 
 	public long getCreationTime() {
 	    return originalTxn.getCreationTime();
+	}
+
+	public long getTimeout() {
+	    return originalTxn.getTimeout();
+	}
+
+	public void checkTimeout() {
+	    originalTxn.checkTimeout();
 	}
 
 	public void join(TransactionParticipant participant) {
@@ -146,18 +168,6 @@ final class Context {
 
 	/* -- Other methods -- */
 
-	/**
-	 * Checks that the specified transaction equals the original one, and
-	 * throws IllegalStateException if not.
-	 */
-	void check(Transaction otherTxn) {
-	    if (!originalTxn.equals(otherTxn)) {
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + originalTxn +
-		    ", found " + otherTxn);
-	    }
-	}
-
 	/** Notes that this transaction is inactive. */
 	void setInactive() {
 	    inactive = true;
@@ -190,7 +200,7 @@ final class Context {
     <T> T getBinding(String internalName, Class<T> type) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return getReference(id).get(type);
+	return getReference(id).get(type, false);
     }
 
     /** Sets the object associated with the specified internal name. */
@@ -208,26 +218,33 @@ final class Context {
 	return store.nextBoundName(txn, internalName);
     }
 
-    /* -- Methods for TransactionParticipant -- */
+    /* -- Methods for TransactionContext -- */
 
-    boolean prepare() throws Exception {
+    @Override
+    public boolean prepare() throws Exception {
+	isPrepared = true;
 	txn.setInactive();
 	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant == null) {
+	    isCommitted = true;
 	    return true;
 	} else {
 	    return storeParticipant.prepare(txn);
 	}
     }
 
-    void commit() {
+    @Override
+    public void commit() {
+	isCommitted = true;
 	txn.setInactive();
 	if (storeParticipant != null) {
 	    storeParticipant.commit(txn);
 	}
     }
 
-    void prepareAndCommit() throws Exception {
+    @Override
+    public void prepareAndCommit() throws Exception {
+	isCommitted = true;
 	txn.setInactive();
 	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant != null) {
@@ -235,10 +252,16 @@ final class Context {
 	}
     }
 
-    void abort() {
+    @Override
+    public void abort(boolean retryable) {
 	txn.setInactive();
 	if (storeParticipant != null) {
 	    storeParticipant.abort(txn);
+	}
+	if (abortActions != null) {
+	    for (Runnable action : abortActions) {
+		action.run();
+	    }
 	}
     }
 
@@ -256,11 +279,19 @@ final class Context {
 	}
     }
 
+    /** Checks that the service is running or shutting down. */
+    void checkState() {
+	service.checkState();
+    }
+
     /**
-     * Check that the specified transaction equals the original one, and throw
-     * IllegalStateException if not.
+     * Adds an action to be performed on abort, to roll back transient state
+     * changes.
      */
-    void checkTxn(Transaction otherTxn) {
-	txn.check(otherTxn);
+    void addAbortAction(Runnable action) {
+	if (abortActions == null) {
+	    abortActions = new LinkedList<Runnable>();
+	}
+	abortActions.add(action);
     }
 }

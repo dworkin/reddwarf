@@ -30,6 +30,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
@@ -39,7 +40,6 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
@@ -75,12 +75,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"TestClientSessionServiceImpl.db";
 
     /** The port for the client session service. */
-    private static int PORT = 0;
+    private static int PORT = 2468;
 
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	StandardProperties.APP_PORT, Integer.toString(PORT));
+	StandardProperties.APP_PORT, Integer.toString(0));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -116,7 +116,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private DummyTaskScheduler taskScheduler;
     private static DummyIdentityManager identityManager;
 
     /** The listen port for the client session service. */
@@ -155,7 +154,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
 	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
 
-	createTransaction();
+	createTransaction(10000);
 
 	// configure data service
         dataService.configure(serviceRegistry, txnProxy);
@@ -184,7 +183,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	// configure channel service
 	channelService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
+	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	commitTransaction();
 	createTransaction();
@@ -275,6 +276,55 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
+
+    /* -- Test configure -- */
+
+    public void testConfigureNullRegistry() {
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	try {
+            cssi.configure(null, new DummyTransactionProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testConfigureNullTransactionProxy() {
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	try {
+            cssi.configure(new DummyComponentRegistry(), null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureTwice() {
+	try {
+	    sessionService.configure(new DummyComponentRegistry(), txnProxy);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureAbortConfigure() throws Exception {
+	Properties testServiceProps = createProperties(
+	    StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
+	    StandardProperties.APP_PORT, Integer.toString(PORT));
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(testServiceProps, systemRegistry);
+	cssi.configure(serviceRegistry, txnProxy);
+	abortTransaction(null);
+	Thread.sleep(WAIT_TIME); // wait for port to unbind
+	createTransaction();
+	cssi.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	System.err.println("configure after abort succeeded");
+    }
+    
 
     /* -- Test connecting, logging in, logging out with server -- */
 
@@ -724,14 +774,35 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return txn;
     }
 
+    /**
+     * Creates a new transaction with the specified timeout, and sets
+     * transaction proxy's current transaction.
+     */
+    private DummyTransaction createTransaction(long timeout) {
+	if (txn == null) {
+	    txn = new DummyTransaction(timeout);
+	    txnProxy.setCurrentTransaction(txn);
+	}
+	return txn;
+    }
+
+    private void abortTransaction(Exception e) {
+	if (txn != null) {
+	    txn.abort(e);
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException("txn:" + txn);
+	}
+    }
+
     private void commitTransaction() throws Exception {
 	if (txn != null) {
 	    txn.commit();
 	    txn = null;
 	    txnProxy.setCurrentTransaction(null);
 	} else {
-	    throw new TransactionNotActiveException(
-		"txn:" + txn + " already committed");
+	    throw new TransactionNotActiveException("txn:" + txn);
 	}
     }
     
@@ -916,15 +987,15 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;
-	private byte[] sessionId;
-	private byte[] reconnectionKey;
+	private CompactId sessionId;
+	private CompactId reconnectionKey;
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
 	DummyClient() {
 	}
 
 	ClientSessionId getSessionId() {
-	    return new ClientSessionId(sessionId);
+	    return new ClientSessionId(sessionId.getId());
 	}
 
 	void connect(int port) {
@@ -1135,8 +1206,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = buf.getBytes(buf.getUnsignedShort());
-		    reconnectionKey = buf.getBytes(buf.getUnsignedShort());
+		    sessionId = CompactId.getCompactId(buf);
+		    reconnectionKey = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1244,10 +1315,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
+		DataManager dataManager = AppContext.getDataManager();
 		ManagedReference listenerRef =
-		    txnProxy.getService(DataService.class).
-		    createReference(listener);
-		AppContext.getDataManager().markForUpdate(this);
+		    dataManager.createReference(listener);
+		dataManager.markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1311,6 +1382,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
+	    AppContext.getDataManager().markForUpdate(this);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
 		this.graceful = graceful;

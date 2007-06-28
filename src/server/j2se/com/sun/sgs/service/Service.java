@@ -34,9 +34,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
  * kernel and system components like the <code>TaskScheduler</code>. If
  * there is an error, the constructor may throw any <code>Exception</code>,
  * and this will halt startup of the application.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface Service {
 

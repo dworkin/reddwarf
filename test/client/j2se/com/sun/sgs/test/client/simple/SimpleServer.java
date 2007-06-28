@@ -19,8 +19,6 @@ import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
-import static com.sun.sgs.protocol.simple.SimpleSgsProtocol.*;
-
 /**
  * A simple server harness for testing the Client API. This server will
  * respond to the client/server protocol. It uses the IO framework for its
@@ -34,7 +32,10 @@ public class SimpleServer implements ConnectionListener {
 
     private long sequenceNumber;
 
+    private static final CompactId SERVER_ID = new CompactId(new byte[]{0});
+    
     final String TEST_CHANNEL_NAME = "Test Channel";
+    
     final CompactId TEST_CHANNEL_ID = new CompactId(new byte[] { 0x22 });
 
     /**
@@ -133,15 +134,15 @@ public class SimpleServer implements ConnectionListener {
         MessageBuffer msg = new MessageBuffer(buffer);
 
         byte version = msg.getByte();
-        if (version != VERSION) {
+        if (version != SimpleSgsProtocol.VERSION) {
             System.out.println("Version number mismatch: " + version
-                    + " " + VERSION);
+                    + " " + SimpleSgsProtocol.VERSION);
             return;
         }
         byte service = msg.getByte();
         byte command = msg.getByte();
-        if (command == LOGIN_REQUEST) {
-            assert service == APPLICATION_SERVICE;
+        if (command == SimpleSgsProtocol.LOGIN_REQUEST) {
+            assert service == SimpleSgsProtocol.APPLICATION_SERVICE;
 
             String username = msg.getString();
             String password = msg.getString();
@@ -151,24 +152,26 @@ public class SimpleServer implements ConnectionListener {
 
             MessageBuffer reply;
             if (password.equals("guest")) {
-                
+
                 byte[] sessionIdBytes = new byte[] {
                     (byte)0xda, 0x2c, 0x57, (byte)0xa2,
                     0x01, 0x02, 0x03, 0x04 
                 };
+		CompactId sessionId = new CompactId(sessionIdBytes);
                 byte[] reconnectKeyBytes = new byte[] {
                     0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
                 };
+		CompactId reconnectKey = new CompactId(reconnectKeyBytes);
 
                 reply =
                     new MessageBuffer(3 +
-                        2 + sessionIdBytes.length +
-                        2 + reconnectKeyBytes.length);
+			sessionId.getExternalFormByteCount() +
+			reconnectKey.getExternalFormByteCount());
                 reply.putByte(SimpleSgsProtocol.VERSION).
                       putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
                       putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-                      putByteArray(sessionIdBytes).
-                      putByteArray(reconnectKeyBytes);
+		      putBytes(sessionId.getExternalForm()).
+		      putBytes(reconnectKey.getExternalForm());
             } else {
                 String reason = "Bad password";
                 reply =
@@ -180,8 +183,8 @@ public class SimpleServer implements ConnectionListener {
                       putString(reason);
             }
             sendMessage(conn, reply.getBuffer());
-        } else if (command == SESSION_MESSAGE) {
-            assert service == APPLICATION_SERVICE;
+        } else if (command == SimpleSgsProtocol.SESSION_MESSAGE) {
+            assert service == SimpleSgsProtocol.APPLICATION_SERVICE;
             msg.getLong(); // FIXME sequence number
             String serverMessage = msg.getString();
             System.out.println("Received general server message: "
@@ -215,8 +218,8 @@ public class SimpleServer implements ConnectionListener {
                 
                 sendMessage(conn, reply.getBuffer());
             }
-        } else if (command == CHANNEL_SEND_REQUEST) {
-            assert service == CHANNEL_SERVICE;
+        } else if (command == SimpleSgsProtocol.CHANNEL_SEND_REQUEST) {
+            assert service == SimpleSgsProtocol.CHANNEL_SERVICE;
             CompactId channelId = CompactId.getCompactId(msg);
             msg.getLong(); // FIXME sequence number
             int numRecipients = msg.getShort();
@@ -237,8 +240,8 @@ public class SimpleServer implements ConnectionListener {
 		  putBytes(TEST_CHANNEL_ID.getExternalForm());
             
             sendMessage(conn, reply.getBuffer());
-        } else if (command == LOGOUT_REQUEST) {
-            assert service == APPLICATION_SERVICE;
+        } else if (command == SimpleSgsProtocol.LOGOUT_REQUEST) {
+            assert service == SimpleSgsProtocol.APPLICATION_SERVICE;
             MessageBuffer reply = new MessageBuffer(3);
             reply.putByte(SimpleSgsProtocol.VERSION).
                   putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
@@ -278,7 +281,7 @@ public class SimpleServer implements ConnectionListener {
         int msgLen = 3 +
             TEST_CHANNEL_ID.getExternalFormByteCount() +
             8 +
-            2 +
+            SERVER_ID.getExternalFormByteCount() +
             MessageBuffer.getSize(chanMessage);
         
         MessageBuffer msg = new MessageBuffer(msgLen);
@@ -287,7 +290,7 @@ public class SimpleServer implements ConnectionListener {
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
             putBytes(TEST_CHANNEL_ID.getExternalForm()).
             putLong(seq).
-            putShort(0).
+            putBytes(SERVER_ID.getExternalForm()).
             putString(chanMessage);
 
         sendMessage(conn, msg.getBuffer());

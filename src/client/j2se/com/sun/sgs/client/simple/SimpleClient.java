@@ -22,6 +22,7 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
+import com.sun.sgs.impl.client.simple.SimpleSessionId;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -56,6 +57,10 @@ public class SimpleClient implements ServerSession {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SimpleClient.class.getName()));
 
+    /** The server's session ID. */
+    private static final CompactId SERVER_ID =
+	new CompactId(new byte[] { (byte) 0});
+    
     /**
      * The listener for the {@code ClientConnection} the session
      * is communicating on.
@@ -107,6 +112,10 @@ public class SimpleClient implements ServerSession {
      * @param listener a listener that will receive events for this client
      */
     public SimpleClient(SimpleClientListener listener) {
+        if (listener == null) {
+            throw new NullPointerException(
+                "The SimpleClientListener argument must not be null");
+        }
         this.clientListener = listener;
     }
 
@@ -270,6 +279,12 @@ public class SimpleClient implements ServerSession {
             PasswordAuthentication authentication =
                 clientListener.getPasswordAuthentication();
 
+            if (authentication == null) {
+                logout(true);
+                throw new NullPointerException(
+                    "The returned PasswordAuthentication must not be null");
+            }
+
             String user = authentication.getUserName();
             String pass = new String(authentication.getPassword());
             MessageBuffer msg =
@@ -374,8 +389,10 @@ public class SimpleClient implements ServerSession {
             switch (command) {
             case SimpleSgsProtocol.LOGIN_SUCCESS:
                 logger.log(Level.FINER, "Logged in");
-                sessionId = SessionId.fromBytes(msg.getByteArray());
-                reconnectKey = msg.getByteArray();
+		byte[] idBytes = CompactId.getCompactId(msg).getId();
+                sessionId = SessionId.fromBytes(idBytes);
+		idBytes = CompactId.getCompactId(msg).getId();
+                reconnectKey = idBytes;
                 clientListener.loggedIn();
                 break;
 
@@ -446,8 +463,8 @@ public class SimpleClient implements ServerSession {
                 if (channels.putIfAbsent(channelId, channel) == null) {
                     channel.joined();
                 } else {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: already a member",
+                    logger.log(Level.WARNING,
+                        "Cannot join channel {0}: already a member",
                         channelName);
                 }
                 break;
@@ -461,7 +478,7 @@ public class SimpleClient implements ServerSession {
                 if (channel != null) {
                     channel.left();
                 } else {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Cannot leave channel {0}: not a member",
                         channelId);
                 }
@@ -481,9 +498,11 @@ public class SimpleClient implements ServerSession {
 
                 msg.getLong(); // FIXME sequence number
                 
-                byte[] sidBytes = msg.getByteArray();
-                SessionId sid = (sidBytes.length == 0) ?
-                        null : SessionId.fromBytes(sidBytes);
+                CompactId compactSessionId = CompactId.getCompactId(msg);
+                SessionId sid =
+		    compactSessionId.equals(SERVER_ID) ?
+		    null :
+		    SessionId.fromBytes(compactSessionId.getId());
                 
                 channel.receivedMessage(sid, msg.getByteArray());
                 break;
@@ -533,14 +552,18 @@ public class SimpleClient implements ServerSession {
      */
     final class SimpleClientChannel implements ClientChannel {
 
-        private final String name;
-	private final CompactId id;
-        private volatile boolean joined;
-        private ClientChannelListener listener;
+        private final String channelName;
+	private final CompactId channelId;
+        
+        /**
+         * The listener for this channel if the client is a member,
+         * or null if the client is no longer a member of this channel.
+         */
+        private volatile ClientChannelListener listener = null;
 
         SimpleClientChannel(String name, CompactId id) {
-            this.name = name;
-	    this.id = id;
+            this.channelName = name;
+	    this.channelId = id;
         }
 
         // Implement ClientChannel
@@ -549,7 +572,7 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public String getName() {
-            return name;
+            return channelName;
         }
 
         /**
@@ -580,73 +603,67 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            joined = true;            
+            assert (listener == null);
+
             listener = clientListener.joinedChannel(this);
+
+            if (listener == null) {
+                throw new NullPointerException(
+                    "The returned ClientChannelListener must not be null");
+            }
         }
 
         void left() {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: not a member",
-                        name);
-                }
-                return;
-            }
-            joined = false;
-            if (listener != null) {
-                listener.leftChannel(this);
-                listener = null;
-            }
+            assert (listener != null);
+
+            listener.leftChannel(this);
+            listener = null;
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Ignore message on channel {0}: not a member",
-                        name);
-                }
-                return;
-            }
+            assert (listener != null);
+
             listener.receivedMessage(this, sid, message);
         }
 
         void sendInternal(Set<SessionId> recipients, byte[] message)
             throws IOException
         {
-            if (! joined) {
+            if (listener == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.log(Level.FINE,
                         "Cannot send on channel {0}: not a member",
-                        name);
+                        channelName);
                 }
                 return;
             }
             int totalSessionLength = 0;
             if (recipients != null) {
-                for (SessionId id : recipients) {
-                    totalSessionLength += 2 + id.toBytes().length;
+                for (SessionId recipientId : recipients) {
+                    totalSessionLength +=
+			((SimpleSessionId) recipientId).getCompactId().
+			    getExternalFormByteCount();
                 }
             }
             
             MessageBuffer msg =
                 new MessageBuffer(3 +
-		    id.getExternalFormByteCount() +
+		    channelId.getExternalFormByteCount() +
                     8 +
                     2 + totalSessionLength +
                     2 + message.length);
             msg.putByte(SimpleSgsProtocol.VERSION).
                 putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
                 putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
-                putBytes(id.getExternalForm()).
+                putBytes(channelId.getExternalForm()).
                 putLong(sequenceNumber.getAndIncrement());
             if (recipients == null) {
                 msg.putShort(0);
             } else {
                 msg.putShort(recipients.size());
-                for (SessionId id : recipients) {
-                    msg.putByteArray(id.toBytes());
+                for (SessionId recipientId : recipients) {
+                    msg.putBytes(((SimpleSessionId) recipientId).getCompactId().
+				 getExternalForm());
                 }
             }
             msg.putByteArray(message);

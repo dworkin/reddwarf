@@ -21,9 +21,6 @@ import java.util.logging.Logger;
  * Note that it would always be an error to persist or otherwise externalize
  * any system tasks. Because of this, this class does not implement
  * <code>Serializable</code>, so we can catch any such occurences as errors.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 final class SystemIdentity implements Identity
 {

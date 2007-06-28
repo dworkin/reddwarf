@@ -4,13 +4,12 @@
 
 package com.sun.sgs.protocol.simple;
 
-import java.io.DataInput;
-
 /**
  * SGS Protocol constants.
  * <p>
  * A protocol message is constructed as follows:
  * <ul>
+ * <li> (int) payload length, not including this int
  * <li> (byte) version number
  * <li> (byte) service id
  * <li> (byte) operation code
@@ -27,7 +26,7 @@ import java.io.DataInput;
  * <ul>
  * <li> (unsigned short) number of bytes of modified UTF-8 encoded String
  * <li> (byte[]) String encoded in modified UTF-8 as described
- * in {@link DataInput}
+ * in {@link java.io.DataInput}
  * </ul>
   * <p>
  * A {@code CompactId} is encoded as follows:
@@ -46,7 +45,6 @@ import java.io.DataInput;
  * <ul><li>1100<i>nnnn</i></li></ul> <p>then, the ID is contained in
  * the next {@code 8 + nnnn} bytes.
  * </ul>
- * </ul>
  */
 public interface SimpleSgsProtocol {
     
@@ -56,35 +54,53 @@ public interface SimpleSgsProtocol {
      */
     final int MAX_MESSAGE_LENGTH = 65535;
 
-    /** The version number. */
-    final byte VERSION = 0x01;
+    /** The version number, currently {@code 0x02}. */
+    final byte VERSION = 0x02;
 
-    /** Application service ID. */
+    /** The Application service ID, {@code 0x01}. */
     final byte APPLICATION_SERVICE = 0x01;
 
-    /** Channel service ID. */
+    /** The Channel service ID, {@code 0x02}. */
     final byte CHANNEL_SERVICE = 0x02;
 
     /**
-     * Login request.
+     * Login request from a client to a server.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x10}
+     * <br>
+     * Payload:
      * <ul>
-     * <li> (String) name
-     * <li> (String) password
+     * <li>(String) name
+     * <li>(String) password
      * </ul>
      */
     final byte LOGIN_REQUEST = 0x10;
 
     /**
-     * Login success (login request acknowledgment).
+     * Login success.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x11}
+     * <br>
+     * Payload:
      * <ul>
-     * <li> (ByteArray) sessionId
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) sessionId
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte LOGIN_SUCCESS = 0x11;
 
     /**
-     * Login failure (login request acknowledgment).
+     * Login failure.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x12}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (String) reason
      * </ul>
@@ -92,23 +108,41 @@ public interface SimpleSgsProtocol {
     final byte LOGIN_FAILURE = 0x12;
 
     /**
-     * Reconnection request.
+     * Reconnection request.  Client requesting reconnect to a server.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x20}
+     * <br>
+     * Payload:
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_REQUEST = 0x20;
 
     /**
-     * Reconnect success (reconnection request acknowledgment).
+     * Reconnect success.  Server response to a client's {@link #RECONNECT_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x21}
+     * <br>
+     * Payload:
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_SUCCESS = 0x21;
 
     /**
-     * Reconnect failure (reconnection request acknowledgment).
+     * Reconnect failure.  Server response to a client's {@link #RECONNECT_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x22}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (String) reason
      * </ul>
@@ -116,10 +150,16 @@ public interface SimpleSgsProtocol {
     final byte RECONNECT_FAILURE = 0x22;
 
     /**
-     * Session message.  Maximum length is 64 KB minus one byte.
+     * Session message.  May be sent by the client or the server.
+     * Maximum length is 64 KB minus one byte.
      * Larger messages require fragmentation and reassembly above
      * this protocol layer.
-     *
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x30}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (long) sequence number
      * <li> (ByteArray) message
@@ -129,17 +169,35 @@ public interface SimpleSgsProtocol {
 
 
     /**
-     * Logout request.
+     * Logout request from a client to a server.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x40}
+     * <br>
+     * No payload.
      */
     final byte LOGOUT_REQUEST = 0x40;
 
     /**
-     * Logout success (logout request acknowledgment).
+     * Logout success.  Server response to a client's {@link #LOGOUT_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x41}
+     * <br>
+     * No payload.
      */
     final byte LOGOUT_SUCCESS = 0x41;
 
     /**
-     * Channel join.
+     * Channel join.  Server notifying a client that it has joined a channel.
+     * <br>
+     * ServiceId: {@code 0x02} (Channel)
+     * <br>
+     * Opcode: {@code 0x50}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (String) channel name
      * <li> (CompactId) channel ID
@@ -148,7 +206,13 @@ public interface SimpleSgsProtocol {
     final byte CHANNEL_JOIN = 0x50;
 
     /**
-     * Channel leave.
+     * Channel leave.  Server notifying a client that it has left a channel.
+     * <br>
+     * ServiceId: {@code 0x02} (Channel)
+     * <br>
+     * Opcode: {@code 0x52}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (CompactId) channel ID
      * </ul>
@@ -156,14 +220,20 @@ public interface SimpleSgsProtocol {
     final byte CHANNEL_LEAVE = 0x52;
     
     /**
-     * Channel send request.
+     * Channel send request from a client to a server.
+     * <br>
+     * ServiceId: {@code 0x02} (Channel)
+     * <br>
+     * Opcode: {@code 0x53}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (CompactId) channel ID
      * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients &gt; 0, for each recipient:
      * <ul>
-     * <li> (ByteArray) sessionId
+     * <li> (CompactId) sessionId
      * </ul>
      * <li> (ByteArray) message
      * </ul>
@@ -171,11 +241,18 @@ public interface SimpleSgsProtocol {
     final byte CHANNEL_SEND_REQUEST = 0x53;
 
     /**
-     * Channel message (to recipient on channel).
+     * Channel message (sent from server to recipient on channel).
+     * <br>
+     * ServiceId: {@code 0x02} (Channel)
+     * <br>
+     * Opcode: {@code 0x54}
+     * <br>
+     * Payload:
      * <ul>
      * <li> (CompactId) channel ID
      * <li> (long) sequence number
-     * <li> (ByteArray) sender's sessionId (zero-length if sent by server)
+     * <li> (CompactId) sender's sessionId
+     *		(canonical CompactId of zero if sent by server)
      * <li> (ByteArray) message
      * </ul>
      */

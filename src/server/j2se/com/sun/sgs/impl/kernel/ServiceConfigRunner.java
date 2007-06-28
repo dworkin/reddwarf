@@ -11,7 +11,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 
 import java.util.List;
 import java.util.Properties;
@@ -27,9 +26,6 @@ import java.util.logging.Logger;
  * scheduling a <code>AppStartupRunner</code> to start the application.
  * <p>
  * This runnable must be run in a transactional context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class ServiceConfigRunner implements KernelRunnable {
 
@@ -132,11 +128,11 @@ class ServiceConfigRunner implements KernelRunnable {
         // special KernelRunnable in a new transaction
         AppStartupRunner startupRunner =
             new AppStartupRunner(appContext, appProperties, kernel);
-        TransactionRunner transactionRunner =
-            new TransactionRunner(startupRunner);
+        UnboundedTransactionRunner unboundedTransactionRunner =
+            new UnboundedTransactionRunner(startupRunner);
         try {
             appContext.getService(TaskService.class).
-                scheduleNonDurableTask(transactionRunner);
+                scheduleNonDurableTask(unboundedTransactionRunner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.CONFIG))
                 logger.logThrow(Level.CONFIG, e, "{0}: failed to schedule " +
