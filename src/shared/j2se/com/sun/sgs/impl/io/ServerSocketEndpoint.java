@@ -122,8 +122,7 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
             }
 	    
             minaAcceptor = minaSocketAcceptor;
-        }
-        else {
+        } else {
             minaAcceptor = new DatagramAcceptor(executor);
         }
         SocketAcceptor acceptor = new SocketAcceptor(this, minaAcceptor);
