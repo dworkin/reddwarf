@@ -90,4 +90,13 @@ public final class ContextResolver {
         context.set(appContext);
     }
 
+    /**
+     * Package-private method used to get the current context.
+     *
+     * @return the current {@code AbstractKernelAppContext}
+     */
+    static AbstractKernelAppContext getContext() {
+        return context.get();
+    }
+
 } 
