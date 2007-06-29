@@ -11,7 +11,7 @@
  * function: printStats()
  */
 void printStats(const sgs_buffer buf) {
-  printf("pos=%lu, size=%lu, cap=%lu, remaining=%lu\n", buf->position,
+  printf("pos=%u, size=%u, cap=%u, remaining=%u\n", buf->position,
          sgs_buffer_size(buf), sgs_buffer_capacity(buf),
          sgs_buffer_remaining_capacity(buf));
 }
