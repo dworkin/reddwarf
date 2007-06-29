@@ -4,28 +4,30 @@
 
 package com.sun.sgs.test.impl.kernel;
 
-/**
- * Provide a simple end-to-end test of the server by calling the Kernel with a
- * simple application class.
- */
-public class TestKernelSimpleApp extends KernelSimpleAppTestCase {
+/** Test restarting a simple application. */
+public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 
     /** Creates the test. */
-    public TestKernelSimpleApp(String name) {
+    public TestKernelSimpleAppRestart(String name) {
 	super(name);
     }
 
     /** Returns the port to use for this application. */
     int getPort() {
-	return 33333;
+	return 33335;
     }
 
     /** Run a simple application */
     public void testRunSimpleApp() throws Exception {
+	runApp(3);
+	runApp(6);
+    }
+
+    private void runApp(final int stopCount) throws Exception {
 	new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
 	    void handleInput(String line) {
 		System.out.println("stdout: " + line);
-		if (line.equals("count=3")) {
+		if (line.equals("count=" + stopCount)) {
 		    done();
 		}
 	    }

@@ -17,6 +17,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl.TaskHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.TransactionContextFactory;
+import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileProducer;
@@ -142,11 +143,13 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** Synchronize on this object when accessing the txnProxy field. */
-    private static final Object txnProxyLock = new Object();
+    /** Synchronize on this object when accessing the contextMap field. */
+    private static final Object contextMapLock = new Object();
 
-    /** The transaction proxy, or null if configure has not been called. */
-    private static TransactionProxy txnProxy = null;
+    /**
+     * The transaction context map, or null if configure has not been called.
+     */
+    private static TransactionContextMap<Context> contextMap = null;
 
     /** The name of this application. */
     private final String appName;
@@ -190,60 +193,67 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
-    /** The transaction context factory. */
+    /**
+     * The transaction context factory.  Note that this field is only set
+     * once, so it can be accessed outside of synchronization on stateLock once
+     * the value of the state field has been checked.
+     */
     private TransactionContextFactory<Context> contextFactory;
 
     /**
-     * Defines the transaction context factory for this class.  The
-     * customizations create a durable transaction participant, check the
-     * reference table, and check the service state when checking a
-     * transaction.
+     * Defines the transaction context map for this class.  This class checks
+     * the service state and the reference table whenever the context is
+     * accessed.  No check is needed for joinTransaction, though, because the
+     * check is already being made when obtaining the context factory.
      */
+    private static final class ContextMap
+	extends TransactionContextMap<Context>
+    {
+	ContextMap(TransactionProxy proxy) {
+	    super(proxy);
+	}
+	@Override public Context getContext() {
+	    return check(super.getContext());
+	}
+	@Override public void checkContext(Context context) {
+	    check(context);
+	    super.checkContext(context);
+	}
+	@Override public Context checkTransaction(Transaction txn) {
+	    return check(super.checkTransaction(txn));
+	}
+	private static Context check(Context context) {
+	    context.checkState();
+	    context.maybeCheckReferenceTable();
+	    return context;
+	}
+    }
+
+    /** Defines the transaction context factory for this class. */
     private final class ContextFactory
 	extends TransactionContextFactory<Context>
     {
-	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	ContextFactory(TransactionContextMap<Context> contextMap) {
+	    super(contextMap);
 	}
-	@Override
-	public Context joinTransaction() {
-	    Context context = super.joinTransaction();
-	    context.maybeCheckReferenceTable();
-	    return context;
-	}
-	@Override
-	public Context getContext() {
-	    Context context = super.getContext();
-	    context.maybeCheckReferenceTable();
-	    return context;
-	}
-	@Override
-	public void checkContext(Context context) {
-	    super.checkContext(context);
-	    context.maybeCheckReferenceTable();
-	}
-	@Override
-	protected Context createContext(Transaction txn) {
-	    /* Prevent joining a new transaction during shutdown */
+	@Override protected Context createContext(Transaction txn) {
+	    /*
+	     * Prevent joining a new transaction during shutdown, even though
+	     * other operations will have been allowed to proceed.
+	     */
 	    synchronized (stateLock) {
 		if (state == State.SHUTTING_DOWN) {
 		    throw new IllegalStateException(
 			"Service is shutting down");
 		}
 	    }
-	    return new Context(store, txn, debugCheckInterval,
-			       detectModifications, classesTable);
+	    return new Context(
+		DataServiceImpl.this, store, txn, debugCheckInterval,
+		detectModifications, classesTable);
 	}
-	@Override
-	protected TransactionParticipant createParticipant() {
+	@Override protected TransactionParticipant createParticipant() {
+	    /* Create a durable participant */
 	    return new Participant();
-	}
-	@Override
-	protected Context checkTransaction(Transaction txn) {
-	    checkState();
-	    Context context = super.checkTransaction(txn);
-	    context.maybeCheckReferenceTable();
-	    return context;
 	}
     }
 
@@ -423,11 +433,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	if (registry == null || proxy == null) {
 	    throw new NullPointerException("The arguments must not be null");
 	}
-	synchronized (txnProxyLock) {
-	    if (txnProxy == null) {
-		txnProxy = proxy;
+	synchronized (contextMapLock) {
+	    if (contextMap == null) {
+		contextMap = new ContextMap(proxy);
 	    }
-	    assert txnProxy == proxy;
 	}
 	synchronized (stateLock) {
 	    if (state != State.UNINITIALIZED) {
@@ -437,7 +446,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    state = State.RUNNING;
 	    boolean addedAbortAction = false;
 	    try {
-		contextFactory = new ContextFactory(proxy);
+		contextFactory = new ContextFactory(contextMap);
 		contextFactory.joinTransaction().addAbortAction(
 		    new Runnable() {
 			public void run() {
@@ -837,7 +846,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * not been done already.
      */
     private Context getContext() {
-	return getContextFactory().joinTransaction();
+	Context context = getContextFactory().joinTransaction();
+	context.maybeCheckReferenceTable();
+	return context;
     }
 
     /**
@@ -845,9 +856,20 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * service.
      */
     private TransactionContextFactory<Context> getContextFactory() {
-	synchronized (stateLock) {
-	    checkState();
-	    return contextFactory;
+	checkState();
+	return contextFactory;
+    }
+
+    /**
+     * Returns the transaction context map, checking to be sure it has been
+     * initialized.
+     */
+    private static TransactionContextMap<Context> getContextMap() {
+	synchronized (contextMapLock) {
+	    if (contextMap == null) {
+		throw new IllegalStateException("Service is not configured");
+	    }
+	    return contextMap;
 	}
     }
 
@@ -875,17 +897,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * the current transaction doesn't match the context.
      */
     static void checkContext(Context context) {
-	getInstance().getContextFactory().checkContext(context);
-    }
-
-    /** Returns the current instance of this service. */
-    private static DataServiceImpl getInstance() {
-	synchronized (txnProxyLock) {
-	    if (txnProxy == null) {
-		throw new IllegalStateException("Service is not configured");
-	    }
-	}
-	return txnProxy.getService(DataServiceImpl.class);
+	getContextMap().checkContext(context);
     }
 
     /**
@@ -894,7 +906,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * transaction.
      */
     static Context getContextNoJoin() {
-	return getInstance().getContextFactory().getContext();
+	return getContextMap().getContext();
     }
 
     /**
