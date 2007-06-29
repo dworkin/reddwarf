@@ -17,6 +17,9 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
+
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
@@ -265,6 +268,18 @@ public class TestMasterTaskSchedulerImpl {
         MasterTaskScheduler scheduler = getScheduler(0);
         RetryTestRunner runner = new RetryTestRunner();
         scheduler.runTask(runner, testOwner, false);
+    }
+
+    @Test public void runTaskTransactional() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    proxy.getCurrentTransaction();
+                    proxy.getCurrentOwner();
+                }
+            });
+        scheduler.runTask(new TransactionRunner(runner), testOwner, false);
     }
 
     /**
