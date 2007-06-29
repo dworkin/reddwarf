@@ -18,7 +18,7 @@ import com.sun.sgs.impl.io.FilterTestHarness;
  * This suite of tests is intended to test the functionality of the 
  * {code CompleteMessageFilter}.
  */
-public class MessageFilterTest
+public class TestMessageFilter
         extends TestCase
         implements FilterTestHarness.Callback
 {
