@@ -27,11 +27,8 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	    Logger.getLogger(
 		TransactionContextFactory.class.getName()));
     
-    /** Provides transaction and other information for the current thread. */
-    private final ThreadLocal<T> currentContext = new ThreadLocal<T>();
-
-    /** The transaction proxy. */
-    private final TransactionProxy txnProxy;
+    /** The transaction context map. */
+    private final TransactionContextMap<T> contextMap;
 
     /** Lock for access to the participant field. */
     private final Object lock = new Object();
@@ -41,28 +38,37 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 
     /**
      * Constructs an instance of this class with the given {@code
-     * txnProxy}.
+     * TransactionContextMap}.
+     *
+     * @param	contextMap the transaction context map
+     */
+    protected TransactionContextFactory(TransactionContextMap<T> contextMap) {
+	if (contextMap == null) {
+	    throw new NullPointerException("null contextMap");
+	}
+	this.contextMap = contextMap;
+    }
+
+    /**
+     * Constructs an instance of this class, using the specified {@code
+     * TransactionProxy} to create the {@link TransactionContextMap}.  Use this
+     * constructor if access to the {@code TransactionContextMap} is not
+     * needed.
      *
      * @param	txnProxy the transaction proxy
      */
     protected TransactionContextFactory(TransactionProxy txnProxy) {
-	if (txnProxy ==  null) {
-	    throw new NullPointerException("null txnProxy");
-	}
-	this.txnProxy = txnProxy;
+	contextMap = new TransactionContextMap<T>(txnProxy);
     }
 
    /**
-    * Makes sure the participant is joined to the current transaction
-    * and returns the associated context.  First, if no participant has
-    * been created for this factory before, calls {@link
-    * #createParticipant createParticipant} to create the participant.
-    * Next, if the participant has not yet joined the current
-    * transaction, creates a new context by invoking {@link
-    * #createContext createContext}, passing the current transaction,
-    * sets that context as the current context for the current thread,
-    * and joins the transaction.  Finally, returns the context for the
-    * current transaction.
+    * Makes sure the participant is joined to the current transaction and
+    * returns the associated context. <p>
+    *
+    * The default implementation calls {@link
+    * TransactionContextMap#joinTransaction joinTransaction} on the {@link
+    * TransactionContextMap} supplied to, or created by, the constructor,
+    * passing this instance as the argument.
     *
     * @return 	the context for the current transaction
     * @throws	TransactionNotActiveException if no transaction is active
@@ -70,84 +76,24 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     *		state of the transaction.
     */
     public T joinTransaction() {
-        Transaction txn = txnProxy.getCurrentTransaction();
-        if (txn == null) {
-            throw new TransactionNotActiveException(
-                "No transaction is active");
-        }
-        T context = currentContext.get();
-        if (context == null) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "join txn:{0}", txn);
-            }
-	    synchronized (lock) {
-		if (participant == null) {
-		    participant = createParticipant();
-		}
+	return contextMap.joinTransaction(this);
+    }
+
+    /**
+     * Returns the transaction participant for use with this factory. <p>
+     *
+     * The default implementation creates a new transaction participant by
+     * calling {@link #createParticipant createParticipant} the first time the
+     * participant is requested.
+     *
+     * @return	the transaction participant
+     */
+    public TransactionParticipant getParticipant() {
+	synchronized (lock) {
+	    if (participant == null) {
+		participant = createParticipant();
 	    }
-            context = createContext(txn);
-            currentContext.set(context);
-            txn.join(participant);
-        } else if (!txn.equals(context.getTransaction())) {
-            currentContext.set(null);
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.getTransaction() +
-                ", found " + txn);
-        }
-        return context;
-    }
-
-    /**
-     * Returns the context for the current transaction.
-     *
-     * @return 	the context for the current transaction
-     * @throws	TransactionNotActiveException if no transaction is active
-     * @throws	IllegalStateException if there is a problem with the
-     *		state of the transaction.
-     */
-    public T getContext() {
-        Transaction txn = txnProxy.getCurrentTransaction();
-        if (txn == null) {
-            throw new TransactionNotActiveException(
-                "No transaction is active");
-        }
-        T context = currentContext.get();
-        if (context == null) {
-	    throw new IllegalStateException(
-		"Not participating in transaction " + txn);
-        } else if (!txn.equals(context.getTransaction())) {
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.getTransaction() +
-                ", found " + txn);
-        }
-        return context;
-    }
-
-    /**
-     * Checks that the specified {@code context} is currently active,
-     * throwing {@code TransactionNotActiveException} if it isn't.
-     *
-     * @param	context a context
-     *
-     * @throws	TransactionNotActiveException if the specified
-     * 		{@code context} is not currently active
-     */
-    public void checkContext(T context) {
-	if (context == null) {
-	    throw new NullPointerException("null context");
-	}
-	/* Make sure the current transaction is active */
-	txnProxy.getCurrentTransaction();
-	T threadContext = currentContext.get();
-	if (threadContext == null) {
-	    throw new TransactionNotActiveException(
-		"Transaction " + context.getTransaction() +
-		" is not the current transaction");
-	} else if (context != threadContext) {
-	    throw new TransactionNotActiveException(
-                "Wrong transaction: Expected " +
-		context.getTransaction() + ", found " +
-		threadContext.getTransaction());
+	    return participant;
 	}
     }
 
@@ -175,31 +121,6 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	return new NonDurableParticipant();
     }
     
-    /**
-     * Checks the specified transaction, throwing {@code
-     * IllegalStateException} if the current context is {@code null}
-     * or if the specified transaction is not equal to the transaction
-     * in the current context.
-     *
-     * @param	txn a transaction
-     * @return	the current transaction context
-     */
-    protected T checkTransaction(Transaction txn) {
-        if (txn == null) {
-            throw new NullPointerException("null transaction");
-        }
-        T context = currentContext.get();
-        if (context == null) {
-            throw new IllegalStateException("null context");
-        }
-        if (!txn.equals(context.getTransaction())) {
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.getTransaction() +
-		", found " + txn);
-        }
-	return context;
-    }
-
     /* -- Implement TransactionParticipant -- */
 
     /** Provides a durable transaction participant. */
@@ -211,13 +132,13 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	/** {@inheritDoc} */
 	public boolean prepare(Transaction txn) throws Exception {
 	    try {
-		T context = checkTransaction(txn);
+		T context = contextMap.checkTransaction(txn);
 		if (context.isPrepared()) {
 		    throw new TransactionNotActiveException("Already prepared");
 		}
 		boolean readOnly = context.prepare();
 		if (readOnly) {
-		    currentContext.set(null);
+		    contextMap.clearContext();
 		}
 		if (logger.isLoggable(Level.FINE)) {
 		    logger.log(Level.FINER, "prepare txn:{0} returns {1}",
@@ -238,19 +159,23 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	/** {@inheritDoc} */
 	public void commit(Transaction txn) {
 	    try {
-		T context = checkTransaction(txn);
-		if (! context.isPrepared()) {
-		    RuntimeException e = 
-			new IllegalStateException("transaction not prepared");
-		    if (logger.isLoggable(Level.WARNING)) {
-			logger.logThrow(
-			    Level.WARNING, e,
-			    "commit: not yet prepared txn:{0}",
-			    txn);
+		T context = contextMap.checkTransaction(txn);
+		try {
+		    if (! context.isPrepared()) {
+			RuntimeException e = 
+			    new IllegalStateException(
+				"transaction not prepared");
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.logThrow(
+				Level.WARNING, e,
+				"commit: not yet prepared txn:{0}",
+				txn);
+			}
+			throw e;
 		    }
-		    throw e;
+		} finally {
+		    contextMap.clearContext();
 		}
-		currentContext.set(null);
 		context.commit();
 		logger.log(Level.FINER, "commit txn:{0} returns", txn);
 
@@ -264,12 +189,12 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	/** {@inheritDoc} */
 	public void prepareAndCommit(Transaction txn) throws Exception {
 	    try {
-		T context = checkTransaction(txn);
+		T context = contextMap.checkTransaction(txn);
 		if (context.isPrepared()) {
 		    throw new TransactionNotActiveException("Already prepared");
 		}
 		context.prepareAndCommit();
-		currentContext.set(null);
+		contextMap.clearContext();
 		logger.log(Level.FINER, "prepareAndCommit txn:{0} returns",
 			   txn);
 	    
@@ -285,8 +210,8 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	/** {@inheritDoc} */
 	public void abort(Transaction txn) {
 	    try {
-		T context = checkTransaction(txn);
-		currentContext.set(null);
+		T context = contextMap.checkTransaction(txn);
+		contextMap.clearContext();
 		context.abort(isRetryable(txn.getAbortCause()));
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
 

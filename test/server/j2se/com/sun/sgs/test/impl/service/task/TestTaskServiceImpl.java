@@ -101,12 +101,12 @@ public class TestTaskServiceImpl extends TestCase {
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
         txn = createTransaction(10000);
+        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        dataService.configure(serviceRegistry, txnProxy);
         taskService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
