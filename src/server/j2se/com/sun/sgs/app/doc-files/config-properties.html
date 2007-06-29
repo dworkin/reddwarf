@@ -229,6 +229,26 @@ the <code>Kernel</code> that schedules tasks.
 
 </dl>
 
+<a name="IO"></a>
+<h2>IO Properties</h2>
+
+These properties control the implementation of the <code>IO</code>
+layer, which is the part of the system that manages all input/output
+facilities.
+
+<dl>
+
+<dt>com.sun.sgs.impl.io.ServerSocketEndpoint.reuseAddress
+<span class="default">true</span>
+<dd>Whether to enable reuse of the TCP port without waiting for it to time out
+in the operating system.  This is useful when starting up the server soon
+after it previously quit unexpectedly.  Otherwise, if this property is set to
+<code>false</code>, then you may receive the following exception until the port
+times out and becomes free again:<br>
+<code>java.net.BindException: Address already in use</code> 
+
+</dl>
+
 <hr>
 <font size="-1">
   Copyright &copy; 2007 Sun Microsystems, Inc. All rights reserved
