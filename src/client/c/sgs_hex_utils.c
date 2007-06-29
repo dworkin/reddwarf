@@ -18,8 +18,8 @@
  */
 #include <errno.h>
 #include <stdint.h>
-#include <stdio.h>   // included for sprintf()
-#include <string.h>  // included for strlen()
+#include <stdio.h>
+#include <string.h>
 #include "sgs_hex_utils.h"
 
 /*
@@ -28,7 +28,7 @@
 int bytestohex(const uint8_t *ba, const int len, char *hexstr) {
   int i;
   
-  // leading zeros are important!
+  /** leading zeros are important! */
   for (i=0; i < len; i++)
     sprintf(hexstr + i*2, "%02X", ba[i]);
   

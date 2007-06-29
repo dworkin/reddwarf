@@ -20,10 +20,8 @@
  * EXTERNAL FUNCTION IMPLEMENTATIONS
  */
 
-// TODO - comments
-
 /*
- *
+ * sgs_ctx_create()
  */
 sgs_context_impl sgs_ctx_create(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection, int[], size_t, short),
@@ -53,15 +51,14 @@ sgs_context_impl sgs_ctx_create(const char *hostname, const int port,
 }
 
 /*
- * todo
+ * sgs_ctx_destroy()
  */
 void sgs_ctx_destroy(sgs_context_impl ctx) {
   free(ctx);
 }
 
 /*
- * parameters to callback() function:
- *  1) ID of channel that was joined
+ * sgs_ctx_set_channel_joined_cb()
  */
 void sgs_ctx_set_channel_joined_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection, const sgs_id*, const uint8_t*, size_t))
@@ -70,8 +67,7 @@ void sgs_ctx_set_channel_joined_cb(sgs_context_impl ctx,
 }
 
 /*
- * parameters to callback() function:
- *  1) ID of channel that was left
+ * sgs_ctx_set_channel_left_cb()
  */
 void sgs_ctx_set_channel_left_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection, const sgs_id*))
@@ -80,20 +76,17 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl ctx,
 }
 
 /* 
- * parameters to callback() function:
- *  1) ID of channel that message was received on
- *  2) ID of sender
- *  3) byte-array containing message
- *  4) length of message byte-array
+ * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl ctx,
-    void (*callback)(sgs_connection, const sgs_id*, const sgs_id*, const uint8_t*, size_t))
+    void (*callback)(sgs_connection, const sgs_id*, const sgs_id*,
+                     const uint8_t*, size_t))
 {
   ctx->channel_recv_msg_cb = callback;
 }
 
 /*
- * parameters to callback() function:   (none)
+ * sgs_ctx_set_disconnected_cb()
  */
 void sgs_ctx_set_disconnected_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection))
@@ -102,7 +95,7 @@ void sgs_ctx_set_disconnected_cb(sgs_context_impl ctx,
 }
 
 /*
- * parameters to callback() function:   (none)
+ * sgs_ctx_set_logged_in_cb()
  */
 void sgs_ctx_set_logged_in_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection, sgs_session))
@@ -111,9 +104,7 @@ void sgs_ctx_set_logged_in_cb(sgs_context_impl ctx,
 }
 
 /*
- * parameters to callback() function:
- *  1) error message
- *  2) length of error message
+ * sgs_ctx_set_login_failed_cb()
  */
 void sgs_ctx_set_login_failed_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection, const uint8_t*, size_t))
@@ -122,7 +113,7 @@ void sgs_ctx_set_login_failed_cb(sgs_context_impl ctx,
 }
 
 /*
- * parameters to callback() function:   (none)
+ * sgs_ctx_set_reconnected_cb()
  */
 void sgs_ctx_set_reconnected_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection))
@@ -131,9 +122,7 @@ void sgs_ctx_set_reconnected_cb(sgs_context_impl ctx,
 }
 
 /*
- * parameters to callback() function:
- *  1) message received from server
- *  2) length of message
+ * sgs_ctx_set_recv_msg_cb()
  */
 void sgs_ctx_set_recv_msg_cb(sgs_context_impl ctx,
     void (*callback)(sgs_connection, const uint8_t*, size_t))
@@ -142,7 +131,7 @@ void sgs_ctx_set_recv_msg_cb(sgs_context_impl ctx,
 }
 
 /*
- * Sets all callback function pointers to NULL.
+ * sgs_ctx_unset_all_cbs()
  */
 void sgs_ctx_unset_all_cbs(sgs_context_impl ctx)
 {

@@ -25,17 +25,17 @@ typedef struct sgs_session_impl *sgs_session;
  */
 
 /*
- * function: SGS_channelSend()
+ * function: sgs_session_channel_send()
  *
- * Sends a CHANNEL_SEND_REQUEST message to the server, which is used when sending
- *  a message on a specific channel.
+ * Sends a message on a specific channel.
  *
  * args:
- *     session: pointer to the current user session
- *   channelId: pointer to the ID of the channel on which to send
- *        data: pointer to an array of data to send
- *     datalen: length of the data array
- *  recipients: array of pointers to IDs of recipients to send to; empty (length=0) implies "all"
+ *     session: the session to send a message
+ *   channelId: pointer to the ID of the channel on which to send the message
+ *        data: array containing the message to send
+ *     datalen: length of the message
+ *  recipients: array of ID for all of the recipients to send to; empty
+ *              (length=0) means "send to all members of the channel"
  *    reciplen: length of the recipients array
  *
  * returns:
@@ -47,15 +47,15 @@ int sgs_session_channel_send(sgs_session session, const sgs_id *pchannel_id,
     size_t reciplen);
 
 /*
- * function: SGS_sessionSend()
+ * function: sgs_session_direct_send()
  *
  * Sends a message directly to the server (i.e. not on a channel).  This is
- * often-times used to implement application-specific messaging.
+ * sometimes used to implement application-specific messaging.
  *
  * args:
- *   session: pointer to the current user session
- *      data: array of message payload to send
- *   datalen: length of data array
+ *   session: the session to send a message
+ *      data: array containing the message to send
+ *   datalen: length of the message
  *
  * returns:
  *    0: success
@@ -64,8 +64,18 @@ int sgs_session_channel_send(sgs_session session, const sgs_id *pchannel_id,
 int sgs_session_direct_send(sgs_session session, const uint8_t *data,
                             size_t datalen);
 
+/*
+ * function: sgs_session_get_reconnectkey()
+ *
+ * Returns the reconnection-key for this session.
+ */
 const sgs_id *sgs_session_get_reconnectkey(const sgs_session session);
 
+/*
+ * function: sgs_session_get_id()
+ *
+ * Returns this session's unique ID.
+ */
 const sgs_id *sgs_session_get_id(const sgs_session session);
 
 #endif  /** #ifndef SGS_SESSION_H */

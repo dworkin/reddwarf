@@ -21,6 +21,10 @@
 #include "sgs_message.h"
 #include "sgs_wire_protocol.h"
 
+/*
+ * STATIC FUNCTION DECLARATIONS
+ * (can only be called by functions in this file)
+ */
 static void update_msg_len(sgs_message *pmsg);
 
 /*

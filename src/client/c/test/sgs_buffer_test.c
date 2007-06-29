@@ -7,12 +7,18 @@
 #include <stdint.h>
 #include "sgs_buffer.h"
 
+/*
+ * function: printStats()
+ */
 void printStats(const sgs_buffer buf) {
-  printf("pos=%d, size=%d, cap=%d, remaining=%d\n", buf->position,
+  printf("pos=%lu, size=%lu, cap=%lu, remaining=%lu\n", buf->position,
          sgs_buffer_size(buf), sgs_buffer_capacity(buf),
          sgs_buffer_remaining_capacity(buf));
 }
 
+/*
+ * function: printArr()
+ */
 void printArr(const char *prefix, const uint8_t *buf, size_t len) {
   size_t i;
   if (prefix != NULL) printf("%s: ", prefix);

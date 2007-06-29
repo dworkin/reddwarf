@@ -22,9 +22,6 @@
 #include "sgs_context.h"
 #include "sgs_error_codes.h"
 
-// ALL COMMENTS (HEADER, FUNCTIONS, ETC)
-
-
 /*
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
@@ -36,6 +33,9 @@ static int consume_data(sgs_connection_impl connection);
  * FUNCTION IMPLEMENTATIONS FOR SGS_CONNECTION.H
  */
 
+/*
+ * sgs_connection_create()
+ */
 sgs_connection_impl sgs_connection_create(sgs_context ctx)
 {
   sgs_connection_impl connection;
@@ -56,7 +56,8 @@ sgs_connection_impl sgs_connection_create(sgs_context ctx)
       connection->outbuf == NULL) {
     
     /** Allocation of at least one object failed. */
-    if (connection->session != NULL) sgs_session_impl_destroy(connection->session);
+    if (connection->session != NULL)
+      sgs_session_impl_destroy(connection->session);
     if (connection->inbuf != NULL) sgs_buffer_destroy(connection->inbuf);
     if (connection->outbuf != NULL) sgs_buffer_destroy(connection->outbuf);
     free(connection);
@@ -66,6 +67,9 @@ sgs_connection_impl sgs_connection_create(sgs_context ctx)
   return connection;
 }
 
+/*
+ * sgs_connection_destroy()
+ */
 void sgs_connection_destroy(sgs_connection_impl connection) {
   sgs_session_impl_destroy(connection->session);
   sgs_buffer_destroy(connection->inbuf);
@@ -73,6 +77,9 @@ void sgs_connection_destroy(sgs_connection_impl connection) {
   free(connection);
 }
 
+/*
+ * sgs_connection_do_io()
+ */
 int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
   int result;
   socklen_t optlen;
@@ -116,7 +123,8 @@ int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
   
   if ((events & POLLERR) == POLLERR) {
     optlen = sizeof(errno);  /* SO_ERROR should return an int */
-    if (getsockopt(connection->socket_fd, SOL_SOCKET, SO_ERROR, &errno, &optlen) == -1) {
+    if (getsockopt(connection->socket_fd, SOL_SOCKET, SO_ERROR,
+                   &errno, &optlen) == -1) {
       return -1;
     }
     
@@ -139,7 +147,11 @@ int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
   return 0;
 }
 
-int sgs_connection_login(sgs_connection_impl connection, const char *login, const char *password)
+/*
+ * sgs_connection_login()
+ */
+int sgs_connection_login(sgs_connection_impl connection, const char *login,
+                         const char *password)
 {
   int ioflags;
   struct hostent *server;
@@ -151,7 +163,8 @@ int sgs_connection_login(sgs_connection_impl connection, const char *login, cons
   
   /** Set socket to non-blocking mode. */
   if ((ioflags = fcntl(connection->socket_fd, F_GETFL, 0)) == -1) return -1;
-  if (fcntl(connection->socket_fd, F_SETFL, ioflags | O_NONBLOCK) == -1) return -1;
+  if (fcntl(connection->socket_fd, F_SETFL, ioflags | O_NONBLOCK) == -1)
+    return -1;
   
   /** Resolve hostname to IP(s). */
   /** TODO - does this work if hostname *IS* an IP? */
@@ -170,10 +183,9 @@ int sgs_connection_login(sgs_connection_impl connection, const char *login, cons
   /**
    * As a "trick", we go ahead and write the login request to the out-buffer
    * now, even though the socket may not connect instantly (since we use a
-   * non-blocking call to connect()).  However that is ok, as long we do not
-   * register interest in writing to the socket's FD until it has connected,
-   * the login request message will just sit in the out-buffer until we are
-   * ready (once the socket connects).
+   * non-blocking call to connect()).  However that is ok, since the socket will
+   * not register as writable (and thus we won't actually try to write to it)
+   * until it has connected.
    */
   if (sgs_session_impl_login(connection->session, login, password) == -1)
     return -1;
@@ -213,6 +225,9 @@ int sgs_connection_login(sgs_connection_impl connection, const char *login, cons
   return 0;
 }
 
+/*
+ * sgs_connection_logout()
+ */
 int sgs_connection_logout(sgs_connection_impl connection, const int force) {
   if (force) {
     sgs_connection_impl_disconnect(connection);
@@ -269,6 +284,11 @@ int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
  * (these are functions that can only be called within this file)
  */
 
+/*
+ * function: conn_closed()
+ *
+ * Called whenever the connection is closed by the server.
+ */
 static void conn_closed(sgs_connection_impl connection) {
   if (connection->expecting_disconnect) {
     /** Expected close of connection... */
@@ -286,9 +306,10 @@ static void conn_closed(sgs_connection_impl connection) {
 /*
  * function: consume_data()
  *
- * Reads (and removes) chunks of data from the connection's in-buffer that comprise complete
- *  messages and passes them on for processing.  Stops once the data remaining in the in-
- *  buffer comprises only part of a message (or there is no data remaining).
+ * Reads (and removes) chunks of data from the connection's in-buffer that
+ * comprise complete messages and passes them on for processing.  Stops once the
+ * data remaining in the in-buffer comprises only part of a message (or there is
+ * no data remaining).
  *
  * returns:
  *    0: success
@@ -301,7 +322,7 @@ static int consume_data(sgs_connection_impl connection) {
   while (sgs_buffer_peek(connection->inbuf, (uint8_t*)&len, 4) != -1) {
     len = ntohl(len);
     if (sgs_buffer_read(connection->inbuf, msgbuf, len + 4) == -1)
-      break;  /* no room */
+      break;  /* not enough data in buffer (not a complete message) */
     
     if (sgs_session_impl_recv_msg(connection->session) == -1) return -1;
   }

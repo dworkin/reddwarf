@@ -47,7 +47,7 @@ int sgs_id_compare(const sgs_id *a, const sgs_id *b) {
   if (a->datalen > b->datalen)
     return 1;
   
-  // else, a->datalen == b->datalen
+  /** else, a->datalen == b->datalen */
   return memcmp(a->data, b->data, a->datalen);
 }
 
@@ -160,7 +160,8 @@ int sgs_id_init_from_hex(const char* hexstr, sgs_id *id) {
 /*
  * function: calc_bytes_from_compressed()
  *
- * Calculates and populates an ID's byte-array format by reading its compact format.
+ * Calculates and populates an ID's byte-array format by reading its compact
+ * format.
  *
  * returns:
  *    0: success
@@ -171,7 +172,7 @@ static int calc_bytes_from_compressed(sgs_id *id) {
   uint8_t first_byte;
   
   size = get_byte_count(id->compressed[0]);
-  if (size == -1) return -1;  // error
+  if (size == -1) return -1;
   
   if (id->compressedlen < size) {
     errno = EINVAL;
@@ -179,17 +180,17 @@ static int calc_bytes_from_compressed(sgs_id *id) {
   }
   
   if (size <= 8) {
-    first_byte = id->compressed[0] & 0x3F;  // clear out first 2 bits
+    first_byte = id->compressed[0] & 0x3F;  /** clear out first 2 bits */
     first = 0;
     
-    // find first non-zero byte in external form
+    /** find first non-zero byte in external form */
     if (first_byte == 0) {
       for (first = 1; first < size && id->compressed[first] == 0; first++)
         ;
     }
     
     if (first == size) {
-      // all bytes are zero, so first byte is last byte
+      /** all bytes are zero, so first byte is last byte */
       first = size - 1;
     }
     
@@ -211,7 +212,8 @@ static int calc_bytes_from_compressed(sgs_id *id) {
 /*
  * function: calc_bytes_from_hex()
  *
- * Calculates and populates an ID's byte-array format by reading its hex-string format.
+ * Calculates and populates an ID's byte-array format by reading its hex-string
+ * format.
  *
  * returns:
  *    0: success
@@ -226,7 +228,8 @@ static int calc_bytes_from_hex(sgs_id *id) {
 /*
  * function: calc_compressed_from_bytes()
  *
- * Calculates and populates an ID's compact format by reading its byte-array format.
+ * Calculates and populates an ID's compact format by reading its byte-array
+ * format.
  *
  * returns:
  *    0: success
@@ -238,14 +241,16 @@ static int calc_compressed_from_bytes(sgs_id *id) {
   int bit_count;
   int mask, size;
   
-  // find bit count
+  /** find bit count */
   for ( ; (zero_bits < 8) && ((b & 0x80) == 0); b <<= 1, zero_bits++)
     ;
   
   bit_count = ((id->datalen - 1) << 3) + (8 - zero_bits);
   
-  // determine external form's byte count and the mask for most
-  // significant two bits of first byte.
+  /**
+   * determine external form's byte count and the mask for most significant two
+   * bits of first byte.
+   */
   mask = 0x00;
   
   if (bit_count <= 14) {
@@ -261,7 +266,7 @@ static int calc_compressed_from_bytes(sgs_id *id) {
     mask = 0xC0 + id->datalen - 8;
   }
   
-  // copy id into destination byte array and apply mask
+  /** copy id into destination byte array and apply mask */
   id->compressedlen = size;
   
   memset(id->compressed, '\0', id->compressedlen);
@@ -275,7 +280,8 @@ static int calc_compressed_from_bytes(sgs_id *id) {
 /*
  * function: calc_hex_from_bytes()
  *
- * Calculates and populates an ID's hex-string format by reading its byte-array format.
+ * Calculates and populates an ID's hex-string format by reading its byte-array
+ * format.
  *
  * returns:
  *    0: success
@@ -289,23 +295,23 @@ static int calc_hex_from_bytes(sgs_id *id) {
 /*
  * function: get_byte_count()
  *
- * Given the first byte of the compact format of an ID, returns the number of bytes used in that
- *  ID's compact format, *including* this first byte (which, in some cases, contains only size
- *  information and no actual data).
+ * Given the first byte of the compact format of an ID, returns the number of
+ * bytes used in that ID's compact format, *including* this first byte (which,
+ * in some cases, contains only size information and no actual data).
  */
 static int8_t get_byte_count(uint8_t length_byte) {
-  switch (length_byte & 0xC0) {  // clears all but the first 2 bits
-  case 0x00:  // first two bits: 00
+  switch (length_byte & 0xC0) {  /** clears all but the first 2 bits */
+  case 0x00:  /** first two bits: 00 */
     return 2;
     
-  case 0x40:  // first two bits: 01
+  case 0x40:  /** first two bits: 01 */
     return 4;
     
-  case 0x80:  // first two bits: 10
+  case 0x80:  /** first two bits: 10 */
     return 8;
     
-  default:  // first two bits: 11
-    if ((length_byte & 0x30) == 0) {  // "& 0x30" clears all but bits 5 and 6
+  default:    /** first two bits: 11 */
+    if ((length_byte & 0x30) == 0) {  /** "& 0x30" clears all but bits 5 and 6 */
       return 9 + (length_byte & 0x0F);
     }
     else {

@@ -52,13 +52,53 @@ struct sgs_session_impl {
   uint8_t msg_buf[SGS_MSG_MAX_LENGTH];
 };
 
-// TODO - declaration comments
-
+/*
+ * function: sgs_session_impl_create()
+ *
+ * Creates a new sgs_session from the specified connection.  Returns null on
+ * failure.
+ */
 sgs_session_impl sgs_session_impl_create(sgs_connection_impl connection);
+
+/*
+ * function: sgs_session_impl_destroy()
+ *
+ * Performs any necessary memory deallocations to dispose of an sgs_session.
+ */
 void sgs_session_impl_destroy(sgs_session_impl session);
+
+/*
+ * function: sgs_session_impl_incr_seqnum()
+ *
+ * Increments the session internal sequence number field.
+ */
 void sgs_session_impl_incr_seqnum(sgs_session_impl session);
-int sgs_session_impl_login(sgs_session_impl session, const char *login, const char *password);
+
+/*
+ * function: sgs_session_impl_login()
+ *
+ * Creates and sends a login request message to the server with the specified
+ * login and password values.  Returns 0 on success and -1 on failure, with
+ * errno set to the specific error code.
+ */
+int sgs_session_impl_login(sgs_session_impl session, const char *login,
+                           const char *password);
+
+/*
+ * function: sgs_session_impl_logout()
+ *
+ * Creates and sends a logout request message to the server.  Returns 0 on
+ * success and -1 on failure, with errno set to the specific error code.
+ */
 int sgs_session_impl_logout(sgs_session_impl session);
+
+/*
+ * function: sgs_session_impl_recv_msg()
+ *
+ * Notifies the session that a new sgs_message has been read into the session's
+ * internal msg_buf field and is ready to the processed.  Returns 0 on success
+ * and -1 on failure, with errno set to the specific error code.
+ */
 int sgs_session_impl_recv_msg(sgs_session_impl session);
 
 #endif  /** #ifndef SGS_SESSION_IMPL_H */

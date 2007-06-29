@@ -22,8 +22,6 @@
 #include "sgs_message.h"
 #include "sgs_session_impl.h"
 
-// TODO - ALL COMMENTS (HEADER, FUNCTIONS, ETC)
-
 /*
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
@@ -88,6 +86,9 @@ int sgs_session_channel_send(sgs_session_impl session, const sgs_id *pchannel_id
   return 0;
 }
 
+/*
+ * sgs_session_direct_send()
+ */
 int sgs_session_direct_send(sgs_session_impl session, const uint8_t *data,
                             size_t datalen)
 {
@@ -116,10 +117,16 @@ int sgs_session_direct_send(sgs_session_impl session, const uint8_t *data,
   return 0;
 }
 
+/*
+ * sgs_session_get_reconnectkey()
+ */
 const sgs_id *sgs_session_get_reconnectkey(const sgs_session_impl session) {
   return &session->reconnect_key;
 }
 
+/*
+ * sgs_session_get_id()
+ */
 const sgs_id *sgs_session_get_id(const sgs_session_impl session) {
   return &session->session_id;
 }
@@ -157,7 +164,9 @@ void sgs_session_impl_destroy(sgs_session_impl session) {
 /*
  * sgs_session_impl_login()
  */
-int sgs_session_impl_login(sgs_session_impl session, const char *login, const char *password) {
+int sgs_session_impl_login(sgs_session_impl session, const char *login,
+                           const char *password)
+{
   sgs_message msg;
   
   /** Initialize static fields of message. */
@@ -170,7 +179,8 @@ int sgs_session_impl_login(sgs_session_impl session, const char *login, const ch
     return -1;
   
   /** Add "password" data field to message. */
-  if (sgs_msg_add_fixed_content(&msg, (uint8_t*)password, strlen(password)) == -1)
+  if (sgs_msg_add_fixed_content(&msg, (uint8_t*)password,
+                                strlen(password)) == -1)
     return -1;
   
   /** Done assembling message; send message buffer to connection to be sent. */
@@ -200,6 +210,9 @@ int sgs_session_impl_logout(sgs_session_impl session) {
   return 0;
 }
 
+/*
+ * sgs_session_impl_recv_msg()
+ */
 int sgs_session_impl_recv_msg(sgs_session_impl session) {
   int8_t result;
   uint16_t namelen, offset;
@@ -209,7 +222,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
   const uint8_t *msg_data;
   size_t msg_datalen;
   
-  if (sgs_msg_deserialize(&msg, session->msg_buf, sizeof(session->msg_buf)) == -1)
+  if (sgs_msg_deserialize(&msg, session->msg_buf,
+                          sizeof(session->msg_buf)) == -1)
     return -1;
   
   msg_datalen = sgs_msg_get_datalen(&msg);
@@ -224,11 +238,13 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
     switch (sgs_msg_get_opcode(&msg)) {
     case SGS_OPCODE_LOGIN_SUCCESS:
       /** field 1: session-id (compact-id format) */
-      result = sgs_id_init_from_compressed(msg_data, msg_datalen, &session->session_id);
+      result = sgs_id_init_from_compressed(msg_data, msg_datalen,
+                                           &session->session_id);
       if (result == -1) return -1;
       
       /** field 2: reconnection-key (compact-id format) */
-      result = sgs_id_init_from_compressed(msg_data + result, msg_datalen - result, &session->reconnect_key);
+      result = sgs_id_init_from_compressed(msg_data + result,
+          msg_datalen - result, &session->reconnect_key);
       if (result == -1) return -1;
       
       if (session->connection->ctx->logged_in_cb != NULL)
@@ -239,7 +255,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
     case SGS_OPCODE_LOGIN_FAILURE:
       /** field 1: error string (first 2 bytes = length of string) */
       if (session->connection->ctx->login_failed_cb != NULL)
-	session->connection->ctx->login_failed_cb(session->connection, msg_data + 2, read_len_header(msg_data));
+	session->connection->ctx->login_failed_cb(session->connection,
+            msg_data + 2, read_len_header(msg_data));
       
       return 0;
       
@@ -252,7 +269,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
       
       /** field 2: message (first 2 bytes = length of message) */
       if (session->connection->ctx->recv_message_cb != NULL)
-	session->connection->ctx->recv_message_cb(session->connection, msg_data + offset + 2, read_len_header(msg_data + offset));
+	session->connection->ctx->recv_message_cb(session->connection,
+            msg_data + offset + 2, read_len_header(msg_data + offset));
       
       return 0;
       
@@ -282,11 +300,15 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
       namelen = read_len_header(msg_data);
       
       /** field 2: channel-id (compact-id format) */
-      result = sgs_id_init_from_compressed(msg_data + namelen + 2, msg_datalen - namelen - 2, &channel_id);
+      result = sgs_id_init_from_compressed(msg_data + namelen + 2,
+                                           msg_datalen - namelen - 2,
+                                           &channel_id);
       if (result == -1) return -1;
       
       if (session->connection->ctx->channel_joined_cb != NULL)
-	session->connection->ctx->channel_joined_cb(session->connection, &channel_id, msg_data + 2, namelen);
+	session->connection->ctx->channel_joined_cb(session->connection,
+                                                    &channel_id, msg_data + 2,
+                                                    namelen);
       
       return 0;
       
@@ -296,7 +318,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
       if (result == -1) return -1;
       
       if (session->connection->ctx->channel_left_cb != NULL)
-	session->connection->ctx->channel_left_cb(session->connection, &channel_id);
+	session->connection->ctx->channel_left_cb(session->connection,
+                                                  &channel_id);
       
       return 0;
       
@@ -312,7 +335,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
       offset = result + 8;
       
       /** field 3: session-id of sender (compact-id format) */
-      result = sgs_id_init_from_compressed(msg_data + offset, msg_datalen - offset, &sender_id);
+      result = sgs_id_init_from_compressed(msg_data + offset, msg_datalen - offset,
+                                           &sender_id);
       if (result == -1) return -1;
       
       offset += result;
@@ -345,7 +369,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
  */
 
 /*
- * increment_seqnum()
+ * function: increment_seqnum()
+ *
+ * Increments the session's internal sequence number.
  */
 static void increment_seqnum(sgs_session_impl session) {
   if (session->seqnum_lo == UINT32_MAX) {
@@ -359,8 +385,8 @@ static void increment_seqnum(sgs_session_impl session) {
 /*
  * function: read_len_header()
  *
- * Reads two bytes from data argument and interprets them as a 2-byte integer field,
- *  returning the result.
+ * Reads two bytes from data argument and interprets them as a 2-byte integer
+ * field, returning the result.
  */
 static uint16_t read_len_header(const uint8_t *data) {
   uint16_t tmp;

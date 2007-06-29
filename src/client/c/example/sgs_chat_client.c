@@ -24,8 +24,8 @@
 #include "sgs_context.h"
 #include "sgs_session.h"
 
-/** duration of each frame in ms */
-#define FRAME_LEN  200
+/** Timeout value for calls to poll() */
+#define POLL_TIMEOUT  200
 
 /** Default connection info for server. */
 #define DEFAULT_HOST  "localhost"
@@ -37,16 +37,22 @@
 /*
  * Message callbacks
  */
-static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id, const uint8_t *msg, size_t msglen);
+static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id,
+                              const uint8_t *msg, size_t msglen);
 static void channel_left_cb(sgs_connection conn, const sgs_id *channel_id);
-static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id, const sgs_id *sender_id, const uint8_t *msg, size_t msglen);
+static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
+                                const sgs_id *sender_id, const uint8_t *msg,
+                                size_t msglen);
 static void disconnected_cb(sgs_connection conn);
 static void logged_in_cb(sgs_connection conn, sgs_session session);
-static void login_failed_cb(sgs_connection conn, const uint8_t *msg, size_t msglen);
+static void login_failed_cb(sgs_connection conn, const uint8_t *msg,
+                            size_t msglen);
 static void reconnected_cb(sgs_connection conn);
 static void recv_msg_cb(sgs_connection conn, const uint8_t *msg, size_t msglen);
-static void register_fd_cb(sgs_connection conn, int fds[], size_t count, short events);
-static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count, short events);
+static void register_fd_cb(sgs_connection conn, int fds[], size_t count,
+                           short events);
+static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count,
+                             short events);
 
 /*
  * STATIC FUNCTION DECLARATIONS
@@ -113,7 +119,9 @@ int main(int argc, char *argv[]) {
       break;
       
     case 'u':  /* usage */
-      printf("Usage: %s [-h HOST] [-p PORT] [-u]\n  -h    Specify remote hostname (default: %s)\n  -p    Specify remote port (default: %d)\n  -u    Print usage\n", argv[0], DEFAULT_HOST, DEFAULT_PORT);
+      printf("Usage: %s [-h HOST] [-p PORT] [-u]\n  -h    Specify remote hostname \
+(default: %s)\n  -p    Specify remote port (default: %d)\n  -u    Print usage\n",
+             argv[0], DEFAULT_HOST, DEFAULT_PORT);
       return 0;
       
       /* no default case necessary; an error will automatically be printed since
@@ -165,7 +173,7 @@ int main(int argc, char *argv[]) {
       }
     }
     
-    result = poll(g_poll_fds, g_nfds, FRAME_LEN);
+    result = poll(g_poll_fds, g_nfds, POLL_TIMEOUT);
     
     if (result == -1) {
       perror("Error calling poll()");
@@ -178,7 +186,8 @@ int main(int argc, char *argv[]) {
             if ((g_poll_fds[i].revents & POLLIN) == POLLIN) {
               /** Data available for reading. */
               len = strlen(inbuf);
-              result = read(STDIN_FILENO, inbuf + len, sizeof(inbuf) - strlen(inbuf) - 1);
+              result = read(STDIN_FILENO, inbuf + len,
+                            sizeof(inbuf) - strlen(inbuf) - 1);
               
               if (result == -1) {
                 perror("Error calling read() on STDIN");
@@ -197,7 +206,8 @@ int main(int argc, char *argv[]) {
             }
           } else if (g_poll_fds[i].fd != -1) {
 	    /** Some other FD, must be from sgs_connection */
-	    if (sgs_connection_do_io(g_conn, g_poll_fds[i].fd, g_poll_fds[i].revents) == -1) {
+	    if (sgs_connection_do_io(g_conn, g_poll_fds[i].fd,
+                                     g_poll_fds[i].revents) == -1) {
               perror("Error calling sgs_connection_do_io()");
             }
           }
@@ -207,7 +217,6 @@ int main(int argc, char *argv[]) {
     /** else, poll() timed out. */
   }
   
-  // perform cleanup!
   cleanup();
   
   printf("Goodbye!\n");
@@ -221,7 +230,12 @@ int main(int argc, char *argv[]) {
  * (these are functions that can only be called within this file)
  */
 
-static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id, const uint8_t *msg, size_t msglen) {
+/*
+ * channel_joined_cb()
+ */
+static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id,
+                              const uint8_t *msg, size_t msglen)
+{
   printf(" - Callback -   Joined channel %s: ", sgs_id_printable(channel_id));
   fprint_fixed_len_str(stdout, msg, msglen);
   printf("\n");
@@ -230,10 +244,16 @@ static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id, con
     g_global_channel_id = *channel_id;
 }
 
+/*
+ * channel_left_cb()
+ */
 static void channel_left_cb(sgs_connection conn, const sgs_id *channel_id) {
   printf(" - Callback -   Left channel %s.\n", sgs_id_printable(channel_id));
 }
 
+/*
+ * channel_recv_msg_cb()
+ */
 static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
                                 const sgs_id *sender_id, const uint8_t *msg,
                                 size_t msglen)
@@ -248,10 +268,16 @@ static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
   printf("\n");
 }
 
+/*
+ * disconnected_cb()
+ */
 static void disconnected_cb(sgs_connection conn) {
   printf(" - Callback -   Disconnected.\n");
 }
 
+/*
+ * logged_in_cb()
+ */
 static void logged_in_cb(sgs_connection conn, sgs_session session) {
   printf(" - Callback -   Logged in with sessionId %s.\n",
          sgs_id_printable(sgs_session_get_id(session)));
@@ -259,16 +285,27 @@ static void logged_in_cb(sgs_connection conn, sgs_session session) {
   g_session = session;
 }
 
-static void login_failed_cb(sgs_connection conn, const uint8_t *msg, size_t msglen) {
+/*
+ * login_failed_cb()
+ */
+static void login_failed_cb(sgs_connection conn, const uint8_t *msg,
+                            size_t msglen)
+{
   printf(" - Callback -   Login failed (");
   fprint_fixed_len_str(stdout, msg, msglen);
   printf(").\n");
 }
 
+/*
+ * reconnected_cb()
+ */
 static void reconnected_cb(sgs_connection conn) {
   printf(" - Callback -   Reconnected.\n");
 }
 
+/*
+ * recv_msg_cb()
+ */
 static void recv_msg_cb(sgs_connection conn, const uint8_t *msg, size_t msglen) {
   printf(" - Callback -   Received message: ");
   fprint_fixed_len_str(stdout, msg, msglen);
@@ -288,7 +325,7 @@ static void cleanup() {
 /*
  * function: concat_str()
  *
- * Copies prefix and suffix to buf, after checking that buf has enugh space.
+ * Copies prefix and suffix to buf, after checking that buf has enough space.
  * Returns 0 on success or -1 on error.
  */
 static int concat_str(const char *prefix, const char *suffix, char *buf,
@@ -356,8 +393,10 @@ static void process_user_cmd(char *cmd) {
     printf("  login <username> <password>: log into the server\n");
     printf("  logout: log out from the server (cleanly)\n");
     printf("  logoutf: log out from the server (forcibly)\n");
-    printf("  srvsend <msg>: send a message directly to the server (not normally necessary)\n");
-    printf("  psend <user-id> <msg>: send a private message to a user (alias: pm)\n");
+    printf("  srvsend <msg>: send a message directly to the server (not \
+normally necessary)\n");
+    printf("  psend <user-id> <msg>: send a private message to a user (alias: \
+pm)\n");
     printf("  chsend <channel-id> <msg>: broadcast a message on a channel\n");
     printf("  chjoin <channel-name>: join a channel (alias: join)\n");
     printf("  chleave <channel-name>: leave a channel (alias: leave)\n");
@@ -418,7 +457,8 @@ static void process_user_cmd(char *cmd) {
       return;
     }
     
-    if (sgs_session_direct_send(g_session, (uint8_t*)token, strlen(token)) == -1) {
+    if (sgs_session_direct_send(g_session, (uint8_t*)token,
+                                strlen(token)) == -1) {
       perror("Error in sgs_session_direct_send()");
       return;
     }
@@ -456,7 +496,8 @@ static void process_user_cmd(char *cmd) {
       return;
     }
     
-    if (sgs_session_channel_send(g_session, &channel_id, (uint8_t*)strbuf, strlen(strbuf), recipients, 1) == -1) {
+    if (sgs_session_channel_send(g_session, &channel_id, (uint8_t*)strbuf,
+                                 strlen(strbuf), recipients, 1) == -1) {
       perror("Error in sgs_session_channel_send()");
       return;
     }
@@ -486,9 +527,10 @@ static void process_user_cmd(char *cmd) {
       return;
     }
     
-    // note: no prefix necessary for this command
+    /** note: no prefix necessary for this command */
     
-    if (sgs_session_channel_send(g_session, &channel_id, (uint8_t*)token, strlen(token), recipients, 0) == -1) {
+    if (sgs_session_channel_send(g_session, &channel_id, (uint8_t*)token,
+                                 strlen(token), recipients, 0) == -1) {
       perror("Error in sgs_session_channel_send()");
       return;
     }
@@ -511,7 +553,8 @@ static void process_user_cmd(char *cmd) {
       return;
     }
     
-    if (sgs_session_direct_send(g_session, (uint8_t*)strbuf, strlen(strbuf)) == -1) {
+    if (sgs_session_direct_send(g_session, (uint8_t*)strbuf,
+                                strlen(strbuf)) == -1) {
       perror("Error in sgs_session_direct_send()");
       return;
     }
@@ -534,7 +577,8 @@ static void process_user_cmd(char *cmd) {
       return;
     }
     
-    if (sgs_session_direct_send(g_session, (uint8_t*)strbuf, strlen(strbuf)) == -1) {
+    if (sgs_session_direct_send(g_session, (uint8_t*)strbuf,
+                                strlen(strbuf)) == -1) {
       perror("Error in sgs_session_direct_send()");
       return;
     }
@@ -544,7 +588,12 @@ static void process_user_cmd(char *cmd) {
   }
 }
 
-static void register_fd_cb(sgs_connection conn, int fds[], size_t count, short events) {
+/*
+ * register_fd_cb()
+ */
+static void register_fd_cb(sgs_connection conn, int fds[], size_t count,
+                           short events)
+{
   int i, j, found;
   
   for (i=0; i < count; i++) {
@@ -561,7 +610,8 @@ static void register_fd_cb(sgs_connection conn, int fds[], size_t count, short e
     if (!found) {
       /** Need a new entry in g_poll_fds[] for this file descriptor. */
       if (g_nfds == sizeof(g_poll_fds)) {
-        fprintf(stderr, "Error: Too many file descriptors registered.  Ignoring requests.\n");
+        fprintf(stderr, "Error: Too many file descriptors registered.  \
+Ignoring requests.\n");
       } else {
         g_poll_fds[g_nfds].fd = fds[i];
         g_poll_fds[g_nfds].events = events;
@@ -577,7 +627,12 @@ static void register_fd_cb(sgs_connection conn, int fds[], size_t count, short e
   }
 }
 
-static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count, short events) {
+/*
+ * unregister_fd_cb()
+ */
+static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count,
+                             short events)
+{
   int i, j, last_max = 0, resize = 0;
   
   for (i=0; i < count; i++) {

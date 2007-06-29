@@ -76,7 +76,7 @@ size_t sgs_id_compressed_len(const sgs_id *id);
  * args:
  *  buf: the buffer to write into
  *  len: the size (capacity) of the buffer
- *   id: an sgs_id to deserialize into
+ *   id: pointer to a sgs_id to deserialize into
  *
  * returns:
  *    0: success
@@ -108,7 +108,7 @@ const char *sgs_id_printable(const sgs_id *id);
  * Serializes a sgs_id to a byte array format.
  *
  * args:
- *   id: the sgs_id to serialize
+ *   id: pointer to the sgs_id to serialize
  *  buf: the buffer to write into
  *  len: the size (capacity) of the buffer
  *
@@ -126,7 +126,7 @@ int sgs_id_serialize(const sgs_id *id, uint8_t *buf, size_t len);
  * args:
  *      data: the byte-array (non-compressed) representation of an ID
  *   datalen: the length of the data array
- *        id: the id to initialize
+ *        id: pointer to the id to initialize
  *
  * returns:
  *    0: success
@@ -142,7 +142,7 @@ int sgs_id_init_from_bytes(const uint8_t *data, size_t datalen, sgs_id *id);
  * args:
  *      data: the compact (compressed) representation of an ID
  *   datalen: the length of the data array
- *        id: the id to initialize
+ *        id: pointer to the id to initialize
  *
  * returns:
  *    0: success

@@ -27,9 +27,7 @@ typedef struct sgs_connection_impl *sgs_connection_impl;
 /*
  * DEFINES
  */
-// TODO
-//#define SGS_CONNECTION_IMPL_IO_BUFSIZE SGS_MSG_MAX_LENGTH
-#define SGS_CONNECTION_IMPL_IO_BUFSIZE 1000
+#define SGS_CONNECTION_IMPL_IO_BUFSIZE SGS_MSG_MAX_LENGTH
 
 /*
  * TYPEDEFS
@@ -70,6 +68,11 @@ struct sgs_connection_impl {
  */
 void sgs_connection_impl_disconnect(sgs_connection_impl connection);
 
+/*
+ * function: sgs_connection_impl_io_write()
+ *
+ * Writes buflen bytes from the buf array to the connection's underlying socket.
+ */
 int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
                                  size_t buflen);
 

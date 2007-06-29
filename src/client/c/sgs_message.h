@@ -51,8 +51,7 @@ typedef struct sgs_message {
  * 2-byte size field is NOT prepended to the data before it is added.
  *
  * args:
- *      msg: the message to add data to; it may have any amount of optional
- *           data already added
+ *     pmsg: the message to add data to
  *  content: byte array containing the content to add
  *     clen: length of the content array
  *
@@ -70,8 +69,7 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
  * size field to the data containing the length of the array.
  *
  * args:
- *      msg: the message to add data to; it may have any amount of optional
- *           data already added
+ *     pmsg: the message to add data to
  *  content: byte array containing the content to add
  *     clen: length of the content array
  *
@@ -88,10 +86,8 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
  * Writes a 32-bit int to an existing message (useful for sequence numbers).
  *
  * args:
- *      msg: the message to add data to; it may have any amount of optional
- *           data already added
- *  content: byte array containing the content to add
- *     clen: length of the content array
+ *     pmsg: pointer to the message to add data to
+ *      val: the 32-bit integer to add to the message
  *
  * returns:
  *    0: success
@@ -165,7 +161,7 @@ uint8_t sgs_msg_get_version(sgs_message *pmsg);
  * Initializes the fields of a message without any optional content.
  *
  * args:
- *         msg: message to initialize
+ *        pmsg: pointer to the message to initialize
  *      buffer: the backing buffer to write/read to/from
  *      buflen: size of backing buffer
  *      opcode: operation code for this message

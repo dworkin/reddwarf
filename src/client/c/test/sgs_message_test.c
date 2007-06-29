@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include "sgs_message.h"
 
+/*
+ * function: printMsg()
+ */
 static void printMsg(sgs_message *pmsg) {
   const uint8_t *data = sgs_msg_get_bytes(pmsg);
   int i;
