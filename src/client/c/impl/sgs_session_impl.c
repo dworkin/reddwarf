@@ -26,7 +26,7 @@
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
-static void increment_seqnum(sgs_session_impl session);
+static void increment_seqnum(sgs_session_impl *session);
 static uint16_t read_len_header(const uint8_t *data);
 
 
@@ -37,7 +37,7 @@ static uint16_t read_len_header(const uint8_t *data);
 /*
  * sgs_session_channel_send()
  */
-int sgs_session_channel_send(sgs_session_impl session, const sgs_id *pchannel_id,
+int sgs_session_channel_send(sgs_session_impl *session, const sgs_id *pchannel_id,
     const uint8_t *data, size_t datalen, const sgs_id recipients[],
     size_t reciplen)
 {
@@ -89,7 +89,7 @@ int sgs_session_channel_send(sgs_session_impl session, const sgs_id *pchannel_id
 /*
  * sgs_session_direct_send()
  */
-int sgs_session_direct_send(sgs_session_impl session, const uint8_t *data,
+int sgs_session_direct_send(sgs_session_impl *session, const uint8_t *data,
                             size_t datalen)
 {
   sgs_message msg;
@@ -120,14 +120,14 @@ int sgs_session_direct_send(sgs_session_impl session, const uint8_t *data,
 /*
  * sgs_session_get_reconnectkey()
  */
-const sgs_id *sgs_session_get_reconnectkey(const sgs_session_impl session) {
+const sgs_id *sgs_session_get_reconnectkey(const sgs_session_impl *session) {
   return &session->reconnect_key;
 }
 
 /*
  * sgs_session_get_id()
  */
-const sgs_id *sgs_session_get_id(const sgs_session_impl session) {
+const sgs_id *sgs_session_get_id(const sgs_session_impl *session) {
   return &session->session_id;
 }
 
@@ -139,10 +139,10 @@ const sgs_id *sgs_session_get_id(const sgs_session_impl session) {
 /*
  * sgs_session_impl_create()
  */
-sgs_session_impl sgs_session_impl_create(sgs_connection_impl connection) {
-  sgs_session_impl session;
+sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
+  sgs_session_impl *session;
   
-  session = (sgs_session_impl)malloc(sizeof(struct sgs_session_impl));
+  session = (sgs_session_impl*)malloc(sizeof(struct sgs_session_impl));
   if (session == NULL) return NULL;
   
   session->connection = connection;
@@ -157,14 +157,14 @@ sgs_session_impl sgs_session_impl_create(sgs_connection_impl connection) {
 /*
  * sgs_session_impl_destroy()
  */
-void sgs_session_impl_destroy(sgs_session_impl session) {
+void sgs_session_impl_destroy(sgs_session_impl *session) {
   free(session);
 }
 
 /*
  * sgs_session_impl_login()
  */
-int sgs_session_impl_login(sgs_session_impl session, const char *login,
+int sgs_session_impl_login(sgs_session_impl *session, const char *login,
                            const char *password)
 {
   sgs_message msg;
@@ -194,7 +194,7 @@ int sgs_session_impl_login(sgs_session_impl session, const char *login,
 /*
  * sgs_session_impl_logout()
  */
-int sgs_session_impl_logout(sgs_session_impl session) {
+int sgs_session_impl_logout(sgs_session_impl *session) {
   sgs_message msg;
   
   /** Initialize static fields of message. */
@@ -213,7 +213,7 @@ int sgs_session_impl_logout(sgs_session_impl session) {
 /*
  * sgs_session_impl_recv_msg()
  */
-int sgs_session_impl_recv_msg(sgs_session_impl session) {
+int sgs_session_impl_recv_msg(sgs_session_impl *session) {
   int8_t result;
   uint16_t namelen, offset;
   sgs_id channel_id, sender_id;
@@ -373,7 +373,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl session) {
  *
  * Increments the session's internal sequence number.
  */
-static void increment_seqnum(sgs_session_impl session) {
+static void increment_seqnum(sgs_session_impl *session) {
   if (session->seqnum_lo == UINT32_MAX) {
     session->seqnum_hi++;
     session->seqnum_lo = 0;

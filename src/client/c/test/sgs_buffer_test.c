@@ -10,7 +10,7 @@
 /*
  * function: printStats()
  */
-void printStats(const sgs_buffer buf) {
+void printStats(const sgs_buffer *buf) {
   printf("pos=%u, size=%u, cap=%u, remaining=%u\n", buf->position,
          sgs_buffer_size(buf), sgs_buffer_capacity(buf),
          sgs_buffer_remaining_capacity(buf));
@@ -33,7 +33,7 @@ void printArr(const char *prefix, const uint8_t *buf, size_t len) {
  * function: main()
  */
 int main(int argc, char *argv[]) {
-  sgs_buffer buf;
+  sgs_buffer *buf;
   uint8_t content[100];
   uint8_t content2[100];
   int result, i;

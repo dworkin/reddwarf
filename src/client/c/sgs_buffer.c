@@ -16,9 +16,9 @@
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
-static size_t readable_len(const sgs_buffer buffer);
-static size_t tailpos (const sgs_buffer buffer);
-static size_t writable_len(const sgs_buffer buffer);
+static size_t readable_len(const sgs_buffer *buffer);
+static size_t tailpos (const sgs_buffer *buffer);
+static size_t writable_len(const sgs_buffer *buffer);
 
 /*
  * (EXTERNAL) FUNCTION IMPLEMENTATIONS
@@ -27,17 +27,17 @@ static size_t writable_len(const sgs_buffer buffer);
 /*
  * sgs_buffer_capacity()
  */
-size_t sgs_buffer_capacity(const sgs_buffer buffer) {
+size_t sgs_buffer_capacity(const sgs_buffer *buffer) {
   return buffer->capacity;
 }
 
 /*
  * sgs_buffer_create()
  */
-sgs_buffer sgs_buffer_create(size_t capacity) {
-  sgs_buffer buffer;
+sgs_buffer *sgs_buffer_create(size_t capacity) {
+  sgs_buffer *buffer;
   
-  buffer = (sgs_buffer)malloc(sizeof(struct sgs_buffer));
+  buffer = (sgs_buffer*)malloc(sizeof(struct sgs_buffer));
   if (buffer == NULL) return NULL;
   
   buffer->buf = (uint8_t*)malloc(capacity);
@@ -58,7 +58,7 @@ sgs_buffer sgs_buffer_create(size_t capacity) {
 /*
  * sgs_buffer_destroy()
  */
-void sgs_buffer_destroy(sgs_buffer buffer) {
+void sgs_buffer_destroy(sgs_buffer *buffer) {
   free(buffer->buf);
   free(buffer);
 }
@@ -66,7 +66,7 @@ void sgs_buffer_destroy(sgs_buffer buffer) {
 /*
  * sgs_buffer_empty()
  */
-void sgs_buffer_empty(sgs_buffer buffer) {
+void sgs_buffer_empty(sgs_buffer *buffer) {
   buffer->position = 0;  /** not necessary, but convenient */
   buffer->size = 0;
 }
@@ -74,7 +74,7 @@ void sgs_buffer_empty(sgs_buffer buffer) {
 /*
  * sgs_buffer_peek()
  */
-int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len) {
+int sgs_buffer_peek(const sgs_buffer *buffer, uint8_t *data, size_t len) {
   size_t readable = readable_len(buffer);
   
   if (len > buffer->size) return -1;
@@ -92,7 +92,7 @@ int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len) {
 /*
  * sgs_buffer_read()
  */
-int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len) {
+int sgs_buffer_read(sgs_buffer *buffer, uint8_t *data, size_t len) {
   if (sgs_buffer_peek(buffer, data, len) == -1) return -1;
   
   buffer->position = (buffer->position + len) % buffer->capacity;
@@ -103,7 +103,7 @@ int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len) {
 /*
  * sgs_buffer_read_from_fd()
  */
-int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd) {
+int sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd) {
   size_t result, total = 0, writable = writable_len(buffer);
   
   while (writable > 0) {
@@ -122,21 +122,21 @@ int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd) {
 /*
  * sgs_buffer_remaining_capacity()
  */
-size_t sgs_buffer_remaining_capacity(const sgs_buffer buffer) {
+size_t sgs_buffer_remaining_capacity(const sgs_buffer *buffer) {
   return buffer->capacity - buffer->size;
 }
 
 /*
  * sgs_buffer_size()
  */
-size_t sgs_buffer_size(const sgs_buffer buffer) {
+size_t sgs_buffer_size(const sgs_buffer *buffer) {
   return buffer->size;
 }
 
 /*
  * sgs_buffer_write()
  */
-int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len) {
+int sgs_buffer_write(sgs_buffer *buffer, const uint8_t *data, size_t len) {
   size_t writable = writable_len(buffer);
   
   if (len > sgs_buffer_remaining_capacity(buffer)) {
@@ -158,7 +158,7 @@ int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len) {
 /*
  * sgs_buffer_write_to_fd()
  */
-int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd) {
+int sgs_buffer_write_to_fd(sgs_buffer *buffer, int fd) {
   size_t result, total = 0, readable = readable_len(buffer);
   
   while (readable > 0) {
@@ -181,7 +181,7 @@ int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd) {
 /*
  * readable_len()
  */
-static size_t readable_len(const sgs_buffer buffer) {
+static size_t readable_len(const sgs_buffer *buffer) {
   if (buffer->size == 0) return 0;
   
   if (tailpos(buffer) > buffer->position) {
@@ -202,14 +202,14 @@ static size_t readable_len(const sgs_buffer buffer) {
 /*
  * tailpos()
  */
-static size_t tailpos(const sgs_buffer buffer) {
+static size_t tailpos(const sgs_buffer *buffer) {
   return (buffer->position + buffer->size) % buffer->capacity;
 }
 
 /*
  * writable_len()
  */
-static size_t writable_len(const sgs_buffer buffer) {
+static size_t writable_len(const sgs_buffer *buffer) {
   size_t mytailpos = tailpos(buffer);
   
   if (mytailpos >= buffer->position) {

@@ -12,9 +12,9 @@
 #define SGS_SESSION_IMPL_H 1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_session_impl typedef (declare before any #includes)
  */
-typedef struct sgs_session_impl *sgs_session_impl;
+typedef struct sgs_session_impl sgs_session_impl;
 
 /*
  * INCLUDES
@@ -29,7 +29,7 @@ typedef struct sgs_session_impl *sgs_session_impl;
  */
 struct sgs_session_impl {
   /** The underlying network connection. */
-  sgs_connection_impl connection;
+  sgs_connection_impl *connection;
   
   /** Server-assigned unique ID for this session. */
   sgs_id session_id;
@@ -58,21 +58,21 @@ struct sgs_session_impl {
  * Creates a new sgs_session from the specified connection.  Returns null on
  * failure.
  */
-sgs_session_impl sgs_session_impl_create(sgs_connection_impl connection);
+sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection);
 
 /*
  * function: sgs_session_impl_destroy()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_session.
  */
-void sgs_session_impl_destroy(sgs_session_impl session);
+void sgs_session_impl_destroy(sgs_session_impl *session);
 
 /*
  * function: sgs_session_impl_incr_seqnum()
  *
  * Increments the session internal sequence number field.
  */
-void sgs_session_impl_incr_seqnum(sgs_session_impl session);
+void sgs_session_impl_incr_seqnum(sgs_session_impl *session);
 
 /*
  * function: sgs_session_impl_login()
@@ -81,7 +81,7 @@ void sgs_session_impl_incr_seqnum(sgs_session_impl session);
  * login and password values.  Returns 0 on success and -1 on failure, with
  * errno set to the specific error code.
  */
-int sgs_session_impl_login(sgs_session_impl session, const char *login,
+int sgs_session_impl_login(sgs_session_impl *session, const char *login,
                            const char *password);
 
 /*
@@ -90,7 +90,7 @@ int sgs_session_impl_login(sgs_session_impl session, const char *login,
  * Creates and sends a logout request message to the server.  Returns 0 on
  * success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_session_impl_logout(sgs_session_impl session);
+int sgs_session_impl_logout(sgs_session_impl *session);
 
 /*
  * function: sgs_session_impl_recv_msg()
@@ -99,6 +99,6 @@ int sgs_session_impl_logout(sgs_session_impl session);
  * internal msg_buf field and is ready to the processed.  Returns 0 on success
  * and -1 on failure, with errno set to the specific error code.
  */
-int sgs_session_impl_recv_msg(sgs_session_impl session);
+int sgs_session_impl_recv_msg(sgs_session_impl *session);
 
 #endif  /** #ifndef SGS_SESSION_IMPL_H */

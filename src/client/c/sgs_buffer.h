@@ -10,9 +10,9 @@
 #define SGS_BUFFER_H  1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_buffer typedef (declare before any #includes)
  */
-typedef struct sgs_buffer *sgs_buffer;
+typedef struct sgs_buffer sgs_buffer;
 
 /*
  * INCLUDES
@@ -46,7 +46,7 @@ struct sgs_buffer {
  *
  * Returns the total capacity of a buffer.
  */
-size_t sgs_buffer_capacity(const sgs_buffer buffer);
+size_t sgs_buffer_capacity(const sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_create()
@@ -54,14 +54,14 @@ size_t sgs_buffer_capacity(const sgs_buffer buffer);
  * Allocates a buffer with at least the specified capacity (in bytes).  NULL is
  * returned if allocation fails.
  */
-sgs_buffer sgs_buffer_create(size_t capacity);
+sgs_buffer *sgs_buffer_create(size_t capacity);
 
 /*
  * function: sgs_buffer_destroy()
  *
  * Safely deallocates a buffer.
  */
-void sgs_buffer_destroy(sgs_buffer buffer);
+void sgs_buffer_destroy(sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_empty()
@@ -70,7 +70,7 @@ void sgs_buffer_destroy(sgs_buffer buffer);
  * buffer's memory but merely resets the internal state so that the buffer
  * "forgets" about any data currently held.
  */
-void sgs_buffer_empty(sgs_buffer buffer);
+void sgs_buffer_empty(sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_peek()
@@ -81,7 +81,7 @@ void sgs_buffer_empty(sgs_buffer buffer);
  * Returns 0 on success or -1 if the buffer does not contain enough data to
  * satisfy the request.
  */
-int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len);
+int sgs_buffer_peek(const sgs_buffer *buffer, uint8_t *data, size_t len);
 
 
 /*
@@ -91,7 +91,7 @@ int sgs_buffer_peek(const sgs_buffer buffer, uint8_t *data, size_t len);
  * 0 on success or -1 if the buffer does not contain enough data to satisfy the
  * request.
  */
-int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len);
+int sgs_buffer_read(sgs_buffer *buffer, uint8_t *data, size_t len);
 
 /*
  * function: sgs_buffer_read_from_fd()
@@ -100,7 +100,7 @@ int sgs_buffer_read(sgs_buffer buffer, uint8_t *data, size_t len);
  * stops if (a) the buffer runs out of room, or (b) a call to read() on the file
  * descriptor returns any value other than the requested length.  TODO - returns?
  */
-int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd);
+int sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd);
 
 /*
  * function: sgs_buffer_remaining_capacity()
@@ -110,14 +110,14 @@ int sgs_buffer_read_from_fd(sgs_buffer buffer, int fd);
  * to the tail of the buffer (since the buffer is circular).  For this function,
  * use sgs_buffer_writable_len().
  */
-size_t sgs_buffer_remaining_capacity(const sgs_buffer buffer);
+size_t sgs_buffer_remaining_capacity(const sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_size()
  *
  * Returns the current size of the stored data.
  */
-size_t sgs_buffer_size(const sgs_buffer buffer);
+size_t sgs_buffer_size(const sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_write()
@@ -126,7 +126,7 @@ size_t sgs_buffer_size(const sgs_buffer buffer);
  * the remaining capacity of the buffer, returning 0.  Otherwise, returns -1 and
  * errno is set to ENOBUFS.
  */
-int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len);
+int sgs_buffer_write(sgs_buffer *buffer, const uint8_t *data, size_t len);
 
 /*
  * function: sgs_buffer_write_to_fd()
@@ -136,6 +136,6 @@ int sgs_buffer_write(sgs_buffer buffer, const uint8_t *data, size_t len);
  * call to write() on the file descriptor returns any value other than the
  * requested length.  TODO - retuirns?
  */
-int sgs_buffer_write_to_fd(sgs_buffer buffer, int fd);
+int sgs_buffer_write_to_fd(sgs_buffer *buffer, int fd);
 
 #endif  /** #ifndef SGS_BUFFER_H */

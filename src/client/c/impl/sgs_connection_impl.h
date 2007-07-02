@@ -11,9 +11,9 @@
 #define SGS_CONNECTION_IMPL_H 1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_connect_impl typdef (declare before any #includes)
  */
-typedef struct sgs_connection_impl *sgs_connection_impl;
+typedef struct sgs_connection_impl sgs_connection_impl;
 
 /*
  * INCLUDES
@@ -52,13 +52,13 @@ struct sgs_connection_impl {
   sgs_connection_state state;
   
   /** The login context (contains all callback functions). */
-  sgs_context_impl ctx;
+  sgs_context_impl *ctx;
   
   /** The session with the server (once connected). */
-  sgs_session_impl session;
+  sgs_session_impl *session;
   
   /** Reusable I/O buffers for reading/writing from/to the network connection. */
-  sgs_buffer inbuf, outbuf;
+  sgs_buffer *inbuf, *outbuf;
 };
 
 /*
@@ -66,14 +66,14 @@ struct sgs_connection_impl {
  *
  * Closes the network connection of a connection.
  */
-void sgs_connection_impl_disconnect(sgs_connection_impl connection);
+void sgs_connection_impl_disconnect(sgs_connection_impl *connection);
 
 /*
  * function: sgs_connection_impl_io_write()
  *
  * Writes buflen bytes from the buf array to the connection's underlying socket.
  */
-int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
+int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
                                  size_t buflen);
 
 #endif  /** #ifndef SGS_CONNECTION_IMPL_H */

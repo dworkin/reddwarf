@@ -37,21 +37,21 @@
 /*
  * Message callbacks
  */
-static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id,
+static void channel_joined_cb(sgs_connection *conn, const sgs_id *channel_id,
                               const uint8_t *msg, size_t msglen);
-static void channel_left_cb(sgs_connection conn, const sgs_id *channel_id);
-static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
+static void channel_left_cb(sgs_connection *conn, const sgs_id *channel_id);
+static void channel_recv_msg_cb(sgs_connection *conn, const sgs_id *channel_id,
                                 const sgs_id *sender_id, const uint8_t *msg,
                                 size_t msglen);
-static void disconnected_cb(sgs_connection conn);
-static void logged_in_cb(sgs_connection conn, sgs_session session);
-static void login_failed_cb(sgs_connection conn, const uint8_t *msg,
+static void disconnected_cb(sgs_connection *conn);
+static void logged_in_cb(sgs_connection *conn, sgs_session *session);
+static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
                             size_t msglen);
-static void reconnected_cb(sgs_connection conn);
-static void recv_msg_cb(sgs_connection conn, const uint8_t *msg, size_t msglen);
-static void register_fd_cb(sgs_connection conn, int fds[], size_t count,
+static void reconnected_cb(sgs_connection *conn);
+static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen);
+static void register_fd_cb(sgs_connection *conn, int fds[], size_t count,
                            short events);
-static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count,
+static void unregister_fd_cb(sgs_connection *conn, int fds[], size_t count,
                              short events);
 
 /*
@@ -76,9 +76,9 @@ static void process_user_cmd(char *cmd);
  * independent sets of these variables for each connection.  This would support
  * multiple, concurrent connections/sessions.
  */
-static sgs_context g_context;
-static sgs_connection g_conn;
-static sgs_session g_session;
+static sgs_context *g_context;
+static sgs_connection *g_conn;
+static sgs_session *g_session;
 static sgs_id g_global_channel_id;
 static struct pollfd g_poll_fds[50];
 static int g_nfds;
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
 /*
  * channel_joined_cb()
  */
-static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id,
+static void channel_joined_cb(sgs_connection *conn, const sgs_id *channel_id,
                               const uint8_t *msg, size_t msglen)
 {
   printf(" - Callback -   Joined channel %s: ", sgs_id_printable(channel_id));
@@ -247,14 +247,14 @@ static void channel_joined_cb(sgs_connection conn, const sgs_id *channel_id,
 /*
  * channel_left_cb()
  */
-static void channel_left_cb(sgs_connection conn, const sgs_id *channel_id) {
+static void channel_left_cb(sgs_connection *conn, const sgs_id *channel_id) {
   printf(" - Callback -   Left channel %s.\n", sgs_id_printable(channel_id));
 }
 
 /*
  * channel_recv_msg_cb()
  */
-static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
+static void channel_recv_msg_cb(sgs_connection *conn, const sgs_id *channel_id,
                                 const sgs_id *sender_id, const uint8_t *msg,
                                 size_t msglen)
 {
@@ -271,14 +271,14 @@ static void channel_recv_msg_cb(sgs_connection conn, const sgs_id *channel_id,
 /*
  * disconnected_cb()
  */
-static void disconnected_cb(sgs_connection conn) {
+static void disconnected_cb(sgs_connection *conn) {
   printf(" - Callback -   Disconnected.\n");
 }
 
 /*
  * logged_in_cb()
  */
-static void logged_in_cb(sgs_connection conn, sgs_session session) {
+static void logged_in_cb(sgs_connection *conn, sgs_session *session) {
   printf(" - Callback -   Logged in with sessionId %s.\n",
          sgs_id_printable(sgs_session_get_id(session)));
   
@@ -288,7 +288,7 @@ static void logged_in_cb(sgs_connection conn, sgs_session session) {
 /*
  * login_failed_cb()
  */
-static void login_failed_cb(sgs_connection conn, const uint8_t *msg,
+static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
                             size_t msglen)
 {
   printf(" - Callback -   Login failed (");
@@ -299,14 +299,14 @@ static void login_failed_cb(sgs_connection conn, const uint8_t *msg,
 /*
  * reconnected_cb()
  */
-static void reconnected_cb(sgs_connection conn) {
+static void reconnected_cb(sgs_connection *conn) {
   printf(" - Callback -   Reconnected.\n");
 }
 
 /*
  * recv_msg_cb()
  */
-static void recv_msg_cb(sgs_connection conn, const uint8_t *msg, size_t msglen) {
+static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen) {
   printf(" - Callback -   Received message: ");
   fprint_fixed_len_str(stdout, msg, msglen);
   printf("\n");
@@ -591,7 +591,7 @@ pm)\n");
 /*
  * register_fd_cb()
  */
-static void register_fd_cb(sgs_connection conn, int fds[], size_t count,
+static void register_fd_cb(sgs_connection *conn, int fds[], size_t count,
                            short events)
 {
   int i, j, found;
@@ -630,7 +630,7 @@ Ignoring requests.\n");
 /*
  * unregister_fd_cb()
  */
-static void unregister_fd_cb(sgs_connection conn, int fds[], size_t count,
+static void unregister_fd_cb(sgs_connection *conn, int fds[], size_t count,
                              short events)
 {
   int i, j, last_max = 0, resize = 0;

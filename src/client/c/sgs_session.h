@@ -10,9 +10,9 @@
 #define SGS_SESSION_H 1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_session typdef (declare before any #includes)
  */
-typedef struct sgs_session_impl *sgs_session;
+typedef struct sgs_session_impl sgs_session;
 
 /*
  * INCLUDES
@@ -42,7 +42,7 @@ typedef struct sgs_session_impl *sgs_session;
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_session_channel_send(sgs_session session, const sgs_id *pchannel_id,
+int sgs_session_channel_send(sgs_session *session, const sgs_id *pchannel_id,
     const uint8_t *data, size_t datalen, const sgs_id recipients[],
     size_t reciplen);
 
@@ -61,7 +61,7 @@ int sgs_session_channel_send(sgs_session session, const sgs_id *pchannel_id,
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_session_direct_send(sgs_session session, const uint8_t *data,
+int sgs_session_direct_send(sgs_session *session, const uint8_t *data,
                             size_t datalen);
 
 /*
@@ -69,13 +69,13 @@ int sgs_session_direct_send(sgs_session session, const uint8_t *data,
  *
  * Returns the reconnection-key for this session.
  */
-const sgs_id *sgs_session_get_reconnectkey(const sgs_session session);
+const sgs_id *sgs_session_get_reconnectkey(const sgs_session *session);
 
 /*
  * function: sgs_session_get_id()
  *
  * Returns this session's unique ID.
  */
-const sgs_id *sgs_session_get_id(const sgs_session session);
+const sgs_id *sgs_session_get_id(const sgs_session *session);
 
 #endif  /** #ifndef SGS_SESSION_H */

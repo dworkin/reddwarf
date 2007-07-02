@@ -12,7 +12,7 @@
 /*
  * Opaque pointer (declare before any #includes)
  */
-typedef struct sgs_connection_impl *sgs_connection;
+typedef struct sgs_connection_impl sgs_connection;
 
 /*
  * INCLUDES
@@ -29,14 +29,14 @@ typedef struct sgs_connection_impl *sgs_connection;
  * Creates a new sgs_connection from the specified login context.  Returns null
  * on failure.
  */
-sgs_connection sgs_connection_create(sgs_context ctx);
+sgs_connection *sgs_connection_create(sgs_context *ctx);
 
 /*
  * function: sgs_connection_destroy()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_connection.
  */
-void sgs_connection_destroy(sgs_connection connection);
+void sgs_connection_destroy(sgs_connection *connection);
 
 /*
  * function: sgs_connection_do_io()
@@ -50,7 +50,7 @@ void sgs_connection_destroy(sgs_connection connection);
  * connection's context was created.  Returns 0 on success and -1 on failure,
  * with errno set to the specific error code.
  */
-int sgs_connection_do_io(sgs_connection connection, int fd, short events);
+int sgs_connection_do_io(sgs_connection *connection, int fd, short events);
 
 /*
  * function: sgs_connection_login()
@@ -59,7 +59,7 @@ int sgs_connection_do_io(sgs_connection connection, int fd, short events);
  * login and password values.  Returns 0 on success and -1 on failure, with
  * errno set to the specific error code.
  */
-int sgs_connection_login(sgs_connection connection, const char *login,
+int sgs_connection_login(sgs_connection *connection, const char *login,
                          const char *password);
 
 /*
@@ -68,6 +68,6 @@ int sgs_connection_login(sgs_connection connection, const char *login,
  * Creates and sends a login request message to the server.  Returns 0 on
  * success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_connection_logout(sgs_connection connection, const int force);
+int sgs_connection_logout(sgs_connection *connection, const int force);
 
 #endif  /** #ifndef SGS_CONNECTION_H */

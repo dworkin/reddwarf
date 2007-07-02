@@ -26,8 +26,8 @@
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
-static void conn_closed(sgs_connection_impl connection);
-static int consume_data(sgs_connection_impl connection);
+static void conn_closed(sgs_connection_impl *connection);
+static int consume_data(sgs_connection_impl *connection);
 
 /*
  * FUNCTION IMPLEMENTATIONS FOR SGS_CONNECTION.H
@@ -36,11 +36,11 @@ static int consume_data(sgs_connection_impl connection);
 /*
  * sgs_connection_create()
  */
-sgs_connection_impl sgs_connection_create(sgs_context ctx)
+sgs_connection_impl *sgs_connection_create(sgs_context *ctx)
 {
-  sgs_connection_impl connection;
+  sgs_connection_impl *connection;
   
-  connection = (sgs_connection_impl)malloc(sizeof(struct sgs_connection_impl));
+  connection = (sgs_connection_impl*)malloc(sizeof(struct sgs_connection_impl));
   if (connection == NULL) return NULL;
   
   connection->socket_fd = -1;
@@ -70,7 +70,7 @@ sgs_connection_impl sgs_connection_create(sgs_context ctx)
 /*
  * sgs_connection_destroy()
  */
-void sgs_connection_destroy(sgs_connection_impl connection) {
+void sgs_connection_destroy(sgs_connection_impl *connection) {
   sgs_session_impl_destroy(connection->session);
   sgs_buffer_destroy(connection->inbuf);
   sgs_buffer_destroy(connection->outbuf);
@@ -80,7 +80,7 @@ void sgs_connection_destroy(sgs_connection_impl connection) {
 /*
  * sgs_connection_do_io()
  */
-int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
+int sgs_connection_do_io(sgs_connection_impl *connection, int fd, short events) {
   int result;
   socklen_t optlen;
   
@@ -150,7 +150,7 @@ int sgs_connection_do_io(sgs_connection_impl connection, int fd, short events) {
 /*
  * sgs_connection_login()
  */
-int sgs_connection_login(sgs_connection_impl connection, const char *login,
+int sgs_connection_login(sgs_connection_impl *connection, const char *login,
                          const char *password)
 {
   int ioflags;
@@ -228,7 +228,7 @@ int sgs_connection_login(sgs_connection_impl connection, const char *login,
 /*
  * sgs_connection_logout()
  */
-int sgs_connection_logout(sgs_connection_impl connection, const int force) {
+int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
   if (force) {
     sgs_connection_impl_disconnect(connection);
   }
@@ -248,7 +248,7 @@ int sgs_connection_logout(sgs_connection_impl connection, const int force) {
 /*
  * sgs_connection_impl_disconnect()
  */
-void sgs_connection_impl_disconnect(sgs_connection_impl connection) {
+void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
   /** Unregister interest in this socket.  (events = 0 means "all") */
   connection->ctx->unreg_fd_cb(connection, &connection->socket_fd, 1, 0);
   
@@ -261,7 +261,7 @@ void sgs_connection_impl_disconnect(sgs_connection_impl connection) {
 /*
  * sgs_connection_impl_io_write()
  */
-int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
+int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
                                  size_t buflen)
 {
   if (buflen == 0) return 0;
@@ -289,7 +289,7 @@ int sgs_connection_impl_io_write(sgs_connection_impl connection, uint8_t *buf,
  *
  * Called whenever the connection is closed by the server.
  */
-static void conn_closed(sgs_connection_impl connection) {
+static void conn_closed(sgs_connection_impl *connection) {
   if (connection->expecting_disconnect) {
     /** Expected close of connection... */
     sgs_connection_impl_disconnect(connection);
@@ -315,7 +315,7 @@ static void conn_closed(sgs_connection_impl connection) {
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-static int consume_data(sgs_connection_impl connection) {
+static int consume_data(sgs_connection_impl *connection) {
   uint8_t *msgbuf = connection->session->msg_buf;
   uint32_t len;
   
