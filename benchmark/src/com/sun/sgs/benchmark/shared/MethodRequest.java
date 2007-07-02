@@ -8,13 +8,26 @@ import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OptionalDataException;
+import java.io.Serializable;
 import java.io.StreamCorruptedException;
 
+import java.util.Arrays;
+
 /**
+ * The serializable form of all method requests sent between client
+ * and server in the benchmark application.  Method requests may
+ * either use full {@code Object} parameters, or can reduce the
+ * transmission overhead by sending op-codes.  A method request
+ * may be exclusively either one of these types, as the server
+ * will treat them differently when generating tasks to satisfy
+ * this request.
  *
- *
+ * @see com.sun.sgs.benchmark.server.TaskFactory
+ * @see com.sun.sgs.benchmark.app.BehaviorModule
  */
-public class MethodRequest {
+public class MethodRequest implements Serializable {
+
+    private static final long serialVersionUID = 0x7CABDAD;
 
     /**
      * The method to be invoked
@@ -40,7 +53,7 @@ public class MethodRequest {
      * Whether this method request uses compressed byte op-codes or
      * serialized Java objects
      */
-    private final boolean isPacked;
+    private final boolean isCompressed;
 
     /**
      * Constructs a method request with byte op-codes denoting the
@@ -74,28 +87,30 @@ public class MethodRequest {
      * Private constructor for setting the method, arguments, and
      * whether the request is in compressed op-code format.
      *
-     * @param op       if {@code isPacked}, then an op code to execute,
+     * @param op       if {@code isCompressed}, then an op code to execute,
      *                 else, the serialized {@code String} of the
      *                 method name.
-     * @param args     if {@code isPacked}, then any byte argument codes,
+     * @param args     if {@code isCompressed}, then any byte argument codes,
      *                 else, the serialized form of the {@code Object}
      *                 argument array.
-     * @param isPacked whether the method request is in compressed
+     * @param isCompressed whether the method request is in compressed
      *                 op-code format.
      *
      * @throws IllegalArgumentException if {@code method} or {@code
      *         args} is null
      */
-    private MethodRequest(byte[] op, byte[] args, boolean isPacked) {
+    private MethodRequest(byte[] op, byte[] args, boolean isCompressed) {
 	if (op == null)
-	    throw new IllegalArgumentException("Requested method operation cannot be null");
+	    throw new IllegalArgumentException("Requested method operation "
+					       + "cannot be null");
 	if (args == null)
-	    throw new IllegalArgumentException("Method arguments cannot be a null array");
+	    throw new IllegalArgumentException("Method arguments cannot be "
+					       + "a null array");
 	this.op = op;
 	this.args = args;
 	this.methodName = null;
 	this.objectArgs = null;
-	this.isPacked = isPacked;
+	this.isCompressed = isCompressed;
     }
 
     /**
@@ -182,7 +197,7 @@ public class MethodRequest {
 
     /**
      * Returns the op-codes that denote which method is being
-     * requested.  If {@link isPacked()} returns false, the return
+     * requested.  If {@link isCompressed()} returns false, the return
      * value of this method has no meaning.
      *
      * @return the op-codes for the requested method
@@ -193,7 +208,7 @@ public class MethodRequest {
 
     /**
      * Returns the op-codes that denote the arguments for the
-     * requested method If {@link isPacked()} returns false, the
+     * requested method If {@link isCompressed()} returns false, the
      * return value of this method has no meaning.
      *
      * @return the op-codes for the arguments of the requested method
@@ -205,7 +220,7 @@ public class MethodRequest {
 
     /**
      * Returns the name of the requested method.  If {@link
-     * #isPacked()} return {@code true}, the results of this method
+     * #isCompressed()} return {@code true}, the results of this method
      * will have no meaning.
      *
      * @return the name of method that should be invoked
@@ -218,7 +233,7 @@ public class MethodRequest {
 
     /**
      * Returns the {@code Object} arguments with which this method
-     * request should be invoked.  If {@link #isPacked()} return
+     * request should be invoked.  If {@link #isCompressed()} return
      * {@code true}, the results of this method will be an empty
      * {@code Object} array.
      *
@@ -238,8 +253,20 @@ public class MethodRequest {
      * @return {@code true} if this method request uses compressed
      *         op-codes instead of java objects.
      */
-    public boolean isPacked() {
-	return isPacked;
+    public boolean isCompressed() {
+	return isCompressed;
     }
+
+    /**
+     * Returns the string description of this method.
+     * 
+     * @return the string description of this method.
+     */
+    public String toString() {
+	return (isCompressed) ? "Method op codes " + Arrays.toString(op)
+	    + ", arg op codes: " + Arrays.toString(args)
+	    : getMethodName() + ".(" + Arrays.toString(getObjectArgs()) + ")";
+    }
+     
 
 }
