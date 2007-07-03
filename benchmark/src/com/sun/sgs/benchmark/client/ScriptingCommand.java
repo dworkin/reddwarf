@@ -15,7 +15,7 @@ import java.util.List;
 public class ScriptingCommand {
     /** Constants */
     public static final String DELIMITER = "\t";
-    public static final int HELP_INDENT_LEN = 16;
+    public static final int HELP_INDENT_LEN = 20;
     public static final String HELP_INDENT_STR;
     public static final String NEWLINE = System.getProperty("line.separator");
     
@@ -28,9 +28,10 @@ public class ScriptingCommand {
     /** Member variablees */
     private ScriptingCommandType type;
     
+    private int count = 1;                /** all command types */
     private long duration = -1;           /** CPU */
     private long size = -1;               /** MALLOC */
-    private String channelName = null;    /** JOIN_, LEAVE_, SEND_CHANNEL */
+    private String channelName = null;    /** [*]_CHANNEL */
     private String topic = null;          /** HELP */
     private String msg = null;            /** SEND_CHANNEL, SEND_DIRECT */
     private ScriptingEvent event = null;  /** ON_EVENT */
@@ -48,6 +49,8 @@ public class ScriptingCommand {
     /** Public Methods */
     
     public String getChannelName() { return channelName; }
+    
+    public int getCount() { return count; }
     
     public long getDuration() { return duration; }
     
@@ -136,7 +139,7 @@ public class ScriptingCommand {
                             parts[i], 0);
                 }
                 else {
-                    cmd.addProperty(cleanupString(fields[0]),
+                    cmd.addProperty(cleanupString(fields[0].substring(1)),
                         cleanupString(fields[1]));
                 }
             }
@@ -173,12 +176,19 @@ public class ScriptingCommand {
             }
             break;
             
+        case CREATE_CHANNEL:
+            if (index == 0) {  /** 0 = channel name */
+                channelName = arg;
+                return;
+            }
+            break;
+            
         case DATASTORE:
             break;  /** No arguments */
 
         case DISCONNECT:
             break;  /** No arguments */
-
+            
         case END_BLOCK:
             break;  /** No arguments */
 
@@ -198,7 +208,7 @@ public class ScriptingCommand {
                 return;
             }
             break;
-
+            
         case LEAVE_CHANNEL:
             if (index == 0) {  /** 0 = channel name */
                 channelName = arg;
@@ -233,7 +243,7 @@ public class ScriptingCommand {
                 }
             }
             break;
-
+            
         case ON_EVENT:
             if (index == 0) {  /** 0 = event trigger */
                 event = ScriptingEvent.parse(arg);
@@ -276,6 +286,19 @@ public class ScriptingCommand {
         case START_BLOCK:
             break;  /** No arguments */
             
+        case WAIT_FOR:
+            if (index == 0) {  /** 0 = event trigger */
+                event = ScriptingEvent.parse(arg);
+                
+                if (event == null) {
+                    throw new ParseException("Invalid ScriptingEvent alias: " +
+                        arg, 0);
+                }
+                
+                return;
+            }
+            break;
+            
         default:
             throw new IllegalStateException("ScriptingCommand.addProperty()" +
                 " switch statement fell through without matching any cases. " +
@@ -292,10 +315,27 @@ public class ScriptingCommand {
     
     private void addProperty(String key, String value) throws ParseException
     {
+        /** First check properties that apply to all command types. */
+        key = key.toLowerCase();
+        
+        if (key.equals("count")) {
+            try {
+                count = Integer.valueOf(value);
+            }
+            catch (NumberFormatException e) {
+                throw new ParseException("Invalid @count value: " + value, 0);
+            }
+            
+            return;
+        }
+        
         switch (type) {
         case CPU:
             break;
         
+        case CREATE_CHANNEL:
+            break;
+            
         case DATASTORE:
             break;
 
@@ -341,6 +381,9 @@ public class ScriptingCommand {
         case START_BLOCK:
             break;
             
+        case WAIT_FOR:
+            break;
+            
         default:
             throw new IllegalStateException("ScriptingCommand.addProperty()" +
                 " switch statement fell through without matching any cases. " +
@@ -363,6 +406,9 @@ public class ScriptingCommand {
         switch (type) {
         case CPU:
             return (duration != -1);
+            
+        case CREATE_CHANNEL:
+            return (channelName != null);
             
         case DATASTORE:
             return true;  /** no arguments (yet) */
@@ -409,6 +455,9 @@ public class ScriptingCommand {
         case START_BLOCK:
             return true;  /** no arguments (yet) */
             
+        case WAIT_FOR:
+            return (event != null);
+            
         default:
             throw new IllegalStateException("ScriptingCommand.checkComplete()" +
                 " switch statement fell through without matching any cases. " +
@@ -434,6 +483,9 @@ public class ScriptingCommand {
         case CPU:
             return "duration_ms";
             
+        case CREATE_CHANNEL:
+            return "channel";
+            
         case JOIN_CHANNEL:
             return "channel";
             
@@ -454,6 +506,9 @@ public class ScriptingCommand {
             
         case SEND_CHANNEL:
             return "channel msg [recipient1] [recipient2] [...]";
+            
+        case WAIT_FOR:
+            return "event";
 
         default:
             return "";  /** no arguments */
