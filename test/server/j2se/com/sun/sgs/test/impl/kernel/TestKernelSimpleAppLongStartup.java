@@ -45,7 +45,7 @@ public class TestKernelSimpleAppLongStartup extends KernelSimpleAppTestCase {
 
     /** Run a simple application with long enough configure timeout. */
     public void testLongTimeout() throws Exception {
-	assertTrue(runWithUnboundedTimeout(3000));
+	assertTrue(runWithUnboundedTimeout(4000));
     }
 
     /** Run a simple application with a short configure timeout. */
