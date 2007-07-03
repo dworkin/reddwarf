@@ -78,7 +78,7 @@ public class BenchmarkClient
     
     /** Used for communication with the server */
     private SimpleClient client = new SimpleClient(masterListener);
-        
+    
     /** The mapping between sessions and names */
     private final Map<SessionId, String> sessionNames =
         new HashMap<SessionId, String>();
@@ -90,6 +90,9 @@ public class BenchmarkClient
     /** The userName (i.e. login) for this client's session. */
     private String login;
     
+    /** Used to perform the wait-for operation. */
+    private Object waitLock = new Object();
+    
     /** Variables to keep track of things while processing input: */
     
     /** Whether we are inside a block. */
@@ -100,11 +103,11 @@ public class BenchmarkClient
      * we are inside of a block (as indicated by the inblock variable being
      * true) or the immediately previous line was an on_event command.
      */
-    private ScriptingCommand onEvent = null;
+    private ScriptingCommand onEventCmd = null;
     
     /**
      * The list of commands being stored up following an onEvent command.  The
-     * contents of this list are only valid if onEvent is non-null.
+     * contents of this list are only valid if onEventCmd is non-null.
      */
     private List<ScriptingCommand> onEventCmdList;
     
@@ -210,8 +213,8 @@ public class BenchmarkClient
                     " open brace.", 0);
             }
             
-            assignEventHandler(onEvent, onEventCmdList);
-            onEvent = null;
+            assignEventHandler(onEventCmd.getEvent(), onEventCmdList);
+            onEventCmd = null;
             inBlock = false;
             break;
             
@@ -220,12 +223,12 @@ public class BenchmarkClient
                 throw new ParseException("Nested blocks are not supported.", 0);
             }
             
-            if (onEvent != null) {
+            if (onEventCmd != null) {
                 throw new ParseException("Sequential on_event commands; " +
                     "perhaps a command is missing in between?", 0);
             }
             
-            onEvent = cmd;
+            onEventCmd = cmd;
             onEventCmdList = new LinkedList<ScriptingCommand>();
             break;
             
@@ -234,7 +237,7 @@ public class BenchmarkClient
                 throw new ParseException("Nested blocks are not supported.", 0);
             }
             
-            if (onEvent == null) {
+            if (onEventCmd == null) {
                 throw new ParseException("Blocks can only start immediately" +
                     " following on_event commands.", 0);
             }
@@ -244,13 +247,13 @@ public class BenchmarkClient
             
         default:
             /**
-             * If we are not in a block, but onEvent is not null, then this
+             * If we are not in a block, but onEventCmd is not null, then this
              * command immediately followed an onEvent command.
              */
-            if (!inBlock && onEvent != null) {
+            if (!inBlock && onEventCmd != null) {
                 onEventCmdList.add(cmd);
-                assignEventHandler(onEvent, onEventCmdList);
-                onEvent = null;
+                assignEventHandler(onEventCmd.getEvent(), onEventCmdList);
+                onEventCmd = null;
             }
             /** Else, if we are in a block, then just store this command. */
             else if (inBlock) {
@@ -267,12 +270,9 @@ public class BenchmarkClient
      * PRIVATE METHODS
      */
     
-    private void assignEventHandler(ScriptingCommand onEventCmd,
+    private void assignEventHandler(ScriptingEvent event,
         final List<ScriptingCommand> cmds)
-        throws ParseException
     {
-        ScriptingEvent event = onEventCmd.getEvent();
-        
         /*
          * TODO - some of these commands might want to take the arguments of the
          * event call in as arguments themselves.  Not sure best way to do that.
@@ -338,8 +338,8 @@ public class BenchmarkClient
         case RECV_CHANNEL:
             masterListener.registerChannelMessageListener(new ChannelMessageListener() {
                     public void receivedMessage(String channelName,
-                        SessionId sender,
-                        byte[] message) {
+                        SessionId sender, byte[] message)
+                    {
                         executeCommands(cmds);
                     }
                 });
@@ -354,105 +354,125 @@ public class BenchmarkClient
             break;
             
         default:
-            throw new ParseException("Unsupported event: " + event, 0);
+            throw new IllegalArgumentException("Unsupported event: " + event);
         }
     }
     
-    // todo
-    private void debug(String s) {
-        System.out.println("[debugging]  " + s);
-    }
-    
     /*
-     * This method can be called into by the various listeners registered with
-     * the masterListener, so access to it is synchronized in case any member
-     * variables are touched in this method.
-     *
-     * TODO - is synchronization really needed?  not sure
+     * TODO - since this handles calls from both SimpleClientListener and
+     * ClientChannelListener, could calls on those 2 interfaces be mixed,
+     * meaning we should synchronize to protect member variables?
      */
     private void executeCommand(ScriptingCommand cmd) {
         try {
             System.out.println("# Executing: " + cmd.getType());
             
-            switch (cmd.getType()) {
-            case CPU:
-                cmd.getDuration();
-                System.out.println("not yet implemented - TODO");
-                break;
-                
-            case DATASTORE:
-                System.out.println("not yet implemented - TODO");
-                break;
-                
-            case DISCONNECT:
-                client.logout(true);   /* force */
-                break;
-                
-            case EXIT:
-                System.exit(0);
-                break;
-                
-            case HELP:
-                if (cmd.getTopic() == null) {
-                    System.out.println(ScriptingCommand.getHelpString());
-                } else {
-                    System.out.println(ScriptingCommand.getHelpString(cmd.getTopic()));
+            for (int i=0; i < cmd.getCount(); i++) {
+                switch (cmd.getType()) {
+                case CPU:
+                    sendServerMessage(new MethodRequest("CPU",
+                        new Object[] { cmd.getDuration() } ));
+                    break;
+                    
+                case CREATE_CHANNEL:
+                    sendServerMessage(new MethodRequest("CREATE_CHANNEL",
+                        new Object[] { cmd.getChannelName() } ));
+                    break;
+                    
+                case DATASTORE:
+                    System.out.println("not yet implemented - TODO");
+                    break;
+                    
+                case DISCONNECT:
+                    client.logout(true);   /* force */
+                    break;
+                    
+                case EXIT:
+                    System.exit(0);
+                    break;
+                    
+                case HELP:
+                    if (cmd.getTopic() == null) {
+                        System.out.println(ScriptingCommand.getHelpString());
+                    } else {
+                        System.out.println(ScriptingCommand.getHelpString(cmd.getTopic()));
+                    }
+                    break;
+                    
+                case JOIN_CHANNEL:
+                    sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
+                        new Object[] { cmd.getChannelName() }));
+                    break;
+                    
+                case LEAVE_CHANNEL:
+                    sendServerMessage("/leave " + cmd.getChannelName());
+                    break;
+                    
+                case LOGIN:
+                    sendLogin(cmd.getLogin(), cmd.getPassword());
+                    break;
+                    
+                case LOGOUT:
+                    client.logout(false);   /* non-force */
+                    break;
+                    
+                case MALLOC:
+                    cmd.getSize();
+                    System.out.println("not yet implemented - TODO");
+                    break;
+                    
+                case PRINT:
+                    boolean first = true;
+                    StringBuilder sb = new StringBuilder("PRINT: ");
+                    
+                    for (String arg : cmd.getPrintArgs()) {
+                        if (first) first = false;
+                        else sb.append(", ");
+                        sb.append(arg);
+                    }
+                    
+                    System.out.println(sb);
+                    return;
+                    
+                case SEND_CHANNEL:
+                    // need to somehow get a handle to the channel -- probably will need
+                    // to save a map of channel-names to ClientChannel objects (which
+                    // get passed to you in joinedChannel() event call)
+                    cmd.getChannelName();
+                    cmd.getMessage();
+                    cmd.getRecipients();
+                    //sendServerMessage("/chsend ");
+                    System.out.println("not yet implemented - TODO");
+                    break;
+                    
+                case SEND_DIRECT:
+                    sendServerMessage(cmd.getMessage());
+                    break;
+                    
+                case WAIT_FOR:
+                    /** Register listener to call notify() when event happens. */
+                    modifyNotificationEventHandler(cmd.getEvent(), true);
+                    
+                    while (true) {
+                        try {
+                            waitLock.wait();
+                            
+                            /**
+                             * Unregister listener so it doesn't screw up
+                             * future WAIT_FOR commands.
+                             */
+                            modifyNotificationEventHandler(cmd.getEvent(), false);
+                            
+                            break;  /** Only break after wait() returns normally. */
+                        }
+                        catch (InterruptedException e) { }
+                    }
+                    break;
+                    
+                default:
+                    throw new IllegalStateException("ERROR!  executeCommand() does" +
+                        " not support command type " + cmd.getType());
                 }
-                break;
-                
-            case JOIN_CHANNEL:
-                sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
-                    new Object[] { cmd.getChannelName() }));
-                break;
-                
-            case LEAVE_CHANNEL:
-                sendServerMessage("/leave " + cmd.getChannelName());
-                break;
-                
-            case LOGIN:
-                sendLogin(cmd.getLogin(), cmd.getPassword());
-                break;
-                
-            case LOGOUT:
-                client.logout(false);   /* non-force */
-                break;
-                
-            case MALLOC:
-                cmd.getSize();
-                System.out.println("not yet implemented - TODO");
-                break;
-                
-            case PRINT:
-                boolean first = true;
-                StringBuilder sb = new StringBuilder("PRINT: ");
-                
-                for (String arg : cmd.getPrintArgs()) {
-                    if (first) first = false;
-                    else sb.append(", ");
-                    sb.append(arg);
-                }
-                
-                System.out.println(sb);
-                return;
-                
-            case SEND_CHANNEL:
-                // need to somehow get a handle to the channel -- probably will need
-                // to save a map of channel-names to ClientChannel objects (which
-                // get passed to you in joinedChannel() event call)
-                cmd.getChannelName();
-                cmd.getMessage();
-                cmd.getRecipients();
-                //sendServerMessage("/chsend ");
-                System.out.println("not yet implemented - TODO");
-                break;
-                
-            case SEND_DIRECT:
-                sendServerMessage(cmd.getMessage());
-                break;
-                
-            default:
-                throw new IllegalStateException("ERROR!  executeCommand() does" +
-                    " not support command type " + cmd.getType());
             }
         } catch (IOException e) {
             System.err.println(e);
@@ -462,6 +482,107 @@ public class BenchmarkClient
     private void executeCommands(List<ScriptingCommand> cmds) {
         for (ScriptingCommand cmd : cmds)
             executeCommand(cmd);
+    }
+    
+    private void modifyNotificationEventHandler(ScriptingEvent event,
+        boolean register)
+    {
+        switch (event) {
+        case DISCONNECTED:
+            masterListener.registerDisconnectedListener(new DisconnectedListener() {
+                    public void disconnected(boolean graceful, String reason) {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case JOINED_CHANNEL:
+            masterListener.registerJoinedChannelListener(new JoinedChannelListener() {
+                    public void joinedChannel(ClientChannel channel) {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case LEFT_CHANNEL:
+            masterListener.registerLeftChannelListener(new LeftChannelListener() {
+                    public void leftChannel(String channelName) {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case LOGGED_IN:
+            masterListener.registerLoggedInListener(new LoggedInListener() {
+                    public void loggedIn() {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case LOGIN_FAILED:
+            masterListener.registerLoginFailedListener(new LoginFailedListener() {
+                    public void loginFailed(String reason) {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case RECONNECTED:
+            masterListener.registerReconnectedListener(new ReconnectedListener() {
+                    public void reconnected() {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case RECONNECTING:
+            masterListener.registerReconnectingListener(new ReconnectingListener() {
+                    public void reconnecting() {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case RECV_CHANNEL:
+            masterListener.registerChannelMessageListener(new ChannelMessageListener() {
+                    public void receivedMessage(String channelName,
+                        SessionId sender, byte[] message)
+                    {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        case RECV_DIRECT:
+            masterListener.registerServerMessageListener(new ServerMessageListener() {
+                    public void receivedMessage(byte[] message) {
+                        synchronized(waitLock) {
+                            waitLock.notifyAll();
+                        }
+                    }
+                });
+            break;
+            
+        default:
+            throw new IllegalArgumentException("Unsupported event: " + event);
+        }
     }
     
     private void sendLogin(String login, String password) throws IOException {
