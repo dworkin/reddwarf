@@ -476,6 +476,8 @@ public class BenchmarkClient
         
         this.login = login;
         
+        System.out.println("Notice: Connecting to " + host + ":" + port);
+        
         Properties props = new Properties();
         props.put("host", host);
         props.put("port", port);
