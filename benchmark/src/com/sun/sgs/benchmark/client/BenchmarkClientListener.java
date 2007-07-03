@@ -123,7 +123,6 @@ public class BenchmarkClientListener
      * {@inheritDoc}
      */
     public void loginFailed(String reason) {
-        System.out.println("FAILED! " + reason);
         for (LoginFailedListener listener : loginFailedListeners)
             listener.loginFailed(reason);
     }
