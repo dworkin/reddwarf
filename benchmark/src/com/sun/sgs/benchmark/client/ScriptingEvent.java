@@ -13,7 +13,7 @@ public enum ScriptingEvent {
     DISCONNECTED   ("disconnected"),
     JOINED_CHANNEL (new String[] { "joined", "joined_channel" }),
     LEFT_CHANNEL   (new String[] { "left", "left_channel" }),
-    LOGGED_IN      ("logged_in"),
+    LOGGED_IN      (new String[] { "logged_in", "login" }),
     LOGIN_FAILED   (new String[] { "login_failed", "login_fail" }),
     RECONNECTED    ("reconnected"),
     RECONNECTING   ("reconnecting"),
