@@ -102,6 +102,42 @@ public class BenchmarkClientListener
         auth = new PasswordAuthentication(login, password.toCharArray());
     }
     
+    public boolean unregisterChannelMessageListener(ChannelMessageListener listener) {
+        return channelMessageListeners.remove(listener);
+    }
+    
+    public boolean unregisterDisconnectedListener(DisconnectedListener listener) {
+        return disconnectedListeners.remove(listener);
+    }
+    
+    public boolean unregisterJoinedChannelListener(JoinedChannelListener listener) {
+        return joinedChannelListeners.remove(listener);
+    }
+    
+    public boolean unregisterLeftChannelListener(LeftChannelListener listener) {
+        return leftChannelListeners.remove(listener);
+    }
+    
+    public boolean unregisterLoggedInListener(LoggedInListener listener) {
+        return loggedInListeners.remove(listener);
+    }
+    
+    public boolean unregisterLoginFailedListener(LoginFailedListener listener) {
+        return loginFailedListeners.remove(listener);
+    }
+    
+    public boolean unregisterReconnectedListener(ReconnectedListener listener) {
+        return reconnectedListeners.remove(listener);
+    }
+    
+    public boolean unregisterReconnectingListener(ReconnectingListener listener) {
+        return reconnectingListeners.remove(listener);
+    }
+    
+    public boolean unregisterServerMessageListener(ServerMessageListener listener) {
+        return serverMessageListeners.remove(listener);
+    }
+    
     // Implement SimpleClientListener
 
     /**
