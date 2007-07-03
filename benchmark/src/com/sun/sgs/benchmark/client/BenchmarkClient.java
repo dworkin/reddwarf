@@ -455,7 +455,9 @@ public class BenchmarkClient
                     
                     while (true) {
                         try {
-                            waitLock.wait();
+                            synchronized(waitLock) {
+                                waitLock.wait();
+                            }
                             
                             /**
                              * Unregister listener so it doesn't screw up
