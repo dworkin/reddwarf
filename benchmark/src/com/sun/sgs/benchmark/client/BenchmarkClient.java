@@ -4,10 +4,11 @@
 
 package com.sun.sgs.benchmark.client;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.io.PushbackInputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.text.ParseException;
@@ -165,33 +166,24 @@ public class BenchmarkClient
      * @param args the commandline arguments (not used)
      */
     public static void main(String[] args) {
-        PushbackInputStream stdin = new PushbackInputStream(System.in, 100);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         String line;
         int lineNum = 0;
         
         BenchmarkClient client = new BenchmarkClient();
         
         try {
-            while (!isEOF(stdin)) {
-                line = getInputLine(stdin, 100);
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                line = line.trim();
                 
-                if (line != null) {
-                    lineNum++;
-                    line = line.trim();
-                    
-                    if (line.length() > 0 && (!line.startsWith("#"))) {
-                        try {
-                            client.processInput(line);
-                        } catch (ParseException e) {
-                            System.err.println("Syntax error on line " +
-                                lineNum + ": " + e.getMessage());
-                        }
-                    }
-                }
-                else {
+                if (line.length() > 0 && (!line.startsWith("#"))) {
                     try {
-                        Thread.currentThread().sleep(100);  // ms
-                    } catch (InterruptedException e) { }
+                        client.processInput(line);
+                    } catch (ParseException e) {
+                        System.err.println("Syntax error on line " +
+                            lineNum + ": " + e.getMessage());
+                    }
                 }
             }
         } catch (IOException e) {
@@ -199,8 +191,6 @@ public class BenchmarkClient
             System.exit(-1);
             return;
         }
-        
-        System.exit(0);
     }
     
     /** Public Methods */
@@ -679,43 +669,6 @@ public class BenchmarkClient
             bytes[i] = Integer.valueOf(hexByte, 16).byteValue();
         }
         return bytes;
-    }
-    
-    private static String getInputLine(PushbackInputStream is, int readAheadLimit)
-        throws IOException
-    {
-        int readTotal = 0;
-        byte ba[] = new byte[readAheadLimit];
-        
-        while (readTotal < readAheadLimit) {
-            if (is.available() == 0) break;
-            
-            int readlen = is.read(ba, readTotal, readAheadLimit - readTotal);
-            
-            for (int i=0; i < readlen; i++) {
-                if (ba[readTotal + i] == '\n') {
-                    is.unread(ba, readTotal + i + 1, readlen - (i + 1));
-                    return new String(ba, 0, readTotal + i);
-                }
-            }
-            
-            readTotal += readlen;
-        }
-        
-        is.unread(ba, 0, readTotal);
-        return null;
-    }
-    
-    private static boolean isEOF(PushbackInputStream is)
-        throws IOException
-    {
-        if (is.available() > 0) {
-            int c = is.read();
-            if (c == -1) return true;
-            is.unread(c);
-        }
-        
-        return false;
     }
     
     private void userLogin(String memberString) {
