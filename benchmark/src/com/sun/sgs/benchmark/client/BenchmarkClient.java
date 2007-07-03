@@ -93,6 +93,9 @@ public class BenchmarkClient
     /** Used to perform the wait-for operation. */
     private Object waitLock = new Object();
     
+    /** Used to perform the pause operation. */
+    private Object pauseLock = new Object();
+    
     /** Variables to keep track of things while processing input: */
     
     /** Whether we are inside a block. */
@@ -419,6 +422,23 @@ public class BenchmarkClient
                 case MALLOC:
                     cmd.getSize();
                     System.out.println("not yet implemented - TODO");
+                    break;
+                    
+                case PAUSE:
+                    long start = System.currentTimeMillis();
+                    long elapsed = 0;
+                    long duration = cmd.getDuration();
+                    
+                    synchronized (pauseLock) {
+                        while (elapsed < duration) {
+                            try {
+                                pauseLock.wait(duration - elapsed);
+                            }
+                            catch (InterruptedException e) { }
+                            
+                            elapsed = System.currentTimeMillis() - start;
+                        }
+                    }
                     break;
                     
                 case PRINT:

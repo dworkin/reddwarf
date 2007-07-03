@@ -257,6 +257,20 @@ public class ScriptingCommand {
             }
             break;
             
+        case PAUSE:
+            if (index == 0) {  /** 0 = duration (ms) */
+                try {
+                    duration = Long.valueOf(arg);
+                    if (duration <= 0) throw new NumberFormatException();
+                    return;
+                }
+                catch (NumberFormatException e) {
+                    throw new ParseException("Invalid PAUSE argument, must be a" +
+                        " positive integer: " + arg, 0);
+                }
+            }
+            break;
+            
         case PRINT:
             /** No checks on arguments; everything accepted. */
             prints.add(arg);
@@ -369,6 +383,9 @@ public class ScriptingCommand {
         case ON_EVENT:
             break;
 
+        case PAUSE:
+            break;
+            
         case PRINT:
             break;
 
@@ -442,7 +459,10 @@ public class ScriptingCommand {
 
         case ON_EVENT:
             return (event != null);
-
+            
+        case PAUSE:
+            return (duration != -1);
+            
         case PRINT:
             return (prints.size() > 0);
 
@@ -500,6 +520,9 @@ public class ScriptingCommand {
             
         case ON_EVENT:
             return "event";
+            
+        case PAUSE:
+            return "duration_ms";
             
         case PRINT:
             return "str1 [str2] [...]";

@@ -23,6 +23,7 @@ public enum ScriptingCommandType {
     LOGOUT         ("logout"),
     MALLOC         (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
     ON_EVENT       (new String[] { "on_event", "onevent", "on" }),
+    PAUSE          ("pause"),
     PRINT          (new String[] { "debug", "print", "printf" }),
     SEND_CHANNEL   (new String[] { "send_channel", "channel_send", "chsend" }),
     SEND_DIRECT    (new String[] { "send_direct", "send_server", "direct_send" }),
