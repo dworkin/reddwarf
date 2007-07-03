@@ -10,22 +10,24 @@ package com.sun.sgs.benchmark.client;
  */
 public enum ScriptingCommandType {
     /** Enum types */
-    CPU           (new String[] { "cpu", "do_cpu" }),
-    DATASTORE     (new String[] { "datastore", "do_datastore", "get_datastore" }),
-    DISCONNECT    ("disconnect"),
-    END_BLOCK     ("}"),
-    EXIT          (new String[] { "exit", "quit" }),
-    HELP          ("help"),
-    JOIN_CHANNEL  (new String[] { "join", "join_channel", "chjoin" }),
-    LEAVE_CHANNEL (new String[] { "leave", "leave_channel", "chleave" }),
-    LOGIN         ("login"),
-    LOGOUT        ("logout"),
-    MALLOC        (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
-    ON_EVENT      (new String[] { "on_event", "onevent", "on" }),
-    PRINT         (new String[] { "debug", "print", "printf" }),
-    SEND_CHANNEL  (new String[] { "send_channel", "channel_send", "chsend" }),
-    SEND_DIRECT   (new String[] { "send_direct", "send_server", "direct_send" }),
-    START_BLOCK   ("{");
+    CPU            (new String[] { "cpu", "do_cpu" }),
+    CREATE_CHANNEL (new String[] { "create_channel", "crchannel" }),
+    DATASTORE      (new String[] { "datastore", "do_datastore", "get_datastore" }),
+    DISCONNECT     ("disconnect"),
+    END_BLOCK      ("}"),
+    EXIT           (new String[] { "exit", "quit" }),
+    HELP           ("help"),
+    JOIN_CHANNEL   (new String[] { "join", "join_channel", "chjoin" }),
+    LEAVE_CHANNEL  (new String[] { "leave", "leave_channel", "chleave" }),
+    LOGIN          ("login"),
+    LOGOUT         ("logout"),
+    MALLOC         (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
+    ON_EVENT       (new String[] { "on_event", "onevent", "on" }),
+    PRINT          (new String[] { "debug", "print", "printf" }),
+    SEND_CHANNEL   (new String[] { "send_channel", "channel_send", "chsend" }),
+    SEND_DIRECT    (new String[] { "send_direct", "send_server", "direct_send" }),
+    START_BLOCK    ("{"),
+    WAIT_FOR       (new String[] { "wait_for", "wait" });
     
     /** Member variables */
     
