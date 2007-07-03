@@ -902,6 +902,7 @@
   <!-- Runs the benchmark suite (server) -->
  <target name="benchmark" depends="benchmark-classes"
 	 description="run a set of example benchmark applications">
+   <delete dir="/tmp/sgs-benchmark"/>
    <mkdir dir="/tmp/sgs-benchmark"/>
    <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
    <java classname="com.sun.sgs.impl.kernel.Kernel"

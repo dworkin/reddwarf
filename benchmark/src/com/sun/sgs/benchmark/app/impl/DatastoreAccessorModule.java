@@ -5,7 +5,9 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.sun.sgs.app.Task;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.DataManager;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
@@ -23,7 +25,7 @@ public class DatastoreAccessorModule implements BehaviorModule, Serializable {
      *
      * @return ?
      */
-    public List<Runnable> getOperations(byte[] args) {
+    public List<Runnable> getOperations(ClientSession session, byte[] args) {
 	LinkedList<Runnable> operations = new LinkedList<Runnable>();
 	return operations;
     }
@@ -35,9 +37,16 @@ public class DatastoreAccessorModule implements BehaviorModule, Serializable {
      *
      * @return ?
      */
-    public List<Runnable> getOperations(Object[] args) {
+    public List<Runnable> getOperations(ClientSession session, Object[] args) {
 	LinkedList<Runnable> operations = new LinkedList<Runnable>();
+	operations.add(new Runnable() {
+		public void run() {
+		    //AppContext.getDataManager().
+		}
+	    });
 	return operations;
     }
+
+
 
 }

@@ -1,6 +1,7 @@
 package com.sun.sgs.benchmark.server;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
@@ -64,16 +65,20 @@ public class TaskFactory implements ManagedObject, Serializable {
      * arguments.  These operations include those that should be run
      * before, during and after the desired operations.
      *
+     * @param session      the client session on whose behalf this
+     *                     method is invoked
      * @param methodOpCode the op-codes for the method to invoke
      * @param args         arguments to this method encoded as op-codes
      *
      * @return the ordered lists of {@code Runnable} operations that
      *         represent this method
      */
-    public List<Runnable> getOperations(byte[] methodOpCode, byte[] argOpCodes) {
+    public List<Runnable> getOperations(ClientSession session, 
+					byte[] methodOpCode, 
+					byte[] argOpCodes) {
 	MethodTaskProfile b = opCodes.get(methodOpCode);
 	if (b != null) {
-	    return b.getOperations(argOpCodes);
+	    return b.getOperations(session, argOpCodes);
 	}
 	else {
 	    // log that we didn't have something to generate any task
@@ -88,16 +93,20 @@ public class TaskFactory implements ManagedObject, Serializable {
      * arguments.  These operations include those that should be run
      * before, during and after the desired operations.
      *
+     * @param session    the client session on whose behalf this method
+     *                   is invoked
      * @param methodName the name of the method to invoke
      * @param args       arguments to this method encoded as op-codes
      *
      * @return the ordered lists of {@code Runnable} operations that
      *         represent this method
      */
-    public List<Runnable> getOperations(String methodName, Object[] args) {
+    public List<Runnable> getOperations(ClientSession session, 
+					String methodName, 
+					Object[] args) {
 	MethodTaskProfile b = methods.get(methodName);
 	if (b != null) {
-	    return b.getOperations(args);
+	    return b.getOperations(session, args);
 	}
 	else {
 	    // log that we didn't have something to generate any task
@@ -347,19 +356,22 @@ public class TaskFactory implements ManagedObject, Serializable {
 	 * reflect this specific behavior based on the op-code
 	 * arguments.  
 	 *
-	 * @param args arguments to this method encoded as op-codes
+	 * @param session the client session on whose behalf this
+	 *                method is invoked
+	 * @param args    arguments to this method encoded as op-codes
 	 *
 	 * @return the ordered lists of {@code Runnable}s to be
 	 *         executed
 	 */
-	public List<Runnable> getOperations(byte[] args) {
+	public List<Runnable> getOperations(ClientSession session, 
+					    byte[] args) {
 	    LinkedList<Runnable> tasks = new LinkedList<Runnable>();
 	    for (BehaviorModule mod : preops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    for (BehaviorModule mod : ops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    for (BehaviorModule mod : postops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    return tasks;
 	}
 
@@ -367,19 +379,22 @@ public class TaskFactory implements ManagedObject, Serializable {
 	 * Returns an ordered list of {@code Runnable} operations that
 	 * reflect this specific behavior based on the arguments.
 	 *
-	 * @param args {@code Object} arguments to this method.
+	 * @param session the client session on whose behalf this
+	 *                method is invoked
+	 * @param args    {@code Object} arguments to this method.
 	 *
 	 * @return the ordered lists of {@code Runnable}s to
 	 *         be executed
 	 */
-	public List<Runnable> getOperations(Object[] args) {
+	public List<Runnable> getOperations(ClientSession session, 
+					    Object[] args) {
 	    LinkedList<Runnable> tasks = new LinkedList<Runnable>();
 	    for (BehaviorModule mod : preops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    for (BehaviorModule mod : ops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    for (BehaviorModule mod : postops) 
-		tasks.addAll(mod.getOperations(args));
+		tasks.addAll(mod.getOperations(session, args));
 	    return tasks;
 	}
     }

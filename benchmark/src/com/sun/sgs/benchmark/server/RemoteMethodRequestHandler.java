@@ -1,7 +1,9 @@
 package com.sun.sgs.benchmark.server;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
@@ -14,7 +16,7 @@ import java.io.IOException;
 import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.OptionalDataException;
-import java.io.Serializable
+import java.io.Serializable;
 import java.io.StreamCorruptedException;
 
 /**
@@ -23,6 +25,8 @@ import java.io.StreamCorruptedException;
  */
 public class RemoteMethodRequestHandler 
     implements ClientSessionListener, ManagedObject, Serializable {
+
+    private static final long serialVersionUID = 1;
 
     private final ClientSession session;
 
@@ -42,9 +46,11 @@ public class RemoteMethodRequestHandler
 	    TaskFactory factory = TaskFactory.instance();
 	    TaskManager manager = AppContext.getTaskManager();
 	    for (Runnable operation : (request.isCompressed()) 
-		     ? factory.getOperations(request.getOpCode(), 
+		     ? factory.getOperations(session,
+					     request.getOpCode(), 
 					     request.getArgs())
-		     : factory.getOperations(request.getMethodName(),
+		     : factory.getOperations(session,
+					     request.getMethodName(),
 					     request.getObjectArgs())) {
 		try {
 		    operation.run();

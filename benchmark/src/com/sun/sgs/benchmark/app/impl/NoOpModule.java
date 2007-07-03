@@ -5,7 +5,7 @@ import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.sun.sgs.app.Task;
+import com.sun.sgs.app.ClientSession;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
@@ -24,7 +24,7 @@ public class NoOpModule implements BehaviorModule, Serializable {
      *
      * @return an empty list
      */
-    public List<Runnable> getOperations(byte[] args) {
+    public List<Runnable> getOperations(ClientSession session, byte[] args) {
 	return new LinkedList<Runnable>();
     }
 
@@ -35,7 +35,7 @@ public class NoOpModule implements BehaviorModule, Serializable {
      *
      * @return an empty list
      */
-    public List<Runnable> getOperations(Object[] args) {
+    public List<Runnable> getOperations(ClientSession session, Object[] args) {
 	return new LinkedList<Runnable>();
     }
 
