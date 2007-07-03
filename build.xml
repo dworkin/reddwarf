@@ -942,7 +942,10 @@
         <pathelement location="${build.dir}/benchmark/classes"/>
         <path refid="server.classpath"/>
       </classpath>
-      <arg value="benchmark/BenchmarkClient.properties"/>
+      <sysproperty key="BenchmarkClient.host"
+                   value="foghorn.east.sun.com" />
+      <sysproperty key="BenchmarkClient.port"
+                   value="6168" />
     </java>
   </target>
 
