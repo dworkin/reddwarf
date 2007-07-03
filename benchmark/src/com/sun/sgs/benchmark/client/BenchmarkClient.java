@@ -4,7 +4,9 @@
 
 package com.sun.sgs.benchmark.client;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PushbackInputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
@@ -19,6 +21,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import com.sun.sgs.benchmark.client.listener.*;
+import com.sun.sgs.benchmark.shared.MethodRequest;
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
@@ -103,8 +106,7 @@ public class BenchmarkClient
      * The list of commands being stored up following an onEvent command.  The
      * contents of this list are only valid if onEvent is non-null.
      */
-    private List<ScriptingCommand> onEventCmdList =
-        new LinkedList<ScriptingCommand>();
+    private List<ScriptingCommand> onEventCmdList;
     
     // Constructor
 
@@ -171,11 +173,12 @@ public class BenchmarkClient
                     lineNum++;
                     line = line.trim();
                     
-                    if (line.length() > 0) {
+                    if (line.length() > 0 && (!line.startsWith("#"))) {
                         try {
-                            client.processInput(line, lineNum);
+                            client.processInput(line);
                         } catch (ParseException e) {
-                            System.err.println(e);
+                            System.err.println("Syntax error on line " +
+                                lineNum + ": " + e.getMessage());
                         }
                     }
                 }
@@ -196,35 +199,34 @@ public class BenchmarkClient
     
     /** Public Methods */
     
-    public void processInput(String line, int lineNum) throws ParseException {
-        ScriptingCommand cmd;
-        
-        try {
-            cmd = ScriptingCommand.parse(line);
-        } catch (ParseException e) {
-            throw new ParseException("Syntax error on line " + lineNum + ": " +
-                e.getMessage(), 0);
-        }
+    public void processInput(String line) throws ParseException {
+        ScriptingCommand cmd = ScriptingCommand.parse(line);
         
         /** Check for control flow commands */
         switch (cmd.getType()) {
         case END_BLOCK:
             if (!inBlock) {
                 throw new ParseException("Close brace with no matching" +
-                    "open brace.", 0);
+                    " open brace.", 0);
             }
             
-            inBlock = false;
             assignEventHandler(onEvent, onEventCmdList);
+            onEvent = null;
+            inBlock = false;
             break;
             
         case ON_EVENT:
+            if (inBlock) {
+                throw new ParseException("Nested blocks are not supported.", 0);
+            }
+            
             if (onEvent != null) {
                 throw new ParseException("Sequential on_event commands; " +
                     "perhaps a command is missing in between?", 0);
             }
             
             onEvent = cmd;
+            onEventCmdList = new LinkedList<ScriptingCommand>();
             break;
             
         case START_BLOCK:
@@ -234,11 +236,10 @@ public class BenchmarkClient
             
             if (onEvent == null) {
                 throw new ParseException("Blocks can only start immediately" +
-                    " after on_event commands.", 0);
+                    " following on_event commands.", 0);
             }
             
             inBlock = true;
-            onEventCmdList.clear();
             break;
             
         default:
@@ -247,7 +248,6 @@ public class BenchmarkClient
              * command immediately followed an onEvent command.
              */
             if (!inBlock && onEvent != null) {
-                onEventCmdList.clear();
                 onEventCmdList.add(cmd);
                 assignEventHandler(onEvent, onEventCmdList);
                 onEvent = null;
@@ -267,17 +267,18 @@ public class BenchmarkClient
      * PRIVATE METHODS
      */
     
-    private void assignEventHandler(ScriptingCommand event,
+    private void assignEventHandler(ScriptingCommand onEventCmd,
         final List<ScriptingCommand> cmds)
         throws ParseException
     {
+        ScriptingEvent event = onEventCmd.getEvent();
         
         /*
          * TODO - some of these commands might want to take the arguments of the
          * event call in as arguments themselves.  Not sure best way to do that.
          */
         
-        switch (event.getEvent()) {
+        switch (event) {
         case DISCONNECTED:
             masterListener.registerDisconnectedListener(new DisconnectedListener() {
                     public void disconnected(boolean graceful, String reason) {
@@ -384,7 +385,7 @@ public class BenchmarkClient
                 break;
                 
             case DISCONNECT:
-                client.logout(true /* force */);
+                client.logout(true);   /* force */
                 break;
                 
             case EXIT:
@@ -400,7 +401,8 @@ public class BenchmarkClient
                 break;
                 
             case JOIN_CHANNEL:
-                sendServerMessage("/join " + cmd.getChannelName());
+                sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
+                    new Object[] { cmd.getChannelName() }));
                 break;
                 
             case LEAVE_CHANNEL:
@@ -412,7 +414,7 @@ public class BenchmarkClient
                 break;
                 
             case LOGOUT:
-                client.logout(false /* non-force */);
+                client.logout(false);   /* non-force */
                 break;
                 
             case MALLOC:
@@ -478,6 +480,14 @@ public class BenchmarkClient
         props.put("host", host);
         props.put("port", port);
         client.login(props);
+    }
+    
+    private void sendServerMessage(MethodRequest req) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(req);
+        oos.close();
+        client.send(baos.toByteArray());
     }
     
     private void sendServerMessage(String message) throws IOException {
