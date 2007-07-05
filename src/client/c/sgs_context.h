@@ -26,7 +26,7 @@ typedef struct sgs_context_impl sgs_context;
  */
 
 /*
- * function: sgs_ctx_create()
+ * function: sgs_ctx_new()
  *
  * Creates a new login context.  Returns null on failure.
  *
@@ -45,7 +45,7 @@ typedef struct sgs_context_impl sgs_context;
  *           short: events for which interest is being (un)registered for all of
  *                  the specified file descriptors
  */
-sgs_context *sgs_ctx_create(const char *hostname, const int port,
+sgs_context *sgs_ctx_new(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int[], size_t, short),
     void (*unreg_fd)(sgs_connection*, int[], size_t, short));
 

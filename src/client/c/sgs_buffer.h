@@ -49,12 +49,12 @@ struct sgs_buffer {
 size_t sgs_buffer_capacity(const sgs_buffer *buffer);
 
 /*
- * function: sgs_buffer_create()
+ * function: sgs_buffer_new()
  *
  * Allocates a buffer with at least the specified capacity (in bytes).  NULL is
  * returned if allocation fails.
  */
-sgs_buffer *sgs_buffer_create(size_t capacity);
+sgs_buffer *sgs_buffer_new(size_t capacity);
 
 /*
  * function: sgs_buffer_free()

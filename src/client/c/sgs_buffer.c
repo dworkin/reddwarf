@@ -32,9 +32,9 @@ size_t sgs_buffer_capacity(const sgs_buffer *buffer) {
 }
 
 /*
- * sgs_buffer_create()
+ * sgs_buffer_new()
  */
-sgs_buffer *sgs_buffer_create(size_t capacity) {
+sgs_buffer *sgs_buffer_new(size_t capacity) {
   sgs_buffer *buffer;
   
   buffer = (sgs_buffer*)malloc(sizeof(struct sgs_buffer));

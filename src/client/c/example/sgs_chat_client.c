@@ -132,8 +132,8 @@ int main(int argc, char *argv[]) {
   printf("Starting up with host=%s and port=%d...\n", hostname, port);
   
   /** Create sgs_context object and register event callbacks. */
-  g_context = sgs_ctx_create(hostname, port, register_fd_cb, unregister_fd_cb);
-  if (g_context == NULL) { perror("Error in sgs_ctx_create()"); quit(-1); }
+  g_context = sgs_ctx_new(hostname, port, register_fd_cb, unregister_fd_cb);
+  if (g_context == NULL) { perror("Error in sgs_ctx_new()"); quit(-1); }
   
   sgs_ctx_set_channel_joined_cb(g_context, channel_joined_cb);
   sgs_ctx_set_channel_left_cb(g_context, channel_left_cb);
@@ -145,8 +145,8 @@ int main(int argc, char *argv[]) {
   sgs_ctx_set_recv_msg_cb(g_context, recv_msg_cb);
   
   /** Create sgs_connection object. */
-  g_conn = sgs_connection_create(g_context);
-  if (g_conn == NULL) { perror("Error in sgs_connection_create()"); quit(-1); }
+  g_conn = sgs_connection_new(g_context);
+  if (g_conn == NULL) { perror("Error in sgs_connection_new()"); quit(-1); }
   
   printf("Command: ");
   fflush(stdout);

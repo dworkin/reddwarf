@@ -21,9 +21,9 @@
  */
 
 /*
- * sgs_ctx_create()
+ * sgs_ctx_new()
  */
-sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
+sgs_context_impl *sgs_ctx_new(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int[], size_t, short),
     void (*unreg_fd)(sgs_connection*, int[], size_t, short))
 {

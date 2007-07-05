@@ -34,9 +34,9 @@ static int consume_data(sgs_connection_impl *connection);
  */
 
 /*
- * sgs_connection_create()
+ * sgs_connection_new()
  */
-sgs_connection_impl *sgs_connection_create(sgs_context *ctx)
+sgs_connection_impl *sgs_connection_new(sgs_context *ctx)
 {
   sgs_connection_impl *connection;
   
@@ -47,11 +47,11 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx)
   connection->expecting_disconnect = 0;
   connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
   connection->ctx = ctx;
-  connection->session = sgs_session_impl_create(connection);
-  connection->inbuf = sgs_buffer_create(SGS_CONNECTION_IMPL_IO_BUFSIZE);
-  connection->outbuf = sgs_buffer_create(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+  connection->session = sgs_session_impl_new(connection);
+  connection->inbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+  connection->outbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
   
-  /** Check if any create() calls failed. */
+  /** Check if any new() calls failed. */
   if (connection->session == NULL || connection->inbuf == NULL ||
       connection->outbuf == NULL) {
     

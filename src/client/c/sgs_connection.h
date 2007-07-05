@@ -24,12 +24,12 @@ typedef struct sgs_connection_impl sgs_connection;
  */
 
 /*
- * function: sgs_connection_create()
+ * function: sgs_connection_new()
  *
  * Creates a new sgs_connection from the specified login context.  Returns null
  * on failure.
  */
-sgs_connection *sgs_connection_create(sgs_context *ctx);
+sgs_connection *sgs_connection_new(sgs_context *ctx);
 
 /*
  * function: sgs_connection_free()
@@ -46,7 +46,7 @@ void sgs_connection_free(sgs_connection *connection);
  * non-blocking IO on the sgs_connection's underlying socket connection.  The
  * sgs_connection will notify applications of file descriptor(s) that it is
  * interested in monitoring by calling the reg_fd() and unreg_fg() callback
- * functions that were specified as arguments to sgs_ctx_create() when the
+ * functions that were specified as arguments to sgs_ctx_new() when the
  * connection's context was created.  Returns 0 on success and -1 on failure,
  * with errno set to the specific error code.
  */

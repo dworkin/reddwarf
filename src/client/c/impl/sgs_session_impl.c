@@ -137,9 +137,9 @@ const sgs_id *sgs_session_get_id(const sgs_session_impl *session) {
  */
 
 /*
- * sgs_session_impl_create()
+ * sgs_session_impl_new()
  */
-sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
+sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection) {
   sgs_session_impl *session;
   
   session = (sgs_session_impl*)malloc(sizeof(struct sgs_session_impl));

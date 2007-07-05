@@ -53,12 +53,12 @@ struct sgs_session_impl {
 };
 
 /*
- * function: sgs_session_impl_create()
+ * function: sgs_session_impl_new()
  *
  * Creates a new sgs_session from the specified connection.  Returns null on
  * failure.
  */
-sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection);
+sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection);
 
 /*
  * function: sgs_session_impl_free()
