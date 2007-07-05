@@ -44,8 +44,8 @@ int main(int argc, char *argv[]) {
   for (i=0; i < sizeof(content2); i++)
     content2[i] = 99;
   
-  buf = sgs_buffer_create(10);
-  if (buf == NULL) { perror("create() failed.\n"); exit(-1); }
+  buf = sgs_buffer_new(10);
+  if (buf == NULL) { perror("new() failed.\n"); exit(-1); }
   
   result = sgs_buffer_peek(buf, content2, 1);
   printf("PEEK(1) = %d  \t|  ", result);
@@ -95,6 +95,8 @@ int main(int argc, char *argv[]) {
   printf("READ(10) = %d  \t|  ", result);
   printStats(buf);
   printArr("results", content2, 10);
+  
+  sgs_buffer_free(buf);
   
   printf("Goodbye!\n");
   
