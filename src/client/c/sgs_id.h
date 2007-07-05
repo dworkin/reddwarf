@@ -21,16 +21,16 @@
  * STRUCTS
  */
 struct sgs_id {
-  /** normal (uncompressed) form: len is 0 if the ID is unspecified */
-  uint8_t data[SGS_MAX_ID_SIZE];
-  uint8_t datalen;
+    /** normal (uncompressed) form: len is 0 if the ID is unspecified */
+    uint8_t data[SGS_MAX_ID_SIZE];
+    uint8_t datalen;
   
-  /** compressed form (as would be sent over the network */
-  uint8_t compressed[SGS_MAX_ID_SIZE + 1];
-  uint8_t compressedlen;
+    /** compressed form (as would be sent over the network */
+    uint8_t compressed[SGS_MAX_ID_SIZE + 1];
+    uint8_t compressedlen;
   
-  /** hex representation (+1 is for the null terminator ('\0') */
-  char hexstr[SGS_MAX_ID_SIZE*2 + 1];
+    /** hex representation (+1 is for the null terminator ('\0') */
+    char hexstr[SGS_MAX_ID_SIZE*2 + 1];
 };
 
 /*

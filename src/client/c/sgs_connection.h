@@ -60,7 +60,7 @@ int sgs_connection_do_io(sgs_connection *connection, int fd, short events);
  * errno set to the specific error code.
  */
 int sgs_connection_login(sgs_connection *connection, const char *login,
-                         const char *password);
+    const char *password);
 
 /*
  * function: sgs_connection_logout()

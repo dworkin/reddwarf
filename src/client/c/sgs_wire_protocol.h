@@ -69,129 +69,129 @@
 #define SGS_MSG_VERSION 1
 
 typedef enum sgs_service_id {
-  /* Application service ID */
-  SGS_APPLICATION_SERVICE = 0x01,
+    /* Application service ID */
+    SGS_APPLICATION_SERVICE = 0x01,
   
-  /* Channel serivce ID */
-  SGS_CHANNEL_SERVICE = 0x02,
+    /* Channel serivce ID */
+    SGS_CHANNEL_SERVICE = 0x02,
 } sgs_service_id;
 
 typedef enum sgs_opcode {
-  /**
-   * Login request.
-   * <ul>
-   * <li> (String) name
-   * <li> (String) password
-   * </ul>
-   */
-  SGS_OPCODE_LOGIN_REQUEST = 0x10,
+    /**
+     * Login request.
+     * <ul>
+     * <li> (String) name
+     * <li> (String) password
+     * </ul>
+     */
+    SGS_OPCODE_LOGIN_REQUEST = 0x10,
 
-  /**
-   * Login success (login request acknowledgment).
-   * <ul>
-   * <li> (CompactId) sessionId
-   * <li> (CompactId) reconnectionKey
-   * </ul>
-   */
-  SGS_OPCODE_LOGIN_SUCCESS = 0x11,
+    /**
+     * Login success (login request acknowledgment).
+     * <ul>
+     * <li> (CompactId) sessionId
+     * <li> (CompactId) reconnectionKey
+     * </ul>
+     */
+    SGS_OPCODE_LOGIN_SUCCESS = 0x11,
 
-  /**
-   * Login failure (login request acknowledgment).
-   * <ul>
-   * <li> (String) reason
-   * </ul>
-   */
-  SGS_OPCODE_LOGIN_FAILURE = 0x12,
+    /**
+     * Login failure (login request acknowledgment).
+     * <ul>
+     * <li> (String) reason
+     * </ul>
+     */
+    SGS_OPCODE_LOGIN_FAILURE = 0x12,
 
-  /**
-   * Reconnection request.
-   * <ul>
-   * <li> (CompactId) reconnectionKey
-   * </ul>
-   */
-  SGS_OPCODE_RECONNECT_REQUEST = 0x20,
+    /**
+     * Reconnection request.
+     * <ul>
+     * <li> (CompactId) reconnectionKey
+     * </ul>
+     */
+    SGS_OPCODE_RECONNECT_REQUEST = 0x20,
 
-  /**
-   * Reconnect success (reconnection request acknowledgment).
-   * <ul>
-   * <li> (CompactId) reconnectionKey
-   * </ul>
-   */
-  SGS_OPCODE_RECONNECT_SUCCESS = 0x21,
+    /**
+     * Reconnect success (reconnection request acknowledgment).
+     * <ul>
+     * <li> (CompactId) reconnectionKey
+     * </ul>
+     */
+    SGS_OPCODE_RECONNECT_SUCCESS = 0x21,
 
-  /**
-   * Reconnect failure (reconnection request acknowledgment).
-   * <ul>
-   * <li> (String) reason
-   * </ul>
-   */
-  SGS_OPCODE_RECONNECT_FAILURE = 0x22,
+    /**
+     * Reconnect failure (reconnection request acknowledgment).
+     * <ul>
+     * <li> (String) reason
+     * </ul>
+     */
+    SGS_OPCODE_RECONNECT_FAILURE = 0x22,
 
-  /**
-   * Session message.  Maximum length is 64 KB minus one byte.
-   * Larger messages require fragmentation and reassembly above
-   * this protocol layer.
-   *
-   * <ul>
-   * <li> (long) sequence number
-   * <li> (ByteArray) message
-   * </ul>
-   */
-  SGS_OPCODE_SESSION_MESSAGE = 0x30,
+    /**
+     * Session message.  Maximum length is 64 KB minus one byte.
+     * Larger messages require fragmentation and reassembly above
+     * this protocol layer.
+     *
+     * <ul>
+     * <li> (long) sequence number
+     * <li> (ByteArray) message
+     * </ul>
+     */
+    SGS_OPCODE_SESSION_MESSAGE = 0x30,
 
-  /**
-   * Logout request.
-   */
-  SGS_OPCODE_LOGOUT_REQUEST = 0x40,
+    /**
+     * Logout request.
+     */
+    SGS_OPCODE_LOGOUT_REQUEST = 0x40,
 
-  /**
-   * Logout success (logout request acknowledgment).
-   */
-  SGS_OPCODE_LOGOUT_SUCCESS = 0x41,
+    /**
+     * Logout success (logout request acknowledgment).
+     */
+    SGS_OPCODE_LOGOUT_SUCCESS = 0x41,
 
-  /**
-   * Channel join.
-   * <ul>
-   * <li> (String) channel name
-   * <li> (CompactId) channel ID
-   * </ul>
-   */
-  SGS_OPCODE_CHANNEL_JOIN = 0x50,
+    /**
+     * Channel join.
+     * <ul>
+     * <li> (String) channel name
+     * <li> (CompactId) channel ID
+     * </ul>
+     */
+    SGS_OPCODE_CHANNEL_JOIN = 0x50,
 
-  /**
-   * Channel leave.
-   * <ul>
-   * <li> (CompactId) channel ID
-   * </ul>
-   */
-  SGS_OPCODE_CHANNEL_LEAVE = 0x52,
+    /**
+     * Channel leave.
+     * <ul>
+     * <li> (CompactId) channel ID
+     * </ul>
+     */
+    SGS_OPCODE_CHANNEL_LEAVE = 0x52,
     
-  /**
-   * Channel send request.
-   * <ul>
-   * <li> (CompactId) channel ID
-   * <li> (long) sequence number
-   * <li> (short) number of recipients (0 = all)
-   * <li> If number of recipients &gt, 0, for each recipient:
-   * <ul>
-   * <li> (CompactId) sessionId
-   * </ul>
-   * <li> (ByteArray) message
-   * </ul>
-   */
-  SGS_OPCODE_CHANNEL_SEND_REQUEST = 0x53,
+    /**
+     * Channel send request.
+     * <ul>
+     * <li> (CompactId) channel ID
+     * <li> (long) sequence number
+     * <li> (short) number of recipients (0 = all)
+     * <li> If number of recipients &gt, 0, for each recipient:
+     * <ul>
+     * <li> (CompactId) sessionId
+     * </ul>
+     * <li> (ByteArray) message
+     * </ul>
+     */
+    SGS_OPCODE_CHANNEL_SEND_REQUEST = 0x53,
 
-  /**
-   * Channel message (to recipient on channel).
-   * <ul>
-   * <li> (CompactId) channel ID
-   * <li> (long) sequence number
-   * <li> (CompactId) sender's sessionId
-   *(canonical CompactId of zero if sent by server)
-   * <li> (ByteArray) message
-   * </ul>
-   */
-  SGS_OPCODE_CHANNEL_MESSAGE = 0x54,
+    /**
+     * Channel message (to recipient on channel).
+     * <ul>
+     * <li> (CompactId) channel ID
+     * <li> (long) sequence number
+     * <li> (CompactId) sender's sessionId
+     *(canonical CompactId of zero if sent by server)
+     * <li> (ByteArray) message
+     * </ul>
+     */
+    SGS_OPCODE_CHANNEL_MESSAGE = 0x54,
 } sgs_opcode;
 
 #endif  /** #ifndef SGS_WIRE_PROTOCOL_H */

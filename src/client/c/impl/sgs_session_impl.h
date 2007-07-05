@@ -28,28 +28,28 @@ typedef struct sgs_session_impl sgs_session_impl;
  * STRUCTS
  */
 struct sgs_session_impl {
-  /** The underlying network connection. */
-  sgs_connection_impl *connection;
+    /** The underlying network connection. */
+    sgs_connection_impl *connection;
   
-  /** Server-assigned unique ID for this session. */
-  sgs_id session_id;
+    /** Server-assigned unique ID for this session. */
+    sgs_id session_id;
   
-  /** Server-assigned key used to reconnect after disconnect. */
-  sgs_id reconnect_key;
+    /** Server-assigned key used to reconnect after disconnect. */
+    sgs_id reconnect_key;
   
-  /**
-   * Sequence number used in some messages (increment after each use).  We have
-   * to store this as two 32-bit ints instead of just a single 64-bit int so
-   * that we can use htonl() and ntohl() of which there are no 64-bit versions.
-   */
-  uint32_t seqnum_hi;
-  uint32_t seqnum_lo;
+    /**
+     * Sequence number used in some messages (increment after each use).  We have
+     * to store this as two 32-bit ints instead of just a single 64-bit int so
+     * that we can use htonl() and ntohl() of which there are no 64-bit versions.
+     */
+    uint32_t seqnum_hi;
+    uint32_t seqnum_lo;
   
-  /**
-   * Used as the backing array for any sgs_messages (more efficient to just
-   * declare once and keep it around than to malloc() every time we need one).
-   */
-  uint8_t msg_buf[SGS_MSG_MAX_LENGTH];
+    /**
+     * Used as the backing array for any sgs_messages (more efficient to just
+     * declare once and keep it around than to malloc() every time we need one).
+     */
+    uint8_t msg_buf[SGS_MSG_MAX_LENGTH];
 };
 
 /*
@@ -82,7 +82,7 @@ void sgs_session_impl_incr_seqnum(sgs_session_impl *session);
  * errno set to the specific error code.
  */
 int sgs_session_impl_login(sgs_session_impl *session, const char *login,
-                           const char *password);
+    const char *password);
 
 /*
  * function: sgs_session_impl_logout()

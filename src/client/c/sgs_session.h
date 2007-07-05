@@ -62,7 +62,7 @@ int sgs_session_channel_send(sgs_session *session, const sgs_id *pchannel_id,
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_session_direct_send(sgs_session *session, const uint8_t *data,
-                            size_t datalen);
+    size_t datalen);
 
 /*
  * function: sgs_session_get_reconnectkey()

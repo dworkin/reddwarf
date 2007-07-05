@@ -19,24 +19,24 @@
  * TYPEDEFS
  */
 typedef struct sgs_message {
-  /** Pointer to the start of the memory reserved for this message. */
-  uint8_t *buf;
+    /** Pointer to the start of the memory reserved for this message. */
+    uint8_t *buf;
   
-  /**
-   * Length of the memory reserved for this message.  This may be larger than
-   * the number of bytes in the actual message.  If a method attempts to add
-   * data to the message payload but there is no room (as indicated by this
-   * variable), that method must fail and not write beyond the memory limit
-   * imposed by this value.
-   */
-  size_t buflen;
+    /**
+     * Length of the memory reserved for this message.  This may be larger than
+     * the number of bytes in the actual message.  If a method attempts to add
+     * data to the message payload but there is no room (as indicated by this
+     * variable), that method must fail and not write beyond the memory limit
+     * imposed by this value.
+     */
+    size_t buflen;
   
-  /**
-   * The number of size of this message (so far).  Since the first 4 bytes of
-   * any message contains its length (not including those 4 bytes), this
-   * variable is redundant with those bytes but is more convenient to use.
-   */
-  size_t size;
+    /**
+     * The number of size of this message (so far).  Since the first 4 bytes of
+     * any message contains its length (not including those 4 bytes), this
+     * variable is redundant with those bytes but is more convenient to use.
+     */
+    size_t size;
 } sgs_message;
 
 
@@ -60,7 +60,7 @@ typedef struct sgs_message {
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
-                            size_t clen);
+    size_t clen);
 
 /*
  * function: sgs_msg_add_fixed_content()
@@ -78,7 +78,7 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
-                              size_t clen);
+    size_t clen);
 
 /*
  * function: sgs_msg_add_uint32()
@@ -172,6 +172,6 @@ uint8_t sgs_msg_get_version(sgs_message *pmsg);
  *  -1: failure (errno is set to specific error code)
  */
 int sgs_msg_init(sgs_message *pmsg, uint8_t *buffer, size_t buflen,
-                 sgs_opcode opcode, sgs_service_id service_id);
+    sgs_opcode opcode, sgs_service_id service_id);
 
 #endif  /** #ifndef SGS_MESSAGE_H */

@@ -24,17 +24,17 @@ typedef struct sgs_buffer sgs_buffer;
  * STRUCTS
  */
 struct sgs_buffer {
-  /* Total amount of memory allocated to the "buf" pointer. */
-  size_t capacity;
+    /* Total amount of memory allocated to the "buf" pointer. */
+    size_t capacity;
   
-  /* Current position of the start of the data in the buffer. */
-  size_t position;
+    /* Current position of the start of the data in the buffer. */
+    size_t position;
   
-  /* Number of bytes currently stored in the buffer. */
-  size_t size;
+    /* Number of bytes currently stored in the buffer. */
+    size_t size;
   
-  /* Array of the actual data. */
-  uint8_t *buf;
+    /* Array of the actual data. */
+    uint8_t *buf;
 };
 
 /*
