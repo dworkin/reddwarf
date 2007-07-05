@@ -97,6 +97,12 @@ public class BenchmarkClient
     /** Used to perform the pause operation. */
     private Object pauseLock = new Object();
     
+    /** Whether to print informational messages when certain events occur. */
+    private boolean printNotices = true;
+    
+    /** Whether to print info to stdin when running commands. */
+    private boolean printCommands = true;
+    
     /** Variables to keep track of things while processing input: */
     
     /** Whether we are inside a block. */
@@ -126,7 +132,10 @@ public class BenchmarkClient
                 public void loggedIn() {
                     SessionId session = client.getSessionId();
                     sessionNames.put(session, login);
-                    System.out.println("Notice: Logged in with session ID " + session);
+                    
+                    if (printNotices)
+                        System.out.println("Notice: Logged in with session ID " +
+                            session);
                 }
             });
         
@@ -138,9 +147,10 @@ public class BenchmarkClient
         
         masterListener.registerDisconnectedListener(new DisconnectedListener() {
                 public void disconnected(boolean graceful, String reason) {
-                    System.out.println("Notice: Disconnected " +
-                        (graceful ? "gracefully" : "ungracefully") +
-                        ": " + reason);
+                    if (printNotices)
+                        System.out.println("Notice: Disconnected " +
+                            (graceful ? "gracefully" : "ungracefully") +
+                            ": " + reason);
                 }
             });
         
@@ -152,8 +162,9 @@ public class BenchmarkClient
         
         masterListener.registerServerMessageListener(new ServerMessageListener() {
                 public void receivedMessage(byte[] message) {
-                    System.out.println("Notice: (from server) " +
-                        fromMessageBytes(message));
+                    if (printNotices)
+                        System.out.println("Notice: (from server) " +
+                            fromMessageBytes(message));
                 }
             });
     }
@@ -166,11 +177,30 @@ public class BenchmarkClient
      * @param args the commandline arguments (not used)
      */
     public static void main(String[] args) {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        BenchmarkClient client = new BenchmarkClient();
+        boolean quitOnException = false;
+        
+        // TODO - cheesy command line parsing used here
+        for (int i=0; i < args.length; i++) {
+            if (args[i].equals("-e")) {
+                client.printCommands(true);
+            }
+            else if (args[i].equals("-n")) {
+                client.printNotices(true);
+            }
+            else if (args[i].equals("-s")) {
+                client.printCommands(false);
+                client.printNotices(false);
+            }
+            else if (args[i].equals("-q")) {
+                quitOnException = true;
+            }
+        }
+        
+        
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));    
         String line;
         int lineNum = 0;
-        
-        BenchmarkClient client = new BenchmarkClient();
         
         try {
             while ((line = reader.readLine()) != null) {
@@ -183,6 +213,8 @@ public class BenchmarkClient
                     } catch (ParseException e) {
                         System.err.println("Syntax error on line " +
                             lineNum + ": " + e.getMessage());
+                        
+                        if (quitOnException) System.exit(0);
                     }
                 }
             }
@@ -194,6 +226,10 @@ public class BenchmarkClient
     }
     
     /** Public Methods */
+    
+    public void printCommands(boolean enable) { printCommands = enable; }
+    
+    public void printNotices(boolean enable) { printNotices = enable; }
     
     public void processInput(String line) throws ParseException {
         ScriptingCommand cmd = ScriptingCommand.parse(line);
@@ -358,7 +394,8 @@ public class BenchmarkClient
      */
     private void executeCommand(ScriptingCommand cmd) {
         try {
-            System.out.println("# Executing: " + cmd.getType());
+            if (printCommands)
+                System.out.println("# Executing: " + cmd.getType());
             
             for (int i=0; i < cmd.getCount(); i++) {
                 switch (cmd.getType()) {
@@ -448,11 +485,16 @@ public class BenchmarkClient
                     // need to somehow get a handle to the channel -- probably will need
                     // to save a map of channel-names to ClientChannel objects (which
                     // get passed to you in joinedChannel() event call)
-                    cmd.getChannelName();
-                    cmd.getMessage();
-                    cmd.getRecipients();
-                    //sendServerMessage("/chsend ");
-                    System.out.println("not yet implemented - TODO");
+                    String channelName = cmd.getChannelName();
+                    ClientChannel channel = channels.get(channelName);
+                    
+                    if (channel == null) {
+                        System.err.println("Error: unknown channel \"" +
+                            channelName + "\"");
+                    } else {
+                        channel.send(toMessageBytes(cmd.getMessage()));
+                    }
+                    
                     break;
                     
                 case SEND_DIRECT:
@@ -609,7 +651,8 @@ public class BenchmarkClient
         
         this.login = login;
         
-        System.out.println("Notice: Connecting to " + host + ":" + port);
+        if (printNotices)
+            System.out.println("Notice: Connecting to " + host + ":" + port);
         
         Properties props = new Properties();
         props.put("host", host);
@@ -680,45 +723,7 @@ public class BenchmarkClient
         SessionId session = SessionId.fromBytes(fromHexString(idString));
         sessionNames.remove(session);
     }
-
-    // Implement ClientChannelListener
-
-    /**
-     * {@inheritDoc}
-     */
-    /*
-      public void receivedMessage(ClientChannel channel, SessionId sender,
-      byte[] message)
-      {
-      try {
-      String messageString = fromMessageBytes(message);
-      System.err.format("Recv on %s from %s: %s\n",
-      channel.getName(), sender, messageString);
-      String[] args = messageString.split(" ", 2);
-      String command = args[0];
-
-      if (command.equals("/joined")) {
-      userLogin(args[1]);
-      } else if (command.equals("/left")) {
-      userLogout(args[1]);
-      } else if (command.equals("/members")) {
-      List<String> members = Arrays.asList(args[1].split(" "));
-      if (! members.isEmpty()) {
-      //
-      }
-      } else if (command.equals("/pm")) {
-      pmReceived(sender, args[1]);
-      } else if (command.startsWith("/")) {
-      System.err.format("Unknown command: %s\n", command);
-      } else {
-      System.err.format("Not a command: %s\n", messageString);
-      }
-      } catch (Exception e) {
-      e.printStackTrace();
-      }
-      }
-    */
-
+    
     /**
      * Decodes the given {@code bytes} into a message string.
      *
