@@ -11,7 +11,7 @@ package com.sun.sgs.benchmark.client;
 public enum ScriptingCommandType {
     /** Enum types */
     CPU            (new String[] { "cpu", "do_cpu" }),
-    CREATE_CHANNEL (new String[] { "create_channel", "crchannel" }),
+    CREATE_CHANNEL (new String[] { "create_channel", "chcreate" }),
     DATASTORE      (new String[] { "datastore", "do_datastore", "get_datastore" }),
     DISCONNECT     ("disconnect"),
     END_BLOCK      ("}"),
