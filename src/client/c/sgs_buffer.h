@@ -57,11 +57,11 @@ size_t sgs_buffer_capacity(const sgs_buffer *buffer);
 sgs_buffer *sgs_buffer_create(size_t capacity);
 
 /*
- * function: sgs_buffer_destroy()
+ * function: sgs_buffer_free()
  *
  * Safely deallocates a buffer.
  */
-void sgs_buffer_destroy(sgs_buffer *buffer);
+void sgs_buffer_free(sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_empty()

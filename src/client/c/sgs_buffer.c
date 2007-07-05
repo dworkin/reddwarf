@@ -56,9 +56,9 @@ sgs_buffer *sgs_buffer_create(size_t capacity) {
 }
 
 /*
- * sgs_buffer_destroy()
+ * sgs_buffer_free()
  */
-void sgs_buffer_destroy(sgs_buffer *buffer) {
+void sgs_buffer_free(sgs_buffer *buffer) {
   free(buffer->buf);
   free(buffer);
 }

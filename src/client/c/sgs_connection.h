@@ -32,11 +32,11 @@ typedef struct sgs_connection_impl sgs_connection;
 sgs_connection *sgs_connection_create(sgs_context *ctx);
 
 /*
- * function: sgs_connection_destroy()
+ * function: sgs_connection_free()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_connection.
  */
-void sgs_connection_destroy(sgs_connection *connection);
+void sgs_connection_free(sgs_connection *connection);
 
 /*
  * function: sgs_connection_do_io()

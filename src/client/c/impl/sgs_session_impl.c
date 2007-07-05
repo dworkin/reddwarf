@@ -155,9 +155,9 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
 }
 
 /*
- * sgs_session_impl_destroy()
+ * sgs_session_impl_free()
  */
-void sgs_session_impl_destroy(sgs_session_impl *session) {
+void sgs_session_impl_free(sgs_session_impl *session) {
   free(session);
 }
 

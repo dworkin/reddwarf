@@ -318,8 +318,8 @@ static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen)
  * Takes care of any and all housekeeping before the program exits.
  */
 static void cleanup() {
-  if (g_context != NULL) sgs_ctx_destroy(g_context);
-  if (g_conn != NULL) sgs_connection_destroy(g_conn);
+  if (g_context != NULL) sgs_ctx_free(g_context);
+  if (g_conn != NULL) sgs_connection_free(g_conn);
 }
 
 /*

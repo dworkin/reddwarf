@@ -50,11 +50,11 @@ sgs_context *sgs_ctx_create(const char *hostname, const int port,
     void (*unreg_fd)(sgs_connection*, int[], size_t, short));
 
 /*
- * function: sgs_ctx_destroy()
+ * function: sgs_ctx_free()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_context.
  */
-void sgs_ctx_destroy(sgs_context *ctx);
+void sgs_ctx_free(sgs_context *ctx);
 
 /*
  * function: sgs_ctx_set_channel_joined_cb()

@@ -51,9 +51,9 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
 }
 
 /*
- * sgs_ctx_destroy()
+ * sgs_ctx_free()
  */
-void sgs_ctx_destroy(sgs_context_impl *ctx) {
+void sgs_ctx_free(sgs_context_impl *ctx) {
   free(ctx);
 }
 

@@ -57,9 +57,9 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx)
     
     /** Allocation of at least one object failed. */
     if (connection->session != NULL)
-      sgs_session_impl_destroy(connection->session);
-    if (connection->inbuf != NULL) sgs_buffer_destroy(connection->inbuf);
-    if (connection->outbuf != NULL) sgs_buffer_destroy(connection->outbuf);
+      sgs_session_impl_free(connection->session);
+    if (connection->inbuf != NULL) sgs_buffer_free(connection->inbuf);
+    if (connection->outbuf != NULL) sgs_buffer_free(connection->outbuf);
     free(connection);
     return NULL;
   }
@@ -68,12 +68,12 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx)
 }
 
 /*
- * sgs_connection_destroy()
+ * sgs_connection_free()
  */
-void sgs_connection_destroy(sgs_connection_impl *connection) {
-  sgs_session_impl_destroy(connection->session);
-  sgs_buffer_destroy(connection->inbuf);
-  sgs_buffer_destroy(connection->outbuf);
+void sgs_connection_free(sgs_connection_impl *connection) {
+  sgs_session_impl_free(connection->session);
+  sgs_buffer_free(connection->inbuf);
+  sgs_buffer_free(connection->outbuf);
   free(connection);
 }
 

@@ -61,11 +61,11 @@ struct sgs_session_impl {
 sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection);
 
 /*
- * function: sgs_session_impl_destroy()
+ * function: sgs_session_impl_free()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_session.
  */
-void sgs_session_impl_destroy(sgs_session_impl *session);
+void sgs_session_impl_free(sgs_session_impl *session);
 
 /*
  * function: sgs_session_impl_incr_seqnum()
