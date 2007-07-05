@@ -328,7 +328,8 @@ sub merge {
     my $new = escape($trunk) . "\@$trunk_rev";
     my $merge_command = "$merge $old $new";
     print "$merge_command\n";
-    print command($merge_command);
+    my @merge_results = command($merge_command);
+    print @merge_results;
     if (!$opt_n) {
 	# Update meta data
 	set_refreshed(".", $trunk_rev, $branch_name);
@@ -344,12 +345,30 @@ sub merge {
 	print command($diff_command);
     }
     if (!$opt_n) {
+	# Check for conflicts
+	print_conflicts(@merge_results);
 	# Print what happened
-	print "Refreshed branch working copy to trunk revision $trunk_rev\n";
+	print "Refreshed working copy for branch $branch_name " .
+	    "to trunk revision $trunk_rev\n";
     }
     if ($contains_moves && !$opt_f) {
 	exit 1;
     } else {
 	exit 0;
+    }
+}
+
+# Check the output from a merge and print information about conflicts.
+sub print_conflicts {
+    my (@merge_results) = @_;
+    my $found_conflict = 0;
+    for my $line (@merge_results) {
+	if ($line =~ /^C/) {
+	    if (!$found_conflict) {
+		$found_conflict = 1;
+		print("The refresh produced merge conflicts:\n");
+	    }
+	    print $line;
+	}
     }
 }

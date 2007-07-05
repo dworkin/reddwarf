@@ -470,6 +470,55 @@ test("Refresh after merging",
 }
 
 ####
+# Check conflicts
+####
+
+test("Force refresh with conflict on modified file",
+     join(" &&\n",
+	  "cd $escaped_trunk",
+	  "echo foo$$ > file.txt",
+	  "svn commit file.txt -m \"Modify file.txt\"",
+	  "cd $escaped_branch",
+	  "echo bar$$ > file.txt"),
+     "$svnrefresh -f",
+     join(" &&\n",
+	  check_pass(),
+	  "tail -3 /tmp/stdout$$ | head -2 > /tmp/stdouttail$$",
+	  "diff - /tmp/stdouttail$$ <<EOF\n" .
+	  "The refresh produced merge conflicts:\n" .
+	  "C    file.txt\n" .
+	  "EOF"),
+     join(" &&\n",
+	  "rm -f /tmp/stdouttail$$",
+	  "cd $escaped_branch",
+	  "cat $escaped_trunk/file.txt > file.txt",
+	  "svn resolved file.txt",
+	  "svn commit -m \"Refresh\""));
+
+test("Refresh with conflict on committed file",
+     join(" &&\n",
+	  "cd $escaped_trunk",
+	  "echo baz$$ > file.txt",
+	  "svn commit file.txt -m \"Modify file.txt\"",
+	  "cd $escaped_branch",
+	  "echo quux$$ > file.txt",
+	  "svn commit -m \"Modify file.txt in branch\""),
+     "$svnrefresh",
+     join(" &&\n",
+	  check_pass(),
+	  "tail -3 /tmp/stdout$$ | head -2 > /tmp/stdouttail$$",
+	  "diff - /tmp/stdouttail$$ <<EOF\n" .
+	  "The refresh produced merge conflicts:\n" .
+	  "C    file.txt\n" .
+	  "EOF"),
+     join(" &&\n",
+	  "rm -f /tmp/stdouttail$$",
+	  "cd $escaped_branch",
+	  "cat $escaped_trunk/file.txt > file.txt",
+	  "svn resolved file.txt",
+	  "svn commit -m \"Refresh\""));
+
+####
 # Miscellaneous
 ####
 
