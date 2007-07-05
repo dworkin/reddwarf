@@ -10,7 +10,7 @@
 #define SGS_SESSION_H 1
 
 /*
- * sgs_session typdef (declare before any #includes)
+ * sgs_session typedef (declare before any #includes)
  */
 typedef struct sgs_session_impl sgs_session;
 

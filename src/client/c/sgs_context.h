@@ -10,7 +10,7 @@
 #define SGS_CONTEXT_H 1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_context typedef(declare before any #includes)
  */
 typedef struct sgs_context_impl sgs_context;
 

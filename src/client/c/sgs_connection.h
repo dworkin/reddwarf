@@ -10,7 +10,7 @@
 #define SGS_CONNECTION_H 1
 
 /*
- * Opaque pointer (declare before any #includes)
+ * sgs_connection typedef (declare before any #includes)
  */
 typedef struct sgs_connection_impl sgs_connection;
 
