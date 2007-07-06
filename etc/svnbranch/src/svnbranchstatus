@@ -1,0 +1,197 @@
+#! /usr/bin/env perl
+
+# Prints information about changes to commit, merge up to the trunk, or
+# refresh from the trunk.
+
+# $Id$
+
+################
+# Use
+################
+
+# Enforce strict scoping
+use strict;
+
+# Print warnings
+use warnings;
+
+# Use getopts
+use Getopt::Std;
+
+# The directory containing the current program
+my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
+if (!$program_dir) {
+    $program_dir = ".";
+}
+
+# Load utilities
+require "$program_dir/svnmergeutil.pl";
+
+################
+# Variables
+################
+
+# Subversion ID for this revision
+my $id ='$Id$';
+
+# Usage message
+my $usage = "Usage: " . escape($0) .
+    " [-h] [BRANCH_URL_OR_DIRECTORY]
+Options:
+  -h                    : Help
+Environment variables:
+  SVNDIR                : Directory containing Subversion executables";
+
+# Help message
+my $help = "Prints information about changes for a branch, including
+changes in the repository that need to be updated into the working copy,
+changes in the working copy that need to be commited, changes that need
+to be refreshed from the trunk to the branch, and changes that need to
+be merged up from the branch to the trunk.
+
+The argument, if specified, should be the repository URL, or the
+pathname of a working copy, for the top level directory of a branch.  A
+pathname argument is permitted to contain spaces, which should be
+escaped or quoted.  Branch URLs should end in in '/branches/BRANCHNAME'.
+If not specified, the current directory is used.
+
+If the -h option is specified, prints this help message and exits.
+
+If the SVNDIR environment variable is set to a non-empty value, uses the
+Subversion executables located in that directory.  Otherwise, uses the
+executables available in the current path.
+
+Exits with a non-zero status if:
+- The branch argument, if specified, is not a repository URL or working
+  copy pathname for the top level directory of an existing branch
+- The current directory, if no branch argument is specified, is not the
+  top level directory of a working copy for a branch
+
+$id";
+
+# The branch argument, or the current directory if not specified
+my $branch = ".";
+
+# The URL for the branch
+my $branch_url;
+
+# The current revision of the branch
+my $branch_rev;
+
+# The name of the branch
+my $branch_name;
+
+# The URL for the trunk
+my $trunk_url;
+
+# The current revision of the trunk
+my $trunk_rev;
+
+# Declare global flags for options
+our($opt_c, $opt_h, $opt_m, $opt_r);
+
+# Use variables defined in svnmergeutil.pl.
+our($svn);
+
+################
+# Main subroutines
+################
+
+# Call main subroutine
+main();
+
+# Main subroutine
+sub main {
+    check_arguments();
+    check_branch_and_trunk();
+    check_changes();
+}
+
+# Checks the command line arguments, sets the $opt_X variables, and sets
+# $branch.
+sub check_arguments {
+    if (getopts("chmr")) {
+	if ($opt_h) {
+	    print "$usage\n";
+	    print "$help\n";
+	    exit 0;
+	}
+	if ($#ARGV == 0) {
+	    $branch = shift(@ARGV);
+	    return;
+	} elsif ($#ARGV < 0) {
+	    return;
+	}
+    }
+    die "$usage\n";
+}
+
+# Checks that the branch and trunk are valid, and sets the $branch_url,
+# $branch_rev, $branch_name, $trunk_url, and $trunk_rev variables.
+sub check_branch_and_trunk {
+    # Check branch URL
+    if (is_repository_url($branch)) { # The argument is a repository URL
+	$branch_url = $branch;
+    } else {			# A working copy -- get its URL
+	$branch_url = get_wc_url($branch);
+    }
+    if ($branch_url !~ m!^(.*)/branches/([^/]+)$!) {
+	if ($branch eq ".") {
+	    die "Error: Current directory not top of branch: " . `pwd`;
+	} else {
+	    die "Error: Argument is not top of branch: $branch\n";
+	}
+    }
+    my $branch_base = $1;
+    $branch_name = $2;
+    $branch_rev = get_url_revision($branch_url);
+    if (!$branch_rev) {
+	die "Error: Branch URL not found: $branch_url\n";
+    }
+    # Check trunk URL
+    $trunk_url = "$branch_base/trunk";
+    # Check trunk
+    $trunk_rev = get_url_revision($trunk_url);
+    if (!$trunk_rev) {
+	die "Error: Trunk URL not found: $trunk_url\n";
+    }
+}
+
+# Check for changes that need to be updated, committed, refreshed, or
+# merged up
+sub check_changes {
+    my $is_working_copy = $branch ne $branch_url;
+    my $working_copy_info = 
+	$is_working_copy ? " (working copy: $branch)" : "";
+    print "Status for branch $branch_name$working_copy_info:\n";
+    if ($is_working_copy) {
+	my $result = get_update_modified("$branch", 1);
+	if ($result) {
+	    print "Branch working copy $result\n";
+	}
+    }
+    my $refreshed = get_refreshed($branch, $branch_name, $branch_rev);
+    if ($trunk_rev <= $refreshed) {
+	print "Branch is refreshed up to date from trunk\n";
+    } else {
+	print "Branch needs to be refreshed from trunk:\n";
+	my $merge_command = "$svn merge --dry-run " .
+	    "-r $refreshed:$trunk_rev $trunk_url";
+	print "$merge_command\n";
+	print command($merge_command);
+    }
+    my $merged = get_merged_up(".", $branch_name);
+    if (!$merged) {
+	# Branch not merged, use the initial branch revision instead
+	$merged = get_branch_first_revision($branch, $branch_rev);
+    }
+    if ($branch_rev == $merged) {
+	print "Branch is merged up to date to trunk\n";
+    } else {
+	print "Branch needs to be merged up to trunk:\n";
+	my $merge_command = "$svn merge --dry-run " .
+	    "$trunk_url\@$refreshed $branch_url\@$branch_rev";
+	print "$merge_command\n";
+	print command($merge_command);
+    }
+}
