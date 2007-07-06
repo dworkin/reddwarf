@@ -466,6 +466,18 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		"non-existent channel:{0}, dropping message", channelId);
 	    return;
 	}
+
+	// Ensure that sender is a channel member before continuing.
+	if (!cachedState.hasSession(sender)) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.log(
+		    Level.WARNING,
+		    "send attempt on channel:{0} by non-member session:{1}, " +
+		    "dropping message", channelId, sender);
+	    }
+	    return;
+	}
+	
 	long seq = buf.getLong(); // TODO Check sequence num
 	short numRecipients = buf.getShort();
 	if (numRecipients < 0) {

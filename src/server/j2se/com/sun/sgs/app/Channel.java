@@ -32,6 +32,13 @@ import java.util.Set;
  * delivered according to that channel's {@link Delivery} requirement,
  * specified at channel creation time.
  *
+ * <p>A client session can send a message to a channel only if it is a
+ * member of that channel.  A client session sends a channel message
+ * by sending a request to server using a protocol employed by the
+ * implementation.  A requested channel message is delivered,
+ * according to the channel's delivery requirement, to all requested
+ * recipients except for the sending client session.
+ *
  * <p>If a channel is created with a {@link ChannelListener}, then
  * when any client session sends a message on that channel, that
  * listener's {@link
