@@ -44,13 +44,18 @@ public class MallocModule implements BehaviorModule, Serializable {
 	Class<?> type = null;
 	Integer count = null;
 	try {
-	    type = (Class<?>)(args[0]);
+	    String className = (String)(args[0]);
+	    type = Class.forName(className);
 	    count = (Integer)(args[1]);
 	}
 	catch (ClassCastException cce) {
 	    System.out.printf("invalid parameter(s) to %s: %s\n" +
 			      "expected Object type and count\n" ,
 			      this, args[0]);
+	    return operations;
+	}
+	catch (Throwable t) {
+	    return operations;
 	}
 	final Class<?> clazz = type;
 	final int num = count.intValue();

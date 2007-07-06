@@ -10,7 +10,8 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
-
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
@@ -34,7 +35,8 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
     }
 
     /**
-     *
+     * Returns a list with one {@code Runnable} that connects this
+     * client session to the channel specified in {@code args}.
      */
     public List<Runnable> getOperations(final ClientSession session, Object[] args) {
        	List<Runnable> operations = new LinkedList<Runnable>();
@@ -57,8 +59,17 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
-		    Channel chan = cm.getChannel(name);
-		    chan.join(session, null);
+		    try {
+			Channel chan = cm.getChannel(name);
+			chan.join(session, null);
+		    } catch (NameNotBoundException nnbe) {
+			System.out.printf("Client tried to join non-existent"
+					  + " channel: %s\n", name);
+		    } catch (TransactionException te) {
+			System.out.printf("Channel.join() failed due to a " +
+					  "transaction exception: %s\n", 
+					  te.getMessage());
+		    }
 		}
 	    });
 	return operations;

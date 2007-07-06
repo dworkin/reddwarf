@@ -9,6 +9,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
@@ -42,7 +43,9 @@ public class MasterTask implements AppListener, Serializable {
 	
 	Properties appProperties = new Properties();
 	try {
-	    appProperties.load(new FileReader(appPropertiesFile));
+	    // if we had 1.6, this would work
+	    //appProperties.load(new FileReader(appPropertiesFile));
+	    appProperties.load(new FileInputStream(appPropertiesFile));
 	}
 	catch (IOException ioe) {
 	    // log that we couldn't load the app
@@ -56,7 +59,7 @@ public class MasterTask implements AppListener, Serializable {
 
     public ClientSessionListener loggedIn(ClientSession session) {
 
-	System.out.printf("client connected: \n\t%s\n", session);
+	System.out.printf("client connected: %s\n", session);
 
 	// create a new ClientSessionHandler to generate tasks
 	return new RemoteMethodRequestHandler(session);

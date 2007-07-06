@@ -28,6 +28,8 @@ public class RemoteMethodRequestHandler
 
     private static final long serialVersionUID = 1;
 
+    private static final boolean DEBUG = false;
+
     private final ClientSession session;
 
     public RemoteMethodRequestHandler(ClientSession session) {
@@ -35,11 +37,13 @@ public class RemoteMethodRequestHandler
     }
 
     public void receivedMessage(byte[] message) {
-	System.out.printf("%s sent message\n", session);
+	if (DEBUG) System.out.printf("%s sent message\n", session);
 	try {
 	    ByteArrayInputStream bais = new ByteArrayInputStream(message);
 	    ObjectInputStream ois = new ObjectInputStream(bais);
 	    MethodRequest request = (MethodRequest)(ois.readObject());
+	    
+	    if (DEBUG) System.out.println("method request: " + request);
 
 	    // use the task factory to generate tasks on behalf of
 	    // this method request, then schedule them to run

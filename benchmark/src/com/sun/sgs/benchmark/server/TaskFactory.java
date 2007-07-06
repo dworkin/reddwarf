@@ -16,6 +16,7 @@ import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -106,11 +107,14 @@ public class TaskFactory implements ManagedObject, Serializable {
 					Object[] args) {
 	MethodTaskProfile b = methods.get(methodName);
 	if (b != null) {
+// 	    System.out.printf("loaded profile for %s(): %s\n", 
+// 			      methodName, b);
 	    return b.getOperations(session, args);
-	}
+	}	
 	else {
 	    // log that we didn't have something to generate any task
 	    // and return an empty list
+	    System.out.printf("no profile for method %s\n", methodName);
 	    return new LinkedList<Runnable>();
 	}	
     }    
@@ -158,8 +162,20 @@ public class TaskFactory implements ManagedObject, Serializable {
 	// mark the as needing to write
 	AppContext.getDataManager().markForUpdate(this);
 
-	for (String key : appProperties.stringPropertyNames()) {
+	// we need java 1.6 for this:
+	//for (String key : appProperties.stringPropertyNames()) {
 	    
+	//for (Object o : appProperties.propertyNames()) {
+	Enumeration<?> enumer = appProperties.propertyNames();
+	while (enumer.hasMoreElements()) {
+	    
+	    Object o = enumer.nextElement();
+	
+	    if (!(o instanceof String))
+		continue;
+
+	    String key = (String)o;
+
 	    // check that the prefix is what we expect
 	    if (!key.startsWith(PREFIX)) {
 		// REMINDER: add logging
@@ -396,6 +412,12 @@ public class TaskFactory implements ManagedObject, Serializable {
 	    for (BehaviorModule mod : postops) 
 		tasks.addAll(mod.getOperations(session, args));
 	    return tasks;
+	}
+
+	public String toString() {
+	    return "MethodTaskProfile [pre-ops: " + preops
+		+ ", ops: " + ops + ", post-ops" + postops + "]";
+		
 	}
     }
 

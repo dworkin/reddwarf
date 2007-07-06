@@ -10,6 +10,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.NameNotBoundException;
 
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
@@ -34,7 +35,7 @@ public class SendChannelMessageModule implements BehaviorModule, Serializable {
     }
 
     /**
-     *
+     * Fill me in
      */
     public List<Runnable> getOperations(final ClientSession session, Object[] args) {
        	List<Runnable> operations = new LinkedList<Runnable>();
@@ -47,21 +48,28 @@ public class SendChannelMessageModule implements BehaviorModule, Serializable {
 	String message = null;
 	try {
 	    channelName = (String)(args[0]);
-	    channelName = (String)(args[1]);
+	    message = (String)(args[1]);
 	}
 	catch (ClassCastException cce) {
 	    System.out.printf("invalid parameter(s) to %s: %s\n" +
 			      "expected java.lang.String\n" ,
 			      this, args[0]);
+	    return operations;
 	}
 
 	final String name = channelName;
 	final String m = message;
+
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
-		    Channel chan = cm.getChannel(name);
-		    chan.send(m.getBytes());
+		    try {
+			Channel chan = cm.getChannel(name);
+			chan.send(m.getBytes());
+		    } catch (NameNotBoundException nnbe) {
+			System.out.printf("Client tried send message on "
+					  + "non-existent channel: %s", name);
+		    }
 		}
 	    });
 	return operations;

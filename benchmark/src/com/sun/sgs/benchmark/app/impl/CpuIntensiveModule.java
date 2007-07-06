@@ -31,7 +31,10 @@ public class CpuIntensiveModule implements BehaviorModule, Serializable {
     }
 
     /**
-     * Fill me in.
+     * Returns a list with a single {@code Runnable} that will spin on
+     * the CPU for the number of milliseconds specified in the first
+     * parameter of {@code args}.
+     *
      */
     public List<Runnable> getOperations(ClientSession session, Object[] args) {
 	List<Runnable> operations = new LinkedList<Runnable>();
@@ -48,11 +51,14 @@ public class CpuIntensiveModule implements BehaviorModule, Serializable {
 	    System.out.printf("invalid parameter(s) to %s: %s\n" +
 			      "expected java.lang.Long\n" ,
 			      this, args[0]);
+	    return operations;
 	}
-	final long stopTime = 
-	    System.currentTimeMillis() + duration.longValue();
+
+	final long d = duration.longValue();
 	operations.add(new Runnable() {
 		public void run() {
+		    long startTime = System.currentTimeMillis();
+		    long stopTime = startTime + d;
 		    for (int i = Integer.MIN_VALUE; 
 			 System.currentTimeMillis() < stopTime;
 			 i++);
