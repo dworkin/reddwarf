@@ -68,16 +68,13 @@ a Subversion branch:
 <ul>
   <li> Create the branch using the Subversion copy command:
 <pre>
-$ svn copy -m "Create branch mybranch of project myproj"
-           svn://billerica/neuromancer/subproj/myproj/trunk
-	   svn://billerica/neuromancer/subproj/myproj/branches/mybranch
+$ svn copy -m "Create branch mybranch" svn://labsvn/sgs/trunk svn://labsvn/sgs/branches/mybranch
 </pre> <p>
     
   <li> Create a working copy for the branch:
 
 <pre>
-$ svn checkout svn://billerica/neuromancer/subproj/myproj/branches/mybranch
-               ~/svn/myproj
+$ svn checkout svn://labsvn/sgs/branches/mybranch ~/svn/sgs-mybranch
 </pre> <p>
 
   <li> Modify the branch, committing changes as desired. <p>
@@ -87,7 +84,7 @@ $ svn checkout svn://billerica/neuromancer/subproj/myproj/branches/mybranch
        you may want to check to see what will be refreshed:
 
 <pre>
-$ cd ~/svn/myproj
+$ cd ~/svn/sgs-mybranch
 $ svnrefresh -n
 </pre>
 
@@ -98,7 +95,7 @@ $ svnrefresh -n
        the <code>-n</code> option:
 
 <pre>
-$ cd ~/svn/myproj
+$ cd ~/svn/sgs-mybranch
 $ svnrefresh
 </pre> <p>
 
@@ -113,22 +110,21 @@ $ svn commit -m "Refresh revision 1234"
 
   <li> Create a working copy for the trunk:
 <pre>
-$ svn checkout svn://billerica/neuromancer/subproj/myproj/trunk
-               ~/svn/myproj-trunk
+$ svn checkout svn://labsvn/sgs/trunk ~/svn/sgs
 </pre> <p>
 
   <li> You can check to see what changes will be merged up first:
 
 <pre>
-$ cd ~/svn/myproj-trunk
-$ svnmergeup -n ~/svn/myproj
+$ cd ~/svn/sgs
+$ svnmergeup -n ~/svn/sgs-mybranch
 </pre> <p>
 
   <li> Merge the changes up by leaving out the <code>-n</code> option:
 
 <pre>
-$ cd ~/svn/myproj-trunk
-$ svnmergeup ~/svn/myproj
+$ cd ~/svn/sgs
+$ svnmergeup ~/svn/sgs-mybranch
 </pre> <p>
 
   <li> Commit the changes when you are satisfied with them:
