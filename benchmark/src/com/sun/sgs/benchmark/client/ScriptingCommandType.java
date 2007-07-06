@@ -10,10 +10,12 @@ package com.sun.sgs.benchmark.client;
  */
 public enum ScriptingCommandType {
     /** Enum types */
+    CONFIG         (new String[] { "config", "host" }),
     CPU            (new String[] { "cpu", "do_cpu" }),
-    CREATE_CHANNEL (new String[] { "create_channel", "chcreate" }),
+    CREATE_CHANNEL (new String[] { "create_channel", "chcreate", "create" }),
     DATASTORE      (new String[] { "datastore", "do_datastore", "get_datastore" }),
     DISCONNECT     ("disconnect"),
+    DO_TAG         (new String[] { "do_tag", "dotag", "do", "do_sub", "exec", "run" }),
     END_BLOCK      ("}"),
     EXIT           (new String[] { "exit", "quit" }),
     HELP           ("help"),
@@ -24,10 +26,11 @@ public enum ScriptingCommandType {
     MALLOC         (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
     ON_EVENT       (new String[] { "on_event", "onevent", "on" }),
     PAUSE          ("pause"),
-    PRINT          (new String[] { "debug", "print", "printf" }),
+    PRINT          (new String[] { "print", "debug", "printf" }),
     SEND_CHANNEL   (new String[] { "send_channel", "channel_send", "chsend" }),
     SEND_DIRECT    (new String[] { "send_direct", "send_server", "direct_send" }),
     START_BLOCK    ("{"),
+    TAG            (new String[] { "tag", "sub" }),
     WAIT_FOR       (new String[] { "wait_for", "wait" });
     
     /** Member variables */

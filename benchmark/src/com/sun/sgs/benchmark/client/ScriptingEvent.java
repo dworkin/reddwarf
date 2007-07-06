@@ -11,13 +11,13 @@ package com.sun.sgs.benchmark.client;
 public enum ScriptingEvent {
     /** Enum types */
     DISCONNECTED   ("disconnected"),
-    JOINED_CHANNEL (new String[] { "joined", "joined_channel" }),
+    JOINED_CHANNEL (new String[] { "join", "joined", "join_channel", "joined_channel" }),
     LEFT_CHANNEL   (new String[] { "left", "left_channel" }),
     LOGGED_IN      (new String[] { "logged_in", "login" }),
     LOGIN_FAILED   (new String[] { "login_failed", "login_fail" }),
     RECONNECTED    ("reconnected"),
     RECONNECTING   ("reconnecting"),
-    RECV_CHANNEL   (new String[] { "recv_channel", "channel_msg" }),
+    RECV_CHANNEL   (new String[] { "recv_channel", "channel_msg", "channel_recv" }),
     RECV_DIRECT    (new String[] { "recv_direct", "recv_server", "server_msg" });
     
     /** Member variables */

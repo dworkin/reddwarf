@@ -74,6 +74,9 @@ public class BenchmarkClient
     /** The {@link Charset} encoding for client/server messages */
     public static final String MESSAGE_CHARSET = "UTF-8";
     
+    /** Server to connect to */
+    private String serverHostname, serverPort;        
+    
     /** Handles listener multiplexing. */
     private BenchmarkClientListener masterListener = new BenchmarkClientListener();
     
@@ -85,8 +88,12 @@ public class BenchmarkClient
         new HashMap<SessionId, String>();
     
     /** Provides convenient lookup of channels by name. */
-    private Map<String,ClientChannel> channels =
-        new HashMap<String,ClientChannel>();
+    private Map<String, ClientChannel> channels =
+        new HashMap<String, ClientChannel>();
+    
+    /** Holds all registered tags (groupings of commands). */
+    private Map<String, List<ScriptingCommand>> tags =
+        new HashMap<String, List<ScriptingCommand>>();
     
     /** The userName (i.e. login) for this client's session. */
     private String login;
@@ -97,11 +104,14 @@ public class BenchmarkClient
     /** Used to perform the pause operation. */
     private Object pauseLock = new Object();
     
+    /** Whether to print informational message when any event occurs. */
+    private boolean printAllEvents = false;
+    
+    /** Whether to print informational messages when running commands. */
+    private boolean printCommands = true;
+    
     /** Whether to print informational messages when certain events occur. */
     private boolean printNotices = true;
-    
-    /** Whether to print info to stdin when running commands. */
-    private boolean printCommands = true;
     
     /** Variables to keep track of things while processing input: */
     
@@ -109,17 +119,17 @@ public class BenchmarkClient
     private boolean inBlock = false;
     
     /**
-     * The active onEvent command.  If this reference is non-null, then either
-     * we are inside of a block (as indicated by the inblock variable being
-     * true) or the immediately previous line was an on_event command.
+     * The name of the active TAG command.  If this reference is non-null, then
+     * either we are inside of a block (as indicated by the inblock variable
+     * being true) or the immediately previous line was a (this) TAG command.
      */
-    private ScriptingCommand onEventCmd = null;
+    private String activeTag = null;
     
     /**
-     * The list of commands being stored up following an onEvent command.  The
-     * contents of this list are only valid if onEventCmd is non-null.
+     * The list of commands being stored up following an TAG command.  The
+     * contents of this list are only valid if activeTag is non-null.
      */
-    private List<ScriptingCommand> onEventCmdList;
+    private List<ScriptingCommand> tagCmdList;
     
     // Constructor
 
@@ -127,27 +137,26 @@ public class BenchmarkClient
      * Creates a new {@code BenchmarkClient}.
      */
     public BenchmarkClient() {
-        /** Register ourselves for a few events with the master listener. */
-        masterListener.registerLoggedInListener(new LoggedInListener() {
-                public void loggedIn() {
-                    SessionId session = client.getSessionId();
-                    sessionNames.put(session, login);
-                    
-                    if (printNotices)
-                        System.out.println("Notice: Logged in with session ID " +
-                            session);
-                }
-            });
+        /** Default values */
+        serverHostname = System.getProperty(HOST_PROPERTY, DEFAULT_HOST);
+        serverPort = System.getProperty(PORT_PROPERTY, DEFAULT_PORT);
         
-        masterListener.registerLoginFailedListener(new LoginFailedListener() {
-                public void loginFailed(String reason) {
-                    System.out.println("Notice: Login failed: " + reason);
+        /** Register ourselves for a few events with the master listener. */
+        masterListener.registerChannelMessageListener(new ChannelMessageListener() {
+                public void receivedMessage(String channelName, SessionId sender,
+                    byte[] message)
+                {
+                    if (printAllEvents)
+                        System.out.println("Received message \"" +
+                            fromMessageBytes(message) + "\" from \"" +
+                            formatSession(sender) + "\" on channel \"" +
+                            channelName + "\"");
                 }
             });
         
         masterListener.registerDisconnectedListener(new DisconnectedListener() {
                 public void disconnected(boolean graceful, String reason) {
-                    if (printNotices)
+                    if (printNotices || printAllEvents)
                         System.out.println("Notice: Disconnected " +
                             (graceful ? "gracefully" : "ungracefully") +
                             ": " + reason);
@@ -157,12 +166,56 @@ public class BenchmarkClient
         masterListener.registerJoinedChannelListener(new JoinedChannelListener() {
                 public void joinedChannel(ClientChannel channel) {
                     channels.put(channel.getName(), channel);
+                    
+                    if (printAllEvents)
+                        System.out.println("Notice: Joined channel \"" +
+                            channel.getName() + "\"");
+                }
+            });
+        
+        masterListener.registerLeftChannelListener(new LeftChannelListener() {
+                public void leftChannel(String channelName) {
+                    if (printAllEvents)
+                        System.out.println("Notice: Left channel \"" +
+                            channelName + "\"");
+                }
+            });
+        
+        masterListener.registerLoggedInListener(new LoggedInListener() {
+                public void loggedIn() {
+                    SessionId session = client.getSessionId();
+                    sessionNames.put(session, login);
+                    
+                    if (printNotices || printAllEvents)
+                        System.out.println("Notice: Logged in with session ID " +
+                            session);
+                }
+            });
+        
+        masterListener.registerLoginFailedListener(new LoginFailedListener() {
+                public void loginFailed(String reason) {
+                    if (printNotices || printAllEvents)
+                        System.out.println("Notice: Login failed: " + reason);
+                }
+            });
+        
+        masterListener.registerReconnectedListener(new ReconnectedListener() {
+                public void reconnected() {
+                    if (printAllEvents)
+                        System.out.println("Notice: Reconnected.");
+                }
+            });
+        
+        masterListener.registerReconnectingListener(new ReconnectingListener() {
+                public void reconnecting() {
+                    if (printAllEvents)
+                        System.out.println("Notice: Reconnecting.");
                 }
             });
         
         masterListener.registerServerMessageListener(new ServerMessageListener() {
                 public void receivedMessage(byte[] message) {
-                    if (printNotices)
+                    if (printNotices || printAllEvents)
                         System.out.println("Notice: (from server) " +
                             fromMessageBytes(message));
                 }
@@ -182,18 +235,41 @@ public class BenchmarkClient
         
         // TODO - cheesy command line parsing used here
         for (int i=0; i < args.length; i++) {
-            if (args[i].equals("-e")) {
+            if (args[i].equals("-c")) {
                 client.printCommands(true);
+            }
+            else if (args[i].equals("-e")) {
+                client.printAllEvents(true);
+            }
+            else if (args[i].equals("-h")) {
+                System.out.println("Usage: java com.sun.sgs.benchmark.client." +
+                    "BenchmarkClient [-c] [-e] [-h] [-n] [-q] [-s]");
+                System.out.println("  -c   Enable messages to stdout whenever" +
+                    " a command is executed (default: enabled). Think" +
+                    " 'commands'.");
+                System.out.println("  -e   Enable message to stdout whenever" +
+                    " any event occurs (default: disabled). Think 'events'.");
+                System.out.println("  -h   Print this help message");
+                System.out.println("  -n   Enable notification messages to" + 
+                    " stdout when certain significant events occur (default:" +
+                    " enabled).  Think 'notify'.");
+                System.out.println("  -q   Quit JVM on any syntax error when" +
+                    " processing input, instead of simply printing an error" +
+                    " and waiting for more input (default: disabled).  Think" +
+                    " 'quit'.");
+                System.out.println("  -s   Disable all informational messages." +
+                    " Think 'squelch'.");
             }
             else if (args[i].equals("-n")) {
                 client.printNotices(true);
             }
-            else if (args[i].equals("-s")) {
-                client.printCommands(false);
-                client.printNotices(false);
-            }
             else if (args[i].equals("-q")) {
                 quitOnException = true;
+            }
+            else if (args[i].equals("-s")) {
+                client.printAllEvents(false);
+                client.printCommands(false);
+                client.printNotices(false);
             }
         }
         
@@ -227,6 +303,8 @@ public class BenchmarkClient
     
     /** Public Methods */
     
+    public void printAllEvents(boolean enable) { printAllEvents = enable; }
+    
     public void printCommands(boolean enable) { printCommands = enable; }
     
     public void printNotices(boolean enable) { printNotices = enable; }
@@ -242,23 +320,23 @@ public class BenchmarkClient
                     " open brace.", 0);
             }
             
-            assignEventHandler(onEventCmd.getEvent(), onEventCmdList);
-            onEventCmd = null;
+            tags.put(activeTag, tagCmdList);
+            activeTag = null;
             inBlock = false;
             break;
             
-        case ON_EVENT:
+        case TAG:
             if (inBlock) {
                 throw new ParseException("Nested blocks are not supported.", 0);
             }
             
-            if (onEventCmd != null) {
-                throw new ParseException("Sequential on_event commands; " +
+            if (activeTag != null) {
+                throw new ParseException("Sequential TAG commands; " +
                     "perhaps a command is missing in between?", 0);
             }
             
-            onEventCmd = cmd;
-            onEventCmdList = new LinkedList<ScriptingCommand>();
+            activeTag = cmd.getTagName();
+            tagCmdList = new LinkedList<ScriptingCommand>();
             break;
             
         case START_BLOCK:
@@ -266,9 +344,9 @@ public class BenchmarkClient
                 throw new ParseException("Nested blocks are not supported.", 0);
             }
             
-            if (onEventCmd == null) {
+            if (activeTag == null) {
                 throw new ParseException("Blocks can only start immediately" +
-                    " following on_event commands.", 0);
+                    " following TAG commands.", 0);
             }
             
             inBlock = true;
@@ -276,17 +354,17 @@ public class BenchmarkClient
             
         default:
             /**
-             * If we are not in a block, but onEventCmd is not null, then this
-             * command immediately followed an onEvent command.
+             * If we are not in a block, but activeTag is not null, then this
+             * command immediately followed an TAG command.
              */
-            if (!inBlock && onEventCmd != null) {
-                onEventCmdList.add(cmd);
-                assignEventHandler(onEventCmd.getEvent(), onEventCmdList);
-                onEventCmd = null;
+            if (!inBlock && activeTag != null) {
+                tagCmdList.add(cmd);
+                tags.put(activeTag, tagCmdList);
+                activeTag = null;
             }
             /** Else, if we are in a block, then just store this command. */
             else if (inBlock) {
-                onEventCmdList.add(cmd);
+                tagCmdList.add(cmd);
             }
             /** Else, just a normal situation: execute command now. */
             else {
@@ -299,19 +377,18 @@ public class BenchmarkClient
      * PRIVATE METHODS
      */
     
-    private void assignEventHandler(ScriptingEvent event,
-        final List<ScriptingCommand> cmds)
+    private void assignEventHandler(ScriptingEvent event, final String tagName,
+        final int repeat)
     {
         /*
          * TODO - some of these commands might want to take the arguments of the
          * event call in as arguments themselves.  Not sure best way to do that.
          */
-        
         switch (event) {
         case DISCONNECTED:
             masterListener.registerDisconnectedListener(new DisconnectedListener() {
                     public void disconnected(boolean graceful, String reason) {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -319,7 +396,7 @@ public class BenchmarkClient
         case JOINED_CHANNEL:
             masterListener.registerJoinedChannelListener(new JoinedChannelListener() {
                     public void joinedChannel(ClientChannel channel) {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -327,7 +404,7 @@ public class BenchmarkClient
         case LEFT_CHANNEL:
             masterListener.registerLeftChannelListener(new LeftChannelListener() {
                     public void leftChannel(String channelName) {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -335,7 +412,7 @@ public class BenchmarkClient
         case LOGGED_IN:
             masterListener.registerLoggedInListener(new LoggedInListener() {
                     public void loggedIn() {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -343,7 +420,7 @@ public class BenchmarkClient
         case LOGIN_FAILED:
             masterListener.registerLoginFailedListener(new LoginFailedListener() {
                     public void loginFailed(String reason) {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -351,7 +428,7 @@ public class BenchmarkClient
         case RECONNECTED:
             masterListener.registerReconnectedListener(new ReconnectedListener() {
                     public void reconnected() {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -359,7 +436,7 @@ public class BenchmarkClient
         case RECONNECTING:
             masterListener.registerReconnectingListener(new ReconnectingListener() {
                     public void reconnecting() {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -369,7 +446,7 @@ public class BenchmarkClient
                     public void receivedMessage(String channelName,
                         SessionId sender, byte[] message)
                     {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -377,7 +454,7 @@ public class BenchmarkClient
         case RECV_DIRECT:
             masterListener.registerServerMessageListener(new ServerMessageListener() {
                     public void receivedMessage(byte[] message) {
-                        executeCommands(cmds);
+                        executeTag(tagName, repeat);
                     }
                 });
             break;
@@ -397,136 +474,151 @@ public class BenchmarkClient
             if (printCommands)
                 System.out.println("# Executing: " + cmd.getType());
             
-            for (int i=0; i < cmd.getCount(); i++) {
-                switch (cmd.getType()) {
-                case CPU:
-                    sendServerMessage(new MethodRequest("CPU",
-                        new Object[] { cmd.getDuration() } ));
-                    break;
+            switch (cmd.getType()) {
+            case CONFIG:
+                if (cmd.getHostname() != null) {
+                    serverHostname = cmd.getHostname();
                     
-                case CREATE_CHANNEL:
-                    sendServerMessage(new MethodRequest("CREATE_CHANNEL",
-                        new Object[] { cmd.getChannelName() } ));
-                    break;
-                    
-                case DATASTORE:
-                    System.out.println("not yet implemented - TODO");
-                    break;
-                    
-                case DISCONNECT:
-                    client.logout(true);   /* force */
-                    break;
-                    
-                case EXIT:
-                    System.exit(0);
-                    break;
-                    
-                case HELP:
-                    if (cmd.getTopic() == null) {
-                        System.out.println(ScriptingCommand.getHelpString());
-                    } else {
-                        System.out.println(ScriptingCommand.getHelpString(cmd.getTopic()));
-                    }
-                    break;
-                    
-                case JOIN_CHANNEL:
-                    sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
-                        new Object[] { cmd.getChannelName() }));
-                    break;
-                    
-                case LEAVE_CHANNEL:
-                    sendServerMessage("/leave " + cmd.getChannelName());
-                    break;
-                    
-                case LOGIN:
-                    sendLogin(cmd.getLogin(), cmd.getPassword());
-                    break;
-                    
-                case LOGOUT:
-                    client.logout(false);   /* non-force */
-                    break;
-                    
-                case MALLOC:
-                    cmd.getSize();
-                    System.out.println("not yet implemented - TODO");
-                    break;
-                    
-                case PAUSE:
-                    long start = System.currentTimeMillis();
-                    long elapsed = 0;
-                    long duration = cmd.getDuration();
-                    
-                    synchronized (pauseLock) {
-                        while (elapsed < duration) {
-                            try {
-                                pauseLock.wait(duration - elapsed);
-                            }
-                            catch (InterruptedException e) { }
-                            
-                            elapsed = System.currentTimeMillis() - start;
-                        }
-                    }
-                    break;
-                    
-                case PRINT:
-                    boolean first = true;
-                    StringBuilder sb = new StringBuilder("PRINT: ");
-                    
-                    for (String arg : cmd.getPrintArgs()) {
-                        if (first) first = false;
-                        else sb.append(", ");
-                        sb.append(arg);
-                    }
-                    
-                    System.out.println(sb);
-                    return;
-                    
-                case SEND_CHANNEL:
-                    // need to somehow get a handle to the channel -- probably will need
-                    // to save a map of channel-names to ClientChannel objects (which
-                    // get passed to you in joinedChannel() event call)
-                    String channelName = cmd.getChannelName();
-                    ClientChannel channel = channels.get(channelName);
-                    
-                    if (channel == null) {
-                        System.err.println("Error: unknown channel \"" +
-                            channelName + "\"");
-                    } else {
-                        channel.send(toMessageBytes(cmd.getMessage()));
-                    }
-                    
-                    break;
-                    
-                case SEND_DIRECT:
-                    sendServerMessage(cmd.getMessage());
-                    break;
-                    
-                case WAIT_FOR:
-                    /** Register listener to call notify() when event happens. */
-                    modifyNotificationEventHandler(cmd.getEvent(), true);
-                    
-                    while (true) {
+                    if (cmd.getPort() != -1)
+                        serverPort = "" + cmd.getPort();
+                }
+                else {
+                    /** Just a query */
+                    System.out.println("Server is currently configured to " +
+                        serverHostname + ":" + serverPort);
+                }
+                
+                break;
+                
+            case CPU:
+                sendServerMessage(new MethodRequest("CPU",
+                                      new Object[] { cmd.getDuration() } ));
+                break;
+                
+            case CREATE_CHANNEL:
+                System.out.println(cmd.getChannelName());
+                sendServerMessage(new MethodRequest("CREATE_CHANNEL",
+                                      new Object[] { cmd.getChannelName() } ));
+                break;
+                
+            case DATASTORE:
+                System.out.println("not yet implemented - TODO");
+                break;
+                
+            case DISCONNECT:
+                client.logout(true);   /* force */
+                break;
+                
+            case DO_TAG:
+                executeTag(cmd.getTagName(), cmd.getCount());
+                break;
+                
+            case EXIT:
+                System.exit(0);
+                break;
+                
+            case HELP:
+                if (cmd.getTopic() == null) {
+                    System.out.println(ScriptingCommand.getHelpString());
+                } else {
+                    System.out.println(ScriptingCommand.getHelpString(cmd.getTopic()));
+                }
+                break;
+                
+            case JOIN_CHANNEL:
+                sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
+                                      new Object[] { cmd.getChannelName() }));
+                break;
+                
+            case LEAVE_CHANNEL:
+                sendServerMessage("/leave " + cmd.getChannelName());
+                break;
+                
+            case LOGIN:
+                sendLogin(cmd.getLogin(), cmd.getPassword());
+                break;
+                
+            case LOGOUT:
+                client.logout(false);   /* non-force */
+                break;
+                
+            case MALLOC:
+                cmd.getSize();
+                System.out.println("not yet implemented - TODO");
+                break;
+                
+            case ON_EVENT:
+                assignEventHandler(cmd.getEvent(), cmd.getTagName(),
+                    cmd.getCount());
+                
+                break;
+                
+            case PAUSE:
+                long start = System.currentTimeMillis();
+                long elapsed = 0;
+                long duration = cmd.getDuration();
+                
+                synchronized (pauseLock) {
+                    while (elapsed < duration) {
                         try {
-                            synchronized(waitLock) {
-                                waitLock.wait();
-                            }
-                            
-                            /**
-                             * Unregister listener so it doesn't screw up
-                             * future WAIT_FOR commands.
-                             */
-                            modifyNotificationEventHandler(cmd.getEvent(), false);
-                            
-                            break;  /** Only break after wait() returns normally. */
+                            pauseLock.wait(duration - elapsed);
                         }
                         catch (InterruptedException e) { }
+                        
+                        elapsed = System.currentTimeMillis() - start;
                     }
-                    break;
-                    
-                default:
-                    throw new IllegalStateException("ERROR!  executeCommand() does" +
-                        " not support command type " + cmd.getType());
                 }
+                break;
+                
+            case PRINT:
+                System.out.println("PRINT: " + cmd.getPrintArg());
+                return;
+                
+            case SEND_CHANNEL:
+                // need to somehow get a handle to the channel -- probably will need
+                // to save a map of channel-names to ClientChannel objects (which
+                // get passed to you in joinedChannel() event call)
+                String channelName = cmd.getChannelName();
+                ClientChannel channel = channels.get(channelName);
+                
+                if (channel == null) {
+                    System.err.println("Error: unknown channel \"" +
+                        channelName + "\"");
+                } else {
+                    channel.send(toMessageBytes(cmd.getMessage()));
+                }
+                    
+                break;
+                    
+            case SEND_DIRECT:
+                sendServerMessage(cmd.getMessage());
+                break;
+                    
+            case WAIT_FOR:
+                /** Register listener to call notify() when event happens. */
+                modifyNotificationEventHandler(cmd.getEvent(), true);
+                    
+                while (true) {
+                    try {
+                        synchronized(waitLock) {
+                            waitLock.wait();
+                        }
+                            
+                        /**
+                         * Unregister listener so it doesn't screw up
+                         * future WAIT_FOR commands.
+                         */
+                        modifyNotificationEventHandler(cmd.getEvent(), false);
+                            
+                        break;  /** Only break after wait() returns normally. */
+                    }
+                    catch (InterruptedException e) { }
+                }
+                break;
+                    
+            default:
+                throw new IllegalStateException("ERROR!  executeCommand() does" +
+                    " not support command type " + cmd.getType());
             }
         } catch (IOException e) {
             System.err.println(e);
@@ -536,6 +628,18 @@ public class BenchmarkClient
     private void executeCommands(List<ScriptingCommand> cmds) {
         for (ScriptingCommand cmd : cmds)
             executeCommand(cmd);
+    }
+    
+    private void executeTag(String tagName, int repeat) {
+        if (tags.containsKey(tagName)) {
+            for (int i=0; i < repeat; i++) {
+                executeCommands(tags.get(tagName));
+            }
+        }
+        else {
+            System.err.println("Error executing tag \"" + tagName + "\": tag" +
+                " not found.");
+        }
     }
     
     private void modifyNotificationEventHandler(ScriptingEvent event,
@@ -640,9 +744,6 @@ public class BenchmarkClient
     }
     
     private void sendLogin(String login, String password) throws IOException {
-        String host = System.getProperty(HOST_PROPERTY, DEFAULT_HOST);
-        String port = System.getProperty(PORT_PROPERTY, DEFAULT_PORT);
-        
         /**
          * The "master listener" needs the login and password for
          * SimpleClientListener.getPasswordAuthentication()
@@ -651,12 +752,13 @@ public class BenchmarkClient
         
         this.login = login;
         
-        if (printNotices)
-            System.out.println("Notice: Connecting to " + host + ":" + port);
+        if (printNotices || printAllEvents)
+            System.out.println("Notice: Connecting to " + serverHostname +
+                ":" + serverPort);
         
         Properties props = new Properties();
-        props.put("host", host);
-        props.put("port", port);
+        props.put("host", serverHostname);
+        props.put("port", serverPort);
         client.login(props);
     }
     

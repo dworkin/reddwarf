@@ -15,6 +15,7 @@ import java.util.List;
 public class ScriptingCommand {
     /** Constants */
     public static final String DELIMITER = "\t";
+    public static final String EMPTY_STR = "";
     public static final int HELP_INDENT_LEN = 20;
     public static final String HELP_INDENT_STR;
     public static final String NEWLINE = System.getProperty("line.separator");
@@ -28,16 +29,19 @@ public class ScriptingCommand {
     /** Member variablees */
     private ScriptingCommandType type;
     
-    private int count = 1;                /** all command types */
+    private int count = -1;               /** DO_TAG */
+    private int port = -1;                /** CONFIG */
     private long duration = -1;           /** CPU */
     private long size = -1;               /** MALLOC */
     private String channelName = null;    /** [*]_CHANNEL */
+    private String hostname = null;       /** CONFIG */
+    private String tagName = null;        /** DO_TAG, TAG */
     private String topic = null;          /** HELP */
     private String msg = null;            /** SEND_CHANNEL, SEND_DIRECT */
+    private String printArg = null;       /** PRINT */
     private ScriptingEvent event = null;  /** ON_EVENT */
     private String login = null, password = null;  /** LOGIN */
     private List<String> recips = new LinkedList<String>();  /** SEND_CHANNEL */
-    private List<String> prints = new LinkedList<String>();  /** PRINT */
     
     /** Constructors */
     
@@ -96,17 +100,17 @@ public class ScriptingCommand {
         return sb.toString();
     }
     
+    public String getHostname() { return hostname; }
+    
     public String getLogin() { return login; }
     
     public String getMessage() { return msg; }
     
     public String getPassword() { return password; }
     
-    public String getTopic() { return topic; }
+    public int getPort() { return port; }
     
-    public List<String> getPrintArgs() {
-        return Collections.unmodifiableList(prints);
-    }
+    public String getPrintArg() { return printArg; }
     
     public List<String> getRecipients() {
         return Collections.unmodifiableList(recips);
@@ -114,12 +118,16 @@ public class ScriptingCommand {
     
     public long getSize() { return size; }
     
+    public String getTagName() { return tagName; }
+    
+    public String getTopic() { return topic; }
+    
     public ScriptingCommandType getType() { return type; }
     
     public static ScriptingCommand parse(String line)
     throws ParseException
     {
-        String[] parts = line.trim().split(DELIMITER);
+        String[] parts = line.trim().split("\\s+", 2);
         
         ScriptingCommandType type = ScriptingCommandType.parse(parts[0]);
         
@@ -128,129 +136,164 @@ public class ScriptingCommand {
         }
         
         ScriptingCommand cmd = new ScriptingCommand(type);
+        String[] args = (parts.length == 2) ? parts[1].split("\\s+") :
+            new String[] { };
         
-        for (int i=1; i < parts.length; i++) {
-            if (parts[i].startsWith("@")) {  /** Property */
-                String[] fields = parts[i].split("=", 2);
-                
-                if (fields.length == 1) {
-                    if (fields[0].trim().length() > 0)  /* Ignore empty strings */
-                        throw new ParseException("Invalid property format: " +
-                            parts[i], 0);
-                }
-                else {
-                    cmd.addProperty(cleanupString(fields[0].substring(1)),
-                        cleanupString(fields[1]));
-                }
-            }
-            else {  /** Argument */
-                cmd.addArgument(i - 1, cleanupString(parts[i]));
-            }
-        }
-        
-        /** confirm that all required arguments were present */
-        if (!cmd.checkComplete()) {
-            throw new ParseException("Missing argument.  " + type + " syntax: " +
-                type.getAlias() + " " + getArgList(type), 0);
-        }
-        
+        cmd.parseArgs(args);
         return cmd;
     }
     
     /** Private Methods */
     
-    private void addArgument(int index, String arg) throws ParseException
-    {
+    private void parseArgs(String[] args) throws ParseException {
         switch (type) {
+        case CONFIG:
+            if (args.length <= 2) {
+                if (args.length >= 1) {  /** Optional argument */
+                    hostname = args[0];
+                }
+                
+                if (args.length >= 2) {  /** Optional argument */
+                    try {
+                        port = Integer.valueOf(args[1]);
+                        if (port <= 0) throw new NumberFormatException();
+                    }
+                    catch (NumberFormatException e) {
+                        throw new ParseException("Invalid " + type + " argument," +
+                            " must be a valid network port: " + args[1], 0);
+                    }
+                }
+                return;
+            }
+            break;
+            
         case CPU:
-            if (index == 0) {  /** 0 = duration (ms) */
+            if (args.length == 1) {
                 try {
-                    duration = Long.valueOf(arg);
+                    duration = Long.valueOf(args[0]);
                     if (duration <= 0) throw new NumberFormatException();
-                    return;
                 }
                 catch (NumberFormatException e) {
-                    throw new ParseException("Invalid CPU argument, must be a" +
-                        " positive integer: " + arg, 0);
+                    throw new ParseException("Invalid " + type + " argument," +
+                        " must be a positive integer: " + args[0], 0);
                 }
+                return;
             }
             break;
             
         case CREATE_CHANNEL:
-            if (index == 0) {  /** 0 = channel name */
-                channelName = arg;
+            if (args.length == 1) {
+                channelName = args[0];
                 return;
             }
-            break;
+            return;
             
         case DATASTORE:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
 
         case DISCONNECT:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
+            
+        case DO_TAG:
+            if (args.length >= 1 && args.length <= 2) {
+                tagName = args[0];
+                count = 1;  /** default */
+                
+                if (args.length >= 2) {  /** Optional argument */
+                    try {
+                        count = Integer.valueOf(args[1]);
+                        if (count <= 0) throw new NumberFormatException();
+                    }
+                    catch (NumberFormatException e) {
+                        throw new ParseException("Invalid " + type + " argument," +
+                            " must bet a positive integer: " + args[1], 0);
+                    }
+                }
+                
+                return;
+            }
+            break;
             
         case END_BLOCK:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
 
         case EXIT:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
             
         case HELP:
-            if (index == 0) {  /** 0 = topic (optional) */
-                topic = arg;
+            if (args.length <= 1) {
+                if (args.length == 1) {  /** Optional argument */
+                    topic = args[0];
+                }
                 return;
             }
-            break;  /** No arguments */
+            break;
             
         case JOIN_CHANNEL:
-            if (index == 0) {  /** 0 = channel name */
-                channelName = arg;
+            if (args.length == 1) {
+                channelName = args[0];
                 return;
             }
-            break;
+            return;
             
         case LEAVE_CHANNEL:
-            if (index == 0) {  /** 0 = channel name */
-                channelName = arg;
+            if (args.length == 1) {
+                channelName = args[0];
                 return;
             }
-            break;
+            return;
             
         case LOGIN:
-            if (index == 0) {  /** 0 = login name */
-                login = arg;
-                return;
-            }
-            else if (index == 1) {  /** 1 = password */
-                password = arg;
+            if (args.length == 2) {
+                login = args[0];
+                password = args[1];
                 return;
             }
             break;
 
         case LOGOUT:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
 
         case MALLOC:
-            if (index == 0) {  /** 0 = size (bytes) */
+            if (args.length == 1) {
                 try {
-                    size = Long.valueOf(arg);
+                    size = Long.valueOf(args[0]);
                     if (size <= 0) throw new NumberFormatException();
-                    return;
                 }
                 catch (NumberFormatException e) {
-                    throw new ParseException("Invalid MALLOC argument, must be a" +
-                        " positive integer: " + arg, 0);
+                    throw new ParseException("Invalid " + type + " argument," +
+                        " must be a positive integer: " + args[0], 0);
                 }
+                return;
             }
             break;
             
         case ON_EVENT:
-            if (index == 0) {  /** 0 = event trigger */
-                event = ScriptingEvent.parse(arg);
+            if (args.length >= 2 && args.length <= 3) {
+                event = ScriptingEvent.parse(args[0]);
                 
                 if (event == null) {
                     throw new ParseException("Invalid ScriptingEvent alias: " +
-                        arg, 0);
+                        args[0], 0);
+                }
+                
+                tagName = args[1];
+                count = 1;  /** default */
+                
+                if (args.length >= 3) {
+                    try {
+                        count = Integer.valueOf(args[2]);
+                        if (count <= 0) throw new NumberFormatException();
+                    }
+                    catch (NumberFormatException e) {
+                        throw new ParseException("Invalid " + type + " argument," +
+                            " must be a positive integer: " + args[1], 0);
+                    }
                 }
                 
                 return;
@@ -258,55 +301,57 @@ public class ScriptingCommand {
             break;
             
         case PAUSE:
-            if (index == 0) {  /** 0 = duration (ms) */
+            if (args.length == 1) {
                 try {
-                    duration = Long.valueOf(arg);
+                    duration = Long.valueOf(args[0]);
                     if (duration <= 0) throw new NumberFormatException();
-                    return;
                 }
                 catch (NumberFormatException e) {
-                    throw new ParseException("Invalid PAUSE argument, must be a" +
-                        " positive integer: " + arg, 0);
+                    throw new ParseException("Invalid " + type + " argument," +
+                        " must be a positive integer: " + args[0], 0);
                 }
+                return;
             }
             break;
             
         case PRINT:
-            /** No checks on arguments; everything accepted. */
-            prints.add(arg);
+            /** Accept whole line as argument, including spaces */
+            if (args.length == 0) break;
+            printArg = stripQuotes(strJoin(args));
             return;
-
-        case SEND_CHANNEL:
-            if (index == 0) {  /** 0 = channel name */
-                channelName = arg;
-                return;
-            }
-            else if (index == 1) { /** 1 = message */
-                msg = arg;
-                return;
-            }
-            else {  /** 2+ = recipient name (TODO - name or id?) */
-                recips.add(arg);
-                return;
-            }
             
-        case SEND_DIRECT:
-            if (index == 0) {  /** message */
-                msg = arg;
+        case SEND_CHANNEL:
+            if (args.length >= 2) {
+                channelName = args[0];
+                msg = stripQuotes(strJoin(args, 1));
                 return;
             }
             break;
-
+            
+        case SEND_DIRECT:
+            /** Accept whole line as argument, including spaces */
+            if (args.length == 0) break;
+            printArg = stripQuotes(strJoin(args));
+            return;
+            
         case START_BLOCK:
-            break;  /** No arguments */
+            if (args.length == 0) return;  /** No arguments */
+            break;
+            
+        case TAG:
+            if (args.length == 1) {
+                tagName = args[0];
+                return;
+            }
+            break;
             
         case WAIT_FOR:
-            if (index == 0) {  /** 0 = event trigger */
-                event = ScriptingEvent.parse(arg);
+            if (args.length == 1) {
+                event = ScriptingEvent.parse(args[0]);
                 
                 if (event == null) {
                     throw new ParseException("Invalid ScriptingEvent alias: " +
-                        arg, 0);
+                        args[0], 0);
                 }
                 
                 return;
@@ -320,172 +365,14 @@ public class ScriptingCommand {
         }
         
         /**
-         * If control reaches here, the argument is not supported by this
-         * particular ScriptingCommand type.
+         * If control reaches here, the argument list was invalid (wrong number
+         * of arguments for this particular ScriptingCommand type.
          */
-        throw new ParseException("Excessive arguments to " + this + " command: " +
-            arg, 0);
+        throw new ParseException("Wrong number of arguments to " + type +
+            " command (" + args.length + ").  try 'help " + type + "'.", 0);
     }
     
-    private void addProperty(String key, String value) throws ParseException
-    {
-        /** First check properties that apply to all command types. */
-        key = key.toLowerCase();
-        
-        if (key.equals("count")) {
-            try {
-                count = Integer.valueOf(value);
-            }
-            catch (NumberFormatException e) {
-                throw new ParseException("Invalid @count value: " + value, 0);
-            }
-            
-            return;
-        }
-        
-        switch (type) {
-        case CPU:
-            break;
-        
-        case CREATE_CHANNEL:
-            break;
-            
-        case DATASTORE:
-            break;
-
-        case DISCONNECT:
-            break;
-
-        case END_BLOCK:
-            break;
-            
-        case EXIT:
-            break;
-
-        case HELP:
-            break;
-            
-        case JOIN_CHANNEL:
-            break;
-
-        case LEAVE_CHANNEL:
-            break;
-
-        case LOGIN:
-            break;
-
-        case LOGOUT:
-            break;
-
-        case MALLOC:
-            break;
-
-        case ON_EVENT:
-            break;
-
-        case PAUSE:
-            break;
-            
-        case PRINT:
-            break;
-
-        case SEND_CHANNEL:
-            break;
-
-        case SEND_DIRECT:
-            break;
-
-        case START_BLOCK:
-            break;
-            
-        case WAIT_FOR:
-            break;
-            
-        default:
-            throw new IllegalStateException("ScriptingCommand.addProperty()" +
-                " switch statement fell through without matching any cases. " +
-                " this=" + this);
-        }
-        
-        /**
-         * If control reaches here, the property is not recognized/supported by
-         * this particular ScriptingCommand type.
-         */
-        throw new ParseException("\"" + key + "\" property not supported by " +
-            this + " command.", 0);
-    }
-    
-    /** 
-     * Throws a ParseException if not all of the commands's required arguments
-     * have been set.
-     */
-    private boolean checkComplete() {
-        switch (type) {
-        case CPU:
-            return (duration != -1);
-            
-        case CREATE_CHANNEL:
-            return (channelName != null);
-            
-        case DATASTORE:
-            return true;  /** no arguments (yet) */
-
-        case DISCONNECT:
-            return true;  /** no arguments (yet) */
-
-        case END_BLOCK:
-            return true;  /** no arguments (yet) */
-
-        case EXIT:
-            return true;  /** no arguments (yet) */
-            
-        case HELP:
-            return true;  /** no arguments (yet) */
-            
-        case JOIN_CHANNEL:
-            return (channelName != null);
-
-        case LEAVE_CHANNEL:
-            return (channelName != null);
-
-        case LOGIN:
-            return (login != null && password != null);
-
-        case LOGOUT:
-            return true;  /** no arguments (yet) */
-
-        case MALLOC:
-            return (size != -1);
-
-        case ON_EVENT:
-            return (event != null);
-            
-        case PAUSE:
-            return (duration != -1);
-            
-        case PRINT:
-            return (prints.size() > 0);
-
-        case SEND_CHANNEL:
-            return (channelName != null && msg != null);
-
-        case SEND_DIRECT:
-            return (msg != null);
-
-        case START_BLOCK:
-            return true;  /** no arguments (yet) */
-            
-        case WAIT_FOR:
-            return (event != null);
-            
-        default:
-            throw new IllegalStateException("ScriptingCommand.checkComplete()" +
-                " switch statement fell through without matching any cases. " +
-                " this=" + this);
-        }
-    }
-    
-    private static String cleanupString(String s) {
+    private static String stripQuotes(String s) {
         s = s.trim().toLowerCase();
         
         if ((s.startsWith("\"") && s.endsWith("\"")) ||
@@ -498,43 +385,75 @@ public class ScriptingCommand {
     }
     
     private static String getArgList(ScriptingCommandType type) {
-        /** Note that only commands with arguments are listed */
         switch (type) {
+        case CONFIG:
+            return "[hostname [port]]";
+            
         case CPU:
             return "duration_ms";
             
         case CREATE_CHANNEL:
-            return "channel";
+            return "channel  (may not contain spaces)";
+            
+        case DATASTORE:
+            return "";
+           
+        case DISCONNECT:
+            return "";
+            
+        case DO_TAG:
+            return "tagname [repeat-count]";
+            
+        case END_BLOCK:
+            return "";
+            
+        case EXIT:
+            return "";
+            
+        case HELP:
+            return "";
             
         case JOIN_CHANNEL:
-            return "channel";
+            return "channel  (may not contain spaces)";
             
         case LEAVE_CHANNEL:
-            return "channel";
+            return "channel  (may not contain spaces)";
             
         case LOGIN:
             return "username password";
+            
+        case LOGOUT:
+            return "";
             
         case MALLOC:
             return "size_bytes";
             
         case ON_EVENT:
-            return "event";
+            return "event tagname [repeat-count]";
             
         case PAUSE:
             return "duration_ms";
             
         case PRINT:
-            return "str1 [str2] [...]";
+            return "message   (may contain spaces)";
             
         case SEND_CHANNEL:
-            return "channel msg [recipient1] [recipient2] [...]";
+            return "channel message  (message may contain spaces, but not channel)";
+            
+        case SEND_DIRECT:
+            return "message   (may contain spaces)";
+            
+        case START_BLOCK:
+            return "";
+            
+        case TAG:
+            return "tagname";
             
         case WAIT_FOR:
             return "event";
 
         default:
-            return "";  /** no arguments */
+            return "Error: unknown command-type: " + type;
         }
     }
     
@@ -572,8 +491,24 @@ public class ScriptingCommand {
         /** Arguments */
         sb.append(getArgList(type));
         
-        /** Properties (TODO) */
-        // sb.append("??");
+        return sb.toString();
+    }
+    
+    private static String strJoin(String[] strs) {
+        return strJoin(strs, 0, strs.length);
+    }
+    
+    private static String strJoin(String[] strs, int offset) {
+        return strJoin(strs, offset, strs.length);
+    }
+    
+    private static String strJoin(String[] strs, int offset, int length) {
+        StringBuilder sb = new StringBuilder();
+        
+        for (int i=offset; i < length; i++) {
+            sb.append(strs[i]);
+            sb.append(" ");
+        }
         
         return sb.toString();
     }
