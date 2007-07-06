@@ -1,3 +1,25 @@
+Version 0.9.3:
+- Document the network protocol and public server configuration
+  properties
+- Perform service and application initialization with an unbounded
+  transaction timeout
+- Reduce the default task transaction timeout to 100 ms
+- Modify the client API to call leftChannel on all channels before
+  calling disconnected() callback, and to check that the session has
+  logged in before accepting most messages from the server
+- Modify the ClientSessionService to use the CompactId representation
+  for session IDs in protocol messages -- this is an incompatible
+  network format change
+- Modify the DataService to
+  - Compress object data by storing class descriptors separately -- this
+    is an incompatible database format change
+  - Log information about modified objects that are not marked for
+    update
+  - Add support for a thread that periodically checkpoints the database,
+    and for automatically removing database log files
+  - Improve handling of exceptions thrown by managed object toString
+    methods
+
 Version 0.9.2:
 - Fix a bug that caused clients not to receive a disconnected callback
   if the initial server connection failed

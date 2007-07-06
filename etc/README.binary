@@ -8,8 +8,8 @@ scalable, reliable, persistent and fault-tolerant game server
 applications using simple single-threaded, event-driven code.
 
 This kit contains everything you need to develop game servers that run
-as applications in the SGS environment, and clients that communicate
-with these servers and each other.
+as applications in the SGS environment.  Information about building
+client apps is available as a separate download.
 
 In addition to the documents, APIs and examples, this kit contains a
 complete single-system version of the Sun Game Server.  The APIs in this
@@ -29,7 +29,7 @@ subdirectories:
 
 - lib
    JAR files and native libraries needed to develop for the SGS, and to
-   run the server and client apps
+   run server apps
 
 - tutorial
    Documentation and sample code for the two SGS tutorials
@@ -56,11 +56,6 @@ highly portable; you can obtain and compile it for unsupported
 platforms.
 
 DEVELOPING AND RUNNING
-
-To develop or run clients, include the following JAR file in your
-classpath:
-
-   lib/sgs-client.jar
 
 To develop server applications, include the following JAR file in your
 classpath:
@@ -89,9 +84,28 @@ To run the SGS server:
 
    sgs tutorial.jar HelloWorld.properties
 
+
 KNOWN ISSUES
 
-This version of the SDK only supports single node operation.
+This version of the SDK has the following limitations:
+
+- The SDK only supports single node operation.
+
+- I/O Throttling has not been implemented in this release, so it is
+  possible for clients to overwhelm the server with network traffic and
+  cause the server to run out of memory.  As a temporary workaround,
+  developers must ensure that clients do not send network traffic faster
+  than the server application can process it.
+
+- The SDK does not provide for pluggable I/O transports
+
+- The SDK cannot yet support plugging in additional managers that
+  provide persistence
+
+- The SDK does not provide J2ME, C, or C++ implementations of the client
+  API, although developers can use the documentation of the network
+  protocol to develop their own implementations
+
 
 MORE INFORMATION
 
