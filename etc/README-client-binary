@@ -1,4 +1,4 @@
-Sun Game Server Sample Client
+Sun Game Server Client API Pack
 Version @VERSION@
 
 INTRODUCTION
@@ -13,8 +13,7 @@ implemented as applications that run in the SGS environment.
 
 CONTENTS
 
-The SGS Client binary distribution contains the following
-subdirectories:
+The SGS Client API Pack contains the following subdirectories:
 
 - doc
    Documentation for the SGS client
@@ -24,7 +23,7 @@ subdirectories:
 	
 SUPPORTED PLATFORMS
 
-The sample client has been tested on the following operating systems and
+The client code has been tested on the following operating systems and
 processors:
 
 - Solaris 10 on SPARC processors and AMD 64-bit processors
@@ -32,7 +31,7 @@ processors:
 - Redhat Linux EL4 on 32-bit processors
 - Mac OS X 10.4 on PowerPC and Intel processors
 
-The sample client requires Java(tm) 2 Platform Standard Edition 5.0 or
+The client code requires Java(tm) 2 Platform Standard Edition 5.0 or
 greater.
 
 It has been tested with version 1.5.0_11 of the J2SE(tm) Runtime
@@ -51,6 +50,11 @@ KNOWN ISSUES
 
 This version of the SDK has the following limitations:
 
+- The SGS Client API Pack currently only includes a J2SE client
+  implementation.  Developers can use the documentation of the network
+  protocol to develop other implementations, including ones to support
+  different languages.
+
 - I/O throttling has not been implemented in this release, so it is
   possible for clients to overwhelm the server with network traffic and
   cause the server to run out of memory.  As a temporary workaround,
@@ -60,9 +64,10 @@ This version of the SDK has the following limitations:
 
 MORE INFORMATION
 
-For more information, please see the documentation in the docs
-directory.  Also check the http://www.projectdarkstar.com website, which
-has links to more information and to the Project Darkstar forums.
+For more information, please see the tutorial in the tutorial directory,
+and the documentation in the doc directory.  Also check the
+http://www.projectdarkstar.com website, which has links to more
+information and to the Project Darkstar forums.
 
 See the CHANGELOG file for a list of changes.
 

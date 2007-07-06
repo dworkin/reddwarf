@@ -1,20 +1,20 @@
-Project Darkstar Sample Client
+Project Darkstar Client API Pack
 Version @VERSION@
 
 INTRODUCTION
 
-The Project Darkstar Server is a system that enables developers to write
+Project Darkstar provides a system that enables developers to write
 scalable, reliable, persistent and fault-tolerant game server
 applications using simple single-threaded, event-driven code.
 
-This distribution includes the source code for developing and running
+This distribution includes the source code needed to develop and run
 clients that communicate with each other and with game servers
 implemented as applications that run in the Project Darkstar Server
 environment.
 
 CONTENTS
 
-The SGS Software Development Kit (SDK) contains the following
+The Project Darkstar Client API Pack contains the following
 subdirectories:
 
 - src
@@ -25,7 +25,8 @@ subdirectories:
 
 BUILDING
 
-The Sun Game Server makes use of two other open source projects.
+The client makes use of two other open source projects, whose JAR files
+should be downloaded and included in the classpath:
 
 - Apache MINA, version 1.1:
 
@@ -37,20 +38,23 @@ The Sun Game Server makes use of two other open source projects.
 
 KNOWN ISSUES
 
-- The SDK only includes
- does not provide J2ME, C, or C++ implementations of the client
-  API, although developers can use the documentation of the network
-  protocol to develop their own implementations
+- The Client API Pack currently only includes a J2SE client
+  implementation.  Developers can use the documentation of the network
+  protocol to develop other implementations, including ones to support
+  different languages.
 
- 
+- I/O throttling has not been implemented in this release, so it is
+  possible for clients to overwhelm the server with network traffic and
+  cause the server to run out of memory.  As a temporary workaround,
+  developers must ensure that clients do not send network traffic faster
+  than the server application can process it.
 
 
 MORE INFORMATION
 
-For more information, please see the tutorials in the tutorial directory
-and the documentation in the docs directory.  Also check the
-http://www.projectdarkstar.com website, which has links to more
-information and to the Project Darkstar forums.
+For more information, please see the tutorial in the doc directory.
+Also check the http://www.projectdarkstar.com website, which has links
+to more information and to the Project Darkstar forums.
 
 See the CHANGELOG file for a list of changes.
 

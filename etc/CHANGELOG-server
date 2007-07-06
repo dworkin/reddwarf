@@ -4,9 +4,6 @@ Version 0.9.3:
 - Perform service and application initialization with an unbounded
   transaction timeout
 - Reduce the default task transaction timeout to 100 ms
-- Modify the client API to call leftChannel on all channels before
-  calling disconnected() callback, and to check that the session has
-  logged in before accepting most messages from the server
 - Modify the ClientSessionService to use the CompactId representation
   for session IDs in protocol messages -- this is an incompatible
   network format change

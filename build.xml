@@ -296,16 +296,28 @@
     <copy todir="${build.dir}/sgs-client-src">
       <fileset dir="."
 	       excludes="**/.svn"
-	       includes="src/client/**,
+	       includes="doc/ClientTutorial.*,
+			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
+			 src/client/**,
 			 src/shared/**,
 			 test/client/**"/>
     </copy>
+    <copy file="etc/CHANGELOG-client"
+	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
+    <copy file="etc/BSD" tofile="${build.dir}/sgs-client-src/LICENSE"/>
     <copy file="etc/README-client-source"
 	  tofile="${build.dir}/sgs-client-src/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
       </filterset>
     </copy>
+    <apply executable="etc/update_copyrights" logError="true">
+      <arg file="etc/COPYRIGHT-client"/>
+      <fileset dir="${build.dir}/sgs-client-src" includes="**/*.java"/>
+    </apply>
+    <delete>
+      <fileset dir="${build.dir}/sgs-client-src" includes="**/*~"/>
+    </delete>
     <zip destfile="${build.dir}/sgs-client-src-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-client-src"
 		  prefix="sgs-client-src-${project.version}"/>
@@ -323,10 +335,26 @@
     </copy>
     <copy todir="${build.dir}/sgs-client-bin/lib">
       <fileset file="build/lib/sgs-client.jar"/>
-      <fileset file="lib/mina-core-1.1.jar"/>
-      <fileset file="lib/slf4j-api-1.4.0.jar"/>
-      <fileset file="lib/slf4j-jdk14-1.4.0.jar"/>
+      <fileset dir="lib"
+	       includes="mina-core-1.1.jar,
+			 slf4j-api-1.4.0.jar,
+			 slf4j-jdk14-1.4.0.jar"/>
     </copy>
+    <copy todir="${build.dir}/sgs-client-bin/tutorial">
+      <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
+      <fileset file="doc/ClientTutorial.pdf"/>
+    </copy>
+    <copy todir="${build.dir}/sgs-client-bin/tutorial/src">
+      <fileset dir="example/tutorial/src"
+	       includes="com/sun/sgs/tutorial/client/**/*.java"/>
+    </copy>
+    <copy todir="${build.dir}/sgs-client-bin">
+      <fileset dir="etc"
+	       includes="LICENSE.pdf,
+			 THIRDPARTYLICENSE.pdf"/>
+    </copy>
+    <copy file="etc/CHANGELOG-client"
+	  tofile="${build.dir}/sgs-client-bin/CHANGELOG"/>
     <copy file="etc/README-client-binary"
 	  tofile="${build.dir}/sgs-client-bin/README">
       <filterset>
@@ -352,20 +380,22 @@
       <fileset dir="."
 	       excludes="**/.svn"
 	       includes="build.xml,
-			 doc/**, 
+			 doc/ServerAppTutorial.*,
 			 etc/jdk5.0_package_list/**,
 			 etc/mina1.1_package_list/**,
 			 etc/sgs-config.properties,
 			 etc/sgs-logging.properties,
 			 etc/sgs.bat,
 			 etc/sgs.sh,
-			 example/tutorial/**,
+			 example/tutorial/*,
+			 example/tutorial/src/com/sun/sgs/tutorial/server/**,
 			 src/shared/**,
 			 src/server/**,
 			 test/shared/**,
 			 test/server/**"/>
-      <fileset file="etc/CHANGELOG"/>
     </copy>
+    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
+    <copy file="etc/GPL" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
@@ -388,11 +418,12 @@
       <fileset dir="etc"
 	       includes="sgs.*,
 			 sgs-*.properties,
-			 CHANGELOG,
 			 LICENSE.pdf,
 			 THIRDPARTYLICENSE.pdf"/>
     </copy>
-    <copy file="etc/README.binary" tofile="${build.dir}/sgs-bin/README">
+    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-bin/CHANGELOG"/>
+    <copy file="etc/README-server-binary"
+	  tofile="${build.dir}/sgs-bin/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
       </filterset>
@@ -994,13 +1025,16 @@
     </java>
   </target>
 
-  <!-- Builds tutorial jar file -->
+  <!-- Builds tutorial jar files -->
   <target name="jar-tutorial" depends="example-classes"
           description="Builds tutorial jar file">
-    <mkdir dir="${build.dir}/example/tutorial"/>
     <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
       <fileset dir="${build.dir}/example/classes"
-               includes="com/sun/sgs/tutorial/**"/>
+               includes="com/sun/sgs/tutorial/server/**"/>
+    </jar>
+    <jar destfile="${build.dir}/example/tutorial/tutorial-client.jar">
+      <fileset dir="${build.dir}/example/classes"
+               includes="com/sun/sgs/tutorial/client/**"/>
     </jar>
   </target>
 
@@ -1011,9 +1045,11 @@
     <copy todir="${build.dir}/sgs-bin/tutorial">
       <fileset dir="example/tutorial" includes="*.properties"/>
       <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
+      <fileset file="doc/ServerAppTutorial.pdf"/>
     </copy>
     <copy todir="${build.dir}/sgs-bin/tutorial/src">
-      <fileset dir="example/tutorial/src" includes="**/*.java"/>
+      <fileset dir="example/tutorial/src"
+	       includes="com/sun/sgs/tutorial/server/**/*.java"/>
     </copy>
     <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloChannels/dsdb"/>
     <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloEcho/dsdb"/>
@@ -1026,10 +1062,6 @@
     <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloUser2/dsdb"/>
     <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloWorld/dsdb"/>
     <mkdir dir="${build.dir}/sgs-bin/tutorial/data/SwordWorld/dsdb"/>
-    <copy todir="${build.dir}/sgs-bin/tutorial">
-      <fileset dir="doc"
-	       includes="ClientTutorial.pdf, ServerAppTutorial.pdf"/>
-    </copy>
     <!-- TODO: generate and package javadoc -->
   </target>
 
