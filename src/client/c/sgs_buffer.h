@@ -98,7 +98,12 @@ int sgs_buffer_read(sgs_buffer *buffer, uint8_t *data, size_t len);
  *
  * Copies data from the specified file descriptor into the buffer.  Copying
  * stops if (a) the buffer runs out of room, or (b) a call to read() on the file
- * descriptor returns any value other than the requested length.  TODO - returns?
+ * descriptor returns any value other than the requested length.  If copying
+ * stops because the buffer ran out of room or because a call to read() returned
+ * a valued smaller than the requested read size, then the total number of bytes
+ * read into the buffer is returned.  Otherwise, the return value of read
+ * (either 0, meaning EOF was reached, or -1, meaning an error occurred) is
+ * returned.
  */
 int sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd);
 
@@ -134,7 +139,8 @@ int sgs_buffer_write(sgs_buffer *buffer, const uint8_t *data, size_t len);
  * Copies len bytes of data out of the buffer and writes them to the specified
  * file descriptor.  Writing stops if (a) the buffer runs out of data, or (b) a
  * call to write() on the file descriptor returns any value other than the
- * requested length.  TODO - retuirns?
+ * requested length.  Returns -1 if an error occurs; otherwise returns the total
+ * number of bytes written to the file descriptor.
  */
 int sgs_buffer_write_to_fd(sgs_buffer *buffer, int fd);
 
