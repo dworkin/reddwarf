@@ -10,7 +10,8 @@
 #define SGS_CONNECTION_H 1
 
 /*
- * sgs_connection typedef (declare before any #includes)
+ * sgs_connection_impl provides the implementation for the sgs_connection
+ * interface (declare before any #includes)
  */
 typedef struct sgs_connection_impl sgs_connection;
 

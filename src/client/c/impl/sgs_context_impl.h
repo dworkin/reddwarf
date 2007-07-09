@@ -17,6 +17,7 @@ typedef struct sgs_context_impl sgs_context_impl;
 /*
  * INCLUDES
  */
+#include "sgs_channel.h"
 #include "sgs_connection.h"
 #include "sgs_id.h"
 #include "sgs_session.h"
@@ -33,10 +34,9 @@ struct sgs_context_impl {
     void (*reg_fd_cb)(sgs_connection*, int[], size_t, short);
     void (*unreg_fd_cb)(sgs_connection*, int[], size_t, short);
   
-    void (*channel_joined_cb)(sgs_connection*, const sgs_id*, const uint8_t*,
-        size_t);
-    void (*channel_left_cb)(sgs_connection*, const sgs_id*);
-    void (*channel_recv_msg_cb)(sgs_connection*, const sgs_id*, const sgs_id*,
+    void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_left_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const sgs_id*,
         const uint8_t*, size_t);
     void (*disconnected_cb)(sgs_connection*);
     void (*logged_in_cb)(sgs_connection*, sgs_session*);

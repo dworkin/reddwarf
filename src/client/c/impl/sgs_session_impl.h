@@ -22,6 +22,7 @@ typedef struct sgs_session_impl sgs_session_impl;
 #include <stdint.h>
 #include "sgs_connection_impl.h"
 #include "sgs_id.h"
+#include "sgs_map.h"
 #include "sgs_message.h"
 
 /*
@@ -30,13 +31,16 @@ typedef struct sgs_session_impl sgs_session_impl;
 struct sgs_session_impl {
     /** The underlying network connection. */
     sgs_connection_impl *connection;
-  
+    
     /** Server-assigned unique ID for this session. */
     sgs_id session_id;
-  
+    
     /** Server-assigned key used to reconnect after disconnect. */
     sgs_id reconnect_key;
-  
+    
+    /** Map of channels to which this session is currently a member. */
+    sgs_map *channels;
+    
     /**
      * Sequence number used in some messages (increment after each use).  We have
      * to store this as two 32-bit ints instead of just a single 64-bit int so
@@ -44,7 +48,7 @@ struct sgs_session_impl {
      */
     uint32_t seqnum_hi;
     uint32_t seqnum_lo;
-  
+    
     /**
      * Used as the backing array for any sgs_messages (more efficient to just
      * declare once and keep it around than to malloc() every time we need one).
@@ -95,10 +99,19 @@ int sgs_session_impl_logout(sgs_session_impl *session);
 /*
  * function: sgs_session_impl_recv_msg()
  *
- * Notifies the session that a new sgs_message has been read into the session's
- * internal msg_buf field and is ready to the processed.  Returns 0 on success
- * and -1 on failure, with errno set to the specific error code.
+ * Notifies the session that a new sgs_message has been received and written
+ * into the session's internal msg_buf field, ready to be processed.  Returns 0
+ * on success and -1 on failure, with errno set to the specific error code.
  */
 int sgs_session_impl_recv_msg(sgs_session_impl *session);
+
+/*
+ * function: sgs_session_impl_send_msg()
+ *
+ * Notifies the session that a new sgs_message has been created and written into
+ * the session's internal msg_buf field, ready to be sent to the server. Returns
+ * 0 on success and -1 on failure, with errno set to the specific error code.
+ */
+int sgs_session_impl_send_msg(sgs_session_impl *session);
 
 #endif  /** #ifndef SGS_SESSION_IMPL_H */

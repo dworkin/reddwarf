@@ -17,55 +17,13 @@
  */
 
 /*
- * sgs_map_new()
+ * sgs_map_contains()
  */
-sgs_linked_list_map sgs_map_new(int (*comparator)(const sgs_map_key*,
-                                    const sgs_map_value*),
-    void (*free_map_key)(sgs_map_key*),
-    void (*free_map_value)(sgs_map_value*))
-{
-    sgs_linked_list_map this_map;
-    
-    this_map = (sgs_linked_list_map)malloc(sizeof(sgs_linked_list_map));
-    if (this_map == NULL) return NULL;
-    
-    this_map->compare_keys = comparator;
-    this_map->free_map_key = free_map_key;
-    this_map->free_map_value = free_map_value;
-    this_map->head = NULL;
-    return this_map;
-}
-
-/*
- * sgs_map_free()
- */
-void sgs_map_free(sgs_linked_list_map map)
-{
-    sgs_map_empty(map);
-    free(map);
-}
-
-/*
- * sgs_map_empty()
- */
-void sgs_map_empty(sgs_linked_list_map map)
-{
-    while (map->head != NULL) {
-        sgs_map_remove(map, map->head->key);
-    }
-}
-
-/*
- * sgs_map_get()
- */
-int sgs_map_get(const sgs_linked_list_map map, const sgs_map_key *key,
-    sgs_map_value **value)
-{
+int sgs_map_contains(const sgs_linked_list_map *map, const void *key) {
     sgs_linked_list_map_elt *ptr = map->head;
     
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
-            *value = ptr->value;
             return 1;
         }
         
@@ -76,10 +34,61 @@ int sgs_map_get(const sgs_linked_list_map map, const sgs_map_key *key,
 }
 
 /*
+ * sgs_map_empty()
+ */
+void sgs_map_empty(sgs_linked_list_map *map) {
+    while (map->head != NULL) {
+        sgs_map_remove(map, map->head->key);
+    }
+}
+
+/*
+ * sgs_map_free()
+ */
+void sgs_map_free(sgs_linked_list_map *map) {
+    sgs_map_empty(map);
+    free(map);
+}
+
+/*
+ * sgs_map_get()
+ */
+void *sgs_map_get(const sgs_linked_list_map *map, const void *key) {
+    sgs_linked_list_map_elt *ptr = map->head;
+    
+    while (ptr != NULL) {
+        if (map->compare_keys(ptr->key, key) == 0) {
+            return ptr->value;
+        }
+        
+        ptr = ptr->next;
+    }
+    
+    return NULL;
+}
+
+/*
+ * sgs_map_new()
+ */
+sgs_linked_list_map *sgs_map_new(int (*comparator)(const void*, const void*),
+    void (*free_map_key)(void*), void (*free_map_value)(void*))
+{
+    sgs_linked_list_map *this_map;
+    
+    this_map = (sgs_linked_list_map*)malloc(sizeof(sgs_linked_list_map));
+    if (this_map == NULL) return NULL;
+    
+    this_map->compare_keys = comparator;
+    this_map->free_map_key = free_map_key;
+    this_map->free_map_value = free_map_value;
+    this_map->head = NULL;
+    return this_map;
+}
+
+/*
  * sgs_map_put()
  */
-int sgs_map_put(sgs_linked_list_map map, sgs_map_key *key, sgs_map_value *value)
-{
+int sgs_map_put(sgs_linked_list_map *map, void *key, void *value) {
     sgs_linked_list_map_elt *ptr = map->head;
     sgs_linked_list_map_elt *prev = NULL;
     
@@ -125,8 +134,7 @@ int sgs_map_put(sgs_linked_list_map map, sgs_map_key *key, sgs_map_value *value)
 /*
  * sgs_map_remove()
  */
-int sgs_map_remove(sgs_linked_list_map map, const sgs_map_key *key)
-{
+int sgs_map_remove(sgs_linked_list_map *map, const void *key) {
     sgs_linked_list_map_elt *ptr = map->head;
     sgs_linked_list_map_elt *prev = NULL;
   

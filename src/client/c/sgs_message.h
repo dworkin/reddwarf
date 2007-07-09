@@ -10,15 +10,21 @@
 #define SGS_MESSAGE_H  1
 
 /*
+ * TYPEDEFS
+ * (declare before any #includes)
+ */
+typedef struct sgs_message sgs_message;
+
+/*
  * INCLUDES
  */
 #include <stdint.h>
 #include "sgs_wire_protocol.h"
 
 /*
- * TYPEDEFS
+ * STRUCTS
  */
-typedef struct sgs_message {
+struct sgs_message {
     /** Pointer to the start of the memory reserved for this message. */
     uint8_t *buf;
   
@@ -37,7 +43,7 @@ typedef struct sgs_message {
      * variable is redundant with those bytes but is more convenient to use.
      */
     size_t size;
-} sgs_message;
+};
 
 
 /*

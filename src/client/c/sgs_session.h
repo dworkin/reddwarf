@@ -10,7 +10,8 @@
 #define SGS_SESSION_H 1
 
 /*
- * sgs_session typedef (declare before any #includes)
+ * sgs_session_impl provides the implementation for the sgs_session interface
+ * (declare before any #includes)
  */
 typedef struct sgs_session_impl sgs_session;
 
@@ -23,28 +24,6 @@ typedef struct sgs_session_impl sgs_session;
 /*
  * FUNCTION DECLARATIONS
  */
-
-/*
- * function: sgs_session_channel_send()
- *
- * Sends a message on a specific channel.
- *
- * args:
- *     session: the session to send a message
- *   channelId: pointer to the ID of the channel on which to send the message
- *        data: array containing the message to send
- *     datalen: length of the message
- *  recipients: array of ID for all of the recipients to send to; empty
- *              (length=0) means "send to all members of the channel"
- *    reciplen: length of the recipients array
- *
- * returns:
- *    0: success
- *   -1: failure (errno is set to specific error code)
- */
-int sgs_session_channel_send(sgs_session *session, const sgs_id *pchannel_id,
-    const uint8_t *data, size_t datalen, const sgs_id recipients[],
-    size_t reciplen);
 
 /*
  * function: sgs_session_direct_send()

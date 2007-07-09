@@ -20,10 +20,10 @@ int main(int argc, char *argv[]) {
     void *pbuf;
     void *pkey;
     int result;
-    sgs_map map;
-  
+    sgs_map *map;
+    
     map = sgs_map_new(compare_ints, free, NULL);
-  
+    
     if (map == NULL) {
         fprintf(stderr, "Could not create sgs_map.\n");
         exit(-1);
@@ -31,33 +31,29 @@ int main(int argc, char *argv[]) {
     
     pkey = malloc(sizeof(int));
     *(int*)pkey = 100;
-    result = sgs_map_get(map, pkey, &pbuf);
-    printf("GET(%d) == %d\n", *(int*)pkey, result);
+    pbuf = sgs_map_get(map, pkey);
+    printf("GET(%d) == %d.  value=%s\n", *(int*)pkey, (pbuf != NULL), (char*)pbuf);
     
     result = sgs_map_put(map, pkey, str1);
     printf("Added element {%d, %s}.  result=%d\n", *(int*)pkey, str1, result);
     
-    result = sgs_map_get(map, pkey, &pbuf);
-    printf("GET(%d) == %d\n", *(int*)pkey, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, pkey);
+    printf("GET(%d) == %d.  value=%s\n", *(int*)pkey, (pbuf != NULL), (char*)pbuf);
     
     pkey = malloc(sizeof(int));
     *(int*)pkey = 200;
-    result = sgs_map_get(map, pkey, &pbuf);
-    printf("GET(%d) == %d\n", *(int*)pkey, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, pkey);
+    printf("GET(%d) == %d.  value=%s\n", *(int*)pkey, (pbuf != NULL), (char*)pbuf);
     
     result = sgs_map_put(map, pkey, str2);
     printf("Added element {%d, %s}.  result=%d\n", *(int*)pkey, str2, result);
     
-    result = sgs_map_get(map, pkey, &pbuf);
-    printf("GET(%d) == %d\n", *(int*)pkey, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, pkey);
+    printf("GET(%d) == %d.  value=%s\n", *(int*)pkey, (pbuf != NULL), (char*)pbuf);
     
     lookup_key = 100;
-    result = sgs_map_get(map, &lookup_key, &pbuf);
-    printf("GET(%d) == %d\n", lookup_key, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, &lookup_key);
+    printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
     
     lookup_key = 300;
     result = sgs_map_remove(map, &lookup_key);
@@ -68,27 +64,23 @@ int main(int argc, char *argv[]) {
     printf("REMOVE(%d) == %d\n", lookup_key, result);
     
     lookup_key = 100;
-    result = sgs_map_get(map, &lookup_key, &pbuf);
-    printf("GET(%d) == %d\n", lookup_key, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, &lookup_key);
+    printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
     
     lookup_key = 200;
-    result = sgs_map_get(map, &lookup_key, &pbuf);
-    printf("GET(%d) == %d\n", lookup_key, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, &lookup_key);
+    printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
   
     sgs_map_empty(map);
     printf("EMPTY()\n");
   
     lookup_key = 100;
-    result = sgs_map_get(map, &lookup_key, &pbuf);
-    printf("GET(%d) == %d\n", lookup_key, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, &lookup_key);
+    printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
   
     lookup_key = 200;
-    result = sgs_map_get(map, &lookup_key, &pbuf);
-    printf("GET(%d) == %d\n", lookup_key, result);
-    if (result) printf("value = %s\n", (char*)pbuf);
+    pbuf = sgs_map_get(map, &lookup_key);
+    printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
   
     sgs_map_free(map);
   

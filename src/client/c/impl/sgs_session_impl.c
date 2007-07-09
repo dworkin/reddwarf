@@ -17,8 +17,11 @@
 #include <poll.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include "sgs_channel.h"
+#include "sgs_channel_impl.h"
 #include "sgs_error_codes.h"
 #include "sgs_id.h"
+#include "sgs_map.h"
 #include "sgs_message.h"
 #include "sgs_session_impl.h"
 
@@ -33,58 +36,6 @@ static uint16_t read_len_header(const uint8_t *data);
 /*
  * FUNCTION IMPLEMENTATIONS FOR SGS_SESSION.H
  */
-
-/*
- * sgs_session_channel_send()
- */
-int sgs_session_channel_send(sgs_session_impl *session, const sgs_id *pchannel_id,
-    const uint8_t *data, size_t datalen, const sgs_id recipients[],
-    size_t reciplen)
-{
-    int i;
-    uint16_t _uint16_tmp;
-    sgs_message msg;
-  
-    /** Initialize static fields of message. */
-    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
-            SGS_OPCODE_CHANNEL_SEND_REQUEST, SGS_CHANNEL_SERVICE) == -1)
-        return -1;
-  
-    /** Add channel-id data field to message. */
-    if (sgs_msg_add_arb_content(&msg, sgs_id_compressed_form(pchannel_id),
-            sgs_id_compressed_len(pchannel_id)) == -1)
-        return -1;
-  
-    /** Add sequence number to message. */
-    if (sgs_msg_add_uint32(&msg, session->seqnum_hi) == -1) return -1;
-    if (sgs_msg_add_uint32(&msg, session->seqnum_lo) == -1) return -1;
-  
-    /** Add recipient-count to message. */
-    if (reciplen > UINT16_MAX) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
-    _uint16_tmp = htons(reciplen);
-    if (sgs_msg_add_arb_content(&msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
-        return -1;
-  
-    /** Add each recipient-id to message. */
-    for (i=0; i < reciplen; i++) {
-        if (sgs_msg_add_arb_content(&msg, sgs_id_compressed_form(&recipients[i]),
-                sgs_id_compressed_len(&recipients[i])) == -1)
-            return -1;
-    }
-  
-    /** Add message payload to message. */
-    if (sgs_msg_add_fixed_content(&msg, data, datalen) == -1) return -1;
-  
-    /** Done assembling message; send message buffer to connection to be sent. */
-    if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-            sgs_msg_get_size(&msg)) == -1)
-        return -1;
-  
-    /** Only update sequence number if message is (appears) successfully sent */
-    increment_seqnum(session);
-  
-    return 0;
-}
 
 /*
  * sgs_session_direct_send()
@@ -141,16 +92,32 @@ const sgs_id *sgs_session_get_id(const sgs_session_impl *session) {
  */
 sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection) {
     sgs_session_impl *session;
-  
+    
     session = (sgs_session_impl*)malloc(sizeof(struct sgs_session_impl));
     if (session == NULL) return NULL;
-  
+    
+    /**
+     * The map key (a channel ID) is just a pointer into the map value (an
+     * sgs_channel struct), so we don't need an explicit deallocation function
+     * for the key, just the value.  Also note that we have to cast our function
+     * pointers to make them look like they take void* arguments instead of
+     * their usual argument types.
+     */
+    session->channels = sgs_map_new((int(*)(const void*, const void*))sgs_id_compare,
+        NULL, (void (*)(void *))sgs_channel_impl_free);
+    
+    if (session->channels == NULL) {
+        /** roll back allocation of session */
+        free(session);
+        return NULL;
+    }
+    
     session->connection = connection;
     sgs_id_init_from_hex("", &session->session_id);
     sgs_id_init_from_hex("", &session->reconnect_key);
     session->seqnum_hi = 0;
     session->seqnum_lo = 0;
-  
+    
     return session;
 }
 
@@ -220,20 +187,21 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     sgs_id *psender;
     sgs_message msg;
     const uint8_t *msg_data;
+    sgs_channel *channel;
     size_t msg_datalen;
-  
+    
     if (sgs_msg_deserialize(&msg, session->msg_buf,
             sizeof(session->msg_buf)) == -1)
         return -1;
-  
+    
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
-  
+    
     if (sgs_msg_get_version(&msg) != SGS_MSG_VERSION) {
         errno = SGS_ERR_BAD_MSG_VERSION;
         return -1;
     }
-  
+    
     if (sgs_msg_get_service(&msg) == SGS_APPLICATION_SERVICE) {
         switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
@@ -297,42 +265,55 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     else if (sgs_msg_get_service(&msg) == SGS_CHANNEL_SERVICE) {
         switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_CHANNEL_JOIN:
-            /**field 1: channel name (first 2 bytes = length of string) */
+            /** field 1: channel name (first 2 bytes = length of string) */
             namelen = read_len_header(msg_data);
-      
+            
             /** field 2: channel-id (compact-id format) */
             result = sgs_id_init_from_compressed(msg_data + namelen + 2,
-                msg_datalen - namelen - 2,
-                &channel_id);
+                msg_datalen - namelen - 2, &channel_id);
+            
             if (result == -1) return -1;
-      
+            
+            channel = sgs_channel_impl_new(session, channel_id,
+                (const char*)(msg_data + 2), namelen);
+            
+            if (channel == NULL) return -1;
+            
+            result = sgs_map_put(session->channels,
+                sgs_channel_impl_get_id(channel), channel);
+            
+            if (result == -1) return -1;
+            
             if (session->connection->ctx->channel_joined_cb != NULL)
                 session->connection->ctx->channel_joined_cb(session->connection,
-                    &channel_id, msg_data + 2,
-                    namelen);
-      
+                    channel);
+            
             return 0;
       
         case SGS_OPCODE_CHANNEL_LEAVE:
             /** field 1: channel-id (compact-id format) */
             result = sgs_id_init_from_compressed(msg_data, msg_datalen,
                 &channel_id);
-            
             if (result == -1) return -1;
-      
+            
+            channel = sgs_map_get(session->channels, &channel_id);
+            if (result == 0) { errno = SGS_ERR_UNKNOWN_CHANNEL; return -1; }
+            
             if (session->connection->ctx->channel_left_cb != NULL)
                 session->connection->ctx->channel_left_cb(session->connection,
-                    &channel_id);
-      
+                    channel);
+            
+            sgs_map_remove(session->channels, &channel_id);
+            
             return 0;
-      
+            
         case SGS_OPCODE_CHANNEL_MESSAGE:
             /** field 1: channel-id (compact-id format) */
             result = sgs_id_init_from_compressed(msg_data, msg_datalen,
                 &channel_id);
             
             if (result == -1) return -1;
-      
+            
             /**
              * field 2: sequence number (8 bytes)
              * TODO next 8 bytes are a sequence number that is currently ignored
@@ -343,17 +324,21 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             result = sgs_id_init_from_compressed(msg_data + offset, msg_datalen -
                 offset, &sender_id);
             if (result == -1) return -1;
-      
+            
             offset += result;
-      
-            /** field 4: message (first 2 bytes = length of message) */
+            
+            channel = sgs_map_get(session->channels, &channel_id);
+            if (result == 0) { errno = SGS_ERR_UNKNOWN_CHANNEL; return -1; }
+            
             if (session->connection->ctx->channel_recv_msg_cb != NULL) {
                 psender = sgs_id_equals_server(&sender_id) ? NULL : &sender_id;
+                
+                /** field 4: message (first 2 bytes = length of message) */
                 session->connection->ctx->channel_recv_msg_cb(session->connection,
-                    &channel_id, psender, msg_data + offset + 2,
+                    channel, psender, msg_data + offset + 2,
                     read_len_header(msg_data + offset));
             }
-      
+            
             return 0;
       
         default:
@@ -365,6 +350,24 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
         errno = SGS_ERR_BAD_MSG_SERVICE;
         return -1;
     }
+}
+
+int sgs_session_impl_send_msg(sgs_session_impl *session) {
+    sgs_message msg;
+    
+    if (sgs_msg_deserialize(&msg, session->msg_buf,
+            sizeof(session->msg_buf)) == -1)
+        return -1;
+    
+    /** Send message buffer to connection to be sent. */
+    if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
+            sgs_msg_get_size(&msg)) == -1)
+        return -1;
+  
+    /** Only update sequence number if message is (appears) successfully sent */
+    increment_seqnum(session);
+  
+    return 0;
 }
 
 

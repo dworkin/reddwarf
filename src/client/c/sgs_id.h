@@ -9,6 +9,12 @@
 #ifndef SGS_ID_H
 #define SGS_ID_H  1
 
+/*
+ * TYPEDEFS
+ * (declare before any #includes)
+ */
+typedef struct sgs_id sgs_id;
+
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -33,10 +39,6 @@ struct sgs_id {
     char hexstr[SGS_MAX_ID_SIZE*2 + 1];
 };
 
-/*
- * TYPEDEFS
- */
-typedef struct sgs_id sgs_id;
 
 /*
  * FUNCTION DECLARATIONS

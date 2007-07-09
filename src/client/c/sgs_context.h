@@ -10,7 +10,8 @@
 #define SGS_CONTEXT_H 1
 
 /*
- * sgs_context typedef(declare before any #includes)
+ * sgs_context_impl provides the implementation for the sgs_context interface
+ * (declare before any #includes)
  */
 typedef struct sgs_context_impl sgs_context;
 
@@ -18,6 +19,7 @@ typedef struct sgs_context_impl sgs_context;
  * INCLUDES
  */
 #include "sgs_connection.h"
+#include "sgs_channel.h"
 #include "sgs_id.h"
 #include "sgs_session.h"
 
@@ -39,11 +41,11 @@ typedef struct sgs_context_impl sgs_context;
  *            this sgs_context) to unregister interest in a file descriptor 
  *
  * arguments to reg_fd and unreg_fd:
- *  sgs_connection: the connection making this callback
- *           int[]: an array of file descriptors
- *          size_t: number of elements in the array of file descriptors
- *           short: events for which interest is being (un)registered for all of
- *                  the specified file descriptors
+ *   sgs_connection*: the connection making this callback
+ *             int[]: an array of file descriptors
+ *            size_t: number of elements in the array of file descriptors
+ *             short: events for which interest is being (un)registered for all of
+ *                    the specified file descriptors
  */
 sgs_context *sgs_ctx_new(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int[], size_t, short),
@@ -61,40 +63,37 @@ void sgs_ctx_free(sgs_context *ctx);
  *
  * Registers a function to be called whenever a channel is joined.  The function
  * should take the following arguments:
- *   sgs_connection: the connection making this callback
- *    const sgs_id*: the ID of the channel that was joined
- *   const uint8_t*: the name of the channel that was joined (not \0-terminated)
- *           size_t: the length of the name of the channel
+ *   sgs_connection*: the connection making this callback
+ *      sgs_channel*: the channel that was joined
  */
 void sgs_ctx_set_channel_joined_cb(sgs_context *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*, const uint8_t*, size_t));
+    void (*callback)(sgs_connection*, sgs_channel*));
 
 /*
- * function: sgs_ctx_set_channel_joined_cb()
+ * function: sgs_ctx_set_channel_left_cb()
  *
  * Registers a function to be called whenever a channel is joined.  The function
  * should take the following arguments:
- *   sgs_connection: the connection making this callback
- *    const sgs_id*: the ID of the channel that was joined
- *   const uint8_t*: the name of the channel that was joined (not \0-terminated)
- *           size_t: the length of the name of the channel
+ *   sgs_connection*: the connection making this callback
+ *      sgs_channel*: the channel that was left
  */
 void sgs_ctx_set_channel_left_cb(sgs_context *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*));
+    void (*callback)(sgs_connection*, sgs_channel*));
 
 /*
  * function: sgs_ctx_set_channel_recv_msg_cb()
  *
  * Registers a function to be called whenever a message is received on a
  * channel.  The function should take the following arguments:
- *   sgs_connection: the connection making this callback
- *    const sgs_id*: the ID of the channel that the message was received on
- *    const sgs_id*: the ID of the sender of the message
- *   const uint8_t*: the received message (not \0-terminated)
- *           size_t: the length of the received message
+ *   sgs_connection*: the connection making this callback
+ *      sgs_channel*: the channel on which the message was received
+ *     const sgs_id*: the ID of the sender of the message
+ *    const uint8_t*: the received message (not null-terminated)
+ *            size_t: the length of the received message
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*, const sgs_id*, const uint8_t*, size_t));
+    void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
+        const uint8_t*, size_t));
 
 /*
  * function: sgs_ctx_set_disconnected_cb()

@@ -24,11 +24,11 @@ struct sgs_linked_list_map_elt {
 
 struct sgs_linked_list_map {
     int (*compare_keys)(const void*, const void*);
-    void (*free_map_key)(sgs_map_key*);
-    void (*free_map_value)(sgs_map_value*);
+    void (*free_map_key)(void*);
+    void (*free_map_value)(void*);
     sgs_linked_list_map_elt *head;
 };
 
-typedef struct sgs_linked_list_map *sgs_linked_list_map;
+typedef struct sgs_linked_list_map sgs_linked_list_map;
 
 #endif  /** #ifndef SGS_LINKED_LIST_MAP_H */

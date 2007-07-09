@@ -61,7 +61,7 @@ void sgs_ctx_free(sgs_context_impl *ctx) {
  * sgs_ctx_set_channel_joined_cb()
  */
 void sgs_ctx_set_channel_joined_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*, const uint8_t*, size_t))
+    void (*callback)(sgs_connection*, sgs_channel*))
 {
     ctx->channel_joined_cb = callback;
 }
@@ -70,7 +70,7 @@ void sgs_ctx_set_channel_joined_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_left_cb()
  */
 void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*))
+    void (*callback)(sgs_connection*, sgs_channel*))
 {
     ctx->channel_left_cb = callback;
 }
@@ -79,7 +79,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, const sgs_id*, const sgs_id*,
+    void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
         const uint8_t*, size_t))
 {
     ctx->channel_recv_msg_cb = callback;
