@@ -28,8 +28,7 @@ OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 
 .PHONY:	clean tar run
 
-all:
-	@echo "'all' target not yet implemented in Makefile..."
+all:	chatclient tests
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(API_HEADERS) $(SRCDIR)/%.h
 	@mkdir -p $(ODIR)
