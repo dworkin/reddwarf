@@ -42,6 +42,16 @@ size_t sgs_buffer_capacity(const sgs_buffer *buffer);
 void sgs_buffer_empty(sgs_buffer *buffer);
 
 /*
+ * function: sgs_buffer_eof()
+ *
+ * Returns 1 iff the last call to sgs_buffer_read_from_fd() ended with a call to
+ * read() that returned 0, indicating that end-of-file was read.  This method
+ * should only be called immediately following a call to
+ * sgs_buffer_read_from_fd(), otherwise its behavior is undefined.
+ */
+int sgs_buffer_eof(const sgs_buffer *buffer);
+
+/*
  * function: sgs_buffer_free()
  *
  * Safely deallocates a buffer.
@@ -85,9 +95,11 @@ int sgs_buffer_read(sgs_buffer *buffer, uint8_t *data, size_t len);
  * descriptor returns any value other than the requested length.  If copying
  * stops because the buffer ran out of room or because a call to read() returned
  * a valued smaller than the requested read size, then the total number of bytes
- * read into the buffer is returned.  Otherwise, the return value of read
- * (either 0, meaning EOF was reached, or -1, meaning an error occurred) is
- * returned.
+ * read into the buffer is returned.  Otherwise, if read ever returns -1,
+ * indicating an error, then -1 is returned.  Note that if this method returns 0
+ * it may indicate that the buffer is full, or that read() returned 0,
+ * indicating that end-of-file was read.  The method sgs_buffer_eof() can be
+ * used to disambiguate these two cases.
  */
 int sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd);
 

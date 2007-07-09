@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     char inbuf[1024] = { '\0' };   /** inbuf must always be null-terminated */
     int inbuf_alive = 0;
     char *token;
-    int c, i, len, result, token_len;
+    int c, i, len, result, token_len, work;
     char *hostname = DEFAULT_HOST;
     int port = DEFAULT_PORT;
     
@@ -128,7 +128,7 @@ t usage\n",
              */
         }
     }
-  
+    
     printf("Starting up with host=%s and port=%d...\n", hostname, port);
     
     /**
@@ -156,14 +156,14 @@ t usage\n",
     /** Create sgs_connection object. */
     g_conn = sgs_connection_new(g_context);
     if (g_conn == NULL) { perror("Error in sgs_connection_new()"); bye(-1); }
-  
+    
     printf("Command: ");
     fflush(stdout);
-  
+    
     while (1) {
         if (inbuf_alive && strlen(inbuf) > 0) {
             len = strlen(inbuf);
-      
+            
             /**
              * Note: If strtok is called on a string with no characters from
              * set, strtok will return the string, not NULL, which is not the
@@ -172,7 +172,7 @@ t usage\n",
              * wait for more input).  So we need a special check for this case.
              */
             token = strtok(inbuf, "\n");
-      
+            
             if (token == NULL || strlen(token) == len) {
                 inbuf_alive = 0;
             } else {
@@ -181,13 +181,15 @@ t usage\n",
                 memmove(inbuf, token + token_len + 1, len - (token_len + 1) + 1);
             }
         }
-    
+        
         result = poll(g_poll_fds, g_nfds, POLL_TIMEOUT);
-    
+        
         if (result == -1) {
             perror("Error calling poll()");
         }
         else if (result > 0) {
+            work = 0;
+            
             for (i=0; i < g_nfds; i++) {
                 if (g_poll_fds[i].revents != 0) {
                     /** STDIN */
@@ -214,12 +216,15 @@ t usage\n",
                             }
                         }
                     } else if (g_poll_fds[i].fd != -1) {
-                        /** Some other FD, must be from sgs_connection */
-                        if (sgs_connection_do_io(g_conn, g_poll_fds[i].fd,
-                                g_poll_fds[i].revents) == -1) {
-                            perror("Error calling sgs_connection_do_io()");
-                        }
+                        /** Must be some fd that the sgs_connection registered */
+                        work = 1;
                     }
+                }
+            }
+            
+            if (work) {
+                if (sgs_connection_do_work(g_conn)) {
+                    perror("Error calling sgs_connection_do_work()");
                 }
             }
         }
@@ -501,7 +506,7 @@ normally necessary)\n");
         printf("  chleave <channel-name>: leave a channel (alias: leave)\n");
         printf("\n");
     }
-    else if (strcmp(token, "quit") == 0) {
+    else if ((strcmp(token, "quit") == 0) || (strcmp(token, "exit") == 0)) {
         bye(0);
     }
     else if (strcmp(token, "login") == 0) {

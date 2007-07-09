@@ -25,10 +25,7 @@
 /** A function failed that sets herrno instead of errno. */
 #define SGS_ERR_CHECK_HERRNO  185
 
-/** sgs_connection_do_io() was called with an unregistered FD. */
-#define SGS_ERR_BAD_FD 186
-
 /** The server sent a mesage referring to an unknown channel. */
-#define SGS_ERR_UNKNOWN_CHANNEL 187
+#define SGS_ERR_UNKNOWN_CHANNEL 186
 
 #endif  /** #ifndef SGS_ERROR_CODES_H */

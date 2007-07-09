@@ -41,6 +41,13 @@ void sgs_buffer_empty(sgs_buffer_impl *buffer) {
 }
 
 /*
+ * sgs_buffer_eof()
+ */
+int sgs_buffer_eof(const sgs_buffer_impl *buffer) {
+    return buffer->eof;
+}
+
+/*
  * sgs_buffer_free()
  */
 void sgs_buffer_free(sgs_buffer_impl *buffer) {
@@ -68,6 +75,7 @@ sgs_buffer_impl *sgs_buffer_new(size_t capacity) {
     buffer->capacity = capacity;
     buffer->position = 0;
     buffer->size = 0;
+    buffer->eof = 0;
   
     return buffer;
 }
@@ -106,11 +114,18 @@ int sgs_buffer_read(sgs_buffer_impl *buffer, uint8_t *data, size_t len) {
  */
 int sgs_buffer_read_from_fd(sgs_buffer_impl *buffer, int fd) {
     size_t result, total = 0, writable = writable_len(buffer);
-  
+    
+    buffer->eof = 0;  /* Reset flag before any calls to read() */
+    
     while (writable > 0) {
         result = read(fd, buffer->buf + tailpos(buffer), writable);
         if (result == -1) return -1;  /* error */
-        if (result == 0) return 0;    /* EOF */
+        
+        if (result == 0) {   /* EOF */
+            buffer->eof = 1;
+            return total;
+        }
+        
         total += result;
         buffer->size += result;
         if (result != writable) return total;  /* partial read */

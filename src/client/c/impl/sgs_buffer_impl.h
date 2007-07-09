@@ -36,6 +36,9 @@ struct sgs_buffer_impl {
   
     /* Array of the actual data. */
     uint8_t *buf;
+    
+    /* Flag used to indicate if a call to read() reached end-of-file */
+    int eof;
 };
 
 #endif  /** #ifndef SGS_BUFFER_IMPL_H */

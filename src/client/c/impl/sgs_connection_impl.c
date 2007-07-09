@@ -34,75 +34,72 @@ static int consume_data(sgs_connection_impl *connection);
  */
 
 /*
- * sgs_connection_do_io()
+ * sgs_connection_do_work()
  */
-int sgs_connection_do_io(sgs_connection_impl *connection, int fd, short events) {
-    int result;
+int sgs_connection_do_work(sgs_connection_impl *connection) {
+    struct pollfd fds[1];
+    int result, sockfd = connection->socket_fd;
     socklen_t optlen;
-  
+    
     if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
         /** Error: should not call do_io() when disconnected. */
         errno = ENOTCONN;
         return -1;
     }
-  
-    if (fd != connection->socket_fd) {
-        /** Error: this FD was never registered by this connection. */
-        errno = SGS_ERR_BAD_FD;
+    
+    fds[0].fd = sockfd;
+    fds[0].events = POLLIN | POLLOUT;
+    
+    result = poll(fds, 1, 0);
+    if (result <= 0) return result;  /** -1 or 0 */
+    
+    if ((fds[0].revents & POLLERR) == POLLERR) {
+        optlen = sizeof(errno);  /* SO_ERROR should return an int */
+        if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &errno, &optlen) == -1) {
+            return -1;
+        }
+        
+        conn_closed(connection);
         return -1;
     }
-  
-    if ((events & POLLIN) == POLLIN) {
-        /** Read stuff off the socket and write it to the in-buffer. */
-        result = sgs_buffer_read_from_fd(connection->inbuf,
-            connection->socket_fd);
-        
-        if (result == -1) return -1;
     
-        if (result == 0) {
+    if ((fds[0].revents & POLLIN) == POLLIN) {
+        /** Read stuff off the socket and write it to the in-buffer. */
+        result = sgs_buffer_read_from_fd(connection->inbuf, sockfd);
+        if (result == -1) return -1;
+        
+        /* Return value of 0 may or may not mean that EOF was read. */
+        if ((result == 0) && sgs_buffer_eof(connection->inbuf)) {
             conn_closed(connection);   /** The server closed the socket. */
             return 0;
         }
-    
+        
         /** Try to pull out messages from the inbuf and process them. */
         if (consume_data(connection) == -1) return -1;
     }
-  
-    if ((events & POLLOUT) == POLLOUT) {
+    
+    if ((fds[0].revents & POLLOUT) == POLLOUT) {
         /** If we are waiting for connect() to complete, its done now. */
         if (connection->state == SGS_CONNECTION_IMPL_CONNECTING) {
             connection->state = SGS_CONNECTION_IMPL_CONNECTED;
         }
     
         /** Read stuff out of the out-buffer and write it to the socket. */
-        result = sgs_buffer_write_to_fd(connection->outbuf,
-            connection->socket_fd);
-        
+        result = sgs_buffer_write_to_fd(connection->outbuf, sockfd);
         if (result == -1) return -1;
     }
-  
-    if ((events & POLLERR) == POLLERR) {
-        optlen = sizeof(errno);  /* SO_ERROR should return an int */
-        if (getsockopt(connection->socket_fd, SOL_SOCKET, SO_ERROR,
-                &errno, &optlen) == -1) {
-            return -1;
-        }
     
-        conn_closed(connection);
-        return -1;
-    }
-  
     /** If there is room in inbuf, then register interest in socket reads. */
     if (sgs_buffer_remaining_capacity(connection->inbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLIN);
+        connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
     else
-        connection->ctx->unreg_fd_cb(connection, connection->socket_fd, POLLIN);
+        connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
   
     /** If there is data in outbuf, then register interest in socket writes. */
     if (sgs_buffer_size(connection->outbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
+        connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
     else
-        connection->ctx->unreg_fd_cb(connection, connection->socket_fd, POLLOUT);
+        connection->ctx->unreg_fd_cb(connection, sockfd, POLLOUT);
   
     return 0;
 }

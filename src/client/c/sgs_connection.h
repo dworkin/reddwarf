@@ -25,18 +25,20 @@ typedef struct sgs_connection_impl sgs_connection;
  */
 
 /*
- * function: sgs_connection_do_io()
+ * function: sgs_connection_do_work()
  *
- * Informs the sgs_connection that the specified file descriptor has select()-ed
- * or poll()-ed for the specified bitmap of events.  This is used to implement
- * non-blocking IO on the sgs_connection's underlying socket connection.  The
- * sgs_connection will notify applications of file descriptor(s) that it is
- * interested in monitoring by calling the reg_fd() and unreg_fg() callback
- * functions that were specified as arguments to sgs_ctx_new() when the
- * connection's context was created.  Returns 0 on success and -1 on failure,
- * with errno set to the specific error code.
+ * Informs the sgs_connection that one or more file descriptors are ready for IO
+ * operations.  The sgs_connection will call select() or a similar method to
+ * determine specifically which file descriptors are ready and for which
+ * operations (e.g. writing or reading).  This is used to implement non-blocking
+ * IO on the sgs_connection's underlying socket connection.  The sgs_connection
+ * will notify applications of file descriptor(s) that it is interested in
+ * monitoring by calling the reg_fd() and unreg_fg() callback functions that
+ * were specified as arguments to sgs_ctx_new() when the connection's context
+ * was created.  Returns 0 on success and -1 on failure, with errno set to the
+ * specific error code.
  */
-int sgs_connection_do_io(sgs_connection *connection, int fd, short events);
+int sgs_connection_do_work(sgs_connection *connection);
 
 /*
  * function: sgs_connection_free()
