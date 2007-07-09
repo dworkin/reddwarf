@@ -6,11 +6,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "sgs_buffer.h"
+#include "sgs_buffer_impl.h"
 
 /*
  * function: printStats()
  */
-void printStats(const sgs_buffer *buf) {
+void printStats(const sgs_buffer_impl *buf) {
     printf("pos=%u, size=%u, cap=%u, remaining=%u\n", buf->position,
         sgs_buffer_size(buf), sgs_buffer_capacity(buf),
         sgs_buffer_remaining_capacity(buf));
