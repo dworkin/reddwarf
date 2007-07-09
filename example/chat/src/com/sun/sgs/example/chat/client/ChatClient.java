@@ -338,6 +338,12 @@ public class ChatClient extends JFrame
     }
 
     void joinChannel(String channelName) {
+
+        if ((channelName == null) || channelName.matches("^\\s*$")) {
+            // Ignore empty channel name
+            return;
+        }
+
 	String cmd = "/join " + channelName;
         try {
             client.send(toMessageBytes(cmd));

@@ -257,6 +257,15 @@ public class SimpleClient implements ServerSession {
         }
     }
 
+    private void checkLoggedIn() {
+        if (getSessionId() == null) {
+            RuntimeException re =
+                new IllegalStateException("Client not logged in");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
+        }
+    }
+
     /**
      * Receives callbacks on the associated {@code ClientConnection}.
      */
@@ -322,6 +331,19 @@ public class SimpleClient implements ServerSession {
                 MessageBuffer msg = new MessageBuffer(message);
                 reason = msg.getString();
             }
+            
+            for (SimpleClientChannel channel : channels.values()) {
+                try {
+                    channel.left();
+                } catch (RuntimeException e) {
+                    logger.logThrow(Level.FINE, e,
+                        "During leftChannel ({0}) on disconnect:",
+                        channel.getName());
+                    // ignore the exception
+                }
+            }
+            channels.clear();
+
             // FIXME ignore graceful from connection for now (not implemented),
             // instead look at the boolean we set when expecting disconnect
             clientListener.disconnected(expectingDisconnect, reason);
@@ -403,6 +425,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.SESSION_MESSAGE:
                 logger.log(Level.FINEST, "Direct receive");
+                checkLoggedIn();
                 msg.getLong(); // FIXME sequence number
                 clientListener.receivedMessage(msg.getByteArray());
                 break;
@@ -456,6 +479,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_JOIN: {
                 logger.log(Level.FINER, "Channel join");
+                checkLoggedIn();
                 String channelName = msg.getString();
 		CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
@@ -472,6 +496,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_LEAVE: {
                 logger.log(Level.FINER, "Channel leave");
+                checkLoggedIn();
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
                     channels.remove(channelId);
@@ -487,6 +512,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 logger.log(Level.FINEST, "Channel recv");
+                checkLoggedIn();
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel = channels.get(channelId);
                 if (channel == null) {
