@@ -634,7 +634,7 @@ normally necessary)\n");
         
         channel = sgs_map_get(g_channel_map, token);
         if (channel == NULL) {
-            printf("Error: Channel \"%s\" not found.", token);
+            printf("Error: Channel \"%s\" not found.\n", token);
             return;
         }
         
