@@ -31,8 +31,8 @@ struct sgs_context_impl {
     int port;
   
     /** function pointers to callbacks: */
-    void (*reg_fd_cb)(sgs_connection*, int[], size_t, short);
-    void (*unreg_fd_cb)(sgs_connection*, int[], size_t, short);
+    void (*reg_fd_cb)(sgs_connection*, int, short);
+    void (*unreg_fd_cb)(sgs_connection*, int, short);
   
     void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
     void (*channel_left_cb)(sgs_connection*, sgs_channel*);

@@ -138,17 +138,15 @@ int sgs_connection_do_io(sgs_connection_impl *connection, int fd, short events) 
   
     /** If there is room in inbuf, then register interest in socket reads. */
     if (sgs_buffer_remaining_capacity(connection->inbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1, POLLIN);
+        connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLIN);
     else
-        connection->ctx->unreg_fd_cb(connection, &connection->socket_fd, 1,
-            POLLIN);
+        connection->ctx->unreg_fd_cb(connection, connection->socket_fd, POLLIN);
   
     /** If there is data in outbuf, then register interest in socket writes. */
     if (sgs_buffer_size(connection->outbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1, POLLOUT);
+        connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
     else
-        connection->ctx->unreg_fd_cb(connection, &connection->socket_fd, 1,
-            POLLOUT);
+        connection->ctx->unreg_fd_cb(connection, connection->socket_fd, POLLOUT);
   
     return 0;
 }
@@ -208,7 +206,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
              * writing to the socket because that's how we can tell once the socket
              * has finished connecting.
              */
-            connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1,
+            connection->ctx->reg_fd_cb(connection, connection->socket_fd,
                 POLLOUT);
             
             connection->state = SGS_CONNECTION_IMPL_CONNECTING;
@@ -227,8 +225,8 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     connection->state = SGS_CONNECTION_IMPL_CONNECTED;
   
     /** Register interest in socket writes to send the login request. */
-    connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1, POLLOUT);
-  
+    connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
+    
     return 0;
 }
 
@@ -257,8 +255,8 @@ int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
  */
 void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
     /** Unregister interest in this socket.  (events = 0 means "all") */
-    connection->ctx->unreg_fd_cb(connection, &connection->socket_fd, 1, 0);
-  
+    connection->ctx->unreg_fd_cb(connection, connection->socket_fd, 0);
+    
     close(connection->socket_fd);
     connection->socket_fd = -1;
     connection->expecting_disconnect = 0;
@@ -279,8 +277,7 @@ int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
      * (unless we have not yet connected).
      */
     if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
-        connection->ctx->reg_fd_cb(connection, &connection->socket_fd, 1,
-            POLLOUT);
+        connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
     }
   
     return 0;

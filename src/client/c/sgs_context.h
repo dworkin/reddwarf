@@ -42,14 +42,13 @@ typedef struct sgs_context_impl sgs_context;
  *
  * arguments to reg_fd and unreg_fd:
  *   sgs_connection*: the connection making this callback
- *             int[]: an array of file descriptors
- *            size_t: number of elements in the array of file descriptors
- *             short: events for which interest is being (un)registered for all of
- *                    the specified file descriptors
+ *               int: a file descriptor
+ *             short: events for which interest is being (un)registered for the
+ *                    specified file descriptor
  */
 sgs_context *sgs_ctx_new(const char *hostname, const int port,
-    void (*reg_fd)(sgs_connection*, int[], size_t, short),
-    void (*unreg_fd)(sgs_connection*, int[], size_t, short));
+    void (*reg_fd)(sgs_connection*, int, short),
+    void (*unreg_fd)(sgs_connection*, int, short));
 
 /*
  * function: sgs_ctx_free()

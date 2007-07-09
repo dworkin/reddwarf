@@ -24,8 +24,8 @@
  * sgs_ctx_new()
  */
 sgs_context_impl *sgs_ctx_new(const char *hostname, const int port,
-    void (*reg_fd)(sgs_connection*, int[], size_t, short),
-    void (*unreg_fd)(sgs_connection*, int[], size_t, short))
+    void (*reg_fd)(sgs_connection*, int, short),
+    void (*unreg_fd)(sgs_connection*, int, short))
 {
     sgs_context_impl *ctx = NULL;
   

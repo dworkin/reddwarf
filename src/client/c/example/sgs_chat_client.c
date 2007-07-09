@@ -49,10 +49,8 @@ static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
     size_t msglen);
 static void reconnected_cb(sgs_connection *conn);
 static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen);
-static void register_fd_cb(sgs_connection *conn, int fds[], size_t count,
-    short events);
-static void unregister_fd_cb(sgs_connection *conn, int fds[], size_t count,
-    short events);
+static void register_fd_cb(sgs_connection *conn, int fd, short events);
+static void unregister_fd_cb(sgs_connection *conn, int fd, short events);
 
 /*
  * STATIC FUNCTION DECLARATIONS
@@ -340,39 +338,35 @@ static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg,
 /*
  * register_fd_cb()
  */
-static void register_fd_cb(sgs_connection *conn, int fds[], size_t count,
-    short events)
-{
-    int i, j, found;
-  
-    for (i=0; i < count; i++) {
-        found = 0;
+static void register_fd_cb(sgs_connection *conn, int fd, short events) {
+    int i, found;
     
-        for (j=0; j < g_nfds; j++) {
-            if (fds[i] == g_poll_fds[j].fd) {
-                found = 1;
-                g_poll_fds[j].events |= events;  /** Turn on requested bits */
-                break;
-            }
+    found = 0;
+    
+    for (i=0; i < g_nfds; i++) {
+        if (fd == g_poll_fds[i].fd) {
+            found = 1;
+            g_poll_fds[i].events |= events;  /** Turn on requested bits */
+            break;
         }
+    }
     
-        if (!found) {
-            /** Need a new entry in g_poll_fds[] for this file descriptor. */
-            if (g_nfds == sizeof(g_poll_fds)) {
-                fprintf(stderr, "Error: Too many file descriptors registered.  \
+    if (!found) {
+        /** Need a new entry in g_poll_fds[] for this file descriptor. */
+        if (g_nfds == sizeof(g_poll_fds)) {
+            fprintf(stderr, "Error: Too many file descriptors registered.  \
 Ignoring requests.\n");
-            } else {
-                g_poll_fds[g_nfds].fd = fds[i];
-                g_poll_fds[g_nfds].events = events;
-	
-                /**
-                 * We have to set revents to 0 for all new entries in case this
-                 * callback is called while in the middle of iterating
-                 * g_poll_fds[] after a poll().
-                 */
-                g_poll_fds[g_nfds].revents = 0;
-                g_nfds++;
-            }
+        } else {
+            g_poll_fds[g_nfds].fd = fd;
+            g_poll_fds[g_nfds].events = events;
+            
+            /**
+             * We have to set revents to 0 for all new entries in case this
+             * callback is called while in the middle of iterating
+             * g_poll_fds[] after a poll().
+             */
+            g_poll_fds[g_nfds].revents = 0;
+            g_nfds++;
         }
     }
 }
@@ -380,42 +374,38 @@ Ignoring requests.\n");
 /*
  * unregister_fd_cb()
  */
-static void unregister_fd_cb(sgs_connection *conn, int fds[], size_t count,
-    short events)
-{
-    int i, j, last_max = 0, resize = 0;
-  
-    for (i=0; i < count; i++) {
-        for (j=0; j < g_nfds; j++) {
-            if (fds[i] == g_poll_fds[j].fd) {
-                if (events == 0) {
-                    g_poll_fds[j].fd = -1;
-          
-                    if (j == g_nfds-1) {
+static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
+    int i, last_max = 0, resize = 0;
+    
+    for (i=0; i < g_nfds; i++) {
+        if (fd == g_poll_fds[i].fd) {
+            if (events == 0) {
+                g_poll_fds[i].fd = -1;
+                
+                if (i == g_nfds-1) {
+                    /** Last fd in array was cleared, so resize array */
+                    last_max = i;
+                    resize = 1;
+                }
+            } else {
+                /** Turn off requested bits */
+                g_poll_fds[i].events &= ~events;
+                
+                if (g_poll_fds[i].events == 0) {
+                    g_poll_fds[i].fd = -1;
+                    
+                    if (i == g_nfds-1) {
                         /** Last fd in array was cleared, so resize array */
-                        last_max = j;
+                        last_max = i;
                         resize = 1;
                     }
-                } else {
-                    /** Turn off requested bits */
-                    g_poll_fds[j].events &= ~events;
-          
-                    if (g_poll_fds[j].events == 0) {
-                        g_poll_fds[j].fd = -1;
-            
-                        if (j == g_nfds-1) {
-                            /** Last fd in array was cleared, so resize array */
-                            last_max = j;
-                            resize = 1;
-                        }
-                    }
                 }
-        
-                break;
             }
+            
+            break;
         }
     }
-  
+    
     if (resize) {
         for (i=0; i <= last_max; i++) {
             if (g_poll_fds[i].fd != -1) {
