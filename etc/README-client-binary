@@ -1,40 +1,44 @@
-Sun Game Server Client API Pack
+Project Darkstar Client API Pack, Binary Distribution
 Version @VERSION@
 
 INTRODUCTION
 
-The Sun Game Server (SGS) is a system that enables developers to write
-scalable, reliable, persistent and fault-tolerant game server
-applications using simple single-threaded, event-driven code.
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
 
-This distribution contains everything you need to develop and run
-clients that communicate with each other and with game servers
-implemented as applications that run in the SGS environment.
+The Project Darkstar Client API Pack, Binary Distribution, contains
+everything you need to develop and run game clients that communicate
+with each other and with game servers implemented with the Project
+Darkstar Server.
 
 CONTENTS
 
-The SGS Client API Pack contains the following subdirectories:
+This distribution contains the following subdirectories:
 
 - doc
-   Documentation for the SGS client
+  Documentation for the client API
 
 - lib
-   JAR files for developing and running client apps
+  JAR files needed to develop and run client applications
 	
+- tutorial
+  Documentation and sample code for the client tutorial
+
 SUPPORTED PLATFORMS
 
-The client code has been tested on the following operating systems and
+The client has been tested on the following operating systems and
 processors:
 
-- Solaris 10 on SPARC processors and AMD 64-bit processors
+- Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
+  processors
 - Windows XP SP2 on 32-bit processors
 - Redhat Linux EL4 on 32-bit processors
 - Mac OS X 10.4 on PowerPC and Intel processors
 
-The client code requires Java(tm) 2 Platform Standard Edition 5.0 or
-greater.
+The client requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
 
-It has been tested with version 1.5.0_11 of the J2SE(tm) Runtime
+It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
 1.5.0_07 on Mac OS X platforms.
 
@@ -48,12 +52,11 @@ classpath:
 
 KNOWN ISSUES
 
-This version of the SDK has the following limitations:
+This version of the Client API Pack has the following limitations:
 
-- The SGS Client API Pack currently only includes a J2SE client
-  implementation.  Developers can use the documentation of the network
-  protocol to develop other implementations, including ones to support
-  different languages.
+- It only includes a J2SE client implementation.  Developers can use the
+  documentation of the network protocol to develop other
+  implementations, including ones to support different languages.
 
 - I/O throttling has not been implemented in this release, so it is
   possible for clients to overwhelm the server with network traffic and

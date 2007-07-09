@@ -3,7 +3,7 @@
  */
 
 /**
- * Defines a standard interface for a JavaSE client framework
+ * Defines a standard interface for a J2SE(TM) client framework
  * that communicates with the Sun Game Server.
  */
 package com.sun.sgs.client;

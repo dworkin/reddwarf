@@ -1,24 +1,23 @@
-Project Darkstar Client API Pack
+Project Darkstar Client API Pack, Source Distribution
 Version @VERSION@
 
 INTRODUCTION
 
-Project Darkstar provides a system that enables developers to write
-scalable, reliable, persistent and fault-tolerant game server
-applications using simple single-threaded, event-driven code.
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
 
-This distribution includes the source code needed to develop and run
-clients that communicate with each other and with game servers
-implemented as applications that run in the Project Darkstar Server
-environment.
+The Project Darkstar Client API Pack, Source Distribution, contains the
+source code needed to develop and run game clients that communicate with
+each other and with game servers implemented with the Project Darkstar
+Server.
 
 CONTENTS
 
-The Project Darkstar Client API Pack contains the following
-subdirectories:
+This distribution contains the following subdirectories:
 
 - src
-  Source code files
+  Source code for the client implementation
 
 - test
   Source code for tests
@@ -38,10 +37,11 @@ should be downloaded and included in the classpath:
 
 KNOWN ISSUES
 
-- The Client API Pack currently only includes a J2SE client
-  implementation.  Developers can use the documentation of the network
-  protocol to develop other implementations, including ones to support
-  different languages.
+This version of the Client API Pack has the following limitations:
+
+- It only includes a J2SE(TM) client implementation.  Developers can use
+  the documentation of the network protocol to develop other
+  implementations, including ones to support different languages.
 
 - I/O throttling has not been implemented in this release, so it is
   possible for clients to overwhelm the server with network traffic and

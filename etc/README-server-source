@@ -1,32 +1,31 @@
-Project Darkstar Server
+Project Darkstar Server, Source Distribution
 Version @VERSION@
 
 INTRODUCTION
 
-The Project Darkstar Server is a system that enables developers to write
-scalable, reliable, persistent and fault-tolerant game server
-applications using simple single-threaded, event-driven code.
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
 
-This distribution includes the source code for developing game servers
-that run as applications in the Project Darkstar Server environment.
-The source code for building client apps is available as a separate
-download.
+The Project Darkstar Server, Source Distribution, contains the source
+code for developing game servers that run as applications in the Project
+Darkstar Server environment.  Information about building client
+application is available as a separate download.
 
-In addition to the documents, APIs and examples, this kit contains a
-complete single-system version of the Project Darkstar Server.  The APIs
-in this version are the same as those that will be included in the
-full-scale, multi-node version of the system, which will be released in
-the future. The current system allows development of games that run on a
-single server. The server system will make use of the multi-threading
-capabilities of that server when they are available.
+In addition to the documents, APIs and examples, this kit contains the
+source code for a complete single-system version of the Project Darkstar
+Server.  The APIs in this version are the same as those that will be
+included in the full-scale, multi-node version of the system, which will
+be released in the future. The current system allows development of
+games that run on a single server. The server system will make use of
+the multi-threading capabilities of that server when they are available.
 
 CONTENTS
 
-The Project Darkstar Server distribution contains the following
-subdirectories:
+This distribution contains the following subdirectories:
 
 - doc
-  Client and server tutorials
+  Server tutorial
 
 - etc
   Miscellaneous files for building the source code and for running the
@@ -39,14 +38,15 @@ subdirectories:
   An empty directory for installing third party JAR files
 
 - src
-  Source code files
+  Source code for the server implementation
 
 - test
   Source code for tests
 
 BUILDING
 
-The Sun Game Server makes use of several other open source projects.
+The Project Darkstar Server makes use of several other open source
+projects.
 
 To build the software, you should install and use Ant:
 
