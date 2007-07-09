@@ -209,6 +209,12 @@ int sgs_msg_init(sgs_message *pmsg, uint8_t *buffer, size_t buflen,
     return 0;
 }
 
+
+/*
+ * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
+ * (these are functions that can only be called within this file)
+ */
+
 /*
  * update_msg_len()
  */

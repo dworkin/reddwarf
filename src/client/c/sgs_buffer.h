@@ -33,12 +33,13 @@ typedef struct sgs_buffer_impl sgs_buffer;
 size_t sgs_buffer_capacity(const sgs_buffer *buffer);
 
 /*
- * function: sgs_buffer_new()
+ * function: sgs_buffer_empty()
  *
- * Allocates a buffer with at least the specified capacity (in bytes).  NULL is
- * returned if allocation fails.
+ * Clears all data from the buffer.  This doesnt' actually write anything to the
+ * buffer's memory but merely resets the internal state so that the buffer
+ * "forgets" about any data currently held.
  */
-sgs_buffer *sgs_buffer_new(size_t capacity);
+void sgs_buffer_empty(sgs_buffer *buffer);
 
 /*
  * function: sgs_buffer_free()
@@ -48,13 +49,12 @@ sgs_buffer *sgs_buffer_new(size_t capacity);
 void sgs_buffer_free(sgs_buffer *buffer);
 
 /*
- * function: sgs_buffer_empty()
+ * function: sgs_buffer_new()
  *
- * Clears all data from the buffer.  This doesnt' actually write anything to the
- * buffer's memory but merely resets the internal state so that the buffer
- * "forgets" about any data currently held.
+ * Allocates a buffer with at least the specified capacity (in bytes).  NULL is
+ * returned if allocation fails.
  */
-void sgs_buffer_empty(sgs_buffer *buffer);
+sgs_buffer *sgs_buffer_new(size_t capacity);
 
 /*
  * function: sgs_buffer_peek()

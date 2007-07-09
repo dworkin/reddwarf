@@ -57,25 +57,6 @@ int sgs_channel_send_all(sgs_channel* channel, const uint8_t *data,
     size_t datalen);
 
 /*
- * function: sgs_channel_send_one()
- *
- * Sends the given message to the recipient on this channel.  If the recipient
- * is not a member of this channel, then no action is taken.
- *
- * args:
- *     channel: pointer to the channel on which to send the message
- *        data: array containing the message to send
- *     datalen: length of the message
- *   recipient: the channel member that should receive the message
- *
- * returns:
- *    0: success
- *   -1: failure (errno is set to specific error code)
- */
-int sgs_channel_send_one(sgs_channel* channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipient);
-
-/*
  * function: sgs_channel_send_multi()
  *
  * Sends the given message data to the specified recipients on this channe. Any
@@ -94,5 +75,24 @@ int sgs_channel_send_one(sgs_channel* channel, const uint8_t *data,
  */
 int sgs_channel_send_multi(sgs_channel* channel, const uint8_t *data,
     size_t datalen, const sgs_id recipients[], size_t recipslen);
+
+/*
+ * function: sgs_channel_send_one()
+ *
+ * Sends the given message to the recipient on this channel.  If the recipient
+ * is not a member of this channel, then no action is taken.
+ *
+ * args:
+ *     channel: pointer to the channel on which to send the message
+ *        data: array containing the message to send
+ *     datalen: length of the message
+ *   recipient: the channel member that should receive the message
+ *
+ * returns:
+ *    0: success
+ *   -1: failure (errno is set to specific error code)
+ */
+int sgs_channel_send_one(sgs_channel* channel, const uint8_t *data,
+    size_t datalen, const sgs_id recipient);
 
 #endif  /** #ifndef SGS_CHANNEL_H */

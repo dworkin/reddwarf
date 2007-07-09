@@ -21,6 +21,13 @@
  */
 
 /*
+ * sgs_ctx_free()
+ */
+void sgs_ctx_free(sgs_context_impl *ctx) {
+    free(ctx);
+}
+
+/*
  * sgs_ctx_new()
  */
 sgs_context_impl *sgs_ctx_new(const char *hostname, const int port,
@@ -48,13 +55,6 @@ sgs_context_impl *sgs_ctx_new(const char *hostname, const int port,
     sgs_ctx_unset_all_cbs(ctx);  /** initialize all callback functions to NULL */
   
     return ctx;
-}
-
-/*
- * sgs_ctx_free()
- */
-void sgs_ctx_free(sgs_context_impl *ctx) {
-    free(ctx);
 }
 
 /*

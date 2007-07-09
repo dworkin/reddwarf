@@ -57,26 +57,11 @@ struct sgs_session_impl {
 };
 
 /*
- * function: sgs_session_impl_new()
- *
- * Creates a new sgs_session from the specified connection.  Returns null on
- * failure.
- */
-sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection);
-
-/*
  * function: sgs_session_impl_free()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_session.
  */
 void sgs_session_impl_free(sgs_session_impl *session);
-
-/*
- * function: sgs_session_impl_incr_seqnum()
- *
- * Increments the session internal sequence number field.
- */
-void sgs_session_impl_incr_seqnum(sgs_session_impl *session);
 
 /*
  * function: sgs_session_impl_login()
@@ -95,6 +80,14 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
  * success and -1 on failure, with errno set to the specific error code.
  */
 int sgs_session_impl_logout(sgs_session_impl *session);
+
+/*
+ * function: sgs_session_impl_new()
+ *
+ * Creates a new sgs_session from the specified connection.  Returns null on
+ * failure.
+ */
+sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection);
 
 /*
  * function: sgs_session_impl_recv_msg()

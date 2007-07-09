@@ -33,6 +33,22 @@ size_t sgs_buffer_capacity(const sgs_buffer_impl *buffer) {
 }
 
 /*
+ * sgs_buffer_empty()
+ */
+void sgs_buffer_empty(sgs_buffer_impl *buffer) {
+    buffer->position = 0;  /** not necessary, but convenient */
+    buffer->size = 0;
+}
+
+/*
+ * sgs_buffer_free()
+ */
+void sgs_buffer_free(sgs_buffer_impl *buffer) {
+    free(buffer->buf);
+    free(buffer);
+}
+
+/*
  * sgs_buffer_new()
  */
 sgs_buffer_impl *sgs_buffer_new(size_t capacity) {
@@ -54,22 +70,6 @@ sgs_buffer_impl *sgs_buffer_new(size_t capacity) {
     buffer->size = 0;
   
     return buffer;
-}
-
-/*
- * sgs_buffer_free()
- */
-void sgs_buffer_free(sgs_buffer_impl *buffer) {
-    free(buffer->buf);
-    free(buffer);
-}
-
-/*
- * sgs_buffer_empty()
- */
-void sgs_buffer_empty(sgs_buffer_impl *buffer) {
-    buffer->position = 0;  /** not necessary, but convenient */
-    buffer->size = 0;
 }
 
 /*

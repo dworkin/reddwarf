@@ -87,40 +87,6 @@ const sgs_id *sgs_session_get_id(const sgs_session_impl *session) {
  */
 
 /*
- * sgs_session_impl_new()
- */
-sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection) {
-    sgs_session_impl *session;
-    
-    session = (sgs_session_impl*)malloc(sizeof(struct sgs_session_impl));
-    if (session == NULL) return NULL;
-    
-    /**
-     * The map key (a channel ID) is just a pointer into the map value (an
-     * sgs_channel struct), so we don't need an explicit deallocation function
-     * for the key, just the value.  Also note that we have to cast our function
-     * pointers to make them look like they take void* arguments instead of
-     * their usual argument types.
-     */
-    session->channels = sgs_map_new((int(*)(const void*, const void*))sgs_id_compare,
-        NULL, (void (*)(void *))sgs_channel_impl_free);
-    
-    if (session->channels == NULL) {
-        /** roll back allocation of session */
-        free(session);
-        return NULL;
-    }
-    
-    session->connection = connection;
-    sgs_id_init_from_hex("", &session->session_id);
-    sgs_id_init_from_hex("", &session->reconnect_key);
-    session->seqnum_hi = 0;
-    session->seqnum_lo = 0;
-    
-    return session;
-}
-
-/*
  * sgs_session_impl_free()
  */
 void sgs_session_impl_free(sgs_session_impl *session) {
@@ -174,6 +140,40 @@ int sgs_session_impl_logout(sgs_session_impl *session) {
         return -1;
   
     return 0;
+}
+
+/*
+ * sgs_session_impl_new()
+ */
+sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection) {
+    sgs_session_impl *session;
+    
+    session = (sgs_session_impl*)malloc(sizeof(struct sgs_session_impl));
+    if (session == NULL) return NULL;
+    
+    /**
+     * The map key (a channel ID) is just a pointer into the map value (an
+     * sgs_channel struct), so we don't need an explicit deallocation function
+     * for the key, just the value.  Also note that we have to cast our function
+     * pointers to make them look like they take void* arguments instead of
+     * their usual argument types.
+     */
+    session->channels = sgs_map_new((int(*)(const void*, const void*))sgs_id_compare,
+        NULL, (void (*)(void *))sgs_channel_impl_free);
+    
+    if (session->channels == NULL) {
+        /** roll back allocation of session */
+        free(session);
+        return NULL;
+    }
+    
+    session->connection = connection;
+    sgs_id_init_from_hex("", &session->session_id);
+    sgs_id_init_from_hex("", &session->reconnect_key);
+    session->seqnum_hi = 0;
+    session->seqnum_lo = 0;
+    
+    return session;
 }
 
 /*

@@ -28,6 +28,13 @@ typedef struct sgs_context_impl sgs_context;
  */
 
 /*
+ * function: sgs_ctx_free()
+ *
+ * Performs any necessary memory deallocations to dispose of an sgs_context.
+ */
+void sgs_ctx_free(sgs_context *ctx);
+
+/*
  * function: sgs_ctx_new()
  *
  * Creates a new login context.  Returns null on failure.
@@ -49,13 +56,6 @@ typedef struct sgs_context_impl sgs_context;
 sgs_context *sgs_ctx_new(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int, short),
     void (*unreg_fd)(sgs_connection*, int, short));
-
-/*
- * function: sgs_ctx_free()
- *
- * Performs any necessary memory deallocations to dispose of an sgs_context.
- */
-void sgs_ctx_free(sgs_context *ctx);
 
 /*
  * function: sgs_ctx_set_channel_joined_cb()

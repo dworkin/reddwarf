@@ -48,6 +48,16 @@ int sgs_channel_send_all(sgs_channel_impl *channel, const uint8_t *data,
 }
 
 /*
+ * sgs_session_channel_send_multi()
+ */
+int sgs_channel_send_multi(sgs_channel_impl *channel, const uint8_t *data,
+    size_t datalen, const sgs_id recipients[], size_t recipslen)
+{
+    return send_msg_general(channel, data, datalen, recipients,
+        recipslen);
+}
+
+/*
  * sgs_session_channel_send_one()
  */
 int sgs_channel_send_one(sgs_channel_impl *channel, const uint8_t *data,
@@ -56,16 +66,6 @@ int sgs_channel_send_one(sgs_channel_impl *channel, const uint8_t *data,
     sgs_id recipients[] = { recipient };
     
     return send_msg_general(channel, data, datalen, recipients, 1);
-}
-
-/*
- * sgs_session_channel_send_multi()
- */
-int sgs_channel_send_multi(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipients[], size_t recipslen)
-{
-    return send_msg_general(channel, data, datalen, recipients,
-        recipslen);
 }
 
 

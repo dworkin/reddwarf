@@ -34,50 +34,6 @@ static int consume_data(sgs_connection_impl *connection);
  */
 
 /*
- * sgs_connection_new()
- */
-sgs_connection_impl *sgs_connection_new(sgs_context *ctx)
-{
-    sgs_connection_impl *connection;
-    
-    connection = (sgs_connection_impl*)malloc(sizeof(struct sgs_connection_impl));
-    if (connection == NULL) return NULL;
-    
-    connection->socket_fd = -1;
-    connection->expecting_disconnect = 0;
-    connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
-    connection->ctx = ctx;
-    connection->session = sgs_session_impl_new(connection);
-    connection->inbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
-    connection->outbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
-  
-    /** Check if any new() calls failed. */
-    if (connection->session == NULL || connection->inbuf == NULL ||
-        connection->outbuf == NULL) {
-    
-        /** Allocation of at least one object failed. */
-        if (connection->session != NULL)
-            sgs_session_impl_free(connection->session);
-        if (connection->inbuf != NULL) sgs_buffer_free(connection->inbuf);
-        if (connection->outbuf != NULL) sgs_buffer_free(connection->outbuf);
-        free(connection);
-        return NULL;
-    }
-  
-    return connection;
-}
-
-/*
- * sgs_connection_free()
- */
-void sgs_connection_free(sgs_connection_impl *connection) {
-    sgs_session_impl_free(connection->session);
-    sgs_buffer_free(connection->inbuf);
-    sgs_buffer_free(connection->outbuf);
-    free(connection);
-}
-
-/*
  * sgs_connection_do_io()
  */
 int sgs_connection_do_io(sgs_connection_impl *connection, int fd, short events) {
@@ -149,6 +105,16 @@ int sgs_connection_do_io(sgs_connection_impl *connection, int fd, short events) 
         connection->ctx->unreg_fd_cb(connection, connection->socket_fd, POLLOUT);
   
     return 0;
+}
+
+/*
+ * sgs_connection_free()
+ */
+void sgs_connection_free(sgs_connection_impl *connection) {
+    sgs_session_impl_free(connection->session);
+    sgs_buffer_free(connection->inbuf);
+    sgs_buffer_free(connection->outbuf);
+    free(connection);
 }
 
 /*
@@ -243,6 +209,39 @@ int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
     }
   
     return 0;
+}
+
+/*
+ * sgs_connection_new()
+ */
+sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
+    sgs_connection_impl *connection;
+    
+    connection = (sgs_connection_impl*)malloc(sizeof(struct sgs_connection_impl));
+    if (connection == NULL) return NULL;
+    
+    connection->socket_fd = -1;
+    connection->expecting_disconnect = 0;
+    connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
+    connection->ctx = ctx;
+    connection->session = sgs_session_impl_new(connection);
+    connection->inbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+    connection->outbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+  
+    /** Check if any new() calls failed. */
+    if (connection->session == NULL || connection->inbuf == NULL ||
+        connection->outbuf == NULL) {
+    
+        /** Allocation of at least one object failed. */
+        if (connection->session != NULL)
+            sgs_session_impl_free(connection->session);
+        if (connection->inbuf != NULL) sgs_buffer_free(connection->inbuf);
+        if (connection->outbuf != NULL) sgs_buffer_free(connection->outbuf);
+        free(connection);
+        return NULL;
+    }
+  
+    return connection;
 }
 
 

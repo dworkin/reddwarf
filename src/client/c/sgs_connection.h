@@ -25,21 +25,6 @@ typedef struct sgs_connection_impl sgs_connection;
  */
 
 /*
- * function: sgs_connection_new()
- *
- * Creates a new sgs_connection from the specified login context.  Returns null
- * on failure.
- */
-sgs_connection *sgs_connection_new(sgs_context *ctx);
-
-/*
- * function: sgs_connection_free()
- *
- * Performs any necessary memory deallocations to dispose of an sgs_connection.
- */
-void sgs_connection_free(sgs_connection *connection);
-
-/*
  * function: sgs_connection_do_io()
  *
  * Informs the sgs_connection that the specified file descriptor has select()-ed
@@ -52,6 +37,13 @@ void sgs_connection_free(sgs_connection *connection);
  * with errno set to the specific error code.
  */
 int sgs_connection_do_io(sgs_connection *connection, int fd, short events);
+
+/*
+ * function: sgs_connection_free()
+ *
+ * Performs any necessary memory deallocations to dispose of an sgs_connection.
+ */
+void sgs_connection_free(sgs_connection *connection);
 
 /*
  * function: sgs_connection_login()
@@ -70,5 +62,13 @@ int sgs_connection_login(sgs_connection *connection, const char *login,
  * success and -1 on failure, with errno set to the specific error code.
  */
 int sgs_connection_logout(sgs_connection *connection, int force);
+
+/*
+ * function: sgs_connection_new()
+ *
+ * Creates a new sgs_connection from the specified login context.  Returns null
+ * on failure.
+ */
+sgs_connection *sgs_connection_new(sgs_context *ctx);
 
 #endif  /** #ifndef SGS_CONNECTION_H */
