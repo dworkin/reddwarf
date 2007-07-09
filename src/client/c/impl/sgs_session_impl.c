@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <poll.h>
 #include <string.h>
-#include <arpa/inet.h>
 #include "sgs_channel.h"
 #include "sgs_channel_impl.h"
 #include "sgs_error_codes.h"

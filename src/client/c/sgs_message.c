@@ -12,11 +12,11 @@
  *  code.
  */
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
 #include "sgs_error_codes.h"
 #include "sgs_message.h"
 #include "sgs_wire_protocol.h"

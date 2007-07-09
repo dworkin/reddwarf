@@ -11,6 +11,7 @@
  *  specific error code.
  */
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
 #include "sgs_channel_impl.h"
