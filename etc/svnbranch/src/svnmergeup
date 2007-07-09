@@ -1,0 +1,348 @@
+#! /usr/bin/env perl
+
+# Merges changes made in a Subversion branch into a working copy for the
+# associated trunk.
+
+# $Id: svnmergeup 1446 2005-07-29 12:03:23Z tb97327 $
+
+################
+# Use
+################
+
+# Enforce strict scoping
+use strict;
+
+# Print warnings
+use warnings;
+
+# Use getopts
+use Getopt::Std;
+
+# The directory containing the current program
+my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
+if (!$program_dir) {
+    $program_dir = ".";
+}
+
+# Load utilities
+require "$program_dir/svnmergeutil.pl";
+
+################
+# Variables
+################
+
+# Subversion ID for this revision
+my $id ='$Id: svnmergeup 1446 2005-07-29 12:03:23Z tb97327 $';
+
+# Usage message
+my $usage = "Usage: " . escape($0) .
+    " [-fhnpv] [-i rev] BRANCH_URL_OR_DIRECTORY
+Options:
+  -f                    : Force
+  -h                    : Help
+  -i rev                : Initialize merged up revision
+  -p                    : Print last merged up revision
+  -n                    : Dry run
+  -v                    : Verbose
+Environment variables:
+  SVNDIR                : Directory containing Subversion executables";
+
+# Help message
+my $help = "Merges changes made in a Subversion branch into a working
+copy for the associated trunk in the current directory.  Does nothing if
+no changes have been made to the branch since it was last merged up or
+since the branch was created.
+
+The current directory should be the top level directory of a working
+copy for a Subversion trunk.
+
+The argument should be the repository URL, or the pathname of a working
+copy, for the top level directory of a branch associated with the trunk.
+A pathname argument is permitted to contain spaces, which should be
+escaped or quoted.  Trunk URLs should end in '/trunk', branch URLs
+should end in '/branches/BRANCHNAME'.  A branch and a trunk are related
+if the portions of their URLs to the left of these endings are the same.
+
+If the -f option is specified, forces the merge up to proceed even if
+the changes being merged up include moves, or if the trunk working copy
+contains modifications.
+
+If the -h option is specified, prints this help message and exits.
+
+If the -i option is specified, the option value specifies the revision
+to which the branch has already been merged up to the trunk.  The
+command sets information in the working copy to specify that merged up
+revision and exits.  Use this option to note merges that have been
+performed without using this utility.
+
+If the -n option is specified, prints information about the operations
+that would be carried out if the commands were actually run.  By
+default, prints a dry run of the 'svn merge' command that would be used
+to perform the merge up.
+
+If the -p option is specified, prints the revision the branch is
+currently merged up to in the trunk.  It is an error to specify both the
+-i and -p options.
+
+If the -v option is specified, also prints the log entries for the
+changes made in the branch, and the diffs for the changes.
+
+If the SVNDIR environment variable is set to a non-empty value, uses the
+Subversion executables located in that directory.  Otherwise, uses the
+executables available in the current path.
+
+Exits with a non-zero status if:
+- The current directory is not the top level directory of a working copy
+  for a trunk
+- The trunk working copy needs to be updated
+- The trunk working copy contains modifications and the -f flag is not
+  specified
+- The branch argument is not a repository URL or working copy pathname
+  for the top level directory of a branch
+- The branch argument specifies a working copy that contains
+  modifications or needs to be updated
+- The branch argument specifies a repository URL for a non-existent
+  branch
+- The branch needs to be refreshed from the trunk
+- The branch and trunk are not associated
+- The branch changes appear to include moves and the -f option was not
+  specified
+
+$id";
+
+# The branch argument
+my $branch;
+
+# The URL for the branch
+my $branch_url;
+
+# The current revision of the branch
+my $branch_rev;
+
+# The name of the branch
+my $branch_name;
+
+# The URL for the trunk
+my $trunk_url;
+
+# The current revision of the trunk
+my $trunk_rev;
+
+# The branch revision last merged up into the branch
+my $merged;
+
+# The command used for printing the log for changes to refresh from the
+# trunk.
+my $log_command;
+
+# The contents of the log of changes to refresh from the trunk.
+my @log_contents;
+
+# Set to 1 if the changes contain moves
+my $contains_moves = 0;
+
+# Declare global flags for options
+our($opt_f, $opt_h, $opt_i, $opt_n, $opt_p, $opt_v);
+
+# Use variables defined in svnmergeutil.pl.
+our($svn);
+
+################
+# Main subroutines
+################
+
+# Call main subroutine
+main();
+
+# Main subroutine
+sub main {
+    check_arguments();
+    check_branch_and_trunk();
+    handle_opt_ip();
+    check_merged();
+    check_refreshed();
+    check_moves();
+    merge();
+}
+
+# Checks the command line arguments, sets the $opt_X variables, and sets
+# $branch.
+sub check_arguments {
+    if (getopts("fhi:npv")) {
+	if ($opt_h) {
+	    print "$usage\n";
+	    print "$help\n";
+	    exit 0;
+	} elsif ($opt_i) {
+	    if ($opt_i !~ /^\d+$/) {
+		die "Error: Bad value for -i: $opt_i\n$usage\n";
+	    } elsif ($opt_p) {
+		die "Error: -p not permitted with -i\n$usage\n";
+	    }
+	}
+	if ($#ARGV == 0) {
+	    $branch = shift(@ARGV);
+	    return;
+	}
+    }
+    die "$usage\n";
+}
+
+# Checks that the branch and trunk are valid.
+sub check_branch_and_trunk {
+    # Check trunk URL
+    $trunk_url = get_wc_url(".");
+    if ($trunk_url !~ m!^(.*)/trunk$!) {
+	die "Error: Current directory not top of trunk: " . `pwd`;
+    }
+    my $trunk_base = $1;
+    # Check branch URL
+    if (is_repository_url($branch)) { # The argument is a repository URL
+	$branch_url = $branch;
+    } else {			# A working copy -- get its URL
+	$branch_url = get_wc_url($branch);
+    }
+    if ($branch_url !~ m!^(.*)/branches/([^/]+)/?$!) {
+	die "Error: Argument not top of branch: $branch\n";
+    }
+    my $branch_base = $1;
+    $branch_name = $2;
+    if ($branch_base ne $trunk_base) {
+	die "Error: Branch and trunk not related: $branch, " . `pwd`;
+    }
+    # Check branch
+    $branch_rev = get_url_revision($branch_url);
+    if (!$branch_rev) {
+	die "Error: Branch not found: $branch_url\n";
+    } elsif ($branch ne $branch_url) {
+	# Check for modifications and updates in the branch working copy
+	my $result = get_update_modified($branch, 1);
+	if ($result) {
+	    die "Error: Branch working copy $result: $branch\n";
+	}
+    }
+    # Check trunk
+    $trunk_rev = get_url_revision($trunk_url);
+    if (!$trunk_rev) {
+	die "Error: Trunk URL not found\n";
+    }
+    my $result = get_update_modified(".", !$opt_f);
+    if ($result) {
+	die "Error: Trunk working copy $result: " . `pwd`;
+    }
+}
+
+# Handle the -i and -p options, if specified.
+sub handle_opt_ip {
+    if ($opt_i) {
+	if ($opt_n) {
+	    print "Would mark branch $branch_name merged up to revision " .
+		"$opt_i\n";
+	} else {
+	    set_merged_up(".", $opt_i, $branch_name);
+	    print "Set branch $branch_name merged up to revision $opt_i\n";
+	}
+	exit 0;
+    } elsif ($opt_p) {
+	my $merged = get_merged_up(".", $branch_name) ||
+	    "Branch $branch_name is not merged up";
+	print "$merged\n";
+	exit 0;
+    }
+}
+
+# Determine when the branch was last merged up to the trunk, and exit
+# if the trunk is already up to date.
+sub check_merged {
+    $merged = get_merged_up(".", $branch_name);
+    if (!$merged) {
+	# Branch not merged, use the initial branch revision instead
+	$merged = get_branch_first_revision($branch, $branch_rev);
+    }
+    if ($branch_rev == $merged) {
+	print "Trunk working copy is up to date with branch revision " .
+	    "$branch_rev\n";
+	exit 0;
+    }
+}
+
+# Checks that the branch is refreshed up to date with the trunk
+sub check_refreshed {
+    my $refreshed = get_refreshed($branch, $branch_name, $branch_rev);
+    # $refreshed could be greater than $trunk_rev if the trunk was not
+    # changed since the branch was created.
+    if ($trunk_rev > $refreshed) {
+	die "Error: Branch needs to be refreshed before merging up\n" .
+	    "  Current trunk revision: $trunk_rev\n" .
+	    "  Branch refreshed to trunk revision: $refreshed\n";
+    }
+}
+
+# Checks the log for moves, printing out what it finds and exiting if
+# needed.
+sub check_moves {
+    # The revision numbers specified when printing the log include the
+    # log for changes specified by the first number, not the changes
+    # made since that number as in printing the diffs.
+    my $log_start = $merged + 1;
+    $log_command = "$svn log -v -r $log_start:$branch_rev " . escape($branch);
+    @log_contents = command($log_command);
+    my $moves = get_moves($branch_url, @log_contents);
+    my $where = "Branch";
+    if (!$moves) {
+	$moves = get_moves($trunk_url, @log_contents);
+	if (!$moves) {
+	    return;
+	}
+	$where = "Trunk";
+    }
+    $contains_moves = 1;
+    if ($opt_f) {
+	print "Warning: $where changes contain moves:\n$moves";
+    } else {
+	warn "Error: $where changes contain moves:\n$moves" .
+	    "Account for moves manually and then call 'svnmergeup -f'\n";
+    }
+    if (!$opt_f && !$opt_n) {
+	exit 1;
+    }
+}
+
+# Performs the merge, and prints the log and diffs as needed.
+sub merge {
+    my $merge;
+    if ($opt_n) {
+	$merge = "$svn merge --dry-run";
+    } else {
+	$merge = "$svn merge";
+    }
+    my $old = ".\@$trunk_rev";
+    my $new = escape($branch) . "\@$branch_rev";
+    my $merge_command = "$merge $old $new";
+    print "$merge_command\n";
+    print command($merge_command);
+    if (!$opt_n) {
+	# Update meta data
+	set_merged_up(".", $branch_rev, $branch_name);
+    }
+    # Print log and diffs in verbose mode
+    if ($opt_v) {
+	print "------------------------------------" .
+	    "------------------------------------\n";
+	print "$log_command\n";
+	print @log_contents;
+	my $diff_command = "$svn diff --notice-ancestry --old $old --new $new";
+	print "$diff_command\n";
+	print command($diff_command);
+    }
+    if (!$opt_n) {
+	# Print what happened
+	print "Merged up to trunk working copy from revision $branch_rev " .
+	    "of branch $branch_name\n";
+    }
+    if ($contains_moves && !$opt_f) {
+	exit 1;
+    } else {
+	exit 0;
+    }
+}
