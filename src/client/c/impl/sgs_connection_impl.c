@@ -172,8 +172,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     if (fcntl(connection->socket_fd, F_SETFL, ioflags | O_NONBLOCK) == -1)
         return -1;
   
-    /** Resolve hostname to IP(s). */
-    /** TODO - does this work if hostname *IS* an IP? */
+    /** Resolve hostname to IP(s).  This works even if hostname *is* an IP. */
     server = gethostbyname(connection->ctx->hostname);
     if (server == NULL) {
         errno = SGS_ERR_CHECK_HERRNO;
