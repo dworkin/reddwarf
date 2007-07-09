@@ -47,11 +47,11 @@ $(ODIR)/test/%.o: $(SRCDIR)/test/%.c $(API_HEADERS)
 	@mkdir -p $(ODIR)/test
 	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
 
-chatclient: $(ODIR)/example/sgs_chat_client.o $(DEPS) $(ODIR)/impl/sgs_connection_impl.o $(ODIR)/impl/sgs_context_impl.o $(ODIR)/impl/sgs_session_impl.o $(ODIR)/sgs_id.o $(ODIR)/sgs_buffer.o $(ODIR)/sgs_message.o $(ODIR)/sgs_hex_utils.o $(ODIR)/impl/sgs_linked_list_map.o $(ODIR)/impl/sgs_channel_impl.o
+chatclient: $(ODIR)/example/sgs_chat_client.o $(DEPS) $(ODIR)/impl/sgs_connection_impl.o $(ODIR)/impl/sgs_context_impl.o $(ODIR)/impl/sgs_session_impl.o $(ODIR)/sgs_id.o $(ODIR)/impl/sgs_buffer_impl.o $(ODIR)/sgs_message.o $(ODIR)/sgs_hex_utils.o $(ODIR)/impl/sgs_linked_list_map.o $(ODIR)/impl/sgs_channel_impl.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/chatclient $^
 
-buffertest: $(ODIR)/sgs_buffer.o $(ODIR)/test/sgs_buffer_test.o
+buffertest: $(ODIR)/impl/sgs_buffer_impl.o $(ODIR)/test/sgs_buffer_test.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/buffertest $^
 

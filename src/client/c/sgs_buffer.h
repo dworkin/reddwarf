@@ -3,39 +3,23 @@
  */
 
 /*
- * This file provides declarations for a circular byte-buffer.
+ * This file provides declarations relating to byte-buffers.
  */
 
 #ifndef SGS_BUFFER_H
 #define SGS_BUFFER_H  1
 
 /*
- * sgs_buffer typedef (declare before any #includes)
+ * sgs_buffer_impl provides the implementation for the sgs_buffer interface
+ * (declare before any #includes)
  */
-typedef struct sgs_buffer sgs_buffer;
+typedef struct sgs_buffer_impl sgs_buffer;
 
 /*
  * INCLUDES
  */
 #include <stdint.h>
-#include <stdlib.h>
 
-/*
- * STRUCTS
- */
-struct sgs_buffer {
-    /* Total amount of memory allocated to the "buf" pointer. */
-    size_t capacity;
-  
-    /* Current position of the start of the data in the buffer. */
-    size_t position;
-  
-    /* Number of bytes currently stored in the buffer. */
-    size_t size;
-  
-    /* Array of the actual data. */
-    uint8_t *buf;
-};
 
 /*
  * FUNCTION DECLARATIONS
