@@ -44,6 +44,7 @@ public class RunTimeListener implements ProfileOperationListener {
     private final AtomicLong failedCount;
     private final AtomicLong maxRunTime;
     private final AtomicLong runTime;   
+    private final AtomicLong readyCountSum;   
     private final Map<String, AtomicLong> identityTaskCount;
     private final Map<String, AtomicLong> identityRunTime;
 
@@ -52,6 +53,7 @@ public class RunTimeListener implements ProfileOperationListener {
     private final AtomicLong lifetimeMax;
     private final AtomicLong lifetimeFailed;
     private final AtomicLong lifetimeRunTime;
+    private final AtomicLong lifetimeReadyCountSum;
     private final Map<String, AtomicLong> lifetimeIdentityCount;
     private final Map<String, AtomicLong> lifetimeIdentityRunTime;
 
@@ -65,6 +67,7 @@ public class RunTimeListener implements ProfileOperationListener {
 	failedCount = new AtomicLong(0);
 	runTime     = new AtomicLong(0);
 	maxRunTime  = new AtomicLong(0);
+	readyCountSum = new AtomicLong(0);
 	identityTaskCount = new HashMap<String, AtomicLong>();
 	identityRunTime = new HashMap<String, AtomicLong>();
 
@@ -72,6 +75,7 @@ public class RunTimeListener implements ProfileOperationListener {
 	lifetimeFailed  = new AtomicLong(0);
 	lifetimeRunTime = new AtomicLong(0);
 	lifetimeMax     = new AtomicLong(0);
+	lifetimeReadyCountSum = new AtomicLong(0);
 	lifetimeIdentityCount = new HashMap<String, AtomicLong>();
 	lifetimeIdentityRunTime = new HashMap<String, AtomicLong>();
 
@@ -98,6 +102,8 @@ public class RunTimeListener implements ProfileOperationListener {
     public void report(ProfileReport profileReport) {
 	
 	long count = taskCount.incrementAndGet();
+	long readyCount = 
+	    readyCountSum.addAndGet(profileReport.getReadyCount());
 
 	if (INCLUDE_IDENTITY_STATS) {
 	    // keep per-user statistics
@@ -149,6 +155,7 @@ public class RunTimeListener implements ProfileOperationListener {
 	    long lCount = lifetimeCount.addAndGet(count);
 	    long lFailed = lifetimeFailed.addAndGet(failed);
 	    long lRuntime = lifetimeRunTime.addAndGet(time);
+	    long lReadyCount = lifetimeReadyCountSum.addAndGet(readyCount);
 
 	    long lMax = lifetimeMax.get();
 	    if (lMax < max) {
@@ -170,30 +177,34 @@ public class RunTimeListener implements ProfileOperationListener {
 	    maxRunTime.set(0);
 	    failedCount.set(0);
 	    runTime.set(0);	   
+	    taskCount.set(0);
 	    if (INCLUDE_IDENTITY_STATS)
 		identityTaskCount.clear(); // maybe just clear values?
 
 	    if (INCLUDE_IDENTITY_STATS) {
 		System.out.printf("past %d tasks: mean: %fms, max: %dms, "
-				  + "# of failed: %d, "
+				  + "# of failed: %d, mean ready count: %f, "
 				  + "user statistics: \n%s\n"
 				  + "all %d tasks: mean: %fms, max: %dms, "
-				  + "# of failed: %d, "
+				  + "# of failed: %d,  mean ready count: %f, "
 				  + "user statistics: \n%s\n",			      
 				  count, (double)time/ (double)count, max, 
-				  failed, stats,
+				  failed, (double)readyCount / (double)count,
+				  stats,
 				  lCount, (double)lRuntime/(double)lCount,
-				  lMax, lFailed, lStats);
+				  lMax, lFailed, 
+				  (double)lReadyCount / (double)lCount, lStats);
 	    }
 	    else {
 		System.out.printf("past %d tasks: mean: %fms, max: %dms, "
-				  + "# of failed %d\n"
+				  + "# of failed %d, mean ready count: %f, \n"
 				  + "all %d tasks: mean: %fms, max: %dms, "
-				  + " # of failed %d\n",			      
+				  + " # of failed %d, mean ready count: %f, \n",
 				  count, (double)time/ (double)count, max, 
-				  failed, 
+				  failed, (double)readyCount / (double)count,
 				  lCount, (double)lRuntime/(double)lCount,
-				  lMax, lFailed);
+				  lMax, lFailed, 
+				  (double)lReadyCount / (double)lCount);
 	    }
 	}
     }
