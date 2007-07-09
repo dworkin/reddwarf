@@ -11,7 +11,7 @@
 #define SGS_CONNECTION_IMPL_H 1
 
 /*
- * sgs_connect_impl typdef (declare before any #includes)
+ * sgs_connect_impl typedef (declare before any #includes)
  */
 typedef struct sgs_connection_impl sgs_connection_impl;
 
