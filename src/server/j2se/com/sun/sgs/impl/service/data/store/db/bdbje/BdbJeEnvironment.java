@@ -7,12 +7,12 @@ package com.sun.sgs.impl.service.data.store.db.bdbje;
 import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.DeadlockException;
-import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.ExceptionEvent;
 import com.sleepycat.je.ExceptionListener;
 import com.sleepycat.je.LockNotGrantedException;
 import com.sleepycat.je.RunRecoveryException;
+import com.sleepycat.je.XAEnvironment;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -29,6 +29,10 @@ import java.io.FileNotFoundException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.transaction.xa.XAException;
+import static javax.transaction.xa.XAException.XA_RBDEADLOCK;
+import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
+
 
 /** Provides a database implementation using Berkeley DB. */
 public class BdbJeEnvironment implements DbEnvironment {
@@ -99,7 +103,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	PACKAGE + ".flush.to.disk";
 
     /** The Berkeley DB environment. */
-    private final Environment env;
+    private final XAEnvironment env;
 
     /** Used to cancel the checkpoint task. */
     private final TaskHandle checkpointTaskHandle;
@@ -176,7 +180,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	config.setTransactional(true);
 	config.setTxnWriteNoSync(!flushToDisk);
 	try {
-	    env = new Environment(new File(directory), config);
+	    env = new XAEnvironment(new File(directory), config);
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
 	}
@@ -215,7 +219,7 @@ public class BdbJeEnvironment implements DbEnvironment {
      * exceptions if convertTxnExceptions is true.
      */
     static RuntimeException convertException(
-	DatabaseException e, boolean convertTxnExceptions) {
+	Exception e, boolean convertTxnExceptions) {
 	/*
 	 * Don't include DatabaseExceptions as the cause because, even though
 	 * that class implements Serializable, the Environment object
@@ -241,6 +245,19 @@ public class BdbJeEnvironment implements DbEnvironment {
 		e);
 	    logger.logThrow(Level.SEVERE, error, "Database requires recovery");
 	    throw error;
+	} else if (e instanceof XAException) {
+	    int errorCode = ((XAException) e).errorCode;
+	    switch (errorCode) {
+	    case XA_RBTIMEOUT:
+		throw new TransactionTimeoutException(
+		    "Transaction timed out: " + e, e);
+	    case XA_RBDEADLOCK:
+		throw new TransactionConflictException(
+		    "Transaction conflict: " + e, e);
+	    default:
+		throw new DbDatabaseException(
+		    "Unexpected database exception: " + e, e);
+	    }
 	} else {
 	    throw new DbDatabaseException(
 		"Unexpected database exception: " + e);

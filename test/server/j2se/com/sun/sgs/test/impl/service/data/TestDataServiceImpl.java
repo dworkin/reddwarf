@@ -1503,7 +1503,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
@@ -1987,7 +1987,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(

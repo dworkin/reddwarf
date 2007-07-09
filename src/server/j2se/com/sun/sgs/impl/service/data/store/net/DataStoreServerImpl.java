@@ -35,7 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /*
- * XXX: Make sure that prepared transactions do not timeout.  -tjb@sun.com
+ * FIXME: Make sure that prepared transactions do not timeout.  -tjb@sun.com
  * (06/28/2007)
  */
 

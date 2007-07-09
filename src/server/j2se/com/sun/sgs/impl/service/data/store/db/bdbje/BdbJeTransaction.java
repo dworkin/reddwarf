@@ -6,14 +6,63 @@ package com.sun.sgs.impl.service.data.store.db.bdbje;
 
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sleepycat.je.DatabaseException;
-import com.sleepycat.je.Environment;
 import com.sleepycat.je.Transaction;
+import com.sleepycat.je.XAEnvironment;
+import java.util.Arrays;
+import javax.transaction.xa.XAException;
+import javax.transaction.xa.Xid;
 
 /** Provide a transaction implementation using Berkeley DB. */
 class BdbJeTransaction implements DbTransaction {
 
-    /** The Berkeley DB transacction. */
+    /** The Berkeley DB environment. */
+    private final XAEnvironment env;
+
+    /** The Berkeley DB transaction. */
     private final Transaction txn;
+
+    /**
+     * Implement a Xid whose format is always 1 and with a null branch
+     * qualifier.
+     */
+    private final class SimpleXid implements Xid {
+	/** The global transaction ID. */
+	private byte[] gid;
+
+	/** Creates an instance with the specified global transaction ID. */
+	SimpleXid(byte[] gid) {
+	    this.gid = gid;
+	}
+
+	/* -- Implement Xid -- */
+
+	public int getFormatId() {
+	    return 1;
+	}
+
+	public byte[] getGlobalTransactionId() {
+	    return gid;
+	}
+
+	public byte[] getBranchQualifier() {
+	    return null;
+	}
+
+	public int hashCode() {
+	    return Arrays.hashCode(gid);
+	}
+
+	public boolean equals(Object object) {
+	    if (object instanceof Xid) {
+		Xid xid = (Xid) object;
+		return xid.getFormatId() == 1 &&
+		    Arrays.equals(xid.getGlobalTransactionId(), gid) &&
+		    xid.getBranchQualifier() == null;
+	    } else {
+		return false;
+	    }
+	}
+    }
 
     /**
      * Creates an instance of this class.
@@ -25,7 +74,8 @@ class BdbJeTransaction implements DbTransaction {
      * @throws	IllegalArgumentException if timeout is less than {@code 1}
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    BdbJeTransaction(Environment env, long timeout) {
+    BdbJeTransaction(XAEnvironment env, long timeout) {
+	this.env = env;
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
 		"Timeout must be greater than 0");
@@ -58,7 +108,15 @@ class BdbJeTransaction implements DbTransaction {
 
     /** {@inheritDoc} */
     public void prepare(byte[] gid) {
-	/* XXX: Does nothing for now. */
+	try {
+	    Xid xid = new SimpleXid(gid);
+	    env.setXATransaction(xid, txn);
+ 	    env.prepare(xid);
+	} catch (DatabaseException e) {
+	    throw BdbJeEnvironment.convertException(e, false);
+	} catch (XAException e) {
+	    throw BdbJeEnvironment.convertException(e, false);
+	}
     }
 
     /** {@inheritDoc} */
