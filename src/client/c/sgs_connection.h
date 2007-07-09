@@ -69,6 +69,6 @@ int sgs_connection_login(sgs_connection *connection, const char *login,
  * Creates and sends a login request message to the server.  Returns 0 on
  * success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_connection_logout(sgs_connection *connection, const int force);
+int sgs_connection_logout(sgs_connection *connection, int force);
 
 #endif  /** #ifndef SGS_CONNECTION_H */
