@@ -380,25 +380,21 @@ static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
     for (i=0; i < g_nfds; i++) {
         if (fd == g_poll_fds[i].fd) {
             if (events == 0) {
+                /** Turn off all bits */
+                g_poll_fds[i].events = 0;
+            }
+            else {
+                /** Turn off requested bits */
+                g_poll_fds[i].events &= ~events;
+            }
+            
+            if (g_poll_fds[i].events == 0) {
                 g_poll_fds[i].fd = -1;
                 
                 if (i == g_nfds-1) {
                     /** Last fd in array was cleared, so resize array */
                     last_max = i;
                     resize = 1;
-                }
-            } else {
-                /** Turn off requested bits */
-                g_poll_fds[i].events &= ~events;
-                
-                if (g_poll_fds[i].events == 0) {
-                    g_poll_fds[i].fd = -1;
-                    
-                    if (i == g_nfds-1) {
-                        /** Last fd in array was cleared, so resize array */
-                        last_max = i;
-                        resize = 1;
-                    }
                 }
             }
             
