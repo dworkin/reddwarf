@@ -4,13 +4,9 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sleepycat.bind.tuple.LongBinding;
-import com.sleepycat.bind.tuple.ShortBinding;
-import com.sleepycat.db.Database;
-import com.sleepycat.db.DatabaseEntry;
-import com.sleepycat.db.DatabaseException;
-import com.sleepycat.db.LockMode;
-import com.sleepycat.db.OperationStatus;
+import com.sun.sgs.impl.service.data.store.db.DataEncoding;
+import com.sun.sgs.impl.service.data.store.db.DbDatabase;
+import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import java.math.BigInteger;
 
 /**
@@ -120,73 +116,69 @@ final class DataStoreHeader {
      * version number.
      *
      * @param	db the database
-     * @param	bdbTxn the Berkeley DB transaction
+     * @param	dbTxn the database transaction
      * @return	the minor version number
-     * @throws	DatabaseException if a problem occurs accessing the database
+     * @throws	DbDatabaseException if a problem occurs accessing the database
      * @throws	DataStoreException if the format of the header information is
      *		incorrect
      */
-    static int verify(Database db, com.sleepycat.db.Transaction bdbTxn)
-	throws DatabaseException
-    {
-	DatabaseEntry key = new DatabaseEntry();
-	DatabaseEntry value = new DatabaseEntry();
-
-	LongBinding.longToEntry(MAGIC_KEY, key);
-	get(db, bdbTxn, key, value, null);
-	long magic = LongBinding.entryToLong(value);
+    static int verify(DbDatabase db, DbTransaction dbTxn) {
+	byte[] value =
+	    db.get(dbTxn, DataEncoding.encodeLong(MAGIC_KEY), false);
+	if (value == null) {
+	    throw new DataStoreException("Magic number not found");
+	}
+	long magic = DataEncoding.decodeLong(value);
 	if (magic != MAGIC) {
 	    throw new DataStoreException(
 		"Bad magic number in header: expected " +
 		toHexString(MAGIC) + ", found " + toHexString(magic));
 	}
-
-	LongBinding.longToEntry(MAJOR_KEY, key);
-	get(db, bdbTxn, key, value, null);
-	int majorVersion = ShortBinding.entryToShort(value);
+	value = db.get(dbTxn, DataEncoding.encodeLong(MAJOR_KEY), false);
+	if (value == null) {
+	    throw new DataStoreException("Major version number not found");
+	}
+	short majorVersion = DataEncoding.decodeShort(value);
 	if (majorVersion != MAJOR_VERSION) {
 	    throw new DataStoreException(
 		"Wrong major version number: expected " + MAJOR_VERSION +
 		", found " + majorVersion);
 	}
-
-	LongBinding.longToEntry(MINOR_KEY, key);
-	get(db, bdbTxn, key, value, null);
-	return ShortBinding.entryToShort(value);
+	value = db.get(dbTxn, DataEncoding.encodeLong(MINOR_KEY), false);
+	if (value == null) {
+	    throw new DataStoreException("Minor version number not found");
+	}
+	return DataEncoding.decodeShort(value);
     }
 
     /**
      * Stores header information in the database.
      *
      * @param	db the database
-     * @param	bdbTxn the Berkeley DB transaction
-     * @throws	DatabaseException if a problem occurs accessing the database
+     * @param	dbTxn the database transaction
+     * @throws	DbDatabaseException if a problem occurs accessing the database
      */
-    static void create(Database db, com.sleepycat.db.Transaction bdbTxn)
-	throws DatabaseException
-    {
-	DatabaseEntry key = new DatabaseEntry();
-	DatabaseEntry value = new DatabaseEntry();
-
-	LongBinding.longToEntry(MAGIC_KEY, key);
-	LongBinding.longToEntry(MAGIC, value);
-	putNoOverwrite(db, bdbTxn, key, value);
-
-	LongBinding.longToEntry(MAJOR_KEY, key);
-	ShortBinding.shortToEntry(MAJOR_VERSION, value);
-	putNoOverwrite(db, bdbTxn, key, value);
-
-	LongBinding.longToEntry(MINOR_KEY, key);
-	ShortBinding.shortToEntry(MINOR_VERSION, value);
-	putNoOverwrite(db, bdbTxn, key, value);
-
-	LongBinding.longToEntry(NEXT_OBJ_ID_KEY, key);
-	LongBinding.longToEntry(INITIAL_NEXT_OBJ_ID, value);
-	putNoOverwrite(db, bdbTxn, key, value);
-
-	LongBinding.longToEntry(NEXT_TXN_ID_KEY, key);
-	LongBinding.longToEntry(INITIAL_NEXT_TXN_ID, value);
-	putNoOverwrite(db, bdbTxn, key, value);
+    static void create(DbDatabase db, DbTransaction dbTxn) {
+	boolean success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(MAGIC_KEY),
+	    DataEncoding.encodeLong(MAGIC));
+	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
+	    DataEncoding.encodeShort(MAJOR_VERSION));
+	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(MINOR_KEY),
+	    DataEncoding.encodeShort(MINOR_VERSION));
+	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(NEXT_OBJ_ID_KEY),
+	    DataEncoding.encodeLong(INITIAL_NEXT_OBJ_ID));
+	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(NEXT_TXN_ID_KEY),
+	    DataEncoding.encodeLong(INITIAL_NEXT_TXN_ID));
+	assert success;
     }
 
     /**
@@ -196,24 +188,23 @@ final class DataStoreHeader {
      *
      * @param	key the key under which the ID is stored
      * @param	db the database
-     * @param	bdbTxn the Berkeley DB transaction
+     * @param	dbTxn the database transaction
      * @param	increment the amount to increment the stored amount
      * @return	the next available ID
-     * @throws	DatabaseException if a problem occurs accessing the database
+     * @throws	DbDatabaseException if a problem occurs accessing the database
      */
     static long getNextId(long key,
-			  Database db,
-			  com.sleepycat.db.Transaction bdbTxn,
+			  DbDatabase db,
+			  DbTransaction dbTxn,
 			  long increment)
-	throws DatabaseException
     {
-	DatabaseEntry keyEntry = new DatabaseEntry();
-	LongBinding.longToEntry(key, keyEntry);
-	DatabaseEntry valueEntry = new DatabaseEntry();
-	get(db, bdbTxn, keyEntry, valueEntry, LockMode.RMW);
-	long result = LongBinding.entryToLong(valueEntry);
-	LongBinding.longToEntry(result + increment, valueEntry);
-	put(db, bdbTxn, keyEntry, valueEntry);
+	byte[] keyBytes = DataEncoding.encodeLong(key);
+	byte[] valueBytes = db.get(dbTxn, keyBytes, true);
+	if (valueBytes == null) {
+	    throw new DataStoreException("Key not found: " + key);
+	}
+	long result = DataEncoding.decodeLong(valueBytes);
+	db.put(dbTxn, keyBytes, DataEncoding.encodeLong(result + increment));
 	return result;
     }
 
@@ -229,57 +220,6 @@ final class DataStoreHeader {
     static String headerString(int minorVersion) {
 	return "DataStoreHeader[magic:" + toHexString(MAGIC) +
 	    ", version:" + MAJOR_VERSION + "." + minorVersion + "]";
-    }
-
-    /**
-     * Reads a value from the database, throwing an exception if the key is not
-     * present.
-     */
-    private static void get(Database db,
-			    com.sleepycat.db.Transaction bdbTxn,
-			    DatabaseEntry key,
-			    DatabaseEntry value,
-			    LockMode lockMode)
-	throws DatabaseException
-    {
-	OperationStatus status = db.get(bdbTxn, key, value, lockMode);
-	if (status == OperationStatus.NOTFOUND) {
-	    throw new DataStoreException("Item not found");
-	} else if (status != OperationStatus.SUCCESS) {
-	    throw new DataStoreException(
-		"Problem reading item: " + status);
-	}
-    }
-
-    /**
-     * Writes a value to the database, throwing an exception if the key is
-     * already present.
-     */
-    private static void putNoOverwrite(Database db,
-				       com.sleepycat.db.Transaction bdbTxn,
-				       DatabaseEntry key,
-				       DatabaseEntry value)
-	throws DatabaseException
-    {
-	OperationStatus status = db.putNoOverwrite(bdbTxn, key, value);
-	if (status == OperationStatus.KEYEXIST) {
-	    throw new DataStoreException("Item already present");
-	} else if (status != OperationStatus.SUCCESS) {
-	    throw new DataStoreException("Problem writing item: " + status);
-	}
-    }
-
-    /** Writes a value to the database. */
-    private static void put(Database db,
-			    com.sleepycat.db.Transaction bdbTxn,
-			    DatabaseEntry key,
-			    DatabaseEntry value)
-	throws DatabaseException
-    {
-	OperationStatus status = db.put(bdbTxn, key, value);
-	if (status != OperationStatus.SUCCESS) {
-	    throw new DataStoreException("Problem writing item: " + status);
-	}
     }
 
     /** Converts a long to a string in hexadecimal. */

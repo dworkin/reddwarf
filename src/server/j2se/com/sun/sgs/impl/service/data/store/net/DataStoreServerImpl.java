@@ -34,6 +34,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/*
+ * XXX: Make sure that prepared transactions do not timeout.  -tjb@sun.com
+ * (06/28/2007)
+ */
+
 /**
  * Provides an implementation of {@code DataStoreServer}, using the {@link
  * DataStoreImpl} class to support the same database format which that class

@@ -62,6 +62,7 @@
   <!-- The caller should set the bdb.builds.dir property to a directory
        containing builds of Berkeley DB for all of the platforms if
        calling the dist-server task. -->
+  <property name="bdb.je.jar" location="lib/je-3.2.23.jar"/>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
@@ -75,6 +76,7 @@
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${bdb.je.jar}"/>
     <path refid="shared.classpath"/>
   </path>
 
