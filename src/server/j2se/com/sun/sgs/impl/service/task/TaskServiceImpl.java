@@ -405,7 +405,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         PendingTask ptask = null;
         try {
             ptask = dataService.getServiceBinding(objName, PendingTask.class);
-        } catch (ObjectNotFoundException onfe) {
+        } catch (NameNotBoundException nnbe) {
             return null;
         }
         boolean isAvailable = ptask.isTaskAvailable();

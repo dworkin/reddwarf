@@ -144,7 +144,7 @@ class ServiceConfigRunner implements KernelRunnable {
             }
         } else {
             // we're running without an application, so we're finished
-            kernel.applicationReady(appContext);
+            kernel.contextReady(appContext, false);
         }
 
         if (logger.isLoggable(Level.CONFIG))

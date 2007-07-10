@@ -582,16 +582,26 @@ class Kernel {
     }
 
     /**
-     * Called when an application has finished loading and has started to
-     * run. This is typically called by <code>AppStartupRunner</code>
-     * after it has started an application.
+     * Called when a context has finished loading and, if there is an
+     * associated application, the application has started to run. This
+     * is typically called by <code>AppStartupRunner</code> after it has
+     * started an application or <code>ServiceConfigRunner</code> when
+     * a context with no application is ready.
      *
      * @param context the application's kernel context
+     * @param hasApplication <code>true</code> if the context is associated
+     *                       with a running application, <code>false</code>
+     *                       otherwise 
      */
-    void applicationReady(AppKernelAppContext context) {
+    void contextReady(AppKernelAppContext context, boolean hasApplication) {
         applications.add(context);
-        if (logger.isLoggable(Level.INFO))
-	    logger.log(Level.INFO, "{0}: application is ready", context);
+        if (logger.isLoggable(Level.INFO)) {
+            if (hasApplication)
+                logger.log(Level.INFO, "{0}: application is ready", context);
+            else
+                logger.log(Level.INFO, "{0}: non-application context is ready",
+                           context);
+        }
     }
 
     /**

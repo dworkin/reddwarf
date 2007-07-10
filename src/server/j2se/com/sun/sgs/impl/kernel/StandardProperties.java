@@ -141,12 +141,24 @@ public class StandardProperties {
     public static final String FINAL_SERVICE = NS + "app.finalService";
 
     /**
-     * An enumeration of the known, standard <code>Service</code>s.
+     * An enumeration of the known, standard <code>Service</code>s. The
+     * ordering represents the order in which the services are configured.
      */
     public enum StandardService {
-        DataService, WatchdogService, RegistrationService, TaskService,
-            ClientSessionService, ChannelService;
+        /** Enumeration for the Data Service */
+        DataService,
+        /** Enumeration for the Watchdog Service */
+        WatchdogService,
+        /** Enumeration for the Registration Service */
+        RegistrationService,
+        /** Enumeration for the Task Service */
+        TaskService,
+        /** Enumeration for the Client Session Service */
+        ClientSessionService,
+        /** Enumeration for the Channel Service */
+        ChannelService;
 
+        /** The last service that gets configured for an application. */
         public static final StandardService LAST_SERVICE = ChannelService;
     }
 

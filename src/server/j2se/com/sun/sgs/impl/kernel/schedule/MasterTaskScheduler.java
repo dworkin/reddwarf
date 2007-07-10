@@ -54,7 +54,7 @@ public class MasterTaskScheduler
     private static ThreadLocal<Boolean> runningDirectTask =
         new ThreadLocal<Boolean>() {
             protected Boolean initialValue() {
-                return false;
+                return Boolean.FALSE;
             }
         };
 

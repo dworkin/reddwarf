@@ -72,9 +72,7 @@ class TaskExecutor {
     void runTask(ScheduledTask task, boolean retry)
         throws InterruptedException, Exception
     {
-        int tryCount = 1;
-
-        while (true) {
+        for (int tryCount = 1; ; tryCount++) {
             try {
                 if (collector != null) {
                     TaskOwner owner = task.getOwner();
@@ -112,7 +110,6 @@ class TaskExecutor {
                     // etc...this is just re-running in place until the task
                     // is done, but this is one of the first issues that will
                     // be investigated for optimization
-                    tryCount++;
                 } else {
                     if (logger.isLoggable(Level.WARNING)) {
                         if (task.isRecurring()) {
