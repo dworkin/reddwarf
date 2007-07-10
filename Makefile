@@ -30,19 +30,7 @@ OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 all:	chatclient tests
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(API_HEADERS) $(SRCDIR)/%.h
-	@mkdir -p $(ODIR)
-	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
-
-$(ODIR)/example/%.o: $(SRCDIR)/example/%.c $(API_HEADERS)
-	@mkdir -p $(ODIR)/example
-	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
-
-$(ODIR)/impl/%.o: $(SRCDIR)/impl/%.c $(API_HEADERS) $(SRCDIR)/impl/%.h
-	@mkdir -p $(ODIR)/impl
-	$(CC) $(CFLAGS) -I $(SRCDIR) -c $< -o $@
-
-$(ODIR)/test/%.o: $(SRCDIR)/test/%.c $(API_HEADERS)
-	@mkdir -p $(ODIR)/test
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
 
 chatclient: $(OBJS) $(ODIR)/example/sgs_chat_client.o $(API_HEADERS)
@@ -72,4 +60,5 @@ tar:
 	tar cf c_backups.tar $(SRCDIR)
 
 clean:
-	rm -f *~ core callbacks.out $(SRCDIR)/*~ $(SRCDIR)/*/*~ $(ODIR)/*.o $(ODIR)/*/*.o $(SRCDIR)/*.gch $(SRCDIR)/*/*.gch
+	rm -f *~ core callbacks.out $(SRCDIR)/*~ $(SRCDIR)/*/*~ $(SRCDIR)/*.gch $(SRCDIR)/*/*.gch
+	rm -fr $(ODIR)
