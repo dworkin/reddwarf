@@ -1,5 +1,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ *
+ * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
+ * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
+ * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
  */
 
 /*
@@ -381,6 +385,9 @@ Ignoring requests.\n");
  */
 static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
     int i, last_max = 0, resize = 0;
+    
+    if ((events & POLLIN) == POLLIN)
+        printf("UNREG FOR POLLIN!  fd=%d\n", fd);
     
     for (i=0; i < g_nfds; i++) {
         if (fd == g_poll_fds[i].fd) {

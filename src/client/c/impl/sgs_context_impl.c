@@ -1,5 +1,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ *
+ * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
+ * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
+ * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
  */
 
 /*
@@ -14,7 +18,7 @@
 #include <string.h>
 #include "sgs_context_impl.h"
 #include "sgs_connection.h"
-#include "sgs_session_id.h"
+#include "sgs_id.h"
 
 /*
  * FUNCTION IMPLEMENTATIONS FOR SGS_CONTEXT.H
@@ -79,7 +83,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_channel*, const sgs_session_id*,
+    void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
         const uint8_t*, size_t))
 {
     ctx->channel_recv_msg_cb = callback;
