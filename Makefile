@@ -15,7 +15,7 @@ ODIR = obj
 BINDIR = bin
 SRCDIR = src/client/c
 
-API_HEADERS = $(wildcard $(SRCDIR)/*.h)
+HEADERS = $(notdir $(wildcard $(SRCDIR)/*.h)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.h)))
 SRCS = $(notdir $(wildcard $(SRCDIR)/*.c)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.c)))
 OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 
@@ -29,11 +29,11 @@ OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 
 all:	chatclient tests
 
-$(ODIR)/%.o: $(SRCDIR)/%.c $(API_HEADERS) $(SRCDIR)/%.h
+$(ODIR)/%.o: $(SRCDIR)/%.c $(HEADERS)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
 
-chatclient: $(OBJS) $(ODIR)/example/sgs_chat_client.o $(API_HEADERS)
+chatclient: $(OBJS) $(ODIR)/example/sgs_chat_client.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/chatclient $^
 
