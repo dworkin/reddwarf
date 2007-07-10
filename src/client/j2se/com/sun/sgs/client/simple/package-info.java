@@ -4,6 +4,7 @@
 
 /**
  * Defines the interface to a simple, concrete implementation of
- * a J2SE(TM) client framework that communicates with the Sun Game Server.
+ * a J2SE(TM) client framework that communicates with the Project Darkstar
+ * Server.
  */
 package com.sun.sgs.client.simple;

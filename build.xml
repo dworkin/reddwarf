@@ -3,7 +3,7 @@
 <project name="sgs" default="build" basedir=".">
 
   <description>
-    Builds the Sun Game Server project
+    Builds Project Darkstar
   </description>
 
   <!-- First load the user's properties -->
@@ -28,7 +28,7 @@
   <property name="external.release" value="false"/>
 
   <!-- Values for the JavaDocs -->
-  <property name="project.name" value="Sun Game Server"/>
+  <property name="project.name" value="Project Darkstar"/>
   <tstamp>
     <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
   </tstamp>
@@ -188,7 +188,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -219,7 +219,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -250,7 +250,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -282,7 +282,7 @@
 
   <!-- Creates distribution files -->
   <target name="dist" depends="dist-client, dist-server"
-	  description="Creates files for distribution"/>
+	  description="Creates distribution files"/>
 
   <!-- Creates client distribution files -->
   <target name="dist-client" depends="dist-client-source, dist-client-binary"
@@ -291,7 +291,6 @@
   <!-- Creates client source distribution -->
   <target name="dist-client-source" depends="project-version"
 	  description="Creates client source distribution">
-    <mkdir dir="${build.dir}"/>
     <delete dir="${build.dir}/sgs-client-src"/>
     <copy todir="${build.dir}/sgs-client-src">
       <fileset dir="."
@@ -304,7 +303,8 @@
     </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
-    <copy file="etc/BSD" tofile="${build.dir}/sgs-client-src/LICENSE"/>
+    <copy file="etc/LICENSE-client"
+	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
     <copy file="etc/README-client-source"
 	  tofile="${build.dir}/sgs-client-src/README">
       <filterset>
@@ -326,9 +326,9 @@
 
   <!-- Creates client binary distribution -->
   <target name="dist-client-binary"
-	  depends="javadoc-api-client, jar-client, project-version"
+	  depends="javadoc-api-client, jar-client, jar-tutorial,
+		   project-version"
 	  description="Creates client binary files for distribution">
-    <mkdir dir="${build.dir}"/>
     <delete dir="${build.dir}/sgs-client-bin"/>
     <copy todir="${build.dir}/sgs-client-bin/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
@@ -348,13 +348,11 @@
       <fileset dir="example/tutorial/src"
 	       includes="com/sun/sgs/tutorial/client/**/*.java"/>
     </copy>
-    <copy todir="${build.dir}/sgs-client-bin">
-      <fileset dir="etc"
-	       includes="LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf"/>
-    </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client-bin/CHANGELOG"/>
+    <copy file="etc/LICENSE-client"
+	  tofile="${build.dir}/sgs-client-bin/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client-bin"/>
     <copy file="etc/README-client-binary"
 	  tofile="${build.dir}/sgs-client-bin/README">
       <filterset>
@@ -373,8 +371,7 @@
 
   <!-- Creates server source distribution -->
   <target name="dist-server-source" depends="project-version"
-	  description="Builds server Creates a source distribution">
-    <mkdir dir="${build.dir}"/>
+	  description="Creates server source distribution">
     <delete dir="${build.dir}/sgs-src"/>
     <copy todir="${build.dir}/sgs-src">
       <fileset dir="."
@@ -395,7 +392,7 @@
 			 test/server/**"/>
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
-    <copy file="etc/GPL" tofile="${build.dir}/sgs-src/LICENSE"/>
+    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
@@ -413,15 +410,15 @@
 	  depends="-dist-server-binary-clean, dist-server-binary-tutorial,
 		   dist-server-binary-bdb, jar-server, javadoc-api-server,
 		   project-version"
-	  description="Creates server binary files for distribution">
+	  description="Creates server binary distribution">
     <copy todir="${build.dir}/sgs-bin">
       <fileset dir="etc"
 	       includes="sgs.*,
-			 sgs-*.properties,
-			 LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf"/>
+			 sgs-*.properties"/>
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-bin/CHANGELOG"/>
+    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-bin/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-bin"/>
     <copy file="etc/README-server-binary"
 	  tofile="${build.dir}/sgs-bin/README">
       <filterset>
@@ -449,7 +446,6 @@
 
   <!-- Cleans the server binary distribution directory -->
   <target name="-dist-server-binary-clean">
-    <mkdir dir="${build.dir}"/>
     <delete dir="${build.dir}/sgs-bin"/>
   </target>
 
@@ -1028,6 +1024,7 @@
   <!-- Builds tutorial jar files -->
   <target name="jar-tutorial" depends="example-classes"
           description="Builds tutorial jar file">
+    <mkdir dir="${build.dir}/example/tutorial"/>
     <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
       <fileset dir="${build.dir}/example/classes"
                includes="com/sun/sgs/tutorial/server/**"/>

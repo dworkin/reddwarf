@@ -1,6 +1,7 @@
-SUN (TM) GAME SERVER THIRD PARTY LICENSE README 
+PROJECT DARKSTAR THIRD PARTY LICENSE README
 
 ******************************************************************** 
+
 The following software may be included in this product: Apache MINA
 v. 1.1.  Use of any of this software is governed by the terms of the
 Apache License, Version 2.0, January 2004, which is available at:
@@ -8,6 +9,7 @@ Apache License, Version 2.0, January 2004, which is available at:
 <http://svn.apache.org/repos/asf/mina/branches/1.1/LICENSE.txt> 
 
 ******************************************************************** 
+
 The following software may be included in this product: Simple Logging
 Facade for Java (SLF4J) v. 1.2.  Use of any of this software is governed
 by the terms of a MIT LICENSE, which is available at:
