@@ -22,7 +22,7 @@ static size_t tailpos (const sgs_buffer_impl *buffer);
 static size_t writable_len(const sgs_buffer_impl *buffer);
 
 /*
- * (EXTERNAL) FUNCTION IMPLEMENTATIONS
+ * FUNCTION IMPLEMENTATIONS FOR SGS_BUFFER.H
  */
 
 /*

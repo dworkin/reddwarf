@@ -14,10 +14,10 @@
 #include <string.h>
 #include "sgs_context_impl.h"
 #include "sgs_connection.h"
-#include "sgs_id.h"
+#include "sgs_session_id.h"
 
 /*
- * EXTERNAL FUNCTION IMPLEMENTATIONS
+ * FUNCTION IMPLEMENTATIONS FOR SGS_CONTEXT.H
  */
 
 /*
@@ -79,7 +79,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
+    void (*callback)(sgs_connection*, sgs_channel*, const sgs_session_id*,
         const uint8_t*, size_t))
 {
     ctx->channel_recv_msg_cb = callback;
