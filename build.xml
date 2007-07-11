@@ -338,7 +338,7 @@
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
     </copy>
     <copy todir="${build.dir}/sgs-client/lib">
-      <fileset file="build/lib/sgs-client.jar"/>
+      <fileset file="${build.dir}/lib/sgs-client.jar"/>
       <fileset dir="lib"
 	       includes="mina-core-1.1.jar,
 			 slf4j-api-1.4.0.jar,
