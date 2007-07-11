@@ -1,4 +1,4 @@
-Project Darkstar Server, Source Distribution
+Project Darkstar Server Source Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,10 +7,10 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Server, Source Distribution, contains the source
-code for developing game servers that run as applications in the Project
+The Project Darkstar Server Source Distribution contains the source code
+for developing game servers that run as applications in the Project
 Darkstar Server environment.  Information about building client
-application is available as a separate download.
+applications is available as a separate download.
 
 In addition to the documents, APIs and examples, this kit contains the
 source code for a complete single-system version of the Project Darkstar
@@ -84,11 +84,13 @@ subdirectory in order to run the tests:
 
   http://junit.org/index.htm
 
+
 KNOWN ISSUES
 
-This version of the SDK has the following limitations:
+This version of the Project Darkstar Server has the following
+limitations:
 
-- The SDK only supports single node operation.
+- It only supports single node operation.
 
 - I/O throttling has not been implemented in this release, so it is
   possible for clients to overwhelm the server with network traffic and
@@ -96,14 +98,14 @@ This version of the SDK has the following limitations:
   developers must ensure that clients do not send network traffic faster
   than the server application can process it.
 
-- The SDK does not support pluggable I/O transports
+- It does not support pluggable I/O transports
 
 - The API for customizing managers and services is incomplete and still
   under development
 
-- The transaction coordinator implementation in the SDK does not support
-  more than one persistent service at a time.  This restriction prevents
-  using additional services that modify the contents of databases.
+- The transaction coordinator implementation does not support more than
+  one persistent service at a time.  This restriction prevents using
+  additional services that modify the contents of databases.
 
 
 MORE INFORMATION

@@ -329,39 +329,39 @@
 	  depends="javadoc-api-client, jar-client, jar-tutorial,
 		   project-version"
 	  description="Creates client binary files for distribution">
-    <delete dir="${build.dir}/sgs-client-bin"/>
-    <copy todir="${build.dir}/sgs-client-bin/doc/sgs-client-api">
+    <delete dir="${build.dir}/sgs-client"/>
+    <copy todir="${build.dir}/sgs-client/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
     </copy>
-    <copy todir="${build.dir}/sgs-client-bin/lib">
+    <copy todir="${build.dir}/sgs-client/lib">
       <fileset file="build/lib/sgs-client.jar"/>
       <fileset dir="lib"
 	       includes="mina-core-1.1.jar,
 			 slf4j-api-1.4.0.jar,
 			 slf4j-jdk14-1.4.0.jar"/>
     </copy>
-    <copy todir="${build.dir}/sgs-client-bin/tutorial">
-      <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
+    <copy todir="${build.dir}/sgs-client/tutorial">
+      <fileset file="${build.dir}/example/tutorial/tutorial-client.jar"/>
       <fileset file="doc/ClientTutorial.pdf"/>
     </copy>
-    <copy todir="${build.dir}/sgs-client-bin/tutorial/src">
+    <copy todir="${build.dir}/sgs-client/tutorial/src">
       <fileset dir="example/tutorial/src"
 	       includes="com/sun/sgs/tutorial/client/**/*.java"/>
     </copy>
     <copy file="etc/CHANGELOG-client"
-	  tofile="${build.dir}/sgs-client-bin/CHANGELOG"/>
+	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
     <copy file="etc/LICENSE-client"
-	  tofile="${build.dir}/sgs-client-bin/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client-bin"/>
+	  tofile="${build.dir}/sgs-client/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client"/>
     <copy file="etc/README-client-binary"
-	  tofile="${build.dir}/sgs-client-bin/README">
+	  tofile="${build.dir}/sgs-client/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
       </filterset>
     </copy>
-    <zip destfile="${build.dir}/sgs-client-bin-${project.version}.zip">
-      <zipfileset dir="${build.dir}/sgs-client-bin"
-		  prefix="sgs-client-bin-${project.version}"/>
+    <zip destfile="${build.dir}/sgs-client-${project.version}.zip">
+      <zipfileset dir="${build.dir}/sgs-client"
+		  prefix="sgs-client-${project.version}"/>
     </zip>
   </target>
 
@@ -411,42 +411,41 @@
 		   dist-server-binary-bdb, jar-server, javadoc-api-server,
 		   project-version"
 	  description="Creates server binary distribution">
-    <copy todir="${build.dir}/sgs-bin">
+    <copy todir="${build.dir}/sgs">
       <fileset dir="etc"
 	       includes="sgs.*,
 			 sgs-*.properties"/>
     </copy>
-    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-bin/CHANGELOG"/>
-    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-bin/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-bin"/>
-    <copy file="etc/README-server-binary"
-	  tofile="${build.dir}/sgs-bin/README">
+    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
+    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs"/>
+    <copy file="etc/README-server-binary" tofile="${build.dir}/sgs/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
       </filterset>
     </copy>
-    <chmod file="${build.dir}/sgs-bin/sgs.sh" perm="a+x"/>
-    <copy todir="${build.dir}/sgs-bin/lib">
+    <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
+    <copy todir="${build.dir}/sgs/lib">
       <fileset file="${build.dir}/lib/sgs.jar"/>
       <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/doc/sgs-api">
+    <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"/>
     </copy>
-    <zip destfile="${build.dir}/sgs-bin-${project.version}.zip">
-      <zipfileset dir="${build.dir}/sgs-bin" includes="**"
+    <zip destfile="${build.dir}/sgs-${project.version}.zip">
+      <zipfileset dir="${build.dir}/sgs" includes="**"
 		  excludes="sgs.sh, lib/bdb/win32-x86/*"
-		  prefix="sgs-bin-${project.version}"/>
-      <zipfileset dir="${build.dir}/sgs-bin"
+		  prefix="sgs-${project.version}"/>
+      <zipfileset dir="${build.dir}/sgs"
 		  includes="sgs.sh, lib/bdb/win32-x86/*"
 		  filemode="755"
-		  prefix="sgs-bin-${project.version}"/>
+		  prefix="sgs-${project.version}"/>
     </zip>
   </target>
 
   <!-- Cleans the server binary distribution directory -->
   <target name="-dist-server-binary-clean">
-    <delete dir="${build.dir}/sgs-bin"/>
+    <delete dir="${build.dir}/sgs"/>
   </target>
 
   <!-- Builds files for distributing Berkeley DB -->
@@ -454,39 +453,39 @@
 	  description="Builds files for distributing Berkeley DB">
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb"
+    <copy todir="${build.dir}/sgs/lib/bdb"
 	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/macosx-ppc">
+    <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
       <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/macosx-x86">
+    <copy todir="${build.dir}/sgs/lib/bdb/macosx-x86">
       <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/solaris-x86">
+    <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/solaris-sparc">
+    <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/linux-x86">
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86">
       <fileset dir="${bdb.builds.dir}/linux-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/linux-x86_64">
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86_64">
       <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/lib/bdb/win32-x86/">
+    <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
@@ -1039,26 +1038,26 @@
   <target name="dist-server-binary-tutorial" depends="jar-tutorial"
           description=
 	    "Builds tutorial files for the binary server distribution">
-    <copy todir="${build.dir}/sgs-bin/tutorial">
+    <copy todir="${build.dir}/sgs/tutorial">
       <fileset dir="example/tutorial" includes="*.properties"/>
       <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
       <fileset file="doc/ServerAppTutorial.pdf"/>
     </copy>
-    <copy todir="${build.dir}/sgs-bin/tutorial/src">
+    <copy todir="${build.dir}/sgs/tutorial/src">
       <fileset dir="example/tutorial/src"
 	       includes="com/sun/sgs/tutorial/server/**/*.java"/>
     </copy>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloChannels/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloEcho/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloLogger/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloPersistence/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloPersistence2/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloPersistence3/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloTimer/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloUser/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloUser2/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/HelloWorld/dsdb"/>
-    <mkdir dir="${build.dir}/sgs-bin/tutorial/data/SwordWorld/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloChannels/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloEcho/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloLogger/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence3/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloTimer/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
     <!-- TODO: generate and package javadoc -->
   </target>
 

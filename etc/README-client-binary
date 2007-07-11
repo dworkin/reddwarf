@@ -1,4 +1,4 @@
-Project Darkstar Client API Pack, Binary Distribution
+Project Darkstar Client Software Development Kit
 Version @VERSION@
 
 INTRODUCTION
@@ -7,14 +7,16 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Client API Pack, Binary Distribution, contains
-everything you need to develop and run game clients that communicate
-with each other and with game servers implemented with the Project
-Darkstar Server.
+The Project Darkstar Client Software Development Kit contains everything
+you need to develop and run game clients that communicate with each
+other and with game servers implemented with the Project Darkstar
+Server.  The Project Darkstar Server is available as a separate
+download.
 
 CONTENTS
 
-This distribution contains the following subdirectories:
+The Software Development Kit (SDK) contains the following
+subdirectories:
 
 - doc
   Documentation for the client API
@@ -27,7 +29,7 @@ This distribution contains the following subdirectories:
 
 SUPPORTED PLATFORMS
 
-The client has been tested on the following operating systems and
+The SDK has been tested on the following operating systems and
 processors:
 
 - Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
@@ -36,7 +38,7 @@ processors:
 - Redhat Linux EL4 on 32-bit processors
 - Mac OS X 10.4 on PowerPC and Intel processors
 
-The client requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
+The SDK requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
 
 It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
@@ -52,7 +54,7 @@ classpath:
 
 KNOWN ISSUES
 
-This version of the Client API Pack has the following limitations:
+This version of the SDK has the following limitations:
 
 - It only includes a J2SE client implementation.  Developers can use the
   documentation of the network protocol to develop other
@@ -67,7 +69,7 @@ This version of the Client API Pack has the following limitations:
 
 MORE INFORMATION
 
-For more information, please see the tutorial in the tutorial directory,
+For more information, please see the tutorial in the tutorial directory
 and the documentation in the doc directory.  Also check the
 http://www.projectdarkstar.com website, which has links to more
 information and to the Project Darkstar forums.
