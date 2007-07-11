@@ -207,7 +207,7 @@
   <!-- Build the public Application API JavaDoc -->
   <target name="javadoc-api-server" depends="build-server, project-version"
 	  description="Builds public server application API javadoc">
-    <javadoc sourcepath="src/server/j2se"
+    <javadoc sourcepath="src/server/j2se:src/shared/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
              classpathref="server.classpath"
              packagenames="com.sun.sgs.app.*, com.sun.sgs.protocol.simple"

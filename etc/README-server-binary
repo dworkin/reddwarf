@@ -99,10 +99,10 @@ This version of the SDK has the following limitations:
   developers must ensure that clients do not send network traffic faster
   than the server application can process it.
 
-- The SDK does not support pluggable I/O transports
+- The SDK does not support pluggable I/O transports.
 
 - The API for customizing managers and services is incomplete and still
-  under development
+  under development.
 
 - The transaction coordinator implementation in the SDK does not support
   more than one persistent service at a time.  This restriction prevents

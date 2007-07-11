@@ -16,6 +16,12 @@ CONTENTS
 
 This distribution contains the following subdirectories:
 
+- doc
+  Documentation for the client tutorial
+
+- example
+  Source code for the client tutorial
+
 - src
   Source code for the client implementation
 
