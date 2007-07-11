@@ -13,7 +13,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 
 /**
- * Simple example {@link ChannelListener} for the Sun Game Server.
+ * Simple example {@link ChannelListener} for the Project Darkstar Server.
  * <p>
  * Logs when a channel receives data.
  */

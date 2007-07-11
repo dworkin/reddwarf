@@ -26,7 +26,7 @@ echo root:
 find . -print | sort
 
 # List the contents of JAR files
-for jar in `find . -name *.jar -not $dont_check_jars -print`; do
+for jar in `find . -name *.jar -not $dont_check_jars -print | sort`; do
     echo $jar\:
     jar tf $jar | sort
 done
