@@ -15,7 +15,7 @@ ODIR = obj
 BINDIR = bin
 SRCDIR = src/client/c
 
-HEADERS = $(notdir $(wildcard $(SRCDIR)/*.h)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.h)))
+HEADERS = $(wildcard $(SRCDIR)/*.h) $(wildcard $(SRCDIR)/impl/*.h)
 SRCS = $(notdir $(wildcard $(SRCDIR)/*.c)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.c)))
 OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 
