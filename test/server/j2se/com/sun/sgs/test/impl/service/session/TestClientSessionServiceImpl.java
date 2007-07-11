@@ -154,7 +154,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
 	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
 
-	createTransaction();
+	createTransaction(10000);
 
 	// configure data service
         dataService.configure(serviceRegistry, txnProxy);
@@ -772,6 +772,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return txn;
     }
 
+    /**
+     * Creates a new transaction with the specified timeout, and sets
+     * transaction proxy's current transaction.
+     */
+    private DummyTransaction createTransaction(long timeout) {
+	if (txn == null) {
+	    txn = new DummyTransaction(timeout);
+	    txnProxy.setCurrentTransaction(txn);
+	}
+	return txn;
+    }
+
     private void abortTransaction(Exception e) {
 	if (txn != null) {
 	    txn.abort(e);
@@ -1301,10 +1313,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
+		DataManager dataManager = AppContext.getDataManager();
 		ManagedReference listenerRef =
-		    txnProxy.getService(DataService.class).
-		    createReference(listener);
-		AppContext.getDataManager().markForUpdate(this);
+		    dataManager.createReference(listener);
+		dataManager.markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1368,6 +1380,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
+	    AppContext.getDataManager().markForUpdate(this);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
 		this.graceful = graceful;

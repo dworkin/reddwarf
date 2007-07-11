@@ -28,8 +28,6 @@ package com.sun.sgs.service;
  * communication, this interface is sufficient to support transactions with at
  * most one durable transaction participant.
  *
- * @since 1.0
- * @author Seth Proctor
  * @see NonDurableTransactionParticipant
  */
 public interface TransactionParticipant {

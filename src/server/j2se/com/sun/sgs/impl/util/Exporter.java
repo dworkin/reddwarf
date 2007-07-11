@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
@@ -34,13 +33,13 @@ public class Exporter<T extends Remote> {
      * the port is 0, chooses an anonymous port.  Returns the actual port
      * on which the server is available.
      */
-    public int export(T server, int port) throws IOException {
+    public int export(T server, String name, int port) throws IOException {
 	this.server = server;
 	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	registry = LocateRegistry.createRegistry(port, null, ssf);
 	registry.rebind(
-	    "DataStoreServer",
+	    name,
 	    UnicastRemoteObject.exportObject(server, port, null, ssf));
 	return ssf.getLocalPort();
     }

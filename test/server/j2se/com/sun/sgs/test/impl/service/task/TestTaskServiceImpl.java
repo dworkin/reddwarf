@@ -100,7 +100,7 @@ public class TestTaskServiceImpl extends TestCase {
         // configure the main service instances that will be used throughout
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
-        txn = createTransaction();
+        txn = createTransaction(10000);
         dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
@@ -443,6 +443,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask());
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -483,6 +484,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         for (long i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask(), i * 100L);
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -501,6 +503,7 @@ public class TestTaskServiceImpl extends TestCase {
                                                  0L, 500L);
             dataService.setBinding("runHandle." + i,
                                    new ManagedHandle(handle));
+	    dataService.markForUpdate(counter);
             counter.increment();
             counter.increment();
         }
@@ -511,7 +514,7 @@ public class TestTaskServiceImpl extends TestCase {
         while ((name != null) && (name.startsWith("runHandle."))) {
             ManagedHandle mHandle =
                 dataService.getBinding(name, ManagedHandle.class);
-            mHandle.handle.cancel();
+            mHandle.cancel();
             dataService.removeObject(mHandle);
             dataService.removeBinding(name);
             name = dataService.nextBoundName(name);
@@ -544,7 +547,7 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
         } catch (Exception e) {
             fail("Did not expect Exception: " + e);
         }
@@ -562,6 +565,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         PeriodicTaskHandle handle =
             taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+	dataService.markForUpdate(counter);
         counter.increment();
         txn.commit();
         try {
@@ -614,11 +618,11 @@ public class TestTaskServiceImpl extends TestCase {
         ManagedHandle mHandle =
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
-        mHandle.handle.cancel();
+        mHandle.cancel();
         txn.commit();
         txn = createTransaction();
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
             fail("Expected ObjectNotFoundException");
         } catch (ObjectNotFoundException e) {
             System.err.println(e);
@@ -649,7 +653,7 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
         } catch (ObjectNotFoundException e) {
             fail("Did not exxpect ObjectNotFoundException");
         }
@@ -743,6 +747,7 @@ public class TestTaskServiceImpl extends TestCase {
         for (int i = 0; i < 3; i++) {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter));
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -758,6 +763,7 @@ public class TestTaskServiceImpl extends TestCase {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter),
                                        i * 100L);
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -772,6 +778,12 @@ public class TestTaskServiceImpl extends TestCase {
 
     private DummyTransaction createTransaction() {
         DummyTransaction txn = new DummyTransaction();
+        txnProxy.setCurrentTransaction(txn);
+        return txn;
+    }
+
+    private DummyTransaction createTransaction(long timeout) {
+        DummyTransaction txn = new DummyTransaction(timeout);
         txnProxy.setCurrentTransaction(txn);
         return txn;
     }
@@ -820,7 +832,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     private Counter getClearedCounter() {
         Counter counter = dataService.getBinding("counter", Counter.class);
-        dataService.markForUpdate(counter);
+	dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }
@@ -848,6 +860,7 @@ public class TestTaskServiceImpl extends TestCase {
         public void run() throws Exception {
             DataManager dataManager = AppContext.getDataManager();
             Counter counter = dataManager.getBinding("counter", Counter.class);
+	    dataManager.markForUpdate(counter);
             counter.decrement();
         }
     }
@@ -907,10 +920,14 @@ public class TestTaskServiceImpl extends TestCase {
 
     public static class ManagedHandle implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
-        public PeriodicTaskHandle handle;
+        private final PeriodicTaskHandle handle;
         public ManagedHandle(PeriodicTaskHandle handle) {
             this.handle = handle;
         }
+	public void cancel() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    handle.cancel();
+	}
     }
 
 }

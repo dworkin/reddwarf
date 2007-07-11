@@ -42,7 +42,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /** Prints the test case, sets handle and txn */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	handle = coordinator.createTransaction();
+	handle = coordinator.createTransaction(true);
 	txn = handle.getTransaction();
     }
 
@@ -54,6 +54,31 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorIllegalPropertyValues() {
+	Properties[] allProperties = {
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "foo"),
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0"),
+	    createProperties(
+		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "-33"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "foo"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "0"),
+	    createProperties(
+		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "-200")
+	};
+	for (Properties props : allProperties) {
+	    try {
+		new TransactionCoordinatorImpl(props, null);
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(props + ": " + e);
+	    }
 	}
     }
 
@@ -603,7 +628,8 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testGetId() {
 	txn.abort(null);
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertNotNull(txn.getId());
 	assertNotNull(txn2.getId());
 	assertFalse(Arrays.equals(txn.getId(), txn2.getId()));
@@ -614,15 +640,37 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     public void testGetCreationTime() throws Exception {
 	long now = System.currentTimeMillis();
 	Thread.sleep(50);
-	Transaction txn1 = coordinator.createTransaction().getTransaction();
+	Transaction txn1 = coordinator.createTransaction(true).
+	    getTransaction();
 	Thread.sleep(50);
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertTrue("Transaction creation time is too early: " +
             txn1.getCreationTime(),
             now < txn1.getCreationTime());
 	assertTrue("Transaction creation times out-of-order: " +
             txn1.getCreationTime() + " vs " + txn2.getCreationTime(),
             txn1.getCreationTime() < txn2.getCreationTime());
+    }
+
+    /*  -- Test Transaction.getTimeout -- */
+
+    public void testGetTimeout() {
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "5000");
+	p.setProperty(TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY,
+		      "100000");
+	TransactionCoordinator coordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	Transaction txn = coordinator.createTransaction(false).
+	    getTransaction();
+	assertTrue("Incorrect bounded Transaction timeout: " +
+		   txn.getTimeout(),
+		   txn.getTimeout() == 5000);
+	txn = coordinator.createTransaction(true).getTransaction();
+	assertTrue("Incorrect unbounded Transaction timeout: " +
+		   txn.getTimeout(),
+		   txn.getTimeout() == 100000);
     }
 
     /* -- Test Transaction.join -- */
@@ -1266,7 +1314,8 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /* -- Test equals -- */
 
     public void testEquals() throws Exception {
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
 	assertFalse(txn.equals(txn2));
@@ -1300,5 +1349,17 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     private static boolean retryable(Throwable t) {
 	return t instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
     }
 }

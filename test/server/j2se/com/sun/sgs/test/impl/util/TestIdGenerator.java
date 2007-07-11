@@ -89,7 +89,7 @@ public class TestIdGenerator extends TestCase {
 	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
 	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
-	createTransaction();
+	createTransaction(10000);
 
 	// configure data service
         dataService.configure(serviceRegistry, txnProxy);
@@ -268,6 +268,18 @@ public class TestIdGenerator extends TestCase {
     private DummyTransaction createTransaction() {
 	if (txn == null) {
 	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	}
+	return txn;
+    }
+
+    /**
+     * Creates a new transaction with the specified timeout, and sets
+     * transaction proxy's current transaction.
+     */
+    private DummyTransaction createTransaction(long timeout) {
+	if (txn == null) {
+	    txn = new DummyTransaction(timeout);
 	    txnProxy.setCurrentTransaction(txn);
 	}
 	return txn;

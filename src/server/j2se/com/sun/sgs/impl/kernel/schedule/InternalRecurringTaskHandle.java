@@ -13,9 +13,6 @@ import java.util.TimerTask;
  * This interface is the specific type of <code>RecurringTaskHandle</code>
  * used by all schedulers in this package. It adds some internal-use methods
  * to help manage the task and its relationship with schedulers and timers.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 interface InternalRecurringTaskHandle extends RecurringTaskHandle {
 

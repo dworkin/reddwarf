@@ -113,9 +113,6 @@ public class TestDataStorePerformance extends TestCase {
 		e.printStackTrace();
 	    }
 	}
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
-	}
     }
 
     /** Shuts down the store. */
@@ -131,7 +128,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -141,7 +138,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], false);
 		}
@@ -174,7 +171,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -184,7 +181,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    byte[] result = store.getObject(txn, ids[i], update);
@@ -206,7 +203,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -214,7 +211,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getBinding(txn, "name" + i);
 		}
@@ -231,7 +228,7 @@ public class TestDataStorePerformance extends TestCase {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
             DummyProfileCoordinator.startProfiling((ProfileProducer) store);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -239,7 +236,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction();
+		txn = new DummyTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    long result = store.getBinding(txn, "name" + i);
@@ -275,22 +272,6 @@ public class TestDataStorePerformance extends TestCase {
 	}
 	directory = dir.getPath();
 	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
     }
 
     /** Creates a property list with the specified keys and values. */

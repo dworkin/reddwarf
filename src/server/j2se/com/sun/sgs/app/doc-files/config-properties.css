@@ -1,0 +1,80 @@
+/* config-properties.css */
+
+/* Indent the properties */
+dl {
+  margin-left: 1em;
+}
+
+/* Use monospace bold for the property name */
+dt {
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* Put <i>Property: </i> before the property name */
+dt:before {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  content: "Property: ";
+}
+
+/*
+ * Put a 1/2 blank line before and 1 blank line after the property definition
+ */
+dd {
+  padding-top: .5em;
+  padding-bottom: 1em;
+}
+
+/*
+ * Define a span for a configuration property default.  Use monospace
+ * normal and start on a new line
+ */
+span.default {
+  font-family: monospace;
+  font-weight: normal;
+  display: block;
+}
+
+/* Put <i>Default: </i> in front of each property default */
+span.default:before {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  content: "Default: ";
+}
+
+/*
+ * Define a span for a required property.  Use serif italic normal and
+ * start on a new line.
+ */
+span.required {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  display: block;
+}
+
+/* Put <i>Required</i> for required. */
+span.required:before {
+  font-style: italic;
+  content: "Required";
+}
+
+/*
+ * Define a span for a property that has no default.  Use serif italic normal
+ * and start on a new line.
+ */
+span.nodefault { 
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  display: block;
+}
+
+/* Put <i>No default</i> when there is no default. */
+span.nodefault:before { 
+  font-style: italic;
+  content: "No default";
+}

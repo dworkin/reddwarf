@@ -19,12 +19,12 @@ public interface NodeListener {
      *
      * @param	node	node status information 
      */
-    void nodeStarted(NodeStatus node);
+    void nodeStarted(Node node);
     
     /**
      * Notifies this listener that the specified {@code node} failed.
      *
      * @param	node	node status information 
      */
-    void nodeFailed(NodeStatus node);
+    void nodeFailed(Node node);
 }

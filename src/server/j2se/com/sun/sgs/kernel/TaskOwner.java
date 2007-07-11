@@ -15,9 +15,6 @@ import com.sun.sgs.auth.Identity;
  * <p>
  * All implementations of <code>TaskOwner</code> must implement
  * <code>hashCode</code> and <code>equals</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TaskOwner
 {

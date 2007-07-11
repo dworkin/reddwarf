@@ -28,6 +28,7 @@ import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
+import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -58,16 +59,9 @@ import java.util.logging.Logger;
 /**
  * Simple ChannelService implementation. <p>
  * 
- * The {@link #ChannelServiceImpl constructor} supports the
- * following properties: <p>
- *
- * <ul>
- *
- * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the application name. <p>
- *
- * </ul> <p>
+ * The {@link #ChannelServiceImpl constructor} requires the <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> property. <p>
  */
 public class ChannelServiceImpl implements ChannelManager, Service {
     /** The name of this class. */
@@ -83,21 +77,26 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /**
+     * The transaction context map, or null if configure has not been called.
+     */
+    private static TransactionContextMap<Context> contextMap = null;
+
+    /** The transaction proxy, or null if configure has not been called. */    
+    private static TransactionProxy txnProxy = null;
+
     /** List of contexts that have been prepared (non-readonly) or commited. */
     private final List<Context> contextList = new LinkedList<Context>();
 
     /** The name of this application. */
     private final String appName;
 
-    /** Synchronize on this object before accessing the txnProxy. */
+    /** Synchronize on this object before accessing the contextFactory. */
     private final Object lock = new Object();
 
     /** The listener that receives incoming channel protocol messages. */
     private final ProtocolMessageListener protocolMessageListener;
     
-    /** The transaction proxy, or null if configure has not been called. */    
-    private static TransactionProxy txnProxy;
-
     /** The data service. */
     private DataService dataService;
 
@@ -187,6 +186,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    synchronized (ChannelServiceImpl.class) {
 		if (ChannelServiceImpl.txnProxy == null) {
 		    ChannelServiceImpl.txnProxy = proxy;
+		    contextMap = new TransactionContextMap<Context>(proxy);
 		} else {
 		    assert ChannelServiceImpl.txnProxy == proxy;
 		}
@@ -196,7 +196,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		if (contextFactory != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		contextFactory = new ContextFactory(txnProxy);
+		contextFactory = new ContextFactory(contextMap);
 		dataService = registry.getComponent(DataService.class);
 		sessionService =
 		    registry.getComponent(ClientSessionService.class);
@@ -293,8 +293,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     /* -- Implement TransactionContextFactory -- */
        
     private class ContextFactory extends TransactionContextFactory<Context> {
-	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	ContextFactory(TransactionContextMap<Context> contextMap) {
+	    super(contextMap);
 	}
 	
 	public Context createContext(Transaction txn) {
@@ -332,23 +332,36 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * TransactionNotActiveException if it isn't.
      */
     static void checkContext(Context context) {
-	getInstance().contextFactory.checkContext(context);
+	getContextMap().checkContext(context);
     }
 
     /**
-     * Returns the channel service relevant to the current context.
+     * Returns the transaction context map.
      *
-     * @return the channel service relevant to the current
-     * context
+     * @return the transaction context map
      */
-    private synchronized static ChannelServiceImpl getInstance() {
-	if (txnProxy == null) {
+    private synchronized static TransactionContextMap<Context> getContextMap()
+    {
+	if (contextMap == null) {
 	    throw new IllegalStateException("Service not configured");
-	} else {
-	    return txnProxy.getService(ChannelServiceImpl.class);
 	}
+	return contextMap;
     }
     
+    /**
+     * Returns the transaction context factory.
+     *
+     * @return the transaction context factory
+     */
+    private TransactionContextFactory<Context> getContextFactory() {
+	synchronized (lock) {
+	    if (contextFactory == null) {
+		throw new IllegalStateException("Service is not configured");
+	    }
+	    return contextFactory;
+	}
+    }
+
     /* -- Implement ProtocolMessageListener -- */
 
     private final class ChannelProtocolMessageListener
@@ -422,7 +435,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		new AbstractKernelRunnable() {
 		    public void run() {
 			Context context =
-			    getInstance().contextFactory.joinTransaction();
+			    getContextFactory().joinTransaction();
 			Set<Channel> channels = context.removeSession(session);
 			for (Channel channel : channels) {
 			    channel.leave(session);
@@ -453,6 +466,18 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		"non-existent channel:{0}, dropping message", channelId);
 	    return;
 	}
+
+	// Ensure that sender is a channel member before continuing.
+	if (!cachedState.hasSession(sender)) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.log(
+		    Level.WARNING,
+		    "send attempt on channel:{0} by non-member session:{1}, " +
+		    "dropping message", channelId, sender);
+	    }
+	    return;
+	}
+	
 	long seq = buf.getLong(); // TODO Check sequence num
 	short numRecipients = buf.getShort();
 	if (numRecipients < 0) {
@@ -847,7 +872,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	
 	Set<Channel> removeAll() {
 	    Set<Channel> channels = new HashSet<Channel>();
-	    Context context = getInstance().contextFactory.getContext();
+	    Context context = getContextMap().getContext();
 	    for (String name : set) {
 		try {
 		    channels.add(context.getChannel(name));

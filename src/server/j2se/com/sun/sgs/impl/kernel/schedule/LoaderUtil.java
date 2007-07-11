@@ -18,9 +18,6 @@ import java.util.logging.Logger;
 /**
  * Simple utility class used to load <code>ApplicationScheduler</code>s based
  * on the well-known property key <code>APPLICATION_SCHEDULER_PROPERTY</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class LoaderUtil {
 

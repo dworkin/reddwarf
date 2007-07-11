@@ -11,9 +11,6 @@ package com.sun.sgs.auth;
  * Implementations of <code>IdentityCredentials</code> should not
  * actually contain any authentication logic. This should instead be
  * part of the consuming <code>IdentityAuthenticator</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface IdentityCredentials
 {

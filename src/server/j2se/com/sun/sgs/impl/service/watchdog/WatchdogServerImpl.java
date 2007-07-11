@@ -63,10 +63,10 @@ public class WatchdogServerImpl implements WatchdogServer {
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** The property name for the server port. */
-    private static final String PORT_PROPERTY = CLASSNAME + ".port";
+    static final String PORT_PROPERTY = CLASSNAME + ".port";
 
     /** The default value of the server port. */
-    private static final int DEFAULT_PORT = 44533;
+    static final int DEFAULT_PORT = 44533;
 
     /** The property name for the ping interval. */
     private static final String PING_INTERVAL_PROPERTY =
@@ -119,7 +119,7 @@ public class WatchdogServerImpl implements WatchdogServer {
 		requestedPort);
 	}
 	exporter = new Exporter<WatchdogServer>();
-	port = exporter.export(this, requestedPort);
+	port = exporter.export(this, "WatchdogServer", requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
@@ -128,7 +128,8 @@ public class WatchdogServerImpl implements WatchdogServer {
 	if (pingInterval < PING_INTERVAL_LOWER_BOUND) {
 	    throw new IllegalArgumentException(
 		"The " + PING_INTERVAL_PROPERTY + " property value must be " +
-		"greater than or equal to 5: " + pingInterval);
+		"greater than or equal to " + PING_INTERVAL_LOWER_BOUND +
+		": " + pingInterval);
 	}
 	txnCoordinator = new TransactionCoordinatorImpl(properties, null);
 	txnProxy = new TransactionProxyImpl();
@@ -203,7 +204,7 @@ public class WatchdogServerImpl implements WatchdogServer {
     private void runTransactionally(Task task) throws Exception {
 	// TBD: should this check to see if there is already a
 	// transaction set?
-	TransactionHandle handle = txnCoordinator.createTransaction();
+	TransactionHandle handle = txnCoordinator.createTransaction(true);
 	Transaction txn = handle.getTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	try {

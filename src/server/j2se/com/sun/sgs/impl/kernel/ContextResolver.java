@@ -12,9 +12,6 @@ import com.sun.sgs.app.TaskManager;
 /**
  * This class is used to resolve the state associated with the current task's
  * context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public final class ContextResolver {
 
