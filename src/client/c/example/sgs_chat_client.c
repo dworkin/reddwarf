@@ -16,7 +16,8 @@
  */
 
 #include <errno.h>
-#include <poll.h>
+#include <sys/select.h>
+#include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
 #include <stdio.h>
 #include <string.h>
 /* required for STDIN_FILENO on Linux/Solaris, but not Darwin: */
@@ -29,8 +30,8 @@
 #include "sgs_map.h"
 #include "sgs_session.h"
 
-/** Timeout value for calls to poll() */
-#define POLL_TIMEOUT  200
+/** Timeout value for calls to select(), in milliseconds */
+#define SELECT_TIMEOUT  200
 
 /** Default connection info for server. */
 #define DEFAULT_HOST  "localhost"
@@ -63,7 +64,6 @@ static void unregister_fd_cb(sgs_connection *conn, int fd, short events);
 static void bye(int exitval);
 static int concatstr(const char *prefix, const char *suffix, char *buf,
     size_t buflen);
-static int fprint_fixed_len_str(FILE *stream, const uint8_t *data, size_t len);
 static void process_user_cmd(char *cmd);
 
 /*
@@ -81,8 +81,8 @@ static sgs_context *g_context;
 static sgs_connection *g_conn;
 static sgs_session *g_session;
 static sgs_map *g_channel_map;
-static struct pollfd g_poll_fds[50];
-static int g_nfds;
+static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
+static int g_maxfd;
 
 /*
  * function: main()
@@ -94,6 +94,8 @@ int main(int argc, char *argv[]) {
     int c, i, len, result, token_len, work;
     char *hostname = DEFAULT_HOST;
     int port = DEFAULT_PORT;
+    fd_set readset, writeset, exceptset;
+    struct timeval timeout_tv;
     
     /**
      * stdout and stderr are normally line-buffered, but if they are redirected
@@ -103,10 +105,13 @@ int main(int argc, char *argv[]) {
     setvbuf(stdout, (char *)NULL, _IOLBF, 0);
     setvbuf(stderr, (char *)NULL, _IOLBF, 0);
     
+    FD_ZERO(&g_master_readset);
+    FD_ZERO(&g_master_writeset);
+    FD_ZERO(&g_master_exceptset);
+    
     /** We are always interested in reading from STDIN. */
-    g_poll_fds[0].fd = STDIN_FILENO;
-    g_poll_fds[0].events = POLLIN;
-    g_nfds = 1;
+    FD_SET(STDIN_FILENO, &g_master_readset);
+    g_maxfd = STDIN_FILENO;
     
     /** process command line arguments */
     while ((c = getopt(argc, argv, "h:p:u")) != -1) {
@@ -186,43 +191,53 @@ t usage\n",
             }
         }
         
-        result = poll(g_poll_fds, g_nfds, POLL_TIMEOUT);
+        /** Copy master fd_sets into temporary copies. */
+        FD_COPY(&g_master_readset, &readset);
+        FD_COPY(&g_master_writeset, &writeset);
+        FD_COPY(&g_master_exceptset, &exceptset);
+        
+        /**
+         * According to `man select(2)`, timeout might be modified by select(),
+         * hence we re-initialize it every time.
+         */
+        timeout_tv.tv_sec = 0;
+        timeout_tv.tv_usec = SELECT_TIMEOUT*1000;
+        
+        result = select(g_maxfd + 1, &readset, &writeset, &exceptset,
+            &timeout_tv);
         
         if (result == -1) {
-            perror("Error calling poll()");
+            perror("Error calling select()");
         }
         else if (result > 0) {
             work = 0;
             
-            for (i=0; i < g_nfds; i++) {
-                if (g_poll_fds[i].revents != 0) {
-                    /** STDIN */
-                    if (g_poll_fds[i].fd == STDIN_FILENO) {
-                        if ((g_poll_fds[i].revents & POLLIN) == POLLIN) {
-                            /** Data available for reading. */
-                            len = strlen(inbuf);
-                            result = read(STDIN_FILENO, inbuf + len,
-                                sizeof(inbuf) - strlen(inbuf) - 1);
-              
-                            if (result == -1) {
-                                perror("Error calling read() on STDIN");
-                            }
-                            else if (result > 0) {
-                                /**
-                                 * Always null-terminate the block of data in
-                                 * inbuf so that strtok can be called on it.
-                                 */
-                                inbuf[len + result] = '\0';
-                                inbuf_alive = 1;
-                
-                                printf("Command: ");
-                                fflush(stdout);
-                            }
-                        }
-                    } else if (g_poll_fds[i].fd != -1) {
-                        /** Must be some fd that the sgs_connection registered */
-                        work = 1;
+            for (i=0; i <= g_maxfd; i++) {
+                /** STDIN */
+                if (FD_ISSET(i, &readset) && (i == STDIN_FILENO)) {
+                    /** Data available for reading. */
+                    len = strlen(inbuf);
+                    result = read(STDIN_FILENO, inbuf + len,
+                        sizeof(inbuf) - strlen(inbuf) - 1);
+                    
+                    if (result == -1) {
+                        perror("Error calling read() on STDIN");
                     }
+                    else if (result > 0) {
+                        /**
+                         * Always null-terminate the block of data in
+                         * inbuf so that strtok can be called on it.
+                         */
+                        inbuf[len + result] = '\0';
+                        inbuf_alive = 1;
+                        
+                        printf("Command: ");
+                        fflush(stdout);
+                    }
+                } else if (FD_ISSET(i, &readset) || FD_ISSET(i, &writeset) ||
+                    FD_ISSET(i, &exceptset)) {
+                    /** Must be some fd that the sgs_connection registered */
+                    work = 1;
                 }
             }
             
@@ -232,7 +247,7 @@ t usage\n",
                 }
             }
         }
-        /** else, poll() timed out. */
+        /** else, select() timed out. */
     }
     
     /** Just for compiler; should never reach here. */
@@ -287,15 +302,16 @@ static void channel_left_cb(sgs_connection *conn, sgs_channel *channel) {
 static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
     const sgs_id *sender_id, const uint8_t *msg, size_t msglen)
 {
+    char cbuf[msglen + 1];
     const char *channel_name = sgs_channel_get_name(channel);
     const char *sender_desc = (sender_id == NULL) ? "Server" :
         sgs_id_printable(sender_id);
-  
-    printf(" - Callback -   Received message on channel %s from %s: ",
-        channel_name, sender_desc);
-  
-    fprint_fixed_len_str(stdout, msg, msglen);
-    printf("\n");
+    
+    memcpy(cbuf, msg, msglen);
+    cbuf[msglen] = '\0';
+    
+    printf(" - Callback -   Received message on channel %s from %s: %s\n",
+        channel_name, sender_desc, cbuf);
 }
 
 /*
@@ -321,9 +337,11 @@ static void logged_in_cb(sgs_connection *conn, sgs_session *session) {
 static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
     size_t msglen)
 {
-    printf(" - Callback -   Login failed (");
-    fprint_fixed_len_str(stdout, msg, msglen);
-    printf(").\n");
+    char cbuf[msglen + 1];
+    memcpy(cbuf, msg, msglen);
+    cbuf[msglen] = '\0';
+    
+    printf(" - Callback -   Login failed (%s)\n", cbuf);
 }
 
 /*
@@ -339,87 +357,56 @@ static void reconnected_cb(sgs_connection *conn) {
 static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg,
     size_t msglen)
 {
-    printf(" - Callback -   Received message: ");
-    fprint_fixed_len_str(stdout, msg, msglen);
-    printf("\n");
+    char cbuf[msglen + 1];
+    memcpy(cbuf, msg, msglen);
+    cbuf[msglen] = '\0';
+    
+    printf(" - Callback -   Received message: %s\n", cbuf);
 }
 
 /*
  * register_fd_cb()
  */
 static void register_fd_cb(sgs_connection *conn, int fd, short events) {
-    int i, found;
+    if ((events & POLLIN) == POLLIN)
+        FD_SET(fd, &g_master_readset);
     
-    found = 0;
+    if ((events & POLLOUT) == POLLOUT)
+        FD_SET(fd, &g_master_writeset);
     
-    for (i=0; i < g_nfds; i++) {
-        if (fd == g_poll_fds[i].fd) {
-            found = 1;
-            g_poll_fds[i].events |= events;  /** Turn on requested bits */
-            break;
-        }
-    }
+    if ((events & POLLERR) == POLLERR)
+        FD_SET(fd, &g_master_exceptset);
     
-    if (!found) {
-        /** Need a new entry in g_poll_fds[] for this file descriptor. */
-        if (g_nfds == sizeof(g_poll_fds)) {
-            fprintf(stderr, "Error: Too many file descriptors registered.  \
-Ignoring requests.\n");
-        } else {
-            g_poll_fds[g_nfds].fd = fd;
-            g_poll_fds[g_nfds].events = events;
-            
-            /**
-             * We have to set revents to 0 for all new entries in case this
-             * callback is called while in the middle of iterating
-             * g_poll_fds[] after a poll().
-             */
-            g_poll_fds[g_nfds].revents = 0;
-            g_nfds++;
-        }
-    }
+    if (fd > g_maxfd) g_maxfd = fd;
 }
 
 /*
  * unregister_fd_cb()
  */
 static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
-    int i, last_max = 0, resize = 0;
+    int i, new_max;
     
     if ((events & POLLIN) == POLLIN)
-        printf("UNREG FOR POLLIN!  fd=%d\n", fd);
+        FD_CLR(fd, &g_master_readset);
     
-    for (i=0; i < g_nfds; i++) {
-        if (fd == g_poll_fds[i].fd) {
-            if (events == 0) {
-                /** Turn off all bits */
-                g_poll_fds[i].events = 0;
-            }
-            else {
-                /** Turn off requested bits */
-                g_poll_fds[i].events &= ~events;
-            }
-            
-            if (g_poll_fds[i].events == 0) {
-                g_poll_fds[i].fd = -1;
-                
-                if (i == g_nfds-1) {
-                    /** Last fd in array was cleared, so resize array */
-                    last_max = i;
-                    resize = 1;
-                }
-            }
-            
-            break;
-        }
-    }
+    if ((events & POLLOUT) == POLLOUT)
+        FD_CLR(fd, &g_master_writeset);
     
-    if (resize) {
-        for (i=0; i <= last_max; i++) {
-            if (g_poll_fds[i].fd != -1) {
-                g_nfds = i + 1;
-            }
+    if ((events & POLLERR) == POLLERR)
+        FD_CLR(fd, &g_master_exceptset);
+    
+    /** Check if a new max-fd needs to be calculated. */
+    if (fd == g_maxfd) {
+        new_max = 0;
+        
+        for (i=0; i <= g_maxfd; i++) {
+            if (FD_ISSET(i, &g_master_readset) ||
+                FD_ISSET(i, &g_master_writeset) ||
+                FD_ISSET(i, &g_master_exceptset))
+                new_max = i;
         }
+        
+        g_maxfd = new_max;
     }
 }
 
@@ -460,23 +447,6 @@ static int concatstr(const char *prefix, const char *suffix, char *buf,
     memcpy(buf, prefix, strlen(prefix));
     memcpy(buf + strlen(prefix), suffix, strlen(suffix) + 1);  /* include '\0' */
     return 0;
-}
-
-/*
- * function: fprint_fixed_len_str()
- *
- * Prints a fixed length string to the specified stream; since the length of the
- *  string is passed as an argument, the string does not have to end with a null
- *  ('\0') character (and null characters encountered before the datalen-th
- *  character of the string will NOT terminate the copying).
- */
-static int fprint_fixed_len_str(FILE *stream, const uint8_t *data, size_t len) {
-    int i;
-  
-    for (i=0; i < len; i++)
-        fputc(data[i], stream);
-  
-    return len;
 }
 
 /*

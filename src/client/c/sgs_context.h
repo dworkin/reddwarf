@@ -56,6 +56,10 @@ void sgs_ctx_free(sgs_context *ctx);
  *               int: a file descriptor
  *             short: events for which interest is being (un)registered for the
  *                    specified file descriptor
+ *
+ * Note that for compatibility with select(2) instead of just poll(2), the only
+ * events that will be ever be specified in reg_fd and unreg_fd will be POLLIN,
+ * POLLOUT, and/or POLLERR.
  */
 sgs_context *sgs_ctx_new(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int, short),

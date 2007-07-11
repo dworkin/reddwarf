@@ -19,7 +19,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <poll.h>
+#include <sys/select.h>
+#include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
 #include <string.h>
 #include <unistd.h>
 #include "sgs_connection_impl.h"
@@ -41,9 +42,21 @@ static int consume_data(sgs_connection_impl *connection);
  * sgs_connection_do_work()
  */
 int sgs_connection_do_work(sgs_connection_impl *connection) {
-    struct pollfd fds[1];
+    fd_set readset, writeset, exceptset;
+    struct timeval timeout_tv;
     int result, sockfd = connection->socket_fd;
     socklen_t optlen;
+    
+    FD_ZERO(&readset);
+    FD_ZERO(&writeset);
+    FD_ZERO(&exceptset);
+    
+    FD_SET(sockfd, &readset);
+    FD_SET(sockfd, &writeset);
+    FD_SET(sockfd, &exceptset);
+    
+    timeout_tv.tv_sec = 0;
+    timeout_tv.tv_usec = 0;
     
     if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
         /** Error: should not call do_io() when disconnected. */
@@ -51,13 +64,10 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         return -1;
     }
     
-    fds[0].fd = sockfd;
-    fds[0].events = POLLIN | POLLOUT;
-    
-    result = poll(fds, 1, 0);
+    result = select(sockfd + 1, &readset, &writeset, &exceptset, &timeout_tv);
     if (result <= 0) return result;  /** -1 or 0 */
     
-    if ((fds[0].revents & POLLERR) == POLLERR) {
+    if (FD_ISSET(sockfd, &exceptset)) {
         optlen = sizeof(errno);  /* SO_ERROR should return an int */
         if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &errno, &optlen) == -1) {
             return -1;
@@ -67,7 +77,7 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         return -1;
     }
     
-    if ((fds[0].revents & POLLIN) == POLLIN) {
+    if (FD_ISSET(sockfd, &readset)) {
         /** Read stuff off the socket and write it to the in-buffer. */
         result = sgs_buffer_read_from_fd(connection->inbuf, sockfd);
         if (result == -1) return -1;
@@ -82,12 +92,12 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         if (consume_data(connection) == -1) return -1;
     }
     
-    if ((fds[0].revents & POLLOUT) == POLLOUT) {
+    if (FD_ISSET(sockfd, &writeset)) {
         /** If we are waiting for connect() to complete, its done now. */
         if (connection->state == SGS_CONNECTION_IMPL_CONNECTING) {
             connection->state = SGS_CONNECTION_IMPL_CONNECTED;
         }
-    
+        
         /** Read stuff out of the out-buffer and write it to the socket. */
         result = sgs_buffer_write_to_fd(connection->outbuf, sockfd);
         if (result == -1) return -1;
@@ -98,7 +108,7 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
     else
         connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
-  
+    
     /** If there is data in outbuf, then register interest in socket writes. */
     if (sgs_buffer_size(connection->outbuf) > 0)
         connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
@@ -228,7 +238,7 @@ sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
     connection->session = sgs_session_impl_new(connection);
     connection->inbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
     connection->outbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
-  
+    
     /** Check if any new() calls failed. */
     if (connection->session == NULL || connection->inbuf == NULL ||
         connection->outbuf == NULL) {
@@ -254,8 +264,9 @@ sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
  * sgs_connection_impl_disconnect()
  */
 void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
-    /** Unregister interest in this socket.  (events = 0 means "all") */
-    connection->ctx->unreg_fd_cb(connection, connection->socket_fd, 0);
+    /** Unregister interest in this socket */
+    connection->ctx->unreg_fd_cb(connection, connection->socket_fd,
+        POLLIN | POLLOUT | POLLERR);
     
     close(connection->socket_fd);
     connection->socket_fd = -1;
