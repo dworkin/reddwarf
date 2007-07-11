@@ -10,6 +10,7 @@
  * Tests sgs_id.h
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include "sgs_id.h"
 
@@ -18,12 +19,15 @@
  */
 int main(int argc, char *argv[]) {
     char hex[] = "08";
+    uint8_t bytes[] = { 1, 2, 3 };
     sgs_id id;
     int result;
-  
-    result = sgs_id_init_from_hex(hex, &id);
-    printf("INIT-HEX(\"%s\") == %d\n", hex, result);
-    if (result == -1) perror("init_from_hex()");
-  
-    printf("PRINT: %s\n", sgs_id_printable(&id));
+    
+    result = sgs_id_init(&id, bytes, sizeof(bytes));
+    printf("init() == %d\n", result);
+    if (result == -1) perror("init()");
+    
+    printf("bytelen = %d\n", sgs_id_get_byte_len(&id));
+    printf("memcmp = %d\n", memcmp(bytes, sgs_id_get_bytes(&id),
+               sgs_id_get_byte_len(&id)));
 }
