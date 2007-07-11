@@ -22,6 +22,9 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
+  <!-- Where to find Ruby on the current platform -->
+  <property name="ruby" location="/usr/bin/ruby"/>
+
   <!-- Version information -->
   <property name="project.release" value="0.9.3"/>
   <!-- Set to true when building an external release -->
@@ -311,7 +314,8 @@
 	<filter token="VERSION" value="${project.version}"/>
       </filterset>
     </copy>
-    <apply executable="etc/update_copyrights" logError="true">
+    <apply executable="${ruby}" logError="true">
+      <arg file="etc/update_copyrights"/>
       <arg file="etc/COPYRIGHT-client"/>
       <fileset dir="${build.dir}/sgs-client-src" includes="**/*.java"/>
     </apply>
