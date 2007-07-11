@@ -3,7 +3,7 @@
  */
 
 /**
- * Provides the interface to the Sun Game Server used by application
+ * Provides the interface to the Project Darkstar Server used by application
  * developers.
  */
 package com.sun.sgs.app;

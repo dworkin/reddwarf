@@ -122,7 +122,7 @@ public final class DataStoreClient
 
     /**
      * The name of the undocumented property that controls whether to replace
-     * Java RMI with an experimental, socket-based facility.
+     * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	CLASSNAME + ".no.rmi");
@@ -215,7 +215,7 @@ public final class DataStoreClient
      *		property is not a valid integer greater than {@code 0} and not
      *		greater than {@code 65535}
      * @throws	IOException if a network problem occurs
-     * @throws	NotBoundException if the server is not found in the RMI
+     * @throws	NotBoundException if the server is not found in the Java RMI
      *		registry
      */
     public DataStoreClient(Properties properties)

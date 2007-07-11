@@ -1,0 +1,18 @@
+Version 0.9.3:
+- Document the network protocol
+- Modify the client API to call leftChannel on all channels before
+  calling disconnected() callback, and to check that the session has
+  logged in before accepting most messages from the server
+- Modify the protocol to use the CompactId representation for session
+  IDs in protocol messages -- this is an incompatible network format
+  change
+
+Version 0.9.2:
+- Fix a bug that caused clients not to receive a disconnected callback
+  if the initial server connection failed
+- Use a compact format for channel identifiers
+
+Version 0.9.1:
+
+Version 0.9:
+- First release with new API and architecture
