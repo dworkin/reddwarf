@@ -6,7 +6,6 @@ package com.sun.sgs.impl.service.data.store.db;
 
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.db.bdbdb.BdbDbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.bdbje.BdbJeEnvironment;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.util.Properties;
 
@@ -48,9 +47,8 @@ public final class DbEnvironmentFactory {
 	DbEnvironment result = wrapper.getClassInstanceProperty(
 	    ENVIRONMENT_CLASS_PROPERTY, DbEnvironment.class,
 	    new Class<?>[] { Properties.class, Scheduler.class },
-	    properties);
+	    properties, scheduler);
 	return (result != null)
-	    ? result : //new BdbDbEnvironment(properties, scheduler)
-	    new BdbJeEnvironment(properties, scheduler);
+	    ? result : new BdbDbEnvironment(properties, scheduler);
     };
 }

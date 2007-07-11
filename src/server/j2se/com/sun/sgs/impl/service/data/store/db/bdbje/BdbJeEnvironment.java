@@ -4,7 +4,6 @@
 
 package com.sun.sgs.impl.service.data.store.db.bdbje;
 
-import com.sleepycat.je.CheckpointConfig;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.DeadlockException;
 import com.sleepycat.je.EnvironmentConfig;
@@ -12,6 +11,7 @@ import com.sleepycat.je.ExceptionEvent;
 import com.sleepycat.je.ExceptionListener;
 import com.sleepycat.je.LockNotGrantedException;
 import com.sleepycat.je.RunRecoveryException;
+import com.sleepycat.je.StatsConfig;
 import com.sleepycat.je.XAEnvironment;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -39,7 +39,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 
     /** The package name. */
     private static final String PACKAGE =
-	"com.sun.sgs.impl.service.data.store.db.bdbdb";
+	"com.sun.sgs.impl.service.data.store.db.bdbje";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -62,30 +62,10 @@ public class BdbJeEnvironment implements DbEnvironment {
 	PACKAGE + ".cache.size";
 
     /** The minimum cache size, as specified by Berkeley DB */
-    private static final long MIN_CACHE_SIZE = 20000;
+    private static final long MIN_CACHE_SIZE = 96 * 1024;
 
     /** The default cache size. */
     private static final long DEFAULT_CACHE_SIZE = 1000000L;
-
-    /**
-     * The property that specifies the time in milliseconds between
-     * checkpoints.
-     */
-    private static final String CHECKPOINT_INTERVAL_PROPERTY =
-	PACKAGE + ".checkpoint.interval";
-
-    /** The default checkpoint interval. */
-    private static final long DEFAULT_CHECKPOINT_INTERVAL = 60000;
-
-    /**
-     * The property that specifies how many bytes need to be modified before
-     * performing a checkpoint.
-     */
-    private static final String CHECKPOINT_SIZE_PROPERTY =
-	PACKAGE + ".checkpoint.size";
-
-    /** The default checkpoint size. */
-    private static final long DEFAULT_CHECKPOINT_SIZE = 100000;
 
     /**
      * The property that specifies whether to automatically remove log files.
@@ -102,11 +82,18 @@ public class BdbJeEnvironment implements DbEnvironment {
     private static final String FLUSH_TO_DISK_PROPERTY =
 	PACKAGE + ".flush.to.disk";
 
+    /**
+     * The property that specifies the interval in milliseconds between calls
+     * to log database statistics, or a negative value to disable logging.  The
+     * property is set to -1 by default.
+     */
+    private static final String STATS_PROPERTY = PACKAGE + ".stats";
+    
     /** The Berkeley DB environment. */
     private final XAEnvironment env;
 
-    /** Used to cancel the checkpoint task. */
-    private final TaskHandle checkpointTaskHandle;
+    /** Used to cancel the stats task, if non-null. */
+    private TaskHandle statsTaskHandle;
 
     /** A Berkeley DB exception listener that uses logging. */
     private static class LoggingExceptionListener implements ExceptionListener {
@@ -119,17 +106,20 @@ public class BdbJeEnvironment implements DbEnvironment {
 	}
     }
 
-    /** A runnable that performs a periodic database checkpoint. */
-    private class CheckpointRunnable implements Runnable {
-	private final CheckpointConfig config = new CheckpointConfig();
-	CheckpointRunnable(long size) {
-	    config.setKBytes((int) (size / 1000));
+    /** A runnable that logs database statistics. */
+    private class StatsRunnable implements Runnable {
+	private final StatsConfig statsConfig = new StatsConfig();
+	StatsRunnable() {
+	    statsConfig.setClear(true);
 	}
 	public void run() {
 	    try {
-		env.checkpoint(config);
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.log(Level.INFO, "Database stats:\n{0}",
+			       env.getStats(statsConfig));
+		}
 	    } catch (Throwable e) {
-		logger.logThrow(Level.WARNING, e, "Checkpoint failed");
+		logger.logThrow(Level.WARNING, e, "Stats failed");
 	    }
 	}
     }
@@ -169,10 +159,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	    Long.MAX_VALUE);
 	boolean removeLogs = wrappedProps.getBooleanProperty(
 	    REMOVE_LOGS_PROPERTY, false);
-	long checkpointInterval = wrappedProps.getLongProperty(
-	    CHECKPOINT_INTERVAL_PROPERTY, DEFAULT_CHECKPOINT_INTERVAL);
-	long checkpointSize = wrappedProps.getLongProperty(
-	    CHECKPOINT_SIZE_PROPERTY, DEFAULT_CHECKPOINT_SIZE);
+	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setCacheSize(cacheSize);
@@ -184,8 +171,10 @@ public class BdbJeEnvironment implements DbEnvironment {
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
 	}
-	checkpointTaskHandle = scheduler.scheduleRecurringTask(
-	    new CheckpointRunnable(checkpointSize), checkpointInterval);
+	if (stats >= 0) {
+	    statsTaskHandle = scheduler.scheduleRecurringTask(
+		new StatsRunnable(), stats);
+	}
     }
 	
     /** {@inheritDoc} */
@@ -204,7 +193,10 @@ public class BdbJeEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public void close() {
-	checkpointTaskHandle.cancel();
+	if (statsTaskHandle != null) {
+	    statsTaskHandle.cancel();
+	    statsTaskHandle = null;
+	}
 	try {
 	    env.close();
 	} catch (DatabaseException e) {
