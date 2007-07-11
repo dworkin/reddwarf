@@ -13,17 +13,19 @@
 #ifndef SGS_SESSION_H
 #define SGS_SESSION_H 1
 
-/*
- * sgs_session_impl provides the implementation for the sgs_session interface
- * (declare before any #includes)
- */
-typedef struct sgs_session_impl sgs_session;
 
 /*
  * INCLUDES
  */
 #include <stdint.h>
 #include "sgs_id.h"
+
+
+/*
+ * sgs_session_impl provides the implementation for the sgs_session interface.
+ */
+typedef struct sgs_session_impl sgs_session;
+
 
 /*
  * FUNCTION DECLARATIONS

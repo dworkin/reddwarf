@@ -13,11 +13,12 @@
 #ifndef SGS_MAP_H
 #define SGS_MAP_H  1
 
+
 /*
  * sgs_linked_list_map provides the implementation for the sgs_map interface
- * (declare before any #includes)
  */
 typedef struct sgs_linked_list_map sgs_map;
+
 
 /*
  * FUNCTION DECLARATIONS

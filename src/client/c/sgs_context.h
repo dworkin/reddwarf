@@ -13,19 +13,24 @@
 #ifndef SGS_CONTEXT_H
 #define SGS_CONTEXT_H 1
 
-/*
- * sgs_context_impl provides the implementation for the sgs_context interface
- * (declare before any #includes)
- */
-typedef struct sgs_context_impl sgs_context;
 
 /*
  * INCLUDES
  */
-#include "sgs_connection.h"
 #include "sgs_channel.h"
 #include "sgs_id.h"
+
+
+/*
+ * sgs_context_impl provides the implementation for the sgs_context interface
+ * (must be declared before any headers are included that reference this type)
+ */
+typedef struct sgs_context_impl sgs_context;
+
+
+#include "sgs_connection.h"
 #include "sgs_session.h"
+
 
 /*
  * FUNCTION DECLARATIONS

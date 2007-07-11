@@ -14,10 +14,6 @@
 #ifndef SGS_CONNECTION_IMPL_H
 #define SGS_CONNECTION_IMPL_H 1
 
-/*
- * sgs_connect_impl typedef (declare before any #includes)
- */
-typedef struct sgs_connection_impl sgs_connection_impl;
 
 /*
  * INCLUDES
@@ -25,8 +21,17 @@ typedef struct sgs_connection_impl sgs_connection_impl;
 #include <stdint.h>
 #include "sgs_buffer.h"
 #include "sgs_context_impl.h"
-#include "sgs_session_impl.h"
 #include "sgs_wire_protocol.h"
+
+
+/*
+ * sgs_connect_impl typedef
+ * (must be declared before sgs_session_impl.h is loaded)
+ */
+typedef struct sgs_connection_impl sgs_connection_impl;
+
+#include "sgs_session_impl.h"
+
 
 /*
  * DEFINES
@@ -41,6 +46,7 @@ typedef enum {
     SGS_CONNECTION_IMPL_CONNECTING,
     SGS_CONNECTION_IMPL_CONNECTED,
 } sgs_connection_state;
+
 
 /*
  * STRUCTS
@@ -64,6 +70,11 @@ struct sgs_connection_impl {
     /** Reusable I/O buffers for reading/writing from/to the network connection. */
     sgs_buffer *inbuf, *outbuf;
 };
+
+
+/*
+ * FUNCTION DECLARATIONS
+ */
 
 /*
  * function: sgs_connection_impl_disconnect()

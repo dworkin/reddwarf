@@ -172,8 +172,8 @@ sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection) {
     }
     
     session->connection = connection;
-    sgs_id_init_from_hex("", &session->session_id);
-    sgs_id_init_from_hex("", &session->reconnect_key);
+    sgs_id_init(&session->session_id, NULL, 0);
+    sgs_id_init(&session->reconnect_key, NULL, 0);
     session->seqnum_hi = 0;
     session->seqnum_lo = 0;
     
@@ -209,21 +209,21 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
         switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
             /** field 1: session-id (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data, msg_datalen,
-                &session->session_id);
+            result = sgs_compact_id_init(&session->session_id, msg_data,
+                msg_datalen);
             if (result == -1) return -1;
-      
+            
             /** field 2: reconnection-key (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data + result,
-                msg_datalen - result, &session->reconnect_key);
+            result = sgs_compact_id_init(&session->reconnect_key, msg_data +
+                result, msg_datalen - result);
             if (result == -1) return -1;
-      
+            
             if (session->connection->ctx->logged_in_cb != NULL)
                 session->connection->ctx->logged_in_cb(session->connection,
                     session);
-      
+            
             return 0;
-      
+            
         case SGS_OPCODE_LOGIN_FAILURE:
             /** field 1: error string (first 2 bytes = length of string) */
             if (session->connection->ctx->login_failed_cb != NULL)
@@ -272,12 +272,12 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             namelen = read_len_header(msg_data);
             
             /** field 2: channel-id (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data + namelen + 2,
-                msg_datalen - namelen - 2, &channel_id);
+            result = sgs_compact_id_init(&channel_id, msg_data + namelen + 2,
+                msg_datalen - namelen - 2);
             
             if (result == -1) return -1;
             
-            channel = sgs_channel_impl_new(session, channel_id,
+            channel = sgs_channel_impl_new(session, &channel_id,
                 (const char*)(msg_data + 2), namelen);
             
             if (channel == NULL) return -1;
@@ -295,8 +295,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
       
         case SGS_OPCODE_CHANNEL_LEAVE:
             /** field 1: channel-id (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data, msg_datalen,
-                &channel_id);
+            result = sgs_compact_id_init(&channel_id, msg_data, msg_datalen);
             if (result == -1) return -1;
             
             channel = sgs_map_get(session->channels, &channel_id);
@@ -312,9 +311,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             
         case SGS_OPCODE_CHANNEL_MESSAGE:
             /** field 1: channel-id (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data, msg_datalen,
-                &channel_id);
-            
+            result = sgs_compact_id_init(&channel_id, msg_data, msg_datalen);
             if (result == -1) return -1;
             
             /**
@@ -322,10 +319,10 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              * TODO next 8 bytes are a sequence number that is currently ignored
              */
             offset = result + 8;
-      
+            
             /** field 3: session-id of sender (compact-id format) */
-            result = sgs_id_init_from_compressed(msg_data + offset, msg_datalen -
-                offset, &sender_id);
+            result = sgs_compact_id_init(&sender_id, msg_data + offset,
+                msg_datalen - offset);
             if (result == -1) return -1;
             
             offset += result;

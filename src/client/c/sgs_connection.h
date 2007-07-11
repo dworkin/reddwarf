@@ -13,16 +13,20 @@
 #ifndef SGS_CONNECTION_H
 #define SGS_CONNECTION_H 1
 
+
 /*
  * sgs_connection_impl provides the implementation for the sgs_connection
- * interface (declare before any #includes)
+ * interface (must be declared before any headers are included that reference
+ * this type)
  */
 typedef struct sgs_connection_impl sgs_connection;
+
 
 /*
  * INCLUDES
  */
 #include "sgs_context.h"
+
 
 /*
  * FUNCTION DECLARATIONS

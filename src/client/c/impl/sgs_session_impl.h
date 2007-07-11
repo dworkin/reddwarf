@@ -15,19 +15,25 @@
 #ifndef SGS_SESSION_IMPL_H
 #define SGS_SESSION_IMPL_H 1
 
-/*
- * sgs_session_impl typedef (declare before any #includes)
- */
-typedef struct sgs_session_impl sgs_session_impl;
 
 /*
  * INCLUDES
  */
 #include <stdint.h>
-#include "sgs_connection_impl.h"
 #include "sgs_id.h"
 #include "sgs_map.h"
 #include "sgs_message.h"
+#include "sgs_id.h"
+
+
+/*
+ * sgs_session_impl typedef
+ * (must be declared before sgs_connection_impl.h is loaded)
+ */
+typedef struct sgs_session_impl sgs_session_impl;
+
+#include "sgs_connection_impl.h"
+
 
 /*
  * STRUCTS
@@ -59,6 +65,11 @@ struct sgs_session_impl {
      */
     uint8_t msg_buf[SGS_MSG_MAX_LENGTH];
 };
+
+
+/*
+ * FUNCTION DECLARATIONS
+ */
 
 /*
  * function: sgs_session_impl_free()

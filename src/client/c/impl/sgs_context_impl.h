@@ -13,10 +13,6 @@
 #ifndef SGS_CONTEXT_IMPL_H
 #define SGS_CONTEXT_IMPL_H 1
 
-/*
- * sgs_context_impl typedef (declare before any #includes)
- */
-typedef struct sgs_context_impl sgs_context_impl;
 
 /*
  * INCLUDES
@@ -25,6 +21,13 @@ typedef struct sgs_context_impl sgs_context_impl;
 #include "sgs_connection.h"
 #include "sgs_id.h"
 #include "sgs_session.h"
+
+
+/*
+ * sgs_context_impl typedef
+ */
+typedef struct sgs_context_impl sgs_context_impl;
+
 
 /*
  * STRUCTS

@@ -16,17 +16,18 @@
  */
 
 #include <errno.h>
-#include <sys/select.h>
 #include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 /* required for STDIN_FILENO on Linux/Solaris, but not Darwin: */
 #include <unistd.h>
-
+#include <sys/select.h>
 /** included for optarg (declared in unistd.h on some, but not all systems) */
 #include <getopt.h>
 #include "sgs_connection.h"
 #include "sgs_context.h"
+#include "sgs_hex_utils.h"
 #include "sgs_map.h"
 #include "sgs_session.h"
 
@@ -90,6 +91,7 @@ static int g_maxfd;
 int main(int argc, char *argv[]) {
     char inbuf[1024] = { '\0' };   /** inbuf must always be null-terminated */
     int inbuf_alive = 0;
+    int do_cmd_prompts = 1;
     char *token;
     int c, i, len, result, token_len, work;
     char *hostname = DEFAULT_HOST;
@@ -114,23 +116,27 @@ int main(int argc, char *argv[]) {
     g_maxfd = STDIN_FILENO;
     
     /** process command line arguments */
-    while ((c = getopt(argc, argv, "h:p:u")) != -1) {
+    while ((c = getopt(argc, argv, "h:p:su")) != -1) {
         switch (c) {
         case 'h':  /* hostname */
             hostname = optarg;
             break;
-      
+            
         case 'p':  /* port */
             port = atoi(optarg);
             break;
-      
+            
+        case 's': /* silence */
+            do_cmd_prompts = 0;
+            break;
+            
         case 'u':  /* usage */
-            printf("Usage: %s [-h HOST] [-p PORT] [-u]\n  -h    Specify remote \
-hostname (default: %s)\n  -p    Specify remote port (default: %d)\n  -u    Prin\
-t usage\n",
+            printf("Usage: %s [-h HOST] [-p PORT] [-s] [-u]\n  -h    Specify rem\
+ote hostname (default: %s)\n  -p    Specify remote port (default: %d)\n  -s    S\
+ilent Mode (no command prompts)\n  -u    Print usage\n",
                 argv[0], DEFAULT_HOST, DEFAULT_PORT);
             return 0;
-      
+            
             /* 
              * No default case necessary; an error will automatically be printed
              * since opterr is 1.
@@ -166,8 +172,10 @@ t usage\n",
     g_conn = sgs_connection_new(g_context);
     if (g_conn == NULL) { perror("Error in sgs_connection_new()"); bye(-1); }
     
-    printf("Command: ");
-    fflush(stdout);
+    if (do_cmd_prompts) {
+        printf("Command: ");
+        fflush(stdout);
+    }
     
     while (1) {
         if (inbuf_alive && strlen(inbuf) > 0) {
@@ -231,8 +239,10 @@ t usage\n",
                         inbuf[len + result] = '\0';
                         inbuf_alive = 1;
                         
-                        printf("Command: ");
-                        fflush(stdout);
+                        if (do_cmd_prompts) {
+                            printf("Command: ");
+                            fflush(stdout);
+                        }
                     }
                 } else if (FD_ISSET(i, &readset) || FD_ISSET(i, &writeset) ||
                     FD_ISSET(i, &exceptset)) {
@@ -302,16 +312,32 @@ static void channel_left_cb(sgs_connection *conn, sgs_channel *channel) {
 static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
     const sgs_id *sender_id, const uint8_t *msg, size_t msglen)
 {
-    char cbuf[msglen + 1];
+    char msgstr[msglen + 1];
     const char *channel_name = sgs_channel_get_name(channel);
-    const char *sender_desc = (sender_id == NULL) ? "Server" :
-        sgs_id_printable(sender_id);
+    char *sender_desc;
     
-    memcpy(cbuf, msg, msglen);
-    cbuf[msglen] = '\0';
+    memcpy(msgstr, msg, msglen);
+    msgstr[msglen] = '\0';
+    
+    if (sender_id == NULL) {
+        sender_desc = "Server";
+    }
+    else {
+        sender_desc = (char *)malloc(sgs_id_get_byte_len(sender_id)*2 + 1);
+        
+        if (sender_desc == NULL) {
+            printf("Error: malloc failed in channel_recv_msg_cb().");
+            return;
+        }
+        
+        bytestohex(sgs_id_get_bytes(sender_id), sgs_id_get_byte_len(sender_id),
+            sender_desc);
+    }
     
     printf(" - Callback -   Received message on channel %s from %s: %s\n",
-        channel_name, sender_desc, cbuf);
+        channel_name, sender_desc, msgstr);
+    
+    if (sender_id != NULL) free(sender_desc);
 }
 
 /*
@@ -325,10 +351,21 @@ static void disconnected_cb(sgs_connection *conn) {
  * logged_in_cb()
  */
 static void logged_in_cb(sgs_connection *conn, sgs_session *session) {
-    printf(" - Callback -   Logged in with sessionId %s.\n",
-        sgs_id_printable(sgs_session_get_id(session)));
-  
+    const sgs_id *session_id = sgs_session_get_id(session);
+    char *session_desc = (char *)malloc(sgs_id_get_byte_len(session_id)*2 + 1);
+    
+    if (session_desc == NULL) {
+        printf("Error: malloc failed in logged_in_cb().");
+        return;
+    }
+    
+    bytestohex(sgs_id_get_bytes(session_id), sgs_id_get_byte_len(session_id),
+        session_desc);
+    
+    printf(" - Callback -   Logged in with sessionId %s.\n", session_desc);
+    
     g_session = session;
+    free(session_desc);
 }
 
 /*
@@ -337,11 +374,11 @@ static void logged_in_cb(sgs_connection *conn, sgs_session *session) {
 static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
     size_t msglen)
 {
-    char cbuf[msglen + 1];
-    memcpy(cbuf, msg, msglen);
-    cbuf[msglen] = '\0';
+    char msgstr[msglen + 1];
+    memcpy(msgstr, msg, msglen);
+    msgstr[msglen] = '\0';
     
-    printf(" - Callback -   Login failed (%s)\n", cbuf);
+    printf(" - Callback -   Login failed (%s)\n", msgstr);
 }
 
 /*
@@ -357,11 +394,11 @@ static void reconnected_cb(sgs_connection *conn) {
 static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg,
     size_t msglen)
 {
-    char cbuf[msglen + 1];
-    memcpy(cbuf, msg, msglen);
-    cbuf[msglen] = '\0';
+    char msgstr[msglen + 1];
+    memcpy(msgstr, msg, msglen);
+    msgstr[msglen] = '\0';
     
-    printf(" - Callback -   Received message: %s\n", cbuf);
+    printf(" - Callback -   Received message: %s\n", msgstr);
 }
 
 /*
@@ -460,6 +497,8 @@ static int concatstr(const char *prefix, const char *suffix, char *buf,
 static void process_user_cmd(char *cmd) {
     char *token, *token2, *tmp;
     char strbuf[1024];
+    uint8_t bytebuf[1024];
+    int result;
     sgs_id recipient;
     sgs_channel *channel;
     
@@ -553,7 +592,7 @@ normally necessary)\n");
         /** For private messages, use the "Global" channel */
         channel = sgs_map_get(g_channel_map, GLOBAL_CHANNEL_NAME);
         if (channel == NULL) {
-            printf("Error: could not find global channel in channel map.");
+            printf("Error: could not find global channel in channel map.\n");
             return;
         }
         
@@ -564,8 +603,20 @@ normally necessary)\n");
             return;
         }
         
-        if (sgs_id_init_from_hex(token, &recipient) == -1) {
-            printf("Invalid user ID.\n");
+        if (strlen(token)/2 > sizeof(bytebuf)) {
+            printf("Error: ran out of buffer space (recipient ID too big).\n");
+            return;
+        }
+        
+        result = hextobytes(token, bytebuf);
+        
+        if (result == -1) {
+            printf("Error: invalid recipient ID.\n");
+            return;
+        }
+        
+        if (sgs_id_init(&recipient, bytebuf, result) == -1) {
+            printf("Error: invalid recipient ID.\n");
             return;
         }
         
@@ -577,12 +628,12 @@ normally necessary)\n");
         }
         
         if (concatstr("/pm ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).");
+            printf("Error: ran out of buffer space (user input too big?).\n");
             return;
         }
         
         if (sgs_channel_send_one(channel, (uint8_t*)strbuf, strlen(strbuf),
-                recipient) == -1) {
+                &recipient) == -1) {
             perror("Error in sgs_session_channel_send()");
             return;
         }
@@ -634,7 +685,7 @@ normally necessary)\n");
         }
         
         if (concatstr("/join ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).");
+            printf("Error: ran out of buffer space (user input too big?).\n");
             return;
         }
         
@@ -658,7 +709,7 @@ normally necessary)\n");
         }
         
         if (concatstr("/leave ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).");
+            printf("Error: ran out of buffer space (user input too big?).\n");
             return;
         }
         

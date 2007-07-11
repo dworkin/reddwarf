@@ -35,9 +35,9 @@ int bytestohex(const uint8_t *ba, const int len, char *hexstr) {
     /** leading zeros are important! */
     for (i=0; i < len; i++)
         sprintf(hexstr + i*2, "%02X", ba[i]);
-  
+    
     hexstr[len*2] = '\0';
-  
+    
     return 0;
 }
 
@@ -46,14 +46,14 @@ int bytestohex(const uint8_t *ba, const int len, char *hexstr) {
  */
 int hextobytes(const char *hexstr, uint8_t *ba) {
     int i, hi, lo, hexlen;
-  
+    
     hexlen = strlen(hexstr);
-  
+    
     if ((hexlen & 1) == 1) {
         errno = EINVAL;
         return -1;
     }
-  
+    
     for (i=0; i < hexlen/2; i++) {
         hi = hextoi(hexstr[2*i]);
         lo = hextoi(hexstr[2*i+1]);

@@ -78,7 +78,7 @@ int sgs_channel_send_all(sgs_channel* channel, const uint8_t *data,
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_channel_send_multi(sgs_channel* channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipients[], size_t recipslen);
+    size_t datalen, const sgs_id *recipients[], size_t recipslen);
 
 /*
  * function: sgs_channel_send_one()
@@ -97,6 +97,6 @@ int sgs_channel_send_multi(sgs_channel* channel, const uint8_t *data,
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_channel_send_one(sgs_channel* channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipient);
+    size_t datalen, const sgs_id *recipient);
 
 #endif  /** #ifndef SGS_CHANNEL_H */

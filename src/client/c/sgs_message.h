@@ -13,22 +13,19 @@
 #ifndef SGS_MESSAGE_H
 #define SGS_MESSAGE_H  1
 
-/*
- * TYPEDEFS
- * (declare before any #includes)
- */
-typedef struct sgs_message sgs_message;
 
 /*
  * INCLUDES
  */
 #include <stdint.h>
+#include "sgs_compact_id.h"
 #include "sgs_wire_protocol.h"
+
 
 /*
  * STRUCTS
  */
-struct sgs_message {
+typedef struct sgs_message {
     /** Pointer to the start of the memory reserved for this message. */
     uint8_t *buf;
   
@@ -47,7 +44,7 @@ struct sgs_message {
      * variable is redundant with those bytes but is more convenient to use.
      */
     size_t size;
-};
+} sgs_message;
 
 
 /*
@@ -89,6 +86,22 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
  */
 int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     size_t clen);
+
+
+/*
+ * function: sgs_msg_add_compact_id()
+ *
+ * Writes an sgs_compact_id to an existing message.
+ *
+ * args:
+ *     pmsg: pointer to the message to add data to
+ *       id: pointer to the sgs_compact_id to add to the message
+ *
+ * returns:
+ *    0: success
+ *   -1: failure (errno is set to specific error code)
+ */
+int sgs_msg_add_compact_id(sgs_message *msg, const sgs_compact_id *id);
 
 /*
  * function: sgs_msg_add_uint32()

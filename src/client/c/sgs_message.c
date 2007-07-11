@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sgs_compact_id.h"
 #include "sgs_error_codes.h"
 #include "sgs_message.h"
 #include "sgs_wire_protocol.h"
@@ -98,6 +99,19 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     pmsg->size += clen + 2;
     update_msg_len(pmsg);
   
+    return 0;
+}
+
+/*
+ * sgs_msg_add_compact_id()
+ */
+int sgs_msg_add_compact_id(sgs_message *msg, const sgs_compact_id *id) {
+    int result = sgs_compact_id_write(id, msg->buf + msg->size,
+        msg->buflen - msg->size);
+    
+    if (result == -1) return -1;
+    
+    msg->size += result;
     return 0;
 }
 

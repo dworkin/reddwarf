@@ -15,6 +15,7 @@
  * INCLUDES
  */
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include "sgs_context_impl.h"
 #include "sgs_connection.h"

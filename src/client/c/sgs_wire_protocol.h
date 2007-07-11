@@ -7,9 +7,7 @@
  */
 
 /*
- * The file declares constants relevant to the SGS network wire protocol.  It is
- * essentially a straight C-port of
- * com.sun.sgs.protocol.simple.SimpleSgsProtocol.
+ * This file declares constants relevant to the SGS network wire protocol.
  */
 
 /**

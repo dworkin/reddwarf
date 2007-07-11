@@ -20,6 +20,7 @@
 #include <string.h>
 #include "sgs_channel_impl.h"
 #include "sgs_error_codes.h"
+#include "sgs_compact_id.h"
 #include "sgs_id.h"
 #include "sgs_message.h"
 
@@ -28,7 +29,7 @@
  * (can only be called by functions in this file)
  */
 static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipients[], size_t recipslen);
+    size_t datalen, const sgs_id *recipients[], size_t recipslen);
 
 
 /*
@@ -48,14 +49,14 @@ const char *sgs_channel_get_name(const sgs_channel_impl *channel) {
 int sgs_channel_send_all(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen)
 {
-    return send_msg_general(channel, data, datalen, (sgs_id*)NULL, 0);
+    return send_msg_general(channel, data, datalen, (const sgs_id**)NULL, 0);
 }
 
 /*
  * sgs_session_channel_send_multi()
  */
 int sgs_channel_send_multi(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipients[], size_t recipslen)
+    size_t datalen, const sgs_id *recipients[], size_t recipslen)
 {
     return send_msg_general(channel, data, datalen, recipients,
         recipslen);
@@ -65,9 +66,9 @@ int sgs_channel_send_multi(sgs_channel_impl *channel, const uint8_t *data,
  * sgs_session_channel_send_one()
  */
 int sgs_channel_send_one(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipient)
+    size_t datalen, const sgs_id *recipient)
 {
-    sgs_id recipients[] = { recipient };
+    const sgs_id *recipients[] = { recipient };
     
     return send_msg_general(channel, data, datalen, recipients, 1);
 }
@@ -97,14 +98,14 @@ sgs_id *sgs_channel_impl_get_id(sgs_channel_impl *channel) {
  * sgs_channel_impl_new()
  */
 sgs_channel_impl *sgs_channel_impl_new(sgs_session_impl *session,
-    sgs_id id, const char *name, size_t namelen)
+    const sgs_id *id, const char *name, size_t namelen)
 {
     sgs_channel_impl *channel;
     channel = (sgs_channel_impl*)malloc(sizeof(struct sgs_channel_impl));
     if (channel == NULL) return NULL;
     
     channel->session = session;
-    channel->id = id;
+    channel->id = *id;
     channel->name = (char*)malloc(namelen + 1);
     
     if (channel->name == NULL) {
@@ -132,7 +133,7 @@ sgs_channel_impl *sgs_channel_impl_new(sgs_session_impl *session,
  * sgs_channel_send_one(), and sgs_channel_send_multi().
  */
 static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id recipients[], size_t recipslen)
+    size_t datalen, const sgs_id *recipients[], size_t recipslen)
 {
     int i;
     uint16_t _uint16_tmp;
@@ -145,8 +146,7 @@ static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
         return -1;
     
     /** Add channel-id data field to message. */
-    if (sgs_msg_add_arb_content(&msg, sgs_id_compressed_form(&channel->id),
-            sgs_id_compressed_len(&channel->id)) == -1)
+    if (sgs_msg_add_compact_id(&msg, &channel->id) == -1)
         return -1;
     
     /** Add sequence number to message. */
@@ -161,8 +161,7 @@ static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     
     /** Add each recipient-id to message. */
     for (i=0; i < recipslen; i++) {
-        if (sgs_msg_add_arb_content(&msg, sgs_id_compressed_form(&recipients[i]),
-                sgs_id_compressed_len(&recipients[i])) == -1)
+        if (sgs_msg_add_compact_id(&msg, recipients[i]) == -1)
             return -1;
     }
     

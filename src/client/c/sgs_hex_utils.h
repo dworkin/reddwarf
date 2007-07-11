@@ -14,6 +14,7 @@
 #ifndef SGS_HEX_UTILS_H
 #define SGS_HEX_UTILS_H 1
 
+
 /*
  * FUNCTION DECLARATIONS
  */

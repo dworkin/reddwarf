@@ -13,16 +13,18 @@
 #ifndef SGS_BUFFER_H
 #define SGS_BUFFER_H  1
 
-/*
- * sgs_buffer_impl provides the implementation for the sgs_buffer interface
- * (declare before any #includes)
- */
-typedef struct sgs_buffer_impl sgs_buffer;
 
 /*
  * INCLUDES
  */
 #include <stdint.h>
+#include <stdlib.h>
+
+
+/*
+ * sgs_buffer_impl provides the implementation for the sgs_buffer interface
+ */
+typedef struct sgs_buffer_impl sgs_buffer;
 
 
 /*

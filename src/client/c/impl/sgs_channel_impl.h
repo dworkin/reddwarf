@@ -62,6 +62,6 @@ sgs_id *sgs_channel_impl_get_id(sgs_channel_impl *channel);
  * and id.  Returns null on failure.
  */
 sgs_channel_impl *sgs_channel_impl_new(sgs_session_impl *session,
-    const sgs_id id, const char *name, size_t namelen);
+    const sgs_id *id, const char *name, size_t namelen);
 
 #endif  /** #ifndef SGS_CHANNEL_IMPL_H */
