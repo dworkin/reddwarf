@@ -26,13 +26,13 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Enumeration;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.transaction.xa.XAException;
 import static javax.transaction.xa.XAException.XA_RBDEADLOCK;
 import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
-
 
 /** Provides a database implementation using Berkeley DB. */
 public class BdbJeEnvironment implements DbEnvironment {
@@ -56,24 +56,6 @@ public class BdbJeEnvironment implements DbEnvironment {
     private static final String DEFAULT_DIRECTORY = "dsdb";
 
     /**
-     * The property that specifies the size in bytes of the Berkeley DB cache.
-     */
-    private static final String CACHE_SIZE_PROPERTY =
-	PACKAGE + ".cache.size";
-
-    /** The minimum cache size, as specified by Berkeley DB */
-    private static final long MIN_CACHE_SIZE = 96 * 1024;
-
-    /** The default cache size. */
-    private static final long DEFAULT_CACHE_SIZE = 1000000L;
-
-    /**
-     * The property that specifies whether to automatically remove log files.
-     */
-    private static final String REMOVE_LOGS_PROPERTY =
-	PACKAGE + ".remove.logs";
-
-    /**
      * The property that specifies whether to flush changes to disk on
      * transaction boundaries.  The property is set to false by default.  If
      * false, some recent transactions may be lost in the event of a crash,
@@ -89,6 +71,20 @@ public class BdbJeEnvironment implements DbEnvironment {
      */
     private static final String STATS_PROPERTY = PACKAGE + ".stats";
     
+    /**
+     * Default values for Berkeley DB Java Edition properties that are
+     * different from the BDB defaults.
+     */
+    private static final Properties defaultProperties = new Properties();
+    static {
+	/*
+	 * Perform checkpoints after 1 MB of changes.  This setting improves
+	 * performance when there are large number of changes being committed.
+	 */
+	defaultProperties.setProperty(
+	    "je.checkpointer.bytesInterval", "1000000");
+    }
+
     /** The Berkeley DB environment. */
     private final XAEnvironment env;
 
@@ -132,6 +128,10 @@ public class BdbJeEnvironment implements DbEnvironment {
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
     public BdbJeEnvironment(Properties properties, Scheduler scheduler) {
+	Properties propertiesWithDefaults = new Properties();
+	propertiesWithDefaults.putAll(defaultProperties);
+	propertiesWithDefaults.putAll(properties);
+	properties = propertiesWithDefaults;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	String specifiedDirectory =
 	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
@@ -154,18 +154,24 @@ public class BdbJeEnvironment implements DbEnvironment {
 	String directory = new File(specifiedDirectory).getAbsolutePath();
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
-	long cacheSize = wrappedProps.getLongProperty(
-	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
-	    Long.MAX_VALUE);
-	boolean removeLogs = wrappedProps.getBooleanProperty(
-	    REMOVE_LOGS_PROPERTY, false);
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
-	config.setCacheSize(cacheSize);
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
 	config.setTxnWriteNoSync(!flushToDisk);
+	for (Enumeration<?> names = properties.propertyNames();
+	     names.hasMoreElements(); )
+	{
+	    Object name = names.nextElement();
+	    if (name instanceof String) {
+		String property = (String) name;
+		if (property.startsWith("je.")) {
+		    config.setConfigParam(
+			property, properties.getProperty(property));
+		}
+	    }
+	}
 	try {
 	    env = new XAEnvironment(new File(directory), config);
 	} catch (DatabaseException e) {
