@@ -19,6 +19,8 @@ import java.io.OptionalDataException;
 import java.io.Serializable;
 import java.io.StreamCorruptedException;
 
+import java.util.List;
+
 /**
  *
  *
@@ -49,13 +51,21 @@ public class RemoteMethodRequestHandler
 	    // this method request, then schedule them to run
 	    TaskFactory factory = TaskFactory.instance();
 	    TaskManager manager = AppContext.getTaskManager();
-	    for (Runnable operation : (request.isCompressed()) 
-		     ? factory.getOperations(session,
-					     request.getOpCode(), 
-					     request.getArgs())
-		     : factory.getOperations(session,
-					     request.getMethodName(),
-					     request.getObjectArgs())) {
+            List<Runnable> operations;
+            
+            try {
+                operations = (request.isCompressed()) 
+                    ? factory.getOperations(session,
+                        request.getOpCode(), request.getArgs())
+                    : factory.getOperations(session,
+                        request.getMethodName(), request.getObjectArgs());
+            }
+            catch (UnsupportedOperationException uoe) {
+                System.out.println(uoe.toString());
+                return;
+            }
+            
+	    for (Runnable operation : operations) {
 		try {
 		    operation.run();
 		}
@@ -65,15 +75,25 @@ public class RemoteMethodRequestHandler
 		    e.printStackTrace();
 		}
 	    }
-		 
 	}
-	// fail silently
-	catch (ClassCastException cce) { } 
-	catch (ClassNotFoundException cnfe) { }
-	catch (InvalidClassException ice) { }
-	catch (StreamCorruptedException sce) { }
-	catch (OptionalDataException ode) { }
-	catch (IOException ioe) { }
+        catch (ClassCastException cce) {
+            System.out.println(cce.toString());
+        }
+	catch (ClassNotFoundException cnfe) {
+            System.out.println(cnfe.toString());
+        }
+	catch (InvalidClassException ice) {
+            System.out.println(ice.toString());
+        }
+	catch (StreamCorruptedException sce) {
+            System.out.println(sce.toString());
+        }
+	catch (OptionalDataException ode) {
+            System.out.println(ode.toString());
+        }
+	catch (IOException ioe) {
+            System.out.println(ioe.toString());
+        }
     }
 
     public void disconnected(boolean graceful) {

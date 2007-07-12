@@ -15,6 +15,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -73,19 +74,20 @@ public class TaskFactory implements ManagedObject, Serializable {
      *
      * @return the ordered lists of {@code Runnable} operations that
      *         represent this method
+     *
+     * @throws UnsupportedOperationException if the {@code methodOpCode}
+     *         is unrecognized
      */
     public List<Runnable> getOperations(ClientSession session, 
-					byte[] methodOpCode, 
-					byte[] argOpCodes) {
+        byte[] methodOpCode, byte[] argOpCodes)
+    {
 	MethodTaskProfile b = opCodes.get(methodOpCode);
-	if (b != null) {
-	    return b.getOperations(session, argOpCodes);
-	}
-	else {
-	    // log that we didn't have something to generate any task
-	    // and return an empty list
-	    return new LinkedList<Runnable>();
-	}
+        
+        if (b == null)
+            throw new UnsupportedOperationException("Unsupported " +
+                "method called, opCode=" + Arrays.toString(methodOpCode));
+        
+        return b.getOperations(session, argOpCodes);
     }
 
     /**
@@ -101,23 +103,21 @@ public class TaskFactory implements ManagedObject, Serializable {
      *
      * @return the ordered lists of {@code Runnable} operations that
      *         represent this method
+     *
+     * @throws UnsupportedOperationException if the {@code methodName}
+     *         is unrecognized
      */
     public List<Runnable> getOperations(ClientSession session, 
-					String methodName, 
-					Object[] args) {
+        String methodName, Object[] args)
+    {
 	MethodTaskProfile b = methods.get(methodName);
-	if (b != null) {
-// 	    System.out.printf("loaded profile for %s(): %s\n", 
-// 			      methodName, b);
-	    return b.getOperations(session, args);
-	}	
-	else {
-	    // log that we didn't have something to generate any task
-	    // and return an empty list
-	    System.out.printf("no profile for method %s\n", methodName);
-	    return new LinkedList<Runnable>();
-	}	
-    }    
+        
+        if (b == null)
+            throw new UnsupportedOperationException("Unsupported " +
+                "method called, name=" + methodName);
+        
+        return b.getOperations(session, args);
+    }
 	
     /**
      * Returns the singleton instance of the {@code TaskFactory}, or
@@ -161,10 +161,10 @@ public class TaskFactory implements ManagedObject, Serializable {
     void loadModules(Properties appProperties) {
 	// mark the as needing to write
 	AppContext.getDataManager().markForUpdate(this);
-
+        
 	// we need java 1.6 for this:
 	//for (String key : appProperties.stringPropertyNames()) {
-	    
+        
 	//for (Object o : appProperties.propertyNames()) {
 	Enumeration<?> enumer = appProperties.propertyNames();
 	while (enumer.hasMoreElements()) {
@@ -188,20 +188,20 @@ public class TaskFactory implements ManagedObject, Serializable {
 	    // representation, name, operation order
 	    String[] typeNameAndOrder = 
 		key.substring(PREFIX.length()).split("\\.");
-
+            
 	    if (typeNameAndOrder.length != 3) {
 		// REMINDER: add logging
 		System.out.printf("invalid key format: %s\n", key);
 		continue;
 	    }
-
+            
 	    // reference out the individual elements for clarity
 	    String type = typeNameAndOrder[0];
 	    String name = typeNameAndOrder[1];
 	    String order = typeNameAndOrder[2];
-
+            
 	    MethodTaskProfile profile = null;
-
+            
 	    if (type.equals("method")) {
 		profile = methods.get(name);
 		if (profile == null) {
@@ -223,10 +223,9 @@ public class TaskFactory implements ManagedObject, Serializable {
 		continue;
 	    }
 	    
-	    
 	    String[] behaviorModuleNames = 
 		appProperties.getProperty(key).split(",");
-   
+            
 	    for (String className : behaviorModuleNames) {
 		BehaviorModule module  = loadModule(className);
 		if (module == null) { // unsuccessful load
@@ -293,7 +292,7 @@ public class TaskFactory implements ManagedObject, Serializable {
 	}
 	else {
 	    // unknown op type
-	    System.out.printf("unknown operation type: \"%s\". " +
+	    System.out.printf("** unknown operation type: \"%s\". " +
 			      "Unable to load module.\n", opOrder);
 	}
     }
