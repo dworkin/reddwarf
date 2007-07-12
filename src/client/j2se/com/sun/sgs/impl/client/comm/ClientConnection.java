@@ -7,7 +7,7 @@ package com.sun.sgs.impl.client.comm;
 import java.io.IOException;
 
 /**
- * Represents an abstract network connection with the Sun Game Server.
+ * Represents an abstract network connection with the Project Darkstar Server.
  */
 public interface ClientConnection {
 

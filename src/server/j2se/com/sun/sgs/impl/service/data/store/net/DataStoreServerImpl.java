@@ -132,7 +132,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * The name of the undocumented property that controls whether to replace
-     * Java RMI with an experimental, socket-based facility.
+     * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	CLASSNAME + ".no.rmi");
@@ -534,7 +534,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The server for handling inbound requests. */
 	private DataStoreServer server;
 
-	/** The RMI registry for advertising the server. */
+	/** The Java RMI registry for advertising the server. */
 	private Registry registry;
 
 	/** Creates an instance. */

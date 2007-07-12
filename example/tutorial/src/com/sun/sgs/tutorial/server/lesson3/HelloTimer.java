@@ -17,7 +17,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
 /**
- * A simple timed-task example for the Sun Game Server.
+ * A simple timed-task example for the Project Darkstar Server.
  * It uses the {@link TaskManager} to schedule itself as a periodic task
  * that logs the current timestamp on each execution.
  */
