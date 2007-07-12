@@ -162,7 +162,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
-	config.setTxnNoSync(!flushToDisk);
+	config.setTxnWriteNoSync(!flushToDisk);
 	for (Enumeration<?> names = properties.propertyNames();
 	     names.hasMoreElements(); )
 	{
