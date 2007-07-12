@@ -15,7 +15,7 @@ import com.sun.sgs.app.ClientSessionListener;
 
 /**
  * Simple example of listening for user {@linkplain AppListener#loggedIn login}
- * in the Sun Game Server.
+ * in the Project Darkstar Server.
  * <p>
  * Logs each time a user logs in, and sets their listener to a
  * new {@link HelloUserSessionListener}.

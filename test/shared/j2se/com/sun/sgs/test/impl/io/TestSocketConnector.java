@@ -7,12 +7,11 @@ package com.sun.sgs.test.impl.io;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import junit.framework.Assert;
+import junit.framework.TestCase;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.SocketEndpoint;
@@ -26,25 +25,27 @@ import com.sun.sgs.io.ConnectionListener;
 /**
  * A set of JUnit tests for the SocketConnector class.
  */
-public class SocketConnectorTest {
-
-    private final static int BIND_PORT = 5000;
+public class TestSocketConnector
+    extends TestCase
+{
+    private final static int PORT = 5000;
 
     private final static int DELAY = 1000;
 
-    private final SocketAddress ADDRESS = new InetSocketAddress(BIND_PORT);
+    private final SocketEndpoint connectEndpoint =
+        new SocketEndpoint(new InetSocketAddress("", PORT),
+            TransportType.RELIABLE);
+
+    private final ServerSocketEndpoint acceptEndpoint =
+        new ServerSocketEndpoint(new InetSocketAddress(PORT),
+            TransportType.RELIABLE);
 
     Acceptor<SocketAddress> acceptor;
 
-    private boolean connected = false;
-
-    @Before
-    public void init() {
-        connected = false;
-
+    @Override
+    public void setUp() {
         try {
-            acceptor = new ServerSocketEndpoint(ADDRESS, TransportType.RELIABLE)
-                    .createAcceptor();
+            acceptor = acceptEndpoint.createAcceptor();
             acceptor.listen(new AcceptorListener() {
 
                 public ConnectionListener newConnection() {
@@ -62,21 +63,19 @@ public class SocketConnectorTest {
     }
 
     /**
-     * Shutdown the acceptor and start over for the next test.
-     * 
+     * Shuts down the acceptor and start over for the next test.
+     * <p>
      * Note that even though the acceptor will shutdown in a separate thread,
      * the current thread will block until shutdown is complete. Even so, it
      * seems that sometimes the next call to "init" happens too quickly after
      * the call to shutdown, causing subsequent tests to fail. This may be an IO
      * limitation of the machine, not being able to fully unbind the port before
      * it is bound again.
-     * 
      */
-    @After
-    public void cleanup() {
+    @Override
+    public void tearDown() {
         acceptor.shutdown();
         acceptor = null;
-
     }
 
     /**
@@ -84,30 +83,33 @@ public class SocketConnectorTest {
      *
      * @throws IOException if an unexpected IO problem occurs
      */
-    @Test
     public void testConnect() throws IOException {
+        final CountDownLatch connectLatch = new CountDownLatch(1);
+
         Connector<SocketAddress> connector =
-            new SocketEndpoint(ADDRESS,
-                               TransportType.RELIABLE)
-                .createConnector();
+            connectEndpoint.createConnector();
 
         ConnectionListener listener = new ConnectionAdapter() {
+            @Override
             public void connected(Connection conn) {
-                connected = true;
-                notifyAll();
+                System.err.println("connected");
+                connectLatch.countDown();
             }
         };
 
+        boolean connected = false;
+
         connector.connect(listener);
 
-        synchronized (this) {
-            try {
-                wait(DELAY);
-            } catch (InterruptedException ie) {
-            }
+        try {
+            connected = connectLatch.await(DELAY, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+            System.err.println("interrupted!");
         }
-        Assert.assertTrue(connected);
 
+        System.err.println("connected = " + connected);
+
+        Assert.assertTrue(connected);
     }
 
     /**
@@ -115,30 +117,34 @@ public class SocketConnectorTest {
      *
      * @throws IOException if an unexpected IO problem occurs
      */
-    @Test(expected = IllegalStateException.class)
     public void testMultipleConnect() throws IOException {
         Connector<SocketAddress> connector =
-            new SocketEndpoint(ADDRESS,
-                               TransportType.RELIABLE).createConnector();
+            connectEndpoint.createConnector();
 
         ConnectionListener listener = new ConnectionAdapter();
 
         connector.connect(listener);
 
-        connector.connect(listener);
+        try {
+            connector.connect(listener);
+        } catch (IllegalStateException expected) {
+            // passed
+            return;
+        }
+        Assert.fail("Expected IllegalStateException");
     }
 
-    @Test(expected = IllegalStateException.class)
     public void testShutdown() throws IOException {
-        final Connector<SocketAddress> connector =
-            new SocketEndpoint(ADDRESS,
-                               TransportType.RELIABLE).createConnector();
+        Connector<SocketAddress> connector =
+            connectEndpoint.createConnector();
 
-        ConnectionListener listener = new ConnectionAdapter();
-
-        connector.shutdown();
-        connector.connect(listener);
-
+        try {
+            connector.shutdown();
+        } catch (IllegalStateException expected) {
+            // passed
+            return;
+        }
+        Assert.fail("Expected IllegalStateException");
     }
 
     private static class ConnectionAdapter implements ConnectionListener {

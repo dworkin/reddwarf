@@ -111,6 +111,7 @@ public class TestDataServiceImpl extends TestCase {
 	    createTransaction(10000);
 	    service.configure(componentRegistry, txnProxy);
 	    txn.commit();
+	    componentRegistry.setComponent(DataManager.class, service);
 	}
 	componentRegistry.registerAppContext();
 	createTransaction();
@@ -2579,14 +2580,6 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Returns a DataServiceImpl for the shared database using the default
-     * properties and the default component registry.
-     */
-    protected DataServiceImpl createDataServiceImpl() throws Exception {
-	return createDataServiceImpl(props, componentRegistry);
-    }
-
-    /**
      * Returns a DataServiceImpl for the shared database using the specified
      * properties and component registry.
      */
@@ -2605,17 +2598,11 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Returns a DataServiceImpl that has been registered with the component
-     * registry, but not configured.
+     * Returns a DataServiceImpl using the default properties and component
+     * registry.
      */
     private DataServiceImpl getDataServiceImpl() throws Exception {
-	DataServiceImpl service = createDataServiceImpl();
-	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.setComponent(DataService.class, service);
-	componentRegistry.setComponent(DataServiceImpl.class, service);
-	txnProxy.setComponent(DataService.class, service);
-	txnProxy.setComponent(DataServiceImpl.class, service);
-	return service;
+	return new DataServiceImpl(props, componentRegistry);
     }
 
     /** Returns the default properties to use for creating data services. */

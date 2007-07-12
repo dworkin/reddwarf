@@ -12,7 +12,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 
 /**
- * Hello World example for the Sun Game Server.
+ * Hello World example for the Project Darkstar Server.
  * Prints {@code "Hello World!"} to the console the first time it's started.
  */
 public class HelloWorld

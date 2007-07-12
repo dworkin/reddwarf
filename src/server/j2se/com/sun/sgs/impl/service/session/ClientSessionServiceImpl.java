@@ -619,11 +619,13 @@ public class ClientSessionServiceImpl implements ClientSessionService {
         }
 
 	/**
-	 * If the first context in the context queue is committed,
-	 * wakes up the thread to process committed contexts in queue.
+	 * Wakes up the thread to process committed contexts in the
+	 * context queue if the queue is non-empty and the first
+	 * context in the queue is committed, .
 	 */
 	private void checkFlush() {
-	    if (contextQueue.peek().isCommitted) {
+	    Context context = contextQueue.peek();
+	    if ((context != null) && (context.isCommitted)) {
 		synchronized (flushContextsLock) {
 		    flushContextsLock.notify();
 		}
