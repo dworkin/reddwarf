@@ -83,6 +83,9 @@ public class BdbJeEnvironment implements DbEnvironment {
 	 */
 	defaultProperties.setProperty(
 	    "je.checkpointer.bytesInterval", "1000000");
+	/* Use shared latches to improve concurrency. */
+	defaultProperties.setProperty(
+	    "je.env.sharedLatches", "true");
     }
 
     /** The Berkeley DB environment. */
@@ -159,7 +162,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
-	config.setTxnWriteNoSync(!flushToDisk);
+	config.setTxnNoSync(!flushToDisk);
 	for (Enumeration<?> names = properties.propertyNames();
 	     names.hasMoreElements(); )
 	{
