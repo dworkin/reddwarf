@@ -22,23 +22,23 @@ public final class DbEnvironmentFactory {
     /**
      * Returns the environment for interacting with the database implementation
      * specified by the properties.  The value of the {@code
-     * com.sun.sgs.impl.service.data.store.db.environment.class} property
-     * should be the fully qualified name of a non-abstract class that
+     * com.sun.sgs.impl.service.data.store.db.environment.class} property, if
+     * present, should be the fully qualified name of a non-abstract class that
      * implements {@link DbEnvironment}, and that has a public constructor with
      * two parameters: a {@link Properties}, which specifies configuration
      * options, and a {@link Scheduler}, which the implementation can use to
      * run asynchronous periodic tasks.  If the property is present, the
      * results of calling the constructor with the arguments passed to this
      * method will be returned.  Otherwise, an instance of {@link
-     * BdbDbEnvironment} constructed with the arguments will be returned.
+     * BdbDbEnvironment}, constructed with the arguments, will be returned.
      *
      * @param	properties the properties
      * @param	scheduler the periodic task scheduler
      * @return	the database environment
-     * @throws	IllegalArgumentException if {@code properties} contains a value
-     *		for the {@code
+     * @throws	IllegalArgumentException if {@code properties} contains an
+     *		invalid value for the {@code
      *		com.sun.sgs.impl.service.data.store.db.environment.class}
-     *		property that is not a valid {@code DbEnvironment} class
+     *		property
      */
     public static DbEnvironment getEnvironment(
 	Properties properties, Scheduler scheduler)

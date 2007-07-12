@@ -31,7 +31,42 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides a database implementation using Berkeley DB. */
+/**
+ * Provides a database implementation based on <a href=
+ * "http://www.oracle.com/database/berkeley-db/db/index.html">Berkeley
+ * DB</a>. <p>
+ *
+ * Operations on this class will throw an {@link Error} if the underlying
+ * Berkeley DB database requires recovery.  In that case, callers need to
+ * restart the server or create a new instance of this class. <p>
+ *
+ * Note that, although databases returned by this class provide support for the
+ * {@link DbDatabase#prepare DbDatabase.prepare} method, they do not provide
+ * facilities for resolving prepared transactions after a crash.  Callers can
+ * work around this limitation by insuring that the transaction implementation
+ * calls {@link TransactionParticipant#prepareAndCommit
+ * TransactionParticipant.prepareAndCommit} to commit transactions on this
+ * class.  The current transaction implementation calls
+ * <code>prepareAndCommit</code> on durable participants, so the inability to
+ * resolve prepared transactions should have no effect at present. <p>
+ *
+ * The {@link #BdbDbEnvironment constructor} supports these public <a
+ * href="../../../../app/doc-files/config-properties.html#BdbDb">
+ * properties</a>. <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.data.db.bdbdb</code> to log information at
+ * the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
+ *	application restart and recovery
+ * <li> {@link Level#WARNING WARNING} - Berkeley DB errors
+ * <li> {@link Level#INFO INFO} - Berkeley DB statistics
+ * <li> {@link Level#FINE FINE} - Berkeley DB messages, allocating blocks of
+ *	object IDs
+ * </ul>
+ */
 public class BdbDbEnvironment implements DbEnvironment {
 
     /** The package name. */
@@ -155,8 +190,7 @@ public class BdbDbEnvironment implements DbEnvironment {
 	    if (rootDir == null) {
 		throw new IllegalArgumentException(
 		    "A value for the property " +
-		    StandardProperties.APP_ROOT +
-		    " must be specified");
+		    StandardProperties.APP_ROOT + " must be specified");
 	    }
 	    specifiedDirectory =
 		rootDir + File.separator + DEFAULT_DIRECTORY;
@@ -202,30 +236,6 @@ public class BdbDbEnvironment implements DbEnvironment {
 	    new CheckpointRunnable(checkpointSize), checkpointInterval);
     }
 	
-    /** {@inheritDoc} */
-    public DbTransaction beginTransaction(long timeout) {
-	return new BdbDbTransaction(env, timeout);
-    }
-
-    /** {@inheritDoc} */
-    public DbDatabase openDatabase(
-	DbTransaction txn, String fileName, boolean create)
-	throws FileNotFoundException
-    {
-	return new BdbDbDatabase(
-	    env, BdbDbTransaction.getBdbTxn(txn), fileName, create);
-    }
-
-    /** {@inheritDoc} */
-    public void close() {
-	checkpointTaskHandle.cancel();
-	try {
-	    env.close();
-	} catch (DatabaseException e) {
-	    throw convertException(e, false);
-	}
-    }
-
     /**
      * Returns the correct SGS exception for a Berkeley DB DatabaseException
      * thrown during an operation.  Throws an Error if recovery is needed.
@@ -262,6 +272,32 @@ public class BdbDbEnvironment implements DbEnvironment {
 	} else {
 	    throw new DbDatabaseException(
 		"Unexpected database exception: " + e);
+	}
+    }
+
+    /* -- Implement DbEnvironment -- */
+
+    /** {@inheritDoc} */
+    public DbTransaction beginTransaction(long timeout) {
+	return new BdbDbTransaction(env, timeout);
+    }
+
+    /** {@inheritDoc} */
+    public DbDatabase openDatabase(
+	DbTransaction txn, String fileName, boolean create)
+	throws FileNotFoundException
+    {
+	return new BdbDbDatabase(
+	    env, BdbDbTransaction.getBdbTxn(txn), fileName, create);
+    }
+
+    /** {@inheritDoc} */
+    public void close() {
+	checkpointTaskHandle.cancel();
+	try {
+	    env.close();
+	} catch (DatabaseException e) {
+	    throw convertException(e, false);
 	}
     }
 }

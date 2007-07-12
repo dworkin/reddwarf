@@ -6,7 +6,11 @@ package com.sun.sgs.impl.service.data.store.db;
 
 import java.io.FileNotFoundException;
 
-/** The interface for interacting with the database implementation. */
+/**
+ * The interface for interacting with the database implementation.
+ * Environments must not be used after the {@link #close close} method is
+ * called.
+ */
 public interface DbEnvironment {
 
     /**
@@ -29,6 +33,8 @@ public interface DbEnvironment {
      * @param	fileName the name of the file containing the database
      * @param	create whether to create the database if it does not exist
      * @return	the database
+     * @throws	IllegalArgumentException if {@code txn} was not created by this
+     *		environment
      * @throws	FileNotFoundException if {@code create} is {@code false} and
      *		the database is not found
      * @throws	DbDatabaseException if an unexpected database problem occurs

@@ -4,7 +4,10 @@
 
 package com.sun.sgs.impl.service.data.store.db;
 
-/** The interface to a database. */
+/**
+ * The interface to a database.  Databases must not be used after the {@link
+ * #close close} method is called.
+ */
 public interface DbDatabase {
 
     /**
@@ -15,6 +18,8 @@ public interface DbDatabase {
      * @param	key the key
      * @param	forUpdate whether the object should be locked for update
      * @return	the associated value, or {@code null} if the key was not found
+     * @throws	IllegalArgumentException if {@code txn} was not created by the
+     *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -28,6 +33,8 @@ public interface DbDatabase {
      * @param	txn the transaction for this operation
      * @param	key the key
      * @param	value the value
+     * @throws	IllegalArgumentException if {@code txn} was not created by the
+     *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -43,6 +50,8 @@ public interface DbDatabase {
      * @param	value the value
      * @return	{@code true} if a value was stored for the key, and {@code
      *		false} if the key already had a value
+     * @throws	IllegalArgumentException if {@code txn} was not created by the
+     *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -56,6 +65,8 @@ public interface DbDatabase {
      * @param	key the key
      * @return	{@code true} if the value was removed, and {@code false} if the
      *		key had no associated value
+     * @throws	IllegalArgumentException if {@code txn} was not created by the
+     *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -67,6 +78,8 @@ public interface DbDatabase {
      * that cursors need to be closed before the associated transaction ends.
      *
      * @return	the cursor
+     * @throws	IllegalArgumentException if {@code txn} was not created by the
+     *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs

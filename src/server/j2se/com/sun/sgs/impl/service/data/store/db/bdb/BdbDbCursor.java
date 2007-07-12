@@ -15,7 +15,6 @@ import static com.sleepycat.db.OperationStatus.SUCCESS;
 import com.sleepycat.db.Transaction;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 
 /** Provides a cursor implementation using Berkeley DB. */
 public class BdbDbCursor implements DbCursor {
@@ -23,11 +22,11 @@ public class BdbDbCursor implements DbCursor {
     /** The Berkeley DB cursor. */
     private final Cursor cursor;
 
-    /** The entry for the key if isCurrent is true. */
+    /** An entry containing the current key if isCurrent is true. */
     private DatabaseEntry keyEntry = new DatabaseEntry();
 
-    /** The entry for the value if isCurrent is true. */
-    private final DatabaseEntry valueEntry = new DatabaseEntry();
+    /** An entry containing the current value if isCurrent is true. */
+    private DatabaseEntry valueEntry = new DatabaseEntry();
 
     /** Whether the data in keyEntry and valueEntry is valid. */
     private boolean isCurrent = false;
@@ -138,10 +137,14 @@ public class BdbDbCursor implements DbCursor {
     /** {@inheritDoc} */
     public boolean putNoOverwrite(byte[] key, byte[] value) {
 	try {
+	    DatabaseEntry putKeyEntry = new DatabaseEntry(key);
+	    DatabaseEntry putValueEntry = new DatabaseEntry(value);
 	    OperationStatus status = cursor.putNoOverwrite(
-		new DatabaseEntry(key), new DatabaseEntry(value));
+		putKeyEntry, putValueEntry);
 	    if (status == SUCCESS) {
 		isCurrent = true;
+		keyEntry = putKeyEntry;
+		valueEntry = putValueEntry;
 		return true;
 	    } else if (status == KEYEXIST) {
 		return false;

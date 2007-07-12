@@ -6,7 +6,10 @@ package com.sun.sgs.impl.service.data.store.db;
 
 /**
  * The interface to a cursor for iterating over the contents of a database.  A
- * newly created cursor has no current key or value.
+ * newly created cursor has no current key or value.  Cursors are associated
+ * with a single transaction, and must be opened and closed within that single
+ * transaction.  Cursors must not be used after the {@link #close close} method
+ * is called.  Cursor implementations are not required to be synchronized.
  */
 public interface DbCursor {
 

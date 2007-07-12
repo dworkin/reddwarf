@@ -206,7 +206,7 @@ public class DataEncoding {
 		public byte[] toByteArray() {
 		    byte[] newbuf = new byte[count - 1];
 		    System.arraycopy(buf, 2, newbuf, 0, count - 2);
-		    newbuf[count - 2] = (byte) 0;
+		    newbuf[count - 2] = 0;
 		    return newbuf;
 		}
 	    };

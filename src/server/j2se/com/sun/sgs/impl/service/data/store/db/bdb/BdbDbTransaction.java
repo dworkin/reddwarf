@@ -12,7 +12,7 @@ import com.sleepycat.db.Transaction;
 /** Provide a transaction implementation using Berkeley DB. */
 class BdbDbTransaction implements DbTransaction {
 
-    /** The Berkeley DB transacction. */
+    /** The Berkeley DB transaction. */
     private final Transaction txn;
 
     /**
@@ -74,6 +74,7 @@ class BdbDbTransaction implements DbTransaction {
 	}
     }
 
+    /** {@inheritDoc} */
     public void abort() {
 	try {
 	    txn.abort();
