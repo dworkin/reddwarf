@@ -496,7 +496,6 @@ public class BenchmarkClient
                 break;
                 
             case CREATE_CHANNEL:
-                System.out.println(cmd.getChannelName());
                 sendServerMessage(new MethodRequest("CREATE_CHANNEL",
                                       new Object[] { cmd.getChannelName() } ));
                 break;
@@ -531,7 +530,8 @@ public class BenchmarkClient
                 break;
                 
             case LEAVE_CHANNEL:
-                sendServerMessage("/leave " + cmd.getChannelName());
+                sendServerMessage(new MethodRequest("leaveChannel",
+                                      new Object[] { cmd.getChannelName() }));
                 break;
                 
             case LOGIN:
@@ -543,8 +543,11 @@ public class BenchmarkClient
                 break;
                 
             case MALLOC:
-                cmd.getSize();
-                System.out.println("not yet implemented - TODO");
+                sendServerMessage(new MethodRequest("MALLOC",
+                                      new Object[] {
+                                          byte[].class.getName(),
+                                          cmd.getSize()
+                                      }));
                 break;
                 
             case ON_EVENT:
@@ -554,18 +557,20 @@ public class BenchmarkClient
                 break;
                 
             case PAUSE:
-                long start = System.currentTimeMillis();
-                long elapsed = 0;
-                long duration = cmd.getDuration();
-                
-                synchronized (pauseLock) {
-                    while (elapsed < duration) {
-                        try {
-                            pauseLock.wait(duration - elapsed);
+                {
+                    long start = System.currentTimeMillis();
+                    long elapsed = 0;
+                    long duration = cmd.getDuration();
+                    
+                    synchronized (pauseLock) {
+                        while (elapsed < duration) {
+                            try {
+                                pauseLock.wait(duration - elapsed);
+                            }
+                            catch (InterruptedException e) { }
+                            
+                            elapsed = System.currentTimeMillis() - start;
                         }
-                        catch (InterruptedException e) { }
-                        
-                        elapsed = System.currentTimeMillis() - start;
                     }
                 }
                 break;
@@ -575,19 +580,17 @@ public class BenchmarkClient
                 return;
                 
             case SEND_CHANNEL:
-                // need to somehow get a handle to the channel -- probably will need
-                // to save a map of channel-names to ClientChannel objects (which
-                // get passed to you in joinedChannel() event call)
-                String channelName = cmd.getChannelName();
-                ClientChannel channel = channels.get(channelName);
-                
-                if (channel == null) {
-                    System.err.println("Error: unknown channel \"" +
-                        channelName + "\"");
-                } else {
-                    channel.send(toMessageBytes(cmd.getMessage()));
-                }
+                {
+                    String channelName = cmd.getChannelName();
+                    ClientChannel channel = channels.get(channelName);
                     
+                    if (channel == null) {
+                        System.err.println("Error: unknown channel \"" +
+                            channelName + "\"");
+                    } else {
+                        channel.send(toMessageBytes(cmd.getMessage()));
+                    }
+                }
                 break;
                     
             case SEND_DIRECT:
