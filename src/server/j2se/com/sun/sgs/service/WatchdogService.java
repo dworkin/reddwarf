@@ -38,26 +38,35 @@ public interface WatchdogService extends Service {
 
     /**
      * Returns an iterator for the set of nodes that this service
-     * monitors.
+     * monitors.  The {@code remove} operation of the returned
+     * iterator is not supported and will throw {@code
+     * UnsupportedOperationException} if invoked.  This method should
+     * only be called within a transaction.
      *
      * @return	an iterator for the set of nodes that this service
      *		monitors
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
      */
     Iterator<Node> getNodes();
 
     /**
      * Returns node status information for the node with the specified
-     * {@code nodeId}.
+     * {@code nodeId}.  This method should only be called within a
+     * transaction.
      *
      * @param	nodeId	a node ID
      * @return	node status information for the specified {@code
      * 		nodeId}
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
      */
     Node getNode(long nodeId);
 
     /**
      * Registers a {@code listener} to be notified when any node that
-     * this service monitors starts or fails.
+     * this service monitors starts or fails.  Registered listeners
+     * are notified outside of a transaction.
      *
      * @param	listener a node listener
      */
@@ -65,11 +74,8 @@ public interface WatchdogService extends Service {
 
     /**
      * Registers a {@code listener} to be notified when the node with
-     * the specified {@code nodeId} starts or fails.<p>
-     *
-     * <i>Note: is this method necessary?  The listener can't be notified
-     * of startup because node IDs aren't assigned until the node
-     * comes up...</i>
+     * the specified {@code nodeId} starts or fails.  Registered
+     * listeners are notified outside of a transaction.
      *
      * @param	nodeId a node ID
      * @param	listener a node listener

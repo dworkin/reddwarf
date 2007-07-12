@@ -7,7 +7,6 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -15,6 +14,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
@@ -25,8 +25,7 @@ import java.util.logging.Logger;
 /**
  * The {@link WatchdogServer} implementation. <p>
  *
- * In addition to the properties supported by the {@link DataServiceImpl}
- * class, the {@link #WatchdogServerImpl constructor} supports the following
+ * The {@link #WatchdogServerImpl constructor} supports the following
  * properties: <p>
  *
  * <ul>
@@ -52,7 +51,7 @@ import java.util.logging.Logger;
  * </ul> <p>
 
  */
-public class WatchdogServerImpl implements WatchdogServer {
+public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**  The name of this class. */
     private static final String CLASSNAME =
@@ -78,8 +77,11 @@ public class WatchdogServerImpl implements WatchdogServer {
     /** The lower bound for the ping interval. */
     private static final int PING_INTERVAL_LOWER_BOUND = 5;
 
-    /** Set by main to make sure the server is reachable. */
-    private static WatchdogServerImpl server;
+    /** The transaction proxy for this class. */
+    private static TransactionProxy txnProxy;
+
+    /** The lock. */
+    private final Object lock = new Object();
     
     /** The server port. */
     private final int port;
@@ -91,20 +93,18 @@ public class WatchdogServerImpl implements WatchdogServer {
     private final Exporter<WatchdogServer> exporter;
 
     /** The data service. */
-    private final DataServiceImpl dataService;
+    private DataService dataService;
 
-    /** The transaction coordinator. */
-    private final TransactionCoordinatorImpl txnCoordinator;
-
-    /** The transaction proxy/component registry. */
-    private final TransactionProxyImpl txnProxy;
-
+    /** If true, this service is shutting down; initially, false. */
+    private boolean shuttingDown = false;
+    
     /**
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServerImpl class documentation} for a list
      * of supported properties.
      */
-    public WatchdogServerImpl(Properties properties)
+    public WatchdogServerImpl(Properties properties,
+			      ComponentRegistry systemRegistry)
 	throws IOException, Exception
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
@@ -131,42 +131,63 @@ public class WatchdogServerImpl implements WatchdogServer {
 		"greater than or equal to " + PING_INTERVAL_LOWER_BOUND +
 		": " + pingInterval);
 	}
-	txnCoordinator = new TransactionCoordinatorImpl(properties, null);
-	txnProxy = new TransactionProxyImpl();
-	dataService = new DataServiceImpl(properties, txnProxy);
-	// TBD:  are all these settings necessary?
-	txnProxy.setComponent(DataService.class, dataService);
-	txnProxy.setComponent(DataServiceImpl.class, dataService);
-	runTransactionally(new Task() {
-	     public void run() throws Exception {
-		 dataService.configure(txnProxy, txnProxy);
-	     }});
     }
 
-    public void configure(ComponentRegistry registry,
-			  TransactionProxy proxy)
-    {
+    /** {@inheritDoc} */
+    public String getName() {
+	return toString();
     }
     
-    /* -- main method -- */
-
-    /**
-     * Starts the server.  The current system properties are supplied
-     * to the constructor.  Exits with a non-zero status value if a
-     * problem occurs.
-     *
-     * @param	args ignored
-     */
-    public static void main(String[] args) {
+    /** {@inheritDoc} */
+    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+	
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG, "Configuring WatchdogServerImpl");
+	}
 	try {
-	    server = new WatchdogServerImpl(System.getProperties());
-	    logger.log(Level.INFO, "Server started: {0}", server);
-	} catch (Throwable t) {
-	    logger.logThrow(Level.SEVERE, t, "Problem starting server");
-	    System.exit(1);
+	    if (registry == null) {
+		throw new NullPointerException("null registry");
+	    } else if (proxy == null) {
+		throw new NullPointerException("null transaction proxy");
+	    }
+	    
+	    synchronized (WatchdogServerImpl.class) {
+		if (WatchdogServerImpl.txnProxy == null) {
+		    WatchdogServerImpl.txnProxy = proxy;
+		} else {
+		    assert WatchdogServerImpl.txnProxy == proxy;
+		}
+	    }
+	    
+	    synchronized (lock) {
+		if (dataService != null) {
+		    throw new IllegalStateException("already configured");
+		}
+		dataService = registry.getComponent(DataService.class);
+	    }
+	    
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to configure WatchdogServerImpl");
+	    }
+	    throw e;
 	}
     }
 
+    /** {@inheritDoc} */
+    public boolean shutdown() {
+	synchronized (lock) {
+	    if (shuttingDown) {
+		throw new IllegalStateException("already shutting down");
+	    }
+	    shuttingDown = true;
+	}
+	exporter.unexport();
+	return true;
+    }
+    
     /* -- Implement WatchdogServer -- */
 
     /**
@@ -201,6 +222,16 @@ public class WatchdogServerImpl implements WatchdogServer {
 	return port;
     }
 
+    /**
+     * Resets the server to an uninitialized state so that configure
+     * can be reinvoked.  This method is invoked by the {@code
+     * WatchdogServiceImpl} if its {@code configure} method aborts.
+     */
+    void configureAborted() {
+	dataService = null;
+    }
+    
+    /*
     private void runTransactionally(Task task) throws Exception {
 	// TBD: should this check to see if there is already a
 	// transaction set?
@@ -229,4 +260,6 @@ public class WatchdogServerImpl implements WatchdogServer {
 	    txnProxy.setCurrentTransaction(null);
 	}
     }
+
+    */
 }
