@@ -21,6 +21,8 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabase;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Provides a database implementation using Berkeley DB. */
 public class BdbJeDatabase implements DbDatabase {
@@ -41,8 +43,11 @@ public class BdbJeDatabase implements DbDatabase {
 	createConfig.setAllowCreate(true);
     }
 
-    /** The Berkeley DB database. */
-    private final Database db;
+    private final Environment env;
+    private final String fileName;
+
+    /** Open Berkeley DB databases that are not in use. */
+    private final List<Database> idleDbs = new ArrayList<Database>();
 
     /**
      * Creates an instance of this class.
@@ -57,9 +62,12 @@ public class BdbJeDatabase implements DbDatabase {
 	Environment env, Transaction txn, String fileName, boolean create)
 	throws FileNotFoundException
     {
+	this.env = env;
+	this.fileName = fileName;
 	try {
-	    db = env.openDatabase(
-		txn, fileName, create ? createConfig : openConfig);
+	    addIdleDatabase(
+		env.openDatabase(
+		    txn, fileName, create ? createConfig : openConfig));
 	} catch (DatabaseNotFoundException e) {
 	    throw (FileNotFoundException)
 		new FileNotFoundException(e.getMessage()).initCause(e);
@@ -80,10 +88,11 @@ public class BdbJeDatabase implements DbDatabase {
 
     /** {@inheritDoc} */
     public byte[] get(DbTransaction txn, byte[] key, boolean forUpdate) {
+	BdbJeTransaction bdbJeTxn = BdbJeTransaction.coerce(txn);
 	try {
 	    DatabaseEntry valueEntry = new DatabaseEntry();
-	    OperationStatus status = db.get(
-		BdbJeTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+	    OperationStatus status = getDb(bdbJeTxn).get(
+		bdbJeTxn.txn, new DatabaseEntry(key),
 		valueEntry, forUpdate ? LockMode.RMW : null);
 	    if (status == SUCCESS) {
 		return convertData(valueEntry.getData());
@@ -99,9 +108,10 @@ public class BdbJeDatabase implements DbDatabase {
 
     /** {@inheritDoc} */
     public void put(DbTransaction txn, byte[] key, byte[] value) {
+	BdbJeTransaction bdbJeTxn = BdbJeTransaction.coerce(txn);
 	try {
-	    OperationStatus status = db.put(
-		BdbJeTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+	    OperationStatus status = getDb(bdbJeTxn).put(
+		bdbJeTxn.txn, new DatabaseEntry(key),
 		new DatabaseEntry(value));
 	    if (status != SUCCESS) {
 		throw new DbDatabaseException("Operation failed: " + status);
@@ -115,9 +125,10 @@ public class BdbJeDatabase implements DbDatabase {
     public boolean putNoOverwrite(
 	DbTransaction txn, byte[] key, byte[] value)
     {
+	BdbJeTransaction bdbJeTxn = BdbJeTransaction.coerce(txn);
 	try {
-	    OperationStatus status = db.putNoOverwrite(
-		BdbJeTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+	    OperationStatus status = getDb(bdbJeTxn).putNoOverwrite(
+		bdbJeTxn.txn, new DatabaseEntry(key),
 		new DatabaseEntry(value));
 	    if (status == SUCCESS) {
 		return true;
@@ -133,9 +144,10 @@ public class BdbJeDatabase implements DbDatabase {
 
     /** {@inheritDoc} */
     public boolean delete(DbTransaction txn, byte[] key) {
+	BdbJeTransaction bdbJeTxn = BdbJeTransaction.coerce(txn);
 	try {
-	    OperationStatus status = db.delete(
-		BdbJeTransaction.getBdbTxn(txn), new DatabaseEntry(key));
+	    OperationStatus status = getDb(bdbJeTxn).delete(
+		bdbJeTxn.txn, new DatabaseEntry(key));
 	    if (status == SUCCESS) {
 		return true;
 	    } else if (status == NOTFOUND) {
@@ -150,15 +162,50 @@ public class BdbJeDatabase implements DbDatabase {
 
     /** {@inheritDoc} */
     public DbCursor openCursor(DbTransaction txn) {
-	return new BdbJeCursor(db, BdbJeTransaction.getBdbTxn(txn));
+	BdbJeTransaction bdbJeTxn = BdbJeTransaction.coerce(txn);
+	try {
+	    return new BdbJeCursor(getDb(bdbJeTxn), bdbJeTxn.txn);
+	} catch (DatabaseException e) {
+	    throw BdbJeEnvironment.convertException(e, true);
+	}
     }
 
     /** {@inheritDoc} */
     public void close() {
 	try {
-	    db.close();
+	    synchronized (idleDbs) {
+		for (Database db : idleDbs) {
+		    db.close();
+		}
+		idleDbs.clear();
+	    }
 	} catch (DatabaseException e) {
 	    throw BdbJeEnvironment.convertException(e, false);
+	}
+    }
+
+    private Database getDb(BdbJeTransaction bdbJeTxn)
+	throws DatabaseException
+    {
+	Database db = bdbJeTxn.inUseDbs.get(this);
+	if (db != null) {
+	    return db;
+	}
+	synchronized (idleDbs) {
+	    if (!idleDbs.isEmpty()) {
+		db = idleDbs.remove(0);
+	    }
+	}
+	if (db == null) {
+	    db = env.openDatabase(bdbJeTxn.txn, fileName, openConfig);
+	}
+	bdbJeTxn.inUseDbs.put(this, db);
+	return db;
+    }
+
+    void addIdleDatabase(Database db) {
+	synchronized (idleDbs) {
+	    idleDbs.add(db);
 	}
     }
 }
