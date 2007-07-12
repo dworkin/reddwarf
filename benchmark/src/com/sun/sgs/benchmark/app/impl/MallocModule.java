@@ -2,6 +2,7 @@ package com.sun.sgs.benchmark.app.impl;
 
 import java.io.Serializable;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 
 import java.util.Arrays;
@@ -41,43 +42,47 @@ public class MallocModule implements BehaviorModule, Serializable {
 			      this, Arrays.toString(args));
 	    return operations;
 	}
-	Class<?> type = null;
-	Integer count = null;
+	final Class<?> clazz;
+	final int count;
 	try {
 	    String className = (String)(args[0]);
-	    type = Class.forName(className);
-	    count = (Integer)(args[1]);
+            Integer objCount = (Integer)(args[1]);
+	    clazz = Class.forName(className);
+	    count = objCount.intValue();
 	}
 	catch (ClassCastException cce) {
 	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-			      "expected Object type and count\n" ,
+			      "expected Object class and count\n" ,
 			      this, args[0]);
 	    return operations;
 	}
 	catch (Throwable t) {
 	    return operations;
 	}
-	final Class<?> clazz = type;
-	final int num = count.intValue();
-
+        
 	operations.add(new Runnable() {
 		public void run() {
-		    // keep a pointer so they all stay in memory at once
-		    Object[] arr = new Object[num];
-		    for (int i = 0; i < num; i++) {
-			try {
-			    Constructor<?> c = 
-				clazz.getConstructor(new Class<?>[]{});
-			    arr[i] = c.newInstance(new Object[]{});
-			}
-			catch (Throwable t) {
-			    // silent
-			    arr[i] = new Object(); // to fill space
-			}
+                    if (clazz.isArray()) {
+                        Object arr = Array.newInstance(clazz.getComponentType(),
+                            count);
+                    }
+                    else {
+                        // keep a pointer so they all stay in memory at once
+                        Object[] arr = new Object[count];
+                        for (int i = 0; i < count; i++) {
+                            try {
+                                Constructor<?> c = 
+                                    clazz.getConstructor(new Class<?>[]{});
+                                arr[i] = c.newInstance(new Object[]{});
+                            }
+                            catch (Throwable t) {
+                                // silent
+                                arr[i] = new Object(); // to fill space
+                            }
+                        }
 		    }
 		}
 	    });
 	return operations;
     }
-
 }
