@@ -5,14 +5,10 @@
 package com.sun.sgs.impl.service.data.store.db.bdbje;
 
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Transaction;
 import com.sleepycat.je.XAEnvironment;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 
@@ -23,10 +19,7 @@ class BdbJeTransaction implements DbTransaction {
     private final XAEnvironment env;
 
     /** The Berkeley DB transaction. */
-    final Transaction txn;
-
-    final Map<BdbJeDatabase, Database> inUseDbs =
-	new HashMap<BdbJeDatabase, Database>();
+    private final Transaction txn;
 
     /**
      * Implement a Xid whose format is always 1 and with a null branch
@@ -103,12 +96,8 @@ class BdbJeTransaction implements DbTransaction {
 
     /** Converts the argument to a Berkeley DB transaction. */
     static Transaction getBdbTxn(DbTransaction dbTxn) {
-	return coerce(dbTxn).txn;
-    }
-
-    static BdbJeTransaction coerce(DbTransaction dbTxn) {
 	if (dbTxn instanceof BdbJeTransaction) {
-	    return (BdbJeTransaction) dbTxn;
+	    return ((BdbJeTransaction) dbTxn).txn;
 	} else {
 	    throw new IllegalArgumentException(
 		"Transaction must be an instance of BdbJeTransaction");
@@ -132,7 +121,6 @@ class BdbJeTransaction implements DbTransaction {
 
     /** {@inheritDoc} */
     public void commit() {
-	makeDbsIdle();
 	try {
 	    txn.commit();
 	} catch (DatabaseException e) {
@@ -141,18 +129,10 @@ class BdbJeTransaction implements DbTransaction {
     }
 
     public void abort() {
-	makeDbsIdle();
 	try {
 	    txn.abort();
 	} catch (DatabaseException e) {
 	    throw BdbJeEnvironment.convertException(e, false);
 	}
-    }
-
-    private void makeDbsIdle() {
-	for (Entry<BdbJeDatabase, Database> entry : inUseDbs.entrySet()) {
-	    entry.getKey().addIdleDatabase(entry.getValue());
-	}
-	inUseDbs.clear();
     }
 }
