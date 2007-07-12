@@ -29,19 +29,19 @@ public class ScriptingCommand {
     /** Member variablees */
     private ScriptingCommandType type;
     
-    private int count = -1;               /** DO_TAG */
-    private int port = -1;                /** CONFIG */
-    private long duration = -1;           /** CPU */
-    private long size = -1;               /** MALLOC */
-    private String channelName = null;    /** [*]_CHANNEL */
-    private String hostname = null;       /** CONFIG */
-    private String tagName = null;        /** DO_TAG, TAG */
-    private String topic = null;          /** HELP */
-    private String msg = null;            /** SEND_CHANNEL, SEND_DIRECT */
-    private String printArg = null;       /** PRINT */
-    private ScriptingEvent event = null;  /** ON_EVENT */
-    private String login = null, password = null;  /** LOGIN */
-    private List<String> recips = new LinkedList<String>();  /** SEND_CHANNEL */
+    private int count = -1;
+    private int port = -1;
+    private long duration = -1;
+    private int size = -1;
+    private String channelName = null;
+    private String hostname = null;
+    private String tagName = null;
+    private String topic = null;
+    private String msg = null;
+    private String printArg = null;
+    private ScriptingEvent event = null;
+    private String login = null, password = null;
+    private List<String> recips = new LinkedList<String>();
     
     /** Constructors */
     
@@ -116,7 +116,7 @@ public class ScriptingCommand {
         return Collections.unmodifiableList(recips);
     }
     
-    public long getSize() { return size; }
+    public int getSize() { return size; }
     
     public String getTagName() { return tagName; }
     
@@ -208,7 +208,7 @@ public class ScriptingCommand {
                     }
                     catch (NumberFormatException e) {
                         throw new ParseException("Invalid " + type + " argument," +
-                            " must bet a positive integer: " + args[1], 0);
+                            " must be a positive integer: " + args[1], 0);
                     }
                 }
                 
@@ -262,7 +262,7 @@ public class ScriptingCommand {
         case MALLOC:
             if (args.length == 1) {
                 try {
-                    size = Long.valueOf(args[0]);
+                    size = Integer.valueOf(args[0]);
                     if (size <= 0) throw new NumberFormatException();
                 }
                 catch (NumberFormatException e) {
@@ -320,6 +320,30 @@ public class ScriptingCommand {
             printArg = stripQuotes(strJoin(args));
             return;
             
+        case REQ_RESPONSE:
+            if (args.length >= 1 && args.length <= 2) {
+                String sizeArg;
+                
+                if (args.length == 2) {
+                    channelName = args[0];
+                    sizeArg = args[1];
+                }
+                else {
+                    sizeArg = args[0];
+                }
+                
+                try {
+                    size = Integer.valueOf(sizeArg);
+                    if (size < 0) throw new NumberFormatException();
+                }
+                catch (NumberFormatException e) {
+                    throw new ParseException("Invalid " + type + " argument, " +
+                        " must be a non-negative integer: " + args[0], 0);
+                }
+                return;
+            }
+            break;
+
         case SEND_CHANNEL:
             if (args.length >= 2) {
                 channelName = args[0];
@@ -436,6 +460,9 @@ public class ScriptingCommand {
             
         case PRINT:
             return "message   (may contain spaces)";
+            
+        case REQ_RESPONSE:
+            return "[channel] size_bytes  (channel name may not contain spaces)";
             
         case SEND_CHANNEL:
             return "channel message  (message may contain spaces, but not channel)";
