@@ -12,8 +12,8 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
 /**
- * A loadable module that always generates an empty list of {@code
- * Runnable} operations.
+ * 
+ * 
  */
 public class CpuIntensiveModule implements BehaviorModule, Serializable {
 

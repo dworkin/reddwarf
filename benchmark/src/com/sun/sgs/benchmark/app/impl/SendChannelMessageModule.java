@@ -16,8 +16,8 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
 /**
- * A loadable module that always generates an empty list of {@code
- * Runnable} operations.
+ * 
+ * 
  */
 public class SendChannelMessageModule implements BehaviorModule, Serializable {
 
