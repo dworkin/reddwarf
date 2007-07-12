@@ -61,7 +61,7 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
 		    ChannelManager cm = AppContext.getChannelManager();
 		    try {			
 			Channel chan = cm.getChannel(name);
-			// chan.join(session, null);
+			chan.join(session, null);
 		    } catch (NameNotBoundException nnbe) {
 			System.out.printf("Client tried to join non-existent"
 					  + " channel: %s\n", name);
