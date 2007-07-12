@@ -16,8 +16,8 @@ import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
 /**
- * A loadable module that always generates an empty list of {@code
- * Runnable} operations.
+ * 
+ *
  */
 public class JoinChannelModule implements BehaviorModule, Serializable {
 
@@ -45,14 +45,14 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
 			      this, Arrays.toString(args));
 	    return operations;
 	}
-	String channelName = null;
+	String channelName;
 	try {
 	    channelName = (String)(args[0]);
 	}
 	catch (ClassCastException cce) {
 	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-			      "expected java.lang.String\n" ,
-			      this, args[0]);
+                "expected java.lang.String\n", this, args[0]);
+            return operations;
 	}
 
 	final String name = channelName;
