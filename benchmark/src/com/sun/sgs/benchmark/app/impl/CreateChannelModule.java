@@ -10,8 +10,8 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.NameExistsException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
@@ -19,7 +19,7 @@ import com.sun.sgs.benchmark.app.BehaviorModule;
  * A loadable module that always generates an empty list of {@code
  * Runnable} operations.
  */
-public class JoinChannelModule implements BehaviorModule, Serializable {
+public class CreateChannelModule implements BehaviorModule, Serializable {
 
     private static final long serialVersionUID = 0x82F9E38CF1DL;
 
@@ -35,8 +35,7 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
     }
 
     /**
-     * Returns a list with one {@code Runnable} that connects this
-     * client session to the channel specified in {@code args}.
+     *
      */
     public List<Runnable> getOperations(final ClientSession session, Object[] args) {
        	List<Runnable> operations = new LinkedList<Runnable>();
@@ -59,16 +58,15 @@ public class JoinChannelModule implements BehaviorModule, Serializable {
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
-		    try {			
-			Channel chan = cm.getChannel(name);
-			// chan.join(session, null);
-		    } catch (NameNotBoundException nnbe) {
-			System.out.printf("Client tried to join non-existent"
-					  + " channel: %s\n", name);
-		    } catch (TransactionException te) {
-			System.out.printf("Channel.join() failed due to a " +
-					  "transaction exception: %s\n", 
-					  te.getMessage());
+		    try {
+			cm.createChannel(name, null,
+					 Delivery.RELIABLE);
+			System.out.printf("created new channel: %s\n",
+					  name);
+		    } catch (NameExistsException nee) {
+			System.out.printf("Client tried to recreate an" +
+					  " already existing channel: %s\n", 
+					  name);
 		    }
 		}
 	    });
