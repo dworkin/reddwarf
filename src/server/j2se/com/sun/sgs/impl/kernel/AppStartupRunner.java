@@ -105,7 +105,7 @@ class AppStartupRunner implements KernelRunnable {
         }
 
         // tell the kernel that this application has now started up
-        kernel.applicationReady(appContext);
+        kernel.contextReady(appContext, true);
     }
 
 }
