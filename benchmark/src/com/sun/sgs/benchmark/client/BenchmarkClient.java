@@ -546,8 +546,7 @@ public class BenchmarkClient
                 sendServerMessage(new MethodRequest("MALLOC",
                                       new Object[] {
                                           byte[].class.getName(),
-                                          cmd.getSize()
-                                      }));
+                                          cmd.getSize() }));
                 break;
                 
             case ON_EVENT:
@@ -578,6 +577,25 @@ public class BenchmarkClient
             case PRINT:
                 System.out.println("PRINT: " + cmd.getPrintArg());
                 return;
+                
+            case REQ_RESPONSE:
+                {
+                    String channelName = cmd.getChannelName();
+                    int size = cmd.getSize();
+                    MethodRequest req;
+                    
+                    if (channelName != null) {
+                        req = new MethodRequest("sendChannelMessage",
+                            new Object[] { channelName, size });
+                    }
+                    else {
+                        req = new MethodRequest("sendDirectMessage",
+                            new Object[] { size });
+                    }
+                    
+                    sendServerMessage(req);
+                }
+                break;
                 
             case SEND_CHANNEL:
                 {
@@ -623,7 +641,8 @@ public class BenchmarkClient
                 throw new IllegalStateException("ERROR!  executeCommand() does" +
                     " not support command type " + cmd.getType());
             }
-        } catch (IOException e) {
+        /** catch ALL exceptions here */
+        } catch (Exception e) {
             System.err.println(e);
         }
     }
