@@ -28,7 +28,7 @@ public class BdbDbDatabase implements DbDatabase {
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
 
-    /** The database configuration when creating a database. */
+    /** The database configuration when creating a new database. */
     private static final DatabaseConfig createConfig = new DatabaseConfig();
     static {
 	createConfig.setType(DatabaseType.BTREE);

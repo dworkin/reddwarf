@@ -4,10 +4,10 @@
 
 package com.sun.sgs.impl.service.data.store.db.bdbdb;
 
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.Transaction;
+import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 
 /** Provide a transaction implementation using Berkeley DB. */
 class BdbDbTransaction implements DbTransaction {
@@ -21,7 +21,6 @@ class BdbDbTransaction implements DbTransaction {
      * @param	env the Berkeley DB environment
      * @param	timeout the number of milliseconds the transaction should be
      *		allowed to run
-     * @return	the transaction
      * @throws	IllegalArgumentException if timeout is less than {@code 1}
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */

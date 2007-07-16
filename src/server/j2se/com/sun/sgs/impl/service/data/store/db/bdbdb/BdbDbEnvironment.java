@@ -16,7 +16,6 @@ import com.sleepycat.db.MessageHandler;
 import com.sleepycat.db.RunRecoveryException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
@@ -25,6 +24,7 @@ import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Properties;
@@ -36,22 +36,22 @@ import java.util.logging.Logger;
  * "http://www.oracle.com/database/berkeley-db/db/index.html">Berkeley
  * DB</a>. <p>
  *
- * Operations on this class will throw an {@link Error} if the underlying
- * Berkeley DB database requires recovery.  In that case, callers need to
- * restart the server or create a new instance of this class. <p>
+ * Operations on classes in this package will throw an {@link Error} if the
+ * underlying Berkeley DB database requires recovery.  In that case, callers
+ * need to restart the application or create a new instance of this class. <p>
  *
  * Note that, although databases returned by this class provide support for the
- * {@link DbDatabase#prepare DbDatabase.prepare} method, they do not provide
- * facilities for resolving prepared transactions after a crash.  Callers can
- * work around this limitation by insuring that the transaction implementation
- * calls {@link TransactionParticipant#prepareAndCommit
+ * {@link DbTransaction#prepare DbTransaction.prepare} method, they do not
+ * provide facilities for resolving prepared transactions after a crash.
+ * Callers can work around this limitation by insuring that the transaction
+ * implementation calls {@link TransactionParticipant#prepareAndCommit
  * TransactionParticipant.prepareAndCommit} to commit transactions on this
  * class.  The current transaction implementation calls
  * <code>prepareAndCommit</code> on durable participants, so the inability to
  * resolve prepared transactions should have no effect at present. <p>
  *
  * The {@link #BdbDbEnvironment constructor} supports these public <a
- * href="../../../../app/doc-files/config-properties.html#BdbDb">
+ * href="../../../../../../app/doc-files/config-properties.html#BdbDb">
  * properties</a>. <p>
  *
  * This class uses the {@link Logger} named
@@ -62,9 +62,7 @@ import java.util.logging.Logger;
  * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
  *	application restart and recovery
  * <li> {@link Level#WARNING WARNING} - Berkeley DB errors
- * <li> {@link Level#INFO INFO} - Berkeley DB statistics
- * <li> {@link Level#FINE FINE} - Berkeley DB messages, allocating blocks of
- *	object IDs
+ * <li> {@link Level#FINE FINE} - Berkeley DB messages
  * </ul>
  */
 public class BdbDbEnvironment implements DbEnvironment {
@@ -76,16 +74,6 @@ public class BdbDbEnvironment implements DbEnvironment {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE));
-
-    /**
-     * The property that specifies the directory in which to store database
-     * files.
-     */
-    private static final String DIRECTORY_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.DataStoreImpl.directory";
-
-    /** The default directory for database files from the app root. */
-    private static final String DEFAULT_DIRECTORY = "dsdb";
 
     /**
      * The property that specifies the size in bytes of the Berkeley DB cache.
@@ -176,30 +164,15 @@ public class BdbDbEnvironment implements DbEnvironment {
     /**
      * Creates an instance of this class.
      *
+     * @param	directory the directory containing database files
      * @param	properties the properties to configure this instance
      * @param	scheduler the scheduler for running periodic tasks
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public BdbDbEnvironment(Properties properties, Scheduler scheduler) {
+    public BdbDbEnvironment(
+	String directory, Properties properties, Scheduler scheduler)
+    {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	String specifiedDirectory =
-	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
-	if (specifiedDirectory == null) {
-	    String rootDir =
-		properties.getProperty(StandardProperties.APP_ROOT);
-	    if (rootDir == null) {
-		throw new IllegalArgumentException(
-		    "A value for the property " +
-		    StandardProperties.APP_ROOT + " must be specified");
-	    }
-	    specifiedDirectory =
-		rootDir + File.separator + DEFAULT_DIRECTORY;
-	}
-	/*
-	 * Use an absolute path to avoid problems on Windows.
-	 * -tjb@sun.com (02/16/2007)
-	 */
-	String directory = new File(specifiedDirectory).getAbsolutePath();
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long cacheSize = wrappedProps.getLongProperty(

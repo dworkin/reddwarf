@@ -6,13 +6,14 @@ package com.sun.sgs.impl.service.data.store.db;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UTFDataFormatException;
 
 /** Provides methods for encoding and decoding data stored in the database. */
-public class DataEncoding {
+public final class DataEncoding {
 
     /** This class should not be instantiated. */
     private DataEncoding() {
@@ -225,7 +226,7 @@ public class DataEncoding {
      * Decodes an array of bytes encoded as modified UTF-8, but with no initial
      * two-byte size and with a null termination, into a {@code String}.
      *
-     * @param	the byte array to decode
+     * @param	bytes the byte array to decode
      * @return	the decoded string
      * @throws	IllegalArgumentException if the format the bytes is not valid
      *		UTF-8 data

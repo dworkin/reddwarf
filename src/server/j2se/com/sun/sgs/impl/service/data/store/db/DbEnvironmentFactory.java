@@ -21,18 +21,21 @@ public final class DbEnvironmentFactory {
 
     /**
      * Returns the environment for interacting with the database implementation
-     * specified by the properties.  The value of the {@code
+     * for files stored in the specified directory, and configured with the
+     * specified properties and scheduler.  The value of the {@code
      * com.sun.sgs.impl.service.data.store.db.environment.class} property, if
      * present, should be the fully qualified name of a non-abstract class that
      * implements {@link DbEnvironment}, and that has a public constructor with
-     * two parameters: a {@link Properties}, which specifies configuration
-     * options, and a {@link Scheduler}, which the implementation can use to
-     * run asynchronous periodic tasks.  If the property is present, the
-     * results of calling the constructor with the arguments passed to this
+     * three parameters: a {@link String}, which specifies the directory
+     * containing database files, {@link Properties}, which specifies
+     * configuration options, and a {@link Scheduler}, which the implementation
+     * can use to run asynchronous periodic tasks.  If the property is present,
+     * the results of calling the constructor with the arguments passed to this
      * method will be returned.  Otherwise, an instance of {@link
      * BdbDbEnvironment}, constructed with the arguments, will be returned.
      *
-     * @param	properties the properties
+     * @param	directory the directory containing database files
+     * @param	properties the properties to configure the implementation
      * @param	scheduler the periodic task scheduler
      * @return	the database environment
      * @throws	IllegalArgumentException if {@code properties} contains an
@@ -41,14 +44,14 @@ public final class DbEnvironmentFactory {
      *		property
      */
     public static DbEnvironment getEnvironment(
-	Properties properties, Scheduler scheduler)
+	String directory, Properties properties, Scheduler scheduler)
     {
 	PropertiesWrapper wrapper = new PropertiesWrapper(properties);
 	DbEnvironment result = wrapper.getClassInstanceProperty(
 	    ENVIRONMENT_CLASS_PROPERTY, DbEnvironment.class,
-	    new Class<?>[] { Properties.class, Scheduler.class },
-	    properties, scheduler);
+	    new Class<?>[] { String.class, Properties.class, Scheduler.class },
+	    directory, properties, scheduler);
 	return (result != null)
-	    ? result : new BdbDbEnvironment(properties, scheduler);
+	    ? result : new BdbDbEnvironment(directory, properties, scheduler);
     };
 }

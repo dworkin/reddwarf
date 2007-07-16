@@ -17,6 +17,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.impl.service.data.store.db.bdbdb.BdbDbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ProfileConsumer;
@@ -81,6 +82,9 @@ import java.util.logging.Logger;
  *	would be discarded when the program exits. <p>
  *
  * </dl> <p>
+ *
+ * The constructor also passes the properties to the {@link BdbDbEnvironment}
+ * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information
@@ -498,7 +502,8 @@ public class DataStoreImpl
 	DbTransaction dbTxn = null;
 	boolean done = false;
 	try {
-	    env = DbEnvironmentFactory.getEnvironment(properties, scheduler);
+	    env = DbEnvironmentFactory.getEnvironment(
+		directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
 	    Databases dbs = getDatabases(dbTxn);
 	    infoDb = dbs.info;

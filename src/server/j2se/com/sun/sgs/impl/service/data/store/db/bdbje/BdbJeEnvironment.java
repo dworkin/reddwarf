@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.data.store.db.bdbje;
 
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.DeadlockException;
+import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.ExceptionEvent;
 import com.sleepycat.je.ExceptionListener;
@@ -15,7 +16,6 @@ import com.sleepycat.je.StatsConfig;
 import com.sleepycat.je.XAEnvironment;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
@@ -24,6 +24,7 @@ import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Enumeration;
@@ -34,7 +35,90 @@ import javax.transaction.xa.XAException;
 import static javax.transaction.xa.XAException.XA_RBDEADLOCK;
 import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
 
-/** Provides a database implementation using Berkeley DB. */
+/**
+ * Provides a database implementation based on <a href=
+ * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB, Java
+ * Edition</a> <p>
+ * 
+ * Operations on classes in this package will throw an {@link Error} if the
+ * underlying Berkeley DB database requires recovery.  In that case, callers
+ * need to restart the application or create a new instance of this class. <p>
+ *
+ * Note that, although databases returned by this class provide support for the
+ * {@link DbTransaction#prepare DbTransaction.prepare} method, they do not
+ * provide facilities for resolving prepared transactions after a crash.
+ * Callers can work around this limitation by insuring that the transaction
+ * implementation calls {@link TransactionParticipant#prepareAndCommit
+ * TransactionParticipant.prepareAndCommit} to commit transactions on this
+ * class.  The current transaction implementation calls
+ * <code>prepareAndCommit</code> on durable participants, so the inability to
+ * resolve prepared transactions should have no effect at present. <p>
+ *
+ * The {@link #BdbJeEnvironment constructor} supports the following
+ * configuration properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.db.bdbje.flush.to.disk
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to flush changes to disk when a
+ * transaction commits.  If <code>false</code>, the modifications made in some
+ * of the most recent transactions may be lost if the host crashes, although
+ * data integrity will be maintained.  Flushing changes to disk avoids data
+ * loss but introduces a significant reduction in performance. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.db.bdbje.flush.to.disk
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>-1</code>
+ *
+ * <dd style="padding-top: .5em">The interval in milliseconds between calls to
+ * log database statistics, or a negative value to disable logging.  The
+ * property is set to {@code -1} by default, which disables statistics
+ * logging. <p>
+ *
+ * </dl> <p>
+ *
+ * It also supports any initialization properties supported by the {@link
+ * Environment} class that start with the {@code je.} prefix. <p>
+ *
+ * Unless overridden, this implementation provides the following non-default
+ * settings for initialization properties:
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	je.checkpointer.bytesInterval
+ *	</b></code> <br>
+ *	<i>Value:</i> <code>1000000</code>
+ *
+ * <dd style="padding-top: .5em">Perform checkpoints after 1 MB of changes.
+ * This setting improves performance when there are large number of changes
+ * being committed. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	je.env.sharedLatches
+ *	</b></code> <br>
+ *	<i>Value:</i> <code>true</code>
+ *
+ * <dd style="padding-top: .5em">Use shared latches to improve concurrency. <p>
+ *
+ * </dl> <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.data.db.bdbje</code> to log information at
+ * the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
+ *	application restart and recovery
+ * <li> {@link Level#WARNING WARNING} - Berkeley DB exceptions
+ * <li> {@link Level#INFO INFO} - Berkeley DB statistics
+ * </ul>
+ */
 public class BdbJeEnvironment implements DbEnvironment {
 
     /** The package name. */
@@ -44,16 +128,6 @@ public class BdbJeEnvironment implements DbEnvironment {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE));
-
-    /**
-     * The property that specifies the directory in which to store database
-     * files.
-     */
-    private static final String DIRECTORY_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.DataStoreImpl.directory";
-
-    /** The default directory for database files from the app root. */
-    private static final String DEFAULT_DIRECTORY = "dsdb";
 
     /**
      * The property that specifies whether to flush changes to disk on
@@ -126,35 +200,19 @@ public class BdbJeEnvironment implements DbEnvironment {
     /**
      * Creates an instance of this class.
      *
+     * @param	directory the directory containing database files
      * @param	properties the properties to configure this instance
      * @param	scheduler the scheduler for running periodic tasks
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public BdbJeEnvironment(Properties properties, Scheduler scheduler) {
+    public BdbJeEnvironment(
+	String directory, Properties properties, Scheduler scheduler)
+    {
 	Properties propertiesWithDefaults = new Properties();
 	propertiesWithDefaults.putAll(defaultProperties);
 	propertiesWithDefaults.putAll(properties);
 	properties = propertiesWithDefaults;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	String specifiedDirectory =
-	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
-	if (specifiedDirectory == null) {
-	    String rootDir =
-		properties.getProperty(StandardProperties.APP_ROOT);
-	    if (rootDir == null) {
-		throw new IllegalArgumentException(
-		    "A value for the property " +
-		    StandardProperties.APP_ROOT +
-		    " must be specified");
-	    }
-	    specifiedDirectory =
-		rootDir + File.separator + DEFAULT_DIRECTORY;
-	}
-	/*
-	 * Use an absolute path to avoid problems on Windows.
-	 * -tjb@sun.com (02/16/2007)
-	 */
-	String directory = new File(specifiedDirectory).getAbsolutePath();
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
@@ -186,33 +244,6 @@ public class BdbJeEnvironment implements DbEnvironment {
 	}
     }
 	
-    /** {@inheritDoc} */
-    public DbTransaction beginTransaction(long timeout) {
-	return new BdbJeTransaction(env, timeout);
-    }
-
-    /** {@inheritDoc} */
-    public DbDatabase openDatabase(
-	DbTransaction txn, String fileName, boolean create)
-	throws FileNotFoundException
-    {
-	return new BdbJeDatabase(
-	    env, BdbJeTransaction.getBdbTxn(txn), fileName, create);
-    }
-
-    /** {@inheritDoc} */
-    public void close() {
-	if (statsTaskHandle != null) {
-	    statsTaskHandle.cancel();
-	    statsTaskHandle = null;
-	}
-	try {
-	    env.close();
-	} catch (DatabaseException e) {
-	    throw convertException(e, false);
-	}
-    }
-
     /**
      * Returns the correct SGS exception for a Berkeley DB DatabaseException
      * thrown during an operation.  Throws an Error if recovery is needed.
@@ -262,6 +293,35 @@ public class BdbJeEnvironment implements DbEnvironment {
 	} else {
 	    throw new DbDatabaseException(
 		"Unexpected database exception: " + e);
+	}
+    }
+
+    /* -- Implement DbEnvironment -- */
+
+    /** {@inheritDoc} */
+    public DbTransaction beginTransaction(long timeout) {
+	return new BdbJeTransaction(env, timeout);
+    }
+
+    /** {@inheritDoc} */
+    public DbDatabase openDatabase(
+	DbTransaction txn, String fileName, boolean create)
+	throws FileNotFoundException
+    {
+	return new BdbJeDatabase(
+	    env, BdbJeTransaction.getBdbTxn(txn), fileName, create);
+    }
+
+    /** {@inheritDoc} */
+    public void close() {
+	if (statsTaskHandle != null) {
+	    statsTaskHandle.cancel();
+	    statsTaskHandle = null;
+	}
+	try {
+	    env.close();
+	} catch (DatabaseException e) {
+	    throw convertException(e, false);
 	}
     }
 }
