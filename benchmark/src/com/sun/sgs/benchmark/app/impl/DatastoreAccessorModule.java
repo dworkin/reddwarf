@@ -8,6 +8,7 @@ import java.util.List;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
@@ -39,9 +40,29 @@ public class DatastoreAccessorModule implements BehaviorModule, Serializable {
      */
     public List<Runnable> getOperations(ClientSession session, Object[] args) {
 	LinkedList<Runnable> operations = new LinkedList<Runnable>();
+
+	if (args.length == 0)
+	    return operations;
+	
+	String name = "";
+	final boolean markForUpdate = args.length > 1;
+
+	try {
+	    name = (String)(args[0]);
+	}
+	catch (Exception e) {
+	    e.printStackTrace();
+	    return operations;
+	}
+
+	final String name_ = name;
+		
 	operations.add(new Runnable() {
 		public void run() {
-		    //AppContext.getDataManager().
+		    ManagedObject o = AppContext.getDataManager().
+			getBinding(name_, ManagedObject.class);
+		    if (markForUpdate)
+			AppContext.getDataManager().markForUpdate(o);
 		}
 	    });
 	return operations;
