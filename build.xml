@@ -912,13 +912,13 @@
 	 fork="true">
      <jvmarg line="-server"/>
 <!--     <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-     <jvmarg line="-XX:+UseParallelGC"/>
+     <!--<jvmarg line="-XX:+UseParallelGC"/>
      <jvmarg line="-XX:+UseFastAccessorMethods"/>
      <jvmarg line="-XX:+AggressiveOpts"/>
      <jvmarg line="-XX:+MaxFDLimit"/>
      <jvmarg line="-XX:NewSize=512m"/>
      <jvmarg line="-Xmx2g"/>
-     <jvmarg line="-XX:+PrintCompilation"/>
+     <jvmarg line="-XX:+PrintCompilation"/>-->
      <sysproperty key="com.sun.sgs.config.file"
 		  file="benchmark/System.properties"/>
      <sysproperty key="java.library.path" 
@@ -943,11 +943,6 @@
    <java classname="com.sun.sgs.benchmark.client.BenchmarkClient"
 	 fork="true">
      <jvmarg line="${test.jvm.args}"/>
-     <jvmarg line="-server"/>
-     <jvmarg line="-XX:+UseParallelGC"/>
-     <jvmarg line="-XX:NewSize=128m"/>
-     <jvmarg line="-Xmx2g"/>
-     <jvmarg line="-XX:+UseFastAccessorMethods"/>
       <sysproperty key="com.sun.sgs.config.file"
            file="${test.logging}"/>
       <classpath>
@@ -984,7 +979,7 @@
                    value="slytherin.east.sun.com" />
       <sysproperty key="BenchmarkClient.port"
                    value="6168" />
-    </java>
+    <!--/java-->
   </target>
 
 
