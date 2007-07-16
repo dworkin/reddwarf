@@ -1,91 +1,93 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.TransactionException;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
- * 
- * 
+ * TODO
  */
-public class SendDirectMessageModule implements BehaviorModule, Serializable {
-    
+public class SendDirectMessageModule extends AbstractModuleImpl implements Serializable {
+
     private static final long serialVersionUID = 0x82F9E38CF1DL;
     
-   /**
-    * Returns an empty list of {@code Runnable} operations.
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return an empty list
+    /** Empty constructor */
+    public SendDirectMessageModule() { }
+    
+    // implement AbstractModuleImpl
+    
+    /**
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	return new LinkedList<Runnable>();
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String message = null;
+        Integer multiples = new Integer(1);
+        
+        initVars(new Object[] { message, multiples },
+            new Class<?>[] { String.class, Integer.class }, args, 1);
+        
+        message = multiplyString(message, multiples.intValue());
+        return createOperations(session, message);
+    }
+    
+    /*
+     * {@inheritDoc}
+     */
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String message = (String)in.readObject();
+        int multiples = (in.available() > 0) ? in.readInt() : 1;
+        
+        message = multiplyString(message, multiples);
+        return createOperations(session, message);
     }
     
     /**
-     * Fill me in
+     * Does the actual work of creating the {@code Runnable} objects.
      */
-    public List<Runnable> getOperations(final ClientSession session, Object[] args) {
-
-        System.out.println("SendDirectMessageModule invoked.");
-        
-       	List<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length != 1) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n",
-                this, Arrays.toString(args));
-	    return operations;
-	}
-        
-	final String message;
-	
-        try {
-	    if (args[0] instanceof String) {
-                message = (String)(args[0]);
-            }
-            else {
-                message = junkString((Integer)(args[0]));
-            }
-	}
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\nexpected" +
-                "java.lang.String of java.lang.Integer\n", this, args[0]);
-	    return operations;
-	}
+    private List<Runnable> createOperations(final ClientSession session,
+        final String message)
+        throws BehaviorException
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
         
 	operations.add(new Runnable() {
 		public void run() {
-		    try {
-			session.send(message.getBytes());
-		    } catch (TransactionException te) {
-			System.out.printf("Channel.join() failed due to a " +
-                            "transaction exception: %s\n", te.getMessage());
-		    }
+                    session.send(message.getBytes());
 		}
 	    });
 	return operations;
     }
     
     /*
-     * Returns a {@code String} of the specified length, filled with an
-     * arbitrary character.
+     * Returns a {@code String} consisting of {@code count} concatenations of
+     * {@code s}.
      *
      * @throws IllegalArgumentException if {@code len} is negative.
      */
-    private static String junkString(int len) {
-        if (len < 0)
-            throw new IllegalArgumentException("Invalid length: " + len);
+    private static String multiplyString(String s, int count) {
+        if (count < 0)
+            throw new IllegalArgumentException("count must be non-negative: " +
+                count);
         
-        char[] ca = new char[len];
-        for (int i=0; i < len; i++) ca[i] = 'a';
-        return new String(ca);
+        StringBuffer sb = new StringBuffer();
+        for (int i=0; i < count; i++) sb.append(s);
+        return new String(sb);
     }
 }

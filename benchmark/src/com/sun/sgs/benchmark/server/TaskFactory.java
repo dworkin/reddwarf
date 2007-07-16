@@ -7,6 +7,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.Task;
 
+import com.sun.sgs.benchmark.app.BehaviorException;
 import com.sun.sgs.benchmark.app.BehaviorModule;
 
 import java.io.Serializable;
@@ -45,49 +46,13 @@ public class TaskFactory implements ManagedObject, Serializable {
     private static final String POSTOPS_STR = "postops";
 
     /**
-     * The mapping from op codes to the tasks needed to execute the
-     * method specified by the op code.
-     */
-    private final Map<byte[], MethodTaskProfile> opCodes;
-
-    /**
      * The mapping from method name to the tasks needed to execute a
      * specific method
      */
     private final Map<String, MethodTaskProfile> methods;
 
     private TaskFactory() {
-	opCodes = new HashMap<byte[], MethodTaskProfile>();
 	methods = new HashMap<String, MethodTaskProfile>();
-    }
-
-    /**
-     * Returns an ordered list of {@code Runnable} operations that
-     * reflect this specific behavior based on method name and
-     * arguments.  These operations include those that should be run
-     * before, during and after the desired operations.
-     *
-     * @param session      the client session on whose behalf this
-     *                     method is invoked
-     * @param methodOpCode the op-codes for the method to invoke
-     * @param args         arguments to this method encoded as op-codes
-     *
-     * @return the ordered lists of {@code Runnable} operations that
-     *         represent this method
-     *
-     * @throws UnsupportedOperationException if the {@code methodOpCode}
-     *         is unrecognized
-     */
-    public List<Runnable> getOperations(ClientSession session, 
-        byte[] methodOpCode, byte[] argOpCodes)
-    {
-	MethodTaskProfile b = opCodes.get(methodOpCode);
-        
-        if (b == null)
-            throw new UnsupportedOperationException("Unsupported " +
-                "method called, opCode=" + Arrays.toString(methodOpCode));
-        
-        return b.getOperations(session, argOpCodes);
     }
 
     /**
@@ -104,11 +69,44 @@ public class TaskFactory implements ManagedObject, Serializable {
      * @return the ordered lists of {@code Runnable} operations that
      *         represent this method
      *
+     * @throws BehaviorException if thrown by the {@code methodName} module
+     * @throws UnsupportedOperationException if the {@code methodName}
+     *         is unrecognized
+     */
+    public List<Runnable> getOperations(ClientSession session, 
+        String methodName, byte[] args)
+        throws BehaviorException
+    {
+        MethodTaskProfile b = methods.get(methodName);
+        
+        if (b == null)
+            throw new UnsupportedOperationException("Unsupported " +
+                "method called, name=" + methodName);
+        
+        return b.getOperations(session, args);
+    }
+
+    /**
+     * Returns an ordered list of {@code Runnable} operations that
+     * reflect this specific behavior based on method name and
+     * arguments.  These operations include those that should be run
+     * before, during and after the desired operations.
+     *
+     * @param session    the client session on whose behalf this method
+     *                   is invoked
+     * @param methodName the name of the method to invoke
+     * @param args       arguments to this method encoded as op-codes
+     *
+     * @return the ordered lists of {@code Runnable} operations that
+     *         represent this method
+     *
+     * @throws BehaviorException if thrown by the {@code methodName} module
      * @throws UnsupportedOperationException if the {@code methodName}
      *         is unrecognized
      */
     public List<Runnable> getOperations(ClientSession session, 
         String methodName, Object[] args)
+        throws BehaviorException
     {
 	MethodTaskProfile b = methods.get(methodName);
         
@@ -131,7 +129,7 @@ public class TaskFactory implements ManagedObject, Serializable {
 	TaskFactory tf = null;
 	try {
 	    tf = AppContext.getDataManager().getBinding(FACTORY_NAME_REF,
-							TaskFactory.class);	    
+                TaskFactory.class);	    
 	}
 	catch (NameNotBoundException nnbe) {
 	    tf = new TaskFactory();
@@ -207,16 +205,26 @@ public class TaskFactory implements ManagedObject, Serializable {
 		if (profile == null) {
 		    profile = new MethodTaskProfile();
 		    methods.put(name, profile);
-		}		
-	    }
-	    else if (type.equals("opcode")) {
+		}
+	    } else if (type.equals("opcode")) {
+                throw new UnsupportedOperationException("opcode types no longer supported");
+                
+                // todo - delete
+                /*
 		profile = opCodes.get(name);
 		if (profile == null) {
 		    profile = new MethodTaskProfile();
-		    opCodes.put(name.getBytes(), profile);
+                    
+                    try {
+                        opCodes.put(HexUtil.parseBytes(name), profile);
+                    }
+                    catch (IllegalArgumentException iae) {
+                        System.out.println("Bad opcode: " + name);
+                        continue;
+                    }
 		}
-	    }
-	    else {
+                */
+	    } else {
 		// REMINDER: add logging
 		System.out.printf("unknown method representation code: %s\n",
 			      type);
@@ -379,7 +387,9 @@ public class TaskFactory implements ManagedObject, Serializable {
 	 *         executed
 	 */
 	public List<Runnable> getOperations(ClientSession session, 
-					    byte[] args) {
+            byte[] args)
+            throws BehaviorException
+        {
 	    LinkedList<Runnable> tasks = new LinkedList<Runnable>();
 	    for (BehaviorModule mod : preops) 
 		tasks.addAll(mod.getOperations(session, args));
@@ -402,7 +412,9 @@ public class TaskFactory implements ManagedObject, Serializable {
 	 *         be executed
 	 */
 	public List<Runnable> getOperations(ClientSession session, 
-					    Object[] args) {
+            Object[] args)
+            throws BehaviorException
+        {
 	    LinkedList<Runnable> tasks = new LinkedList<Runnable>();
 	    for (BehaviorModule mod : preops) 
 		tasks.addAll(mod.getOperations(session, args));
@@ -416,8 +428,6 @@ public class TaskFactory implements ManagedObject, Serializable {
 	public String toString() {
 	    return "MethodTaskProfile [pre-ops: " + preops
 		+ ", ops: " + ops + ", post-ops" + postops + "]";
-		
 	}
     }
-
 }

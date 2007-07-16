@@ -1,8 +1,13 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -11,99 +16,90 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionException;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException; 
 
 /**
- * 
- * 
+ * TODO
  */
-public class SendChannelMessageModule implements BehaviorModule, Serializable {
+public class SendChannelMessageModule extends AbstractModuleImpl implements Serializable {
 
     private static final long serialVersionUID = 0x82F9E38CF1DL;
-
-   /**
-    * Returns an empty list of {@code Runnable} operations.
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return an empty list
-     */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	return new LinkedList<Runnable>();
-    }
-
+    
+    /** Empty constructor */
+    public SendChannelMessageModule() { }
+    
+    // implement AbstractModuleImpl
+    
     /**
-     * Fill me in
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(final ClientSession session, Object[] args) {
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String channelName = null, message = null;
+        Integer multiples = new Integer(1);
         
-        System.out.println("SendChannelMessageModule invoked.");
+        initVars(new Object[] { channelName, message, multiples },
+            new Class<?>[] { String.class, String.class, Integer.class}, args, 2);
         
-       	List<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length != 2) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n",
-                this, Arrays.toString(args));
-	    return operations;
-	}
+        message = multiplyString(message, multiples.intValue());
         
-	final String channelName, message;
+        return createOperations(session, channelName, message);
+    }
+    
+    /*
+     * {@inheritDoc}
+     */
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String channelName = (String)in.readObject();
+        String message = (String)in.readObject();
+        int multiples = (in.available() > 0) ? in.readInt() : 1;
         
-	try {
-	    channelName = (String)(args[0]);
-        }
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-                "expected java.lang.String\n", this, args[0]);
-	    return operations;
-	}
-        
-        try {
-            if (args[1] instanceof String) {
-                message = (String)(args[1]);
-            }
-            else {
-                message = junkString((Integer)(args[1]));
-            }
-	}
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\nexpected" +
-                "java.lang.String or java.lang.Integer\n", this, args[1]);
-	    return operations;
-	}
+        message = multiplyString(message, multiples);
+        return createOperations(session, channelName, message);
+    }
+    
+    /**
+     * Does the actual work of creating the {@code Runnable} objects.
+     */
+    private List<Runnable> createOperations(ClientSession session,
+        final String channelName, final String message)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
         
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
 		    try {
 			Channel chan = cm.getChannel(channelName);
-			chan.send(message.getBytes());
+                        chan.send(message.getBytes());
 		    } catch (NameNotBoundException nnbe) {
-			System.out.printf("Client requested that server send a" +
-                            " message on non-existent channel: %s", channelName);
-		    } catch (TransactionException te) {
-			System.out.printf("Channel.send() failed due to a " +
-                            "transaction exception: %s\n", te.getMessage());
+			System.err.println("**Error: Client requested " +
+                            "that server send a message on a non-existent " +
+                            "channel: " + channelName);
 		    }
 		}
 	    });
 	return operations;
-
     }
     
     /*
-     * Returns a {@code String} of the specified length, filled with an
-     * arbitrary character.
+     * Returns a {@code String} consisting of {@code count} concatenations of
+     * {@code s}.
      *
      * @throws IllegalArgumentException if {@code len} is negative.
      */
-    private static String junkString(int len) {
-        if (len < 0)
-            throw new IllegalArgumentException("Invalid length: " + len);
+    private static String multiplyString(String s, int count) {
+        if (count < 0)
+            throw new IllegalArgumentException("count must be non-negative: " +
+                count);
         
-        char[] ca = new char[len];
-        for (int i=0; i < len; i++) ca[i] = 'a';
-        return new String(ca);
+        StringBuffer sb = new StringBuffer();
+        for (int i=0; i < count; i++) sb.append(s);
+        return new String(sb);
     }
 }

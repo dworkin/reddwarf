@@ -1,86 +1,99 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
- *
+ * TODO
  */
-public class MallocModule implements BehaviorModule, Serializable {
+public class MallocModule extends AbstractModuleImpl implements Serializable {
 
     private static final long serialVersionUID = 0x82F9E38CF1DL;
-
-   /**
-     * Returns an empty list of {@code Runnable} operations.
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return an empty list
-     */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	return new LinkedList<Runnable>();
-    }
-
+    
+    /** Empty constructor */
+    public MallocModule() { }
+    
+    // implement AbstractModuleImpl
+    
     /**
-     * Fill me in.
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, Object[] args) {
-	List<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length != 2) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n",
-			      this, Arrays.toString(args));
-	    return operations;
-	}
-	final Class<?> clazz;
-	final int count;
-	try {
-	    String className = (String)(args[0]);
-            Integer objCount = (Integer)(args[1]);
-	    clazz = Class.forName(className);
-	    count = objCount.intValue();
-	}
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-			      "expected Object class and count\n" ,
-			      this, args[0]);
-	    return operations;
-	}
-	catch (Throwable t) {
-	    return operations;
-	}
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        Class<?> clazz = null;
+	Integer count = null;
+	
+        initVars(new Object[] { clazz, count },
+            new Class[] { Class.class, Integer.class }, args, 2);
+        
+        return createOperations(session, clazz, count.intValue());
+    }
+    
+    /*
+     * {@inheritDoc}
+     */
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String className = (String)in.readObject();
+        Class<?> clazz = Class.forName(className);
+        int count = in.readInt();
+        return createOperations(session, clazz, count);
+    }
+    
+    /**
+     * Does the actual work of creating the {@code Runnable} objects.
+     */
+    private List<Runnable> createOperations(ClientSession session,
+        final Class<?> clazz, final int count)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
         
 	operations.add(new Runnable() {
 		public void run() {
                     if (clazz.isArray()) {
                         Object arr = Array.newInstance(clazz.getComponentType(),
                             count);
-                    }
-                    else {
-                        // keep a pointer so they all stay in memory at once
-                        Object[] arr = new Object[count];
-                        for (int i = 0; i < count; i++) {
-                            try {
+                    } else {
+                        try {
+                            // keep a pointer so they all stay in memory at once
+                            Object[] arr = new Object[count];
+                            for (int i = 0; i < count; i++) {
                                 Constructor<?> c = 
-                                    clazz.getConstructor(new Class<?>[]{});
-                                arr[i] = c.newInstance(new Object[]{});
+                                    clazz.getConstructor(new Class<?>[0]);
+                                arr[i] = c.newInstance(new Object[0]);
                             }
-                            catch (Throwable t) {
-                                // silent
-                                arr[i] = new Object(); // to fill space
-                            }
+                        } catch (IllegalAccessException iae) {
+                            System.err.println("**Error in " + this + ": " + iae);
+                        } catch (InstantiationException ie) {
+                            System.err.println("**Error in " + this + ": " + ie);
+                        } catch (InvocationTargetException ite) {
+                            System.err.println("**Error in " + this + ": " + ite);
+                        } catch (NoSuchMethodException nsme) {
+                            System.err.println("**Error in " + this + ": " +
+                                clazz.getName() + " does not provide a nullary" +
+                                " constructor.");
                         }
-		    }
+                    }
 		}
 	    });
 	return operations;

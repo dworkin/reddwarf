@@ -1,5 +1,12 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.NotSerializableException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
 import java.util.LinkedList;
@@ -10,64 +17,74 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
  * A loadable module that performs an access of the datastore.
  */
-public class DatastoreAccessorModule implements BehaviorModule, Serializable {
+public class DatastoreAccessorModule extends AbstractModuleImpl implements Serializable {
     
     private static final long serialVersionUID = 0x1234FCL;
-
+    
+    /** Empty constructor */
+    public DatastoreAccessorModule() { }
+    
+    // implement AbstractModuleImpl
+    
     /**
-     * ?
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return ?
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	LinkedList<Runnable> operations = new LinkedList<Runnable>();
-	return operations;
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String boundName = null;
+        Boolean markForUpdate = new Boolean(false);
+        
+        initVars(new Object[] { boundName, markForUpdate },
+            new Class<?>[] { String.class, Boolean.class }, args, 1);
+        
+	return createOperations(session, boundName, markForUpdate.booleanValue());
     }
-
+    
     /**
-     * ?
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return ?
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, Object[] args) {
-	LinkedList<Runnable> operations = new LinkedList<Runnable>();
-
-	if (args.length == 0)
-	    return operations;
-	
-	String name = "";
-	final boolean markForUpdate = args.length > 1;
-
-	try {
-	    name = (String)(args[0]);
-	}
-	catch (Exception e) {
-	    e.printStackTrace();
-	    return operations;
-	}
-
-	final String name_ = name;
-		
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String boundName = (String)in.readObject();
+        boolean markForUpdate = (in.available() > 0) ? in.readBoolean() : false;
+        
+        return createOperations(session, boundName, markForUpdate);
+    }
+    
+    /**
+     * Does the actual work of creating the {@code Runnable} objects.
+     */
+    private List<Runnable> createOperations(final ClientSession session,
+        final String name, final boolean markForUpdate)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
+        
 	operations.add(new Runnable() {
 		public void run() {
-		    ManagedObject o = AppContext.getDataManager().
-			getBinding(name_, ManagedObject.class);
-		    if (markForUpdate)
-			AppContext.getDataManager().markForUpdate(o);
+                    try {
+                        ManagedObject o = AppContext.getDataManager().
+                            getBinding(name, ManagedObject.class);
+                        if (markForUpdate)
+                            AppContext.getDataManager().markForUpdate(o);
+                        
+                        System.out.println("Accessed object " + name +
+                            " from DataStore (for " + (markForUpdate ?
+                                "writing" : "reading") + ").");
+                    } catch (NameNotBoundException nnbe) {
+                        System.err.println("**Error: Client attempted to read" +
+                            " object " + name + " which does not exist");
+                    }
 		}
 	    });
 	return operations;
     }
-
-
-
 }

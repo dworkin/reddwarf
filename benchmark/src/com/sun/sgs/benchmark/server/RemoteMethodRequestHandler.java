@@ -8,6 +8,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
+import com.sun.sgs.benchmark.app.BehaviorException;
 import com.sun.sgs.benchmark.shared.MethodRequest;
 
 import java.io.ByteArrayInputStream;
@@ -54,14 +55,20 @@ public class RemoteMethodRequestHandler
             List<Runnable> operations;
             
             try {
-                operations = (request.isCompressed()) 
-                    ? factory.getOperations(session,
-                        request.getOpCode(), request.getArgs())
-                    : factory.getOperations(session,
-                        request.getMethodName(), request.getObjectArgs());
-            }
-            catch (UnsupportedOperationException uoe) {
-                System.out.println(uoe.toString());
+                if (request.hasObjectArgs()) {
+                    operations = factory.getOperations(session,
+                        request.getMethodName(),
+                        request.getObjectArgs());
+                } else {
+                    operations = factory.getOperations(session,
+                        request.getMethodName(),
+                        request.getByteArgs());
+                }
+            } catch (BehaviorException e) {
+                System.err.println(request.getMethodName() + ": " + e.toString());
+                return;
+            } catch (UnsupportedOperationException e) {
+                System.err.println(e);
                 return;
             }
             
@@ -77,22 +84,13 @@ public class RemoteMethodRequestHandler
 	    }
 	}
         catch (ClassCastException cce) {
-            System.out.println(cce.toString());
+            System.err.println(cce.toString());
         }
 	catch (ClassNotFoundException cnfe) {
-            System.out.println(cnfe.toString());
-        }
-	catch (InvalidClassException ice) {
-            System.out.println(ice.toString());
-        }
-	catch (StreamCorruptedException sce) {
-            System.out.println(sce.toString());
-        }
-	catch (OptionalDataException ode) {
-            System.out.println(ode.toString());
+            System.err.println(cnfe.toString());
         }
 	catch (IOException ioe) {
-            System.out.println(ioe.toString());
+            System.err.println(ioe.toString());
         }
     }
 

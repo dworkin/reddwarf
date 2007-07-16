@@ -34,7 +34,9 @@ public class ScriptingCommand {
     private long duration = -1;
     private int size = -1;
     private String channelName = null;
+    private String className = null;
     private String hostname = null;
+    private String objectName = null;
     private String tagName = null;
     private String topic = null;
     private String msg = null;
@@ -53,6 +55,8 @@ public class ScriptingCommand {
     /** Public Methods */
     
     public String getChannelName() { return channelName; }
+    
+    public String getClassName() { return className; }
     
     public int getCount() { return count; }
     
@@ -106,6 +110,8 @@ public class ScriptingCommand {
     
     public String getMessage() { return msg; }
     
+    public String getObjectName() { return objectName; }
+    
     public String getPassword() { return password; }
     
     public int getPort() { return port; }
@@ -153,7 +159,7 @@ public class ScriptingCommand {
                     hostname = args[0];
                 }
                 
-                if (args.length >= 2) {  /** Optional argument */
+                if (args.length == 2) {  /** Optional argument */
                     try {
                         port = Integer.valueOf(args[1]);
                         if (port <= 0) throw new NumberFormatException();
@@ -188,10 +194,55 @@ public class ScriptingCommand {
             }
             return;
             
-        case DATASTORE:
-            if (args.length == 0) return;  /** No arguments */
+        case DATASTORE_CREATE:
+            if (args.length >= 2 && args.length <= 3) {
+                objectName = args[0];
+                className = args[1];
+                boolean isArray;
+                
+                try {
+                    Class<?> clazz = Class.forName(className);
+                    isArray = clazz.isArray();
+                } catch (ClassNotFoundException e) {
+                    isArray = className.startsWith("[");  /** guess */
+                }
+                
+                if (isArray) {
+                    /** Note: only single-dimension arrays are supported. */
+                    if (args.length == 3) {
+                        try {
+                            size = Integer.valueOf(args[2]);
+                            if (size < 0) {
+                                size = -1;
+                                throw new NumberFormatException();
+                            }
+                            return;
+                        }
+                        catch (NumberFormatException e) {
+                            throw new ParseException("Invalid " + type + " argument, " +
+                                " must be a non-negative integer: " + args[2], 0);
+                        }
+                    }
+                } else {  /** Not an array type */
+                    if (args.length == 2) return;
+                }
+            }
             break;
-
+            
+        case DATASTORE_READ:
+            if (args.length == 1) {
+                objectName = args[0];
+                return;
+            }
+            break;
+            
+        case DATASTORE_WRITE:
+            if (args.length == 1) {
+                objectName = args[0];
+                return;
+            }
+            break;
+            
         case DISCONNECT:
             if (args.length == 0) return;  /** No arguments */
             break;
@@ -201,7 +252,7 @@ public class ScriptingCommand {
                 tagName = args[0];
                 count = 1;  /** default */
                 
-                if (args.length >= 2) {  /** Optional argument */
+                if (args.length == 2) {  /** Optional argument */
                     try {
                         count = Integer.valueOf(args[1]);
                         if (count <= 0) throw new NumberFormatException();
@@ -285,7 +336,7 @@ public class ScriptingCommand {
                 tagName = args[1];
                 count = 1;  /** default */
                 
-                if (args.length >= 3) {
+                if (args.length == 3) {
                     try {
                         count = Integer.valueOf(args[2]);
                         if (count <= 0) throw new NumberFormatException();
@@ -419,8 +470,15 @@ public class ScriptingCommand {
         case CREATE_CHANNEL:
             return "channel  (may not contain spaces)";
             
-        case DATASTORE:
-            return "";
+        case DATASTORE_CREATE:
+            return "object-name class-name  - or -  " +
+                "object-name array-class-name size";
+            
+        case DATASTORE_READ:
+            return "object-name";
+            
+        case DATASTORE_WRITE:
+            return "object-name";
            
         case DISCONNECT:
             return "";

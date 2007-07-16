@@ -1,8 +1,13 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -13,65 +18,66 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
- * A loadable module that always generates an empty list of {@code
- * Runnable} operations.
+ * TODO
  */
-public class CreateChannelModule implements BehaviorModule, Serializable {
+public class CreateChannelModule extends AbstractModuleImpl implements Serializable {
 
     private static final long serialVersionUID = 0x82F9E38CF1DL;
-
-   /**
-    * Returns an empty list of {@code Runnable} operations.
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return an empty list
-     */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	return new LinkedList<Runnable>();
-    }
-
+    
+    /** Empty constructor */
+    public CreateChannelModule() { }
+    
+    // implement AbstractModuleImpl
+    
     /**
-     *
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(final ClientSession session, Object[] args) {
-       	List<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length != 1) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n",
-			      this, Arrays.toString(args));
-	    return operations;
-	}
-	String channelName = null;
-	try {
-	    channelName = (String)(args[0]);
-	}
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-			      "expected java.lang.String\n" ,
-			      this, args[0]);
-	}
-
-	final String name = channelName;
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String channelName = null;
+        
+        initVars(new Object[] { channelName }, new Class<?>[] { String.class },
+            args, 1);
+        
+        return createOperations(session, channelName);
+    }
+    
+    /*
+     * {@inheritDoc}
+     */
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String channelName = (String)in.readObject();
+        return createOperations(session, channelName);
+    }
+    
+    /**
+     * Does the actual work of creating the {@code Runnable} objects.
+     */
+    private List<Runnable> createOperations(ClientSession session,
+        final String channelName)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
+        
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
 		    try {
-			cm.createChannel(name, null,
-					 Delivery.RELIABLE);
+			cm.createChannel(channelName, null, Delivery.RELIABLE);
 			System.out.printf("created new channel: %s\n",
-					  name);
+                            channelName);
 		    } catch (NameExistsException nee) {
-			System.out.printf("Client tried to recreate an" +
-					  " already existing channel: %s\n", 
-					  name);
+                        System.err.println("**Error: Client tried to create " +
+                            "an existing channel: " + channelName);
 		    }
 		}
 	    });
 	return operations;
-
     }
-
 }

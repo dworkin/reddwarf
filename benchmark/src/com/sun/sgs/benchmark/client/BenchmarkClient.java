@@ -14,15 +14,16 @@ import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import com.sun.sgs.benchmark.client.listener.*;
 import com.sun.sgs.benchmark.shared.MethodRequest;
+import com.sun.sgs.benchmark.shared.impl.CodeMethodRequest;
+import com.sun.sgs.benchmark.shared.impl.CodeMethodRequestOp;
+import com.sun.sgs.benchmark.shared.impl.StringMethodRequest;
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
@@ -54,8 +55,7 @@ import com.sun.sgs.client.simple.SimpleClient;
  *
  * </ul>
  */
-public class BenchmarkClient
-{
+public class BenchmarkClient {
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
@@ -470,7 +470,12 @@ public class BenchmarkClient
      * meaning we should synchronize to protect member variables?
      */
     private void executeCommand(ScriptingCommand cmd) {
+        MethodRequest req;
+        
         try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            
             if (printCommands)
                 System.out.println("# Executing: " + cmd.getType());
             
@@ -491,17 +496,54 @@ public class BenchmarkClient
                 break;
                 
             case CPU:
-                sendServerMessage(new MethodRequest("CPU",
-                                      new Object[] { cmd.getDuration() } ));
+                oos.writeLong(cmd.getDuration());
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.CPU,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case CREATE_CHANNEL:
-                sendServerMessage(new MethodRequest("CREATE_CHANNEL",
-                                      new Object[] { cmd.getChannelName() } ));
+                oos.writeObject(cmd.getChannelName());
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.CREATE_CHANNEL,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
-            case DATASTORE:
-                System.out.println("not yet implemented - TODO");
+            case DATASTORE_CREATE:
+                oos.writeObject(cmd.getObjectName());
+                oos.writeObject(cmd.getClassName());
+                
+                if (cmd.getSize() != -1) {
+                    oos.writeInt(cmd.getSize());
+                } else {
+                    oos.writeObject(new Class<?>[0]);
+                    oos.writeObject(new Object[0]);
+                }
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_CREATE,
+                    baos.toByteArray());
+                System.out.println(req);
+                sendServerMessage(req);
+                break;
+                
+            case DATASTORE_READ:
+                oos.writeObject(cmd.getObjectName());
+                oos.writeBoolean(false);  /** do not mark for update */
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
+                    baos.toByteArray());
+                sendServerMessage(req);
+                break;
+                
+            case DATASTORE_WRITE:
+                oos.writeObject(cmd.getObjectName());
+                oos.writeBoolean(true);  /** mark for update */
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case DISCONNECT:
@@ -525,13 +567,19 @@ public class BenchmarkClient
                 break;
                 
             case JOIN_CHANNEL:
-                sendServerMessage(new MethodRequest("JOIN_CHANNEL", 
-                                      new Object[] { cmd.getChannelName() }));
+                oos.writeObject(cmd.getChannelName());
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.JOIN_CHANNEL,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case LEAVE_CHANNEL:
-                sendServerMessage(new MethodRequest("leaveChannel",
-                                      new Object[] { cmd.getChannelName() }));
+                oos.writeObject(cmd.getChannelName());
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.LEAVE_CHANNEL,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case LOGIN:
@@ -543,10 +591,12 @@ public class BenchmarkClient
                 break;
                 
             case MALLOC:
-                sendServerMessage(new MethodRequest("MALLOC",
-                                      new Object[] {
-                                          byte[].class.getName(),
-                                          cmd.getSize() }));
+                oos.writeObject(byte[].class.getName());
+                oos.writeInt(cmd.getSize());
+                oos.close();
+                req = new CodeMethodRequest(CodeMethodRequestOp.MALLOC,
+                    baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case ON_EVENT:
@@ -579,22 +629,21 @@ public class BenchmarkClient
                 return;
                 
             case REQ_RESPONSE:
+                CodeMethodRequestOp op;
                 {
                     String channelName = cmd.getChannelName();
-                    int size = cmd.getSize();
-                    MethodRequest req;
-                    
                     if (channelName != null) {
-                        req = new MethodRequest("sendChannelMessage",
-                            new Object[] { channelName, size });
+                        op = CodeMethodRequestOp.SEND_CHANNEL;
+                        oos.writeObject(channelName);
+                    } else {
+                        op = CodeMethodRequestOp.SEND_DIRECT;
+                        oos.writeObject("a");
                     }
-                    else {
-                        req = new MethodRequest("sendDirectMessage",
-                            new Object[] { size });
-                    }
-                    
-                    sendServerMessage(req);
                 }
+                oos.writeInt(cmd.getSize());
+                oos.close();
+                req = new CodeMethodRequest(op, baos.toByteArray());
+                sendServerMessage(req);
                 break;
                 
             case SEND_CHANNEL:
@@ -789,7 +838,10 @@ public class BenchmarkClient
         ObjectOutputStream oos = new ObjectOutputStream(baos);
         oos.writeObject(req);
         oos.close();
-        client.send(baos.toByteArray());
+        
+        byte[] ba = baos.toByteArray();
+        System.out.printf("sending MethodRequest: %d bytes\n", ba.length);
+        client.send(ba);
     }
     
     private void sendServerMessage(String message) throws IOException {

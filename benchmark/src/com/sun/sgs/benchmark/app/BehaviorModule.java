@@ -21,8 +21,9 @@ public interface BehaviorModule {
      * @return an ordered set of operations to perform for this
      *         module.
      */
-    public List<Runnable> getOperations(ClientSession session, byte[] args);
-
+    public List<Runnable> getOperations(ClientSession session, byte[] args)
+        throws BehaviorException;
+    
     /**
      * Returns an ordered set of operations to perform for this
      * module.  
@@ -34,7 +35,6 @@ public interface BehaviorModule {
      * @return an ordered set of operations to perform for this
      *         module.
      */
-    public List<Runnable> getOperations(ClientSession session, Object[] args);
-
-
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException;
 }

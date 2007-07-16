@@ -1,118 +1,140 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.NotSerializableException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import java.util.LinkedList;
 import java.util.List;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ClientSession;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
- * A loadable module that performs an access of the datastore.
+ * TODO
  */
-public class DatastoreCreateModule implements BehaviorModule, Serializable {
-    
+public class DatastoreCreateModule extends AbstractModuleImpl implements Serializable {
+
     private static final long serialVersionUID = 0x1234FCL;
-
+    
+    /** Empty constructor */
+    public DatastoreCreateModule() { }
+    
+    // implement AbstractModuleImpl
+    
     /**
-     * ?
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return ?
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	LinkedList<Runnable> operations = new LinkedList<Runnable>();
-	return operations;
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String boundName = null, className = null;
+        Class<?>[] ctorTypes = null;
+        Object[] ctorArgs = null;
+        
+        initVars(new Object[] { boundName, className, ctorTypes, ctorArgs },
+            new Class<?>[] { String.class, String.class, Class[].class,
+                                 Object[].class }, args, 2);
+        
+        Class<?> clazz;
+        try {
+	    clazz = Class.forName(className);
+	}
+        catch (ClassNotFoundException cnfe) {
+            throw new BehaviorException(cnfe);
+        }
+        Object obj;
+        if (clazz.isArray()) {
+            obj = Array.newInstance(clazz.getComponentType(), new int[] {
+                (Integer)ctorArgs[0] });
+        } else {
+            /** Not an array... */
+            try {
+                Constructor ctor = clazz.getConstructor(ctorTypes);
+                obj = ctor.newInstance(ctorArgs);
+            } catch (IllegalAccessException iae) {
+                throw new BehaviorException(iae);
+            } catch (InvocationTargetException ite) {
+                throw new BehaviorException(ite);
+            } catch (NoSuchMethodException nsme) {
+                throw new BehaviorException("invalid parameter(s) to " +
+                    this + ": constructor not found.", nsme);
+            } catch (InstantiationException ie) {
+                throw new BehaviorException(ie);
+            }
+        }
+        return createOperations(session, boundName, obj);
     }
-
-    /**
-     * ?
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return ?
+    
+    /*
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, Object[] args) {
-	LinkedList<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length <2 || args.length > 4) {
-	    System.out.printf("invalid number of args for datastore "
-			      + "create: %d\n", args.length);
-	    return operations;
-	}
-
-	String boundName = "";
-	String className = "";
-	Class<?>[] argTypes = null;
-	Object[] objArgs = null;
-	int arrayLength = -1;
-	try {
-	    boundName = (String)args[0];
-	    className = (String)args[1];
-	    if (args.length == 2) {
-		argTypes = new Class<?>[] { };
-		objArgs = new Object[] { };
-	    }
-	    else if (args.length == 3) {
-		arrayLength = ((Integer)args[2]).intValue();
-	    }
-	    else {
-		argTypes = (Class<?>[])(args[2]);
-		objArgs = (Object[])(args[3]);
-	    }
-	}
-	catch (ClassCastException cce) {
-	    System.out.println("invalid arg types for datastore create");
-	    return operations;
-	}
-
-
-	// make the final references
-	final String boundName_ = boundName;
-	final String className_ = className;
-	final Class<?>[] argTypes_ = argTypes;
-	final Object[] objArgs_ = objArgs;
-	final int arrayLength_ = arrayLength;
-		
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String boundName = (String)in.readObject();
+        String className = (String)in.readObject();
+        Class<?> clazz = Class.forName(className);
+        Object obj;
+        
+        if (clazz.isArray()) {
+            obj = Array.newInstance(clazz.getComponentType(), new int[] {
+                in.readInt() });
+        } else {
+            /** Not an array... */
+            try {
+                Class<?>[] ctorTypes = (Class<?>[])in.readObject();
+                Object[] ctorArgs = (Object[])in.readObject();
+                
+                Constructor ctor = clazz.getConstructor(ctorTypes);
+                obj = ctor.newInstance(ctorArgs);
+            } catch (IllegalAccessException iae) {
+                throw new BehaviorException(iae);
+            } catch (InstantiationException ie) {
+                throw new BehaviorException(ie);
+            } catch (InvocationTargetException ite) {
+                throw new BehaviorException(ite);
+            } catch (NoSuchMethodException nsme) {
+                throw new BehaviorException(nsme);
+            }
+        }
+        
+        return createOperations(session, boundName, obj);
+    }
+    
+    /**
+     * Does the actual work of creating the {@code Runnable} objects.
+     */
+    private List<Runnable> createOperations(final ClientSession session,
+        final String name, final Object obj)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
+        
 	operations.add(new Runnable() {
 		public void run() {
-		    
-		    // try to reflectively instantiate the object
+                    DataManager dm = AppContext.getDataManager();
 		    try {
-			Class<?> clazz = Class.forName(className_);
-			ManagedObject m = (arrayLength_ > 0)
-			    ? new ArrayWrapper(Array.newInstance(clazz,
-								 arrayLength_))
-			    : (ManagedObject)
-			    (clazz.getConstructor(argTypes_).
-			     newInstance(objArgs_));
-			
-			AppContext.getDataManager().setBinding(boundName_, m); 
-		    }
-		    catch (Exception e) {
-			e.printStackTrace();
-		    }
-		}
+                        dm.setBinding(name, new ManagedObjectWrapper(obj));
+                        System.out.println("created!");
+                    } catch (NotSerializableException nse) {
+                        System.err.println("**Error: Cannot add object " +
+                            " name to datastore; not serializable.");
+                    }
+                }
 	    });
 	return operations;
     }
-
-    private static class ArrayWrapper implements Serializable, ManagedObject {
-
-	private final Object array;
-
-	public ArrayWrapper(Object array) {
-	    this.array = array;
-	}
-
-    }
-
 }

@@ -1,8 +1,13 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.benchmark.app.impl;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -11,63 +16,63 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionException;
 
-import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
- * 
- * 
+ * TODO
  */
-public class LeaveChannelModule implements BehaviorModule, Serializable {
-    
+public class LeaveChannelModule extends AbstractModuleImpl implements Serializable {
+
     private static final long serialVersionUID = 0x82F9E38CF1DL;
     
-   /**
-    * Returns an empty list of {@code Runnable} operations.
-     *
-     * @param args op-codes denoting the arguments
-     *
-     * @return an empty list
+    /** Empty constructor */
+    public LeaveChannelModule() { }
+    
+    // implement AbstractModuleImpl
+    
+    /**
+     * {@inheritDoc}
      */
-    public List<Runnable> getOperations(ClientSession session, byte[] args) {
-	return new LinkedList<Runnable>();
+    public List<Runnable> getOperations(ClientSession session, Object[] args)
+        throws BehaviorException
+    {
+        String channelName = null;
+        
+        initVars(new Object[] { channelName }, new Class<?>[] { String.class },
+            args, 1);
+        
+        return createOperations(session, channelName);
+    }
+    
+    /*
+     * {@inheritDoc}
+     */
+    protected List<Runnable> getOperations(ClientSession session,
+        ObjectInputStream in)
+        throws BehaviorException, ClassNotFoundException, IOException
+    {
+        String channelName = (String)in.readObject();
+        return createOperations(session, channelName);
     }
     
     /**
-     * Returns a list with one {@code Runnable} that connects this
-     * client session to the channel specified in {@code args}.
+     * Does the actual work of creating the {@code Runnable} objects.
      */
-    public List<Runnable> getOperations(final ClientSession session, Object[] args) {
-       	List<Runnable> operations = new LinkedList<Runnable>();
-	if (args.length != 1) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n",
-                this, Arrays.toString(args));
-	    return operations;
-	}
-	String channelName;
-	try {
-	    channelName = (String)(args[0]);
-	}
-	catch (ClassCastException cce) {
-	    System.out.printf("invalid parameter(s) to %s: %s\n" +
-                "expected java.lang.String\n", this, args[0]);
-            return operations;
-	}
+    private List<Runnable> createOperations(final ClientSession session,
+        final String channelName)
+    {
+        List<Runnable> operations = new LinkedList<Runnable>();
         
-	final String name = channelName;
 	operations.add(new Runnable() {
 		public void run() {
 		    ChannelManager cm = AppContext.getChannelManager();
 		    try {
-			Channel chan = cm.getChannel(name);
+			Channel chan = cm.getChannel(channelName);
 			chan.leave(session);
 		    } catch (NameNotBoundException nnbe) {
-			System.out.printf("Client tried to leave non-existent"
-                            + " channel: %s\n", name);
-		    } catch (TransactionException te) {
-			System.out.printf("Channel.leave() failed due to a " +
-                            "transaction exception: %s\n", te.getMessage());
+                        System.err.println("**Error: Client tried to leave a " +
+                            "non-existent channel: " + channelName);
 		    }
 		}
 	    });
