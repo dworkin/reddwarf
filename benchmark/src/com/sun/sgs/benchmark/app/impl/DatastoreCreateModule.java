@@ -19,6 +19,7 @@ import java.util.List;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.benchmark.app.BehaviorException;
 
@@ -128,7 +129,7 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                     DataManager dm = AppContext.getDataManager();
 		    try {
                         if (obj instanceof ManagedObject)
-                            dm.setBinding(name, obj);
+                            dm.setBinding(name, (ManagedObject)obj);
                         else
                             dm.setBinding(name, new ManagedObjectWrapper(obj));
                         
