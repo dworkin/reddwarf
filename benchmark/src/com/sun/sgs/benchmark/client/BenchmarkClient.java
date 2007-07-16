@@ -524,7 +524,6 @@ public class BenchmarkClient {
                 oos.close();
                 req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_CREATE,
                     baos.toByteArray());
-                System.out.println(req);
                 sendServerMessage(req);
                 break;
                 

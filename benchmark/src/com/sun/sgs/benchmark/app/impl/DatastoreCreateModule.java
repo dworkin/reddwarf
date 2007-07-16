@@ -127,8 +127,14 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
 		public void run() {
                     DataManager dm = AppContext.getDataManager();
 		    try {
-                        dm.setBinding(name, new ManagedObjectWrapper(obj));
-                        System.out.println("created!");
+                        if (obj instanceof ManagedObject)
+                            dm.setBinding(name, obj);
+                        else
+                            dm.setBinding(name, new ManagedObjectWrapper(obj));
+                        
+                        System.out.println("Created DataStore binding for " +
+                            " object of type " + obj.getClass().getName() +
+                            " under name " + name + ".");
                     } catch (NotSerializableException nse) {
                         System.err.println("**Error: Cannot add object " +
                             " name to datastore; not serializable.");
