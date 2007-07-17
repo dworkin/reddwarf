@@ -1,0 +1,82 @@
+Project Darkstar Client Software Development Kit
+Version @VERSION@
+
+INTRODUCTION
+
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
+
+The Project Darkstar Client Software Development Kit contains everything
+you need to develop and run game clients that communicate with each
+other and with game servers implemented with the Project Darkstar
+Server.  The Project Darkstar Server is available as a separate
+download.
+
+CONTENTS
+
+The Software Development Kit (SDK) contains the following
+subdirectories:
+
+- doc
+  Documentation for the client API
+
+- lib
+  JAR files needed to develop and run client applications
+	
+- tutorial
+  Documentation and sample code for the client tutorial
+
+SUPPORTED PLATFORMS
+
+The SDK has been tested on the following operating systems and
+processors:
+
+- Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
+  processors
+- Windows XP SP2 on 32-bit processors
+- Redhat Linux EL4 on 32-bit processors
+- Mac OS X 10.4 on PowerPC and Intel processors
+
+The SDK requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
+
+It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
+Environment 5.0 on Solaris, Windows, and Linux platforms, and version
+1.5.0_07 on Mac OS X platforms.
+
+DEVELOPING AND RUNNING
+
+To develop or run clients, include the following JAR file in your
+classpath:
+
+   lib/sgs-client.jar
+
+
+KNOWN ISSUES
+
+This version of the SDK has the following limitations:
+
+- It only includes a J2SE client implementation.  Developers can use the
+  documentation of the network protocol to develop other
+  implementations, including ones to support different languages.
+
+- I/O throttling has not been implemented in this release, so it is
+  possible for clients to overwhelm the server with network traffic and
+  cause the server to run out of memory.  As a temporary workaround,
+  developers must ensure that clients do not send network traffic faster
+  than the server application can process it.
+
+
+MORE INFORMATION
+
+For more information, please see the tutorial in the tutorial directory
+and the documentation in the doc directory.  Also check the
+http://www.projectdarkstar.com website, which has links to more
+information and to the Project Darkstar forums.
+
+See the CHANGELOG file for a list of changes.
+
+If you cannot find an answer to your question in any of these places,
+please email the Darkstar team at:
+
+   ProjectDarkstar@games.dev.java.net

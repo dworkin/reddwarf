@@ -14,7 +14,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 
 /**
- * Hello World with Logging example for the Sun Game Server.
+ * Hello World with Logging example for the Project Darkstar Server.
  * It logs {@code "Hello World!"} at level {@link Level#INFO INFO}
  * when first started.
  */

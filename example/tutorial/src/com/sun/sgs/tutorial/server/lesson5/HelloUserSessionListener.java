@@ -12,7 +12,8 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 
 /**
- * Simple example {@link ClientSessionListener} for the Sun Game Server.
+ * Simple example {@link ClientSessionListener} for the Project Darkstar
+ * Server.
  * <p>
  * Logs each time a session receives data or logs out.
  */

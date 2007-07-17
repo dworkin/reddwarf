@@ -34,23 +34,21 @@ final class TransactionProxyImpl implements TransactionProxy {
      * {@inheritDoc}
      */
     public Transaction getCurrentTransaction() {
-        return ((TransactionalTaskThread)(Thread.currentThread())).
-            getCurrentTransaction();
+        return ThreadState.getCurrentTransaction();
     }
 
     /**
      * {@inheritDoc}
      */
     public TaskOwner getCurrentOwner() {
-        return ((TaskThread)(Thread.currentThread())).getCurrentOwner();
+        return ThreadState.getCurrentOwner();
     }
 
     /**
      * {@inheritDoc}
      */
     public <T extends Service> T getService(Class<T> type) {
-        return ((AbstractKernelAppContext)(getCurrentOwner().getContext())).
-            getService(type);
+        return ContextResolver.getContext().getService(type);
     }
 
 

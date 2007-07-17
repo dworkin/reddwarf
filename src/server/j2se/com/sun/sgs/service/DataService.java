@@ -94,8 +94,8 @@ public interface DataService extends DataManager, Service {
      * of the names.  To provide flexibility to the implementation, the UTF-8
      * encoding used can be either <em>standard UTF-8</em>, as defined by the
      * IETF in <a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a>, or
-     * <em>modified UTF-8</em>, as used by Java serialization and defined by
-     * the {@link DataInput} interface.
+     * <em>modified UTF-8</em>, as used by serialization and defined by the
+     * {@link DataInput} interface.
      *
      * @param	name the name to search after, or <code>null</code> to start at
      *		the beginning

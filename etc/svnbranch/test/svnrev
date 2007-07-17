@@ -1,0 +1,64 @@
+#! /usr/bin/env perl
+
+# Prints the revision of the current directory
+
+################
+# Use
+################
+
+# Enforce strict scoping
+use strict;
+
+# Print warnings
+use warnings;
+
+# The directory containing the current program
+my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
+if (!$program_dir) {
+    $program_dir = ".";
+}
+
+# The directory containing the svn branch utilities under test.
+my $install_dir = $ENV{"INSTALL_DIR"} || head($program_dir) . "/src";
+
+# Load utilities
+require "$install_dir/svnmergeutil.pl";
+
+################
+# Subroutines
+################
+
+# Returns the head of a pathname, stripping of the last '/' and
+# following file name
+sub head {
+    my ($pathname) = @_;
+    if ($pathname =~ m!^(.*)/[^/]*$!) {
+	return $1;
+    }
+    die "Couldn't compute head: " . $pathname . "\n";
+}
+
+################
+# Variables
+################
+
+# Usage message
+my $usage = "Usage: $0";
+
+################
+# Main
+################
+
+# Check arguments;
+if ($#ARGV != -1) {
+    die "$usage\n";
+}
+
+my $url = get_wc_url(".");
+my $revision = get_url_revision($url);
+if ($revision) {
+    print "$revision\n";
+} else {
+    die "Error: Current directory not a working copy: " . `pwd`;
+}
+

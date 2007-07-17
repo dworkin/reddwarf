@@ -50,8 +50,19 @@ public class MasterTaskScheduler
         new LoggerWrapper(Logger.getLogger(MasterTaskScheduler.
                                            class.getName()));
 
+    // thread-local to track direct-run tasks
+    private static ThreadLocal<Boolean> runningDirectTask =
+        new ThreadLocal<Boolean>() {
+            protected Boolean initialValue() {
+                return Boolean.FALSE;
+            }
+        };
+
     // the scheduler used for this system
     private final SystemScheduler systemScheduler;
+
+    // the runner used to execute tasks
+    private final TaskExecutor taskExecutor;
 
     /**
      * The property used to define the system scheduler.
@@ -136,14 +147,15 @@ public class MasterTaskScheduler
                        startingThreads);
         threadCount = new AtomicInteger(startingThreads);
 
+        this.taskExecutor =
+            new TaskExecutor(taskHandler, systemScheduler, profileCollector);
         this.profileCollector = profileCollector;
 
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {
             resourceCoordinator.
                 startTask(new MasterTaskConsumer(this, systemScheduler,
-                                                 profileCollector,
-                                                 taskHandler),
+                                                 taskExecutor),
                           null);
             if (profileCollector != null)
                 profileCollector.notifyThreadAdded();
@@ -313,6 +325,34 @@ public class MasterTaskScheduler
         return systemScheduler.
             addRecurringTask(new ScheduledTask(task, owner, defaultPriority,
                                                startTime, period));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+        throws Exception
+    {
+        // check that we're not already running a direct task
+        if (runningDirectTask.get())
+            throw new IllegalStateException("Cannot invoke runTask from " +
+                                            "a task started via runTask");
+        runningDirectTask.set(true);
+
+        // NOTE: since there isn't much fairness being guarenteed by the
+        // system yet, this method simply runs the task directly. When
+        // there is more use of policy and priority in the scheduler, and
+        // when the resource coordinator is being used effectively to
+        // manage resources like threads, then this method should be
+        // re-visited to consider alternate policies
+        try {
+            ScheduledTask directTask =
+                new ScheduledTask(task, owner, defaultPriority,
+                                  System.currentTimeMillis());
+            taskExecutor.runTask(directTask, retry);
+        } finally {
+            runningDirectTask.set(false);
+        }
     }
 
     /**
