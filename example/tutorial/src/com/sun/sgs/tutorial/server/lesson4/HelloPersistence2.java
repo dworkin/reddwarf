@@ -16,7 +16,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.TaskManager;
 
 /**
- * A simple persistence example for the Sun Game Server.
+ * A simple persistence example for the Project Darkstar Server.
  */
 public class HelloPersistence2
     implements AppListener, Serializable
