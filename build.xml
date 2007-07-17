@@ -1071,6 +1071,7 @@
     <property name="test.server.host" value="localhost"/>
     <property name="test.server.dir"
 	      location="${build.dir}/test/data-store-network-server"/>
+    <property name="test.server.level" value="INFO"/>
     <delete dir="${test.server.dir}"/>
     <mkdir dir="${test.server.dir}"/>
     <mkdir dir="${test.server.dir}/dsdb"/>
@@ -1086,11 +1087,12 @@
         com.sun.sgs.impl.service.data.store.net.DataStoreClient
     </echo>
     <echo file="${test.server.dir}/logging.config">
-      .level = INFO
+      .level = ${test.server.level}
+      sun.rmi.level = WARNING
       handlers = java.util.logging.ConsoleHandler
       java.util.logging.ConsoleHandler.formatter = \
         java.util.logging.SimpleFormatter
-      java.util.logging.ConsoleHandler.level = INFO
+      java.util.logging.ConsoleHandler.level = ${test.server.level}
     </echo>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  classpathref="server.classpath"
