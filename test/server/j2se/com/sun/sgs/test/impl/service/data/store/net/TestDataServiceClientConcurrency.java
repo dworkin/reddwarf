@@ -5,9 +5,7 @@
 package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
@@ -35,16 +33,13 @@ public class TestDataServiceClientConcurrency
     private static final String DataStoreClientClassName =
 	DataStoreClient.class.getName();
 
-    /** The name of the DataStoreServerImpl class. */
-    private static final String DataStoreServerImplClassName =
-	DataStoreServerImpl.class.getName();
+    /** The name of the DataStoreClient package. */
+    private static final String DataStoreNetPackage =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The name of the DataServiceImpl class. */
     private static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
-
-    /** The data store server. */
-    DataStoreServerImpl server;
 
     /** Creates an instance. */
     public TestDataServiceClientConcurrency(String name) {
@@ -52,22 +47,6 @@ public class TestDataServiceClientConcurrency
 	/* Reduce the size of the test -- the networked version is slower */
 	operations = Integer.getInteger("test.operations", 5000);
 	objects = Integer.getInteger("test.objects", 500);
-    }
-
-    /** Shutdown the server. */
-    protected void tearDown() throws Exception {
-	super.tearDown();
-	try {
-	    if (server != null) {
-		server.shutdown();
-	    }
-	} catch (RuntimeException e) {
-	    if (passed) {
-		throw e;
-	    } else {
-		e.printStackTrace();
-	    }
-	}
     }
 
     /**
@@ -81,14 +60,12 @@ public class TestDataServiceClientConcurrency
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
-	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
-	    server = serverImpl;
 	    host = "localhost";
-	    port = serverImpl.getPort();
+	    port = 0;
+	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
 	}
-	props.setProperty(DataStoreClientClassName + ".server.host", host);
-	props.setProperty(DataStoreClientClassName + ".server.port",
+	props.setProperty(DataStoreNetPackage + ".server.host", host);
+	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);

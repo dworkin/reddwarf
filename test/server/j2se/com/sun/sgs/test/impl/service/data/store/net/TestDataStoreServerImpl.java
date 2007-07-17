@@ -29,9 +29,9 @@ public class TestDataStoreServerImpl extends TestCase {
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
-    /** The name of the DataStoreServerImpl class. */
-    private static final String DataStoreServerImplClassName =
-	DataStoreServerImpl.class.getName();
+    /** The name of the DataStoreServerImpl package. */
+    private static final String DataStoreNetPackage =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** Directory used for database shared across multiple tests. */
     private static String dbDirectory =
@@ -71,7 +71,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	props = createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
-	    DataStoreServerImplClassName + ".port", "0");
+	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
 	tid = server.createTransaction(1000);
 	oid = server.allocateObjects(tid, 1);
@@ -188,7 +188,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	tid = -1;
 	tearDown();
 	props.setProperty("com.sun.sgs.txn.timeout", "2");
-	props.setProperty(DataStoreServerImplClassName + ".reap.delay", "2");
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "2");
 	server = getDataStoreServer();
 	List<TestReaperConcurrencyThread> threads =
 	    new ArrayList<TestReaperConcurrencyThread>();
@@ -291,8 +291,7 @@ public class TestDataStoreServerImpl extends TestCase {
      */
     public void testGetObjectMaxTxnTimeout() throws Exception {
 	server.shutdown();
-	props.setProperty(
-	    DataStoreServerImplClassName + ".max.txn.timeout", "50");
+	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
 	server = getDataStoreServer();
 	tid = server.createTransaction(2000);
 	oid = server.allocateObjects(tid, 1);

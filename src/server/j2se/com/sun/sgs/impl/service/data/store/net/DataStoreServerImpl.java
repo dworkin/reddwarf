@@ -46,7 +46,7 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
+ *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
  *	</b></code>
  *      <i>Default:</i> {@code 600000}
  *
@@ -55,7 +55,7 @@ import java.util.logging.Logger;
  *	for being aborted. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
+ *	com.sun.sgs.impl.service.data.store.net.server.reap.delay
  *	</b></code><br>
  *      <i>Default:</i> {@code 500}
  *
@@ -63,7 +63,7 @@ import java.util.logging.Logger;
  *	reap timed out transactions. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
+ *	com.sun.sgs.impl.service.data.store.net.server.port
  *	</b></code><br>
  *      <i>Default:</i> {@code 44530}
  *
@@ -77,7 +77,7 @@ import java.util.logging.Logger;
  *
  * In addition to any logging performed by the {@code DataStoreImpl} class,
  * this class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl} to log
+ * com.sun.sgs.impl.service.data.store.net.server} to log
  * information at the following levels: <p>
  *
  * <ul>
@@ -94,17 +94,17 @@ import java.util.logging.Logger;
  */
 public class DataStoreServerImpl implements DataStoreServer {
 
-    /** The name of this class. */
-    private static final String CLASSNAME =
-	DataStoreServerImpl.class.getName();
+    /** The package for this class. */
+    private static final String PACKAGE =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".server"));
 
     /** The property that specifies the maximum transaction timeout. */
     private static final String MAX_TXN_TIMEOUT_PROPERTY =
-	CLASSNAME + ".max.txn.timeout";
+	PACKAGE + ".max.txn.timeout";
 
     /** The default maximum transaction timeout in milliseconds. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
@@ -113,8 +113,8 @@ public class DataStoreServerImpl implements DataStoreServer {
      * The property that specifies the delay in milliseconds between attempts
      * to reap timed out transactions.
      */
-    private static final String REAP_DELAY_PROPERTY = CLASSNAME +
-	".reap.delay";
+    private static final String REAP_DELAY_PROPERTY = PACKAGE +
+	".server.reap.delay";
 
     /** The default reap delay. */
     private static final long DEFAULT_REAP_DELAY = 500;
@@ -122,7 +122,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     /**
      * The name of the property for specifying the port for running the server.
      */
-    private static final String PORT_PROPERTY = CLASSNAME + ".port";
+    private static final String PORT_PROPERTY = PACKAGE + ".server.port";
 
     /** The default value of the port for running the server. */
     private static final int DEFAULT_PORT = 44530;
@@ -135,7 +135,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
-	CLASSNAME + ".no.rmi");
+	PACKAGE + ".no.rmi");
 
     /** Set by main to make sure that the server is reachable. */
     private static DataStoreServerImpl server;
@@ -638,22 +638,6 @@ public class DataStoreServerImpl implements DataStoreServer {
 		return false;
 	    }
 	    return true;
-	}
-    }
-
-    /**
-     * Starts the server.  The current system properties supplied to the
-     * constructor.  Exits with a non-zero status value if a problem occurs.
-     *
-     * @param	args ignored
-     */
-    public static void main(String[] args) {
-	try {
-	    server = new DataStoreServerImpl(System.getProperties());
-	    logger.log(Level.INFO, "Server started: {0}", server);
-	} catch (Throwable t) {
-	    logger.logThrow(Level.SEVERE, t, "Problem starting server");
-	    System.exit(1);
 	}
     }
 
