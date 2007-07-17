@@ -1068,7 +1068,6 @@
   <!-- Runs the data store network server -->
   <target name="test-data-store-network-server" depends="build-server"
 	  description="Runs the data store network server">
-    <property name="test.server.host" value="localhost"/>
     <property name="test.server.dir"
 	      location="${build.dir}/test/data-store-network-server"/>
     <property name="test.server.level" value="INFO"/>
@@ -1101,11 +1100,11 @@
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.server.dir}/logging.config"/>
-      <sysproperty key="java.rmi.server.hostname" value="${test.server.host}"/>
       <arg file="${test.server.dir}/app.config"/>
       <syspropertyset>
 	<propertyref prefix="test."/>
 	<propertyref prefix="com.sun.sgs."/>
+	<propertyref prefix="java.rmi."/>
       </syspropertyset>
     </java>
   </target>
