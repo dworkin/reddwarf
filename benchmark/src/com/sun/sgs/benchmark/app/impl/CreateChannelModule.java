@@ -18,6 +18,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -43,7 +44,7 @@ public class CreateChannelModule extends AbstractModuleImpl implements Serializa
         initVars(new Object[] { channelName }, new Class<?>[] { String.class },
             args, 1);
         
-        return createOperations(session, channelName);
+        return createOperations(channelName);
     }
     
     /*
@@ -54,15 +55,13 @@ public class CreateChannelModule extends AbstractModuleImpl implements Serializa
         throws BehaviorException, ClassNotFoundException, IOException
     {
         String channelName = (String)in.readObject();
-        return createOperations(session, channelName);
+        return createOperations(channelName);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(ClientSession session,
-        final String channelName)
-    {
+    private List<Runnable> createOperations(final String channelName) {
         List<Runnable> operations = new LinkedList<Runnable>();
         
 	operations.add(new Runnable() {
@@ -70,8 +69,9 @@ public class CreateChannelModule extends AbstractModuleImpl implements Serializa
 		    ChannelManager cm = AppContext.getChannelManager();
 		    try {
 			cm.createChannel(channelName, null, Delivery.RELIABLE);
-			System.out.printf("created new channel: %s\n",
-                            channelName);
+			if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: created new channel \"%s\"\n",
+                                this, channelName);
 		    } catch (NameExistsException nee) {
                         System.err.println("**Error: Client tried to create " +
                             "an existing channel: " + channelName);

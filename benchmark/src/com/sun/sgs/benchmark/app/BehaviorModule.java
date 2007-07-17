@@ -11,6 +11,12 @@ import com.sun.sgs.app.ClientSession;
 public interface BehaviorModule {
     
     /**
+     * Controls whether BehaviorModule implementations should print messages to
+     * System.out when they are invoked.
+     */
+    public static boolean ENABLE_INFO_OUTPUT = true;
+    
+    /**
      * Returns an ordered set of operations to perform for this
      * module.  
      *

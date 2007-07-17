@@ -18,6 +18,7 @@ import java.util.List;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -44,7 +45,7 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
         initVars(new Object[] { clazz, count },
             new Class[] { Class.class, Integer.class }, args, 2);
         
-        return createOperations(session, clazz, count.intValue());
+        return createOperations(clazz, count.intValue());
     }
     
     /*
@@ -57,14 +58,14 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
         String className = (String)in.readObject();
         Class<?> clazz = Class.forName(className);
         int count = in.readInt();
-        return createOperations(session, clazz, count);
+        return createOperations(clazz, count);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(ClientSession session,
-        final Class<?> clazz, final int count)
+    private List<Runnable> createOperations(final Class<?> clazz,
+        final int count)
     {
         List<Runnable> operations = new LinkedList<Runnable>();
         
@@ -73,6 +74,9 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
                     if (clazz.isArray()) {
                         Object arr = Array.newInstance(clazz.getComponentType(),
                             count);
+                        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: Creating array %s[%d].\n",
+                                this, clazz.getComponentType().getName(), count);
                     } else {
                         try {
                             // keep a pointer so they all stay in memory at once
@@ -82,6 +86,9 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
                                     clazz.getConstructor(new Class<?>[0]);
                                 arr[i] = c.newInstance(new Object[0]);
                             }
+                            if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                                System.out.printf("%s: Creating %d instances " +
+                                    "of %s.\n", this, count, clazz.getName());
                         } catch (IllegalAccessException iae) {
                             System.err.println("**Error in " + this + ": " + iae);
                         } catch (InstantiationException ie) {

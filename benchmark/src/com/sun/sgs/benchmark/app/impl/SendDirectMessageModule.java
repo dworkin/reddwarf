@@ -14,6 +14,7 @@ import java.util.List;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -70,6 +71,9 @@ public class SendDirectMessageModule extends AbstractModuleImpl implements Seria
 	operations.add(new Runnable() {
 		public void run() {
                     session.send(message.getBytes());
+                    if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                        System.out.printf("%s: Sending directly to %s: %s\n",
+                            this, session, message);
 		}
 	    });
 	return operations;

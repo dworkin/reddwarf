@@ -39,61 +39,67 @@ public class RemoteMethodRequestHandler
 	this.session = session;
     }
 
-    public void receivedMessage(byte[] message) {
-	if (DEBUG) System.out.printf("%s sent message\n", session);
-	try {
-	    ByteArrayInputStream bais = new ByteArrayInputStream(message);
-	    ObjectInputStream ois = new ObjectInputStream(bais);
-	    MethodRequest request = (MethodRequest)(ois.readObject());
-	    
-	    if (DEBUG) System.out.println("method request: " + request);
-
-	    // use the task factory to generate tasks on behalf of
-	    // this method request, then schedule them to run
-	    TaskFactory factory = TaskFactory.instance();
-	    TaskManager manager = AppContext.getTaskManager();
-            List<Runnable> operations;
-            
-            try {
-                if (request.hasObjectArgs()) {
-                    operations = factory.getOperations(session,
-                        request.getMethodName(),
-                        request.getObjectArgs());
-                } else {
-                    operations = factory.getOperations(session,
-                        request.getMethodName(),
-                        request.getByteArgs());
-                }
-            } catch (BehaviorException e) {
-                System.err.println(request.getMethodName() + ": " + e.toString());
-                return;
-            } catch (UnsupportedOperationException e) {
-                System.err.println(e);
-                return;
+    public static void runMethodRequest(MethodRequest request,
+        ClientSession session)
+    {
+        if (DEBUG) System.out.printf("Executing request: %s\n", request);
+        
+        // use the task factory to generate tasks on behalf of
+        // this method request, then schedule them to run
+        TaskFactory factory = TaskFactory.instance();
+        TaskManager manager = AppContext.getTaskManager();
+        List<Runnable> operations;
+        
+        try {
+            if (request.hasObjectArgs()) {
+                operations = factory.getOperations(session,
+                    request.getMethodName(),
+                    request.getObjectArgs());
+            } else {
+                operations = factory.getOperations(session,
+                    request.getMethodName(),
+                    request.getByteArgs());
             }
-            
-	    for (Runnable operation : operations) {
-		try {
-		    operation.run();
-		}
-		// NOTE: not sure what to catch here
-		catch (Exception e) {
-		    // REMINDER: add logging
-		    e.printStackTrace();
-		}
-	    }
-	}
-        catch (ClassCastException cce) {
-            System.err.println(cce.toString());
+        } catch (BehaviorException e) {
+            System.err.println(request.getMethodName() + ": " + e.toString());
+            return;
+        } catch (UnsupportedOperationException e) {
+            System.err.println(e);
+            return;
         }
-	catch (ClassNotFoundException cnfe) {
-            System.err.println(cnfe.toString());
-        }
-	catch (IOException ioe) {
-            System.err.println(ioe.toString());
+        
+        for (Runnable operation : operations) {
+            try {
+                operation.run();
+            }
+            // NOTE: not sure what to catch here
+            catch (Exception e) {
+                // REMINDER: add logging
+                e.printStackTrace();
+            }
         }
     }
 
+    // Implement ClientSessionListener
+
+    public void receivedMessage(byte[] message) {
+        if (DEBUG) System.out.printf("Received %d bytes from client %s\n",
+            message.length, session);
+        
+        try {
+            ByteArrayInputStream bais = new ByteArrayInputStream(message);
+	    ObjectInputStream ois = new ObjectInputStream(bais);
+	    MethodRequest request = (MethodRequest)(ois.readObject());
+	    runMethodRequest(request, session);
+        } catch (ClassCastException cce) {
+            System.err.println(cce.toString());
+        } catch (ClassNotFoundException cnfe) {
+            System.err.println(cnfe.toString());
+        } catch (IOException ioe) {
+            System.err.println(ioe.toString());
+        }
+    }
+    
     public void disconnected(boolean graceful) {
 	System.out.printf("%s disconnected\n", session);
     }

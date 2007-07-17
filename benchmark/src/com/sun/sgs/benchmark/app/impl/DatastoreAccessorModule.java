@@ -18,6 +18,8 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.app.NameNotBoundException;
+
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -44,7 +46,7 @@ public class DatastoreAccessorModule extends AbstractModuleImpl implements Seria
         initVars(new Object[] { boundName, markForUpdate },
             new Class<?>[] { String.class, Boolean.class }, args, 1);
         
-	return createOperations(session, boundName, markForUpdate.booleanValue());
+	return createOperations(boundName, markForUpdate.booleanValue());
     }
     
     /**
@@ -57,14 +59,14 @@ public class DatastoreAccessorModule extends AbstractModuleImpl implements Seria
         String boundName = (String)in.readObject();
         boolean markForUpdate = (in.available() > 0) ? in.readBoolean() : false;
         
-        return createOperations(session, boundName, markForUpdate);
+        return createOperations(boundName, markForUpdate);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(final ClientSession session,
-        final String name, final boolean markForUpdate)
+    private List<Runnable> createOperations(final String name,
+        final boolean markForUpdate)
     {
         List<Runnable> operations = new LinkedList<Runnable>();
         
@@ -76,9 +78,10 @@ public class DatastoreAccessorModule extends AbstractModuleImpl implements Seria
                         if (markForUpdate)
                             AppContext.getDataManager().markForUpdate(o);
                         
-                        System.out.println("Accessed object " + name +
-                            " from DataStore (for " + (markForUpdate ?
-                                "writing" : "reading") + ").");
+                        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: Accessed object \"%s\" " +
+                                "from DataStore (for %s).\n", this, name,
+                                (markForUpdate ? "writing" : "reading"));
                     } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client attempted to read" +
                             " object " + name + " which does not exist");

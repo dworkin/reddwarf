@@ -21,6 +21,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ManagedObject;
 
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -76,7 +77,7 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                 throw new BehaviorException(ie);
             }
         }
-        return createOperations(session, boundName, obj);
+        return createOperations(boundName, obj);
     }
     
     /*
@@ -113,15 +114,13 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
             }
         }
         
-        return createOperations(session, boundName, obj);
+        return createOperations(boundName, obj);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(final ClientSession session,
-        final String name, final Object obj)
-    {
+    private List<Runnable> createOperations(final String name, final Object obj) {
         List<Runnable> operations = new LinkedList<Runnable>();
         
 	operations.add(new Runnable() {
@@ -133,9 +132,10 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                         else
                             dm.setBinding(name, new ManagedObjectWrapper(obj));
                         
-                        System.out.println("Created DataStore binding for " +
-                            " object of type " + obj.getClass().getName() +
-                            " under name " + name + ".");
+                        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: Created DataStore binding " +
+                                "for object of type %s under name \"%s\".\n",
+                                this, obj.getClass().getName(), name);
                     } catch (NotSerializableException nse) {
                         System.err.println("**Error: Cannot add object " +
                             " name to datastore; not serializable.");

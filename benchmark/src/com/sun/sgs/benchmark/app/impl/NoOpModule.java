@@ -32,6 +32,8 @@ public class NoOpModule implements BehaviorModule, Serializable {
     public List<Runnable> getOperations(ClientSession session, byte[] args)
         throws BehaviorException
     {
+        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+            System.out.printf("%s called.\n", this);
         return new LinkedList<Runnable>();
     }
     
@@ -41,6 +43,8 @@ public class NoOpModule implements BehaviorModule, Serializable {
     public List<Runnable> getOperations(ClientSession session, Object[] args)
         throws BehaviorException
     {
+        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+            System.out.printf("%s called.\n", this);
         return new LinkedList<Runnable>();
     }
 }

@@ -17,7 +17,8 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.NameNotBoundException;
 
-import com.sun.sgs.benchmark.app.BehaviorException; 
+import com.sun.sgs.benchmark.app.BehaviorModule;
+import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
  * TODO
@@ -45,7 +46,7 @@ public class SendChannelMessageModule extends AbstractModuleImpl implements Seri
         
         message = multiplyString(message, multiples.intValue());
         
-        return createOperations(session, channelName, message);
+        return createOperations(channelName, message);
     }
     
     /*
@@ -60,14 +61,14 @@ public class SendChannelMessageModule extends AbstractModuleImpl implements Seri
         int multiples = (in.available() > 0) ? in.readInt() : 1;
         
         message = multiplyString(message, multiples);
-        return createOperations(session, channelName, message);
+        return createOperations(channelName, message);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(ClientSession session,
-        final String channelName, final String message)
+    private List<Runnable> createOperations(final String channelName,
+        final String message)
     {
         List<Runnable> operations = new LinkedList<Runnable>();
         
@@ -77,6 +78,9 @@ public class SendChannelMessageModule extends AbstractModuleImpl implements Seri
 		    try {
 			Channel chan = cm.getChannel(channelName);
                         chan.send(message.getBytes());
+                        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: Sending on channel \"%s\" " +
+                                ": %s\n", channelName, message);
 		    } catch (NameNotBoundException nnbe) {
 			System.err.println("**Error: Client requested " +
                             "that server send a message on a non-existent " +

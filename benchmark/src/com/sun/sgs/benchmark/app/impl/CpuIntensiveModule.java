@@ -14,6 +14,7 @@ import java.util.List;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 
+import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
 
 /**
@@ -39,7 +40,7 @@ public class CpuIntensiveModule extends AbstractModuleImpl implements Serializab
         initVars(new Object[] { duration }, new Class<?>[] { Long.class },
             args, 1);
         
-        return createOperations(session, duration.longValue());
+        return createOperations(duration.longValue());
     }
     
     /*
@@ -50,24 +51,28 @@ public class CpuIntensiveModule extends AbstractModuleImpl implements Serializab
         throws BehaviorException, ClassNotFoundException, IOException
     {
         long duration = in.readLong();
-        return createOperations(session, duration);
+        return createOperations(duration);
     }
     
     /**
      * Does the actual work of creating the {@code Runnable} objects.
      */
-    private List<Runnable> createOperations(ClientSession session,
-        final long duration)
-    {
+    private List<Runnable> createOperations(final long duration) {
         List<Runnable> operations = new LinkedList<Runnable>();
 	
 	operations.add(new Runnable() {
 		public void run() {
 		    long startTime = System.currentTimeMillis();
 		    long stopTime = startTime + duration;
-		    for (int i = Integer.MIN_VALUE; 
-			 System.currentTimeMillis() < stopTime;
-			 i++);
+                    double junk = 0.0;
+                    
+                    if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                        System.out.printf("%s: running for %d ms.\n", this,
+                            duration);
+                    
+                    while (System.currentTimeMillis() < stopTime) {
+                        junk += Math.random();
+                    }
 		}
 	    });
 	return operations;

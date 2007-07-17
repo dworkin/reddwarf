@@ -22,6 +22,7 @@ public enum CodeMethodRequestOp {
     DATASTORE_GET     ("datastoreAccess"),
     JOIN_CHANNEL      ("joinChannel"),
     LEAVE_CHANNEL     ("leaveChannel"),
+    PERIODIC_TASK     ("periodicTask"),
     SEND_CHANNEL      ("sendChannelMessage"),
     MALLOC            ("malloc"),
     SEND_DIRECT       ("sendDirectMessage");
@@ -34,11 +35,10 @@ public enum CodeMethodRequestOp {
     
     static {
         CodeMethodRequestOp[] vals = CodeMethodRequestOp.values();
-        
         ordinalIndex = new CodeMethodRequestOp[vals.length];
         
-        for (CodeMethodRequestOp mroc : vals)
-            ordinalIndex[mroc.ordinal()] = mroc;
+        for (CodeMethodRequestOp cmro : vals)
+            ordinalIndex[cmro.ordinal()] = cmro;
     }
     
     /** Constructors */

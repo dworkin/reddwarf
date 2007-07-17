@@ -83,10 +83,6 @@ public class BenchmarkClient {
     /** Used for communication with the server */
     private SimpleClient client = new SimpleClient(masterListener);
     
-    /** The mapping between sessions and names */
-    private final Map<SessionId, String> sessionNames =
-        new HashMap<SessionId, String>();
-    
     /** Provides convenient lookup of channels by name. */
     private Map<String, ClientChannel> channels =
         new HashMap<String, ClientChannel>();
@@ -94,9 +90,6 @@ public class BenchmarkClient {
     /** Holds all registered tags (groupings of commands). */
     private Map<String, List<ScriptingCommand>> tags =
         new HashMap<String, List<ScriptingCommand>>();
-    
-    /** The userName (i.e. login) for this client's session. */
-    private String login;
     
     /** Used to perform the wait-for operation. */
     private Object waitLock = new Object();
@@ -184,7 +177,6 @@ public class BenchmarkClient {
         masterListener.registerLoggedInListener(new LoggedInListener() {
                 public void loggedIn() {
                     SessionId session = client.getSessionId();
-                    sessionNames.put(session, login);
                     
                     if (printNotices || printAllEvents)
                         System.out.println("Notice: Logged in with session ID " +
@@ -335,7 +327,7 @@ public class BenchmarkClient {
                     "perhaps a command is missing in between?", 0);
             }
             
-            activeTag = cmd.getTagName();
+            activeTag = cmd.getTagNameArg();
             tagCmdList = new LinkedList<ScriptingCommand>();
             break;
             
@@ -465,84 +457,147 @@ public class BenchmarkClient {
     }
     
     /*
+     * Creates a {@code MethodRequest} for the given {@code ScriptingCommand}.
+     */
+    private MethodRequest createMethodRequest(ScriptingCommand cmd)
+        throws IOException
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        
+        switch (cmd.getType()) {
+        case CPU:
+            oos.writeLong(cmd.getDurationArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.CPU,
+                baos.toByteArray());
+            
+        case CREATE_CHANNEL:
+            oos.writeObject(cmd.getChannelNameArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.CREATE_CHANNEL,
+                baos.toByteArray());
+            
+        case DATASTORE_CREATE:
+            oos.writeObject(cmd.getObjectNameArg());
+            oos.writeObject(cmd.getClassNameArg());
+            
+            if (cmd.getSizeArg() != -1) {
+                oos.writeInt(cmd.getSizeArg());
+            } else {
+                oos.writeObject(new Class<?>[0]);
+                oos.writeObject(new Object[0]);
+            }
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_CREATE,
+                baos.toByteArray());
+            
+        case DATASTORE_READ:
+            oos.writeObject(cmd.getObjectNameArg());
+            oos.writeBoolean(false);  /** do not mark for update */
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
+                baos.toByteArray());
+            
+        case DATASTORE_WRITE:
+            oos.writeObject(cmd.getObjectNameArg());
+            oos.writeBoolean(true);  /** mark for update */
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
+                baos.toByteArray());
+            
+        case JOIN_CHANNEL:
+            oos.writeObject(cmd.getChannelNameArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.JOIN_CHANNEL,
+                baos.toByteArray());
+            
+        case LEAVE_CHANNEL:
+            oos.writeObject(cmd.getChannelNameArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.LEAVE_CHANNEL,
+                baos.toByteArray());
+            
+        case MALLOC:
+            oos.writeObject(byte[].class.getName());
+            oos.writeInt(cmd.getSizeArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.MALLOC,
+                baos.toByteArray());
+            
+        case PERIODIC_TASK:
+            List<ScriptingCommand> taskCmds = tags.get(cmd.getTagNameArg());
+            if (taskCmds == null)
+                throw new IllegalArgumentException("Unknown tag: " +
+                    cmd.getTagNameArg());
+            
+            oos.writeObject(cmd.getTaskTypeArg());
+            oos.writeLong(cmd.getDelayArg());
+            oos.writeLong(cmd.getPeriodArg());
+            oos.writeInt(taskCmds.size());
+            
+            for (ScriptingCommand taskCmd : taskCmds) {
+                MethodRequest request = createMethodRequest(taskCmd);
+                if (request == null)
+                    throw new IllegalArgumentException("Command " + taskCmd +
+                        " is not a legal participant for periodic tasks.");
+                
+                oos.writeObject(request);
+            }
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.PERIODIC_TASK,
+                baos.toByteArray());
+            
+        case REQ_RESPONSE:
+            CodeMethodRequestOp op;
+            String channelName = cmd.getChannelNameArg();
+            if (channelName != null) {
+                op = CodeMethodRequestOp.SEND_CHANNEL;
+                oos.writeObject(channelName);
+            } else {
+                op = CodeMethodRequestOp.SEND_DIRECT;
+            }
+            oos.writeObject("a");
+            oos.writeInt(cmd.getSizeArg());
+            oos.close();
+            return new CodeMethodRequest(op, baos.toByteArray());
+            
+        default:
+            return null;  /** No method request for this command type */
+        }
+    }
+    
+    /*
      * TODO - since this handles calls from both SimpleClientListener and
      * ClientChannelListener, could calls on those 2 interfaces be mixed,
      * meaning we should synchronize to protect member variables?
      */
     private void executeCommand(ScriptingCommand cmd) {
-        MethodRequest req;
-        
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-            
             if (printCommands)
                 System.out.println("# Executing: " + cmd.getType());
             
+            /** If required, send a method request. */
+            MethodRequest request = createMethodRequest(cmd);
+            if (request != null) sendServerMessage(request);
+            
+            /**
+             * Perform any other actions that need to be done outside of the
+             * MethodRequest call.
+             */
             switch (cmd.getType()) {
             case CONFIG:
-                if (cmd.getHostname() != null) {
-                    serverHostname = cmd.getHostname();
+                if (cmd.getHostnameArg() != null) {
+                    serverHostname = cmd.getHostnameArg();
                     
-                    if (cmd.getPort() != -1)
-                        serverPort = "" + cmd.getPort();
+                    if (cmd.getPortArg() != -1)
+                        serverPort = "" + cmd.getPortArg();
                 }
                 else {
                     /** Just a query */
                     System.out.println("Server is currently configured to " +
                         serverHostname + ":" + serverPort);
                 }
-                
-                break;
-                
-            case CPU:
-                oos.writeLong(cmd.getDuration());
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.CPU,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
-            case CREATE_CHANNEL:
-                oos.writeObject(cmd.getChannelName());
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.CREATE_CHANNEL,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
-            case DATASTORE_CREATE:
-                oos.writeObject(cmd.getObjectName());
-                oos.writeObject(cmd.getClassName());
-                
-                if (cmd.getSize() != -1) {
-                    oos.writeInt(cmd.getSize());
-                } else {
-                    oos.writeObject(new Class<?>[0]);
-                    oos.writeObject(new Object[0]);
-                }
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_CREATE,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
-            case DATASTORE_READ:
-                oos.writeObject(cmd.getObjectName());
-                oos.writeBoolean(false);  /** do not mark for update */
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
-            case DATASTORE_WRITE:
-                oos.writeObject(cmd.getObjectName());
-                oos.writeBoolean(true);  /** mark for update */
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.DATASTORE_GET,
-                    baos.toByteArray());
-                sendServerMessage(req);
                 break;
                 
             case DISCONNECT:
@@ -550,7 +605,7 @@ public class BenchmarkClient {
                 break;
                 
             case DO_TAG:
-                executeTag(cmd.getTagName(), cmd.getCount());
+                executeTag(cmd.getTagNameArg(), cmd.getCountArg());
                 break;
                 
             case EXIT:
@@ -558,67 +613,39 @@ public class BenchmarkClient {
                 break;
                 
             case HELP:
-                if (cmd.getTopic() == null) {
+                if (cmd.getTopicArg() == null) {
                     System.out.println(ScriptingCommand.getHelpString());
                 } else {
-                    System.out.println(ScriptingCommand.getHelpString(cmd.getTopic()));
+                    System.out.println(ScriptingCommand.getHelpString(cmd.getTopicArg()));
                 }
                 break;
                 
-            case JOIN_CHANNEL:
-                oos.writeObject(cmd.getChannelName());
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.JOIN_CHANNEL,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
-            case LEAVE_CHANNEL:
-                oos.writeObject(cmd.getChannelName());
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.LEAVE_CHANNEL,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
             case LOGIN:
-                sendLogin(cmd.getLogin(), cmd.getPassword());
+                sendLogin(cmd.getLoginArg(), cmd.getPasswordArg());
                 break;
                 
             case LOGOUT:
                 client.logout(false);   /* non-force */
                 break;
                 
-            case MALLOC:
-                oos.writeObject(byte[].class.getName());
-                oos.writeInt(cmd.getSize());
-                oos.close();
-                req = new CodeMethodRequest(CodeMethodRequestOp.MALLOC,
-                    baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
             case ON_EVENT:
-                assignEventHandler(cmd.getEvent(), cmd.getTagName(),
-                    cmd.getCount());
-                
+                assignEventHandler(cmd.getEventArg(), cmd.getTagNameArg(),
+                    cmd.getCountArg());
                 break;
                 
             case PAUSE:
-                {
-                    long start = System.currentTimeMillis();
-                    long elapsed = 0;
-                    long duration = cmd.getDuration();
-                    
-                    synchronized (pauseLock) {
-                        while (elapsed < duration) {
-                            try {
-                                pauseLock.wait(duration - elapsed);
-                            }
-                            catch (InterruptedException e) { }
-                            
-                            elapsed = System.currentTimeMillis() - start;
+                long start = System.currentTimeMillis();
+                long elapsed = 0;
+                long duration = cmd.getDurationArg();
+                
+                synchronized (pauseLock) {
+                    while (elapsed < duration) {
+                        try {
+                            pauseLock.wait(duration - elapsed);
                         }
+                        catch (InterruptedException e) { }
+                        
+                        elapsed = System.currentTimeMillis() - start;
                     }
                 }
                 break;
@@ -627,45 +654,25 @@ public class BenchmarkClient {
                 System.out.println("PRINT: " + cmd.getPrintArg());
                 return;
                 
-            case REQ_RESPONSE:
-                CodeMethodRequestOp op;
-                {
-                    String channelName = cmd.getChannelName();
-                    if (channelName != null) {
-                        op = CodeMethodRequestOp.SEND_CHANNEL;
-                        oos.writeObject(channelName);
-                    } else {
-                        op = CodeMethodRequestOp.SEND_DIRECT;
-                        oos.writeObject("a");
-                    }
-                }
-                oos.writeInt(cmd.getSize());
-                oos.close();
-                req = new CodeMethodRequest(op, baos.toByteArray());
-                sendServerMessage(req);
-                break;
-                
             case SEND_CHANNEL:
-                {
-                    String channelName = cmd.getChannelName();
-                    ClientChannel channel = channels.get(channelName);
-                    
-                    if (channel == null) {
-                        System.err.println("Error: unknown channel \"" +
-                            channelName + "\"");
-                    } else {
-                        channel.send(toMessageBytes(cmd.getMessage()));
-                    }
+                String channelName = cmd.getChannelNameArg();
+                ClientChannel channel = channels.get(channelName);
+                
+                if (channel == null) {
+                    throw new IllegalArgumentException("Error: unknown channel" +
+                        "\"" + channelName + "\"");
+                } else {
+                    channel.send(toMessageBytes(cmd.getMessageArg()));
                 }
                 break;
                     
             case SEND_DIRECT:
-                sendServerMessage(cmd.getMessage());
+                sendServerMessage(cmd.getMessageArg());
                 break;
                     
             case WAIT_FOR:
                 /** Register listener to call notify() when event happens. */
-                modifyNotificationEventHandler(cmd.getEvent(), true);
+                modifyNotificationEventHandler(cmd.getEventArg(), true);
                     
                 while (true) {
                     try {
@@ -677,17 +684,13 @@ public class BenchmarkClient {
                          * Unregister listener so it doesn't screw up
                          * future WAIT_FOR commands.
                          */
-                        modifyNotificationEventHandler(cmd.getEvent(), false);
+                        modifyNotificationEventHandler(cmd.getEventArg(), false);
                             
                         break;  /** Only break after wait() returns normally. */
                     }
                     catch (InterruptedException e) { }
                 }
                 break;
-                    
-            default:
-                throw new IllegalStateException("ERROR!  executeCommand() does" +
-                    " not support command type " + cmd.getType());
             }
         /** catch ALL exceptions here */
         } catch (Exception e) {
@@ -820,8 +823,6 @@ public class BenchmarkClient {
          */
         masterListener.setPasswordAuthentication(login, password);
         
-        this.login = login;
-        
         if (printNotices || printAllEvents)
             System.out.println("Notice: Connecting to " + serverHostname +
                 ":" + serverPort);
@@ -839,8 +840,11 @@ public class BenchmarkClient {
         oos.close();
         
         byte[] ba = baos.toByteArray();
-        System.out.printf("sending MethodRequest: %d bytes\n", ba.length);
         client.send(ba);
+        
+        /*
+          System.out.printf("sending MethodRequest: %d bytes\n", ba.length);
+        */
     }
     
     private void sendServerMessage(String message) throws IOException {
@@ -854,8 +858,11 @@ public class BenchmarkClient {
      * @return the formatted string
      */
     private String formatSession(SessionId session) {
-        return sessionNames.get(session) + " [" +
-            toHexString(session.toBytes()) + "]";
+        if (session == null) {
+            return "[null]";
+        } else {
+            return "[" + toHexString(session.toBytes()) + "]";
+        }
     }
 
     /**
@@ -887,16 +894,6 @@ public class BenchmarkClient {
             bytes[i] = Integer.valueOf(hexByte, 16).byteValue();
         }
         return bytes;
-    }
-    
-    private void userLogin(String memberString) {
-        System.err.println("userLogin: " + memberString);
-    }
-
-    private void userLogout(String idString) {
-        System.err.println("userLogout: " + idString);
-        SessionId session = SessionId.fromBytes(fromHexString(idString));
-        sessionNames.remove(session);
     }
     
     /**

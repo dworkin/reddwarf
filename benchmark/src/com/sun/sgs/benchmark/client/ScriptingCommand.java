@@ -5,9 +5,12 @@
 package com.sun.sgs.benchmark.client;
 
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+
+import com.sun.sgs.benchmark.shared.CustomTaskType;
 
 /*
  *
@@ -32,6 +35,8 @@ public class ScriptingCommand {
     private int count = -1;
     private int port = -1;
     private long duration = -1;
+    private long delay = -1;
+    private long period = -1;
     private int size = -1;
     private String channelName = null;
     private String className = null;
@@ -41,8 +46,9 @@ public class ScriptingCommand {
     private String topic = null;
     private String msg = null;
     private String printArg = null;
-    private ScriptingEvent event = null;
     private String login = null, password = null;
+    private ScriptingEvent event = null;
+    private CustomTaskType taskType = null;
     private List<String> recips = new LinkedList<String>();
     
     /** Constructors */
@@ -54,15 +60,17 @@ public class ScriptingCommand {
     
     /** Public Methods */
     
-    public String getChannelName() { return channelName; }
+    public String getChannelNameArg() { return channelName; }
     
-    public String getClassName() { return className; }
+    public String getClassNameArg() { return className; }
     
-    public int getCount() { return count; }
+    public int getCountArg() { return count; }
     
-    public long getDuration() { return duration; }
+    public long getDelayArg() { return delay; }
     
-    public ScriptingEvent getEvent() { return event; }
+    public long getDurationArg() { return duration; }
+    
+    public ScriptingEvent getEventArg() { return event; }
     
     public static String getHelpString() {
         StringBuilder sb = new StringBuilder();
@@ -104,29 +112,33 @@ public class ScriptingCommand {
         return sb.toString();
     }
     
-    public String getHostname() { return hostname; }
+    public String getHostnameArg() { return hostname; }
     
-    public String getLogin() { return login; }
+    public String getLoginArg() { return login; }
     
-    public String getMessage() { return msg; }
+    public String getMessageArg() { return msg; }
     
-    public String getObjectName() { return objectName; }
+    public String getObjectNameArg() { return objectName; }
     
-    public String getPassword() { return password; }
+    public String getPasswordArg() { return password; }
     
-    public int getPort() { return port; }
+    public long getPeriodArg() { return period; }
+    
+    public int getPortArg() { return port; }
     
     public String getPrintArg() { return printArg; }
     
-    public List<String> getRecipients() {
+    public List<String> getRecipientArgs() {
         return Collections.unmodifiableList(recips);
     }
     
-    public int getSize() { return size; }
+    public int getSizeArg() { return size; }
     
-    public String getTagName() { return tagName; }
+    public String getTagNameArg() { return tagName; }
     
-    public String getTopic() { return topic; }
+    public CustomTaskType getTaskTypeArg() { return taskType; }
+    
+    public String getTopicArg() { return topic; }
     
     public ScriptingCommandType getType() { return type; }
     
@@ -365,6 +377,38 @@ public class ScriptingCommand {
             }
             break;
             
+        case PERIODIC_TASK:
+            if (args.length == 4) {
+                tagName = args[0];
+                
+                try {
+                    taskType = Enum.valueOf(CustomTaskType.class, args[1]);
+                } catch (IllegalArgumentException e) {
+                    throw new ParseException("Invalid " + type + " argument, " +
+                        " not recognized: " + args[1] + ".  Should be one of: " +
+                        Arrays.toString(CustomTaskType.values()), 0);
+                }
+                
+                try {
+                    delay = Long.valueOf(args[2]);
+                    if (delay < 0) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new ParseException("Invalid " + type + " argument, " +
+                        " must be a non-negative integer: " + args[2], 0);
+                }
+                
+                try {
+                    period = Long.valueOf(args[3]);
+                    if (period < 0) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new ParseException("Invalid " + type + " argument, " +
+                        " must be a non-negative integer: " + args[3], 0);
+                }
+                return;
+            }
+            
+            break;
+            
         case PRINT:
             /** Accept whole line as argument, including spaces */
             if (args.length == 0) break;
@@ -515,6 +559,9 @@ public class ScriptingCommand {
             
         case PAUSE:
             return "duration_ms";
+            
+        case PERIODIC_TASK:
+            return "tag task-type delay_ms period_ms";
             
         case PRINT:
             return "message   (may contain spaces)";
