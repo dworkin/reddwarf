@@ -8,6 +8,8 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
+import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
+
 import com.sun.sgs.impl.kernel.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.kernel.profile.ProfileRegistrarImpl;
 
@@ -312,95 +314,15 @@ class Kernel {
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
 
-        // create the services and their associated managers...call out
-        // the standard services, first, because we need to get the
-        // ordering constant and make sure that they're all present, and
-        // then handle any external services
+        // get the managers and services that we're using
         ArrayList<Service> serviceList = new ArrayList<Service>();
         HashSet<Object> managerSet = new HashSet<Object>();
         ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();
         try {
-            String dataServiceClass =
-                properties.getProperty(StandardProperties.DATA_SERVICE,
-                                       DEFAULT_DATA_SERVICE);
-            String dataManagerClass =
-                properties.getProperty(StandardProperties.DATA_MANAGER,
-                                       DEFAULT_DATA_MANAGER);
-            String taskServiceClass =
-                properties.getProperty(StandardProperties.TASK_SERVICE,
-                                       DEFAULT_TASK_SERVICE);
-            String taskManagerClass =
-                properties.getProperty(StandardProperties.TASK_MANAGER,
-                                       DEFAULT_TASK_MANAGER);
-            String clientSessionServiceClass =
-                properties.getProperty(StandardProperties.
-                                       CLIENT_SESSION_SERVICE,
-                                       DEFAULT_CLIENT_SESSION_SERVICE);
-            String channelServiceClass =
-                properties.getProperty(StandardProperties.CHANNEL_SERVICE,
-                                       DEFAULT_CHANNEL_SERVICE);
-            String channelManagerClass =
-                properties.getProperty(StandardProperties.CHANNEL_MANAGER,
-                                       DEFAULT_CHANNEL_MANAGER);
-
-            setupService(dataServiceClass, serviceList,
-                         dataManagerClass, managerSet, properties,
-                         systemRegistry);
-            setupService(taskServiceClass, serviceList,
-                         taskManagerClass, managerSet, properties,
-                         systemRegistry);
-
-            // the ClientSessionService is a special case, since it has no
-            // manager, so when created it's also registered for profiling,
-            // if appropriate
-            Service clientSessionService =
-                createService(Class.forName(clientSessionServiceClass),
-                              properties, systemRegistry);
-            serviceList.add(clientSessionService);
-            if (clientSessionService instanceof ProfileProducer) {
-                if (profileRegistrar != null)
-                    ((ProfileProducer)clientSessionService).
-                        setProfileRegistrar(profileRegistrar);
-            }
-
-            setupService(channelServiceClass, serviceList,
-                         channelManagerClass, managerSet, properties,
-                         systemRegistry);
-
-            // now load any external services and their associated managers
-            String externalServices =
-                properties.getProperty(StandardProperties.SERVICES);
-            String externalManagers =
-                properties.getProperty(StandardProperties.MANAGERS);
-            if ((externalServices != null) && (externalManagers != null)) {
-                String [] serviceClassNames = externalServices.split(":", -1);
-                String [] managerClassNames = externalManagers.split(":", -1);
-                if (serviceClassNames.length != managerClassNames.length) {
-                    if (logger.isLoggable(Level.SEVERE))
-                        logger.log(Level.SEVERE, "External service count " +
-                                   "({0}) does not match manager count ({1}).",
-                                   serviceClassNames.length,
-                                   managerClassNames.length);
-                    throw new IllegalArgumentException("Mis-matched service " +
-                                                       "and manager count");
-                }
-
-                for (int i = 0; i < serviceClassNames.length; i++) {
-                    if (! managerClassNames[i].equals("")) {
-                        setupService(serviceClassNames[i], serviceList,
-                                     managerClassNames[i], managerSet,
-                                     properties, systemRegistry);
-                    } else {
-                        Class<?> serviceClass =
-                            Class.forName(serviceClassNames[i]);
-                        serviceList.add(createService(serviceClass, properties,
-                                                      systemRegistry));
-                    }
-                }
-            }
+            fetchServices(serviceList, managerSet, systemRegistry, properties);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e, "Could not setup service");
+                logger.logThrow(Level.SEVERE, e, "Could not setup services");
             throw e;
         }
 
@@ -442,6 +364,146 @@ class Kernel {
                 logger.logThrow(Level.SEVERE, e,
                                 "Could not start configuration");
             throw e;
+        }
+    }
+
+    /**
+     * Private helper that creates the services and their associated managers,
+     * taking care to call out the standard services first, because we need
+     * to get the ordering constant and make sure that they're all present.
+     */
+    private void fetchServices(ArrayList<Service> serviceList,
+                               HashSet<Object> managerSet,
+                               ComponentRegistryImpl systemRegistry,
+                               Properties properties) throws Exception {
+        // before we start, figure out if we're running with only a sub-set
+        // of services, in which case there should be no external services
+        String finalService =
+            properties.getProperty(StandardProperties.FINAL_SERVICE);
+        StandardService finalStandardService = null;
+        String externalServices =
+            properties.getProperty(StandardProperties.SERVICES);
+        String externalManagers =
+            properties.getProperty(StandardProperties.MANAGERS);
+        if (finalService != null) {
+            if ((externalServices != null) || (externalManagers != null))
+                throw new IllegalArgumentException("Cannot specify external " +
+                                                   "services and a final " +
+                                                   "service");
+
+            // validate the final service
+            try {
+                finalStandardService =
+                    Enum.valueOf(StandardService.class, finalService);
+            } catch (IllegalArgumentException iae) {
+                if (logger.isLoggable(Level.SEVERE))
+                    logger.logThrow(Level.SEVERE, iae, "Invalid final " +
+                                    "service name: {0}", finalService);
+                throw iae;
+            }
+
+            // make sure we're not running with an application
+            if (! properties.getProperty(StandardProperties.APP_LISTENER).
+                equals(StandardProperties.APP_LISTENER_NONE))
+                throw new IllegalArgumentException("Cannot specify an app " +
+                                                   "listener and a final " +
+                                                   "service");
+        } else {
+            finalStandardService = StandardService.LAST_SERVICE;
+        }
+
+        String dataServiceClass =
+            properties.getProperty(StandardProperties.DATA_SERVICE,
+                                   DEFAULT_DATA_SERVICE);
+        String dataManagerClass =
+            properties.getProperty(StandardProperties.DATA_MANAGER,
+                                   DEFAULT_DATA_MANAGER);
+        setupService(dataServiceClass, serviceList,
+                     dataManagerClass, managerSet, properties,
+                     systemRegistry);
+
+        if (StandardService.TaskService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+
+        String taskServiceClass =
+            properties.getProperty(StandardProperties.TASK_SERVICE,
+                                   DEFAULT_TASK_SERVICE);
+        String taskManagerClass =
+            properties.getProperty(StandardProperties.TASK_MANAGER,
+                                   DEFAULT_TASK_MANAGER);
+        setupService(taskServiceClass, serviceList,
+                     taskManagerClass, managerSet, properties,
+                     systemRegistry);
+
+        if (StandardService.ClientSessionService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+
+        // the ClientSessionService is a special case, since it has no
+        // manager, so when created it's also registered for profiling,
+        // if appropriate
+        String clientSessionServiceClass =
+            properties.getProperty(StandardProperties.
+                                   CLIENT_SESSION_SERVICE,
+                                   DEFAULT_CLIENT_SESSION_SERVICE);
+        Service clientSessionService =
+            createService(Class.forName(clientSessionServiceClass),
+                          properties, systemRegistry);
+        serviceList.add(clientSessionService);
+        if (clientSessionService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer)clientSessionService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+
+        if (StandardService.ChannelService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+
+        String channelServiceClass =
+            properties.getProperty(StandardProperties.CHANNEL_SERVICE,
+                                   DEFAULT_CHANNEL_SERVICE);
+        String channelManagerClass =
+            properties.getProperty(StandardProperties.CHANNEL_MANAGER,
+                                   DEFAULT_CHANNEL_MANAGER);
+        setupService(channelServiceClass, serviceList,
+                     channelManagerClass, managerSet, properties,
+                     systemRegistry);
+
+        // finally, load any external services and their associated managers
+        if ((externalServices != null) && (externalManagers != null)) {
+            String [] serviceClassNames = externalServices.split(":", -1);
+            String [] managerClassNames = externalManagers.split(":", -1);
+            if (serviceClassNames.length != managerClassNames.length) {
+                if (logger.isLoggable(Level.SEVERE))
+                    logger.log(Level.SEVERE, "External service count " +
+                               "({0}) does not match manager count ({1}).",
+                               serviceClassNames.length,
+                               managerClassNames.length);
+                throw new IllegalArgumentException("Mis-matched service " +
+                                                   "and manager count");
+            }
+            
+            for (int i = 0; i < serviceClassNames.length; i++) {
+                if (! managerClassNames[i].equals("")) {
+                    setupService(serviceClassNames[i], serviceList,
+                                 managerClassNames[i], managerSet,
+                                 properties, systemRegistry);
+                } else {
+                    Class<?> serviceClass =
+                        Class.forName(serviceClassNames[i]);
+                    Service service =
+                        createService(serviceClass, properties, systemRegistry);
+                    // since this Service has no Manager, configure it
+                    // for profiling now (if applicable)
+                    if ((profileRegistrar != null) &&
+                        (service instanceof ProfileProducer))
+                        ((ProfileProducer)service).
+                            setProfileRegistrar(profileRegistrar);
+                    serviceList.add(service);
+                }
+            }
         }
     }
 
@@ -520,16 +582,26 @@ class Kernel {
     }
 
     /**
-     * Called when an application has finished loading and has started to
-     * run. This is typically called by <code>AppStartupRunner</code>
-     * after it has started an application.
+     * Called when a context has finished loading and, if there is an
+     * associated application, the application has started to run. This
+     * is typically called by <code>AppStartupRunner</code> after it has
+     * started an application or <code>ServiceConfigRunner</code> when
+     * a context with no application is ready.
      *
      * @param context the application's kernel context
+     * @param hasApplication <code>true</code> if the context is associated
+     *                       with a running application, <code>false</code>
+     *                       otherwise 
      */
-    void applicationReady(AppKernelAppContext context) {
+    void contextReady(AppKernelAppContext context, boolean hasApplication) {
         applications.add(context);
-        if (logger.isLoggable(Level.INFO))
-	    logger.log(Level.INFO, "{0}: application is ready", context);
+        if (logger.isLoggable(Level.INFO)) {
+            if (hasApplication)
+                logger.log(Level.INFO, "{0}: application is ready", context);
+            else
+                logger.log(Level.INFO, "{0}: non-application context is ready",
+                           context);
+        }
     }
 
     /**
@@ -672,7 +744,13 @@ class Kernel {
                 if (logger.isLoggable(Level.CONFIG))
                     logger.log(Level.CONFIG, "Starting up application: {0}",
                                appName);
-                kernel.startupApplication(appProperties);
+                try {
+                    kernel.startupApplication(appProperties);
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.SEVERE))
+                        logger.logThrow(Level.SEVERE, e, "{0}: startup failed",
+                                        appName);
+                }
             }
         }
     }

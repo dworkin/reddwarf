@@ -100,7 +100,7 @@ public class OperationHistogramListener implements ProfileOperationListener {
 
 	    // find the appropriate bucket;
 	    for (int i = 0; i < NUM_BUCKETS; i++) {
-		if (runTime < 1 << i) {
+		if (runTime < 1 << (i+1)) {
 		    hist[i].incrementAndGet();
 		    break;
 		}

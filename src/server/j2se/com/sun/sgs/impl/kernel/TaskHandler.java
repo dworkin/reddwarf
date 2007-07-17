@@ -89,23 +89,27 @@ public final class TaskHandler {
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "running a task as {0}", owner);
 
-        // get the thread and the calling owner
-        TaskThread thread = (TaskThread)(Thread.currentThread());
-        TaskOwner parent = thread.getCurrentOwner();
+        // get the current owner
+        TaskOwner parent = ThreadState.getCurrentOwner();
 
         // change to the context of the new owner and run the task
-        thread.setCurrentOwner(owner);
+        ThreadState.setCurrentOwner(owner);
         try {
             task.run();
         } finally {
             // always restore the previous owner
-            thread.setCurrentOwner(parent);
+            ThreadState.setCurrentOwner(parent);
         }
     }
 
     /**
      * Runs the given task in a transactional state, committing the
      * transaction on completion of the task.
+     * <p>
+     * Note that this method is typically only called from the context of
+     * a thread created by the system. If you need to run a transactional
+     * task from an independent thread, you should use {@code runTask}
+     * on {@code TaskScheduler} and provide a {@code TransactionRunner}.
      *
      * @param task the <code>KernelRunnable</code> to run transactionally
      *
@@ -139,9 +143,7 @@ public final class TaskHandler {
         TransactionHandle handle =
 	    transactionCoordinator.createTransaction(unbounded);
         Transaction transaction = handle.getTransaction();
-        TransactionalTaskThread thread =
-            (TransactionalTaskThread)(Thread.currentThread());
-        thread.setCurrentTransaction(transaction);
+	ThreadState.setCurrentTransaction(transaction);
 
         if (profileCollector != null)
             profileCollector.noteTransactional();
@@ -154,7 +156,7 @@ public final class TaskHandler {
 	    } finally {
 		// regardless of the outcome, always clear the current state
 		// before aborting or committing
-		thread.clearCurrentTransaction(transaction);
+		ThreadState.clearCurrentTransaction(transaction);
 	    }
 	    // commit the transaction, allowing any exceptions to be thrown,
 	    // since they will indicate whether this task is re-tried

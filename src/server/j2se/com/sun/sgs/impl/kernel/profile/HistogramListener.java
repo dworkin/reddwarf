@@ -77,7 +77,7 @@ public class HistogramListener implements ProfileOperationListener {
 
 	// find the appropriate bucket;
 	for (int i = 0; i < buckets.length; i++) {
-	    if (runTime < 1 << i) {
+	    if (runTime < 1 << (i+1)) {
 		buckets[i].incrementAndGet();
 		break;
 	    }
