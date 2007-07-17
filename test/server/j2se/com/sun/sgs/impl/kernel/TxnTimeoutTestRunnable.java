@@ -39,8 +39,7 @@ public class TxnTimeoutTestRunnable implements Runnable {
 	    Thread.sleep(delay);
 
 	    try {
-		((TransactionalTaskThread)(Thread.currentThread())).
-		    getCurrentTransaction();
+	        ThreadState.getCurrentTransaction();
 	    } catch (TransactionTimeoutException tte) {
 		timedOut = true;
 	    }

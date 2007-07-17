@@ -22,7 +22,7 @@ public class Exporter<T extends Remote> {
     /** The server for handling inbound requests. */
     private T server;
 
-    /** The RMI registry for advertising the server. */
+    /** The Java(TM) RMI registry for advertising the server. */
     private Registry registry;
 
     /** Creates an instance. */
