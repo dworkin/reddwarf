@@ -12,7 +12,6 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import java.lang.Math;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.MissingResourceException;

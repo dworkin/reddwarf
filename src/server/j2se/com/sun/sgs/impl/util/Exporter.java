@@ -4,6 +4,8 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.rmi.NoSuchObjectException;
@@ -12,12 +14,23 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Provides for making the server available on the network, and removing it
  * from the network during shutdown.
+ *
+ * @param 	<T> the remote interface type
  */
 public class Exporter<T extends Remote> {
+
+    /** The name of this class. */
+    private static final String CLASSNAME = Exporter.class.getName();
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** The server for handling inbound requests. */
     private T server;
@@ -32,6 +45,14 @@ public class Exporter<T extends Remote> {
      * Makes the server available on the network on the specified port.  If
      * the port is 0, chooses an anonymous port.  Returns the actual port
      * on which the server is available.
+     *
+     * @param	server	the server
+     * @param	name	the name of the server's proxy in the registry
+     * @param	port	the network port for the server
+     *
+     * @return	the port on which the server is available
+     *
+     * @throws	IOException if there is a problem exporting the server
      */
     public int export(T server, String name, int port) throws IOException {
 	this.server = server;
@@ -45,9 +66,13 @@ public class Exporter<T extends Remote> {
     }
 
     /**
-     * Removes the server from the network, returning true if successful.
-     * Throws IllegalStateException if the server has already been removed
-     * from the network.
+     * Removes the server from the network, returning {@code true} if
+     * successful.
+     *
+     * @return	{@code true} if unexport was successful, and {@code false}
+     *		otherwise
+     * @throws	IllegalStateException if the server has already been
+     *		removed from the network
      */
     public boolean unexport() {
 	if (registry == null) {
@@ -59,10 +84,8 @@ public class Exporter<T extends Remote> {
 		UnicastRemoteObject.unexportObject(server, true);
 		server = null;
 	    } catch (NoSuchObjectException e) {
-		/*
 		logger.logThrow(
 		    Level.FINE, e, "Problem unexporting server");
-		*/
 		return false;
 	    }
 	}
@@ -70,10 +93,8 @@ public class Exporter<T extends Remote> {
 	    UnicastRemoteObject.unexportObject(registry, true);
 	    registry = null;
 	} catch (NoSuchObjectException e) {
-	    /*
 	    logger.logThrow(
 		Level.FINE, e, "Problem unexporting registry");
-	    */
 	    return false;
 	}
 	return true;

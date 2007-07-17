@@ -15,7 +15,7 @@ import java.io.Serializable;
  *
  * <p>{@code com.sun.sgs.impl.service.watchdog.NodeId.value}
  */
-class NodeId implements ManagedObject, Serializable {
+final class NodeId implements ManagedObject, Serializable {
 
     /** The serialVersionUID of this class. */
     private static final long serialVersionUID = 1L;

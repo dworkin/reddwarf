@@ -16,8 +16,6 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.rmi.NoSuchObjectException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;

@@ -4,18 +4,11 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
-import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -29,9 +22,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.InetAddress;
-import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Collections;
@@ -163,6 +154,10 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServiceImpl class documentation} for a list
      * of supported properties.
+     *
+     * @param	properties service (and server) properties
+     * @param	systemRegistry system registry
+     * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(
 	Properties properties, ComponentRegistry systemRegistry)
