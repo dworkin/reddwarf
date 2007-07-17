@@ -218,10 +218,10 @@ public class PrefixHashMap<K,V>
 	if (leftChild == null) { // leaf node
 	    for (PrefixEntry<K,V> e : table) {
 		if (e != null) {
-		    // if we wrapped the value, we can free it directly
-		    if (e.isValueWrapped) {
-			dm.removeObject(e.value.get(ManagedWrapper.class));
-		    }
+		    // remove all references that we are responsible
+		    // for, only calling this when we are sure that we
+		    // will never reference these entries again
+		    e.unmanage();
 		}
 	    }
 	}
@@ -259,7 +259,7 @@ public class PrefixHashMap<K,V>
 		 e = e.next) {
 		
 		Object k;
-		if (e.hash == hash && ((k = e.key) == key || 
+		if (e.hash == hash && ((k = e.getKey()) == key || 
 				       (k != null && k.equals(key)))) {
 		    return true;
 		}
@@ -331,14 +331,16 @@ public class PrefixHashMap<K,V>
 
  	    for (PrefixEntry<K,V> e = leftChild_.table[i]; e != null; e = e.next) {
 		e.prefix.shiftRight();
-		addEntry(e.hash, e.key, e.value, i, e.prefix, 
-			 e.isValueWrapped);
+// 		addEntry(e.hash, e.key, e.value, i, e.prefix, 
+// 			 e.isValueWrapped);
+		addEntry(e, i);
 	    }
 
  	    for (PrefixEntry<K,V> e = rightChild_.table[i]; e != null; e = e.next) {
 		e.prefix.shiftRight();
-		addEntry(e.hash, e.key, e.value, i, e.prefix, 
-			 e.isValueWrapped);
+// 		addEntry(e.hash, e.key, e.value, i, e.prefix, 
+// 			 e.isValueWrapped);
+		addEntry(e, i);
 	    }
 
 // 	    // add all entries from the left child first
@@ -493,7 +495,7 @@ public class PrefixHashMap<K,V>
 		
 		Object k;
 		if (e.hash == hash && 
-		    ((k = e.key) == key || (k != null && k.equals(key)))) {
+		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
 		    return e.getValue();
 		}
 	    }
@@ -519,7 +521,7 @@ public class PrefixHashMap<K,V>
     private V getForNullKey() {
 	PrefixHashMap<K,V> leftMost = leftMost();
 	for (PrefixEntry<K,V> e = leftMost.table[0]; e != null; e = e.next) {
-	    if (e.key == null)
+	    if (e.getKey() == null)
 		return e.getValue();
 	}
 	return null;
@@ -571,7 +573,7 @@ public class PrefixHashMap<K,V>
 		
 		Object k;
 		if (e.hash == hash && 
-		    ((k = e.key) == key || (k != null && k.equals(key)))) {
+		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
 		    
 		    // if the keys and hash match, swap the values
 		    // and return the old value
@@ -601,7 +603,7 @@ public class PrefixHashMap<K,V>
     private V putForNullKey(V value) {
 	PrefixHashMap<K,V> leftMost = leftMost();
 	for (PrefixEntry<K,V> e = leftMost.table[0]; e != null; e = e.next) {
-	    if (e.key == null)
+	    if (e.getKey() == null)
 		return e.setValue(value);
 	}
 	leftMost.addEntry(0, null, value, 0, new Prefix(0));
@@ -648,23 +650,27 @@ public class PrefixHashMap<K,V>
     }
     
     /**
-     * Adds a new entry but does not perform the size check for
-     * splitting.  This should only be called from {@link #merge()}
-     * when adding children entries.
+     * Copies the values of the specified entry, excluding the {@code
+     * PrefixEntry#next} reference, and adds to the the current leaf,
+     * but does not perform the size check for splitting.  This should
+     * only be called from {@link #merge()} when adding children
+     * entries.
+     *
+     * @param copy the entry whose fields should be copied and added
+     *        as a new entry to this leaf.
+     * @param index the index where the new entry should be put
      */
-    private void addEntry(int hash, K key, ManagedReference ref,
-			  int index, Prefix prefix, boolean isValueWrapped) {
+    private void addEntry(PrefixEntry copy, int index) {
  	PrefixEntry<K,V> prev = table[index];
- 	table[index] = new PrefixEntry<K,V>(hash, key, ref, prev, prefix, 
-					    isValueWrapped);
+	table[index] = new PrefixEntry<K,V>(copy, prev); 
  	size++;
     }
     
     /**
-     * {@inheritdoc}
+     * Returns whether this map has no mappings in {@code O(1)} time.
      */
     public boolean isEmpty() {
-	return (leftChild == null) ? size == 0 : size() == 0;
+	return leftChild != null || size == 0;
     }
      
      /**
@@ -732,7 +738,7 @@ public class PrefixHashMap<K,V>
 		PrefixEntry<K,V> next = e.next;
 		Object k;
 		if (e.hash == hash && 
-		    ((k = e.key) == key || (k != null && k.equals(key)))) {
+		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
 			
 		    // remove the value and reorder the chained keys
 		    if (e == prev) // if this was the first element
@@ -745,13 +751,16 @@ public class PrefixHashMap<K,V>
 		    
 		    V v = e.getValue();
 		    
-		    // see whether this data structure is responsible for the
-		    // persistence lifetime of the value
-		    if (e.isValueWrapped) {
-			AppContext.getDataManager().
-			    removeObject(e.value.get(ManagedWrapper.class));
-		    }	
-		    
+// 		    if (e.isValueWrapped) {
+// 			AppContext.getDataManager().
+// 			    removeObject(e.valueRef.get(ManagedWrapper.class));
+// 		    }	
+
+		    // if this data structure is responsible for the
+		    // persistence lifetime of the key or value,
+		    // remove them from the datastore
+		    e.unmanage();
+
 // 		    System.out.printf("size: %s, subtree: %s\n", size-1,
 // 				      treeString());
 
@@ -978,15 +987,17 @@ public class PrefixHashMap<K,V>
 	private static final long serialVersionUID = 1;
 	    
 	/**
-	 * The key for this entry
+	 * The a reference to key for this entry. The class type of
+	 * this reference will depend on whether the map is managing
+	 * the key
 	 */	
-	final K key;
+	private final ManagedReference keyRef;
 
 	/**
-	 * A reference to the value.  The type of this reference will
-	 * depend on whether this map is managing the object or not
+	 * A reference to the value.  The class type of this reference
+	 * will depend on whether this map is managing the value
 	 */ 
-	ManagedReference value;
+	private ManagedReference valueRef;
 
 	/**
 	 * The next chained entry in this entry's bucket
@@ -1002,6 +1013,13 @@ public class PrefixHashMap<K,V>
 	 * The current prefix for where this entry is stored.
 	 */
 	Prefix prefix;
+
+
+	/**
+	 * Whether the key stored in this entry is actually stored
+	 * as a {@link ManagedWrapper}
+	 */
+	boolean isKeyWrapped;
 
 	/**
 	 * Whether the value stored in this entry is actually stored
@@ -1021,40 +1039,56 @@ public class PrefixHashMap<K,V>
 	 */
 	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next, Prefix prefix) {
 
+	    if (k instanceof ManagedObject) {
+		// if k is already a ManagedObject, then put it in the
+		// datastore
+		keyRef = AppContext.getDataManager().
+		    createReference((ManagedObject)k);
+		isKeyWrapped = false;
+	    }
+	    else {
+		// otherwise, we need to wrap it in a ManagedObject
+		keyRef = AppContext.getDataManager().
+		    createReference(new ManagedWrapper<K>(k));
+		isKeyWrapped = true;
+	    }
+
 	    if (v instanceof ManagedObject) {
 		// if v is already a ManagedObject, then put it in the
 		// datastore
-		value = AppContext.getDataManager().
+		valueRef = AppContext.getDataManager().
 		    createReference((ManagedObject)v);
 		isValueWrapped = false;
 	    }
 	    else {
 		// otherwise, we need to wrap it in a ManagedObject
-		value = AppContext.getDataManager().
+		valueRef = AppContext.getDataManager().
 		    createReference(new ManagedWrapper<V>(v));
 		isValueWrapped = true;
 	    }
+
 	    this.next = next;
-	    this.key = k;
 	    this.hash = h;
 	    this.prefix = prefix;
 	}
 
- 	PrefixEntry(int h, K k, ManagedReference ref, PrefixEntry<K,V> next,
- 		    Prefix prefix, boolean isValueWrapped) {
-	    this.hash = h;
-	    this.key = k;
+	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next) {
+	    this.hash = clone.hash;
+	    this.keyRef = clone.keyRef;
 	    this.next = next;
-	    this.prefix = prefix;
-	    this.value = ref;
-	    this.isValueWrapped = isValueWrapped;
- 	}
-	    
+	    this.prefix = clone.prefix;
+	    this.valueRef = clone.valueRef;
+	    this.isValueWrapped = clone.isValueWrapped;
+	    this.isKeyWrapped = clone.isKeyWrapped;
+	}
+  
 	/**
 	 * {@inheritDoc}
 	 */
 	public final K getKey() {
-	    return key;
+	    return (isKeyWrapped)
+		? ((ManagedWrapper<K>)(keyRef.get(ManagedWrapper.class))).object
+		: (K)(keyRef.get(Object.class));
 	}
 	    
 	/**
@@ -1070,8 +1104,8 @@ public class PrefixHashMap<K,V>
 	//       the map is responsible for managing
 	public final V getValue() {
 	    return (isValueWrapped) 
-		? ((ManagedWrapper<V>)(value.get(ManagedWrapper.class))).object
-		: (V)(value.get(Object.class));
+		? ((ManagedWrapper<V>)(valueRef.get(ManagedWrapper.class))).object
+		: (V)(valueRef.get(Object.class));
 	}
 
 	/**
@@ -1088,24 +1122,24 @@ public class PrefixHashMap<K,V>
 	    if (isValueWrapped) {
 		// unpack the value from the wrapper prior to
 		// returning it
-		ManagedWrapper<V> wrapper = value.get(ManagedWrapper.class);
+		ManagedWrapper<V> wrapper = valueRef.get(ManagedWrapper.class);
 		oldValue = wrapper.object;
 		AppContext.getDataManager().removeObject(wrapper);
 	    }
 	    else {
-		oldValue = (V)(value.get(Object.class));
+		oldValue = (V)(valueRef.get(Object.class));
 	    } 
 
 	    if (newValue instanceof ManagedObject) {
 		// if v is already a ManagedObject, then do not put it
 		// in the datastore, and instead get a reference to it
-		value = AppContext.getDataManager().
+		valueRef = AppContext.getDataManager().
 		    createReference((ManagedObject)newValue);
 		isValueWrapped = false;
 	    }
 	    else {
 		// otherwise, we need to wrap it in a ManagedObject
-		value = AppContext.getDataManager().
+		valueRef = AppContext.getDataManager().
 		    createReference(new ManagedWrapper<V>(newValue));
 		isValueWrapped = true;
 	    }
@@ -1134,8 +1168,8 @@ public class PrefixHashMap<K,V>
 	 * {@inheritdoc}
 	 */
 	public final int hashCode() {
-	    return (key==null   ? 0 : key.hashCode()) ^
-		(value==null ? 0 : value.hashCode());
+	    return (keyRef==null   ? 0 : keyRef.hashCode()) ^
+		(valueRef==null ? 0 : valueRef.hashCode());
 	}
 	
 	/**
@@ -1143,7 +1177,28 @@ public class PrefixHashMap<K,V>
 	 * {@code value}]-&gt;<i>next</i>.
 	 */
 	public String toString() {
-	    return "[" + key + "," + getValue() + "]->" + next;
+	    return "[" + getKey() + "," + getValue() + "]->" + next;
+	}
+
+	/**
+	 * Removes any {@code Serializable} managed by this entry from
+	 * the datastore.  This should only be called from {@link
+	 * PrefixHashMap#clear()} and {@link
+	 * PrefixHashMap#remove(Object)} under the condition that this
+	 * entry's map-managed object will never be reference again by
+	 * the map.
+	 */
+	final void unmanage() {
+	    if (isKeyWrapped) {
+		// unpack the key from the wrapper 
+		ManagedWrapper<V> wrapper = keyRef.get(ManagedWrapper.class);
+		AppContext.getDataManager().removeObject(wrapper);
+	    }
+	    if (isValueWrapped) {
+		// unpack the value from the wrapper 
+		ManagedWrapper<V> wrapper = valueRef.get(ManagedWrapper.class);
+		AppContext.getDataManager().removeObject(wrapper);
+	    }
 	}
     }
 
@@ -1340,6 +1395,10 @@ public class PrefixHashMap<K,V>
 	    return new EntryIterator(root.leftMost());
 	}
 
+	public boolean isEmpty() {
+	    return root.isEmpty();
+	}
+
 	public int size() {
 	    return root.size();
 	}
@@ -1370,6 +1429,10 @@ public class PrefixHashMap<K,V>
 	    return new KeyIterator(root.leftMost());
 	}
 
+	public boolean isEmpty() {
+	    return root.isEmpty();
+	}
+
 	public int size() {
 	    return root.size();
 	}
@@ -1398,6 +1461,10 @@ public class PrefixHashMap<K,V>
 
 	public Iterator<V> iterator() {
 	    return new ValueIterator(root.leftMost());
+	}
+
+	public boolean isEmpty() {
+	    return root.isEmpty();
 	}
 
 	public int size() {
