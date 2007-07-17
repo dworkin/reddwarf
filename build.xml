@@ -1070,6 +1070,7 @@
 	  description="Runs the data store network server">
     <property name="test.server.dir"
 	      location="${build.dir}/test/data-store-network-server"/>
+    <property name="test.server.host" value="localhost"/>
     <property name="test.server.level" value="INFO"/>
     <delete dir="${test.server.dir}"/>
     <mkdir dir="${test.server.dir}"/>
