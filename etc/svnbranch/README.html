@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+<head>
+<title>Subversion Branch Management Utilities</title>
+</head>
+<body>
+
+<h1>Subversion Branch Management Utilities</h1>
+
+<h2>Introduction</h2>
+
+The svnbranch subdirectory consists of utilities for merging changes
+between <a href="http://subversion.tigris.org/">Subversion</a> branches
+and their associated trunks.  The utilities, which are written in <a
+href="http://www.perl.org">Perl</a>, are intended to simplify the
+process of performing Subversion merge commands to move changes between
+a branch and a trunk, to maintain information about the merges
+performed, and to provide warnings when files have been moved. <p>
+
+While Subversion provides some support for branching, that support, at
+least as of version 1.4, is limited in several ways:
+
+<ul>
+  <li> There is no automatic support for keeping track of the revisions
+       merged between the branch and the trunk.  Users need to keep
+       track of this information by recording the revision information
+       in log comments, and using that information to help them
+       determine what revisions to compare for subsequent merges.
+
+  <li> There is no error checking to ensure that merges are applied in
+       the right places, or that branches have been updated to reflect
+       changes in the trunk before their changes are merged back.
+
+  <li> Merges that involve files that have been moved in the branch or
+       the trunk can cause changes to those files to be silently
+       ignored.
+</ul> <p>
+
+This project provides two utilities, one for ensuring that a branch
+includes changes made in the associated trunk, and another for pushing
+changes made in a branch up into the trunk:
+
+<ul>
+  <li> The <b><code>svnrefresh</code></b> command "refreshes" the
+       working copy for a branch in the current directory by merging
+       changes into it made in the trunk since the branch was created or
+       last refreshed. <p>
+
+  <li> The <b><code>svnmergeup</code></b> command merges changes up into
+       the working copy for a trunk in the current directory made in an
+       associated branch.
+</ul> <p>
+
+For both commands, you need a working copy to accept the changes.  The
+commands merge the changes into that working copy, but leave the changes
+uncommitted.  You can perform tests in the modified working copy to
+ensure that the merge was successful prior to committing the changes.
+Both commands accept an argument that specifies the source of the
+changes to be merged.  That argument can either specify the URL of the
+Subversion repository that contains the branch or trunk, or can be the
+pathname of a working copy. <p>
+
+<h2>Example</h2>
+
+Here is a simple example for how you might use these commands to manage
+a Subversion branch:
+
+<ul>
+  <li> Create the branch using the Subversion copy command:
+<pre>
+$ svn copy -m "Create branch mybranch" svn://labsvn/sgs/trunk svn://labsvn/sgs/branches/mybranch
+</pre> <p>
+    
+  <li> Create a working copy for the branch:
+
+<pre>
+$ svn checkout svn://labsvn/sgs/branches/mybranch ~/svn/sgs-mybranch
+</pre> <p>
+
+  <li> Modify the branch, committing changes as desired. <p>
+
+  <li> When you want to get recent changes from the trunk, first commit
+       outstanding changes in the branch.  Before getting the changes,
+       you may want to check to see what will be refreshed:
+
+<pre>
+$ cd ~/svn/sgs-mybranch
+$ svnrefresh -n
+</pre>
+
+	You can add the <code>-v</code> option to see the diffs and log
+	for the changes to be applied. <p>
+
+  <li> Next refresh the branch with the changes by leaving out
+       the <code>-n</code> option:
+
+<pre>
+$ cd ~/svn/sgs-mybranch
+$ svnrefresh
+</pre> <p>
+
+  <li> When you've checked the refreshed changes over, commit them to
+       the branch:
+<pre>
+$ svn commit -m "Refresh revision 1234"
+</pre> <p>
+
+  <li> Make more changes, refresh, and commit as desired, until you are
+       ready to merge your changes up to the trunk. <p>
+
+  <li> Create a working copy for the trunk:
+<pre>
+$ svn checkout svn://labsvn/sgs/trunk ~/svn/sgs
+</pre> <p>
+
+  <li> You can check to see what changes will be merged up first:
+
+<pre>
+$ cd ~/svn/sgs
+$ svnmergeup -n ~/svn/sgs-mybranch
+</pre> <p>
+
+  <li> Merge the changes up by leaving out the <code>-n</code> option:
+
+<pre>
+$ cd ~/svn/sgs
+$ svnmergeup ~/svn/sgs-mybranch
+</pre> <p>
+
+  <li> Commit the changes when you are satisfied with them:
+
+<pre>
+$ svn commit -m "Merge up revision 1236 of branch mybranch"
+</pre>
+
+</ul> <p>
+
+If the <code>svnrefresh</code> or <code>svnmergeup</code> commands
+detect that the changes involve moving files, they will print a message
+describing the changes detected.  You should perform any moves needed by
+hand, and then use the <code>-f</code> option to apply the changes to
+the modified working copy. <p>
+
+If you have already performed merges between branches and trunks without
+using the svnrefresh and svnmergeup commands, you can use
+the <code>-i</code> option to the <code>svnrefresh</code>
+and <code>svnmergeup</code> commands to make modifications to working
+copies that will record what revisions have been refreshed and merged up
+already. <p>
+
+Both commands will print help messages if the <code>-h</code> option is
+specified. <p>
+
+<h2>Requirements and Limitations</h2>
+
+<ul>
+  <li> The <code>svn</code> command must be available in your shell's
+       path or in the directory specified by the <code>SVNDIR</code>
+       environment variable.
+
+  <li> Merges must be performed from the top level directory of the
+       branch or trunk, and update the entire directory.
+
+  <li> Branches must be refreshed before they are merged up into the
+       trunk.
+
+  <li> Trunk directories must end in <code>/trunk</code>, branch
+       directories must end in <code>/branches/<i>branchname</i></code>.
+
+  <li> If a working copy is specified for the source of a merge, that
+       working copy must be up to date with the repository and must not
+       be modified.
+
+  <li> The <code>-f</code> option must be specified to permit merges
+       into a modified working copy.
+
+  <li> The algorithm for identifying moved files is conservative and may
+       include moves that have no effect on the merge.
+
+  <li> Branches must hang off of the trunk &mdash; hierarchical branching is
+       not (currently) supported.
+
+  <li> Use the <code>-i</code> option to the <code>svnmerge</code>
+       command to record information about a branch merged into the
+       trunk if you rename the branch directory.
+
+  <li> Only repository URLs with the <code>svn</code> and
+      <code>file</code> URL schemes have been tested.
+</ul> <p>
+
+<hr>
+<address><a href="mailto:tim.blackman@sun.com">Tim Blackman</a></address>
+Last modified: $Date$
+
+</body>
+</html>

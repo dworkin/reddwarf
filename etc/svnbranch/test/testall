@@ -1,0 +1,39 @@
+#! /usr/bin/env perl
+# testall -- Run all tests
+
+use strict;
+use warnings;
+
+# The tests in this directory to run
+my @tests = ("testsvnrefresh",
+	     "testsvnmergeup");
+
+# The directory containing this program
+my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
+if (!$program_dir) {
+    $program_dir = ".";
+}
+
+# Call main routine
+main();
+
+# Main routine that runs all tests
+sub main {
+    my $start = time();
+    my $status = 0;
+    for (@tests) {
+	my $test = $_;
+	print "$test:\n";
+	if (0 != system("$program_dir/$test @ARGV")) {
+	    $status = 1;
+	}
+    }
+    my $elapsed = time() - $start;
+    print "Elapsed time: $elapsed seconds\n";
+    if ($status == 0) {
+	print "All passed\n";
+    } else {
+	print "Some failures\n";
+    }
+    exit $status;
+}
