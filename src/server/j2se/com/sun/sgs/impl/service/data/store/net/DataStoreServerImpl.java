@@ -98,7 +98,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	DataStoreServerImpl.class.getName();
 
     /** The logger for this class. */
-    static final LoggerWrapper logger =
+    private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** The property that specifies the maximum transaction timeout. */

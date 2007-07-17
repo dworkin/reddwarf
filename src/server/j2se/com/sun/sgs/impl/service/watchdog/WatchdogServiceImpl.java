@@ -50,8 +50,8 @@ import java.util.logging.Logger;
  * <li> <i>Key:</i> {@code
  *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.start} <br>
  *	<i>Default:</i> {@code false} <br>
- *	Specifies whether the watchdog server should be started.  If
- *	{@code true}, the watchdog server is started.  If this property value
+ *	Specifies whether the watchdog server should be started by this service.
+ *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
  *	{@link WatchdogServerImpl} class must be specified.<p>
  *
@@ -59,13 +59,13 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.host} <br>
  *	<i>Default:</i> the local host name <br>
  *	Specifies the host name for the watchdog server that this service
- *	contacts.<p>
+ *	contacts (and, optionally, starts).<p>
  *
  * <li> <i>Key:</i> {@code
  *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.port} <br>
  *	<i>Default:</i> {@code 44533} <br>
  *	Specifies the network port for the watchdog server that this service
- *	contacts.  If the {@code
+ *	contacts (and, optionally, starts).  If the {@code
  *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.start} property
  *	is {@code true}, then the value must be greater than or equal to
  *	{@code 0} and no greater than {@code 65535}, otherwise the value
@@ -82,13 +82,16 @@ public class WatchdogServiceImpl implements WatchdogService {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    private static final String WATCHDOG_SERVER_CLASSNAME =
+	WatchdogServerImpl.class.getName();
+
     /** The property to specify that the watchdog server should be started. */
     private static final String START_SERVER_PROPERTY =
-	WatchdogServerImpl.class + ".start";
+	WATCHDOG_SERVER_CLASSNAME + ".start";
 
     /** The property name for the watchdog server host. */
     private static final String HOST_PROPERTY =
-	WatchdogServerImpl.class +  ".host";
+	WATCHDOG_SERVER_CLASSNAME +  ".host";
 
     /** The property name for the watchdog server port. */
     private static final String PORT_PROPERTY =
@@ -198,7 +201,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 	    
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, port);
-	    serverProxy = (WatchdogServer) rmiRegistry.lookup("WatchdogServer");
+	    serverProxy = (WatchdogServer)
+		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -211,7 +215,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 	    throw e;
 	}
-	
     }
 
     /* -- Implement Service -- */
@@ -289,11 +292,13 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** {@inheritDoc} */
     public long getLocalNodeId() {
+	checkState();
 	return localNodeId;
     }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive(boolean checkTransactionally) {
+	checkState();
 	boolean aliveStatus = isAlive();
 	if (aliveStatus == false || !checkTransactionally) {
 	    return aliveStatus;
@@ -308,21 +313,25 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
+	checkState();
 	return NodeImpl.getNodes(dataService);
     }
 
     /** {@inheritDoc} */
     public Node getNode(long nodeId) {
+	checkState();
 	return NodeImpl.getNode(dataService, nodeId);
     }
 
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
+	checkState();
 	nodeListeners.add(listener);
     }
 
     /** {@inheritDoc} */
     public void addNodeListener(long nodeId, NodeListener listener) {
+	checkState();
 	synchronized (nodeListenerMap) {
 	    Set<NodeListener> listeners = nodeListenerMap.get(nodeId);
 	    if (listeners == null) {
@@ -365,7 +374,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * {@inheritDoc}
 	 *
 	 * Performs cleanup in the case that the transaction invoking
-	 * the service's {@code configure} method aborts.
+	 * the service's {@link #configure configure} method aborts.
 	 */
 	public void abort(boolean retryable) {
 	    synchronized (lock) {
@@ -373,7 +382,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 
 	    if (serverImpl != null) {
-		serverImpl.configureAborted();
+		serverImpl.reset();
 	    }
 	}
 
@@ -470,6 +479,24 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
 
     /* -- other methods -- */
+
+    public WatchdogServerImpl getServer() {
+	return serverImpl;
+    }
+    
+    /**
+     * Throws {@code IllegalStateException} if this service is not
+     * configured or is shutting down.
+     */
+    private void checkState() {
+	synchronized (lock) {
+	    if (dataService == null) {
+		throw new IllegalStateException("service not configured");
+	    } else if (shuttingDown) {
+		throw new IllegalStateException("service shutting down");
+	    }
+	}
+    }
 
     /**
      * Returns {@code true} if this service is shutting down.

@@ -47,7 +47,8 @@ import java.util.logging.Logger;
  *	<i>Default:</i> {@code 1000} (one second)<br>
  *	Specifies the ping interval which is returned by the {@link #ping ping}
  *	method). The interval must be greater than or equal to  {@code 5}
- *	milliseconds.<p>
+ *	milliseconds and less than or equal to {@code 10000} milliseconds
+ *	(10 seconds).<p>
  * </ul> <p>
 
  */
@@ -60,6 +61,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    static final String WATCHDOG_SERVER_NAME = "WatchdogServer";
 
     /** The property name for the server port. */
     static final String PORT_PROPERTY = CLASSNAME + ".port";
@@ -76,6 +79,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** The lower bound for the ping interval. */
     private static final int PING_INTERVAL_LOWER_BOUND = 5;
+
+    /** The upper bound for the ping interval. */
+    private static final int PING_INTERVAL_UPPER_BOUND = 10000;
 
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
@@ -110,6 +116,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	if (systemRegistry == null) {
+	    throw new NullPointerException("null registry");
+	}
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT);
 	if (requestedPort < 0 || requestedPort > 65535) {
@@ -118,18 +127,21 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		"greater than or equal to 0 and less than 65535: " +
 		requestedPort);
 	}
-	exporter = new Exporter<WatchdogServer>();
-	port = exporter.export(this, "WatchdogServer", requestedPort);
-	if (requestedPort == 0) {
-	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
-	}
 	pingInterval = wrappedProps.getLongProperty(
 	    PING_INTERVAL_PROPERTY, DEFAULT_PING_INTERVAL);
-	if (pingInterval < PING_INTERVAL_LOWER_BOUND) {
+	if (pingInterval < PING_INTERVAL_LOWER_BOUND ||
+	    pingInterval > PING_INTERVAL_UPPER_BOUND)
+	{
 	    throw new IllegalArgumentException(
 		"The " + PING_INTERVAL_PROPERTY + " property value must be " +
 		"greater than or equal to " + PING_INTERVAL_LOWER_BOUND +
+		" and less than or equal to " + PING_INTERVAL_UPPER_BOUND +
 		": " + pingInterval);
+	}
+	exporter = new Exporter<WatchdogServer>();
+	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
+	if (requestedPort == 0) {
+	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
     }
 
@@ -224,10 +236,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**
      * Resets the server to an uninitialized state so that configure
-     * can be reinvoked.  This method is invoked by the {@code
-     * WatchdogServiceImpl} if its {@code configure} method aborts.
+     * can be reinvoked.  This method is invoked by the {@link
+     * WatchdogServiceImpl} if its {@link
+     * WatchdogServiceImpl#configure configure} method aborts.
      */
-    void configureAborted() {
+    void reset() {
 	dataService = null;
     }
     
