@@ -676,12 +676,12 @@ public class TestSystemSchedulerImpl {
         }
     }
 
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
+//     /**
+//      * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
+//      */
 
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestSystemSchedulerImpl.class);
-    }
+//     public static junit.framework.Test suite() {
+//         return new JUnit4TestAdapter(TestSystemSchedulerImpl.class);
+//     }
 
 }

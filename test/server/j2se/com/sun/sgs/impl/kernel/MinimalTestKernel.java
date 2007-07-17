@@ -126,10 +126,8 @@ public final class MinimalTestKernel
     }
 
     /**
-     * Creates a system thread to run tasks. This thread is suitable for
-     * using with a <code>TaskScheduler</code> or other component that
-     * needs our internal implementation of <code>Thread</code> to manage
-     * task and transaction state correctly.
+     * Creates a thread for running tasks. The thread's context will be
+     * initialized to the given {@code KernelAppContext}.
      *
      * @param runnable the task to run in this thread
      * @param context the context in which to run the tasks
@@ -140,18 +138,10 @@ public final class MinimalTestKernel
                                       KernelAppContext context) {
         final TaskOwnerImpl owner =
             new TaskOwnerImpl(new DummyIdentity(), context);
-        return new TransactionalTaskThread(new Runnable() {
+        return new Thread(new Runnable() {
                 public void run() {
-                    try {
-                        taskHandler.runTaskAsOwner(new KernelRunnable() {
-                                public String getBaseTaskType() {
-                                    return runnable.getClass().getName();
-                                }
-                                public void run() throws Exception {
-                                    runnable.run();
-                                }
-                            }, owner);
-                    } catch (Exception e) {}
+                    ThreadState.setCurrentOwner(owner);
+                    runnable.run();
                 }
             });
     }
@@ -233,7 +223,7 @@ public final class MinimalTestKernel
     {
         private HashSet<Thread> threadSet = new HashSet<Thread>();
         public void startTask(Runnable task, Manageable component) {
-            Thread t = new TransactionalTaskThread(task);
+            Thread t = new Thread(task);
             threadSet.add(t);
             t.start();
         }

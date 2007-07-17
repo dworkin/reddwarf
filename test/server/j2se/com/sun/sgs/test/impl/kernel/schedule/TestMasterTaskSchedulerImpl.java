@@ -4,6 +4,8 @@
 
 package com.sun.sgs.test.impl.kernel.schedule;
 
+import com.sun.sgs.app.TaskRejectedException;
+
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
@@ -13,6 +15,10 @@ import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
+import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
@@ -26,6 +32,8 @@ import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 import org.junit.runner.RunWith;
 
@@ -205,6 +213,76 @@ public class TestMasterTaskSchedulerImpl {
     }
 
     /**
+     * Test runTask.
+     */
+
+    @Test (expected=NullPointerException.class)
+        public void runTaskNullTask() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        scheduler.runTask(null, testOwner, false);
+    }
+
+    @Test (expected=NullPointerException.class)
+        public void runTaskNullOwner() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        scheduler.runTask(new TestRunner(new Runnable() {
+                public void run() {}
+            }), null, false);
+    }
+
+    @Test (expected=IllegalStateException.class)
+        public void runTaskNested() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(0);
+        scheduler.runTask(new NestedTestRunner(scheduler), testOwner, false);
+    }
+
+    @Test public void runTaskSingleTask() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        RunCountTestRunner runner = new RunCountTestRunner(1);
+        scheduler.runTask(runner, testOwner, false);
+        assertEquals(0, runner.getRunCount());
+    }
+
+    @Test public void runTaskMultipleTasks() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        RunCountTestRunner runner = new RunCountTestRunner(4);
+        scheduler.runTask(runner, testOwner, false);
+        assertEquals(3, runner.getRunCount());
+        scheduler.runTask(runner, testOwner, false);
+        assertEquals(2, runner.getRunCount());
+        scheduler.runTask(runner, testOwner, false);
+        assertEquals(1, runner.getRunCount());
+        scheduler.runTask(runner, testOwner, false);
+        assertEquals(0, runner.getRunCount());
+    }
+
+    @Test public void runTaskWithRetry() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        RetryTestRunner runner = new RetryTestRunner();
+        scheduler.runTask(runner, testOwner, true);
+        assertTrue(runner.isFinished());
+    }
+
+    @Test (expected=TaskRejectedException.class)
+        public void runTaskWithoutRetry() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        RetryTestRunner runner = new RetryTestRunner();
+        scheduler.runTask(runner, testOwner, false);
+    }
+
+    @Test public void runTaskTransactional() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    proxy.getCurrentTransaction();
+                    proxy.getCurrentOwner();
+                }
+            });
+        scheduler.runTask(new TransactionRunner(runner), testOwner, false);
+    }
+
+    /**
      * Utility methods.
      */
 
@@ -233,6 +311,66 @@ public class TestMasterTaskSchedulerImpl {
         set.add(new DummyKernelRunnable());
         set.add(new DummyKernelRunnable());
         return set;
+    }
+
+    /**
+     * Utility classes.
+     */
+
+    private class TestRunner implements KernelRunnable {
+        final Runnable runnable;
+        TestRunner(Runnable runnable) { this.runnable = runnable; }
+        public String getBaseTaskType() { return TestRunner.class.getName(); }
+        public void run() throws Exception { runnable.run(); }
+    }
+
+    private class NestedTestRunner implements KernelRunnable {
+        final TaskScheduler scheduler;
+        NestedTestRunner(TaskScheduler scheduler) {
+            this.scheduler = scheduler;
+        }
+        public String getBaseTaskType() {
+            return NestedTestRunner.class.getName();
+        }
+        public void run() throws Exception {
+            scheduler.runTask(new TestRunner(new Runnable() {
+                    public void run() {}
+                }), testOwner, false);
+        }
+    }
+
+    private class RunCountTestRunner implements KernelRunnable {
+        private int runCount;
+        RunCountTestRunner(int initialCount) {
+            this.runCount = initialCount;
+        }
+        public String getBaseTaskType() {
+            return RunCountTestRunner.class.getName();
+        }
+        public void run() throws Exception {
+            runCount--;
+        }
+        int getRunCount() {
+            return runCount;
+        }
+    }
+
+    private class RetryTestRunner implements KernelRunnable {
+        private boolean hasRun = false;
+        private boolean finished = false;
+        public String getBaseTaskType() {
+            return RetryTestRunner.class.getName();
+        }
+        public void run() throws Exception {
+            if (! hasRun) {
+                hasRun = true;
+                throw new TaskRejectedException("test");
+            }
+            finished = true;
+        }
+        public boolean isFinished() {
+            return finished;
+        }
     }
 
     /**
