@@ -36,6 +36,7 @@ public class TestDataServiceClient extends TestDataServiceImpl {
     }
 
     /** Adds client and server properties. */
+    @Override
     protected Properties getProperties() throws Exception {
 	Properties props = super.getProperties();
 	String host = serverHost;

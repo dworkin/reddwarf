@@ -35,6 +35,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
      * Create a DataStoreClient, set any default properties, and start the
      * server, if needed.
      */
+    @Override
     protected DataStore getDataStore() throws Exception {
 	String host = serverHost;
 	int port = serverPort;

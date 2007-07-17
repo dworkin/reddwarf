@@ -48,6 +48,7 @@ public class TestDataServiceClientPerformance
      * Create a DataService, setting default properties, and starting the
      * server if needed.
      */
+    @Override
     protected DataService getDataService(Properties props,
 					 ComponentRegistry componentRegistry)
 	throws Exception
@@ -63,7 +64,8 @@ public class TestDataServiceClientPerformance
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
-			    DataStoreClientClassName);
+			  DataStoreClientClassName);
+	System.err.println(props);
 	return new DataServiceImpl(props, componentRegistry);
     }
 }

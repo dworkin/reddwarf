@@ -35,6 +35,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     /** Adds client and server properties. */
+    @Override
     protected Properties getProperties() throws Exception {
 	Properties props = super.getProperties();
 	String host = serverHost;
@@ -51,6 +52,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     /** Create a DataStoreClient. */
+    @Override
     protected DataStore createDataStore(Properties props) throws Exception {
 	return new DataStoreClient(props);
     }

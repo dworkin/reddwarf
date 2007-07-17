@@ -53,6 +53,7 @@ public class TestDataServiceClientConcurrency
      * Create a DataService, set any default properties, and start the server,
      * if needed.
      */
+    @Override
     protected DataService getDataService(Properties props,
 					 ComponentRegistry componentRegistry)
 	throws Exception
