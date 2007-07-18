@@ -673,7 +673,7 @@ public class BenchmarkClient {
             case WAIT_FOR:
                 /** Register listener to call notify() when event happens. */
                 modifyNotificationEventHandler(cmd.getEventArg(), true);
-                    
+                
                 while (true) {
                     try {
                         synchronized(waitLock) {
