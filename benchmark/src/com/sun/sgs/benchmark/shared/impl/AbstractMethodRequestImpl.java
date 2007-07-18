@@ -71,8 +71,9 @@ public abstract class AbstractMethodRequestImpl implements MethodRequest {
      * @return the string description of this method.
      */
     public String toString() {
-	return getMethodName() + ".(" + Arrays.toString(hasObjectArgs() ?
-            getObjectArgs() : getByteArgs());
+	return getMethodName() + ".(" + (hasObjectArgs() ?
+            Arrays.toString(getObjectArgs()) :
+            Arrays.toString(getByteArgs())) + ")";
     }
 
     // implement MethodRequest
