@@ -47,7 +47,7 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
- *	</b></code>
+ *	</b></code><br>
  *      <i>Default:</i> {@code 600000}
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
@@ -81,10 +81,7 @@ import java.util.logging.Logger;
  * information at the following levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - problems starting the server from {@link
- *	#main main} 
- * <li> {@link Level#INFO INFO} - starting the server from {@code main},
- *	actual port if anonymous port was requested
+ * <li> {@link Level#INFO INFO} - actual port if anonymous port was requested
  * <li> {@link Level#CONFIG CONFIG} - server properties
  * <li> {@link Level#FINE FINE} - allocation transaction IDs, problems
  *	unexporting the server, reaping expired transactions, problems
@@ -136,9 +133,6 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	PACKAGE + ".no.rmi");
-
-    /** Set by main to make sure that the server is reachable. */
-    private static DataStoreServerImpl server;
 
     /** The underlying data store. */
     private final CustomDataStoreImpl store;

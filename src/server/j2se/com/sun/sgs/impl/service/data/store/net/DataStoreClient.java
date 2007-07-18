@@ -51,7 +51,7 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.server.run
- *	</b></code>
+ *	</b></code><br>
  *	<i>Default:</i> <code>false</code>
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
