@@ -1101,6 +1101,8 @@
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.server.dir}/logging.config"/>
+      <!-- Set the java.rmi.server.hostname property to use a
+	   non-standard network interface on the server -->
       <arg file="${test.server.dir}/app.config"/>
       <syspropertyset>
 	<propertyref prefix="test."/>
