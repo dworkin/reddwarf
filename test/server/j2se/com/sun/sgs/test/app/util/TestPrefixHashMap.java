@@ -232,13 +232,96 @@ public class TestPrefixHashMap extends TestCase {
     }
 
 
+    @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] a = new int[12];
+
+// 	System.out.println("\nADDING\n");
+
+	for (int i = 0; i < 12; ++i) {
+	    int j = RANDOM.nextInt();
+	    a[i] = j;
+	    test.put(j, i);
+	    control.put(j, i);
+	}
+
+// 	System.out.println("\nREMOVING\n");
+
+	for (int i = 0; i < 6; i += 2) {
+	    test.remove(a[i]);
+	    control.remove(a[i]);
+	}
+
+// 	System.out.println("\nGETTING ODDS\n");
+
+	for (int i = 0; i < 6; i += 2) {
+	    test.get(a[i]);
+	}
+
+
+// 	System.out.println("\nGETTING EVENS\n");
+
+	for (int i = 1; i < 6; i += 2) {
+	    test.get(a[i]);
+	}
+
+
+// 	System.out.println("\nTESTING\n");
+
+// 	System.out.println("test: " + test);
+// 	System.out.println("control: " + control);
+
+	for (Integer k : control.keySet()) {
+	    assertTrue(test.containsKey(k));
+	    assertTrue(test.containsValue(control.get(k)));
+		       
+	}
+
+
+
+	for (Integer k : test.keySet()) {
+	    assertTrue(control.containsKey(k));
+	    assertTrue(control.containsValue(test.get(k)));		       
+	}
+
+
+// 	System.out.printf("test: %s, size: %d, keyset: %s, values: %s ",
+// 			  test, test.size(), test.keySet(), test.values());
+// 	System.out.print("keyset.itr() = ");
+// 	for (Integer k : test.keySet()) 
+// 	    	System.out.print(k + " ");
+// 	System.out.print("values.itr() = ");
+// 	for (Integer v : test.values()) 
+// 	    	System.out.print(v + " ");
+// 	System.out.println("");
+
+	
+// 	System.out.println("asserting equal keys");
+// 	assertEquals(control.keySet(), test.keySet());
+// 	System.out.println("asserting control.containsAll(test) values");
+// 	assertTrue(control.values().containsAll(test.values()));
+// 	System.out.println("asserting test.containsAll(control) values");
+// 	assertTrue(test.values().containsAll(control.values()));
+// 	System.out.println("asserting equal sizes");
+// 	assertEquals(control.size(), test.size());	
+
+	assertEquals(control, test);
+
+	txn.commit();
+    }
+
+
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 32; ++i) {
+	for (int i = 0; i < 24; ++i) {
 
 	    test.put(i, i);
 	    test.put(~i, ~i);
@@ -246,7 +329,7 @@ public class TestPrefixHashMap extends TestCase {
 	    control.put(~i, ~i);
 	}
 
-	for (int i = 0; i < 32; i += 2) {
+	for (int i = 0; i < 24; i += 2) {
 	    test.remove(i);
 	    control.remove(i);
 	}

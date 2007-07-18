@@ -85,21 +85,23 @@ public class PrefixHashMap<K,V>
 
     private static final long serialVersionUID = 1337;
 
-    // REMINDER: should this be exposed to the applicationd developer?
-    private static final int MERGE_THRESHOLD = 16;
-
     /**
      * The granuality in bytes of the lock size in the persistence
-     * mechanism.  Application developers who want to tune this data
-     * structure should take this into account when deciding how many
-     * elements a leaf table should contain before splitting.
+     * mechanism.  
      */
-    public static final int PERSISTENCE_LOCK_SIZE = 1 << 13;
+    public static final int PERSISTENCE_LOCK_SIZE_BYTES = 8192;
 
     /**
-     * The load factor used when none specified in constructor.
+     * The split factor used when none is specified in the constructor.
      */
-    static final float DEFAULT_LOAD_FACTOR = 1.0f;    
+    private static final float DEFAULT_SPLIT_FACTOR = 1.0f;    
+
+    /**
+     * The split factor used when none is specified in the
+     * constructor.
+     */
+    private static final float DEFAULT_MERGE_FACTOR = .25f;
+
     
     /**
      * The default number of {@code ManagedReference} entries per
@@ -161,9 +163,18 @@ public class PrefixHashMap<K,V>
      * The maximum number of elements in this table before it will
      * split this table into two leaf tables.
      *
-     * @see {@link #split()}
+     * @see #split()
      */
-    private int threshold;
+    private int splitThreshold;
+
+    /**
+     * The minimum number of elements in this table before it will
+     * attempt to merge itself with its sibling.
+     *
+     * @see #merge()
+     */
+    private int mergeThreshold;
+
 
     /**
      * The number of {@code PrefixEntry} at leaf node.
@@ -173,8 +184,19 @@ public class PrefixHashMap<K,V>
     /**
      * The fraction of the leaf capacity that will cause the leaf to
      * split.
+     *
+     * @see #split()
      */
     private final float splitFactor;
+
+    /**
+     * The fraction of the leaf capacity that will cause the leaf to
+     * merge.
+     *
+     * @see #merge()
+     */
+    private final float mergeFactor;
+
     
     /** 
      * Constructs an empty {@code PrefixHashMap} with the specified load
@@ -199,7 +221,9 @@ public class PrefixHashMap<K,V>
 	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
 	this.splitFactor = splitFactor;
-	this.threshold = Math.max((int)(splitFactor * leafCapacity), 1);
+	this.mergeFactor = leafCapacity * DEFAULT_MERGE_FACTOR;
+	this.splitThreshold = Math.max((int)(splitFactor * leafCapacity), 1);
+	this.mergeThreshold = Math.max((int)(splitFactor * leafCapacity), 0);
     }
 
     /** 
@@ -207,7 +231,7 @@ public class PrefixHashMap<K,V>
      * factor (1.0).
      */
     public PrefixHashMap() {
-	this(DEFAULT_LOAD_FACTOR);
+	this(DEFAULT_SPLIT_FACTOR);
     }
 
     /**
@@ -220,7 +244,7 @@ public class PrefixHashMap<K,V>
      * @throws NullPointerException if the provided map is null
      */
     public PrefixHashMap(Map<? extends K, ? extends V> m) {
-	this(DEFAULT_LOAD_FACTOR);
+	this(DEFAULT_SPLIT_FACTOR);
 	if (m == null)
 	    throw new NullPointerException("The provided map is null");
 	putAll(m);
@@ -272,43 +296,22 @@ public class PrefixHashMap<K,V>
      * {@inheritDoc}
      */
     public boolean containsKey(Object key) {
-	int h = (key == null) ? 0 : key.hashCode();
-	return containsKey(key, h, h);
-    }
-
-    /**
-     * Recursively searches for the specified key using the prefix to
-     * select a path in the tree.
-     *
-     * @param key the key to locate
-     * @param hash the hash value of the key
-     * @param prefix the current prefix for the level of the tree at
-     *        the time of the recursive call
-     *
-     * @return whether the key was located
-     */
-    private boolean containsKey(Object key, int hash, int prefix) {
-	if (leftChild == null) { // is leaf 
-	    for (PrefixEntry e = table[indexFor(hash, table.length)]; 
-		 e != null; 
-		 e = e.next) {
-		
-		Object k;
-		if (e.hash == hash && ((k = e.getKey()) == key || 
-				       (k != null && k.equals(key)))) {
-		    return true;
-		}
+	int hash = (key == null) ? 0 : key.hashCode();
+// 	return containsKey(key, hash, hash);
+	
+	Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(prefix);
+	for (PrefixEntry e = leaf.table[indexFor(hash, leaf.table.length)]; 
+	     e != null; 
+	     e = e.next) {
+	    
+	    Object k;
+	    if (e.hash == hash && ((k = e.getKey()) == key || 
+				   (k != null && k.equals(key)))) {
+		return true;
 	    }
-	    return false;
 	}
-	else {
-	    // a leading 1 indicates the left child prefix
-	    PrefixHashMap child = ((prefix & 0x80000000) == 0x80000000) 
-		? leftChild.get(PrefixHashMap.class)
-		: rightChild.get(PrefixHashMap.class);
-		
-	    return child.containsKey(key, hash, prefix << 1);		    
-	}
+	return false;
 
     }
 
@@ -350,11 +353,7 @@ public class PrefixHashMap<K,V>
 	// check that their comibined sizes is less than half of the
 	// split threshold, to ensure we don't split soon after the
 	// merge takes place
-	if ((leftChild_.size + rightChild_.size) / 2 > threshold) {
-//  	    System.out.printf("Comined size (%d/%d) would be too big, not "
-//  			      + " performing merge()\n",
-//  			      (leftChild_.size + rightChild_.size),
-// 			      threshold);
+	if ((leftChild_.size + rightChild_.size) / 2 > splitThreshold) {
 	    return;
 	}
 	    
@@ -376,19 +375,11 @@ public class PrefixHashMap<K,V>
 		e.prefix.shiftRight();
 		addEntry(e, i);
 	    }
-
 	}
-
-//  	System.out.printf("merged %d from the left and %d from the right to"
-//  			  + " %d entries\n",
-//  			  leftChild_.size, rightChild_.size, size);
 
 	// update the remaining family references
 	leftLeaf = leftChild_.leftLeaf;
 	rightLeaf = rightChild_.rightLeaf;
-
-// 	System.out.printf("left leaf: %s, right leaf: %s\n",
-// 			  leftLeaf, rightLeaf);
 	
 	// ensure that the child's neighboring leaf reference now
 	// point to this table
@@ -425,6 +416,10 @@ public class PrefixHashMap<K,V>
      */
     private void split() {
 	    
+	if (leftChild != null) {  // can't split an intermediate node!
+	    return;
+	}
+
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
@@ -439,33 +434,15 @@ public class PrefixHashMap<K,V>
 
 	    // go over each entry in the bucket since each might
 	    // have a different prefix next
-	    for (PrefixEntry<K,V> e = table[i]; e != null;) {
+	    for (PrefixEntry<K,V> e = table[i]; e != null; e = e.next) {
 		
-		// cache this value at the start to keep a reference
-		// to it after we reassign the next pointer when
-		// storing in a child
-		PrefixEntry<K,V> next = e.next;
-		
-		if (e.prefix.leadingBit() == 1) { // 1 == left
-		    PrefixEntry<K,V> prev = leftChild_.table[i];
-		    leftChild_.table[i] = e;
-		    e.next = prev;
-		    leftChild_.size++;
-		}
-		else {
-		    PrefixEntry<K,V> prev = rightChild_.table[i];
-		    rightChild_.table[i] = e;
-		    e.next = prev;
-		    rightChild_.size++;
-		}
-
-		// shift the prefix down, for the next time
-		e.prefix.shiftLeft(); 
-
-		table[i] = null; // null out our entry
-		e = next;
+		e.prefix.shiftLeft(); 		
+		((e.prefix.leadingBit() == 1) ? leftChild_ : rightChild_).
+		    addEntry(e, i);
 	    }
 	}
+
+
 
 	// null out the intermediate node's table as an optimization
 	// to reduce serialization time.
@@ -495,60 +472,49 @@ public class PrefixHashMap<K,V>
 	rightChild_.rightLeaf = rightLeaf;
 	rightChild_.parent = leftChild_.parent;
 
+	// invalidate this node's leaf references
 	leftLeaf = null;
 	rightLeaf = null;
     }
 
-    public V get(Object key) {
-	if (key == null)
-	    return getForNullKey();
-	int h = key.hashCode();
-	return get(key, h, new Prefix(h));
-    }
-
-    // NOTE: we can use the integer prefix here (rather than the
-    //       class Prefix), because we don't need need to store
-    //       the bits in a PrefixEntry
-    private V get(Object key, int hash, Prefix prefix) {
-	if (leftChild == null) { // is leaf 
-	    for (PrefixEntry<K,V> e = table[indexFor(hash, table.length)]; 
-		 e != null; 
-		 e = e.next) {
-		
-		Object k;
-		if (e.hash == hash && 
-		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
-		    return e.getValue();
-		}
-	    }
-	    return null;
-	}
-	else {
-	    // a leading 1 indicates the left child prefix
-	    PrefixHashMap<K,V> child = (prefix.leadingBit() == 1)
-		? leftChild.get(PrefixHashMap.class)
-		: rightChild.get(PrefixHashMap.class);
-	    prefix.shiftLeft();
-	    return child.get(key, hash, prefix);		    
-	}
-    }
-
     /**
-     * An off-loaded version of {@link get(Object)} for the {@code
-     * null} key, specifically added for improving the performance of
-     * the common operation by removing the rare case.
+     * Locates the leaf node that is associated with the provided
+     * prefix.  Upon return, the provided prefix will have been
+     * shifted left according to the depth of the leaf.
      *
-     * @return the value mapped to the {@code null} key, if any
+     * @param prefix the initial prefix for which to search 
+     *
+     * @return the leaf table responsible for storing all entries with
+     *         the specified prefix
      */
-    private V getForNullKey() {
-	PrefixHashMap<K,V> leftMost = leftMost();
-	for (PrefixEntry<K,V> e = leftMost.table[0]; e != null; e = e.next) {
-	    if (e.getKey() == null)
-		return e.getValue();
-	}
-	return null;
+    private PrefixHashMap<K,V> lookup(Prefix prefix) {
+	// a leading 1 indicates the left child prefix
+	PrefixHashMap<K,V> leaf;
+	for (leaf = this; leaf.leftChild != null; 
+	     leaf = (prefix.leadingBit() == 1)
+		 ? leaf.leftChild.get(PrefixHashMap.class)
+		 : leaf.rightChild.get(PrefixHashMap.class))
+	     prefix.shiftLeft();
+	return leaf;
     }
-    
+
+    public V get(Object key) {
+
+ 	int hash = (key == null) ? 0 : key.hashCode();
+ 	Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(prefix);
+	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)]; 
+	     e != null; 
+	     e = e.next) {	    
+	    Object k;
+	    if (e.hash == hash && 
+		((k = e.getKey()) == key || (k != null && k.equals(key)))) {
+		return e.getValue();
+	    }
+	}
+	return null;	
+    }
+
     static int hash(int h) {
 	// This function ensures that hashCodes that differ only
 	// by constant multiples at each bit position have a
@@ -568,68 +534,29 @@ public class PrefixHashMap<K,V>
      * @return the previous value mapped to the provided key, if any
      */
     public V put(K key, V value) {
-	if (key == null)
-	    return putForNullKey(value);
-	int h = key.hashCode();
-	return put(key, value, h, new Prefix(h));
-    }
 
-    /**
-     * Recursively searches the tree for the specified key using the
-     * provided prefix, and then returns the value.  This
-     * implementation uses the hash code as the initial prefix.  At
-     * each recursive call, the prefix is shifted to identify at which
-     * subtree the key may be stored
-     *
-     * @param key the key
-     * @param value the value to be mapped to the key
-     * @param hash the hash code of the key
-     * @param prefix the current prefix at the time of a recursive call.
-     * @return the previous value mapped to the provided key, if any
-     */
-    private V put(K key, V value, int hash, Prefix prefix) {
-	// find the subtable with the appropriate prefix
-	if (leftChild == null) { // is leaf
-	    int i = indexFor(hash, table.length);
-	    for (PrefixEntry<K,V> e = table[i]; e != null; e = e.next) {
-		
-		Object k;
-		if (e.hash == hash && 
-		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
-		    
-		    // if the keys and hash match, swap the values
-		    // and return the old value
-		    return e.setValue(value);
-		}
-	    }
-	    
-	    // we found no key match, so add an entry
-	    addEntry(hash, key, value, i, prefix);
-	    
-	    return null;
-	}
-	else {
-	    PrefixHashMap<K,V> child = (prefix.leadingBit() == 1) 
-		? leftChild.get(PrefixHashMap.class)
-		: rightChild.get(PrefixHashMap.class);
-		
-	    prefix.shiftLeft();
-	    return child.put(key, value, hash, prefix);
-	}
-    }
+	int hash = (key == null) ? 0 : key.hashCode();
+	Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(prefix);
+	AppContext.getDataManager().markForUpdate(leaf);
 
-    /**
-     * An offloaded version of {@code put} that specifically deals
-     * with updating the {@code null} key.
-     */
-    private V putForNullKey(V value) {
-	PrefixHashMap<K,V> leftMost = leftMost();
-	for (PrefixEntry<K,V> e = leftMost.table[0]; e != null; e = e.next) {
-	    if (e.getKey() == null)
+	int i = indexFor(hash, leaf.table.length);
+	for (PrefixEntry<K,V> e = leaf.table[i]; e != null; e = e.next) {
+	    
+	    Object k;
+	    if (e.hash == hash && 
+		((k = e.getKey()) == key || (k != null && k.equals(key)))) {
+		
+		// if the keys and hash match, swap the values
+		// and return the old value
 		return e.setValue(value);
+	    }
 	}
-	leftMost.addEntry(0, null, value, 0, new Prefix(0));
-	return null;
+	    
+	// we found no key match, so add an entry
+	leaf.addEntry(hash, key, value, i, prefix);
+
+	return null;	
     }
 
     /**
@@ -656,18 +583,13 @@ public class PrefixHashMap<K,V>
      * @param prefix the value of the prefix at the time the subtable
      *        was identified.
      */
-    private void addEntry(int hash, K key, V value, int index, 
-			  Prefix prefix) {
+    private void addEntry(int hash, K key, V value, int index, Prefix prefix) {
 	PrefixEntry<K,V> prev = table[index];
-//  	System.out.printf("Added entry for <%s,%s> \tat index %d," +
-//  			  "\twith prefix %32s, \tnext: %s\n",
-//  			  key, value, index, prefix, prev);
-	
 	table[index] = new PrefixEntry<K,V>(hash, key, value, prev, prefix);
 
 	// ensure that the prefix has enough precision to support
 	// another split operation	    
-	if (size++ >= threshold && !prefix.isAtMaximum())
+	if ((size++) >= splitThreshold && !prefix.isAtMaximum())
 	    split();
     }
     
@@ -675,8 +597,8 @@ public class PrefixHashMap<K,V>
      * Copies the values of the specified entry, excluding the {@code
      * PrefixEntry#next} reference, and adds to the the current leaf,
      * but does not perform the size check for splitting.  This should
-     * only be called from {@link #merge()} when adding children
-     * entries.
+     * only be called from {@link #split()} or {@link #merge()} when
+     * adding children entries.
      *
      * @param copy the entry whose fields should be copied and added
      *        as a new entry to this leaf.
@@ -727,109 +649,51 @@ public class PrefixHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-	int h = (key == null) ? 0x0 : key.hashCode();
-	return remove(key, h, h);
-    }
+	int hash = (key == null) ? 0x0 : key.hashCode();
+	Prefix prefix = new Prefix(hash);
 
-    /**
-     * Recursively traverses the tree based on the prefix, then
-     * removes the mapping for the specified key from the final leaf
-     * table with the desired prefix if the mapping is present.
-     *
-     * @param  key key whose mapping is to be removed from the map
-     * @return the previous value associated with <tt>key</tt>, or
-     *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
-     *         (A <tt>null</tt> return can also indicate that the map
-     *         previously associated <tt>null</tt> with <tt>key</tt>.)
-     */
-    private V remove(Object key, int hash, int prefix) {
-	if (leftChild == null) { // leaf node
-	    int i = indexFor(hash, table.length);
-	    PrefixEntry<K,V> e = table[i]; 
-	    PrefixEntry<K,V> prev = e;
-	    while (e != null) {
-		PrefixEntry<K,V> next = e.next;
-		Object k;
-		if (e.hash == hash && 
-		    ((k = e.getKey()) == key || (k != null && k.equals(key)))) {
-			
-		    // remove the value and reorder the chained keys
-		    if (e == prev) // if this was the first element
-			table[i] = next;
-		    else 
-			prev.next = next;
+	PrefixHashMap<K,V> leaf = lookup(prefix);
 
-		    // mark that this table's state has changed
-		    AppContext.getDataManager().markForUpdate(this);
-		    
-		    V v = e.getValue();
-		    
-// 		    if (e.isValueWrapped) {
-// 			AppContext.getDataManager().
-// 			    removeObject(e.valueRef.get(ManagedWrapper.class));
-// 		    }	
-
-		    // if this data structure is responsible for the
-		    // persistence lifetime of the key or value,
-		    // remove them from the datastore
-		    e.unmanage();
-
-// 		    System.out.printf("size: %s, subtree: %s\n", size-1,
-// 				      treeString());
-
-		    // lastly, if the leaf size is less than the size
-		    // threshold, attempt a merge
-		    if (--size < MERGE_THRESHOLD && parent != null) {
-			PrefixHashMap parent_ = parent.get(PrefixHashMap.class);
-  			parent_.merge();
-		    }
-		    
-		    return v;
-		    
-		}		
-		prev = e;
-		e = e.next;
-	    }
-	    return null;
-	}
-	else {
-	    // leading bit of 1 -> left child
-	    PrefixHashMap<K,V> child = ((prefix & 0x80000000) == 0x80000000)
-		? leftChild.get(PrefixHashMap.class)
-		: rightChild.get(PrefixHashMap.class);
+	int i = indexFor(hash, leaf.table.length);
+	PrefixEntry<K,V> e = leaf.table[i]; 
+	PrefixEntry<K,V> prev = e;
+	while (e != null) {
+	    PrefixEntry<K,V> next = e.next;
+	    Object k;
+	    if (e.hash == hash && 
+		((k = e.getKey()) == key || (k != null && k.equals(key)))) {
 		
-	    prefix <<= 1; // shift the leading bit
-	    return child.remove(key, hash, prefix);		
+		// remove the value and reorder the chained keys
+		if (e == prev) // if this was the first element
+		    leaf.table[i] = next;
+		else 
+		    prev.next = next;
+
+		// mark that this table's state has changed
+		AppContext.getDataManager().markForUpdate(leaf);
+		
+		V v = e.getValue();
+		
+		// if this data structure is responsible for the
+		// persistence lifetime of the key or value,
+		// remove them from the datastore
+		e.unmanage();
+		
+		// lastly, if the leaf size is less than the size
+		// threshold, attempt a merge
+		if ((leaf.size--) < mergeThreshold && leaf.parent != null) {
+		    PrefixHashMap parent_ = leaf.parent.get(PrefixHashMap.class);
+		    parent_.merge();
+		}
+		
+		return v;
+		
+	    }		
+	    prev = e;
+	    e = e.next;
 	}
+	return null;
     }
-
-//     /**
-//      * Returns the value contained by this entry and removes the value
-//      * from the data store if it was managed by this map.
-//      *
-//      * @param e the entry to be removed
-//      * @return the value contained by the entry
-//      */
-//     private V removeEntry(PrefixEntry<K,V> e) {
-
-// 	V v = e.getValue();
-
-// 	// see whether this data structure is responsible for the
-// 	// persistence lifetime of the value
-// 	if (e.isValueWrapped) {
-// 	    AppContext.getDataManager().
-// 		removeObject(e.value.get(ManagedWrapper.class));
-// 	}	
-	    
-// 	// if the local size is less than the size
-// 	// threshold, attempt a merge
-// 	if (--size < MERGE_THRESHOLD && parent != null) {
-//  	    PrefixHashMap parent_ = parent.get(PrefixHashMap.class);
-//   	    parent_.merge();
-// 	}
-
-// 	return v;
-//     }
 
     /**
      * Returns the left-most leaf table from this node in the prefix
@@ -859,8 +723,13 @@ public class PrefixHashMap<K,V>
 	if (leftChild == null) {
 	    String s = "(";
 	    for (PrefixEntry e : table) {
-		if (e != null)
-		    s += e;
+		if (e != null) {
+		    do {
+			s += (e + ((e.next == null) ? "" : ", "));
+			e = e.next;
+		    } while (e != null);
+		    s += ", ";
+		}
 	    }
 	    return s + ")";
 	}
@@ -1190,7 +1059,7 @@ public class PrefixHashMap<K,V>
 	 * {@code value}]-&gt;<i>next</i>.
 	 */
 	public String toString() {
-	    return "[" + getKey() + "," + getValue() + "]->" + next;
+	    return getKey() + "=" + getValue();
 	}
 
 	/**
