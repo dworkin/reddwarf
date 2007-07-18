@@ -13,12 +13,20 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -98,11 +106,26 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
 
+    /** The task scheduler. */
+    private final TaskScheduler taskScheduler;
+
+    /** The task owner. */
+    private TaskOwner taskOwner;
+
     /** The data service. */
     private DataService dataService;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
+
+    /** The map of registered nodes, from node ID to node information. */
+    private final Map<Long, NodeImpl> nodeMap = new HashMap<Long, NodeImpl>();
+
+    /** The set of node information, sorted by ping expiration time. */
+    private final SortedSet<NodeImpl> expirationSet = new TreeSet<NodeImpl>();
+
+    /** The thread for checking node expiration times. */
+    private final Thread checkExpirationThread = new CheckExpirationThread();
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -143,6 +166,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
+	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	checkExpirationThread.start();
     }
 
     /** {@inheritDoc} */
@@ -176,6 +201,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    throw new IllegalStateException("already configured");
 		}
 		dataService = registry.getComponent(DataService.class);
+		taskOwner = proxy.getCurrentOwner();
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -197,6 +223,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    shuttingDown = true;
 	}
 	exporter.unexport();
+	checkExpirationThread.interrupt();
 	return true;
     }
     
@@ -204,23 +231,72 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>This implementation assumes that it will not receive a ping
+     * for the same node while it is registering that node.
      */
     public long registerNode(long nodeId, String hostname) throws IOException {
-	throw new AssertionError("not implemented");
+	checkState();
+	NodeImpl node;
+	synchronized (nodeMap) {
+	    node = nodeMap.get(nodeId);
+	    if (node != null) {
+		throw new NodeExistsException(
+		    "node already registered: " + nodeId);
+	    }
+	    node = new NodeImpl(nodeId, hostname, true, calculateExpiration());
+	    nodeMap.put(nodeId, node);
+	}
+	synchronized (expirationSet) {
+	    expirationSet.add(node);
+	}
+
+	// TBI: node needs to be put in the data service...
+	return pingInterval;
     }
 
     /**
      * {@inheritDoc}
+     *
+     * <p>This implementation assumes that it will not receive a ping
+     * for the same node while it is processing a ping for that node.
      */
-    public boolean ping(long nodeId) throws IOException {  
-	throw new AssertionError("not implemented");
-   }
+    public boolean ping(long nodeId) throws IOException {
+	checkState();
+	NodeImpl node;
+	synchronized (nodeMap) {
+	    node = nodeMap.get(nodeId);
+	    if (node == null) {
+		return false;
+	    }
+	}
 
+	synchronized (expirationSet) {
+	    if (!node.isAlive()) {
+		return false;
+	    } else {
+		// update ping expiration time in sorted set...
+		expirationSet.remove(node);
+		node.setExpiration(calculateExpiration());
+		expirationSet.add(node);
+	    }
+	    return true;
+	}
+    }
+    
     /**
      * {@inheritDoc}
      */
-    public boolean isAlive(long nodeId) throws IOException { 
-	throw new AssertionError("not implemented");
+    public boolean isAlive(long nodeId) throws IOException {
+	checkState();
+	synchronized (nodeMap) {
+	    NodeImpl node = nodeMap.get(nodeId);
+	    if (node == null) {
+		return false;
+	    } else {
+		return node.isAlive();
+	    }
+	}
     }
 
     /* -- other methods -- */
@@ -243,36 +319,92 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     void reset() {
 	dataService = null;
     }
-    
-    /*
-    private void runTransactionally(Task task) throws Exception {
-	// TBD: should this check to see if there is already a
-	// transaction set?
-	TransactionHandle handle = txnCoordinator.createTransaction(true);
-	Transaction txn = handle.getTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	try {
-	    task.run();
-	    handle.commit();
-	    return;
-	    
-	} catch (Throwable t) {
-	    try {
-		txn.abort(t);
-	    } catch (TransactionNotActiveException e) {
-		// ignore; transaction already aborted
-	    }
 
-	    if (t instanceof Exception) {
-		throw (Exception) t;
-	    } else if (t instanceof Error) {
-		throw (Error) t;
-	    }
-	    
-	} finally {
-	    txnProxy.setCurrentTransaction(null);
+    /**
+     * Runs the specified {@code task} within a transaction.
+     */
+    private void runTransactionally(KernelRunnable task) throws Exception {
+	try {
+	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+	} catch (Exception e) {
+	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
 	}
     }
 
-    */
+    /**
+     * Throws {@code IllegalStateException} if this service is not
+     * configured or is shutting down.
+     */
+    private void checkState() {
+	synchronized (lock) {
+	    if (dataService == null) {
+		throw new IllegalStateException("service not configured");
+	    } else if (shuttingDown) {
+		throw new IllegalStateException("service shutting down");
+	    }
+	}
+    }
+    
+    /**
+     * Returns {@code true} if this server is shutting down.
+     */
+    private boolean shuttingDown() {
+	synchronized (lock) {
+	    return shuttingDown;
+	}
+    }
+
+    /**
+     * Returns an expiration time based on the current time.
+     */
+    private long calculateExpiration() {
+	return System.currentTimeMillis() + pingInterval;
+    }
+
+    /**
+     * This thread checks the node map, sorted by expiration times to
+     * determine if any nodes have failed and updates their state
+     * accordingly.
+     */
+    private final class CheckExpirationThread extends Thread {
+
+	/** Constructs an instance of this class as a daemon thread. */
+	CheckExpirationThread() {
+	    super(CLASSNAME + "$CheckExpirationThread");
+	    setDaemon(true);
+	}
+
+	/**
+	 * Wakes up periodically to detect failed nodes and update
+	 * state accordingly.
+	 */
+	public void run() {
+
+	    while (!shuttingDown()) {
+
+		NodeImpl expirationNode =
+		    new NodeImpl(0, null, false, System.currentTimeMillis());
+		synchronized (expirationSet) {
+		    SortedSet<NodeImpl> expiredNodes =
+			expirationSet.headSet(expirationNode);
+		    if (! expiredNodes.isEmpty()) {
+			for (NodeImpl node : expiredNodes) {
+			    node.setFailed();
+			    // TBI: update node state in data service...
+			}
+			expiredNodes.clear();
+		    }
+		}
+
+		long sleepTime =
+		    expirationSet.isEmpty() ?
+		    pingInterval :
+		    expirationSet.first().getExpiration();
+		try {
+		    Thread.currentThread().sleep(sleepTime);
+		} catch (InterruptedException e) {
+		}
+	    }
+	}
+    }
 }

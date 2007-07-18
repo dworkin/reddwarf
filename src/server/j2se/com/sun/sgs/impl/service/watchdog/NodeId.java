@@ -5,7 +5,7 @@
 package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.service.DataService;
 import java.io.Serializable;
 
@@ -57,7 +57,7 @@ final class NodeId implements ManagedObject, Serializable {
 	NodeId nodeId;
 	try {
 	    nodeId = dataService.getServiceBinding(NODE_ID_KEY, NodeId.class);
-	} catch (ObjectNotFoundException e) {
+	} catch (NameNotBoundException e) {
 	    nodeId = new NodeId();
 	    dataService.setServiceBinding(NODE_ID_KEY, nodeId);
 	}

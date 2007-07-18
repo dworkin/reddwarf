@@ -4,9 +4,9 @@
 
 package com.sun.sgs.test.impl.service.watchdog;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
@@ -18,10 +18,10 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-
 
 import java.io.File;
 import java.util.Properties;
@@ -40,7 +40,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** Directory used for database shared across multiple tests. */
     private static final String DB_DIRECTORY =
         System.getProperty("java.io.tmpdir") + File.separator +
-	"TestWatchdogServerImpl.db";
+	"TestWatchdogServiceImpl.db";
 
     /** The port for the watchdog server. */
     private static int WATCHDOG_PORT = 0;
@@ -67,6 +67,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private DummyTransaction txn;
     private DataServiceImpl dataService;
     private TaskServiceImpl taskService;
+    private WatchdogServiceImpl watchdogService;
 
     /** True if test passes. */
     private boolean passed;
@@ -94,6 +95,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	// create services
 	dataService = createDataService(systemRegistry);
 	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
+	watchdogService = new WatchdogServiceImpl(serviceProps, systemRegistry);
 	//identityManager = new DummyIdentityManager();
 	//systemRegistry.setComponent(IdentityManager.class, identityManager);
 	createTransaction(10000);
@@ -113,7 +115,15 @@ public class TestWatchdogServiceImpl extends TestCase {
         serviceRegistry.setComponent(TaskManager.class, taskService);
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-	//serviceRegistry.registerAppContext();
+
+	// configure watchdog service
+	watchdogService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(WatchdogService.class, watchdogService);
+	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
+	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
+	serviceRegistry.setComponent(
+	    WatchdogServiceImpl.class, watchdogService);
+	commitTransaction();
     }
 
     /** Sets passed if the test passes. */
@@ -144,6 +154,10 @@ public class TestWatchdogServiceImpl extends TestCase {
             dataService.shutdown();
             dataService = null;
         }
+	if (watchdogService != null) {
+	    watchdogService.shutdown();
+	    watchdogService = null;
+	}
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
@@ -213,7 +227,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
     
-    public void testConstructorStartServerPingIntervalTooSmall() throws Exception {
+    public void testConstructorStartServerPingIntervalTooSmall()
+	throws Exception
+    {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerClassName + ".start", "true",
@@ -227,7 +243,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testConstructorStartServerPingIntervalTooLarge() throws Exception {
+    public void testConstructorStartServerPingIntervalTooLarge()
+	throws Exception
+    {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerClassName + ".start", "true",
@@ -240,6 +258,57 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
+
+    /* -- Test configure -- */
+
+    public void testConfigureNullRegistry() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	try {
+	    watchdog.configure(null, new DummyTransactionProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureNullTransactionProxy() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	try {
+	    watchdog.configure(new DummyComponentRegistry(), null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureTwice() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	try {
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureAbortConfigure() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	abortTransaction(null);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+    }
+
     /* -- other methods -- */
     
     /** Creates a property list with the specified keys and values. */

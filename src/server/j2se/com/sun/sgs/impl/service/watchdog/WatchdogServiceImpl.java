@@ -113,7 +113,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final String appName;
 
     /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
     private NonDurableTaskScheduler nonDurableTaskScheduler;
@@ -303,11 +303,13 @@ public class WatchdogServiceImpl implements WatchdogService {
 	if (aliveStatus == false || !checkTransactionally) {
 	    return aliveStatus;
 	} else {
-	    aliveStatus = NodeImpl.getNode(dataService, localNodeId).isAlive();
-	    if (aliveStatus == false) {
+	    Node node = NodeImpl.getNode(dataService, localNodeId);
+	    if (node == null || node.isAlive() == false) {
 		setFailed();
+		return false;
+	    } else {
+		return true;
 	    }
-	    return aliveStatus;
 	}
     }
 
@@ -320,7 +322,11 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** {@inheritDoc} */
     public Node getNode(long nodeId) {
 	checkState();
-	return NodeImpl.getNode(dataService, nodeId);
+	Node node = NodeImpl.getNode(dataService, nodeId);
+	return
+	    node != null ?
+	    node :
+	    new NodeImpl(nodeId, null, false, 0);
     }
 
     /** {@inheritDoc} */
@@ -417,7 +423,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * Registers the node with the watchdog server, and sends
 	 * periodic pings.  This thread terminates if the node is no
 	 * longer considered alive or if the watchdog service is
-	 * shutdown,
+	 * shutdown.
 	 */
 	public void run() {
 
@@ -546,7 +552,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 	}
 
-	final Node node = new NodeImpl(localNodeId, localHost, false);
+	final Node node = new NodeImpl(localNodeId, localHost, false, 0);
 	for (NodeListener listener : listenersToNotify) {
 	    final NodeListener nodeListener = listener;
 	    nonDurableTaskScheduler.scheduleNonTransactionalTask(
