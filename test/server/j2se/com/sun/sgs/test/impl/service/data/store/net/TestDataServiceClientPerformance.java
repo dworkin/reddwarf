@@ -65,7 +65,6 @@ public class TestDataServiceClientPerformance
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			  DataStoreClientClassName);
-	System.err.println(props);
 	return new DataServiceImpl(props, componentRegistry);
     }
 }

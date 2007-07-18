@@ -1070,7 +1070,6 @@
 	  description="Runs the data store network server">
     <property name="test.server.dir"
 	      location="${build.dir}/test/data-store-network-server"/>
-    <property name="test.server.host" value="localhost"/>
     <property name="test.server.level" value="INFO"/>
     <delete dir="${test.server.dir}"/>
     <mkdir dir="${test.server.dir}"/>
@@ -1081,7 +1080,7 @@
       com.sun.sgs.app.port = 0
       com.sun.sgs.app.listener = NONE
       com.sun.sgs.app.finalService = DataService
-      com.sun.sgs.impl.service.data.store.net.server.host = ${test.server.host}
+      com.sun.sgs.impl.service.data.store.net.server.host = localhost
       com.sun.sgs.impl.service.data.store.net.server.run = true
       com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class = \
         com.sun.sgs.impl.service.data.store.net.DataStoreClient

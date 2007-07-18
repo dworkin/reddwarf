@@ -233,7 +233,7 @@ public final class DataStoreClient
      *		property is not a valid integer greater than zero, or if the
      *		value of the {@code
      *		com.sun.sgs.impl.service.data.store.net.server.port}
-     *		property is not a valid integer greater than {@code 0} and not
+     *		property is not a valid integer not less than {@code 0} and not
      *		greater than {@code 65535}
      * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the Java RMI
