@@ -149,8 +149,8 @@ public class StandardProperties {
         DataService,
         /** Enumeration for the Watchdog Service. */
         WatchdogService,
-        /** Enumeration for the Registration Service. */
-        RegistrationService,
+        /** Enumeration for the Node Mapping Service. */
+        NodeMappingService,
         /** Enumeration for the Task Service. */
         TaskService,
         /** Enumeration for the Client Session Service. */
