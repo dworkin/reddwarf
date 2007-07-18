@@ -748,7 +748,7 @@ class Kernel {
                     kernel.startupApplication(appProperties);
                 } catch (Exception e) {
                     if (logger.isLoggable(Level.SEVERE))
-                        logger.logThrow(Level.SEVERE, e, "{0}: startup failed ",
+                        logger.logThrow(Level.SEVERE, e, "{0}: startup failed",
                                         appName);
                 }
             }
