@@ -196,10 +196,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
-        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
-        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
-        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
+        Inc. All rights reserved<br>Use is subject to license terms. </font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -227,7 +224,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved</font>]]>
+        Inc. All rights reserved<br>Use is subject to license terms.</font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -258,7 +255,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved</font>]]>
+        Inc. All rights reserved<br>Use is subject to license terms.</font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -308,6 +305,7 @@
 	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client-src"/>
     <copy file="etc/README-client-source"
 	  tofile="${build.dir}/sgs-client-src/README">
       <filterset>
@@ -356,7 +354,10 @@
 	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client"/>
+    <copy todir="${build.dir}/sgs-client">
+      <fileset file="etc/NOTICE.txt"/>
+      <fileset file="etc/THIRDPARTYLICENSE"/>
+    </copy>
     <copy file="etc/README-client-binary"
 	  tofile="${build.dir}/sgs-client/README">
       <filterset>
@@ -397,6 +398,7 @@
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
@@ -422,7 +424,10 @@
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs"/>
+    <copy todir="${build.dir}/sgs">
+      <fileset file="etc/NOTICE.txt"/>
+      <fileset file="etc/THIRDPARTYLICENSE"/>
+    </copy>
     <copy file="etc/README-server-binary" tofile="${build.dir}/sgs/README">
       <filterset>
 	<filter token="VERSION" value="${project.version}"/>
