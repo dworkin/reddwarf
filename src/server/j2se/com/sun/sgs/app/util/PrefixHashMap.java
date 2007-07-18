@@ -40,6 +40,36 @@ import com.sun.sgs.app.ManagedReference;
  * be responsible for the lifetime of all {@link ManagedObject} stored
  * in this map.
  * 
+ * The {@code PrefixHashMap} is implemented as a prefix tree of hash
+ * maps, which provides {@code O(log(n))} performance for the
+ * following operations: {@code get}, {@code put}, {@code remove},
+ * {@code containsKey}, where {@code n} is the number of leaves in the
+ * tree (<i>not</i> the number of elements).  Note that unlike most
+ * collections, the {@code size} operation is <u>not</u> a constant
+ * time operation.  Because of the concurrent nature of the map,
+ * determining the size requires accessing all of the leaf nodes in
+ * the tree, which takes {@code O(n + log(n))}, where {@code n} is the
+ * number of leaves.  The {@code isEmpty} operation, however, is still
+ * {@code O(1)}.
+ *
+ * An instance of {@code PrefixHashMap} offers one parameters for
+ * performance tuning: {@code splitFactor}.  The {@code splitFactor}
+ * determines at what size to divide a leaf table in the prefix tree
+ * into two separate tables.  This parameter is similar to the {@code
+ * loadFactor} parameter in {@code HashMap}, except that a division in
+ * a leaf node is strictly local and require no tree-global locks.
+ *
+ * As a general rule, the default {@code splitFactor} (1.0) provides a
+ * good tradeoff between datastore contention and serialization
+ * cost. Developers may find that performance for highly contended
+ * maps may improve if the {@code splitFactor} is lowered, thereby
+ * increasing the number of leaves, but also increasing the locality
+ * of updates.
+ *
+ * This class implements all of the optional {@code Map} operations
+ * and supports both {@code null} keys and values.  This map provides
+ * no guarantees on the order of elements when iterating over the key
+ * set, values or entry set.
  * 
  * The iterator for this implemenation will never throw a {@link
  * ConcurrentModificationException}, unlike many of the other {@code
@@ -55,7 +85,7 @@ public class PrefixHashMap<K,V>
 
     private static final long serialVersionUID = 1337;
 
-    // REMINDER: remove me
+    // REMINDER: should this be exposed to the applicationd developer?
     private static final int MERGE_THRESHOLD = 16;
 
     /**
@@ -144,67 +174,58 @@ public class PrefixHashMap<K,V>
      * The fraction of the leaf capacity that will cause the leaf to
      * split.
      */
-    private final float loadFactor;
-
+    private final float splitFactor;
+    
     /** 
-     * Constructs an empty {@code PrefixHashMap} with the specified
-     * load factor and specified leaf capacity.  This constructor
-     * should be used with reservation, only for advance tuning where
-     * the memory overhead of the key set has been determined.  For
-     * optimal performace, all of the key sould fit within the memory
-     * granularity of the peristence mechanism's lock.  This size is
-     * exposed to the developer as {@link #PERSISTENCE_LOCK_SIZE}.
+     * Constructs an empty {@code PrefixHashMap} with the specified load
+     * factor.
      *
-     * @param loadFactor the fraction of the leaf capacity which will
+     * @param splitFactor the fraction of the leaf capacity which will
      *        cause the leaf to split
-     * @param leafCapacity the size of each of the leaf tables
      *
      * @throws IllegalArgumentException if the load factor is non positive
-     * @throws IllegalArgumentException if the leaf capacity is non positive
-     *
-     * @see #PERSISTENCE_LOCK_SIZE
      */
-    public PrefixHashMap(float loadFactor, int leafCapacity) {
-	if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
-	    throw new IllegalArgumentException("Illeal load factor: " + 
-					      loadFactor);
+    public PrefixHashMap(float splitFactor) {
+	if (splitFactor <= 0) {
+	    throw new IllegalArgumentException("Illegal split factor: " + 
+					      splitFactor);	    
 	}
-	if (leafCapacity <= 0) {
-	    throw new IllegalArgumentException("Illeal leaf capacity: " + 
-					      leafCapacity);	    
-	}
-	table = new PrefixEntry[leafCapacity];
 	size = 0;
 	parent = null;
 	leftLeaf = null;
 	rightLeaf = null;
 	leftChild = null;
 	rightChild = null;
-	this.leafCapacity = leafCapacity;
-	this.loadFactor = loadFactor;
-	this.threshold = (int)(loadFactor * leafCapacity);
-    }
-    
-    /** 
-     * Constructs an empty {@code PrefixHashMap} with the specified load
-     * factor and default leaf capacity (512).
-     *
-     * @param loadFactor the fraction of the leaf capacity which will
-     *        cause the leaf to split
-     *
-     * @throws IllegalArgumentException if the load factor is non positive
-     */
-    public PrefixHashMap(float loadFactor) {
-	this(loadFactor, DEFAULT_LEAF_CAPACITY);
+	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
+	table = new PrefixEntry[leafCapacity];
+	this.splitFactor = splitFactor;
+	this.threshold = Math.max((int)(splitFactor * leafCapacity), 1);
     }
 
     /** 
      * Constructs an empty {@code PrefixHashMap} with the default load
-     * factor (1.0) and default leaf capacity (512).
+     * factor (1.0).
      */
     public PrefixHashMap() {
-	this(DEFAULT_LOAD_FACTOR, DEFAULT_LEAF_CAPACITY);
+	this(DEFAULT_LOAD_FACTOR);
     }
+
+    /**
+     * Constructs a new {@code PrefixHashMap} with the same mappings
+     * as the specified {@code Map}, and the default {@code
+     * splitFactor} (1.0).
+     *
+     * @param m the mappings to include
+     *
+     * @throws NullPointerException if the provided map is null
+     */
+    public PrefixHashMap(Map<? extends K, ? extends V> m) {
+	this(DEFAULT_LOAD_FACTOR);
+	if (m == null)
+	    throw new NullPointerException("The provided map is null");
+	putAll(m);
+    }
+
 
     /**
      * Clears the map of all entries in {@code O(n log(n))} time.
@@ -247,11 +268,25 @@ public class PrefixHashMap<K,V>
 	}
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean containsKey(Object key) {
-	int h = key.hashCode();
+	int h = (key == null) ? 0 : key.hashCode();
 	return containsKey(key, h, h);
     }
 
+    /**
+     * Recursively searches for the specified key using the prefix to
+     * select a path in the tree.
+     *
+     * @param key the key to locate
+     * @param hash the hash value of the key
+     * @param prefix the current prefix for the level of the tree at
+     *        the time of the recursive call
+     *
+     * @return whether the key was located
+     */
     private boolean containsKey(Object key, int hash, int prefix) {
 	if (leftChild == null) { // is leaf 
 	    for (PrefixEntry e = table[indexFor(hash, table.length)]; 
@@ -277,6 +312,9 @@ public class PrefixHashMap<K,V>
 
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean containsValue(Object value) {
 	// short circuit for empty maps
 	if (size() == 0) 
@@ -331,40 +369,14 @@ public class PrefixHashMap<K,V>
 
  	    for (PrefixEntry<K,V> e = leftChild_.table[i]; e != null; e = e.next) {
 		e.prefix.shiftRight();
-// 		addEntry(e.hash, e.key, e.value, i, e.prefix, 
-// 			 e.isValueWrapped);
 		addEntry(e, i);
 	    }
 
  	    for (PrefixEntry<K,V> e = rightChild_.table[i]; e != null; e = e.next) {
 		e.prefix.shiftRight();
-// 		addEntry(e.hash, e.key, e.value, i, e.prefix, 
-// 			 e.isValueWrapped);
 		addEntry(e, i);
 	    }
 
-// 	    // add all entries from the left child first
-// 	    for (PrefixEntry e = leftChild_.table[i]; e != null; e = e.next) {
-// 		e.prefix.shiftRight();
-// 		size++;
-// 	    }
-// 	    table[i] = leftChild_.table[i];
-
-// 	    // keep track of the last entry for the right child's
-// 	    // bucket so that the previous entries can be chained on
-// 	    // from here
-// 	    PrefixEntry last = null;
-// 	    for (PrefixEntry e = rightChild_.table[i]; e != null; e = e.next) {
-// 		e.prefix.shiftRight();
-// 		last = e;
-// 		size++;
-// 	    }
-
-// 	    // if the right child had entries, update the last entry
-// 	    // to point to the old start
-// 	    if (last != null) 
-// 		last.next = table[i];    
-// 	    table[i] = rightChild_.table[i];
 	}
 
 //  	System.out.printf("merged %d from the left and %d from the right to"
@@ -401,15 +413,25 @@ public class PrefixHashMap<K,V>
 	dataManager.removeObject(rightChild_);
     }	
 
+    /**
+     * Divides the entires in this node into two leaf nodes on the
+     * basis of prefix, and then marks this node as an intermediate
+     * node.  This method should only be called when the entries
+     * contained within this node have valid prefix bits remaining
+     * (i.e. they have not already been shifted to the maximum
+     * possible precision).
+     *
+     * @see #addEntry(int,Object,Object,int,Prefix)
+     */
     private void split() {
 	    
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
 	PrefixHashMap<K,V> leftChild_ = 
-	    new PrefixHashMap<K,V>(loadFactor, table.length);
+	    new PrefixHashMap<K,V>(splitFactor);
 	PrefixHashMap<K,V> rightChild_ = 
-	    new PrefixHashMap<K,V>(loadFactor, table.length);
+	    new PrefixHashMap<K,V>(splitFactor);
 
 	// iterate over all the entries in this table and assign
 	// them to either the right child or left child
@@ -667,41 +689,32 @@ public class PrefixHashMap<K,V>
     }
     
     /**
-     * Returns whether this map has no mappings in {@code O(1)} time.
+     * Returns whether this map has no mappings.  This implemenation
+     * runs in {@code O(1)} time.
      */
     public boolean isEmpty() {
 	return leftChild != null || size == 0;
     }
      
      /**
-     *  Returns the size of the tree in {@code n + log(n)} time.
+     *  Returns the size of the tree.  Note that this implementation
+     *  runs in {@code O(n + n*log(n))} time, where {@code n} is the
+     *  number of nodes in the tree (<i>not</i> the number of elements).
      *
      * @return the size of the tree
      */
     public int size() {
-// 	if (leftChild == null)
-// 	    return size;
 
-// 	int totalSize = 0;
-// 	PrefixHashMap m = leftMost();
-//  	totalSize += m.size;
-//  	for (; m.rightLeaf != null; m = m.rightLeaf.get(PrefixHashMap.class)) {
-//  	    totalSize += m.size;
-// 	}
-//  	return totalSize;
-	
-
- 	if (leftChild == null) { // leaf node, short-circuit case
+ 	if (leftChild == null) // leaf node, short-circuit case
  	    return size;
- 	}
- 	else {
- 	    // iterate over the keyset, which is faster than querying
- 	    // all the children
- 	    int totalSize = 0;
- 	    for (K k : keySet())
- 		totalSize++;
- 	    return totalSize;
- 	}
+
+ 	int totalSize = 0;
+ 	PrefixHashMap cur = leftMost();
+  	totalSize += cur.size;
+  	while(cur.rightLeaf != null)
+	    totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
+	
+  	return totalSize;
     }
 
     /**
