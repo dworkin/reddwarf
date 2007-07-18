@@ -137,29 +137,28 @@ public class TestPrefixHashMap extends TestCase {
 
     }
 
-    @Test public void testConstructorTwoArg() {
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(.3f,4);
+    @Test public void testCopyConstructor() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	for (int i = 0; i < 32; ++i) 
+	    control.put(i,i);
+	Map<Integer,Integer> test =
+	    new PrefixHashMap<Integer,Integer>(control);
+	assertEquals(control, test);
+	txn.commit();
     }
 
-    // one arg calls the two arg with the error cases above, so no
-    // need to recheck
     
-    @Test (expected=IllegalArgumentException.class)
-	public void testConstructorTwoArgException() {
-	try {
-	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(.3f,0);
+    @Test (expected=NullPointerException.class)
+ 	public void testNullCopyConstructor() {
+ 	try {
+ 	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(null);
+ 	}
+ 	catch(NullPointerException npe) { 
+	    return;
 	}
-	catch(IllegalArgumentException iae) { }
-
-    }
-
-    @Test (expected=IllegalArgumentException.class)
-	public void testConstructorTwoArgException2() {
-	try {
-	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(.3f,-1);
-	}
-	catch(IllegalArgumentException iae) { }
-	
+	assertTrue(false);
     }
     
 
@@ -193,24 +192,16 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndGetOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/256);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 32; ++count) {
 	    int i = RANDOM.nextInt();
 	    test.put(i, i);
-	    test.put(~i, ~i);
 	    control.put(i,i);
-	    control.put(~i, ~i);
 	}
 
-// 	System.out.printf("test size: %d, control size: %d\n",
-// 			  test.size(), control.size());
-	
-
-	for (Integer k : control.keySet()) {
-	    assertEquals(control.get(k), test.get(k));
-	}
+	assertEquals(control, test);    
 
         txn.commit();
     }
@@ -235,11 +226,7 @@ public class TestPrefixHashMap extends TestCase {
 	    control.remove(i);
 	}
 
-	for (Integer k : control.keySet()) {
-	    assertEquals(control.get(k), test.get(k));
-	}
-
-	assertEquals(control.size(), test.size());
+	assertEquals(control, test);
 	
         txn.commit();
     }
@@ -248,7 +235,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 32; ++i) {
@@ -259,7 +246,7 @@ public class TestPrefixHashMap extends TestCase {
 	    control.put(~i, ~i);
 	}
 
-	for (int i = 0; i < 128; i += 2) {
+	for (int i = 0; i < 32; i += 2) {
 	    test.remove(i);
 	    control.remove(i);
 	}
@@ -272,7 +259,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree2() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,8);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[100];
@@ -297,7 +284,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree3() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,15);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[25];
@@ -322,7 +309,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree4() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,5);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -345,10 +332,24 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
+
+    @Test public void testPutAll() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	 for (int i = 0; i < 32; ++i) 
+	     control.put(i,i);
+	 Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	 test.putAll(control);
+	 assertEquals(control, test);
+	 txn.commit();
+     }
+
+
     @Test public void testNullPut() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f,15);
+	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f/128);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -362,7 +363,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullGet() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f,15);
+	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f/128);
 
 	test.put(null, 0);
 	assertEquals(new Integer(0), test.get(null));
@@ -373,7 +374,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f,15);
+	Map<String,Integer> test = new PrefixHashMap<String,Integer>(1f/128);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -393,7 +394,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testClear() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,5);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -418,7 +419,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,5);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -520,7 +521,7 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
 
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -545,7 +546,7 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,5);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 
 	assertEquals(0, test.size());
 
@@ -574,7 +575,8 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	PrefixHashMap<Integer,Integer> test = 
+	    new PrefixHashMap<Integer,Integer>(1f/128);
 
 	assertEquals(0, test.size());
 
@@ -630,7 +632,8 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	PrefixHashMap<Integer,Integer> test = 
+	    new PrefixHashMap<Integer,Integer>(1f/128);
 	HashMap<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
@@ -744,7 +747,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testKeyIteratorOnSplitMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -793,7 +796,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testValuesIteratorOnSplitMap() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f,4);
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1f/128);
 	Set<Integer> control = new HashSet<Integer>();
 	
 	
