@@ -382,7 +382,7 @@ public class ScriptingCommand {
                 tagName = args[0];
                 
                 try {
-                    taskType = Enum.valueOf(CustomTaskType.class, args[1]);
+                    taskType = Enum.valueOf(CustomTaskType.class, args[1].toUpperCase());
                 } catch (IllegalArgumentException e) {
                     throw new ParseException("Invalid " + type + " argument, " +
                         " not recognized: " + args[1] + ".  Should be one of: " +
