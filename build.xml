@@ -320,7 +320,9 @@
       <fileset dir="${build.dir}/sgs-client-src" includes="**/*.java"/>
     </apply>
     <delete>
-      <fileset dir="${build.dir}/sgs-client-src" includes="**/*~"/>
+      <fileset dir="${build.dir}/sgs-client-src"
+	       defaultexcludes="no"
+	       includes="**/*~"/>
     </delete>
     <zip destfile="${build.dir}/sgs-client-src-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-client-src"
