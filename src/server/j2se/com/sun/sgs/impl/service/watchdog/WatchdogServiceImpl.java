@@ -429,7 +429,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 	    try {
 		pingInterval = serverProxy.registerNode(localNodeId, localHost);
-	    } catch (IOException e) {
+	    } catch (Exception e) {
 
 		/*
 		 * Unable to register node with watchdog server, so
@@ -480,12 +480,16 @@ public class WatchdogServiceImpl implements WatchdogService {
 			Math.max(renewInterval / 2, MIN_RENEW_INTERVAL);
 		}
 	    }
-
 	}
     }
 
     /* -- other methods -- */
 
+    /**
+     * Returns the server.
+     *
+     * @return	the server
+     */
     public WatchdogServerImpl getServer() {
 	return serverImpl;
     }

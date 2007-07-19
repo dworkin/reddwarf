@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -142,12 +143,23 @@ class NodeImpl
     }
 
     /**
-     * Stores this instance in the specified {@code dataService} if it
-     * is not already there, otherwise updates the node's state in the
-     * data service.  This method should only be called within a
-     * transaction.
+     * Stores this instance in the specified {@code dataService}.
+     * this method should only be called within a transaction.
      *
      * @param	dataService a data service
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void putNode(DataService dataService) {
+	dataService.setServiceBinding(getNodeKey(id), this);
+    }
+    /**
+     * Updates the node's state in the specified {@code dataService}.
+     * This method should only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @throws	ObjectNotFoundException if this node was not already
+     *		bound in the data service
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
@@ -155,12 +167,10 @@ class NodeImpl
 	
 	NodeImpl node = getNode(dataService, id);
 	if (node == null) {
-	    dataService.markForUpdate(this);
-	    dataService.setServiceBinding(getNodeKey(id), this);
+	    throw new ObjectNotFoundException("node not found: " + id);
 	} else {
 	    dataService.markForUpdate(node);
 	    node.isAlive = isAlive;
-	    node.expiration = expiration;
 	}
     }
 

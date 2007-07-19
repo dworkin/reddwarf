@@ -28,8 +28,11 @@ public interface WatchdogServer extends Remote {
      * 		invoking this method
      * @throws	NodeExistsException if a node with the specified
      *		{@code nodeId} has already been registered
+     * @throws	NodeRegistrationFailedException if there is a problem
+     * 		registering the node
      */
-    long registerNode(long nodeId, String hostname) throws IOException;
+    long registerNode(long nodeId, String hostname)
+	throws IOException;
 
     /**
      * Notifies this watchdog that the node with the specified {@code

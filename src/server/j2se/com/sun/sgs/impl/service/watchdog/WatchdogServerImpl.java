@@ -4,13 +4,9 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
-import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -18,7 +14,6 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
@@ -131,10 +126,15 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServerImpl class documentation} for a list
      * of supported properties.
+     *
+     * @param	properties server properties
+     * @param	systemRegistry the system registry
+     *
+     * @throws	IOException if there is a problem exporting the server
      */
     public WatchdogServerImpl(Properties properties,
 			      ComponentRegistry systemRegistry)
-	throws IOException, Exception
+	throws IOException
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
 		   properties);
@@ -251,7 +251,26 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    expirationSet.add(node);
 	}
 
-	// TBI: node needs to be put in the data service...
+	/*
+	 * Persist node, and back out registration if storing the node fails.
+	 */
+	try {
+	    final NodeImpl newNode = node;
+	    runTransactionally(new AbstractKernelRunnable() {
+		public void run() {
+		    newNode.putNode(dataService);
+		}});
+	} catch (Exception e) {
+	    synchronized (nodeMap) {
+		nodeMap.remove(nodeId);
+	    }
+	    synchronized (expirationSet) {
+		expirationSet.remove(node);
+	    }
+	    throw new NodeRegistrationFailedException(
+		"registration failed: " + nodeId, e);
+	}
+	
 	return pingInterval;
     }
 
@@ -322,12 +341,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**
      * Runs the specified {@code task} within a transaction.
+     *
+     * @param	task a task
+     * @throws	Exception if there is a problem running the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
 	try {
 	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
 	} catch (Exception e) {
 	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
+	    throw e;
 	}
     }
 
@@ -389,8 +412,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			expirationSet.headSet(expirationNode);
 		    if (! expiredNodes.isEmpty()) {
 			for (NodeImpl node : expiredNodes) {
-			    node.setFailed();
-			    // TBI: update node state in data service...
+			    setFailed(node);
 			}
 			expiredNodes.clear();
 		    }
@@ -404,6 +426,25 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    Thread.currentThread().sleep(sleepTime);
 		} catch (InterruptedException e) {
 		}
+	    }
+	}
+
+	/**
+	 * Sets the node's status to failed, and persists the node
+	 * status change.
+	 */
+	private void setFailed(final NodeImpl node) {
+	    node.setFailed();
+
+	    try {
+		runTransactionally(new AbstractKernelRunnable() {
+		    public void run() {
+			node.updateNode(dataService);
+		    }});
+		
+	    } catch (Exception e) {
+		logger.logThrow(Level.SEVERE, e,
+				"Updating node failed: {0}", node.getId());
 	    }
 	}
     }
