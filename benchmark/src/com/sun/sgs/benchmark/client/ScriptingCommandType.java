@@ -28,12 +28,12 @@ public enum ScriptingCommandType {
     MALLOC           (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
     ON_EVENT         (new String[] { "on_event", "onevent", "on" }),
     PAUSE            ("pause"),
-    PERIODIC_TASK    (new String[] { "periodic", "periodic_task" }),
     PRINT            (new String[] { "print", "debug", "printf" }),
     REQ_RESPONSE     (new String[] { "req_response", "req_resp", "request_response", "send_me" }),
     SEND_CHANNEL     (new String[] { "send_channel", "channel_send", "chsend" }),
     SEND_DIRECT      (new String[] { "send_direct", "send_server", "direct_send" }),
     START_BLOCK      ("{"),
+    START_TASK       (new String[] { "start_task", "do_task", "task" }),
     TAG              (new String[] { "tag", "sub" }),
     WAIT_FOR         (new String[] { "wait_for", "wait" });
     

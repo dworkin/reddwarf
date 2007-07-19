@@ -35,7 +35,7 @@ public class ScriptingCommand {
     private int count = -1;
     private int port = -1;
     private long duration = -1;
-    private long delay = -1;
+    private long delay = 0;   /** optional argument; must default to 0 */
     private long period = -1;
     private int size = -1;
     private String channelName = null;
@@ -377,38 +377,6 @@ public class ScriptingCommand {
             }
             break;
             
-        case PERIODIC_TASK:
-            if (args.length == 4) {
-                tagName = args[0];
-                
-                try {
-                    taskType = Enum.valueOf(CustomTaskType.class, args[1].toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    throw new ParseException("Invalid " + type + " argument, " +
-                        " not recognized: " + args[1] + ".  Should be one of: " +
-                        Arrays.toString(CustomTaskType.values()), 0);
-                }
-                
-                try {
-                    delay = Long.valueOf(args[2]);
-                    if (delay < 0) throw new NumberFormatException();
-                } catch (NumberFormatException e) {
-                    throw new ParseException("Invalid " + type + " argument, " +
-                        " must be a non-negative integer: " + args[2], 0);
-                }
-                
-                try {
-                    period = Long.valueOf(args[3]);
-                    if (period < 0) throw new NumberFormatException();
-                } catch (NumberFormatException e) {
-                    throw new ParseException("Invalid " + type + " argument, " +
-                        " must be a non-negative integer: " + args[3], 0);
-                }
-                return;
-            }
-            
-            break;
-            
         case PRINT:
             /** Accept whole line as argument, including spaces */
             if (args.length == 0) break;
@@ -455,6 +423,44 @@ public class ScriptingCommand {
             
         case START_BLOCK:
             if (args.length == 0) return;  /** No arguments */
+            break;
+            
+        case START_TASK:
+            if (args.length >= 2 && args.length <= 4) {
+                tagName = args[0];
+                
+                try {
+                    taskType = Enum.valueOf(CustomTaskType.class, args[1].toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    throw new ParseException("Invalid " + type + " argument, " +
+                        " not recognized: " + args[1] + ".  Should be one of: " +
+                        Arrays.toString(CustomTaskType.values()), 0);
+                }
+                
+                if (args.length >= 3) {
+                    try {
+                        delay = Long.valueOf(args[2]);
+                        if (delay < 0) throw new NumberFormatException();
+                    } catch (NumberFormatException e) {
+                        throw new ParseException("Invalid " + type +
+                            " argument, must be a non-negative integer: " +
+                            args[2], 0);
+                    }
+                }
+                
+                if (args.length >= 4) {
+                    try {
+                        period = Long.valueOf(args[3]);
+                        if (period < 0) throw new NumberFormatException();
+                    } catch (NumberFormatException e) {
+                        throw new ParseException("Invalid " + type +
+                            " argument, must be a non-negative integer: " +
+                            args[3], 0);
+                    }
+                }
+                return;
+            }
+            
             break;
             
         case TAG:
@@ -560,9 +566,6 @@ public class ScriptingCommand {
         case PAUSE:
             return "duration_ms";
             
-        case PERIODIC_TASK:
-            return "tag task-type delay_ms period_ms";
-            
         case PRINT:
             return "message   (may contain spaces)";
             
@@ -577,6 +580,9 @@ public class ScriptingCommand {
             
         case START_BLOCK:
             return "";
+            
+        case START_TASK:
+            return "tag task-type [delay_ms [period_ms]]";
             
         case TAG:
             return "tagname";

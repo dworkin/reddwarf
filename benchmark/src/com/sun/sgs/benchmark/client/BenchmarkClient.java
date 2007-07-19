@@ -525,7 +525,21 @@ public class BenchmarkClient {
             return new CodeMethodRequest(CodeMethodRequestOp.MALLOC,
                 baos.toByteArray());
             
-        case PERIODIC_TASK:
+        case REQ_RESPONSE:
+            CodeMethodRequestOp op;
+            String channelName = cmd.getChannelNameArg();
+            if (channelName != null) {
+                op = CodeMethodRequestOp.SEND_CHANNEL;
+                oos.writeObject(channelName);
+            } else {
+                op = CodeMethodRequestOp.SEND_DIRECT;
+            }
+            oos.writeObject("a");
+            oos.writeInt(cmd.getSizeArg());
+            oos.close();
+            return new CodeMethodRequest(op, baos.toByteArray());
+            
+        case START_TASK:
             List<ScriptingCommand> taskCmds = tags.get(cmd.getTagNameArg());
             if (taskCmds == null)
                 throw new IllegalArgumentException("Unknown tag: " +
@@ -540,27 +554,13 @@ public class BenchmarkClient {
                 MethodRequest request = createMethodRequest(taskCmd);
                 if (request == null)
                     throw new IllegalArgumentException("Command " + taskCmd +
-                        " is not a legal participant for periodic tasks.");
+                        " is not a legal participant in server tasks.");
                 
                 oos.writeObject(request);
             }
             oos.close();
-            return new CodeMethodRequest(CodeMethodRequestOp.PERIODIC_TASK,
+            return new CodeMethodRequest(CodeMethodRequestOp.START_TASK,
                 baos.toByteArray());
-            
-        case REQ_RESPONSE:
-            CodeMethodRequestOp op;
-            String channelName = cmd.getChannelNameArg();
-            if (channelName != null) {
-                op = CodeMethodRequestOp.SEND_CHANNEL;
-                oos.writeObject(channelName);
-            } else {
-                op = CodeMethodRequestOp.SEND_DIRECT;
-            }
-            oos.writeObject("a");
-            oos.writeInt(cmd.getSizeArg());
-            oos.close();
-            return new CodeMethodRequest(op, baos.toByteArray());
             
         default:
             return null;  /** No method request for this command type */

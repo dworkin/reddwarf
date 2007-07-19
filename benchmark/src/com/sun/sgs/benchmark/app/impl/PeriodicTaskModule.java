@@ -35,6 +35,9 @@ public class PeriodicTaskModule extends AbstractModuleImpl implements Serializab
 
     private static final long serialVersionUID = 1L;
     
+    /** Counts the number of periodic tasks queued so far. */
+    private static int periodicTasksQueued = 0;
+    
     /** Empty constructor */
     public PeriodicTaskModule() { }
     
@@ -102,10 +105,24 @@ public class PeriodicTaskModule extends AbstractModuleImpl implements Serializab
 	operations.add(new Runnable() {
 		public void run() {
                     TaskManager tm = AppContext.getTaskManager();
-                    Task task = new CustomClientTask(session, commands, type);
-                    tm.schedulePeriodicTask(task, delay, period);
+                    Task task;
+                    
+                    if (type == CustomTaskType.ONESHOT) {
+                        task = new CustomClientTask(session, commands, type);
+                        tm.scheduleTask(task, delay);
+                    } else {
+                        /** some kind of periodic task */
+                        if (periodicTasksQueued == 0)
+                            task = new CustomClientTask(session, commands, type);
+                        else
+                            task = new CustomClientTask2(session, commands, type);
+                        
+                        tm.schedulePeriodicTask(task, delay, period);
+                        periodicTasksQueued++;
+                    }
+                    
                     if (BehaviorModule.ENABLE_INFO_OUTPUT)
-                        System.out.printf("%s: Scheduling periodic task.  " +
+                        System.out.printf("%s: Scheduled custom task.  " +
                             "type=%s, #commands=%d, delay=%d, period=%d.\n",
                             this, type, commands.size(), delay, period);
 		}
@@ -178,6 +195,7 @@ class CustomClientTask implements Serializable, Task {
             }
             break;
 
+        case ONESHOT:
         case SINGULAR:
             /* Execute all commands in a row right now. */
             for (MethodRequest req : commands) {
@@ -188,5 +206,25 @@ class CustomClientTask implements Serializable, Task {
         default:
             throw new IllegalStateException("Unknown CustomTaskType: " + type);
         }
+    }
+}
+
+/*
+ * Ugly, ugly hack needed for profiling operations to work.  (no other way to
+ * distinguish between different periodic tasks other than to change the base
+ * task class)
+ */
+class CustomClientTask2 extends CustomClientTask {
+
+    public CustomClientTask2(ClientSession session, MethodRequest command,
+        CustomTaskType type)
+    {
+        super(session, command, type);
+    }
+    
+    public CustomClientTask2(ClientSession session, List<MethodRequest> commands,
+        CustomTaskType type)
+    {
+        super(session, commands, type);
     }
 }

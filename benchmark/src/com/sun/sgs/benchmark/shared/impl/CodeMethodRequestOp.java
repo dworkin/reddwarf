@@ -22,10 +22,10 @@ public enum CodeMethodRequestOp {
     DATASTORE_GET     ("datastoreAccess"),
     JOIN_CHANNEL      ("joinChannel"),
     LEAVE_CHANNEL     ("leaveChannel"),
-    PERIODIC_TASK     ("periodicTask"),
-    SEND_CHANNEL      ("sendChannelMessage"),
     MALLOC            ("malloc"),
-    SEND_DIRECT       ("sendDirectMessage");
+    SEND_CHANNEL      ("sendChannelMessage"),
+    SEND_DIRECT       ("sendDirectMessage"),
+    START_TASK        ("startTask");
     
     /** Member variables */
     

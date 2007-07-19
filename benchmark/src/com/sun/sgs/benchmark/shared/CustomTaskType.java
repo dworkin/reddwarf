@@ -10,6 +10,9 @@ package com.sun.sgs.benchmark.shared;
  * of commands to execute; task type differ solely in the order in which the
  * commands are executed.
  *
+ * oneshot  - all tasks are executed sequentially in a single task; this task is
+ *            *not* periodic (once it executes once, its done forever)
+ * 
  * parallel - a seperate task is spawned for each individual command and all are
  *            queued with the TaskManager at the same time
  *
@@ -22,6 +25,7 @@ package com.sun.sgs.benchmark.shared;
  */
 public enum CustomTaskType {
     /** Enum types */
+    ONESHOT,
     PARALLEL,
     SERIAL,
     SINGULAR;
