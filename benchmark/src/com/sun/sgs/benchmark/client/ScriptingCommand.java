@@ -204,7 +204,7 @@ public class ScriptingCommand {
                 channelName = args[0];
                 return;
             }
-            return;
+            break;
             
         case DATASTORE_CREATE:
             if (args.length >= 2 && args.length <= 3) {
