@@ -155,17 +155,36 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
 
-	/** The state value for when the transaction is not in use. */
-	private static final int IDLE = 1;
+	/**
+	 * The state value for when the transaction is not in use, prepared, or
+	 * being reaped.
+	 */
+	private static final int IDLE = 0;
 
-	/** The state value for when the transaction is currently in use. */
-	private static final int IN_USE = 2;
+	/**
+	 * The state value for when the transaction is currently in use, and is
+	 * not prepared or being reaped.
+	 */
+	private static final int IN_USE = 1;
+
+	/**
+	 * The state value for when the transaction is not in use, has been
+	 * prepared, and is not being reaped.
+	 */
+	private static final int PREPARED = 2;
+
+	/**
+	 * The state value for when the transaction is currently in use and
+	 * prepared, and is not being reaped.
+	 */
+	private static final int IN_USE_PREPARED = IN_USE | PREPARED;
 
 	/**
 	 * The state value for when the transaction is being reaped because it
 	 * is expired.  Once this state is reached, it never changes.
+	 * Transactions that are in use or prepared are not reaped.
 	 */
-	private static final int REAPING = 3;
+	private static final int REAPING = 4;
 
 	/** The transaction ID. */
 	private final long tid;
@@ -179,7 +198,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The information associated with this transaction, or null. */
 	private Object txnInfo;
 
-	/** The current state, one of IDLE, IN_USE, or REAPING. */
+	/**
+	 * The current state, one of IDLE, IN_USE, PREPARED, IN_USE_PREPARED,
+	 * or REAPING.
+	 */
 	private final AtomicInteger state = new AtomicInteger(IDLE);
 
 	/** The transaction participant or null. */
@@ -222,24 +244,36 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Sets whether this transaction is in use, doing nothing if the state
 	 * is REAPING.  Returns whether the attempt to set the state was
-	 * successful.  The attempt succeeds if the state is REAPING or if it
-	 * is the opposite of the requested state.
+	 * successful.  The attempt succeeds if the state is REAPING or if the
+	 * IN_USE bit is the opposite of the requested state, independent of
+	 * the PREPARED bit.
 	 */
 	boolean setInUse(boolean inUse) {
-	    int expect = inUse ? IDLE : IN_USE;
-	    int update = inUse ? IN_USE : IDLE;
+	    int prepared = state.get() & PREPARED;
+	    int expect = (inUse ? IDLE : IN_USE) | prepared;
+	    int update = (inUse ? IN_USE : IDLE) | prepared;
 	    return state.compareAndSet(expect, update) ||
 		state.get() == REAPING;
 	}
 
 	/**
 	 * Sets this transaction as being reaped.  Returns whether the attempt
-	 * to set the state was successful.  The attempt fails if the state was
-	 * IN_USE.
+	 * to set the state was successful.  The attempt fails if the
+	 * transaction is in use or if it has been prepared.
 	 */
 	boolean setReaping() {
 	    boolean success = state.compareAndSet(IDLE, REAPING);
 	    return success || state.get() == REAPING;
+	}
+
+	/**
+	 * Marks the transaction as prepared.  This method should only be
+	 * called when the transaction is in use and has not already been
+	 * prepared.
+	 */
+	void setPrepared() {
+	    boolean success = state.compareAndSet(IN_USE, IN_USE_PREPARED);
+	    assert success;
 	}
 
 	/* -- Implement Transaction -- */
@@ -819,7 +853,9 @@ public class DataStoreServerImpl implements DataStoreServer {
     public boolean prepare(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.prepare(txn);
+	    boolean result = store.prepare(txn);
+	    txn.setPrepared();
+	    return result;
 	} finally {
 	    txnTable.notInUse(txn);
 	}
