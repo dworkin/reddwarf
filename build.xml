@@ -1007,92 +1007,90 @@
   </target>
 
 
-  <!-- Runs the benchmark suite (server) -->
+  <!-- Runs the Prefix Hashmap suite (server) -->
   <target name="test-phm" depends="benchmark-classes"
           description="tests the prefix hash table">
-   <delete dir="/tmp/sgs-benchmark"/>
-   <mkdir dir="/tmp/sgs-benchmark"/>
-   <chmod perm="a+w">
-     <fileset dir="/tmp/sgs-benchmark"/>
-   </chmod>
-   <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
-   <java classname="com.sun.sgs.impl.kernel.Kernel"
-	 fork="true">
-     <jvmarg line="-server"/>
-<!--     <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-     <jvmarg line="-XX:+UseParallelGC"/>
-     <jvmarg line="-XX:+UseFastAccessorMethods"/>
-     <jvmarg line="-XX:+AggressiveOpts"/>
-     <jvmarg line="-XX:+MaxFDLimit"/>
-     <jvmarg line="-XX:NewSize=512m"/>
-     <jvmarg line="-Xmx2g"/>
-<!--     <jvmarg line="-XX:+PrintCompilation"/> -->
-     <sysproperty key="com.sun.sgs.config.file"
-		  file="benchmark/System.properties"/>
-     <sysproperty key="java.library.path" 
-		  file="${bdb.lib.dir}"/>
-     <sysproperty key="java.util.logging.config.file"
-		  file="${test.logging}"/>
-     <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
-		  value="true"/>
+    <delete dir="/tmp/sgs-benchmark"/>
+    <mkdir dir="/tmp/sgs-benchmark"/>
+    <chmod perm="a+w">
+      <fileset dir="/tmp/sgs-benchmark"/>
+    </chmod>
+    <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  fork="true">
+      <jvmarg line="-server"/>
+      <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
+      <jvmarg line="-XX:+UseParallelGC"/>
+      <jvmarg line="-XX:+UseFastAccessorMethods"/>
+      <jvmarg line="-XX:+AggressiveOpts"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
+      <jvmarg line="-XX:NewSize=512m"/>
+      <jvmarg line="-Xmx2g"/>
+      <!-- <jvmarg line="-XX:+PrintCompilation"/> -->
+      <sysproperty key="com.sun.sgs.config.file"
+		   file="benchmark/System.properties"/>
+      <sysproperty key="java.library.path" 
+		   file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+		   value="true"/>
       <sysproperty key="com.sun.sgs.config.file"
 		   file="benchmark/PrefixHashMap.properties"/>      
-     <classpath>
-       <pathelement location="${build.dir}/benchmark/classes"/>
-       <path refid="server.classpath"/>
-     </classpath>
-     <arg value="benchmark/PrefixHashMap2.properties"/>
-   </java>
- </target>
-
-
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="benchmark/PrefixHashMap2.properties"/>
+    </java>
+  </target>
 
   <!-- Runs the benchmark suite (server) -->
- <target name="benchmark" depends="benchmark-classes"
-	 description="run a set of example benchmark applications">
-   <delete dir="/tmp/sgs-benchmark"/>
-   <mkdir dir="/tmp/sgs-benchmark"/>
-   <chmod perm="a+w">
-     <fileset dir="/tmp/sgs-benchmark"/>
-   </chmod>
-   <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
-   <java classname="com.sun.sgs.impl.kernel.Kernel"
-	 fork="true">
-     <jvmarg line="-server"/>
-<!--     <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-     <!--<jvmarg line="-XX:+UseParallelGC"/>
-     <jvmarg line="-XX:+UseFastAccessorMethods"/>
-     <jvmarg line="-XX:+AggressiveOpts"/>
-     <jvmarg line="-XX:+MaxFDLimit"/>
-     <jvmarg line="-XX:NewSize=512m"/>
-     <jvmarg line="-Xmx2g"/>
-     <jvmarg line="-XX:+PrintCompilation"/>-->
-     <sysproperty key="com.sun.sgs.config.file"
-		  file="benchmark/System.properties"/>
-     <sysproperty key="java.library.path" 
-		  file="${bdb.lib.dir}"/>
-     <sysproperty key="java.util.logging.config.file"
-		  file="${test.logging}"/>
-     <sysproperty key="com.sun.sgs.benchmark.app"
-		  file="benchmark/DefaultApplication.properties"/>
-     <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
-		  value="true"/>
-     <classpath>
-       <pathelement location="${build.dir}/benchmark/classes"/>
-       <path refid="server.classpath"/>
-     </classpath>
-     <arg value="benchmark/Benchmark.properties"/>
-   </java>
- </target>
-
- <!-- Runs the benchmark client -->
- <target name="benchmark-client" depends="benchmark-classes"
-	 description="Runs the benchmark client">
-   <java classname="com.sun.sgs.benchmark.client.BenchmarkClient"
-	 fork="true">
-     <jvmarg line="${test.jvm.args}"/>
+  <target name="benchmark" depends="benchmark-classes"
+	  description="run a set of example benchmark applications">
+    <delete dir="/tmp/sgs-benchmark"/>
+    <mkdir dir="/tmp/sgs-benchmark"/>
+    <chmod perm="a+w">
+      <fileset dir="/tmp/sgs-benchmark"/>
+    </chmod>
+    <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  fork="true">
+      <jvmarg line="-server"/>
+      <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
+      <!-- <jvmarg line="-XX:+UseParallelGC"/> -->
+      <jvmarg line="-XX:+UseFastAccessorMethods"/>
+      <jvmarg line="-XX:+AggressiveOpts"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
+      <jvmarg line="-XX:NewSize=512m"/>
+      <jvmarg line="-Xmx2g"/>
+      <jvmarg line="-XX:+PrintCompilation"/>-->
       <sysproperty key="com.sun.sgs.config.file"
-           file="${test.logging}"/>
+		   file="benchmark/System.properties"/>
+      <sysproperty key="java.library.path" 
+		   file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <sysproperty key="com.sun.sgs.benchmark.app"
+		   file="benchmark/DefaultApplication.properties"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+		   value="true"/>
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="benchmark/Benchmark.properties"/>
+    </java>
+  </target>
+  
+  <!-- Runs the benchmark client -->
+  <target name="benchmark-client" depends="benchmark-classes"
+	  description="Runs the benchmark client">
+    <java classname="com.sun.sgs.benchmark.client.BenchmarkClient"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="com.sun.sgs.config.file"
+                   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/classes/client"/>
         <pathelement location="${build.dir}/benchmark/classes"/>
@@ -1105,19 +1103,19 @@
     </java>
   </target>
 
- <!-- Runs the benchmark client -->
- <target name="benchmark-client-stresstest" depends="benchmark-classes"
-	 description="Runs the benchmark client">
-   <!-- insert classname to run below -->
-   <java classname="com.sun.sgs.benchmark.scripts.ChannelMessageSend"
-	 fork="true">
-     <jvmarg line="${test.jvm.args}"/>
-     <jvmarg line="-server"/>
-     <jvmarg line="-XX:+UseParallelGC"/>
-     <jvmarg line="-Xmx2g"/>
-     <jvmarg line="-XX:+MaxFDLimit"/>
+  <!-- Runs the benchmark stresstest client -->
+  <target name="benchmark-client-stresstest" depends="benchmark-classes"
+	  description="Runs the benchmark client">
+    <!-- insert classname to run below -->
+    <java classname="com.sun.sgs.benchmark.scripts.ChannelMessageSend"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <jvmarg line="-server"/>
+      <jvmarg line="-XX:+UseParallelGC"/>
+      <jvmarg line="-Xmx2g"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
       <sysproperty key="com.sun.sgs.config.file"
-           file="${test.logging}"/>
+                   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/classes/client"/>
         <pathelement location="${build.dir}/benchmark/classes"/>
@@ -1127,12 +1125,11 @@
                    value="slytherin.east.sun.com" />
       <sysproperty key="BenchmarkClient.port"
                    value="6168" />
-   </java>
- </target>
+    </java>
+  </target>
 
-
- <!-- Runs the example HackApp (server) -->
- <target name="example-hack-app" depends="example-classes"
+  <!-- Runs the example HackApp (server) -->
+  <target name="example-hack-app" depends="example-classes"
           description="Runs the example HackApp (server)">
     <mkdir dir="/tmp/HackApp/dsdb"/>
     <copy todir="/tmp/HackApp/gameData">
