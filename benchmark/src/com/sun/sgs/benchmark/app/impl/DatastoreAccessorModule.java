@@ -16,6 +16,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.app.NameNotBoundException;
 
@@ -85,6 +86,14 @@ public class DatastoreAccessorModule extends AbstractModuleImpl implements Seria
                     } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client attempted to read" +
                             " object " + name + " which does not exist");
+                    } catch (TransactionConflictException tce) {
+                        /**
+                         * Do nothing; we catch this simply because its not
+                         * truly an error case (we expect this to happen
+                         * normally during periods of high contention) and thus
+                         * we don't want it propagating up and printing to
+                         * stdout. 
+                         */
                     }
 		}
 	    });
