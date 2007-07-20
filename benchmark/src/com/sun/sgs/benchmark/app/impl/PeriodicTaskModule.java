@@ -107,24 +107,34 @@ public class PeriodicTaskModule extends AbstractModuleImpl implements Serializab
                     TaskManager tm = AppContext.getTaskManager();
                     Task task;
                     
-                    if (type == CustomTaskType.ONESHOT) {
-                        task = new CustomClientTask(session, commands, type);
-                        tm.scheduleTask(task, delay);
-                    } else {
-                        /** some kind of periodic task */
-                        if (periodicTasksQueued == 0)
+                    try {
+                        if (type == CustomTaskType.ONESHOT) {
                             task = new CustomClientTask(session, commands, type);
-                        else
-                            task = new CustomClientTask2(session, commands, type);
+                            tm.scheduleTask(task, delay);
+                        } else {
+                            /** some kind of periodic task */
+                            if (periodicTasksQueued == 0)
+                                task = new CustomClientTask(session, commands, type);
+                            else
+                                task = new CustomClientTask2(session, commands, type);
+                            
+                            tm.schedulePeriodicTask(task, delay, period);
+                            periodicTasksQueued++;
+                        }
                         
-                        tm.schedulePeriodicTask(task, delay, period);
-                        periodicTasksQueued++;
+                        if (BehaviorModule.ENABLE_INFO_OUTPUT)
+                            System.out.printf("%s: Scheduled custom task.  " +
+                                "type=%s, #commands=%d, delay=%d, period=%d.\n",
+                                this, type, commands.size(), delay, period);
+                    } catch (TransactionConflictException tce) {
+                        /**
+                         * Do nothing; we catch this simply because its not
+                         * truly an error case (we expect this to happen
+                         * normally during periods of high contention) and thus
+                         * we don't want it propagating up and printing to
+                         * stdout. 
+                         */
                     }
-                    
-                    if (BehaviorModule.ENABLE_INFO_OUTPUT)
-                        System.out.printf("%s: Scheduled custom task.  " +
-                            "type=%s, #commands=%d, delay=%d, period=%d.\n",
-                            this, type, commands.size(), delay, period);
 		}
 	    });
 	return operations;
