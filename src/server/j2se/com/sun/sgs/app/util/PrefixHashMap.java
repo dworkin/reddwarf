@@ -53,18 +53,17 @@ import com.sun.sgs.app.ManagedReference;
  * {@code O(1)}.
  *
  * An instance of {@code PrefixHashMap} offers one parameters for
- * performance tuning: {@code splitFactor}.  The {@code splitFactor}
- * determines at what size to divide a leaf table in the prefix tree
- * into two separate tables.  This parameter is similar to the {@code
- * loadFactor} parameter in {@code HashMap}, except that a division in
- * a leaf node is strictly local and require no tree-global locks.
- *
- * As a general rule, the default {@code splitFactor} (1.0) provides a
- * good tradeoff between datastore contention and serialization
- * cost. Developers may find that performance for highly contended
- * maps may improve if the {@code splitFactor} is lowered, thereby
- * increasing the number of leaves, but also increasing the locality
- * of updates.
+ * performance tuning: {@code minConcurrency}, which specifies the
+ * minimum number of write operations to support in parallel.  As the
+ * map grows, the number of supported parallel operations will also
+ * grow beyond this minimum, but this factor ensures that it will
+ * never drop below the provided number.  However, the size of the map
+ * grows {@code O(n log(n))} to support the operations and therefore a
+ * sparse map will incur some overhead when accessing its elements.
+ * Furthermore, the efficacy of the concurrency depends on the
+ * distribution of hash values; keys with poor hashing will minimize
+ * the actual number of possible concurrent writes, regardless of the
+ * {@code minConcurrency} value.
  *
  * This class implements all of the optional {@code Map} operations
  * and supports both {@code null} keys and values.  This map provides
@@ -86,10 +85,10 @@ public class PrefixHashMap<K,V>
     private static final long serialVersionUID = 1337;
 
     /**
-     * The granuality in bytes of the lock size in the persistence
-     * mechanism.  
+     * The default number of parallel write operations used when none
+     * is specified in the constructor.
      */
-    public static final int PERSISTENCE_LOCK_SIZE_BYTES = 8192;
+    private static final int DEFAULT_MINIMUM_CONCURRENCY = 1;    
 
     /**
      * The split factor used when none is specified in the constructor.
@@ -109,7 +108,7 @@ public class PrefixHashMap<K,V>
      */
     // NOTE: this should almost certainly be updated to include class
     //       overhead for the object that contains this array
-    private static final int DEFAULT_LEAF_CAPACITY = 512;
+    private static final int DEFAULT_LEAF_CAPACITY = 128;
     
     /**
      * The parent node directly above this.  For the root node, this
@@ -151,6 +150,9 @@ public class PrefixHashMap<K,V>
     /**
      * The fixed-size table for storing all Map entries.
      */
+    // NOTE: this is actually an array of type PrefixEntry<K,V> but
+    //       generic arrays are not allowed, so we cast the elements
+    //       as necessary
     PrefixEntry[] table;    
 
     /**
@@ -197,21 +199,66 @@ public class PrefixHashMap<K,V>
      */
     private final float mergeFactor;
 
+    /**
+     * The minimum number of concurrent write operations to support.
+     */
+    private final int minConcurrency;
+
+    /**
+     * The minimum depth of the tree, which is controlled by the
+     * minimum concurrency factor
+     */
+    private int minDepth;
+
+    /**
+     * The depth of this node in the tree
+     */
+    private final int depth;
+
     
     /** 
-     * Constructs an empty {@code PrefixHashMap} with the specified load
-     * factor.
+     * Constructs an empty {@code PrefixHashMap} at the provided
+     * depth, with the specified minimum concurrency, split factor and
+     * load factor.
      *
-     * @param splitFactor the fraction of the leaf capacity which will
+     * @param depth the depth of this table in the tree
+     * @param minConcurrency the minimum number of concurrent write
+     *        operations to support
+     * @param splitFactor the fraction of the leaf capacity that will
      *        cause the leaf to split
+     * @param mergeFactor the fraction of the leaf capacity that will
+     *        cause the leaf to attempt merging with its sibling
      *
-     * @throws IllegalArgumentException if the load factor is non positive
+     * @throws IllegalArgumentException if the depth is out of the
+     *         range of valid prefix lengths
+     * @throws IllegalArgumentException if minConcurrency is non positive
+     * @throws IllegalArgumentException if the split factor is non positive
+     * @throws IllegalArgumentException if the merge factor is less
+     *         than zero or greater than or equal to the split factor
      */
-    public PrefixHashMap(float splitFactor) {
+    private PrefixHashMap(int depth, int minConcurrency, float splitFactor,
+			  float mergeFactor) {
+	if (depth < 0 || depth > 32) {
+	    throw new IllegalArgumentException("Illegal tree depth: " + 
+					       depth);	    
+	}
+	if (minConcurrency <= 0) {
+	    throw new IllegalArgumentException("Illegal minimum concurrency: " 
+					       + minConcurrency);	    
+	}
 	if (splitFactor <= 0) {
 	    throw new IllegalArgumentException("Illegal split factor: " + 
 					      splitFactor);	    
 	}
+	if (mergeFactor < 0 || mergeFactor >= splitFactor) {
+	    throw new IllegalArgumentException("Illegal merge factor: " + 
+					       mergeFactor);	    
+	}
+
+	this.depth = depth;
+	this.minConcurrency = minConcurrency;
+	for (minDepth = 0; (1 << minDepth) < minConcurrency; minDepth++)
+	    ;
 	size = 0;
 	parent = null;
 	leftLeaf = null;
@@ -221,35 +268,79 @@ public class PrefixHashMap<K,V>
 	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
 	this.splitFactor = splitFactor;
-	this.mergeFactor = leafCapacity * DEFAULT_MERGE_FACTOR;
+	this.mergeFactor = mergeFactor;
+	// ensure that the split threshold is at least 1
 	this.splitThreshold = Math.max((int)(splitFactor * leafCapacity), 1);
-	this.mergeThreshold = Math.max((int)(splitFactor * leafCapacity), 0);
+	// ensure that the merge threshold is at least one less than
+	// the split threshold
+	this.mergeThreshold = Math.min((int)(splitFactor * leafCapacity), 
+				       splitThreshold-1);       
+	// Only the root note should ensure depth, otherwise this call
+	// causes the children to be created in depth-first fashion,
+	// which prevents the leaf references from being correctly
+	// established
+	if (depth == 0)
+	    ensureDepth(minDepth);
     }
 
     /** 
-     * Constructs an empty {@code PrefixHashMap} with the default load
-     * factor (1.0).
+     * Constructs an empty {@code PrefixHashMap} with the provided
+     * minimum concurrency.
+     *
+     * @param minConcurrency the minimum number of concurrent write
+     *        operations supported
+     *
+     * @throws IllegalArgumentException if minConcurrency is non positive
+     */
+    public PrefixHashMap(int minConcurrency) {
+	this(0, minConcurrency, DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
+    }
+
+
+    /** 
+     * Constructs an empty {@code PrefixHashMap} with the default
+     * minimum concurrency (1).
      */
     public PrefixHashMap() {
-	this(DEFAULT_SPLIT_FACTOR);
+	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
+	     DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
     }
 
     /**
      * Constructs a new {@code PrefixHashMap} with the same mappings
-     * as the specified {@code Map}, and the default {@code
-     * splitFactor} (1.0).
+     * as the specified {@code Map}, and the default 
+     * minimum concurrency (1.0).
      *
      * @param m the mappings to include
      *
      * @throws NullPointerException if the provided map is null
      */
     public PrefixHashMap(Map<? extends K, ? extends V> m) {
-	this(DEFAULT_SPLIT_FACTOR);
+	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
+	     DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
 	if (m == null)
 	    throw new NullPointerException("The provided map is null");
 	putAll(m);
     }
 
+    /**
+     * Ensures that this node has children of at least the provided
+     * minimum depth.
+     *
+     * @param minDepth the minimum depth of the leaf nodes under this
+     *        node
+     *
+     * @see #split()
+     */
+    private void ensureDepth(int minDepth) {
+	if (depth >= minDepth)
+	    return;
+	else {
+	    split(); // split first to ensure breadth-first creation
+	    rightChild.get(PrefixHashMap.class).ensureDepth(minDepth);
+	    leftChild.get(PrefixHashMap.class).ensureDepth(minDepth);
+	}
+    }
 
     /**
      * Clears the map of all entries in {@code O(n log(n))} time.
@@ -296,24 +387,27 @@ public class PrefixHashMap<K,V>
      * {@inheritDoc}
      */
     public boolean containsKey(Object key) {
-	int hash = (key == null) ? 0 : key.hashCode();
-// 	return containsKey(key, hash, hash);
-	
+	return getEntry(key) != null;
+    }
+
+    /**
+     * Returns the {@code PrefixEntry} associated with this key
+     */ 
+    private PrefixEntry<K,V> getEntry(Object key) {
+	int hash = (key == null) ? 0 : hash(key.hashCode());
 	Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(prefix);
-	for (PrefixEntry e = leaf.table[indexFor(hash, leaf.table.length)]; 
-	     e != null; 
-	     e = e.next) {
+	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
+	     e != null; e = e.next) {
 	    
 	    Object k;
 	    if (e.hash == hash && ((k = e.getKey()) == key || 
 				   (k != null && k.equals(key)))) {
-		return true;
+		return e;
 	    }
 	}
-	return false;
-
-    }
+	return null;
+    } 
 
     /**
      * {@inheritDoc}
@@ -356,7 +450,7 @@ public class PrefixHashMap<K,V>
 	if ((leftChild_.size + rightChild_.size) / 2 > splitThreshold) {
 	    return;
 	}
-	    
+
 	dataManager.markForUpdate(this);
 
 	// recreate our table, as it was made null in split()
@@ -424,9 +518,11 @@ public class PrefixHashMap<K,V>
 	dataManager.markForUpdate(this);
 
 	PrefixHashMap<K,V> leftChild_ = 
-	    new PrefixHashMap<K,V>(splitFactor);
+	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
+				   splitFactor, mergeFactor);
 	PrefixHashMap<K,V> rightChild_ = 
-	    new PrefixHashMap<K,V>(splitFactor);
+	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
+				   splitFactor, mergeFactor);
 
 	// iterate over all the entries in this table and assign
 	// them to either the right child or left child
@@ -465,13 +561,14 @@ public class PrefixHashMap<K,V>
 	}
 
 	// update the family links
+	ManagedReference thisRef = dataManager.createReference(this);
 	leftChild_.rightLeaf = rightChild;
 	leftChild_.leftLeaf = leftLeaf;
-	leftChild_.parent = dataManager.createReference(this);
+	leftChild_.parent = thisRef;
 	rightChild_.leftLeaf = leftChild;
 	rightChild_.rightLeaf = rightLeaf;
-	rightChild_.parent = leftChild_.parent;
-
+	rightChild_.parent = thisRef;			  
+	
 	// invalidate this node's leaf references
 	leftLeaf = null;
 	rightLeaf = null;
@@ -498,9 +595,21 @@ public class PrefixHashMap<K,V>
 	return leaf;
     }
 
+    /**
+     * Returns the value to which this key is mapped or {@code null}
+     * if the map contains no mapping for this key.  Note that the
+     * return value of {@code null} does not necessarily imply that no
+     * mapping for this key existed since this implementation supports
+     * {@code null} values.  The {@link #containsKey(Object)} method
+     * can be used to determine whether a mapping exists.
+     *
+     * @param key the key whose mapped value is to be returned
+     * @return the value mapped to the provided key or {@code null} if
+     *         no such mapping exists
+     */
     public V get(Object key) {
 
- 	int hash = (key == null) ? 0 : key.hashCode();
+ 	int hash = (key == null) ? 0 : hash(key.hashCode());
  	Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(prefix);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)]; 
@@ -515,6 +624,14 @@ public class PrefixHashMap<K,V>
 	return null;	
     }
 
+    /**
+     * A secondary hash function for better distributing the keys.
+     * This function is borrowed from the 1.72 version of {@link
+     * HashMap}.
+     *
+     * @param h the initial hash value
+     * @return a re-hashed version of the provided hash value
+     */
     static int hash(int h) {
 	// This function ensures that hashCodes that differ only
 	// by constant multiples at each bit position have a
@@ -535,7 +652,7 @@ public class PrefixHashMap<K,V>
      */
     public V put(K key, V value) {
 
-	int hash = (key == null) ? 0 : key.hashCode();
+	int hash = (key == null) ? 0 : hash(key.hashCode());
 	Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(prefix);
 	AppContext.getDataManager().markForUpdate(leaf);
@@ -613,15 +730,18 @@ public class PrefixHashMap<K,V>
     /**
      * Returns whether this map has no mappings.  This implemenation
      * runs in {@code O(1)} time.
+     *
+     * @return {@code true} if this map contains no mappings
      */
     public boolean isEmpty() {
 	return leftChild != null || size == 0;
     }
      
      /**
-     *  Returns the size of the tree.  Note that this implementation
-     *  runs in {@code O(n + n*log(n))} time, where {@code n} is the
-     *  number of nodes in the tree (<i>not</i> the number of elements).
+     * Returns the size of the tree.  Note that this implementation
+     * runs in {@code O(n + n*log(n))} time, where {@code n} is the
+     * number of nodes in the tree (<i>not</i> the number of elements).
+     * Developers should
      *
      * @return the size of the tree
      */
@@ -649,7 +769,7 @@ public class PrefixHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-	int hash = (key == null) ? 0x0 : key.hashCode();
+	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	Prefix prefix = new Prefix(hash);
 
 	PrefixHashMap<K,V> leaf = lookup(prefix);
@@ -681,7 +801,9 @@ public class PrefixHashMap<K,V>
 		
 		// lastly, if the leaf size is less than the size
 		// threshold, attempt a merge
-		if ((leaf.size--) < mergeThreshold && leaf.parent != null) {
+		if ((leaf.size--) < mergeThreshold && depth > minDepth && 
+		    leaf.parent != null) {
+
 		    PrefixHashMap parent_ = leaf.parent.get(PrefixHashMap.class);
 		    parent_.merge();
 		}
@@ -719,6 +841,7 @@ public class PrefixHashMap<K,V>
 	return h & (length-1);
     }
 
+    // for debugging, remove later
     public String treeString() {
 	if (leftChild == null) {
 	    String s = "(";
@@ -740,6 +863,34 @@ public class PrefixHashMap<K,V>
 	}
     }
 
+    public String treeDiag() {
+	return "ROOT: " + AppContext.getDataManager().createReference(this) + "\n"
+	    + leftChild.get(PrefixHashMap.class).treeDiag(1) + "\n"
+	    + rightChild.get(PrefixHashMap.class).treeDiag(1);	    
+    }
+
+    private String treeDiag(int depth) {
+	String s; int i = 0;
+	for (s = "\t"; ++i < depth; s += "\t")
+	    ;
+	s += (leftChild == null)
+	    ? "LEAF " + AppContext.getDataManager().createReference(this) 
+	    + " contents: "+ treeString()
+	    : "INTR " + AppContext.getDataManager().createReference(this) + "\n"
+	    + leftChild.get(PrefixHashMap.class).treeDiag(depth+1)  + "\n"
+	    + rightChild.get(PrefixHashMap.class).treeDiag(depth+1);
+	return s + "\n";
+    }
+
+    public String treeLeaves() {	
+	String s = "";
+	PrefixHashMap cur = leftMost(); 
+	for (ManagedReference r = AppContext.getDataManager().createReference(cur);
+	     r != null; r = (cur = r.get(PrefixHashMap.class)).rightLeaf) 
+	    s += r + " " + r.get(PrefixHashMap.class).treeString() + 
+		((r.get(PrefixHashMap.class).rightLeaf != null) ? " -> " : "");
+	return s;
+    }
 
 
     /**
@@ -844,7 +995,8 @@ public class PrefixHashMap<K,V>
 	 * Returns a binary represntation of this prefix
 	 */
 	public String toString() {
-	    return Integer.toBinaryString(prefix);
+	    //return Integer.toBinaryString(prefix);
+	    return Integer.toHexString(prefix);
 	}
 
     }
@@ -1086,7 +1238,9 @@ public class PrefixHashMap<K,V>
 
 
     /**
-     *
+     * An abstract base class for implementing iteration over entries
+     * while subclasses define which data from the entry should be
+     * return by {@code next()}.
      */
     private abstract class PrefixTreeIterator<E> 
 	implements Iterator<E> {
@@ -1260,13 +1414,28 @@ public class PrefixHashMap<K,V>
 	}
     }
 
-
+    /**
+     * Returns a {@code Set} of all the mappings contained in this
+     * map.  The returned {@code Set} is back by the map, so changes
+     * to the map will be reflected by this view.  Note that the time
+     * complexity of the operations on this set will be the same as
+     * those on the map itself.  
+     *
+     * @return the set of all mappings contained in this map
+     */
     public Set<Entry<K,V>> entrySet() {
 	return new EntrySet(this);
     }
 
+    /**
+     * An internal-view {@code Set} implementation for viewing all the
+     * entries in this map.  
+     */
     private final class EntrySet extends AbstractSet<Entry<K,V>> {
 
+	/**
+	 * the root node of the prefix tree
+	 */
 	private final PrefixHashMap<K,V> root;
 
 	EntrySet(PrefixHashMap<K,V> root) {
@@ -1286,7 +1455,11 @@ public class PrefixHashMap<K,V>
 	}
 
 	public boolean contains(Object o) {
-	    return root.containsKey(o);
+	    if (!(o instanceof Map.Entry)) 
+		return false;
+	    Map.Entry<K,V> e = (Map.Entry<K,V>)o;
+	    PrefixEntry<K,V> pe = root.getEntry(e.getKey());
+	    return pe != null && pe.equals(e);
 	}
 
 	public void clear() {
@@ -1295,12 +1468,28 @@ public class PrefixHashMap<K,V>
 	
     }
 
+    /**
+     * Returns a {@code Set} of all the keys contained in this
+     * map.  The returned {@code Set} is back by the map, so changes
+     * to the map will be reflected by this view.  Note that the time
+     * complexity of the operations on this set will be the same as
+     * those on the map itself.  
+     *
+     * @return the set of all keys contained in this map
+     */
     public Set<K> keySet() {
 	return new KeySet(this);
     }
-        
+
+    /** 
+     * An internal collections view class for viewing the keys in the
+     * map
+     */
     private final class KeySet extends AbstractSet<K> {
-	    
+	  
+	/**
+	 * the root node of the prefix tree
+	 */
 	private final PrefixHashMap<K,V> root;
 
 	KeySet(PrefixHashMap<K,V> root) {
@@ -1329,12 +1518,29 @@ public class PrefixHashMap<K,V>
 	
     }
 	
+    /**
+     * Returns a {@code Collection} of all the keys contained in this
+     * map.  The returned {@code Collection} is back by the map, so
+     * changes to the map will be reflected by this view.  Note that
+     * the time complexity of the operations on this set will be the
+     * same as those on the map itself.
+     *
+     * @return the collection of all values contained in this map
+     */
+
     public Collection<V> values() {
 	return new Values(this);
     }
-    
+   
+    /**
+     * An internal collections-view of all the values contained in
+     * this map
+     */
     private final class Values extends AbstractCollection<V> {
 
+	/**
+	 * the root node of the prefix tree
+	 */
 	private final PrefixHashMap<K,V> root;
 
 	public Values(PrefixHashMap<K,V> root) {
