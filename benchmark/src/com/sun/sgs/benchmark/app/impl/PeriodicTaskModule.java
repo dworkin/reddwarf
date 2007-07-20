@@ -19,6 +19,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
