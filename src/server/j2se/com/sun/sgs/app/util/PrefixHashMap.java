@@ -400,7 +400,6 @@ public class PrefixHashMap<K,V>
      */ 
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	// Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; e = e.next) {
@@ -611,7 +610,6 @@ public class PrefixHashMap<K,V>
     public V get(Object key) {
 
  	int hash = (key == null) ? 0 : hash(key.hashCode());
- 	//Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)]; 
 	     e != null; 
@@ -654,7 +652,6 @@ public class PrefixHashMap<K,V>
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	//Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 
@@ -772,7 +769,6 @@ public class PrefixHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	//	Prefix prefix = new Prefix(hash);
 	PrefixHashMap<K,V> leaf = lookup(hash);
 
 	int i = indexFor(hash, leaf.table.length);
