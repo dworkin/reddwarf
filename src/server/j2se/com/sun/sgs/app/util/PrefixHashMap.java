@@ -109,6 +109,11 @@ public class PrefixHashMap<K,V>
     // NOTE: this should almost certainly be updated to include class
     //       overhead for the object that contains this array
     private static final int DEFAULT_LEAF_CAPACITY = 128;
+
+    /**
+     * The maximum depth of this tree
+     */
+    private static final int MAX_DEPTH = 32;
     
     /**
      * The parent node directly above this.  For the root node, this
@@ -395,8 +400,8 @@ public class PrefixHashMap<K,V>
      */ 
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	Prefix prefix = new Prefix(hash);
-	PrefixHashMap<K,V> leaf = lookup(prefix);
+	// Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; e = e.next) {
 	    
@@ -427,6 +432,8 @@ public class PrefixHashMap<K,V>
     /**
      * Merges the children nodes into this node and removes
      * them.
+     *
+     * @see #addEntry(PrefixEntry, int)
      */
     private void merge() {	   
 	DataManager dataManager = AppContext.getDataManager();
@@ -440,8 +447,7 @@ public class PrefixHashMap<K,V>
 	// check that we are merging two leaf nodes
 	if (leftChild_.leftChild != null ||
 	    rightChild_.leftChild != null) 
-	    // either one has children, so do not perform the
-	    // merge
+	    // either one has children, so do not perform the merge
 	    return;
 
 	// check that their comibined sizes is less than half of the
@@ -461,12 +467,10 @@ public class PrefixHashMap<K,V>
 	for (int i = 0; i < table.length; ++i) {
 
  	    for (PrefixEntry<K,V> e = leftChild_.table[i]; e != null; e = e.next) {
-		e.prefix.shiftRight();
 		addEntry(e, i);
 	    }
 
  	    for (PrefixEntry<K,V> e = rightChild_.table[i]; e != null; e = e.next) {
-		e.prefix.shiftRight();
 		addEntry(e, i);
 	    }
 	}
@@ -506,14 +510,13 @@ public class PrefixHashMap<K,V>
      * (i.e. they have not already been shifted to the maximum
      * possible precision).
      *
-     * @see #addEntry(int,Object,Object,int,Prefix)
+     * @see #addEntry(PrefixEntry, int)
      */
     private void split() {
 	    
-	if (leftChild != null) {  // can't split an intermediate node!
+	if (leftChild != null)  // can't split an intermediate node!
 	    return;
-	}
-
+	
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
@@ -532,13 +535,11 @@ public class PrefixHashMap<K,V>
 	    // have a different prefix next
 	    for (PrefixEntry<K,V> e = table[i]; e != null; e = e.next) {
 		
-		e.prefix.shiftLeft(); 		
-		((e.prefix.leadingBit() == 1) ? leftChild_ : rightChild_).
+		//e.prefix.shiftLeft(); 		
+		((e.leadingBit() == 1) ? leftChild_ : rightChild_).
 		    addEntry(e, i);
 	    }
 	}
-
-
 
 	// null out the intermediate node's table as an optimization
 	// to reduce serialization time.
@@ -584,14 +585,14 @@ public class PrefixHashMap<K,V>
      * @return the leaf table responsible for storing all entries with
      *         the specified prefix
      */
-    private PrefixHashMap<K,V> lookup(Prefix prefix) {
-	// a leading 1 indicates the left child prefix
+    private PrefixHashMap<K,V> lookup(int prefix) {
+	// a leading bit of 1 indicates the left child prefix
 	PrefixHashMap<K,V> leaf;
-	for (leaf = this; leaf.leftChild != null; 
-	     leaf = (prefix.leadingBit() == 1)
+	for (leaf = this; leaf.leftChild != null && leaf.depth < MAX_DEPTH-1;
+	     leaf = ((prefix & 0x80000000) == 0x80000000) 
 		 ? leaf.leftChild.get(PrefixHashMap.class)
 		 : leaf.rightChild.get(PrefixHashMap.class))
-	     prefix.shiftLeft();
+	    prefix <<= 1;
 	return leaf;
     }
 
@@ -610,8 +611,8 @@ public class PrefixHashMap<K,V>
     public V get(Object key) {
 
  	int hash = (key == null) ? 0 : hash(key.hashCode());
- 	Prefix prefix = new Prefix(hash);
-	PrefixHashMap<K,V> leaf = lookup(prefix);
+ 	//Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)]; 
 	     e != null; 
 	     e = e.next) {	    
@@ -653,8 +654,8 @@ public class PrefixHashMap<K,V>
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	Prefix prefix = new Prefix(hash);
-	PrefixHashMap<K,V> leaf = lookup(prefix);
+	//Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 
 	int i = indexFor(hash, leaf.table.length);
@@ -671,7 +672,7 @@ public class PrefixHashMap<K,V>
 	}
 	    
 	// we found no key match, so add an entry
-	leaf.addEntry(hash, key, value, i, prefix);
+	leaf.addEntry(hash, key, value, i, hash);
 
 	return null;	
     }
@@ -700,13 +701,14 @@ public class PrefixHashMap<K,V>
      * @param prefix the value of the prefix at the time the subtable
      *        was identified.
      */
-    private void addEntry(int hash, K key, V value, int index, Prefix prefix) {
+    private void addEntry(int hash, K key, V value, int index, int prefix) {
 	PrefixEntry<K,V> prev = table[index];
-	table[index] = new PrefixEntry<K,V>(hash, key, value, prev, prefix);
+	table[index] = new PrefixEntry<K,V>(hash, key, value, 
+					    prev, prefix, depth);
 
 	// ensure that the prefix has enough precision to support
 	// another split operation	    
-	if ((size++) >= splitThreshold && !prefix.isAtMaximum())
+	if ((size++) >= splitThreshold && depth < MAX_DEPTH)
 	    split();
     }
     
@@ -723,7 +725,7 @@ public class PrefixHashMap<K,V>
      */
     private void addEntry(PrefixEntry copy, int index) {
  	PrefixEntry<K,V> prev = table[index];
-	table[index] = new PrefixEntry<K,V>(copy, prev); 
+	table[index] = new PrefixEntry<K,V>(copy, prev, depth); 
  	size++;
     }
     
@@ -770,9 +772,8 @@ public class PrefixHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	Prefix prefix = new Prefix(hash);
-
-	PrefixHashMap<K,V> leaf = lookup(prefix);
+	//	Prefix prefix = new Prefix(hash);
+	PrefixHashMap<K,V> leaf = lookup(hash);
 
 	int i = indexFor(hash, leaf.table.length);
 	PrefixEntry<K,V> e = leaf.table[i]; 
@@ -864,9 +865,12 @@ public class PrefixHashMap<K,V>
     }
 
     public String treeDiag() {
-	return "ROOT: " + AppContext.getDataManager().createReference(this) + "\n"
-	    + leftChild.get(PrefixHashMap.class).treeDiag(1) + "\n"
-	    + rightChild.get(PrefixHashMap.class).treeDiag(1);	    
+	return "ROOT: " + 
+	    ((leftChild == null) 
+	     ? "conents: " + treeString()
+	     : AppContext.getDataManager().createReference(this) + "\n"
+	     + leftChild.get(PrefixHashMap.class).treeDiag(1) + "\n"
+	     + rightChild.get(PrefixHashMap.class).treeDiag(1));	    
     }
 
     private String treeDiag(int depth) {
@@ -890,115 +894,6 @@ public class PrefixHashMap<K,V>
 	    s += r + " " + r.get(PrefixHashMap.class).treeString() + 
 		((r.get(PrefixHashMap.class).rightLeaf != null) ? " -> " : "");
 	return s;
-    }
-
-
-    /**
-     * A utility class for keeping track of the full prefix for all of
-     * the PrefixEntry objects as they are split merged;
-     *
-     * This class is necessary to maintain all of the prefix bits.
-     * During successive {@link PrefixHashMap#merge()} and {@code
-     * PrefixHashMap#split()} operations, shifting just the prefix
-     * bits would cause the higher order bits to become
-     * permanently lost, which could cause ill-formed distribution
-     * of the keys.
-     *
-     * Note that it is up to the user to ensure that the bits are not
-     * shifted past their resolution, or incorrectly shifted.  The
-     * {@link Prefix#isAtMaximum()} function allows developers to
-     * decide whether any further shift is possible.  Furthermore,
-     * developers should ensure that no right shift occurs before a
-     * left shift tables occurs, as this would override the current
-     * prefix with incorrect values from the buffer.
-     */
-    private static class Prefix implements Serializable {
-
-	private static final long serialVersionUID = 1;
-	
-	/**
-	 * The former leading bits that have been shifted left, off of
-	 * the original prefix
-	 */
-	private int buffer;
-	    
-	/**
-	 * The current prefix value
-	 */
-	private int prefix;
-	    
-	/**
-	 * The current offset of the original highest order bit.  A
-	 * positive value indicates that the original higest order bit
-	 * is current in the buffered bits.
-	 */
-	private byte shift;
-	    
-	/**
-	 * Constructs a {@code Prefix} with the provided starting
-	 * value.
-	 *
-	 * @param prefix the prefix value
-	 */
-	public Prefix(int prefix) {
-	    this.prefix = prefix;
-	    this.buffer = 0x0;
-	    this.shift = 0;
-	}
-	    
-	/**
-	 * Shifts the prefix right and then shifts the lowest
-	 * ordered bit from the buffered bits onto the highest
-	 * ordered bit of the prefix.
-	 */
-	public void shiftRight() {
-	    // find the lowest order bit in the buffered bits,
-	    // then prepend it to the prefix
-	    prefix = (prefix >>> 1) | ((buffer & 0x1) << 31);
-	    buffer >>>= 1;
-	    shift--;
-	}
-
-	/**
-	 * Shifts the highest order bit off the prefix value onto the
-	 * the buffered bits
-	 */
-	public void shiftLeft() {
-	    buffer = (buffer << 1) | ((prefix & 0x80000000) >>> 31);
-	    prefix <<= 1;
-	    shift++;
-	}
-
-	/**
-	 * Returns the current value of the prefix
-	 */
-	public int prefix() {
-	    return prefix;
-	}
-
-	/**
-	 * Returns the value of the highest-order bit on the prefix
-	 */
-	public byte leadingBit() {
-	    return (byte)((prefix & 0x80000000) >>> 31);
-	}
-
-	/**
-	 * Returns whether this prefix has been shifted to its maximum
-	 * precision.
-	 */
-	public boolean isAtMaximum() {
-	    return shift == 31;
-	}
-
-	/**
-	 * Returns a binary represntation of this prefix
-	 */
-	public String toString() {
-	    //return Integer.toBinaryString(prefix);
-	    return Integer.toHexString(prefix);
-	}
-
     }
 
     /**
@@ -1046,8 +941,12 @@ public class PrefixHashMap<K,V>
 	/**
 	 * The current prefix for where this entry is stored.
 	 */
-	Prefix prefix;
+	int prefix;
 
+	/**
+	 * The depth of this entry in the tree
+	 */
+	int depth;
 
 	/**
 	 * Whether the key stored in this entry is actually stored
@@ -1071,7 +970,7 @@ public class PrefixHashMap<K,V>
 	 * @param prefix the prefix value for when the entry was
 	 *        originally created
 	 */
-	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next, Prefix prefix) {
+	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next, int prefix, int depth) {
 
 	    if (k instanceof ManagedObject) {
 		// if k is already a ManagedObject, then put it in the
@@ -1106,7 +1005,7 @@ public class PrefixHashMap<K,V>
 	    this.prefix = prefix;
 	}
 
-	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next) {
+	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next, int depth) {
 	    this.hash = clone.hash;
 	    this.keyRef = clone.keyRef;
 	    this.next = next;
@@ -1141,6 +1040,15 @@ public class PrefixHashMap<K,V>
 		? ((ManagedWrapper<V>)(valueRef.get(ManagedWrapper.class))).object
 		: (V)(valueRef.get(Object.class));
 	}
+
+	/**
+	 * Returns the leading bit for the prefix of this entry.
+	 *
+	 * @return the leading bit of the prefix
+	 */
+ 	public byte leadingBit() {
+ 	    return (byte)(((prefix << depth) & 0x80000000) >>> 31);
+ 	}
 
 	/**
 	 * Replaces the previous value of this entry with the provided
@@ -1207,8 +1115,8 @@ public class PrefixHashMap<K,V>
 	}
 	
 	/**
-	 * Returns the string form of this entry as [{@code entry},
-	 * {@code value}]-&gt;<i>next</i>.
+	 * Returns the string form of this entry as {@code
+	 * entry}={@code value}.
 	 */
 	public String toString() {
 	    return getKey() + "=" + getValue();

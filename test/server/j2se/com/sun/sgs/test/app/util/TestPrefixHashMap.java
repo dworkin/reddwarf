@@ -22,7 +22,10 @@ import java.io.File;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -231,25 +234,77 @@ public class TestPrefixHashMap extends TestCase {
     }
 
 
-    @Test public void testPutAndRemove() throws Exception {
+    @Test public void testPutAndRemoveSingleLeaf() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();	
+
+	for (int i = 0; i < 54; ++i) {
+	    
+	    test.put(i, i);
+	    test.put(~i, ~i);
+	    control.put(i, i);
+	    control.put(~i, ~i);
+	}
+
+	for (int i = 0; i < 54; i += 2) {
+	    test.remove(i);
+	    control.remove(i);
+	}
+	
+
+	assertEquals(control, test);
+	
+        txn.commit();
+    }
+
+
+    @Test public void testPutAndRemoveLopsided() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
 	    
 	    test.put(i, i);
-	    test.put(~i, ~i);
-	    control.put(i,i);
-	    control.put(~i, ~i);
+	    control.put(i, i);
 	}
 
 	for (int i = 0; i < 128; i += 2) {
 	    test.remove(i);
 	    control.remove(i);
 	}
+	
+	assertEquals(control, test);
+	
+        txn.commit();
+    }
 
+    @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+
+	for (int i = 0; i < 128; ++i) {
+	    
+	    test.put(i, i);
+	    test.put(-i, -i);
+	    control.put(i, i);
+	    control.put(-i, -i);
+	}
+
+	for (int i = 0; i < 128; i += 2) {
+	    test.remove(i);
+	    control.remove(i);
+	}
+	
+	assertEquals(control.size(), test.size());
+
+	assertTrue(control.keySet().containsAll(test.keySet()));
+	       
 	assertEquals(control, test);
 	
         txn.commit();
