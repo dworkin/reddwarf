@@ -18,12 +18,29 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
  * Performs specific tests for the DataStoreServerImpl class that can't easily
  * be performed from via the DataStore interface from the client.
  */
 public class TestDataStoreServerImpl extends TestCase {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static final TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataStoreServerImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataStoreServerImpl(testMethod));
+	return suite;
+    }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -308,9 +325,42 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
-    /** Test that the standard transaction timeout gets applied. */
-    public void testGetObjectTimeout() throws Exception {
+    /**
+     * Test that the standard transaction timeout gets applied by the
+     * reaper.
+     */
+    public void testGetObjectTimeoutReap() throws Exception {
 	server.prepareAndCommit(tid);
+	server.shutdown();
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "50");
+	server = getDataStoreServer();
+	tid = server.createTransaction(100);
+	server.setBinding(tid, "dummy", oid);
+	Thread.sleep(200);
+	try {
+	    server.getBinding(tid, "dummy");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	try {
+	    server.abort(tid);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    tid = -1;
+	}
+    }
+
+    /**
+     * Test that the standard transaction timeout gets applied, without the
+     * reaper kicking in.
+     */
+    public void testGetObjectTimeoutNoReap() throws Exception {
+	server.prepareAndCommit(tid);
+	server.shutdown();
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "10000");
+	server = getDataStoreServer();
 	tid = server.createTransaction(100);
 	server.setBinding(tid, "dummy", oid);
 	Thread.sleep(200);
@@ -319,10 +369,6 @@ public class TestDataStoreServerImpl extends TestCase {
 	    fail("Expected TransactionTimeoutException");
 	} catch (TransactionTimeoutException e) {
 	    System.err.println(e);
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	} finally {
-	    tid = -1;
 	}
     }
 

@@ -7,9 +7,26 @@ package com.sun.sgs.test.impl.service.data.store.net;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
 import java.util.Properties;
+import junit.framework.TestSuite;
 
 /** Test the DataStoreService using a networked data store. */
 public class TestDataServiceClient extends TestDataServiceImpl {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static final TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataServiceImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataServiceClient(testMethod));
+	return suite;
+    }
 
     /**
      * The name of the host running the DataStoreServer, or null to create one
@@ -58,10 +75,12 @@ public class TestDataServiceClient extends TestDataServiceImpl {
 
     /* -- Skip these tests -- they don't apply in the network case -- */
 
+    @Override
     public void testConstructorNoDirectory() {
 	System.err.println("Skipping");
     }
 
+    @Override
     public void testConstructorNoDirectoryNorRoot() {
 	System.err.println("Skipping");
     }

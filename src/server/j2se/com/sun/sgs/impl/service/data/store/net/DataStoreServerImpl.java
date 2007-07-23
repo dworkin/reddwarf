@@ -360,11 +360,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/**
 	 * Gets the transaction associated with the specified ID, and marks it
-	 * in use.
+	 * in use.  Checks if the transaction has timed out if checkTimeout is
+	 * true.
 	 */
-	Txn get(long tid) {
+	Txn get(long tid, boolean checkTimeout) {
 	    Txn txn = table.get(tid);
 	    if (txn != null) {
+		if (checkTimeout) {
+		    txn.checkTimeout();
+		}
 		if (!txn.setInUse(true)) {
 		    throw new IllegalStateException(
 			"Multiple simultaneous accesses to transaction: " +
@@ -984,11 +988,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
-	    Txn txn = txnTable.get(tid);
-	    if (checkTimeout) {
-		txn.checkTimeout();
-	    }
-	    return txn;
+	    return txnTable.get(tid, checkTimeout);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
 			    "Getting transaction stid:{0,number,#} failed",
