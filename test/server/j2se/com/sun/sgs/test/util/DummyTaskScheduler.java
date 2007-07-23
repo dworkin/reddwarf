@@ -198,10 +198,10 @@ public class DummyTaskScheduler implements TaskScheduler {
                 return;
             } catch (Exception e) {
                 if (! retry)
-                    return;
+                    throw e;
                 if ((! (e instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)e).shouldRetry()))
-                    return;
+                    throw e;
             }
         }
     }

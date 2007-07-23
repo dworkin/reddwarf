@@ -270,6 +270,13 @@ public class TestMasterTaskSchedulerImpl {
         scheduler.runTask(runner, testOwner, false);
     }
 
+    @Test (expected=RuntimeException.class)
+        public void runNonRetriedTaskWithRetry() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        NonRetryTestRunner runner = new NonRetryTestRunner();
+        scheduler.runTask(runner, testOwner, true);
+    }
+
     @Test public void runTaskTransactional() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
         final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
@@ -370,6 +377,15 @@ public class TestMasterTaskSchedulerImpl {
         }
         public boolean isFinished() {
             return finished;
+        }
+    }
+
+    private class NonRetryTestRunner implements KernelRunnable {
+        public String getBaseTaskType() {
+            return NonRetryTestRunner.class.getName();
+        }
+        public void run() throws Exception {
+            throw new RuntimeException("non-retry exception");
         }
     }
 
