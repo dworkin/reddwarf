@@ -56,14 +56,14 @@ import com.sun.sgs.app.ManagedReference;
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  As the
  * map grows, the number of supported parallel operations will also
- * grow beyond this minimum, but this factor ensures that it will
- * never drop below the provided number.  However, the size of the map
- * grows {@code O(n log(n))} to support the operations and therefore a
- * sparse map will incur some overhead when accessing its elements.
- * Furthermore, the efficacy of the concurrency depends on the
- * distribution of hash values; keys with poor hashing will minimize
- * the actual number of possible concurrent writes, regardless of the
- * {@code minConcurrency} value.
+ * grow beyond the specified minimum, but this factor ensures that it
+ * will never drop below the provided number.  Setting this value too
+ * high will waste space and time, while setting it too low will cause
+ * conflicts until the map grows sufficiently to support more
+ * concurrent operations.  Furthermore, the efficacy of the
+ * concurrency depends on the distribution of hash values; keys with
+ * poor hashing will minimize the actual number of possible concurrent
+ * writes, regardless of the {@code minConcurrency} value.
  *
  * This class implements all of the optional {@code Map} operations
  * and supports both {@code null} keys and values.  This map provides
@@ -75,7 +75,12 @@ import com.sun.sgs.app.ManagedReference;
  * Map} implementations.   
  *
  * @since 1.0
- * @version 1.0
+ * @version 1.2
+ *
+ * @see Object#hashCode()
+ * @see Map
+ * @see Serializable
+ * @see ManagedObject
  */
 @SuppressWarnings({"unchecked"})
 public class PrefixHashMap<K,V> 
@@ -158,7 +163,7 @@ public class PrefixHashMap<K,V>
     // NOTE: this is actually an array of type PrefixEntry<K,V> but
     //       generic arrays are not allowed, so we cast the elements
     //       as necessary
-    PrefixEntry[] table;    
+    transient PrefixEntry[] table;    
 
     /**
      * The number of elements in this table.  Note that this is
@@ -1499,6 +1504,61 @@ public class PrefixHashMap<K,V>
 	 */
 	public ManagedWrapper(T object) {
 	    this.object = object;
+	}
+    }
+
+    /**
+     * Saves the state of this {@code PrefixHashMap} instance to the
+     * provided stream.
+     *
+     * @serialData a {@code boolean} of whether this instance was a
+     *             leaf node.  If this instance is a leaf node, this
+     *             boolean is followed by a series {@code PrefixEntry}
+     *             instances, some of which may be chained.  The
+     *             deserialization should count each chained entry
+     *             towards the total size of the leaf.
+     */
+    private void writeObject(java.io.ObjectOutputStream s) 
+	throws java.io.IOException {
+	// parent, leafs, children, stable, size, splitThresh, mergeThresh,
+	// leafCapacity, splitFactor, mergeFactor, minDepth, depth
+	// write out all the non-transient state
+	s.defaultWriteObject();
+
+	// write out whether this node was a leaf
+	s.writeBoolean(table != null);
+	
+	// if this was a leaf node, write out all the elments in it
+	if (table != null) {
+	    for (int i = 0; i < table.length; ++i) {
+		if (table[i] != null)
+		    s.writeObject(table[i]);
+	    }
+	}
+    }
+
+    /**
+     * Reconstructs the {@code PrefixHashMap} from the provided
+     * stream.
+     */
+    private void readObject(java.io.ObjectInputStream s) 
+	throws java.io.IOException, ClassNotFoundException {
+	
+	// read in all the non-transient state
+	s.defaultReadObject();
+
+	boolean isLeaf = s.readBoolean();
+
+	// initialize the table if it is a leaf node, otherwise, mark
+	// it as null
+	table = (isLeaf) ? new PrefixEntry[leafCapacity] : null;
+		
+	// read in entries and assign them back their positions in the
+	// table, noting that some positions may have chained entries
+	for (int i = 0; i < size; ) {
+	    PrefixEntry<K,V> e = (PrefixEntry<K,V>) s.readObject();
+	    table[indexFor(e.hash, leafCapacity)] = e;
+	    for (int j = ++i; (e = e.next) != null; ++i);
 	}
     }
 }

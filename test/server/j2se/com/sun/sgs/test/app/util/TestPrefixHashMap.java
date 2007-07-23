@@ -18,7 +18,12 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -309,6 +314,7 @@ public class TestPrefixHashMap extends TestCase {
 	
         txn.commit();
     }
+
 
 
     @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
@@ -1091,6 +1097,82 @@ public class TestPrefixHashMap extends TestCase {
 	
 	txn.commit();
     }
+
+    @SuppressWarnings({"unchecked"})
+	@Test public void testLeafSerialization() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[100];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	    
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(test);
+	
+	byte[] serializedForm = baos.toByteArray();
+
+	System.out.printf("Serialized form is %d bytes\n", 
+			  serializedForm.length);
+
+	ByteArrayInputStream bais = 
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	PrefixHashMap<Integer,Integer> m = 
+	    (PrefixHashMap<Integer,Integer>) ois.readObject();
+
+	assertEquals(control, m);
+	
+	txn.commit();
+    }
+
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testSplitTreeSerialization() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[100];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	    
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(test);
+	
+	byte[] serializedForm = baos.toByteArray();
+
+	System.out.printf("Serialized form is %d bytes\n", 
+			  serializedForm.length);
+
+	ByteArrayInputStream bais = 
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	PrefixHashMap<Integer,Integer> m = 
+	    (PrefixHashMap<Integer,Integer>) ois.readObject();
+
+	assertEquals(control, m);
+	
+	txn.commit();
+    }
+
 
 
     /**
