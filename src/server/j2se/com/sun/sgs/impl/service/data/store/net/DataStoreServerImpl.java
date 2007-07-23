@@ -530,7 +530,9 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private static class SocketExporter extends Exporter<DataStoreServer> {
 	private DataStoreServerRemote remote;
-	SocketExporter() { }
+	SocketExporter(Class<DataStoreServer> type) {
+	    super(type);
+	}
 	public int export(DataStoreServer server, String name, int port)
 	    throws IOException
 	{
@@ -595,8 +597,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
 	exporter = noRmi ?
-	    new SocketExporter() :
-	    new Exporter<DataStoreServer>();
+	    new SocketExporter(DataStoreServer.class) :
+	    new Exporter<DataStoreServer>(DataStoreServer.class);
 	port = exporter.export(this, "DataStoreServer", requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);

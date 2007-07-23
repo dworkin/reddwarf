@@ -41,7 +41,8 @@ public interface WatchdogService extends Service {
      * monitors.  The {@code remove} operation of the returned
      * iterator is not supported and will throw {@code
      * UnsupportedOperationException} if invoked.  This method should
-     * only be called within a transaction.
+     * only be called within a transaction, and the returned iterator
+     * should only be used within that transaction.
      *
      * @return	an iterator for the set of nodes that this service
      *		monitors

@@ -13,15 +13,23 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -104,6 +112,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
+    /** The lock for notifying the {@code NotifyClientsThread}. */
+    private final Object notifyClientsLock = new Object();
+
+    /** The thread to notify clients of node status changes. */
+    private final Thread notifyClientsThread = new NotifyClientsThread();
+
+    /** The queue of nodes whose status has changed. */
+    private final Queue<Node> statusChangedNodes =
+	new ConcurrentLinkedQueue<Node>();
+
     /** The task owner. */
     private TaskOwner taskOwner;
 
@@ -114,7 +132,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private boolean shuttingDown = false;
 
     /** The map of registered nodes, from node ID to node information. */
-    private final Map<Long, NodeImpl> nodeMap = new HashMap<Long, NodeImpl>();
+    private final ConcurrentMap<Long, NodeImpl> nodeMap =
+	new ConcurrentHashMap<Long, NodeImpl>();
 
     /** The set of node information, sorted by ping expiration time. */
     private final SortedSet<NodeImpl> expirationSet = new TreeSet<NodeImpl>();
@@ -161,13 +180,14 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		" and less than or equal to " + PING_INTERVAL_UPPER_BOUND +
 		": " + pingInterval);
 	}
-	exporter = new Exporter<WatchdogServer>();
+	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
 	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	checkExpirationThread.start();
+	notifyClientsThread.start();
     }
 
     /** {@inheritDoc} */
@@ -224,6 +244,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 	exporter.unexport();
 	checkExpirationThread.interrupt();
+	notifyClientsThread.interrupt();
 	return true;
     }
     
@@ -235,18 +256,20 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * <p>This implementation assumes that it will not receive a ping
      * for the same node while it is registering that node.
      */
-    public long registerNode(long nodeId, String hostname) throws IOException {
+    public long registerNode(long nodeId,
+			     String hostname,
+			     WatchdogClient client)
+	throws IOException
+    {
 	checkState();
-	NodeImpl node;
-	synchronized (nodeMap) {
-	    node = nodeMap.get(nodeId);
-	    if (node != null) {
-		throw new NodeExistsException(
-		    "node already registered: " + nodeId);
-	    }
-	    node = new NodeImpl(nodeId, hostname, true, calculateExpiration());
-	    nodeMap.put(nodeId, node);
+	final NodeImpl node = new NodeImpl(
+	    nodeId, hostname, client, calculateExpiration());
+	
+	if (nodeMap.putIfAbsent(nodeId, node) != null) {
+	    throw new NodeExistsException(
+		"node already registered: " + nodeId);
 	}
+
 	synchronized (expirationSet) {
 	    expirationSet.add(node);
 	}
@@ -255,20 +278,22 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 * Persist node, and back out registration if storing the node fails.
 	 */
 	try {
-	    final NodeImpl newNode = node;
 	    runTransactionally(new AbstractKernelRunnable() {
 		public void run() {
-		    newNode.putNode(dataService);
+		    node.putNode(dataService);
 		}});
 	} catch (Exception e) {
-	    synchronized (nodeMap) {
-		nodeMap.remove(nodeId);
-	    }
+	    nodeMap.remove(nodeId);
 	    synchronized (expirationSet) {
 		expirationSet.remove(node);
 	    }
 	    throw new NodeRegistrationFailedException(
 		"registration failed: " + nodeId, e);
+	}
+
+	statusChangedNodes.add(node);
+	synchronized (notifyClientsLock) {
+	    notifyClientsLock.notifyAll();
 	}
 	
 	return pingInterval;
@@ -276,29 +301,19 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**
      * {@inheritDoc}
-     *
-     * <p>This implementation assumes that it will not receive a ping
-     * for the same node while it is processing a ping for that node.
      */
     public boolean ping(long nodeId) throws IOException {
 	checkState();
-	NodeImpl node;
-	synchronized (nodeMap) {
-	    node = nodeMap.get(nodeId);
-	    if (node == null) {
-		return false;
-	    }
+	NodeImpl node = nodeMap.get(nodeId);
+	if (node == null || !node.isAlive()) {
+	    return false;
 	}
 
 	synchronized (expirationSet) {
-	    if (!node.isAlive()) {
-		return false;
-	    } else {
-		// update ping expiration time in sorted set...
-		expirationSet.remove(node);
-		node.setExpiration(calculateExpiration());
-		expirationSet.add(node);
-	    }
+	    // update ping expiration time in sorted set...
+	    expirationSet.remove(node);
+	    node.setExpiration(calculateExpiration());
+	    expirationSet.add(node);
 	    return true;
 	}
     }
@@ -308,13 +323,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      */
     public boolean isAlive(long nodeId) throws IOException {
 	checkState();
-	synchronized (nodeMap) {
-	    NodeImpl node = nodeMap.get(nodeId);
-	    if (node == null) {
-		return false;
-	    } else {
-		return node.isAlive();
-	    }
+	NodeImpl node = nodeMap.get(nodeId);
+	if (node == null) {
+	    return false;
+	} else {
+	    return node.isAlive();
 	}
     }
 
@@ -405,23 +418,32 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
 	    while (!shuttingDown()) {
 
-		NodeImpl expirationNode =
-		    new NodeImpl(0, null, false, System.currentTimeMillis());
+		long now = System.currentTimeMillis();
+		boolean notify = false;
 		synchronized (expirationSet) {
-		    SortedSet<NodeImpl> expiredNodes =
-			expirationSet.headSet(expirationNode);
-		    if (! expiredNodes.isEmpty()) {
-			for (NodeImpl node : expiredNodes) {
-			    setFailed(node);
+		    while (! expirationSet.isEmpty()) {
+			NodeImpl node = expirationSet.first();
+			if (node.getExpiration() > now) {
+			    break;
 			}
-			expiredNodes.clear();
+			setFailed(node);
+			statusChangedNodes.add(node);
+			notify = true;
+			expirationSet.remove(node);
+			// TBD: when should node be removed from nodeMap?
+		    }
+		}
+		
+		if (notify) {
+		    synchronized (notifyClientsLock) {
+			notifyClientsLock.notifyAll();
 		    }
 		}
 
 		long sleepTime =
 		    expirationSet.isEmpty() ?
 		    pingInterval :
-		    expirationSet.first().getExpiration();
+		    expirationSet.first().getExpiration() - now;
 		try {
 		    Thread.currentThread().sleep(sleepTime);
 		} catch (InterruptedException e) {
@@ -445,6 +467,50 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    } catch (Exception e) {
 		logger.logThrow(Level.SEVERE, e,
 				"Updating node failed: {0}", node.getId());
+	    }
+	}
+    }
+
+    private final class NotifyClientsThread extends Thread {
+
+	/** Constructs an instance of this class as a daemon thread. */
+	NotifyClientsThread() {
+	    super(CLASSNAME + "$NotifyClientsThread");
+	    setDaemon(true);
+	}
+	
+	public void run() {
+
+	    while (!shuttingDown()) {
+		while (statusChangedNodes.isEmpty()) {
+		    synchronized (notifyClientsLock) {
+			try {
+			    notifyClientsLock.wait();
+			} catch (InterruptedException e) {
+			    if (shuttingDown()) {
+				return;
+			    }
+			}
+		    }
+		}
+
+		Iterator<Node> iter = statusChangedNodes.iterator();
+		Collection<Node> nodes = new ArrayList<Node>();
+		while (iter.hasNext()) {
+		    nodes.add(iter.next());
+		    iter.remove();
+		}
+
+		for (NodeImpl notifyNode : nodeMap.values()) {
+		    WatchdogClient client = notifyNode.getWatchdogClient();
+		    try {
+			client.nodeStatusChange(nodes);
+		    } catch (Exception e) {
+			logger.logThrow(Level.WARNING, e,
+					"Notifying {0} of status change failed:",
+					notifyNode.getId());
+		    }
+		}
 	    }
 	}
     }

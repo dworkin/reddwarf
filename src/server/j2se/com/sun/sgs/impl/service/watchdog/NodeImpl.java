@@ -41,6 +41,9 @@ class NodeImpl
     
     /** The host name, or {@code null}. */
     private final String host;
+
+    /** The watchdog client, or {@code null}. */
+    private final WatchdogClient client;
     
     /** If true, this node is considered alive. */
     private boolean isAlive;
@@ -49,19 +52,42 @@ class NodeImpl
     private transient long expiration;
 
     /**
-     * Constructs an instance of this class with the given {@code nodeId},
-     * {@code hostname}, and {@code alive} status.
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostname}, {@code client}, and {@code
+     * expiration}.  This instance's alive staus is set to {@code
+     * true}.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
-     * @param 	alive the alive status
+     * @param	client a watchdog client
      * @param	expiration the node's expiration time
      */
-    NodeImpl(long nodeId, String hostName, boolean alive, long expiration) {
+    NodeImpl(long nodeId,
+	     String hostName,
+	     WatchdogClient client,
+	     long expiration)
+    {
 	this.id = nodeId;
 	this.host = hostName;
-	this.isAlive = alive;
+	this.client = client;
 	this.expiration = expiration;
+	this.isAlive = true;
+    }
+
+    /**
+     * Constructs and instance of this class with the given {@code
+     * nodeId}, a {@code null} {@code hostname}, a {@code null} {@code
+     * client}, and a {@code 0} {@code expiration}.  This instance's
+     * alive staus is set to {@code false}.
+     *
+     * @param 	nodeId a node ID
+     */
+    NodeImpl(long nodeId) {
+	this.id = nodeId;
+	host = null;
+	client = null;
+	expiration = 0;
+	isAlive = false;
     }
 
     /* -- Implement Node -- */
@@ -119,6 +145,13 @@ class NodeImpl
     }
 
     /* -- package access methods -- */
+
+    /**
+     * Returns the watchdog client.
+     */
+    WatchdogClient getWatchdogClient() {
+	return client;
+    }
     
     /**
      * Returns the expiration time.
@@ -151,6 +184,7 @@ class NodeImpl
      *		current transaction
      */
     synchronized void putNode(DataService dataService) {
+	dataService.markForUpdate(this);
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
     /**
@@ -164,7 +198,6 @@ class NodeImpl
      *		current transaction
      */
     synchronized void updateNode(DataService dataService) {
-	
 	NodeImpl node = getNode(dataService, id);
 	if (node == null) {
 	    throw new ObjectNotFoundException("node not found: " + id);
@@ -211,7 +244,8 @@ class NodeImpl
      * Returns an iterator for {@code Node} instances to be retrieved
      * from the specified {@code dataService}.  The returned iterator
      * does not support the {@code remove} operation.  This method
-     * should only be called within a transaction.
+     * should only be called within a transaction, and the returned
+     * iterator should only be used within that transaction.
      *
      * @param	dataService a data service
      * @return	an iterator for nodes

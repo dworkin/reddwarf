@@ -32,14 +32,26 @@ public class Exporter<T extends Remote> {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** The type of the server. */
+    private final Class<T> type;
+    
     /** The server for handling inbound requests. */
     private T server;
 
     /** The Java(TM) RMI registry for advertising the server. */
     private Registry registry;
 
-    /** Creates an instance. */
-    public Exporter() { }
+    /** The server proxy. */
+    private T proxy;
+
+    /** Creates an instance for exporting a remote object of the given
+     * {@code type}.
+     *
+     * @param	type the remote object type
+     */
+    public Exporter(Class<T> type) {
+	this.type = type;
+    }
 
     /**
      * Makes the server available on the network on the specified port.  If
@@ -59,10 +71,23 @@ public class Exporter<T extends Remote> {
 	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	registry = LocateRegistry.createRegistry(port, null, ssf);
-	registry.rebind(
-	    name,
-	    UnicastRemoteObject.exportObject(server, port, null, ssf));
+	proxy =
+	    type.cast(UnicastRemoteObject.exportObject(server, port, null, ssf));
+	registry.rebind(name, proxy);
 	return ssf.getLocalPort();
+    }
+
+    public int export(T server, int port) throws IOException {
+	this.server = server;
+	assert server != null;
+	ServerSocketFactory ssf = new ServerSocketFactory();
+	proxy =
+	    type.cast(UnicastRemoteObject.exportObject(server, port, null, ssf));
+	return ssf.getLocalPort();
+    }
+
+    public T getProxy() {
+	return proxy;
     }
 
     /**
@@ -89,13 +114,15 @@ public class Exporter<T extends Remote> {
 		return false;
 	    }
 	}
-	try {
-	    UnicastRemoteObject.unexportObject(registry, true);
-	    registry = null;
-	} catch (NoSuchObjectException e) {
-	    logger.logThrow(
-		Level.FINE, e, "Problem unexporting registry");
-	    return false;
+	if (registry != null ) {
+	    try {
+		UnicastRemoteObject.unexportObject(registry, true);
+		registry = null;
+	    } catch (NoSuchObjectException e) {
+		logger.logThrow(
+		    Level.FINE, e, "Problem unexporting registry");
+		return false;
+	    }
 	}
 	return true;
     }

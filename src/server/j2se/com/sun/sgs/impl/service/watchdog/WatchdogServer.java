@@ -17,9 +17,14 @@ public interface WatchdogServer extends Remote {
      * {@code hostname}, and returns an interval (in milliseconds)
      * that this watchdog must be notified, via the {@link #ping ping}
      * method, in order for the specified node to be considered alive.
+     * When a node fails or a new node starts, the given {@code
+     * client} will be notified via its {@link
+     * WatchdogClient#nodeStarted nodeStarted} and {@link
+     * WatchdogClient#nodeFailed nodeFailed} methods respectively.
      *
      * @param	nodeId	a node ID
      * @param	hostname  a hostname
+     * @param	client a watchdog client
      *
      * @return	an interval (in milliseconds) that this watchdog
      * 		expects to receive pings from the specified node
@@ -31,7 +36,7 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long registerNode(long nodeId, String hostname)
+    long registerNode(long nodeId, String hostname, WatchdogClient client)
 	throws IOException;
 
     /**

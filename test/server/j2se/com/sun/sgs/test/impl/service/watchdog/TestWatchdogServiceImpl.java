@@ -17,6 +17,8 @@ import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -24,7 +26,10 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.Set;
 
 import junit.framework.TestCase;
 
@@ -45,12 +50,16 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** The port for the watchdog server. */
     private static int WATCHDOG_PORT = 0;
 
+    /** The ping interval for the watchdog server. */
+    private static long PING_INTERVAL = 500;
+
     /** Properties for the watchdog server and data service. */
     private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	WatchdogServerClassName + ".start", "true",
 	WatchdogServerClassName + ".port", Integer.toString(WATCHDOG_PORT),
-	WatchdogServerClassName + ".ping.interval", "500");
+	WatchdogServerClassName + ".ping.interval",
+	    Long.toString(PING_INTERVAL));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -301,14 +310,336 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConfigureAbortConfigure() throws Exception {
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	abortTransaction(null);
+	try {
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    abortTransaction(null);
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    commitTransaction();
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    /* -- Test getLocalNodeId -- */
+
+    public void testGetLocalNodeId() throws Exception {
+	long id = watchdogService.getLocalNodeId();
+	if (id != 0) {
+	    fail("Expected id 0, got " + id);
+	}
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	try {
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    commitTransaction();
+	    id = watchdog.getLocalNodeId();
+	    if (id != 1) {
+		fail("Expected id 1, got " + id);
+	    }
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testGetLocalNodeIdServiceNotConfigured() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	try {
+	    watchdog.getLocalNodeId();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
 	createTransaction();
 	watchdog.configure(serviceRegistry, txnProxy);
 	commitTransaction();
+	watchdog.shutdown();
+	try {
+	    watchdog.getLocalNodeId();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
+    /* -- Test getNodes -- */
+
+    public void testGetNodes() throws Exception {
+	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerClassName + ".port", Integer.toString(port));
+	try {
+	    for (int i = 0; i < 5; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry);
+		createTransaction();
+		watchdog.configure(serviceRegistry, txnProxy);
+		commitTransaction();
+		watchdogs.add(watchdog);
+		System.err.println("watchdog service id: " +
+				   watchdog.getLocalNodeId());
+	    }
+	    // ensure that watchdogs have a chance to re
+	    Thread.currentThread().sleep(PING_INTERVAL);
+	    createTransaction();
+	    Iterator<Node> iter = watchdogService.getNodes();
+	    int numNodes = 0;
+	    while (iter.hasNext()) {
+		Node node = iter.next();
+		System.err.println(node);
+		numNodes++;
+	    }
+	    commitTransaction();
+	    int expectedNodes = watchdogs.size() + 1;
+	    if (numNodes != expectedNodes) {
+		fail("Expected " + expectedNodes +
+		     " watchdogs, got " + numNodes);
+	    }
+	} finally {
+
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testGetNodesServiceNotConfigured() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	try {
+	    watchdog.getNodes();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testGetNodesServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	watchdog.shutdown();
+	createTransaction();
+	try {
+	    watchdog.getNodes();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetNodesNoTransaction() throws Exception {
+	try {
+	    watchdogService.getNodes();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test getNode -- */
+
+    public void testGetNode() throws Exception {
+	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerClassName + ".port", Integer.toString(port));
+	try {
+	    for (int i = 0; i < 5; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry);
+		createTransaction();
+		watchdog.configure(serviceRegistry, txnProxy);
+		commitTransaction();
+		watchdogs.add(watchdog);
+	    }
+	    // wait for all nodes to register...
+	    Thread.currentThread().sleep(1000);
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		long id = watchdog.getLocalNodeId();
+		createTransaction();
+		Node node = watchdogService.getNode(id);
+		System.err.println(node);
+		if (id != node.getId()) {
+		    fail("Expected node ID " + id + " got, " + node.getId());
+		} else if (! node.isAlive()) {
+		    fail("Node " + id + " is not alive!");
+		}
+		commitTransaction();
+	    }
+	    
+	} finally {
+
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testGetNodeServiceNotConfigured() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	try {
+	    watchdog.getNode(0);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testGetNodeServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	watchdog.shutdown();
+	createTransaction();
+	try {
+	    watchdog.getNode(0);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetNodeNoTransaction() throws Exception {
+	try {
+	    watchdogService.getNode(0);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetNodeNonexistentNode() throws Exception {
+	createTransaction();
+	Node node = watchdogService.getNode(29);
+	System.err.println(node);
+	if (node.getId() != 29) {
+	    fail("Expected node ID 29, got " + node.getId());
+	} else if (node.isAlive()) {
+	    fail("Node 29 is alive!");
+	} else if (node.getHostName() != null) {
+	    fail("Expected null host name, got " + node.getHostName());
+	}
+
+    }
+
+    /* -- Test addNodeListener -- */
+    
+    public void testAddNodeListenerServiceNotConfigured() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	try {
+	    watchdog.addNodeListener(new DummyNodeListener());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testAddNodeListenerServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	watchdog.shutdown();
+	createTransaction();
+	try {
+	    watchdog.addNodeListener(new DummyNodeListener());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testAddNodeListenerNullListener() throws Exception {
+	try {
+	    watchdogService.addNodeListener(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testAddNodeListenerNodeFailed() throws Exception {
+	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerClassName + ".port", Integer.toString(port));
+	DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+	
+	for (int i = 0; i < 5; i++) {
+	    WatchdogServiceImpl watchdog =
+		new WatchdogServiceImpl(props, systemRegistry);
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    commitTransaction();
+	    watchdogs.add(watchdog);
+	}
+	// wait for all nodes to register...
+	Thread.currentThread().sleep(1000);
+	for (WatchdogServiceImpl watchdog : watchdogs) {
+	    long id = watchdog.getLocalNodeId();
+	    createTransaction();
+	    Node node = watchdogService.getNode(id);
+	    System.err.println(node);
+	    if (id != node.getId()) {
+		fail("Expected node ID " + id + " got, " + node.getId());
+	    } else if (! node.isAlive()) {
+		fail("Node " + id + " is not alive!");
+	    }
+	    commitTransaction();
+	}
+	// shutdown nodes...
+	for (WatchdogServiceImpl watchdog : watchdogs) {
+	    watchdog.shutdown();
+	}
+
+	// wait for all nodes to fail...
+	Thread.currentThread().sleep(PING_INTERVAL * 4);
+
+	Set<Node> nodes = listener.getFailedNodes();
+	System.err.println("failedNodes: " + nodes);
+	if (nodes.size() != 5) {
+	    fail("Expected 5 failed nodes, got " + nodes.size());
+	}
+	for (Node node : nodes) {
+	    System.err.println(node);
+	    if (node.isAlive()) {
+		fail("Node " + node.getId() + " is alive!");
+	    }
+	}
+    }
+    
     /* -- other methods -- */
     
     /** Creates a property list with the specified keys and values. */
@@ -410,5 +741,28 @@ public class TestWatchdogServiceImpl extends TestCase {
 	} else {
 	    throw new TransactionNotActiveException("txn:" + txn);
 	}
-    }    
+    }
+
+    private static class DummyNodeListener implements NodeListener {
+
+	private final Set<Node> failedNodes = new HashSet<Node>();
+	private final Set<Node> startedNodes = new HashSet<Node>();
+	
+
+	public void nodeStarted(Node node) {
+	    startedNodes.add(node);
+	}
+
+	public void nodeFailed(Node node) {
+	    failedNodes.add(node);
+	}
+
+	Set<Node> getFailedNodes() {
+	    return failedNodes;
+	}
+
+	Set<Node> getStartedNodes() {
+	    return startedNodes;
+	}
+    }
 }

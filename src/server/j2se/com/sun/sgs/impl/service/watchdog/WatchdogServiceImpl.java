@@ -9,6 +9,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -112,6 +114,9 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The application name */
     private final String appName;
 
+    /** The exporter for this server. */
+    private final Exporter<WatchdogClient> exporter;
+
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
@@ -123,6 +128,12 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** The watchdog server proxy. */
     private final WatchdogServer serverProxy;
+
+    /** The watchdog client impl. */
+    private final WatchdogClientImpl clientImpl;
+
+    /** The watchdog client proxy. */
+    private final WatchdogClient clientProxy;
 
     /** The name of the local host. */
     private final String localHost;
@@ -199,10 +210,15 @@ public class WatchdogServiceImpl implements WatchdogService {
 			"greater than 0 and less than 65535: " + port);
 		}
 	    }
-	    
+
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, port);
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
+	    
+	    clientImpl = new WatchdogClientImpl();
+	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
+	    exporter.export(clientImpl, 0);
+	    clientProxy = exporter.getProxy();
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -316,6 +332,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
 	checkState();
+	txnProxy.getCurrentTransaction();
 	return NodeImpl.getNodes(dataService);
     }
 
@@ -326,18 +343,24 @@ public class WatchdogServiceImpl implements WatchdogService {
 	return
 	    node != null ?
 	    node :
-	    new NodeImpl(nodeId, null, false, 0);
+	    new NodeImpl(nodeId);
     }
 
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
 	checkState();
+	if (listener == null) {
+	    throw new NullPointerException("null listener");
+	}
 	nodeListeners.add(listener);
     }
 
     /** {@inheritDoc} */
     public void addNodeListener(long nodeId, NodeListener listener) {
 	checkState();
+	if (listener == null) {
+	    throw new NullPointerException("null listener");
+	}
 	synchronized (nodeListenerMap) {
 	    Set<NodeListener> listeners = nodeListenerMap.get(nodeId);
 	    if (listeners == null) {
@@ -426,11 +449,17 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * shutdown.
 	 */
 	public void run() {
-
+	    
 	    try {
-		pingInterval = serverProxy.registerNode(localNodeId, localHost);
+		pingInterval =
+		    serverProxy.registerNode(
+			localNodeId, localHost, clientProxy);
 	    } catch (Exception e) {
 
+		if (shuttingDown()) {
+		    return;
+		}
+		    
 		/*
 		 * Unable to register node with watchdog server, so
 		 * set this node as failed, and exit thread.
@@ -543,28 +572,63 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    isAlive = false;
 	}
 
+	Node node = new NodeImpl(localNodeId);
+	notifyListeners(node);
+    }
+
+    /**
+     * Notifies the appropriate registered node listeners of the
+     * status change of the specified {@code node}.  If {@code failed}
+     * is (@code true}, the {@code NodeListener#nodeFailed nodeFailed}
+     * method is invoked on each node listener, otherwise the {@code
+     * NodeListener#nodeStarted nodeStarted} method is invoked on each
+     * node listener.
+     *
+     * @param	node a node
+     * @param 	failed {@code true} if node has failed, {@code false}
+     * 		otherwise
+     */
+    private void notifyListeners(final Node node) {
+
 	Set<NodeListener> listenersToNotify;
 	synchronized (nodeListenerMap) {
-	    Set<NodeListener> listenersForLocalNode =
-		nodeListenerMap.get(localNodeId);
-	    if (listenersForLocalNode == null) {
+	    Set<NodeListener> listenersForNode =
+		nodeListenerMap.get(node.getId());
+	    if (listenersForNode == null) {
 		listenersToNotify =  nodeListeners;
 	    } else {
 		listenersToNotify =
-		    new HashSet<NodeListener>(listenersForLocalNode);
+		    new HashSet<NodeListener>(listenersForNode);
 		listenersToNotify.addAll(nodeListeners);
 	    }
 	}
 
-	final Node node = new NodeImpl(localNodeId, localHost, false, 0);
 	for (NodeListener listener : listenersToNotify) {
 	    final NodeListener nodeListener = listener;
 	    nonDurableTaskScheduler.scheduleNonTransactionalTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			nodeListener.nodeFailed(node);
+			if (node.isAlive()) {
+			    nodeListener.nodeStarted(node);
+			} else {
+			    nodeListener.nodeFailed(node);
+			}
 		    }
 		});
+	}
+    }
+
+    /**
+     * Implements the WatchdogClient that receives callbacks from the
+     * WatchdogServer.
+     */
+    private class WatchdogClientImpl implements WatchdogClient {
+
+	/** {@inheritDoc} */
+	public void nodeStatusChange(Collection<Node> nodes) {
+	    for (Node node : nodes) {
+		notifyListeners(node);
+	    }
 	}
     }
 }
