@@ -61,16 +61,20 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 
     /* -- Skip tests that involve properties that don't apply -- */
 
+    @Override
     public void testConstructorNoDirectory() throws Exception {
 	System.err.println("Skipping");
     }
+    @Override
     public void testConstructorNonexistentDirectory() throws Exception {
 	System.err.println("Skipping");
     }
+    @Override
     public void testConstructorDirectoryIsFile() throws Exception {
 	System.err.println("Skipping");
 
     }
+    @Override
     public void testConstructorDirectoryNotWritable() throws Exception {
 	System.err.println("Skipping");
     }

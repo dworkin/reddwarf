@@ -85,8 +85,10 @@ import java.util.logging.Logger;
  * at the following levels: <p>
  *
  * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Problems starting the server
+ * <li> {@link Level#INFO INFO} - Starting the server
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
- * <li> {@link Level#FINE FINE} - Allocating object IDs.
+ * <li> {@link Level#FINE FINE} - Allocating object IDs
  * <li> {@link Level#FINEST FINEST} - Object operations
  * </ul>
  */
@@ -162,7 +164,7 @@ public final class DataStoreClient
     private final DataStoreServer server;
 
     /** The local server or null. */
-    private DataStoreServerImpl localServer;
+    private DataStoreServerImpl localServer = null;
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
