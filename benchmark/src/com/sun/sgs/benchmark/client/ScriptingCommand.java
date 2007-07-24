@@ -418,7 +418,7 @@ public class ScriptingCommand {
         case SEND_DIRECT:
             /** Accept whole line as argument, including spaces */
             if (args.length == 0) break;
-            printArg = stripQuotes(strJoin(args));
+            msg = stripQuotes(strJoin(args));
             return;
             
         case START_BLOCK:
