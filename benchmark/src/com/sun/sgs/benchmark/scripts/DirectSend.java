@@ -34,7 +34,11 @@ public class DirectSend {
     public void run() {
         List<Thread> threads = new LinkedList<Thread>();
         
-        final int bytes = this.bytes;
+        StringBuffer sb = new StringBuffer();
+        for (int i=0; i < clients; i++)
+            sb.append("A");
+        
+        final String cmdArg = sb.toString();
         
         for (int i = 0; i < clients; ++i) {
             final int j = i;
@@ -50,7 +54,7 @@ public class DirectSend {
                             Thread.sleep(1000);
                             while (true) {
                                 sleep(delay);
-                                c.processInput("send_direct " + bytes);
+                                c.processInput("noop " + cmdArg);
                             }
                         }
                         catch (Throwable t) {
