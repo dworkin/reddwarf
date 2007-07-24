@@ -16,6 +16,9 @@ import java.util.List;
 /** Stores information for a specific transaction. */
 final class Context extends TransactionContext {
 
+    /** The data service. */
+    private final DataServiceImpl service;
+
     /** The data store. */
     final DataStore store;
 
@@ -64,14 +67,17 @@ final class Context extends TransactionContext {
     private List<Runnable> abortActions = null;
 
     /** Creates an instance of this class. */
-    Context(DataStore store,
+    Context(DataServiceImpl service,
+	    DataStore store,
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
 	    ClassesTable classesTable)
     {
 	super(txn);
-	assert store != null && txn != null && classesTable != null;
+	assert service != null && store != null && txn != null &&
+	    classesTable != null;
+	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
@@ -194,7 +200,7 @@ final class Context extends TransactionContext {
     <T> T getBinding(String internalName, Class<T> type) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return getReference(id).get(type);
+	return getReference(id).get(type, false);
     }
 
     /** Sets the object associated with the specified internal name. */
@@ -271,6 +277,11 @@ final class Context extends TransactionContext {
 	    count = 0;
 	    ManagedReferenceImpl.checkAllState(this);
 	}
+    }
+
+    /** Checks that the service is running or shutting down. */
+    void checkState() {
+	service.checkState();
     }
 
     /**

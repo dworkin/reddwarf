@@ -81,12 +81,17 @@ public interface ServerSessionListener {
      * was due to the associated client gracefully logging out; otherwise,
      * the disconnection was due to other circumstances, such as forced
      * disconnection.
-     * 
+     * <p>
+     * Before this method is invoked, it is guaranteed that the listeners
+     * of all {@code ClientChannel}s with this session as a member will
+     * have their {@link ClientChannelListener#leftChannel leftChannel}
+     * methods invoked.
+     *
      * @param graceful {@code true} if disconnection was due to the
      *        associated client gracefully logging out, and
      *        {@code false} otherwise
      * @param reason a string indicating the reason this session was
-     *        disconnected  TODO: can reason be null? -JM
+     *        disconnected, or {@code null} if no reason was provided
      */
     void disconnected(boolean graceful, String reason);
 }

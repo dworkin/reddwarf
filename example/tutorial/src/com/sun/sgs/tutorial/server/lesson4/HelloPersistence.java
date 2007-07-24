@@ -18,7 +18,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
 /**
- * A simple persistence example for the Sun Game Server.
+ * A simple persistence example for the Project Darkstar Server.
  * As a {@link ManagedObject}, it is able to modify instance fields,
  * demonstrated here by tracking the last timestamp at which a task
  * was run and displaying the time delta.

@@ -16,9 +16,6 @@ package com.sun.sgs.kernel;
  * If this reservation includes tasks scheduled to be run at a specified time,
  * and that time has already passed when <code>use</code> is called, then
  * the tasks are run immediately.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TaskReservation
 {

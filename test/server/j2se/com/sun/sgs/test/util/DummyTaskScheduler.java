@@ -34,9 +34,6 @@ import java.util.logging.Logger;
  * This implementation of <code>TaskScheduler</code> is provided for testing
  * only. Note that it ignores task owners, since the tests are run with only
  * one owner present.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class DummyTaskScheduler implements TaskScheduler {
 
@@ -187,6 +184,26 @@ public class DummyTaskScheduler implements TaskScheduler {
         if (rejectTasks)
             throw new TaskRejectedException("could not schedule task");
         return new RecurringTaskHandleImpl(task, startTime, period);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+        throws Exception
+    {
+        while (true) {
+            try {
+                task.run();
+                return;
+            } catch (Exception e) {
+                if (! retry)
+                    throw e;
+                if ((! (e instanceof ExceptionRetryStatus)) ||
+                    (! ((ExceptionRetryStatus)e).shouldRetry()))
+                    throw e;
+            }
+        }
     }
     
     /**

@@ -172,4 +172,30 @@ public interface TaskScheduler
                                                      long startTime,
                                                      long period);
 
+    /**
+     * Runs the task synchronously, returning when the task has completed
+     * or throwing an exception if the task fails. The scheduler decides
+     * when to run this task, so the task may be run immediately or it may
+     * be queued behind waiting tasks to maintain fairness, and it may be
+     * handed off to another thread of control for execution. In any case,
+     * the caller will block until the task completes or fails permanently.
+     * <p>
+     * Note that a task run through this method may not in turn call
+     * {@code runTask}. Doing so will cause an {@code IllegalStateException}
+     * to be thrown.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     * @param retry {@code true} if the task should be re-tried when it
+     *              fails with {@code ExceptionRetryStatus} requesting the
+     *              task be re-tried, {@code false} otherwise
+     *
+     * @throws TaskRejectedException if the given task is not accepted
+     * @throws IllegalStateException if {@code runTask} is being invoked by
+     *                               a task that was run via {@code runTask}
+     * @throws Exception if the task fails and is not re-tried
+     */
+    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+        throws Exception;
+
 }

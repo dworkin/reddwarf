@@ -17,9 +17,6 @@ import com.sun.sgs.service.TransactionProxy;
  * the only components outside of the kernel that should have visibility into
  * this state, they are the only components in the system that are provided
  * a reference to the usable proxy.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 final class TransactionProxyImpl implements TransactionProxy {
 
@@ -37,23 +34,21 @@ final class TransactionProxyImpl implements TransactionProxy {
      * {@inheritDoc}
      */
     public Transaction getCurrentTransaction() {
-        return ((TransactionalTaskThread)(Thread.currentThread())).
-            getCurrentTransaction();
+        return ThreadState.getCurrentTransaction();
     }
 
     /**
      * {@inheritDoc}
      */
     public TaskOwner getCurrentOwner() {
-        return ((TaskThread)(Thread.currentThread())).getCurrentOwner();
+        return ThreadState.getCurrentOwner();
     }
 
     /**
      * {@inheritDoc}
      */
     public <T extends Service> T getService(Class<T> type) {
-        return ((AbstractKernelAppContext)(getCurrentOwner().getContext())).
-            getService(type);
+        return ContextResolver.getContext().getService(type);
     }
 
 

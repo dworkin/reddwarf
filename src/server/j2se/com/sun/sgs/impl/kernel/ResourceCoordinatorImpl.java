@@ -24,20 +24,13 @@ import java.util.logging.Logger;
  * This implementation of <code>ResourceCoordinator</code> is used by the
  * kernel to create and manage threads of control. No component creates
  * a thread directly. Instead, they request to run some long-lived task
- * through the <code>startTask</code> method. All threads created and
- * managed by this class are instances of
- * <code>TransactionalTaskThread</code>.
+ * through the <code>startTask</code> method.
  * <p>
- * NOTE: This currently provides access to an unbounded number of threads.
- * A pool of threads is kept, but if the pool is empty and a new thread
- * is needed, it is always created. Also, there is no policy governing how
- * many threads may be allocated to any given component. This is fine for
- * an initial testing system, but will need to be profiled and understood
- * better in the final production system. For the present, this is meant
- * be a simple coordinator that provides correct behavior.
- *
- * @since 1.0
- * @author Seth Proctor
+ * NOTE: Currently there is no policy governing how many threads may be
+ * allocated to any given component. This is fine for the initial system,
+ * but will need to be profiled and understood better in the final production
+ * system. For the present, this is meant be a simple coordinator that
+ * provides correct behavior.
  */
 class ResourceCoordinatorImpl implements ResourceCoordinator
 {
@@ -91,7 +84,7 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
         ThreadFactory threadFactory =
             new ThreadFactory() {
                 public Thread newThread(Runnable r) {
-                    return new TransactionalTaskThread(r);
+                    return new Thread(r);
                 }
             };
 
@@ -103,10 +96,6 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
     }
 
     /**
-     *
-     *  NOTE: make sure to set the owner on the new task
-     *
-     *
      * {@inheritDoc}
      */
     public synchronized void startTask(Runnable task, Manageable component) {
