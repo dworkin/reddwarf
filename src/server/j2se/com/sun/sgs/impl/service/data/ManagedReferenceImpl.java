@@ -406,20 +406,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** Replaces this instance with a canonical instance. */
     private Object readResolve() throws ObjectStreamException {
-	try {
-	    context = DataServiceImpl.getContextNoJoin();
-	    state = State.EMPTY;
-	    validate();
-	    ManagedReferenceImpl ref = context.refs.find(oid);
-	    if (ref == null) {
-		context.refs.add(this);
-		return this;
-	    } else {
-		return ref;
-	    }
-	} catch (RuntimeException e) {
-	    throw (InvalidObjectException) new InvalidObjectException(
-		e.getMessage()).initCause(e);
+	context = DataServiceImpl.getContextNoJoin();
+	state = State.EMPTY;
+	validate();
+	ManagedReferenceImpl ref = context.refs.find(oid);
+	if (ref == null) {
+	    context.refs.add(this);
+	    return this;
+	} else {
+	    return ref;
 	}
     }
 
