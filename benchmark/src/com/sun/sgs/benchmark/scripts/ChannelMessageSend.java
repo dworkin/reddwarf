@@ -10,60 +10,59 @@ import java.util.List;
 
 public class ChannelMessageSend {
     
-    static final int DEFAULT_CLIENTS = 3;
-
-    static final long DEFAULT_DELAY = 100;
-
-    static final int DEFAULT_BYTES = 1 << 12;
+    static final int DEFAULT_CLIENTS = 60;
+    static final long DEFAULT_DELAY = 500;
+    static final int DEFAULT_BYTES = 500;//1 << 12;
     
-
-    private final int clients;    
-
+    public static final String CHANNEL_NAME = "ChannelMessageSend_script";
+    
+    private final int clients;
     private final long delay;
-
     private final int bytes;
     
-
     public ChannelMessageSend(int clients, long delay, int bytes) {
 	this.clients = clients;
 	this.delay = delay;
 	this.bytes = bytes;
+        
+        System.out.println("Starting up with #client=" + clients +
+            ",  delay=" + delay + "ms,  bytes=" + bytes + ".");
     }
 
     public ChannelMessageSend() {
 	this(DEFAULT_CLIENTS, DEFAULT_DELAY, DEFAULT_BYTES);
-
-    }    
+    }
     
-
     public void run() {
 	try {
 	    BenchmarkClient client = new BenchmarkClient();
-	  
-	    client.processInput("login datastore-stresser password");
-	    try { Thread.sleep(1000); } catch (Throwable t) { }
-	    client.processInput("create_channel common");
-
+            client.processInput("config dstar2");
+            client.processInput("login user password");
+            client.processInput("wait_for login");
+	    client.processInput("create_channel " + CHANNEL_NAME);
+            
 	    List<Thread> threads = new LinkedList<Thread>();
-
-	    
+            
 	    final int bytes = this.bytes;
-
+            
 	    for (int i = 0; i < clients; ++i) {
 		final int j = i;
 		threads.add(new Thread() {
 			public void run() {
 			    try {
 				BenchmarkClient c = new BenchmarkClient();
+                                c.printCommands(false);
+                                c.printNotices(true);
+                                c.processInput("config dstar2");
 				c.processInput("login sender-" + j + " pswd");
-				sleep(100 + (int)(100 * Math.random()));
-				c.processInput("join common");
+                                c.processInput("wait_for login");
+                                c.processInput("join " + CHANNEL_NAME);
 				c.processInput("wait_for join_channel");
-				sleep(1000);
-				while(true) {
+				Thread.sleep(1000);
+				while (true) {
 				    sleep(delay);
-				    c.processInput("send_channel common " +
-						   bytes);
+				    c.processInput("send_channel " +
+                                        CHANNEL_NAME + " " + bytes);
 				}
 			    }
 			    catch (Throwable t) {
@@ -72,25 +71,23 @@ public class ChannelMessageSend {
 			}
 		    });
 	    }
-
+            
 	    try { Thread.sleep(1000); } catch (Throwable t) { }
-
+            
 	    for (Thread t : threads) {
 		t.start();
 		try {
-		    Thread.sleep(50 + (int)(100 * Math.random()));
+		    //Thread.sleep(50 + (int)(100 * Math.random()));
+                    Thread.sleep(1000);
 		}
 		catch (InterruptedException ie) { } // silent
 	    }
-
 	}
 	catch (ParseException e) {
 	    e.printStackTrace();
 	}		    
     }
     
-
-
     private static void usage() {
 	System.out.println("Usage: java ChannelMessageSend "
 			   + "<#clients> <delay (ms)> "
