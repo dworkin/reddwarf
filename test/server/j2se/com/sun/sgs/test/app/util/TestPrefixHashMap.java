@@ -1120,9 +1120,6 @@ public class TestPrefixHashMap extends TestCase {
 	
 	byte[] serializedForm = baos.toByteArray();
 
-	System.out.printf("Serialized form is %d bytes\n", 
-			  serializedForm.length);
-
 	ByteArrayInputStream bais = 
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
@@ -1157,9 +1154,6 @@ public class TestPrefixHashMap extends TestCase {
 	oos.writeObject(test);
 	
 	byte[] serializedForm = baos.toByteArray();
-
-	System.out.printf("Serialized form is %d bytes\n", 
-			  serializedForm.length);
 
 	ByteArrayInputStream bais = 
 	    new ByteArrayInputStream(serializedForm);

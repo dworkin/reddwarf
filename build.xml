@@ -1008,34 +1008,35 @@
   <!-- Runs the Prefix Hashmap suite (server) -->
   <target name="test-phm" depends="benchmark-classes"
           description="tests the prefix hash table">
-    <delete dir="/tmp/sgs-benchmark"/>
-    <mkdir dir="/tmp/sgs-benchmark"/>
-    <chmod perm="a+w">
-      <fileset dir="/tmp/sgs-benchmark"/>
-    </chmod>
-    <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
-    <java classname="com.sun.sgs.impl.kernel.Kernel"
-	  fork="true">
-      <jvmarg line="-server"/>
-      <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-      <jvmarg line="-XX:+UseParallelGC"/>
-      <jvmarg line="-XX:+UseFastAccessorMethods"/>
-      <jvmarg line="-XX:+AggressiveOpts"/>
-      <jvmarg line="-XX:+MaxFDLimit"/>
-      <jvmarg line="-XX:NewSize=512m"/>
-      <jvmarg line="-Xmx2g"/>
-      <!-- <jvmarg line="-XX:+PrintCompilation"/> -->
-      <sysproperty key="com.sun.sgs.config.file"
-		   file="benchmark/System.properties"/>
-      <sysproperty key="java.library.path" 
-		   file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${test.logging}"/>
-      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
-		   value="true"/>
-      <sysproperty key="com.sun.sgs.config.file"
-		   file="benchmark/PrefixHashMap.properties"/>      
-      <classpath>
+
+   <delete dir="/tmp/sgs-benchmark"/>
+   <mkdir dir="/tmp/sgs-benchmark"/>
+   <chmod perm="a+w">
+     <fileset dir="/tmp/sgs-benchmark"/>
+   </chmod>
+   <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
+   <java classname="com.sun.sgs.impl.kernel.Kernel"
+	 fork="true">
+     <jvmarg line="-server"/>
+<!--     <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
+     <jvmarg line="-XX:+UseParallelGC"/>
+     <jvmarg line="-XX:+UseFastAccessorMethods"/>
+     <jvmarg line="-XX:+AggressiveOpts"/>
+     <jvmarg line="-XX:+MaxFDLimit"/>
+     <jvmarg line="-XX:NewSize=512m"/>
+     <jvmarg line="-Xmx2g"/>
+<!--     <jvmarg line="-XX:+PrintCompilation"/>  -->
+     <sysproperty key="com.sun.sgs.config.file"
+		  file="benchmark/System.properties"/>
+     <sysproperty key="java.library.path" 
+		  file="${bdb.lib.dir}"/>
+     <sysproperty key="java.util.logging.config.file"
+		  file="${test.logging}"/>
+     <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+		  value="true"/>
+     <sysproperty key="com.sun.sgs.config.file"
+		  file="benchmark/PrefixHashMap.properties"/>      
+     <classpath>
         <pathelement location="${build.dir}/benchmark/classes"/>
         <path refid="server.classpath"/>
       </classpath>
@@ -1055,7 +1056,7 @@
     <java classname="com.sun.sgs.impl.kernel.Kernel" fork="true">
       <jvmarg line="-server"/>
       <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-      <!-- <jvmarg line="-XX:+UseParallelGC"/>
+      <!-- <jvmarg line="-XX:+UseParallelGC"/> 
       <jvmarg line="-XX:+UseFastAccessorMethods"/>
       <jvmarg line="-XX:+AggressiveOpts"/>
       <jvmarg line="-XX:+MaxFDLimit"/>
@@ -1104,7 +1105,7 @@
   <target name="benchmark-client-stresstest" depends="benchmark-classes"
 	  description="Runs the benchmark client">
     <!-- insert classname to run below -->
-    <java classname="com.sun.sgs.benchmark.scripts.ChannelMessageSend"
+    <java classname="com.sun.sgs.benchmark.scripts.DirectSend"
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg line="-server"/>
