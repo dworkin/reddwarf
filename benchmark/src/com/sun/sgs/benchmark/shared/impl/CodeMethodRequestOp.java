@@ -23,6 +23,7 @@ public enum CodeMethodRequestOp {
     JOIN_CHANNEL      ("joinChannel"),
     LEAVE_CHANNEL     ("leaveChannel"),
     MALLOC            ("malloc"),
+    NOOP              ("noop"),
     SEND_CHANNEL      ("sendChannelMessage"),
     SEND_DIRECT       ("sendDirectMessage"),
     START_TASK        ("startTask");

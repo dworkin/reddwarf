@@ -26,6 +26,7 @@ public enum ScriptingCommandType {
     LOGIN            ("login"),
     LOGOUT           ("logout"),
     MALLOC           (new String[] { "malloc", "do_malloc", "memory", "do_memory" }),
+    NO_OP            (new String[] { "no_op", "noop" }),
     ON_EVENT         (new String[] { "on_event", "onevent", "on" }),
     PAUSE            ("pause"),
     PRINT            (new String[] { "print", "debug", "printf" }),

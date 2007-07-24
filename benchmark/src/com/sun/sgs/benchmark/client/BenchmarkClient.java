@@ -525,6 +525,12 @@ public class BenchmarkClient {
             return new CodeMethodRequest(CodeMethodRequestOp.MALLOC,
                 baos.toByteArray());
             
+        case NO_OP:
+            oos.writeObject(cmd.getMessageArg());
+            oos.close();
+            return new CodeMethodRequest(CodeMethodRequestOp.NOOP,
+                baos.toByteArray());
+            
         case REQ_RESPONSE:
             CodeMethodRequestOp op;
             String channelName = cmd.getChannelNameArg();

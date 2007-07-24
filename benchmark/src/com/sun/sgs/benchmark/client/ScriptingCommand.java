@@ -336,6 +336,11 @@ public class ScriptingCommand {
             }
             break;
             
+        case NO_OP:
+            /** Accept whole line as argument, including spaces */
+            msg = stripQuotes(strJoin(args));
+            return;
+            
         case ON_EVENT:
             if (args.length >= 2 && args.length <= 3) {
                 event = ScriptingEvent.parse(args[0]);
@@ -559,6 +564,9 @@ public class ScriptingCommand {
             
         case MALLOC:
             return "size_bytes";
+            
+        case NO_OP:
+            return "[message] (ignored by server)";
             
         case ON_EVENT:
             return "event tagname [repeat-count]";
