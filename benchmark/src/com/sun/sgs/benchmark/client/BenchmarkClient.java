@@ -694,7 +694,7 @@ public class BenchmarkClient {
             }
         /** catch ALL exceptions here */
         } catch (Exception e) {
-            System.err.println(e);
+            e.printStackTrace();
         }
     }
     
