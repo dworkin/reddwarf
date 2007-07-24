@@ -38,7 +38,7 @@ import java.util.Iterator;
  * identity's behalf inform this mapping service when the identity is active
  * or inactive by calling {@link #setStatus setStatus}.   The node mapping
  * service will use this information for a simple reference counting 
- * garbage collection scheme within the map.
+ * garbage collection scheme within the map. 
  *              
  * <p>
  * <b> A variation of "assignNode" which adds hints for identities the input
@@ -52,33 +52,40 @@ public interface NodeMappingService extends Service {
      * otherwise, no action is performed.   Additionally (and atomically),
      * notes that the service considers the identity to be active, as
      * though {@link #setStatus setStatus(service, identity, true)} had
-     * been called.
+     * been called on the assigned node.
      * <p>
      * This method should not be called while in a transaction.
+     * <b> clarify this</b>
      * <p>
      *
      * @param service the class of the calling service
      * @param identity the identity to assign to a node
      *
+     *<b> make the first argument just class?</b>
      */
     void assignNode(Class<? extends Service> service, Identity identity);
     
     /**
-     * Inform the {@code NodeMappingService} that a service has observed
-     * a change in status of an identity.  When all services which have
-     * previously noted an identity as active find that identity to be
-     * inactive, the identity can be removed from the map.
+     * Inform the {@code NodeMappingService} that a service instance has observed
+     * a change in status of an identity.  When all services which 
+     * have previously noted an identity as active set the status to false,
+     * the identity can be removed from the map.  If a node fails or the 
+     * node mapping service initiates a mapping change (for load balancing), all 
+     * status votes for the failing or old node are implicitly set to inactive.  
      * <p>
      * This method should not be called while in a transaction.
-     *
+     * <b> clarify this</b>
+     * <p>
      * @param service the class of the calling service
      * @param identity the identity for which {@code service} has observed a 
      *                 state change
      * @param active {@code true} if the identity is active,
      *               {@code false} if the identity is inactive
+     *
+     * @throws UnknownIdentityException if the identity is not in the map
      */
     void setStatus(Class<? extends Service> service, Identity identity, 
-                   boolean active);
+                   boolean active) throws UnknownIdentityException;
     
     /** 
      * Returns the node to which the identity is assigned.
