@@ -58,12 +58,11 @@ public interface NodeMappingService extends Service {
      * <b> clarify this</b>
      * <p>
      *
-     * @param service the class of the calling service
+     * @param service the class of the caller
      * @param identity the identity to assign to a node
      *
-     *<b> make the first argument just class?</b>
      */
-    void assignNode(Class<? extends Service> service, Identity identity);
+    void assignNode(Class service, Identity identity);
     
     /**
      * Inform the {@code NodeMappingService} that a service instance has observed
@@ -84,7 +83,7 @@ public interface NodeMappingService extends Service {
      *
      * @throws UnknownIdentityException if the identity is not in the map
      */
-    void setStatus(Class<? extends Service> service, Identity identity, 
+    void setStatus(Class service, Identity identity, 
                    boolean active) throws UnknownIdentityException;
     
     /** 
