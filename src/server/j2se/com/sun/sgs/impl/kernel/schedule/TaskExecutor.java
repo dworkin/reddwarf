@@ -57,19 +57,24 @@ class TaskExecutor {
     }
 
     /**
-     * Runs the given task, optionally retrying if the task fails.
+     * Runs the given task, optionally re-trying if the task fails, and
+     * optionally re-throwing exceptions if the task is not re-tried.
      *
      * @param task the {@code ScheduledTask} to run
      * @param retry {@code true} if the task should be re-tried when it
      *              fails with {@code ExceptionRetryStatus} requesting the
      *              task be re-tried, {@code false} otherwise
+     * @param throwExceptions {@code true} if {@code Exception}s that don't
+     *                        result in re-trying the task should be
+     *                        re-thrown, {@code false} otherwise
      *
      * @throws InterruptedException if the thread is interrupted while
      *                              executing the task
-     * @throws Exception if any exception occurs while executing the task
-     *                   and {@code retry} is {@code false}
+     * @throws Exception if any exception occurs while executing a task
+     *                   that is not re-tried and {@code throwExceptions}
+     *                   is {@code true}
      */
-    void runTask(ScheduledTask task, boolean retry)
+    void runTask(ScheduledTask task, boolean retry, boolean throwExceptions)
         throws InterruptedException, Exception
     {
         for (int tryCount = 1; ; tryCount++) {
@@ -100,8 +105,11 @@ class TaskExecutor {
                 if (collector != null)
                     collector.finishTask(tryCount, false);
 
-                if (! retry)
-                    throw e;
+                if (! retry) {
+                    if (throwExceptions)
+                        throw e;
+                    return;
+                }
 
                 if ((e instanceof ExceptionRetryStatus) &&
                     (((ExceptionRetryStatus)e).shouldRetry())) {
@@ -124,6 +132,8 @@ class TaskExecutor {
                         }
                     }
 
+                    if (throwExceptions)
+                        throw e;
                     return;
                 }
             }

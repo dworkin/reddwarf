@@ -61,7 +61,7 @@ class MasterTaskConsumer implements Runnable {
                 // wait for the next task, which is the only point at which
                 // we might get interrupted, which in turn ends execution
                 ScheduledTask task = scheduler.getNextTask();
-                taskExecutor.runTask(task, true);
+                taskExecutor.runTask(task, true, false);
 
                 // if this is a recurring task, schedule the next run
                 if (task.isRecurring())
@@ -72,7 +72,7 @@ class MasterTaskConsumer implements Runnable {
                 logger.logThrow(Level.FINE, ie, "Consumer thread finishing");
         } catch (Exception e) {
             // this should never happen, since we're always running the task
-            // requesting re-try
+            // requesting re-try and no re-throwing
             logger.logThrow(Level.SEVERE, e, "Consumer thread fatal error");
         } finally {
             masterScheduler.notifyThreadLeaving();

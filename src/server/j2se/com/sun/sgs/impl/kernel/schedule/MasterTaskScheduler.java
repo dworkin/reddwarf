@@ -349,7 +349,7 @@ public class MasterTaskScheduler
             ScheduledTask directTask =
                 new ScheduledTask(task, owner, defaultPriority,
                                   System.currentTimeMillis());
-            taskExecutor.runTask(directTask, retry);
+            taskExecutor.runTask(directTask, retry, true);
         } finally {
             runningDirectTask.set(false);
         }
