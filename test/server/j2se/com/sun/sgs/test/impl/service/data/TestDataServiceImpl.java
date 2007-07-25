@@ -53,7 +53,7 @@ public class TestDataServiceImpl extends TestCase {
      * Specify the test suite to include all tests, or just a single method if
      * specified.
      */
-    public static final TestSuite suite() {
+    public static TestSuite suite() {
 	if (testMethod == null) {
 	    return new TestSuite(TestDataServiceImpl.class);
 	}

@@ -46,8 +46,8 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
- *	</b></code>
+ *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
+ *	</b></code><br>
  *      <i>Default:</i> {@code 600000}
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
@@ -55,7 +55,7 @@ import java.util.logging.Logger;
  *	for being aborted. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
+ *	com.sun.sgs.impl.service.data.store.net.server.reap.delay
  *	</b></code><br>
  *      <i>Default:</i> {@code 500}
  *
@@ -63,7 +63,7 @@ import java.util.logging.Logger;
  *	reap timed out transactions. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
+ *	com.sun.sgs.impl.service.data.store.net.server.port
  *	</b></code><br>
  *      <i>Default:</i> {@code 44530}
  *
@@ -77,14 +77,11 @@ import java.util.logging.Logger;
  *
  * In addition to any logging performed by the {@code DataStoreImpl} class,
  * this class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl} to log
+ * com.sun.sgs.impl.service.data.store.net.server} to log
  * information at the following levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - problems starting the server from {@link
- *	#main main} 
- * <li> {@link Level#INFO INFO} - starting the server from {@code main},
- *	actual port if anonymous port was requested
+ * <li> {@link Level#INFO INFO} - actual port if anonymous port was requested
  * <li> {@link Level#CONFIG CONFIG} - server properties
  * <li> {@link Level#FINE FINE} - allocation transaction IDs, problems
  *	unexporting the server, reaping expired transactions, problems
@@ -94,17 +91,17 @@ import java.util.logging.Logger;
  */
 public class DataStoreServerImpl implements DataStoreServer {
 
-    /** The name of this class. */
-    private static final String CLASSNAME =
-	DataStoreServerImpl.class.getName();
+    /** The package for this class. */
+    private static final String PACKAGE =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".server"));
 
     /** The property that specifies the maximum transaction timeout. */
     private static final String MAX_TXN_TIMEOUT_PROPERTY =
-	CLASSNAME + ".max.txn.timeout";
+	PACKAGE + ".max.txn.timeout";
 
     /** The default maximum transaction timeout in milliseconds. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
@@ -113,8 +110,8 @@ public class DataStoreServerImpl implements DataStoreServer {
      * The property that specifies the delay in milliseconds between attempts
      * to reap timed out transactions.
      */
-    private static final String REAP_DELAY_PROPERTY = CLASSNAME +
-	".reap.delay";
+    private static final String REAP_DELAY_PROPERTY = PACKAGE +
+	".server.reap.delay";
 
     /** The default reap delay. */
     private static final long DEFAULT_REAP_DELAY = 500;
@@ -122,7 +119,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     /**
      * The name of the property for specifying the port for running the server.
      */
-    private static final String PORT_PROPERTY = CLASSNAME + ".port";
+    private static final String PORT_PROPERTY = PACKAGE + ".server.port";
 
     /** The default value of the port for running the server. */
     private static final int DEFAULT_PORT = 44530;
@@ -135,10 +132,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
-	CLASSNAME + ".no.rmi");
-
-    /** Set by main to make sure that the server is reachable. */
-    private static DataStoreServerImpl server;
+	PACKAGE + ".no.rmi");
 
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
@@ -161,17 +155,36 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
 
-	/** The state value for when the transaction is not in use. */
-	private static final int IDLE = 1;
+	/**
+	 * The state value for when the transaction is not in use, prepared, or
+	 * being reaped.
+	 */
+	private static final int IDLE = 0;
 
-	/** The state value for when the transaction is currently in use. */
-	private static final int IN_USE = 2;
+	/**
+	 * The state value for when the transaction is currently in use, and is
+	 * not prepared or being reaped.
+	 */
+	private static final int IN_USE = 1;
+
+	/**
+	 * The state value for when the transaction is not in use, has been
+	 * prepared, and is not being reaped.
+	 */
+	private static final int PREPARED = 2;
+
+	/**
+	 * The state value for when the transaction is currently in use and
+	 * prepared, and is not being reaped.
+	 */
+	private static final int IN_USE_PREPARED = IN_USE | PREPARED;
 
 	/**
 	 * The state value for when the transaction is being reaped because it
 	 * is expired.  Once this state is reached, it never changes.
+	 * Transactions that are in use or prepared are not reaped.
 	 */
-	private static final int REAPING = 3;
+	private static final int REAPING = 4;
 
 	/** The transaction ID. */
 	private final long tid;
@@ -185,7 +198,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The information associated with this transaction, or null. */
 	private Object txnInfo;
 
-	/** The current state, one of IDLE, IN_USE, or REAPING. */
+	/**
+	 * The current state, one of IDLE, IN_USE, PREPARED, IN_USE_PREPARED,
+	 * or REAPING.
+	 */
 	private final AtomicInteger state = new AtomicInteger(IDLE);
 
 	/** The transaction participant or null. */
@@ -228,24 +244,36 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Sets whether this transaction is in use, doing nothing if the state
 	 * is REAPING.  Returns whether the attempt to set the state was
-	 * successful.  The attempt succeeds if the state is REAPING or if it
-	 * is the opposite of the requested state.
+	 * successful.  The attempt succeeds if the state is REAPING or if the
+	 * IN_USE bit is the opposite of the requested state, independent of
+	 * the PREPARED bit.
 	 */
 	boolean setInUse(boolean inUse) {
-	    int expect = inUse ? IDLE : IN_USE;
-	    int update = inUse ? IN_USE : IDLE;
+	    int prepared = state.get() & PREPARED;
+	    int expect = (inUse ? IDLE : IN_USE) | prepared;
+	    int update = (inUse ? IN_USE : IDLE) | prepared;
 	    return state.compareAndSet(expect, update) ||
 		state.get() == REAPING;
 	}
 
 	/**
 	 * Sets this transaction as being reaped.  Returns whether the attempt
-	 * to set the state was successful.  The attempt fails if the state was
-	 * IN_USE.
+	 * to set the state was successful.  The attempt fails if the
+	 * transaction is in use or if it has been prepared.
 	 */
 	boolean setReaping() {
 	    boolean success = state.compareAndSet(IDLE, REAPING);
 	    return success || state.get() == REAPING;
+	}
+
+	/**
+	 * Marks the transaction as prepared.  This method should only be
+	 * called when the transaction is in use and has not already been
+	 * prepared.
+	 */
+	void setPrepared() {
+	    boolean success = state.compareAndSet(IN_USE, IN_USE_PREPARED);
+	    assert success;
 	}
 
 	/* -- Implement Transaction -- */
@@ -332,11 +360,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/**
 	 * Gets the transaction associated with the specified ID, and marks it
-	 * in use.
+	 * in use.  Checks if the transaction has timed out if checkTimeout is
+	 * true.
 	 */
-	Txn get(long tid) {
+	Txn get(long tid, boolean checkTimeout) {
 	    Txn txn = table.get(tid);
 	    if (txn != null) {
+		if (checkTimeout) {
+		    txn.checkTimeout();
+		}
 		if (!txn.setInUse(true)) {
 		    throw new IllegalStateException(
 			"Multiple simultaneous accesses to transaction: " +
@@ -642,22 +674,6 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Starts the server.  The current system properties supplied to the
-     * constructor.  Exits with a non-zero status value if a problem occurs.
-     *
-     * @param	args ignored
-     */
-    public static void main(String[] args) {
-	try {
-	    server = new DataStoreServerImpl(System.getProperties());
-	    logger.log(Level.INFO, "Server started: {0}", server);
-	} catch (Throwable t) {
-	    logger.logThrow(Level.SEVERE, t, "Problem starting server");
-	    System.exit(1);
-	}
-    }
-
-    /**
      * Creates an instance of this class configured with the specified
      * properties.  See the {@link DataStoreServerImpl class documentation} for
      * a list of supported properties.
@@ -841,7 +857,9 @@ public class DataStoreServerImpl implements DataStoreServer {
     public boolean prepare(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.prepare(txn);
+	    boolean result = store.prepare(txn);
+	    txn.setPrepared();
+	    return result;
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -970,11 +988,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
-	    Txn txn = txnTable.get(tid);
-	    if (checkTimeout) {
-		txn.checkTimeout();
-	    }
-	    return txn;
+	    return txnTable.get(tid, checkTimeout);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
 			    "Getting transaction stid:{0,number,#} failed",
