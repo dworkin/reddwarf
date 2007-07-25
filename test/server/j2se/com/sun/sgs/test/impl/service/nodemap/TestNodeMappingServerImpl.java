@@ -14,13 +14,9 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
-import com.sun.sgs.kernel.ResourceCoordinator;
-
-import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
@@ -28,8 +24,8 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
+import java.util.Set;
 
 import junit.framework.TestCase;
 
@@ -68,10 +64,8 @@ public class TestNodeMappingServerImpl extends TestCase {
     private TaskServiceImpl taskService;
     private NodeMappingServerImpl nodeMappingServer;
     
-    // JANE FOR NOW
-    private static ResourceCoordinator rc = new TestResourceCoordinator();
-    
     private boolean passed = false;
+
     /** Constructs a test instance. */
     public TestNodeMappingServerImpl(String name) {
         super(name);
@@ -90,7 +84,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-        systemRegistry.setComponent(ResourceCoordinator.class, rc);
         
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
 	    
@@ -130,10 +123,8 @@ public class TestNodeMappingServerImpl extends TestCase {
    /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
-    //    Thread.sleep(100);
 	passed = true;
-    }
-    
+    }   
         
     /** Cleans up the transaction. */
     protected void tearDown() throws Exception {
@@ -174,7 +165,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(serviceProps, systemRegistry);
-            System.err.println("nodemap server port: " + nodemap.getPort());
         } finally {
             if (nodemap != null) { 
                 nodemap.shutdown(); 
@@ -311,30 +301,80 @@ public class TestNodeMappingServerImpl extends TestCase {
         }
     }
     
-    /* -- Test NodeMappingServer -- */
+    /* -- Test assignNode -- */
     
     public void testAssignNode() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
         nodeMappingServer.assignNode(TaskService.class, id);      
-        
+        verifyMapCorrect(id); 
+        Set<String> found = getFoundKeys(id);
+        assertEquals(3, found.size());
     }
     
      public void testAssignNodeTwice() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
         nodeMappingServer.assignNode(TaskService.class, id);
-        // Should be no problem
+        verifyMapCorrect(id);
         nodeMappingServer.assignNode(TaskService.class, id);
+        verifyMapCorrect(id);
+        Set<String> found = getFoundKeys(id);
+        assertEquals(3, found.size());
     }
-   
-     // CanRemove
-     // RegisterListener
-     public void testNodeListener() throws Exception {
-         commitTransaction();
-         // create a listener.  create a plugin assigner who always
-         // assigns to the current node.
-         //nodeMappingServer.registerNodeListener(clientListener, 22);
+     
+     public void testAssignNodeTwiceDifferentService() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(TaskService.class, id);
+        verifyMapCorrect(id);
+        nodeMappingServer.assignNode(DataServiceImpl.class, id);
+        verifyMapCorrect(id);
+        Set<String> found = getFoundKeys(id);
+        // An additional setting for the DataService should have been added
+        assertEquals(4, found.size());
+     }
+     
+     /* -- Test canRemove -- */
+     public void testCanRemove() throws Exception {
+        commitTransaction();
+        // Assign outside a transaction
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(NodeMappingServerImpl.class, id);
+        verifyMapCorrect(id);
+        Set<String> found = getFoundKeys(id);
+        
+        // Remove any of the status keys we can find
+        createTransaction();
+        for (String s : found) {
+            if (s.contains(".status.")) {
+                dataService.removeServiceBinding(s);
+            }
+        }
+        commitTransaction();
+        
+        nodeMappingServer.canRemove(id);
+        
+        // This should be something * property for removewait
+        Thread.sleep(10000);
+
+        verifyMapCorrect(id);
+        found = getFoundKeys(id);
+        assertEquals(0, found.size());
+     }
+
+     public void testCanRemoveDoesnt() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(NodeMappingServerImpl.class, id);
+        // We can't remove this, as the status is still set.
+        nodeMappingServer.canRemove(id);
+        // This should be something * property for removewait
+        Thread.sleep(10000);
+
+        verifyMapCorrect(id);
+        Set<String> found = getFoundKeys(id);
+        assertEquals(3, found.size());
      }
      
      
@@ -411,7 +451,8 @@ public class TestNodeMappingServerImpl extends TestCase {
      * Creates a new transaction with the specified timeout, and sets
      * transaction proxy's current transaction.
      */
-    private DummyTransaction createTransaction(long timeout) {
+    private DummyTransaction createTransaction
+            (long timeout) {
 	if (txn == null) {
 	    txn = new DummyTransaction(timeout);
 	    txnProxy.setCurrentTransaction(txn);
@@ -438,4 +479,19 @@ public class TestNodeMappingServerImpl extends TestCase {
 	    throw new TransactionNotActiveException("txn:" + txn);
 	}
     }
+    
+    private void verifyMapCorrect(Identity id) throws Exception {    
+        createTransaction();
+        assertTrue(nodeMappingServer.assertValid(id));
+        commitTransaction();
+    }
+    private Set<String> getFoundKeys(Identity id) throws Exception {
+        createTransaction();
+        try {
+            return (nodeMappingServer.reportFound(id));
+        } finally {
+            commitTransaction();
+        }
+    }
+    
 }

@@ -234,6 +234,15 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 serverImpl.configure(registry, txnProxy);
             }
 
+            // JANE is there not an issue with the server perhaps pumping
+            // out notifications before I've registered?  I don't think
+            // there's much to do about that, so some add/drop stuff might
+            // get lost.  Likewise, when we're coming up, services will register
+            // with me during their configuration - but I shouldn't pump
+            // out any of my notifications until after the commit of this
+            // transaction.  My server should really use the transaction,
+            // then, and wait until commit before performing any updates.
+            // Same thinking applies to the watchdog?
 
 //                watchdogService = registry.getComponent(WatchdogService.class); 
             localNodeId = 0;
@@ -348,7 +357,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
                     tryCount = MAX_RETRY;
                 } catch (IOException ioe) {
                     tryCount++;
-                    logger.log(Level.FINEST, 
+                    logger.logThrow(Level.FINEST, ioe, 
                             "Exception encountered on try {0}: {1}",
                             tryCount, ioe);
                 }
@@ -365,9 +374,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 
                 runTransactionally(localTask);
             } catch (Exception ex) {
-                ex.printStackTrace();
+                logger.logThrow(Level.WARNING, ex, 
+                                "Local assignment for {0} failed", identity);
             }
-            if (!localTask.found()) {
+            if (localTask.added()) {
                 changeNotifier.added(identity, null);
             }
             
@@ -410,13 +420,17 @@ public class NodeMappingServiceImpl implements NodeMappingService
 //        boolean found() { return found; }
 //    }
     
+    /**
+     * Task for assigning an identity to this local node. 
+     * Currently, this is only used when we cannot contact the server.
+     */
     private class AssignNodeLocallyRunnable implements KernelRunnable {
         private final String idkey;
         private final String nodekey;
         private final String statuskey;
         private IdentityMO idmo;
-        /** return value, true assignment already in the map */
-        private boolean found = false;
+        /** return value, true if id added to map */
+        private boolean added = true;
         
         AssignNodeLocallyRunnable(String name, Identity id, Long nodeId) {
             idkey = NodeMapUtil.getIdentityKey(id);
@@ -433,10 +447,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         public void run() {  
             try {
                 idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-                found = true;
-            } catch (NameNotBoundException e) {
-                
-                System.out.println("STORING " + idmo + " with key " + idkey);
+            } catch (NameNotBoundException e) {     
+                added = true;
                 // Add the id->node mapping.
                 dataService.setServiceBinding(idkey, idmo);
                 // Add the node->id mapping
@@ -447,7 +459,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
             
         }
 
-        boolean found() { return found; }
+        boolean added() { return added; }
     }
     
     /** 
@@ -468,7 +480,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             throw new NullPointerException("null identity");
         }       
         
-
         String idkey = NodeMapUtil.getIdentityKey(identity);
         NodeMapUtil.GetIdTask idtask = 
                 new NodeMapUtil.GetIdTask(dataService, idkey);
@@ -486,8 +497,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
         IdentityMO idmo = idtask.getId();
         
         if (idmo != null) {
-            String statuskey = NodeMapUtil.getStatusKey(identity, localNodeId, service.getName());
-            SetStatusRunnable stask = new SetStatusRunnable(statuskey, idmo, active);
+            String statuskey = 
+                    NodeMapUtil.getStatusKey(identity, localNodeId, 
+                                             service.getName());
+            SetStatusRunnable stask = 
+                    new SetStatusRunnable(statuskey, idmo, active);
             try {
                 runTransactionally(stask);
             } catch (NameNotBoundException nnbe) {
@@ -505,7 +519,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             } catch (Exception e) {
                 logger.logThrow(Level.WARNING, e, 
                                 "Setting status for {0} failed", statuskey);
-
             }
             
             if (stask.canRemove()) {
@@ -566,7 +579,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         if (id == null) {
             throw new NullPointerException("null identity");
         }
-        MapTransactionContext context = contextFactory.joinTransaction();
+        Context context = contextFactory.joinTransaction();
         Node node = context.get(id);
         logger.log(Level.FINEST, "getNode id:{0} returns {1}", id, node);
         return node;
@@ -576,9 +589,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
     public Iterator<Identity> getIdentities(long nodeId) 
         throws UnknownNodeException 
     {
-        if (dataService.nextServiceBoundName(NodeMapUtil.getPartialNodeKey(nodeId)) == null) {
+        String key = NodeMapUtil.getPartialNodeKey(nodeId);
+        if (dataService.nextServiceBoundName(key) == null) {
             throw new UnknownNodeException("node id: " + nodeId);
         }
+        logger.log(Level.FINEST, "getIdentities successful");
         return new IdentityIterator(dataService, nodeId);
     }
     
@@ -603,7 +618,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         /** {@inheritDoc} */
         public Identity next() {
             String key = iterator.next();
-            IdentityMO idmo = dataService.getServiceBinding(key, IdentityMO.class);
+            IdentityMO idmo = 
+                    dataService.getServiceBinding(key, IdentityMO.class);
             return idmo.getIdentity();
         }
         
@@ -625,6 +641,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         } finally {
             listenersWrite.unlock();
         }
+        logger.log(Level.FINEST, "addNodeMappingListener successful");
     }
     
     /**
@@ -699,6 +716,15 @@ public class NodeMappingServiceImpl implements NodeMappingService
         
     }
     
+        
+    /**
+     *  Run the given task synchronously, and transactionally.
+     * @param task the task
+     */
+    private void runTransactionally(KernelRunnable task) throws Exception {
+        taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);
+    }
+    
     /* -- Implement transaction participant/context for 'configure' -- */
 
     private class ConfigureServiceContextFactory
@@ -763,26 +789,26 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /* -- Implement transaction participant/context for 'getNode' -- */
 
     private class MapContextFactory
-	extends TransactionContextFactory<MapTransactionContext>
+	extends TransactionContextFactory<Context>
     {
 	MapContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 	
 	/** {@inheritDoc} */
-	public MapTransactionContext createContext(Transaction txn) {
-	    return new MapTransactionContext(txn);
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
 	}
     }
 
-    private final class MapTransactionContext extends TransactionContext {
+    private final class Context extends TransactionContext {
         // Cache looked up nodes for identities within this transaction
         Map<Identity, Node> idcache = new HashMap<Identity, Node>();
         
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
-        private MapTransactionContext(Transaction txn) {
+        private Context(Transaction txn) {
 	    super(txn);
 	}
 	
@@ -810,7 +836,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
             
 	    String key = NodeMapUtil.getIdentityKey(identity);
 	    try {                
-		IdentityMO idmo = dataService.getServiceBinding(key, IdentityMO.class);
+		IdentityMO idmo = 
+                        dataService.getServiceBinding(key, IdentityMO.class);
                 System.out.println("GET:   key is " + key + "  idmo is " + idmo);
                 node = new NodeImpl(idmo.getNodeId());
 //                node = watchdogService.getNode(nodeId);
@@ -826,12 +853,5 @@ public class NodeMappingServiceImpl implements NodeMappingService
         }  
     }
     
-    
-    /**
-     *  Run the given task synchronously, and transactionally.
-     * @param task the task
-     */
-    private void runTransactionally(KernelRunnable task) throws Exception {
-        taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);
-    }
+
 }

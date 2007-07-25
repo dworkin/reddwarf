@@ -27,7 +27,7 @@ public final class NodeMapUtil {
     private static final String HOST_PROPERTY = PKG_NAME + ".server.host";
     
     /** The property name for the server port. */
-    private static final String PORT_PROPERTY = PKG_NAME + "server.port";
+    private static final String PORT_PROPERTY = PKG_NAME + ".server.port";
 
     /** The default value of the server port. */
     private static final int DEFAULT_PORT = 44533;
@@ -46,8 +46,18 @@ public final class NodeMapUtil {
         throw new AssertionError("Should not instantiate");
     }
     
+    
     /**
-     * Returns a node key for the given {@code node}.
+     * Returns a identity key for the given {@code identity}. 
+     */
+    static String getIdentityKey(Identity id) {    
+        StringBuilder sb = new StringBuilder(IDENTITY_KEY_PREFIX);
+        sb.append(id.getName());
+        return sb.toString();
+    }
+    
+    /**
+     * Returns a node key for the given {@code node}.  
      */
     private static StringBuilder buildNodeKey(long nodeId) {
         StringBuilder sb = new StringBuilder(NODE_KEY_PREFIX);
@@ -63,18 +73,10 @@ public final class NodeMapUtil {
         sb.append(id.getName());
         return sb.toString();
     }
-
-    /**
-     * Returns a identity key for the given {@code identity}.
-     */
-    static String getIdentityKey(Identity id) {    
-        StringBuilder sb = new StringBuilder(IDENTITY_KEY_PREFIX);
-        sb.append(id.getName());
-        return sb.toString();
-    }
     
     /**
-     * Returns a status key for the given {@code identity}.
+     * Returns a status key for the given {@code identity}.  The status
+     * mappings are held per identity per node.
      */
     private static StringBuilder buildStatusKey(Identity id) {
         StringBuilder sb = new StringBuilder(STATUS_KEY_PREFIX);
@@ -89,7 +91,7 @@ public final class NodeMapUtil {
         sb.append(".");
         return sb;
     }
-    
+
     static String getPartialStatusKey(Identity id) {
         return buildStatusKey(id).toString();
     }

@@ -202,12 +202,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         try {
             nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
         } finally {
-            if (nodemap != null) {
-                boolean b = nodemap.shutdown();
-                System.out.println("shutdown in test produced " + b);
-            }
+            if (nodemap != null) { nodemap.shutdown(); }
         }
-        //System.err.println("nodemap server port: " + nodemap.getPort());
     }
 
     public void testConstructorNullProperties() throws Exception {
@@ -221,19 +217,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
             if (nodemap != null) { nodemap.shutdown(); }
         }
     }
-
-//    public void testConstructorRequestedPort() throws Exception {
-//        final int PORT = 5556;
-//        Properties properties = createProperties(
-//            DataStoreImplClassName + ".directory", DB_DIRECTORY,
-//            StandardProperties.APP_NAME, "TestNodeMappingServiceImpl",
-//            NodeMappingServiceClassName + ".port", Integer.toString(PORT));
-//        NodeMappingServiceImpl nodemap = new NodeMappingServiceImpl(properties, systemRegistry);
-//       // assertEquals(PORT, nodemap.getPort());
-//    }
-   
-    
-   
     
     /* -- Test configure -- */
 
@@ -268,7 +251,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testConfigure() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap =  new NodeMappingServiceImpl(serviceProps, systemRegistry);
+            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
             nodemap.configure(serviceRegistry, txnProxy);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
@@ -297,7 +280,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // Now expect to be able to find the identity
         createTransaction();
         Node node = nodeMappingService.getNode(id);
-
     }
     
     public void testAssignNodeNullServer() throws Exception {

@@ -25,9 +25,11 @@ import java.rmi.RemoteException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -106,6 +108,9 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
     /** The set of identities that are waiting to be removed,
      *  mapped to the thread that will do the removal. 
      */
+    
+    // JANE persist both of these maps for the hot backup case.
+    
     //JANE what to do if this server fails before all the removes
     // complete?  Should I persist a list of identities-to-be-removed
     // in the datastore, removing them when the thing is actually removed?
@@ -224,18 +229,13 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 //            System.out.println("JANE adding id " + n.getId());
         }
         
-        // Restore any information cached info that was in the datastore.
-        // Need to find all nodes in datastore, check that they are still
-        // live, and add to liveNodes (keeping a list of now-dead-nodes).
-        // Then ask watchdog for live nodes, and add any new ones to our
-        // list (BUT NOT if id == watchdogService.getLocalNodeId()!).
-        // Will watchdog.getNodes return both live and dead nodes?
     }
     
     /**
      * Removes any configuration effects, in case the transaction
      * configuring the service aborts.  This is more convenient than joining
-     * the transaction.
+     * the transaction, and is called from the service during its transaction
+     * abort handling.
      */ 
     void unconfigure() {
         dataService = null;
@@ -283,12 +283,12 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 //        
 //            // Move assignments to new nodes:
 //            //    In a transaction, look up the next id.
-//            //    Find the preferred node via mapNode.
+//            //    Find the preferred node via moveIdentity.
 //            
 //        }
 //    }
     
-    private long mapNode(String serviceName, Identity id, Node oldNode) {
+    private long moveIdentity(String serviceName, Identity id, Node oldNode) {
         assert(serviceName != null);
         assert(id != null);
         
@@ -298,24 +298,27 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 
         final long newNodeId = newNode.getId();
         final String idkey = NodeMapUtil.getIdentityKey(id);
-        final String statuskey = NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
         final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
+        final String statuskey = NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
         
         // if moving, want to look up the old IdentityMO?
         final IdentityMO idmo = new IdentityMO(id, newNodeId);
         System.out.println("STORING " + idmo + " with key " + idkey);
 
         final Node old = oldNode;
-        final long oldId = old.getId();
+        // Set correctly only if old not null.
+        long oid = -1;
         String ostatusk = null;
         String onodek = null;
         if (oldNode != null) {
-            ostatusk =  NodeMapUtil.getPartialStatusKey(id, oldId);
-            onodek = NodeMapUtil.getNodeKey(oldId, id);
+            oid = old.getId();
+            ostatusk =  NodeMapUtil.getPartialStatusKey(id, oid);
+            onodek = NodeMapUtil.getNodeKey(oid, id);
         }
+        // Copy locals into final variables for use by inner class
         final String oldStatusKey = ostatusk;
         final String oldNodeKey = onodek;
-        
+        final long oldId = oid;
         try {
             runTransactionally(new AbstractKernelRunnable() {
                 public void run() {
@@ -337,6 +340,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                         while (iter.hasNext()) {
                             // JANE need to copy the old values to the new?
                             String key = iter.next();
+                            dataService.removeServiceBinding(key);
                             key.replaceAll(String.valueOf(oldId), 
                                            String.valueOf(newNodeId));
                             dataService.setServiceBinding(key, idmo);
@@ -345,7 +349,9 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                     }
                 }});
         } catch (Exception e) {
-            //JANE?
+            logger.logThrow(Level.WARNING, e, 
+                            "Move {0} mappings from {1} to {2} failed", 
+                            idmo, oldNode, newNode);
         }
 
         // Tell our listeners
@@ -379,36 +385,37 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         
         final IdentityMO foundId = idtask.getId();
         if (foundId == null) {
-            // Choose the node.  This needs to occur outside of a transaction,
-            // as it could take a while.
-            Node newNode = assignPolicy.chooseNode(id);
-
-            final long newNodeId = newNode.getId();
-            final String statuskey = 
-                    NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
-            final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
-            final IdentityMO idmo = new IdentityMO(id, newNodeId);
-            System.out.println("STORING " + idmo + " with key " + idkey);
-            
-            try {         
-                runTransactionally(new AbstractKernelRunnable() {
-                    public void run() {
-                        // Add the id->node mapping.
-                        dataService.setServiceBinding(idkey, idmo);
-                        // Add the node->id mapping
-                        dataService.setServiceBinding(nodekey, idmo);
-                        // Add the status
-                        dataService.setServiceBinding(statuskey, idmo);
-                    }});
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex, 
-                                "Adding mappings for {0} failed", idmo);
-            }
-
-            // Tell our listeners
-            notifyListeners(null, newNode, id);
-            
-            logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNode);
+            long newNodeId = moveIdentity(serviceName, id, null);
+////            // Choose the node.  This needs to occur outside of a transaction,
+////            // as it could take a while.
+////            Node newNode = assignPolicy.chooseNode(id);
+////
+////            final long newNodeId = newNode.getId();
+////            final String statuskey = 
+////                    NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
+////            final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
+////            final IdentityMO idmo = new IdentityMO(id, newNodeId);
+////            System.out.println("STORING " + idmo + " with key " + idkey);
+////            
+////            try {         
+////                runTransactionally(new AbstractKernelRunnable() {
+////                    public void run() {
+////                        // Add the id->node mapping.
+////                        dataService.setServiceBinding(idkey, idmo);
+////                        // Add the node->id mapping
+////                        dataService.setServiceBinding(nodekey, idmo);
+////                        // Add the status
+////                        dataService.setServiceBinding(statuskey, idmo);
+////                    }});
+////            } catch (Exception ex) {
+////                logger.logThrow(Level.WARNING, ex, 
+////                                "Adding mappings for {0} failed", idmo);
+////            }
+////
+////            // Tell our listeners
+////            notifyListeners(null, newNode, id);
+////            
+            logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNodeId);
         } else {
             long foundNodeId = foundId.getNodeId();
             try {
@@ -510,9 +517,6 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                     // expect to find NO bound names for any node
                     String name = dataService.nextServiceBoundName(statuskey);
                     dead = (name == null || !name.startsWith(statuskey));
-//                    dead = 
-//                        (dataService.nextServiceBoundName(statuskey) == null);
-
                 } catch (NameNotBoundException e) {
                     e.printStackTrace();
                 }
@@ -531,7 +535,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 
         }
         public String getBaseTaskType() {
-            return "AssignNodeTask";
+            return this.getClass().getName();
         }
         
         boolean isDead() {
@@ -616,5 +620,138 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
     private void runTransactionally(KernelRunnable task) throws Exception {   
         taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);      
     }
+    
+//    /**
+//     * Class for testing data store validity after map modifications.
+//     */
+//    public class NodeMapValidator {
+//        private final DataService dataService;
+//        public NodeMapValidator(DataService dataService) {
+//            this.dataService = dataService;
+//        }
+        /**
+         * Check the validity of the data store for a particular identity.
+         * Used for testing.
+         * @return {@code true} if all is well, {@code false} if there is a problem
+         **/
+        public boolean assertValid(Identity identity) {
+            boolean ok;
+            AssertTask atask = new AssertTask(identity, dataService);
+            try {
+                runTransactionally(atask);
+                ok = atask.allOK();
+            } catch (Exception ex) {
+                logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
+                ok = false;
+            }     
+            return ok;
+        }
+        
+        public Set<String> reportFound(Identity identity) throws Exception {
+            AssertTask atask = new AssertTask(identity, dataService);
+            runTransactionally(atask);
+            return atask.found();
+        }
+    
+        /**
+         * Task to assert some invariants about our use of the data store
+         * are true.
+         */
+        private class AssertTask implements KernelRunnable {
+
+            private final Identity id;
+            private final DataService dataService;
+            private final String idkey;
+            private final String statuskey;
+            private final int statuskeylen;
+            
+            // Return values
+            private boolean ok = true;
+            private Set<String> foundKeys = new HashSet<String>();
+            
+            AssertTask(Identity id, DataService dataService) {
+                this.id = id;
+                this.dataService = dataService;
+                idkey = NodeMapUtil.getIdentityKey(id);
+                statuskey = NodeMapUtil.getPartialStatusKey(id);
+                statuskeylen = statuskey.length();
+            }
+
+            public void run() {
+                // Assert that the data store map seems valid for an identity.
+                // If we can find the id->node map, be sure that:
+                //    there is also a node->id bound name
+                //    we cannot find any other node->id names (might be hard/long)
+                //    if there are any status records, they are only for the node
+                // If we cannot find the id->node map, be sure that:
+                //    we cannot find an node->id mapping (might be hard/long)
+                //    we cannot find a status record for status.id
+                IdentityMO idmo = null;
+                try {
+                    // Look for the identity in the map.
+                    idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                    foundKeys.add(idkey);
+                } catch (Exception e) {
+                    // Do nothing: leave idmo as null to indicate not found
+                }
+                if (idmo != null) {
+                    long nodeId = idmo.getNodeId();
+                    final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
+
+                    try {
+                        dataService.getServiceBinding(nodekey, IdentityMO.class);
+                        foundKeys.add(nodekey);
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, 
+                                "Did not find expected mapping for {0}", nodekey);
+                        ok = false;
+                    }
+                    // Check status
+                    Iterator<String> iter =
+                        BoundNamesUtil.getServiceBoundNamesIterator(
+                            dataService, statuskey);
+
+                    while (iter.hasNext()) {
+                        String key = iter.next();
+                        foundKeys.add(key);
+                        String subkey = key.substring(statuskeylen);
+                        if (!subkey.startsWith(String.valueOf(nodeId))) {
+                            logger.log(Level.SEVERE, 
+                                "Found unexpected mapping for {0}", key);
+                            ok = false;
+                        }      
+                    }
+                } else {
+                    // Not checking all nodes to make sure not mapped yet...
+                    Iterator<String> iter =
+                        BoundNamesUtil.getServiceBoundNamesIterator(
+                            dataService, statuskey);
+
+                    while (iter.hasNext()) {
+                        String key = iter.next();
+                        foundKeys.add(key);
+                        logger.log(Level.SEVERE, 
+                                "Found unexpected mapping for {0}", key);
+                        ok = false;
+
+                    }
+                }
+
+            }
+            public String getBaseTaskType() {
+                return this.getClass().getName();
+            }
+
+            boolean allOK() {
+                return ok;
+            }
+            
+            Set<String> found() {
+                return foundKeys;
+            }
+        }
+//    }
+    
+
 }
     
