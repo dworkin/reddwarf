@@ -71,7 +71,16 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.start} property
  *	is {@code true}, then the value must be greater than or equal to
  *	{@code 0} and no greater than {@code 65535}, otherwise the value
+ *
  *	must be non-zero, positive, and no greater than	{@code 65535}.<p>
+ *
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl.port} <br>
+ *	<i>Default:</i> {@code 0} (anonymous port) <br>
+ *	Specifies the network port for this watchdog service for receiving
+ *	node status change notifications from the watchdog server.  The value
+ *	must be greater than or equal to {@code 0} and no greater than
+ *	{@code 65535}.<p>
  * </ul> <p>
  */
 public class WatchdogServiceImpl implements WatchdogService {
@@ -96,20 +105,27 @@ public class WatchdogServiceImpl implements WatchdogService {
 	WATCHDOG_SERVER_CLASSNAME +  ".host";
 
     /** The property name for the watchdog server port. */
-    private static final String PORT_PROPERTY =
+    private static final String SERVER_PORT_PROPERTY =
 	WatchdogServerImpl.PORT_PROPERTY;
 
     /** The default value of the server port. */
-    private static final int DEFAULT_PORT = WatchdogServerImpl.DEFAULT_PORT;
+    private static final int DEFAULT_SERVER_PORT =
+	WatchdogServerImpl.DEFAULT_PORT;
 
-    /** The minimum renew interval to ping watchdog server. */
-    private static final long MIN_RENEW_INTERVAL = 50;
+    /** The property name for the watchdog client port. */
+    private static final String CLIENT_PORT_PROPERTY = CLASSNAME + ".port";
+
+    /** The default value of the client port. */
+    private static final int DEFAULT_CLIENT_PORT = 0;
+
+    /** The minimum renew interval. */
+    private static final long MIN_RENEW_INTERVAL = 25;
 
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
 
-    /** The lock. */
-    private final Object lock = new Object();
+    /** The lock for this service's state. */
+    private final Object stateLock = new Object();
     
     /** The application name */
     private final String appName;
@@ -138,8 +154,8 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The name of the local host. */
     private final String localHost;
     
-    /** The thread that pings the watchdog server. */
-    private final Thread pingThread = new PingThread();
+    /** The thread that renews the node with the watchdog server. */
+    private final Thread renewThread = new RenewThread();
 
     /** The set of node listeners for all nodes. */
     private final Set<NodeListener> nodeListeners =
@@ -149,14 +165,20 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final Map<Long, Set<NodeListener>>  nodeListenerMap =
 	new HashMap<Long, Set<NodeListener>>();
 
-    /** The ping interval. */
-    private long pingInterval;
+    /** The renew interval. */
+    private long renewInterval;
+
+    /** The time to wait for registration to complete. */
+    private long registrationWaitTime = 500;
 
     /** The data service. */
     private DataService dataService;
 
     /** The local nodeId. */
     private long localNodeId;
+
+    /** If true, this node has completed registration with server. */
+    private boolean isRegistered = false;
 
     /** If true, this node is alive; initially, true. */
     private boolean isAlive = true;
@@ -195,23 +217,35 @@ public class WatchdogServiceImpl implements WatchdogService {
  		START_SERVER_PROPERTY, false);
 	    localHost = InetAddress.getLocalHost().getHostName();
 	    String host;
-	    int port;
+	    int serverPort;
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(properties, systemRegistry);
 		host = localHost;
-		port = serverImpl.getPort();
+		serverPort = serverImpl.getPort();
 	    } else {
 		serverImpl = null;
 		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
-		port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
-		if (port <= 0 || port > 65535) {
+		serverPort = wrappedProps.getIntProperty(
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
+		if (serverPort <= 0 || serverPort > 65535) {
 		    throw new IllegalArgumentException(
-			"The " + PORT_PROPERTY + " property value must be " +
-			"greater than 0 and less than 65535: " + port);
+			"The " + SERVER_PORT_PROPERTY + " property value " +
+			"must be greater than 0 and less than 65535: " +
+			serverPort);
 		}
 	    }
 
-	    Registry rmiRegistry = LocateRegistry.getRegistry(host, port);
+	    int clientPort = wrappedProps.getIntProperty(
+		    CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT);
+	    if (clientPort < 0 || clientPort > 65535) {
+		throw new IllegalArgumentException(
+		    "The " + CLIENT_PORT_PROPERTY + " property value " +
+		    "must be greater than 0 and less than 65535: " +
+		    clientPort);
+	    }
+
+
+	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 	    
@@ -261,7 +295,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		}
 	    }
 	    
-	    synchronized (lock) {
+	    synchronized (stateLock) {
 		if (dataService != null) {
 		    throw new IllegalStateException("already configured");
 		}
@@ -291,13 +325,13 @@ public class WatchdogServiceImpl implements WatchdogService {
     
     /** {@inheritDoc} */
     public boolean shutdown() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    if (shuttingDown) {
 		throw new IllegalStateException("already shutting down");
 	    }
 	    shuttingDown = true;
 	}
-	pingThread.interrupt();
+	renewThread.interrupt();
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}
@@ -406,7 +440,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * the service's {@link #configure configure} method aborts.
 	 */
 	public void abort(boolean retryable) {
-	    synchronized (lock) {
+	    synchronized (stateLock) {
 		dataService = null;
 	    }
 
@@ -419,41 +453,47 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * {@inheritDoc}
 	 *
 	 * Starts the thread that registers this node with the
-	 * watchdog server, and then continuously pings the watchdog
-	 * server at the appropriate ping interval.
+	 * watchdog server, and then continuously renews this node
+	 * with the watchdog server at the appropriate renew interval.
 	 */
 	public void commit() {
 	    isCommitted = true;
-	    pingThread.start();
+	    renewThread.start();
         }
     }
 
 
     /**
      * This thread registers this node with the watchdog server, and
-     * then continuously pings the watchdog server before the ping
-     * interval (returned when registering the node) expires.
+     * then continuously renews this node with the watchdog server
+     * before the renew interval (returned when registering the node)
+     * expires.
      */
-    private final class PingThread extends Thread {
+    private final class RenewThread extends Thread {
 
 	/** Constructs an instance of this class as a daemon thread. */
-	PingThread() {
-	    super(CLASSNAME + "$PingThread");
+	RenewThread() {
+	    super(CLASSNAME + "$RenewThread");
 	    setDaemon(true);
 	}
 
 	/**
 	 * Registers the node with the watchdog server, and sends
-	 * periodic pings.  This thread terminates if the node is no
-	 * longer considered alive or if the watchdog service is
-	 * shutdown.
+	 * periodic renew requests.  This thread terminates if the
+	 * node is no longer considered alive or if the watchdog
+	 * service is shutdown.
 	 */
 	public void run() {
 	    
 	    try {
-		pingInterval =
+		renewInterval =
 		    serverProxy.registerNode(
 			localNodeId, localHost, clientProxy);
+		isRegistered = true;
+		synchronized (stateLock) {
+		    stateLock.notifyAll();
+		}
+		
 	    } catch (Exception e) {
 
 		if (shuttingDown()) {
@@ -469,9 +509,10 @@ public class WatchdogServiceImpl implements WatchdogService {
 		setFailed();
 		return;
 	    }
-	    long normalRenewInterval = pingInterval / 2;
-	    long renewInterval = normalRenewInterval;
-	    long lastPing = System.currentTimeMillis();
+	    
+	    long startRenewInterval = renewInterval / 2;
+	    long nextRenewInterval = startRenewInterval;
+	    long lastRenewTime = System.currentTimeMillis();
 
 	    while (isAlive()) {
 
@@ -481,32 +522,33 @@ public class WatchdogServiceImpl implements WatchdogService {
 		}
 
 		try {
-		    Thread.currentThread().sleep(renewInterval);
+		    Thread.currentThread().sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
 		    // should this call setFailed()?
 		    return;
 		}
 		
 		try {
-		    if (!serverProxy.ping(localNodeId)) {
+		    if (!serverProxy.renewNode(localNodeId)) {
 			setFailed();
 		    }
 		    long now = System.currentTimeMillis();
-		    if (now - lastPing > pingInterval) {
+		    if (now - lastRenewTime > renewInterval) {
 			setFailed();
 		    }
-		    lastPing = now;
-		    renewInterval = normalRenewInterval;
+		    lastRenewTime = now;
+		    nextRenewInterval = startRenewInterval;
 		    
 		} catch (IOException e) {
 		    /*
-		     * Adjust renew interval in order to ping server again
-		     * before ping interval expires.
+		     * Adjust renew interval in order to renew with
+		     * server again before the renew interval expires.
 		     */
 		    logger.logThrow(
-			Level.WARNING, e, "pinging watchdog server throws");
-		    renewInterval =
-			Math.max(renewInterval / 2, MIN_RENEW_INTERVAL);
+			Level.WARNING, e,
+			"renewing with watchdog server throws");
+		    nextRenewInterval =
+			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
 		}
 	    }
 	}
@@ -525,15 +567,40 @@ public class WatchdogServiceImpl implements WatchdogService {
     
     /**
      * Throws {@code IllegalStateException} if this service is not
-     * configured or is shutting down.
+     * configured or is shutting down, and blocks until this node is
+     * registered with the server.
      */
     private void checkState() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    if (dataService == null) {
 		throw new IllegalStateException("service not configured");
-	    } else if (shuttingDown) {
-		throw new IllegalStateException("service shutting down");
+	    } else {
+		checkShutdown();
 	    }
+
+	    while (! isRegistered) {
+		try {
+		    stateLock.wait(registrationWaitTime);
+		} catch (InterruptedException e) {
+		}
+		checkShutdown();
+		if (! isAlive) {
+		    throw new IllegalStateException("node has failed");
+		}
+	    }
+	}
+    }
+
+    /**
+     * Throws {@code IllegalStateException} if this node is shutting
+     * down.  This implementation assumes that the caller is
+     * synchronized on the {@code stateLock}.
+     */
+    private void checkShutdown() {
+	assert Thread.holdsLock(stateLock);
+	
+	if (shuttingDown) {
+	    throw new IllegalStateException("service shutting down");
 	}
     }
 
@@ -541,7 +608,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Returns {@code true} if this service is shutting down.
      */
     private boolean shuttingDown() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    return shuttingDown;
 	}
     }
@@ -551,7 +618,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * considered alive.
      */
     private boolean isAlive() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    return isAlive;
 	}
     }
@@ -565,7 +632,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * already set to {@code false}, then this method does nothing.
      */
     private void setFailed() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    if (!isAlive) {
 		return;
 	    }

@@ -15,7 +15,7 @@ public interface WatchdogServer extends Remote {
     /**
      * Registers a node with the corresponding {@code nodeId} and
      * {@code hostname}, and returns an interval (in milliseconds)
-     * that this watchdog must be notified, via the {@link #ping ping}
+     * that this watchdog must be notified, via the {@link #renewNode renewNode}
      * method, in order for the specified node to be considered alive.
      * When a node fails or a new node starts, the given {@code
      * client} will be notified via its {@link
@@ -27,7 +27,7 @@ public interface WatchdogServer extends Remote {
      * @param	client a watchdog client
      *
      * @return	an interval (in milliseconds) that this watchdog
-     * 		expects to receive pings from the specified node
+     * 		expects to receive renew requests from the specified node
      *
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
@@ -44,7 +44,7 @@ public interface WatchdogServer extends Remote {
      * nodeId} is alive.  This method returns {@code true} if this
      * watchdog still considers the node alive, and returns {@code
      * false} otherwise.  This watchdog considers the node to have
-     * failed if a ping is not received from the node before the
+     * failed if a renew request is not received from the node before the
      * assigned interval, returned from {@link #registerNode
      * registerNode}, expires.
      *
@@ -56,7 +56,7 @@ public interface WatchdogServer extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    boolean ping(long nodeId) throws IOException;
+    boolean renewNode(long nodeId) throws IOException;
 
     /**
      * Returns {@code true} if this watchdog considers the node with

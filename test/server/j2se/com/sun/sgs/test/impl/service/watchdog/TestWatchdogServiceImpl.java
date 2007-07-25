@@ -50,16 +50,16 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** The port for the watchdog server. */
     private static int WATCHDOG_PORT = 0;
 
-    /** The ping interval for the watchdog server. */
-    private static long PING_INTERVAL = 500;
+    /** The renew interval for the watchdog server. */
+    private static long RENEW_INTERVAL = 500;
 
     /** Properties for the watchdog server and data service. */
     private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	WatchdogServerClassName + ".start", "true",
 	WatchdogServerClassName + ".port", Integer.toString(WATCHDOG_PORT),
-	WatchdogServerClassName + ".ping.interval",
-	    Long.toString(PING_INTERVAL));
+	WatchdogServerClassName + ".renew.interval",
+	    Long.toString(RENEW_INTERVAL));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -236,14 +236,14 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
     
-    public void testConstructorStartServerPingIntervalTooSmall()
+    public void testConstructorStartServerRenewIntervalTooSmall()
 	throws Exception
     {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerClassName + ".start", "true",
 	    WatchdogServerClassName + ".port", "0",
-	    WatchdogServerClassName + ".ping.interval", "0");
+	    WatchdogServerClassName + ".renew.interval", "0");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -252,14 +252,14 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testConstructorStartServerPingIntervalTooLarge()
+    public void testConstructorStartServerRenewIntervalTooLarge()
 	throws Exception
     {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerClassName + ".start", "true",
 	    WatchdogServerClassName + ".port", "0",
-	    WatchdogServerClassName + ".ping.interval", "10001");
+	    WatchdogServerClassName + ".renew.interval", "10001");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -392,7 +392,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 				   watchdog.getLocalNodeId());
 	    }
 	    // ensure that watchdogs have a chance to re
-	    Thread.currentThread().sleep(PING_INTERVAL);
+	    Thread.currentThread().sleep(RENEW_INTERVAL);
 	    createTransaction();
 	    Iterator<Node> iter = watchdogService.getNodes();
 	    int numNodes = 0;
@@ -471,8 +471,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 		commitTransaction();
 		watchdogs.add(watchdog);
 	    }
-	    // wait for all nodes to register...
-	    Thread.currentThread().sleep(1000);
 	    for (WatchdogServiceImpl watchdog : watchdogs) {
 		long id = watchdog.getLocalNodeId();
 		createTransaction();
@@ -605,8 +603,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    commitTransaction();
 	    watchdogs.add(watchdog);
 	}
-	// wait for all nodes to register...
-	Thread.currentThread().sleep(1000);
 	for (WatchdogServiceImpl watchdog : watchdogs) {
 	    long id = watchdog.getLocalNodeId();
 	    createTransaction();
@@ -625,7 +621,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
 
 	// wait for all nodes to fail...
-	Thread.currentThread().sleep(PING_INTERVAL * 4);
+	Thread.currentThread().sleep(RENEW_INTERVAL * 4);
 
 	Set<Node> nodes = listener.getFailedNodes();
 	System.err.println("failedNodes: " + nodes);

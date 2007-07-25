@@ -54,12 +54,12 @@ import java.util.logging.Logger;
  *	{@link #getPort getPort} method. <p>
  *
  * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.ping.interval} <br>
+ *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.renew.interval} <br>
  *	<i>Default:</i> {@code 1000} (one second)<br>
- *	Specifies the ping interval which is returned by the {@link #ping ping}
- *	method). The interval must be greater than or equal to  {@code 5}
- *	milliseconds and less than or equal to {@code 10000} milliseconds
- *	(10 seconds).<p>
+ *	Specifies the renew interval which is returned by the
+ *	{@link #renewNode renewNode} method). The interval must be greater
+ *	than or equal to  {@code 5} milliseconds and less than or equal to
+ *	{@code 10000} milliseconds (10 seconds).<p>
  * </ul> <p>
 
  */
@@ -81,18 +81,18 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The default value of the server port. */
     static final int DEFAULT_PORT = 44533;
 
-    /** The property name for the ping interval. */
-    private static final String PING_INTERVAL_PROPERTY =
-	CLASSNAME + ".ping.interval";
+    /** The property name for the renew interval. */
+    private static final String RENEW_INTERVAL_PROPERTY =
+	CLASSNAME + ".renew.interval";
 
-    /** The default value of the ping interval. */
-    private static final int DEFAULT_PING_INTERVAL = 1000;
+    /** The default value of the renew interval. */
+    private static final int DEFAULT_RENEW_INTERVAL = 1000;
 
-    /** The lower bound for the ping interval. */
-    private static final int PING_INTERVAL_LOWER_BOUND = 5;
+    /** The lower bound for the renew interval. */
+    private static final int RENEW_INTERVAL_LOWER_BOUND = 5;
 
-    /** The upper bound for the ping interval. */
-    private static final int PING_INTERVAL_UPPER_BOUND = 10000;
+    /** The upper bound for the renew interval. */
+    private static final int RENEW_INTERVAL_UPPER_BOUND = 10000;
 
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
@@ -103,8 +103,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The server port. */
     private final int port;
 
-    /** The ping interval. */
-    private final long pingInterval;
+    /** The renew interval. */
+    private final long renewInterval;
 
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
@@ -135,7 +135,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final ConcurrentMap<Long, NodeImpl> nodeMap =
 	new ConcurrentHashMap<Long, NodeImpl>();
 
-    /** The set of node information, sorted by ping expiration time. */
+    /** The set of node information, sorted by renew expiration time. */
     private final SortedSet<NodeImpl> expirationSet = new TreeSet<NodeImpl>();
 
     /** The thread for checking node expiration times. */
@@ -169,16 +169,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		"greater than or equal to 0 and less than 65535: " +
 		requestedPort);
 	}
-	pingInterval = wrappedProps.getLongProperty(
-	    PING_INTERVAL_PROPERTY, DEFAULT_PING_INTERVAL);
-	if (pingInterval < PING_INTERVAL_LOWER_BOUND ||
-	    pingInterval > PING_INTERVAL_UPPER_BOUND)
+	renewInterval = wrappedProps.getLongProperty(
+	    RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL);
+	if (renewInterval < RENEW_INTERVAL_LOWER_BOUND ||
+	    renewInterval > RENEW_INTERVAL_UPPER_BOUND)
 	{
 	    throw new IllegalArgumentException(
-		"The " + PING_INTERVAL_PROPERTY + " property value must be " +
-		"greater than or equal to " + PING_INTERVAL_LOWER_BOUND +
-		" and less than or equal to " + PING_INTERVAL_UPPER_BOUND +
-		": " + pingInterval);
+		"The " + RENEW_INTERVAL_PROPERTY + " property value must be " +
+		"greater than or equal to " + RENEW_INTERVAL_LOWER_BOUND +
+		" and less than or equal to " + RENEW_INTERVAL_UPPER_BOUND +
+		": " + renewInterval);
 	}
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
@@ -253,7 +253,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * {@inheritDoc}
      *
-     * <p>This implementation assumes that it will not receive a ping
+     * <p>This implementation assumes that it will not receive a renew
      * for the same node while it is registering that node.
      */
     public long registerNode(long nodeId,
@@ -262,16 +262,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	throws IOException
     {
 	checkState();
-	final NodeImpl node = new NodeImpl(
-	    nodeId, hostname, client, calculateExpiration());
+	final NodeImpl node = new NodeImpl(nodeId, hostname, client, 0);
 	
 	if (nodeMap.putIfAbsent(nodeId, node) != null) {
 	    throw new NodeExistsException(
 		"node already registered: " + nodeId);
-	}
-
-	synchronized (expirationSet) {
-	    expirationSet.add(node);
 	}
 
 	/*
@@ -284,11 +279,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		}});
 	} catch (Exception e) {
 	    nodeMap.remove(nodeId);
-	    synchronized (expirationSet) {
-		expirationSet.remove(node);
-	    }
 	    throw new NodeRegistrationFailedException(
 		"registration failed: " + nodeId, e);
+	}
+
+	node.setExpiration(calculateExpiration());
+	synchronized (expirationSet) {
+	    expirationSet.add(node);
 	}
 
 	statusChangedNodes.add(node);
@@ -296,13 +293,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    notifyClientsLock.notifyAll();
 	}
 	
-	return pingInterval;
+	return renewInterval;
     }
 
     /**
      * {@inheritDoc}
      */
-    public boolean ping(long nodeId) throws IOException {
+    public boolean renewNode(long nodeId) throws IOException {
 	checkState();
 	NodeImpl node = nodeMap.get(nodeId);
 	if (node == null || !node.isAlive()) {
@@ -310,7 +307,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 
 	synchronized (expirationSet) {
-	    // update ping expiration time in sorted set...
+	    // update expiration time in sorted set...
 	    expirationSet.remove(node);
 	    node.setExpiration(calculateExpiration());
 	    expirationSet.add(node);
@@ -394,7 +391,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * Returns an expiration time based on the current time.
      */
     private long calculateExpiration() {
-	return System.currentTimeMillis() + pingInterval;
+	return System.currentTimeMillis() + renewInterval;
     }
 
     /**
@@ -419,7 +416,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    while (!shuttingDown()) {
 
 		long now = System.currentTimeMillis();
-		boolean notify = false;
+		boolean notifyClients = false;
 		synchronized (expirationSet) {
 		    while (! expirationSet.isEmpty()) {
 			NodeImpl node = expirationSet.first();
@@ -428,13 +425,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			}
 			setFailed(node);
 			statusChangedNodes.add(node);
-			notify = true;
+			notifyClients = true;
 			expirationSet.remove(node);
 			// TBD: when should node be removed from nodeMap?
 		    }
 		}
 		
-		if (notify) {
+		if (notifyClients) {
 		    synchronized (notifyClientsLock) {
 			notifyClientsLock.notifyAll();
 		    }
@@ -442,7 +439,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
 		long sleepTime =
 		    expirationSet.isEmpty() ?
-		    pingInterval :
+		    renewInterval :
 		    expirationSet.first().getExpiration() - now;
 		try {
 		    Thread.currentThread().sleep(sleepTime);
@@ -457,6 +454,10 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 */
 	private void setFailed(final NodeImpl node) {
 	    node.setFailed();
+
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE, "Node failed: {0}", node.getId());
+	    }
 
 	    try {
 		runTransactionally(new AbstractKernelRunnable() {
@@ -487,11 +488,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			try {
 			    notifyClientsLock.wait();
 			} catch (InterruptedException e) {
-			    if (shuttingDown()) {
-				return;
-			    }
+			    
 			}
 		    }
+		}
+		
+		if (shuttingDown()) {
+		    return;
 		}
 
 		Iterator<Node> iter = statusChangedNodes.iterator();
@@ -506,9 +509,10 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    try {
 			client.nodeStatusChange(nodes);
 		    } catch (Exception e) {
-			logger.logThrow(Level.WARNING, e,
-					"Notifying {0} of status change failed:",
-					notifyNode.getId());
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Notifying {0} of node status changes failed:",
+			    notifyNode.getId());
 		    }
 		}
 	    }
