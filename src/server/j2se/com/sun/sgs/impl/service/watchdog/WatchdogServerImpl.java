@@ -136,8 +136,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final Thread notifyClientsThread = new NotifyClientsThread();
 
     /** The queue of nodes whose status has changed. */
-    private final Queue<Node> statusChangedNodes =
-	new ConcurrentLinkedQueue<Node>();
+    private final Queue<NodeImpl> statusChangedNodes =
+	new ConcurrentLinkedQueue<NodeImpl>();
 
     /** The task owner. */
     private TaskOwner taskOwner;
@@ -160,6 +160,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** The thread for checking node expiration times. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
+
+    /** The thread for notifying failed nodes on restart. */
+    private Thread notifyClientsOnRestartThread;
     
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -263,6 +266,10 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 				    idBlockSize,
 				    txnProxy,
 				    nonDurableTaskScheduler);
+		Collection<NodeImpl> failedNodes =
+		    NodeImpl.markAllNodesFailed(dataService);
+		notifyClientsOnRestartThread =
+		    new NotifyClientsOnRestartThread(failedNodes);
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -378,15 +385,25 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     public int getPort() {
 	return port;
     }
-
+    
     /**
      * Resets the server to an uninitialized state so that configure
      * can be reinvoked.  This method is invoked by the {@link
      * WatchdogServiceImpl} if its {@link
      * WatchdogServiceImpl#configure configure} method aborts.
      */
-    void reset() {
+    void abortConfigure() {
 	dataService = null;
+    }
+
+    /**
+     * Performs actions necessary when {@link #configure configure}
+     * method commits.  This method is invoked by the {@link
+     * WatchdogServiceImpl} if its {@link
+     * WatchdogServiceImpl#configure configure} method commits.
+     */
+    void commitConfigure() {
+	notifyClientsOnRestartThread.start();
     }
 
     /**
@@ -537,46 +554,77 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    return;
 		}
 
-		Iterator<Node> iter = statusChangedNodes.iterator();
-		Collection<Node> nodes = new ArrayList<Node>();
+		Iterator<NodeImpl> iter = statusChangedNodes.iterator();
+		Collection<NodeImpl> changedNodes = new ArrayList<NodeImpl>();
 		while (iter.hasNext()) {
-		    nodes.add(iter.next());
+		    changedNodes.add(iter.next());
 		    iter.remove();
 		}
+		
+		notifyClients(nodeMap.values(), changedNodes);
+	    }
+	}
+    }
 
-		// Notify clients of status changes.
-		for (NodeImpl notifyNode : nodeMap.values()) {
-		    WatchdogClient client = notifyNode.getWatchdogClient();
-		    try {
-			client.nodeStatusChange(nodes);
-		    } catch (Exception e) {
-			// TBD: Should it try harder to notify the client?
-			logger.logThrow(
-			    Level.WARNING, e,
-			    "Notifying {0} of node status changes failed:",
-			    notifyNode.getId());
-		    }
-		}
+    private final class NotifyClientsOnRestartThread extends Thread {
 
-		// Remove failed nodes from transient map and persistent store.
-		for (Node node : nodes) {
-		    if (! node.isAlive()) {
-			final NodeImpl nodeImpl = (NodeImpl) node;
-			try {
-			    runTransactionally(new AbstractKernelRunnable() {
-				public void run() {
-				    nodeImpl.removeNode(dataService);
-				}});
-			} catch (Exception e) {
-			    logger.logThrow(
-				Level.WARNING, e,
-				"Removing failed node {0} throws",
-				node.getId());
+	private final Collection<NodeImpl> nodes;
+	
+	/**
+	 * Constructs an instance of this class with the specified
+	 * collection of {@code nodes}, and sets this thread as a
+	 * daemon thread.
+	 *
+	 * @param  nodes the collection of nodes to notify about each other
+	 */
+	NotifyClientsOnRestartThread(Collection<NodeImpl> nodes) {
+	    super(CLASSNAME + "$NotifyClientsOnRestartThread");
+	    setDaemon(true);
+	    this.nodes = nodes;
+	}
+	
+	public void run() {
+	    notifyClients(nodes,  nodes);
+	}
+    }
+
+    private void notifyClients(Collection<NodeImpl> notifyNodes,
+			       Collection<NodeImpl> changedNodes)
+    {
+
+	// Notify clients of status changes.
+	for (NodeImpl notifyNode : notifyNodes) {
+	    WatchdogClient client = notifyNode.getWatchdogClient();
+	    try {
+		client.nodeStatusChange(changedNodes);
+	    } catch (Exception e) {
+		// TBD: Should it try harder to notify the client in
+		// the non-restart case?  In the restart case, the
+		// client may have failed too.
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Notifying {0} of node status changes failed:",
+		    notifyNode.getId());
+	    }
+	}
+
+	// Remove failed nodes from transient map and persistent store.
+	for (NodeImpl changedNode : changedNodes) {
+	    if (! changedNode.isAlive()) {
+		final NodeImpl node = changedNode;
+		try {
+		    runTransactionally(new AbstractKernelRunnable() {
+			    public void run() {
+				node.removeNode(dataService);
+			    }});
+		} catch (Exception e) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Removing failed node {0} throws",
+			node.getId());
 			    
-			}
-			nodeMap.remove(node.getId());
-		    }
 		}
+		nodeMap.remove(node.getId());
 	    }
 	}
     }

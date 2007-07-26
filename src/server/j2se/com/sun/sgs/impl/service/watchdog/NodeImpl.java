@@ -11,6 +11,8 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 
 /**
@@ -187,6 +189,7 @@ class NodeImpl
 	dataService.markForUpdate(this); // is this necessary?
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
+    
     /**
      * Updates the node's state in the specified {@code dataService}.
      * This method should only be called within a transaction.
@@ -248,6 +251,20 @@ class NodeImpl
 	} catch (NameNotBoundException e) {
 	}
 	return node;
+    }
+
+    static Collection<NodeImpl> markAllNodesFailed(DataService dataService) {
+	Collection<NodeImpl> nodes = new ArrayList<NodeImpl>();
+	for (String key :
+	     BoundNamesUtil.getServiceBoundNamesIterable(
+		dataService, NODE_PREFIX))
+	{
+	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
+	    dataService.markForUpdate(node);
+	    node.setFailed();
+	    nodes.add(node);
+	}
+	return nodes;
     }
 
     /**

@@ -4,7 +4,6 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.rmi.Remote;
 import java.util.Collection;
@@ -23,5 +22,5 @@ public interface WatchdogClient extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void nodeStatusChange(Collection<Node> nodes) throws IOException;
+    void nodeStatusChange(Collection<NodeImpl> nodes) throws IOException;
 }

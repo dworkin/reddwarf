@@ -441,7 +441,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 
 	    if (serverImpl != null) {
-		serverImpl.reset();
+		serverImpl.abortConfigure();
 	    }
 	}
 
@@ -455,6 +455,9 @@ public class WatchdogServiceImpl implements WatchdogService {
 	public void commit() {
 	    isCommitted = true;
 	    renewThread.start();
+	    if (serverImpl != null) {
+		serverImpl.commitConfigure();
+	    }
         }
     }
 
@@ -696,7 +699,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChange(Collection<Node> nodes) {
+	public void nodeStatusChange(Collection<NodeImpl> nodes) {
 	    for (Node node : nodes) {
 		notifyListeners(node);
 	    }
