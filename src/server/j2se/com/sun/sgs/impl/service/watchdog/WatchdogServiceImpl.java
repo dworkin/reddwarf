@@ -165,17 +165,14 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final Map<Long, Set<NodeListener>>  nodeListenerMap =
 	new HashMap<Long, Set<NodeListener>>();
 
-    /** The renew interval. */
-    private long renewInterval;
-
-    /** The time to wait for registration to complete. */
-    private long registrationWaitTime = 500;
-
     /** The data service. */
     private DataService dataService;
 
     /** The local nodeId. */
-    private long localNodeId;
+    private volatile long localNodeId;
+
+    /** The time to wait for registration to complete. */
+    private long registrationWaitTime = 500;
 
     /** If true, this node has completed registration with server. */
     private boolean isRegistered = false;
@@ -306,7 +303,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    new NonDurableTaskScheduler(
 			taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
-		localNodeId = NodeId.nextNodeId(dataService);
 	    }
 
 	    if (serverImpl != null) {
@@ -355,7 +351,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || node.isAlive() == false) {
-		setFailed();
+		setFailedThenNotify(true);
 		return false;
 	    } else {
 		return true;
@@ -484,29 +480,37 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * service is shutdown.
 	 */
 	public void run() {
-	    
+
+	    long renewInterval;
 	    try {
-		renewInterval =
-		    serverProxy.registerNode(
-			localNodeId, localHost, clientProxy);
-		isRegistered = true;
+		long[] values =
+		    serverProxy.registerNode(localHost, clientProxy);
+		if (values == null || values.length < 2) {
+		    logger.log(
+			Level.SEVERE,
+			"registerNode returned improper array: {0}",
+			values);
+		    setFailedThenNotify(false);
+		    return;
+		}
+		localNodeId = values[0];
+		renewInterval = values[1];
 		synchronized (stateLock) {
+		    isRegistered = true;
 		    stateLock.notifyAll();
 		}
 		
 	    } catch (Exception e) {
-
-		if (shuttingDown()) {
-		    return;
-		}
-		    
 		/*
 		 * Unable to register node with watchdog server, so
 		 * set this node as failed, and exit thread.
 		 */
-		logger.logThrow(
-		    Level.SEVERE, e, "registering with watchdog server throws");
-		setFailed();
+		if (! shuttingDown()) {
+		    logger.logThrow(
+			Level.SEVERE, e,
+			"registering with watchdog server throws");
+		    setFailedThenNotify(false);
+		}
 		return;
 	    }
 	    
@@ -514,27 +518,21 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (isAlive()) {
-
-		if (shuttingDown()) {
-		    // should this call setFailed()?
-		    return;
-		}
+	    while (isAlive() && ! shuttingDown()) {
 
 		try {
 		    Thread.currentThread().sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
-		    // should this call setFailed()?
 		    return;
 		}
 		
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
-			setFailed();
+			setFailedThenNotify(true);
 		    }
 		    long now = System.currentTimeMillis();
 		    if (now - lastRenewTime > renewInterval) {
-			setFailed();
+			setFailedThenNotify(true);
 		    }
 		    lastRenewTime = now;
 		    nextRenewInterval = startRenewInterval;
@@ -625,13 +623,17 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /**
      * Sets the local alive status of this node to {@code false}, and
-     * notifies any registered node listeners of this node's failure.
-     * This method is called when this node is no longer considered
-     * alive.  Subsequent calls to {@link #isAlive isAlive} will
-     * return {@code false}.  If this node's local alive status was
-     * already set to {@code false}, then this method does nothing.
+     * if {@code notify} is {@code true}, notifies appropriate
+     * registered node listeners of this node's failure.  This method
+     * is called when this node is no longer considered alive.
+     * Subsequent calls to {@link #isAlive isAlive} will return {@code
+     * false}.  If this node's local alive status was already set to
+     * {@code false}, then this method does nothing.
+     *
+     * @param	notify	if {@code true}, notifies appropriate registered
+     *		node listeners of this node's failure
      */
-    private void setFailed() {
+    private void setFailedThenNotify(boolean notify) {
 	synchronized (stateLock) {
 	    if (!isAlive) {
 		return;
@@ -639,8 +641,10 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    isAlive = false;
 	}
 
-	Node node = new NodeImpl(localNodeId);
-	notifyListeners(node);
+	if (notify) {
+	    Node node = new NodeImpl(localNodeId);
+	    notifyListeners(node);
+	}
     }
 
     /**

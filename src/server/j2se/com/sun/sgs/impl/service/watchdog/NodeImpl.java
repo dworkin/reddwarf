@@ -184,7 +184,7 @@ class NodeImpl
      *		current transaction
      */
     synchronized void putNode(DataService dataService) {
-	dataService.markForUpdate(this);
+	dataService.markForUpdate(this); // is this necessary?
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
     /**
@@ -205,6 +205,27 @@ class NodeImpl
 	    dataService.markForUpdate(node);
 	    node.isAlive = isAlive;
 	}
+    }
+
+    /**
+     * Removes this instance and binding from the specified {@code
+     * dataService}.  This method should only be called within a
+     * transaction.
+     *
+     * @param	dataService a data service
+     * @throws	ObjectNotFoundException if this node was not already
+     *		stored in the data service
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void removeNode(DataService dataService) {
+	String key = getNodeKey(id);
+	try {
+	    dataService.removeServiceBinding(key);
+	} catch (NameNotBoundException e) {
+	}
+	dataService.markForUpdate(this);
+	dataService.removeObject(this);
     }
 
     /**

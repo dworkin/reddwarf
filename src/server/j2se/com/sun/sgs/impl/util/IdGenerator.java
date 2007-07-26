@@ -12,7 +12,8 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 
 /**
- * Utility class for reserving blocks of non-reusable IDs.
+ * Utility class for reserving blocks of non-reusable IDs.  The
+ * generated IDs start at {@code 1L}.
  */
 public class IdGenerator {
 

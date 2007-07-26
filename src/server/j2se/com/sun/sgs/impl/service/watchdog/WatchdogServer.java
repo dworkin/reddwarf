@@ -13,30 +13,34 @@ import java.rmi.Remote;
 public interface WatchdogServer extends Remote {
 
     /**
-     * Registers a node with the corresponding {@code nodeId} and
-     * {@code hostname}, and returns an interval (in milliseconds)
-     * that this watchdog must be notified, via the {@link #renewNode renewNode}
-     * method, in order for the specified node to be considered alive.
-     * When a node fails or a new node starts, the given {@code
-     * client} will be notified via its {@link
-     * WatchdogClient#nodeStarted nodeStarted} and {@link
-     * WatchdogClient#nodeFailed nodeFailed} methods respectively.
+     * Registers a node with the corresponding {@code hostname} and
+     * {@code client}, and returns and array containing two {@code
+     * long} values consisting of:
      *
-     * @param	nodeId	a node ID
+     * <ul>
+     * <li>a unique node ID for the node, and
+     *
+     * <li>an interval (in milliseconds) that this watchdog must be
+     * notified, via the {@link #renewNode renewNode} method, in order
+     * for the specified node to be considered alive.
+     * </ul>
+     *
+     * When a node fails or a new node starts, the given {@code
+     * client} will be notified of these status changes via its {@link
+     * WatchdogClient#nodeStatusChange nodeStatusChange} method.
+     *
      * @param	hostname  a hostname
      * @param	client a watchdog client
      *
-     * @return	an interval (in milliseconds) that this watchdog
-     * 		expects to receive renew requests from the specified node
+     * @return 	an array containing two {@code long} values consisting of
+     *		a unique node ID and a renew interval (in milliseconds)
      *
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
-     * @throws	NodeExistsException if a node with the specified
-     *		{@code nodeId} has already been registered
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long registerNode(long nodeId, String hostname, WatchdogClient client)
+    long[] registerNode(String hostname, WatchdogClient client)
 	throws IOException;
 
     /**

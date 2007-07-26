@@ -326,18 +326,22 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testGetLocalNodeId() throws Exception {
 	long id = watchdogService.getLocalNodeId();
-	if (id != 0) {
-	    fail("Expected id 0, got " + id);
+	if (id != 1) {
+	    fail("Expected id 1, got " + id);
 	}
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerClassName + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	    new WatchdogServiceImpl(props, systemRegistry);
 	try {
 	    createTransaction();
 	    watchdog.configure(serviceRegistry, txnProxy);
 	    commitTransaction();
 	    id = watchdog.getLocalNodeId();
-	    if (id != 1) {
-		fail("Expected id 1, got " + id);
+	    if (id != 2) {
+		fail("Expected id 2, got " + id);
 	    }
 	} finally {
 	    watchdog.shutdown();

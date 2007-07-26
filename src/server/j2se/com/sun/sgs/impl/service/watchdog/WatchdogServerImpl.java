@@ -8,6 +8,8 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IdGenerator;
+import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -15,6 +17,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
@@ -94,6 +97,17 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The upper bound for the renew interval. */
     private static final int RENEW_INTERVAL_UPPER_BOUND = 10000;
 
+    /** The name of the ID generator. */
+    private static final String ID_GENERATOR_NAME =
+	CLASSNAME + ".id.generator";
+
+    /** The property name for the ID block size. */
+    private static final String ID_BLOCK_SIZE_PROPERTY =
+	CLASSNAME + ".id.block.size";
+
+    /** The default ID block size for the ID generator. */
+    private static final int DEFAULT_ID_BLOCK_SIZE = 256;
+    
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
 
@@ -112,6 +126,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
+    /** The task scheduler for non-durable tasks. */
+    private NonDurableTaskScheduler nonDurableTaskScheduler;
+
     /** The lock for notifying the {@code NotifyClientsThread}. */
     private final Object notifyClientsLock = new Object();
 
@@ -128,8 +145,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The data service. */
     private DataService dataService;
 
-    /** If true, this service is shutting down; initially, false. */
-    private boolean shuttingDown = false;
+    /** The ID block size for the IdGenerator. */
+    private int idBlockSize;
+    
+    /** The ID generator. */
+    private IdGenerator idGenerator;
 
     /** The map of registered nodes, from node ID to node information. */
     private final ConcurrentMap<Long, NodeImpl> nodeMap =
@@ -141,6 +161,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The thread for checking node expiration times. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
     
+    /** If true, this service is shutting down; initially, false. */
+    private boolean shuttingDown = false;
+
     /**
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServerImpl class documentation} for a list
@@ -180,6 +203,15 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		" and less than or equal to " + RENEW_INTERVAL_UPPER_BOUND +
 		": " + renewInterval);
 	}
+	idBlockSize = wrappedProps.getIntProperty(
+ 	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE);
+	if (idBlockSize < IdGenerator.MIN_BLOCK_SIZE) {
+	    throw new IllegalArgumentException(
+		"The " + ID_BLOCK_SIZE_PROPERTY + " property value " +
+		"must be greater than or equal to " +
+		IdGenerator.MIN_BLOCK_SIZE);
+	}
+	
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -222,6 +254,15 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		}
 		dataService = registry.getComponent(DataService.class);
 		taskOwner = proxy.getCurrentOwner();
+		nonDurableTaskScheduler =
+		    new NonDurableTaskScheduler(
+			taskScheduler, taskOwner,
+			registry.getComponent(TaskService.class));
+		idGenerator =
+		    new IdGenerator(ID_GENERATOR_NAME,
+				    idBlockSize,
+				    txnProxy,
+				    nonDurableTaskScheduler);
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -252,26 +293,23 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /**
      * {@inheritDoc}
-     *
-     * <p>This implementation assumes that it will not receive a renew
-     * for the same node while it is registering that node.
      */
-    public long registerNode(long nodeId,
-			     String hostname,
-			     WatchdogClient client)
-	throws IOException
-    {
+    public long[] registerNode(String hostname, WatchdogClient client) {
 	checkState();
-	final NodeImpl node = new NodeImpl(nodeId, hostname, client, 0);
 	
-	if (nodeMap.putIfAbsent(nodeId, node) != null) {
-	    throw new NodeExistsException(
-		"node already registered: " + nodeId);
+	// Get next node ID, and put new node in transient map.
+	long nodeId;
+	try {
+	    nodeId = idGenerator.next();
+	} catch (InterruptedException e) {
+	    throw new NodeRegistrationFailedException(
+		"interrupted while obtaining node ID");
 	}
-
-	/*
-	 * Persist node, and back out registration if storing the node fails.
-	 */
+	final NodeImpl node = new NodeImpl(nodeId, hostname, client, 0);
+	assert !nodeMap.containsKey(nodeId);
+	nodeMap.put(nodeId,  node);
+	
+	// Persist node, and back out transient mapping on failure.
 	try {
 	    runTransactionally(new AbstractKernelRunnable() {
 		public void run() {
@@ -283,17 +321,19 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		"registration failed: " + nodeId, e);
 	}
 
+	// Put node in set, sorted by expiration.
 	node.setExpiration(calculateExpiration());
 	synchronized (expirationSet) {
 	    expirationSet.add(node);
 	}
 
+	// Notify clients of new node.
 	statusChangedNodes.add(node);
 	synchronized (notifyClientsLock) {
 	    notifyClientsLock.notifyAll();
 	}
 	
-	return renewInterval;
+	return new long[]{nodeId, renewInterval};
     }
 
     /**
@@ -307,7 +347,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 
 	synchronized (expirationSet) {
-	    // update expiration time in sorted set...
+	    // update expiration time in sorted set.
 	    expirationSet.remove(node);
 	    node.setExpiration(calculateExpiration());
 	    expirationSet.add(node);
@@ -504,15 +544,37 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    iter.remove();
 		}
 
+		// Notify clients of status changes.
 		for (NodeImpl notifyNode : nodeMap.values()) {
 		    WatchdogClient client = notifyNode.getWatchdogClient();
 		    try {
 			client.nodeStatusChange(nodes);
 		    } catch (Exception e) {
+			// TBD: Should it try harder to notify the client?
 			logger.logThrow(
 			    Level.WARNING, e,
 			    "Notifying {0} of node status changes failed:",
 			    notifyNode.getId());
+		    }
+		}
+
+		// Remove failed nodes from transient map and persistent store.
+		for (Node node : nodes) {
+		    if (! node.isAlive()) {
+			final NodeImpl nodeImpl = (NodeImpl) node;
+			try {
+			    runTransactionally(new AbstractKernelRunnable() {
+				public void run() {
+				    nodeImpl.removeNode(dataService);
+				}});
+			} catch (Exception e) {
+			    logger.logThrow(
+				Level.WARNING, e,
+				"Removing failed node {0} throws",
+				node.getId());
+			    
+			}
+			nodeMap.remove(node.getId());
 		    }
 		}
 	    }
