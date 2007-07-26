@@ -18,12 +18,10 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -84,7 +82,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private DummyTransaction txn;
     
     private DataServiceImpl dataService;
-    private TaskServiceImpl taskService;
 
     private NodeMappingServiceImpl nodeMappingService; 
     
@@ -111,10 +108,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
         
 	// create services
-	dataService = createDataService(systemRegistry);
-        taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-	
-       
+	dataService = createDataService(systemRegistry);	     
         nodeMappingService = new NodeMappingServiceImpl(serviceProps, systemRegistry);
 
 	createTransaction(10000);
@@ -126,13 +120,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        // configure task service
-        taskService.configure(serviceRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
 	
 	serviceRegistry.registerAppContext();
 
@@ -460,8 +447,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
             Set s = nodemap.get(node);
             
             createTransaction(1000);
-            // Can clearly blow out the transaction limit... need to do a
-            // real implementation here!
+           
             Iterator<Identity> idIter = nodeMappingService.getIdentities(node.getId());
             
             

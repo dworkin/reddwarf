@@ -80,7 +80,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private final TaskScheduler taskScheduler;
     
     /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
+//    private NonDurableTaskScheduler nonDurableTaskScheduler;
     
     /** The owner for tasks I initiate. */
     private TaskOwner proxyOwner;
@@ -225,9 +225,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 
                 contextFactory = new MapContextFactory(txnProxy);
                 proxyOwner = txnProxy.getCurrentOwner();
-                nonDurableTaskScheduler = 
-                        new NonDurableTaskScheduler(taskScheduler, proxyOwner, 
-                                registry.getComponent(TaskService.class));
+//                nonDurableTaskScheduler = 
+//                        new NonDurableTaskScheduler(taskScheduler, proxyOwner, 
+//                                registry.getComponent(TaskService.class));
             }
             
             if (serverImpl != null) {

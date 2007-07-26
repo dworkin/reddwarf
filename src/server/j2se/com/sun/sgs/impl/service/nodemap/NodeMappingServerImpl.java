@@ -296,57 +296,75 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         // as it could take a while.
         final Node newNode = assignPolicy.chooseNode(id);
 
+        if (newNode == oldNode) {
+            // We picked the same node.  Not sure how to best handle this...
+            // it probably needs to be dealt with at a higher level, or the
+            // assignPolicy could have an API saying "pick a node, but NOT
+            // this one".
+            return newNode.getId();
+        }
+        
         final long newNodeId = newNode.getId();
         final String idkey = NodeMapUtil.getIdentityKey(id);
         final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
         final String statuskey = NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
         
-        // if moving, want to look up the old IdentityMO?
+        // if moving, want to look up the old IdentityMO?  I'll need to remove it.
         final IdentityMO idmo = new IdentityMO(id, newNodeId);
-        System.out.println("STORING " + idmo + " with key " + idkey);
 
         final Node old = oldNode;
         // Set correctly only if old not null.
         long oid = -1;
+        int len = -1;
         String ostatusk = null;
         String onodek = null;
+        String pstatusk = null;
         if (oldNode != null) {
             oid = old.getId();
             ostatusk =  NodeMapUtil.getPartialStatusKey(id, oid);
+            len = ostatusk.length();
             onodek = NodeMapUtil.getNodeKey(oid, id);
+            pstatusk = NodeMapUtil.getPartialStatusKey(id, newNodeId);
         }
         // Copy locals into final variables for use by inner class
         final String oldStatusKey = ostatusk;
         final String oldNodeKey = onodek;
+        final String partStatusKey = pstatusk;
         final long oldId = oid;
+        final int oldStatusKeyLen = len;
         try {
             runTransactionally(new AbstractKernelRunnable() {
-                public void run() {
+                public void run() {                   
+                    // First, we clean up any old mappings.
+                    if (old != null) {
+                        IdentityMO oldidmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                        //Remove the old node->id key.
+                        dataService.removeServiceBinding(oldNodeKey);
+
+                        // For each status key for the old node, copy that
+                        // status to the new node.  JANE check this.. should
+                        // the functionality really be like the failure case,
+                        // where the old votes go to inactive?
+                        Iterator<String> iter =
+                            BoundNamesUtil.getServiceBoundNamesIterator(
+                                dataService, oldStatusKey);
+
+                        while (iter.hasNext()) {
+                            String key = iter.next();
+                            String newkey = partStatusKey + 
+                                   key.substring(oldStatusKeyLen, key.length());
+                            dataService.setServiceBinding(newkey, idmo);
+                            iter.remove();
+                        }
+                        // Remove the old IdentityMO with the old node info.
+                        dataService.removeObject(oldidmo);
+                    }
                     // Add the id->node mapping.
                     dataService.setServiceBinding(idkey, idmo);
                     // Add the node->id mapping
                     dataService.setServiceBinding(nodekey, idmo);
                     // Reference count
                     dataService.setServiceBinding(statuskey, idmo);
-
-                    if (old != null) {
-                        //Clean up the old mappings.
-                        dataService.removeServiceBinding(oldNodeKey);
-
-                        Iterator<String> iter =
-                            BoundNamesUtil.getServiceBoundNamesIterator(
-                                dataService, oldStatusKey);
-
-                        while (iter.hasNext()) {
-                            // JANE need to copy the old values to the new?
-                            String key = iter.next();
-                            dataService.removeServiceBinding(key);
-                            key.replaceAll(String.valueOf(oldId), 
-                                           String.valueOf(newNodeId));
-                            dataService.setServiceBinding(key, idmo);
-                            iter.remove();
-                        }
-                    }
                 }});
         } catch (Exception e) {
             logger.logThrow(Level.WARNING, e, 
@@ -632,25 +650,38 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         /**
          * Check the validity of the data store for a particular identity.
          * Used for testing.
+         *
+         * @param identity the identity
          * @return {@code true} if all is well, {@code false} if there is a problem
          **/
         public boolean assertValid(Identity identity) {
-            boolean ok;
             AssertTask atask = new AssertTask(identity, dataService);
             try {
                 runTransactionally(atask);
-                ok = atask.allOK();
+                return atask.allOK();
             } catch (Exception ex) {
                 logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
-                ok = false;
+                return false;
             }     
-            return ok;
         }
         
-        public Set<String> reportFound(Identity identity) throws Exception {
+        /**
+         * Return the data store keys found for a particular identity.
+         * Used for testing.
+         *
+         * @param identity the identity
+         * @return the set of service name bindings found for that identity
+         */
+        public Set<String> reportFound(Identity identity) {
             AssertTask atask = new AssertTask(identity, dataService);
-            runTransactionally(atask);
-            return atask.found();
+            try {
+                runTransactionally(atask);
+                return atask.found();
+            } catch (Exception ex) {
+                logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
+                return new HashSet<String>();
+            }   
+
         }
     
         /**

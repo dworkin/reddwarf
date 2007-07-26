@@ -15,15 +15,16 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.service.nodemap.NodeImpl;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.Properties;
 import java.util.Set;
 
@@ -60,8 +61,8 @@ public class TestNodeMappingServerImpl extends TestCase {
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
     
+    // Our services.   Will need to add watchdog.
     private DataServiceImpl dataService;
-    private TaskServiceImpl taskService;
     private NodeMappingServerImpl nodeMappingServer;
     
     private boolean passed = false;
@@ -89,7 +90,6 @@ public class TestNodeMappingServerImpl extends TestCase {
 	    
 	// create services
 	dataService = createDataService(systemRegistry);
-	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
         
         nodeMappingServer = new NodeMappingServerImpl(serviceProps, systemRegistry);
 
@@ -102,15 +102,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-
-	// configure task service
-        taskService.configure(serviceRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-	//serviceRegistry.registerAppContext();
 
         nodeMappingServer.configure(serviceRegistry, txnProxy);
 	
@@ -306,7 +297,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testAssignNode() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
-        nodeMappingServer.assignNode(TaskService.class, id);      
+        nodeMappingServer.assignNode(DataService.class, id);      
         verifyMapCorrect(id); 
         Set<String> found = getFoundKeys(id);
         assertEquals(3, found.size());
@@ -315,9 +306,9 @@ public class TestNodeMappingServerImpl extends TestCase {
      public void testAssignNodeTwice() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
-        nodeMappingServer.assignNode(TaskService.class, id);
+        nodeMappingServer.assignNode(DataService.class, id);
         verifyMapCorrect(id);
-        nodeMappingServer.assignNode(TaskService.class, id);
+        nodeMappingServer.assignNode(DataService.class, id);
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);
         assertEquals(3, found.size());
@@ -326,7 +317,7 @@ public class TestNodeMappingServerImpl extends TestCase {
      public void testAssignNodeTwiceDifferentService() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
-        nodeMappingServer.assignNode(TaskService.class, id);
+        nodeMappingServer.assignNode(DataService.class, id);
         verifyMapCorrect(id);
         nodeMappingServer.assignNode(DataServiceImpl.class, id);
         verifyMapCorrect(id);
@@ -375,20 +366,54 @@ public class TestNodeMappingServerImpl extends TestCase {
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);
         assertEquals(3, found.size());
-     }
+    }
      
+    /* -- Test moveIdentity -- */
+    public void testMoveIdentity() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        
+        verifyMapCorrect(id);
+
+        Set<String> foundFirst = getFoundKeys(id);
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+//        for (String s : foundFirst) {
+//            System.out.println("FOUNDFIRST " + s);
+//        }
+        
+        // Get the method, as it's not public
+        Method moveIdMethod = 
+                (NodeMappingServerImpl.class).getDeclaredMethod("moveIdentity", 
+                        new Class[]{String.class, Identity.class, Node.class});
+        moveIdMethod.setAccessible(true);
+        Node node = new NodeImpl(0);
+        
+        moveIdMethod.invoke(nodeMappingServer, NodeMappingServerImpl.class.getName(), id, node);
+
+        Set<String> foundSecond = getFoundKeys(id);
+
+//        for (String s : foundSecond) {
+//            System.out.println("FOUNDSECOND " + s);
+//        }
+        verifyMapCorrect(id);
+        // There should now be two status keys.
+        assertEquals(4, foundSecond.size());
+
+    }
      
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
         Properties props = new Properties();
         if (args.length % 2 != 0) {
             throw new RuntimeException("Odd number of arguments");
-	        }
-	        for (int i = 0; i < args.length; i += 2) {
-	            props.setProperty(args[i], args[i + 1]);
-	        }
-	        return props;
-	    }
+        }
+        for (int i = 0; i < args.length; i += 2) {
+            props.setProperty(args[i], args[i + 1]);
+        }
+        return props;
+    }
 
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
@@ -485,6 +510,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertTrue(nodeMappingServer.assertValid(id));
         commitTransaction();
     }
+    
     private Set<String> getFoundKeys(Identity id) throws Exception {
         createTransaction();
         try {

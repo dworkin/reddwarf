@@ -30,7 +30,6 @@ class RoundRobinPolicy implements NodeAssignPolicy {
     public Node chooseNode(Identity id) {
         long val = liveNodes.get(nextNode.getAndIncrement() % liveNodes.size());
 //        return watchdogService.getNode(val);
-        System.out.println("JANE in choseNode, picked " + val);
         return new NodeImpl(val);
     }
     
