@@ -40,10 +40,27 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
 public class TestDataServiceImpl extends TestCase {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataServiceImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataServiceImpl(testMethod));
+	return suite;
+    }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -1848,6 +1865,32 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Test that deserializing an object which contains a managed reference
+     * throws TransactionTimeoutException if the deserialization of the
+     * reference occurs after the transaction timeout.
+     */
+    public void testGetReferenceTimeoutReadResolve() throws Exception {
+	DeserializationDelayed dummy = new DeserializationDelayed();
+	dummy.setNext(new DummyManagedObject());
+	service.setBinding("dummy", dummy);
+	txn.commit();
+	createTransaction(100);
+	try {
+	    DeserializationDelayed.delay = 200;
+	    dummy = service.getBinding("dummy", DeserializationDelayed.class);
+	    System.err.println(dummy);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	} catch (RuntimeException e) {
+	    fail("Unexpected exception: " + e);
+	} finally {
+	    DeserializationDelayed.delay = 0;
+	    txn = null;
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNullType() throws Exception {
@@ -2672,6 +2715,28 @@ public class TestDataServiceImpl extends TestCase {
 	    throws IOException
 	{
 	    throw new IOException("Deserialization fails");
+	}
+    }
+
+    /** A managed object whose deserialization is delayed. */
+    static class DeserializationDelayed extends DummyManagedObject {
+	private static final long serialVersionUID = 1;
+	private static long delay = 0;
+	private ManagedReference next = null;
+	@Override
+	public void setNext(DummyManagedObject next) {
+	    service.markForUpdate(this);
+	    this.next = service.createReference(next);
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    try {
+		Thread.sleep(delay);
+	    } catch (InterruptedException e) {
+		fail("Unexpected exception: " + e);
+	    }
+	    in.defaultReadObject();
 	}
     }
 

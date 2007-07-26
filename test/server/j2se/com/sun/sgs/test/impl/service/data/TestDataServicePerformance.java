@@ -11,8 +11,9 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
@@ -339,7 +340,7 @@ public class TestDataServicePerformance extends TestCase {
 
     /** Returns the data service to test. */
     protected DataService getDataService(
-	Properties props, DummyComponentRegistry componentRegistry)
+	Properties props, ComponentRegistry componentRegistry)
 	throws Exception
     {
 	return new DataServiceImpl(props, componentRegistry);

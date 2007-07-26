@@ -1270,7 +1270,7 @@ public class TestDataStoreImpl extends TestCase {
 		    }
 		    public void commit(Transaction txn) {
 			try {
-			    Thread.sleep(1100);
+			    Thread.sleep(2000);
 			    participant.commit(txn);
 			} catch (Exception e) {
 			    e.printStackTrace();
