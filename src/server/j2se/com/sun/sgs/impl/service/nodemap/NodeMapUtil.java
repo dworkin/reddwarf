@@ -9,8 +9,8 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 
 /**
- * Static utility methods for service and server.
- * public for testing only
+ * Static utility methods used by both the service and server.
+ * Class and selected methods are public for use by unit tests.
  */
 public final class NodeMapUtil {
     /** Package name of this class */
@@ -45,8 +45,7 @@ public final class NodeMapUtil {
     private NodeMapUtil() {
         throw new AssertionError("Should not instantiate");
     }
-    
-    
+       
     /**
      * Returns a identity key for the given {@code identity}. 
      */
@@ -193,4 +192,5 @@ public final class NodeMapUtil {
             return idmo;
         }
     }
+
 }

@@ -25,6 +25,7 @@ interface NodeMappingServer extends Remote {
      * @param id the identity to assign
      *    <b> should this be a set? </b>
      *
+     * @throws IllegalStateException if no live nodes exist
      * @throws	IOException if a communication problem occurs while
      *          invoking this method
      */
@@ -54,5 +55,12 @@ interface NodeMappingServer extends Remote {
     void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException;
     
+    /**
+     * Unregister the {@link NotifyClient} object for a node.
+     *
+     * @param nodeId the node
+     * @throws	IOException if a communication problem occurs while
+     *          invoking this method 
+     */
     void unregisterNodeListener(long nodeId) throws IOException;
 }

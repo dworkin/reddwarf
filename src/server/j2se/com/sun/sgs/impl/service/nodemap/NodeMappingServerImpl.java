@@ -227,7 +227,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         for (int i = 0; i < 5; i++) {
             Node n = new NodeImpl(i);
             assignPolicy.nodeStarted(n.getId());
-//            System.out.println("JANE adding id " + n.getId());
+////            System.out.println("JANE adding id " + n.getId());
         }
         
     }
@@ -260,128 +260,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         return toString();
     }
     
-    /* Our node listener for the watchdog service.  This will be notified
-     * when a node starts or stops.
-     */
-//    private class Listener implements NodeListener {
-//        
-//        Listener() {
-//            
-//        }
-//        
-//        /** {@inheritDoc} */
-//        void nodeStarted(Node node){
-//            assignPolicy.nodeStarted(node.getId());
-////            liveNodes.add(node);       
-//        }
-//        
-//        /** {@inheritDoc} */
-//        void nodeFailed(Node node){
-//            long nodeId = node.getId();
-//            assignPolicy.nodeFailed(nodeId);
-////            liveNodes.remove(node);
-//            
-//        
-//            // Move assignments to new nodes:
-//            //    In a transaction, look up the next id.
-//            //    Find the preferred node via moveIdentity.
-//            
-//        }
-//    }
     
-    private long moveIdentity(String serviceName, Identity id, final Node oldNode) {
-//        assert(serviceName != null);
-        assert(id != null);
-        
-        // Choose the node.  This needs to occur outside of a transaction,
-        // as it could take a while.
-        final Node newNode = assignPolicy.chooseNode(id);
-
-        if (newNode == oldNode) {
-            // We picked the same node.  Not sure how to best handle this...
-            // it probably needs to be dealt with at a higher level, or the
-            // assignPolicy could have an API saying "pick a node, but NOT
-            // this one".
-            return newNode.getId();
-        }
-        
-        final long newNodeId = newNode.getId();
-        final String idkey = NodeMapUtil.getIdentityKey(id);
-        final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
-        final String statuskey = (serviceName == null) ? null :
-                NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
-        
-        final IdentityMO idmo = new IdentityMO(id, newNodeId);
-        
-        final String oldNodeKey = (oldNode == null) ? null :
-            NodeMapUtil.getNodeKey(oldNode.getId(), id);
-        final String oldStatusKey = (oldNode == null) ? null :
-            NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
-//        final int oldStatusKeyLen = (oldNode == null) ? -1 : oldStatusKey.length();
-//        final String partStatusKey = (oldNode == null) ? null :
-//                NodeMapUtil.getPartialStatusKey(id, newNodeId);
-
-
-        try {
-            runTransactionally(new AbstractKernelRunnable() {
-                public void run() {                   
-                    // First, we clean up any old mappings.
-                    if (oldNode != null) {
-                        // Find the old IdentityMO, with the old node info.
-                        IdentityMO oldidmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-                        //Remove the old node->id key.
-                        dataService.removeServiceBinding(oldNodeKey);
-
-//                        // For each status key for the old node, copy that
-//                        // status to the new node.  JANE check this.. should
-//                        // the functionality really be like the failure case,
-//                        // where the old votes go to inactive?
-//                        Iterator<String> iter =
-//                            BoundNamesUtil.getServiceBoundNamesIterator(
-//                                dataService, oldStatusKey);
-//
-//                        while (iter.hasNext()) {
-//                            String key = iter.next();
-//                            String newkey = partStatusKey + 
-//                                   key.substring(oldStatusKeyLen, key.length());
-//                            dataService.setServiceBinding(newkey, idmo);
-//                            iter.remove();
-//                        }
-                        // Remove the old status information.  We don't 
-                        // retain any info about the old node's status.
-                        Iterator<String> iter =
-                            BoundNamesUtil.getServiceBoundNamesIterator(
-                                dataService, oldStatusKey);
-
-                        while (iter.hasNext()) {
-                            String key = iter.next();
-//                            String newkey = partStatusKey + 
-//                                   key.substring(oldStatusKeyLen, key.length());
-//                            dataService.setServiceBinding(newkey, idmo);
-                            iter.remove();
-                        }
-                        // Remove the old IdentityMO with the old node info.
-                        dataService.removeObject(oldidmo);
-                    }
-                    // Add the id->node mapping.
-                    dataService.setServiceBinding(idkey, idmo);
-                    // Add the node->id mapping
-                    dataService.setServiceBinding(nodekey, idmo);
-                    // Reference count
-                    if (statuskey != null) {
-                        dataService.setServiceBinding(statuskey, idmo);
-                    }
-                }});
-        } catch (Exception e) {
-            logger.logThrow(Level.WARNING, e, 
-                            "Move {0} mappings from {1} to {2} failed", 
-                            idmo, oldNode, newNode);
-        }
-
-        // Tell our listeners
-        notifyListeners(oldNode, newNode, id);
-        return newNodeId;
-    }
     
     /* -- Implement NodeMappingServer -- */
 
@@ -409,36 +288,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         
         final IdentityMO foundId = idtask.getId();
         if (foundId == null) {
-            long newNodeId = moveIdentity(serviceName, id, null);
-////            // Choose the node.  This needs to occur outside of a transaction,
-////            // as it could take a while.
-////            Node newNode = assignPolicy.chooseNode(id);
-////
-////            final long newNodeId = newNode.getId();
-////            final String statuskey = 
-////                    NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
-////            final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
-////            final IdentityMO idmo = new IdentityMO(id, newNodeId);
-////            System.out.println("STORING " + idmo + " with key " + idkey);
-////            
-////            try {         
-////                runTransactionally(new AbstractKernelRunnable() {
-////                    public void run() {
-////                        // Add the id->node mapping.
-////                        dataService.setServiceBinding(idkey, idmo);
-////                        // Add the node->id mapping
-////                        dataService.setServiceBinding(nodekey, idmo);
-////                        // Add the status
-////                        dataService.setServiceBinding(statuskey, idmo);
-////                    }});
-////            } catch (Exception ex) {
-////                logger.logThrow(Level.WARNING, ex, 
-////                                "Adding mappings for {0} failed", idmo);
-////            }
-////
-////            // Tell our listeners
-////            notifyListeners(null, newNode, id);
-////            
+            long newNodeId = mapToNewNode(id, serviceName, null);
             logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNodeId);
         } else {
             long foundNodeId = foundId.getNodeId();
@@ -576,7 +426,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
     
     // Perhaps need to have a separate thread do this work.
     private void notifyListeners(Node oldNode, Node newNode, Identity id) {
-        System.out.println("In notifyListeners, id is " + id);
+        System.out.println("In notifyListeners, id is " + id + " oldNode: " + oldNode + " newNode: " + newNode);
         NotifyClient oldClient = null;
         NotifyClient newClient = null;
         synchronized(notifyMap) {
@@ -611,6 +461,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         }
     }
     
+    
     /**
      * Returns the port being used for this server.
      *
@@ -630,150 +481,358 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);      
     }
     
-//    /**
-//     * Class for testing data store validity after map modifications.
-//     */
-//    public class NodeMapValidator {
-//        private final DataService dataService;
-//        public NodeMapValidator(DataService dataService) {
-//            this.dataService = dataService;
-//        }
-        /**
-         * Check the validity of the data store for a particular identity.
-         * Used for testing.
-         *
-         * @param identity the identity
-         * @return {@code true} if all is well, {@code false} if there is a problem
-         **/
-        public boolean assertValid(Identity identity) {
-            AssertTask atask = new AssertTask(identity, dataService);
-            try {
-                runTransactionally(atask);
-                return atask.allOK();
-            } catch (Exception ex) {
-                logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
-                return false;
-            }     
+    /**
+     * Move an identity.  First, choose a new node for the identity
+     * (which can take a while) and then update the map to reflect
+     * the choice, cleaning up old mappings as appropriate.  If given
+     * a {@code serviceName}, the status of the identity is set to active
+     * for that service on the new node.
+     *
+     * @param id the identity to map to a new node
+     * @param serviceName the name of the requesting service's class, or null
+     * @param oldNode the last node the identity was mapped to, or null if there
+     *        was no prior mapping
+     *
+     * @throws IllegalStateException if there are no live nodes to map to
+     */
+    private long mapToNewNode(Identity id, String serviceName, Node old) {
+        assert(id != null);
+        
+        final Node oldNode = old;
+        // Choose the node.  This needs to occur outside of a transaction,
+        // as it could take a while.  
+        final Node newNode;
+        try {
+            newNode = assignPolicy.chooseNode(id);
+        } catch (IllegalStateException ex) {
+            logger.logThrow(Level.WARNING, ex, "Move {0} from {1} failed"
+                    + " because no live nodes are available", id, oldNode);
+            throw ex;
+        }
+
+        if (newNode == oldNode) {
+            // We picked the same node.  Not sure how to best handle this...
+            // it probably needs to be dealt with at a higher level, or the
+            // assignPolicy could have an API saying "pick a node, but NOT
+            // this one".
+            return newNode.getId();
         }
         
-        /**
-         * Return the data store keys found for a particular identity.
-         * Used for testing.
-         *
-         * @param identity the identity
-         * @return the set of service name bindings found for that identity
-         */
-        public Set<String> reportFound(Identity identity) {
-            AssertTask atask = new AssertTask(identity, dataService);
-            try {
-                runTransactionally(atask);
-                return atask.found();
-            } catch (Exception ex) {
-                logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
-                return new HashSet<String>();
-            }   
+        final long newNodeId = newNode.getId();
+        final String idkey = NodeMapUtil.getIdentityKey(id);
+        final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
+        final String statuskey = (serviceName == null) ? null :
+                NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
+        
+        final IdentityMO idmo = new IdentityMO(id, newNodeId);
+        
+        final String oldNodeKey = (oldNode == null) ? null :
+            NodeMapUtil.getNodeKey(oldNode.getId(), id);
+        final String oldStatusKey = (oldNode == null) ? null :
+            NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
 
+        try {
+            runTransactionally(new AbstractKernelRunnable() {
+                public void run() {                   
+                    // First, we clean up any old mappings.
+                    if (oldNode != null) {
+                        // Find the old IdentityMO, with the old node info.
+                        IdentityMO oldidmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                        //Remove the old node->id key.
+                        dataService.removeServiceBinding(oldNodeKey);
+
+                        // Remove the old status information.  We don't 
+                        // retain any info about the old node's status.
+                        Iterator<String> iter =
+                            BoundNamesUtil.getServiceBoundNamesIterator(
+                                dataService, oldStatusKey);
+
+                        while (iter.hasNext()) {
+                            iter.next();
+                            iter.remove();
+                        }
+                        // Remove the old IdentityMO with the old node info.
+                        dataService.removeObject(oldidmo);
+                    }
+                    // Add the id->node mapping.
+                    dataService.setServiceBinding(idkey, idmo);
+                    // Add the node->id mapping
+                    dataService.setServiceBinding(nodekey, idmo);
+                    // Reference count
+                    if (statuskey != null) {
+                        dataService.setServiceBinding(statuskey, idmo);
+                    }
+                }});
+        } catch (Exception e) {
+            logger.logThrow(Level.WARNING, e, 
+                            "Move {0} mappings from {1} to {2} failed", 
+                            id, oldNode, newNode);
         }
-    
-        /**
-         * Task to assert some invariants about our use of the data store
-         * are true.
-         */
-        private class AssertTask implements KernelRunnable {
 
-            private final Identity id;
-            private final DataService dataService;
-            private final String idkey;
-            private final String statuskey;
-            private final int statuskeylen;
-            
-            // Return values
-            private boolean ok = true;
-            private Set<String> foundKeys = new HashSet<String>();
-            
-            AssertTask(Identity id, DataService dataService) {
-                this.id = id;
-                this.dataService = dataService;
-                idkey = NodeMapUtil.getIdentityKey(id);
-                statuskey = NodeMapUtil.getPartialStatusKey(id);
-                statuskeylen = statuskey.length();
+        // Tell our listeners
+        notifyListeners(oldNode, newNode, id);
+        return newNodeId;
+    }
+        
+        
+    /** 
+     * The listener registered with the watchdog service.  These methods
+     * will be notified if a node starts or stops.
+     */
+//    private class Listener implements NodeListener {
+//        
+//        Listener() {
+//            
+//        }
+//        
+        /** {@inheritDoc} */
+        public void nodeStarted(Node node){
+            assignPolicy.nodeStarted(node.getId());      
+        }
+        
+        /** {@inheritDoc} */
+        public void nodeFailed(Node node){
+            long nodeId = node.getId();
+            // Tell the assign policy to stop assigning to the node
+            assignPolicy.nodeStopped(nodeId);
+            try {
+                // Remove the service node listener for the node
+                unregisterNodeListener(nodeId);
+            } catch (IOException ex) {
+                // won't happen
             }
-
-            public void run() {
-                // Assert that the data store map seems valid for an identity.
-                // If we can find the id->node map, be sure that:
-                //    there is also a node->id bound name
-                //    we cannot find any other node->id names (might be hard/long)
-                //    if there are any status records, they are only for the node
-                // If we cannot find the id->node map, be sure that:
-                //    we cannot find an node->id mapping (might be hard/long)
-                //    we cannot find a status record for status.id
-                IdentityMO idmo = null;
+            
+            // Look up each identity on the failed node and move it
+            String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
+            GetIdOnNodeTask task = new GetIdOnNodeTask(dataService, nodekey);
+            
+            boolean done = false;
+            while (!done) {
                 try {
-                    // Look for the identity in the map.
-                    idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-                    foundKeys.add(idkey);
-                } catch (Exception e) {
-                    // Do nothing: leave idmo as null to indicate not found
+                    // Find an identity on the node
+                    runTransactionally(task);
+                    done = task.done();
+                    // Move it, removing old mapping
+                    if (!done) {
+                        mapToNewNode(task.getId().getIdentity(), null, node);
+                    }
+                } catch (Exception ex) {
+                    logger.logThrow(Level.WARNING, ex, 
+                        "Failed to move identity {0} from failed node {1}", 
+                        task.getId(), node);
                 }
-                if (idmo != null) {
-                    long nodeId = idmo.getNodeId();
-                    final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
-
-                    try {
-                        dataService.getServiceBinding(nodekey, IdentityMO.class);
-                        foundKeys.add(nodekey);
-                    } catch (Exception e) {
-                        logger.log(Level.SEVERE, 
-                                "Did not find expected mapping for {0}", nodekey);
-                        ok = false;
-                    }
-                    // Check status
-                    Iterator<String> iter =
-                        BoundNamesUtil.getServiceBoundNamesIterator(
-                            dataService, statuskey);
-
-                    while (iter.hasNext()) {
-                        String key = iter.next();
-                        foundKeys.add(key);
-                        String subkey = key.substring(statuskeylen);
-                        if (!subkey.startsWith(String.valueOf(nodeId))) {
-                            logger.log(Level.SEVERE, 
-                                "Found unexpected mapping for {0}", key);
-                            ok = false;
-                        }      
-                    }
-                } else {
-                    // Not checking all nodes to make sure not mapped yet...
-                    Iterator<String> iter =
-                        BoundNamesUtil.getServiceBoundNamesIterator(
-                            dataService, statuskey);
-
-                    while (iter.hasNext()) {
-                        String key = iter.next();
-                        foundKeys.add(key);
-                        logger.log(Level.SEVERE, 
-                                "Found unexpected mapping for {0}", key);
-                        ok = false;
-
-                    }
-                }
-
-            }
-            public String getBaseTaskType() {
-                return this.getClass().getName();
-            }
-
-            boolean allOK() {
-                return ok;
-            }
-            
-            Set<String> found() {
-                return foundKeys;
             }
         }
 //    }
     
+    /**
+     *  Task to support node failure, run under a transaction.
+     *  Finds an identity that was on the failed node.  Code outside
+     *  the transaction moves the identity to another node and removes
+     *  the old id<->failedNode mapping, and any status information.
+     */
+    private static class GetIdOnNodeTask implements KernelRunnable {
+        /** Set to true when no more identities to be found */
+        private boolean done = false;
+        /** If !done, the identity we were looking for */
+        private IdentityMO idmo = null;
 
+        private final DataService dataService;
+        private final String nodekey;
+        
+        GetIdOnNodeTask(DataService dataService, String nodekey) {
+            this.dataService = dataService;
+            this.nodekey = nodekey;
+        }
+        
+        public void run() {
+            String key = dataService.nextServiceBoundName(nodekey);
+            done = (key == null || !key.contains(nodekey));
+            if (!done) {
+                idmo = dataService.getServiceBinding(key, IdentityMO.class);
+            }
+        }
+        
+        public String getBaseTaskType() {
+            return this.getClass().getName();
+        }
+        
+        /**
+         * Returns true if there are no more identities to be found.
+         * @return {@code true} if no more identities could be found for the 
+         *          node, {@code false} otherwise.
+         */
+        public boolean done() {
+            return done;
+        }
+        
+        /**
+         *  The identity MO retrieved from the data store, or null if
+         *  the task has not yet executed or there was an error while
+         *  executing.
+         * @return the IdentityMO
+         */
+        public IdentityMO getId() {
+            return idmo;
+        }
+    }   
+    
+    
+    
+    /* -- Methods to assist in testing and verification -- */
+    
+    /**
+     * Get the node an identity is mapped to.
+     * Used for testing.
+     *
+     * @param id the identity
+     * @return the node the identity is mapped to
+     *
+     * @throws Exception if any error occurs
+     */
+    public long getNodeForIdentity(Identity id) throws Exception {
+        String idkey = NodeMapUtil.getIdentityKey(id);
+        NodeMapUtil.GetIdTask idtask = 
+                new NodeMapUtil.GetIdTask(dataService, idkey);
+        runTransactionally(idtask);
+        IdentityMO idmo = idtask.getId();
+        return idmo.getNodeId();
+    }
+    
+    /**
+     * Check the validity of the data store for a particular identity.
+     * Used for testing.
+     *
+     * @param identity the identity
+     * @return {@code true} if all is well, {@code false} if there is a problem
+     *
+     * @throws Exception if any error occurs
+     */
+    public boolean assertValid(Identity identity) throws Exception {
+        AssertTask atask = new AssertTask(identity, dataService);
+        runTransactionally(atask);
+        return atask.allOK();        
+    }
+
+    /**
+     * Return the data store keys found for a particular identity.
+     * Used for testing.
+     *
+     * @param identity the identity
+     * @return the set of service name bindings found for that identity
+     *
+     * @throws Exception if any error occurs
+     */
+    public Set<String> reportFound(Identity identity) throws Exception {
+        AssertTask atask = new AssertTask(identity, dataService);
+        try {
+            runTransactionally(atask);
+            return atask.found();
+        } catch (Exception ex) {
+            logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
+            return new HashSet<String>();
+        }   
+
+    }
+
+    /**
+     * Task to assert some invariants about our use of the data store
+     * are true.
+     */
+    private class AssertTask implements KernelRunnable {
+
+        private final Identity id;
+        private final DataService dataService;
+        private final String idkey;
+        private final String statuskey;
+        private final int statuskeylen;
+
+        // Return values
+        private boolean ok = true;
+        private Set<String> foundKeys = new HashSet<String>();
+
+        AssertTask(Identity id, DataService dataService) {
+            this.id = id;
+            this.dataService = dataService;
+            idkey = NodeMapUtil.getIdentityKey(id);
+            statuskey = NodeMapUtil.getPartialStatusKey(id);
+            statuskeylen = statuskey.length();
+        }
+
+        public void run() {
+            // Assert that the data store map seems valid for an identity.
+            // If we can find the id->node map, be sure that:
+            //    there is also a node->id bound name
+            //    we cannot find any other node->id names (might be hard/long)
+            //    if there are any status records, they are only for the node
+            // If we cannot find the id->node map, be sure that:
+            //    we cannot find an node->id mapping (might be hard/long)
+            //    we cannot find a status record for status.id
+            IdentityMO idmo = null;
+            try {
+                // Look for the identity in the map.
+                idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                foundKeys.add(idkey);
+            } catch (Exception e) {
+                // Do nothing: leave idmo as null to indicate not found
+            }
+            if (idmo != null) {
+                long nodeId = idmo.getNodeId();
+                final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
+
+                try {
+                    dataService.getServiceBinding(nodekey, IdentityMO.class);
+                    foundKeys.add(nodekey);
+                } catch (Exception e) {
+                    logger.log(Level.SEVERE, 
+                            "Did not find expected mapping for {0}", nodekey);
+                    ok = false;
+                }
+                // Check status
+                Iterator<String> iter =
+                    BoundNamesUtil.getServiceBoundNamesIterator(
+                        dataService, statuskey);
+
+                while (iter.hasNext()) {
+                    String key = iter.next();
+                    foundKeys.add(key);
+                    String subkey = key.substring(statuskeylen);
+                    if (!subkey.startsWith(String.valueOf(nodeId))) {
+                        logger.log(Level.SEVERE, 
+                            "Found unexpected mapping for {0}", key);
+                        ok = false;
+                    }      
+                }
+            } else {
+                // Not checking all nodes to make sure not mapped yet...
+                Iterator<String> iter =
+                    BoundNamesUtil.getServiceBoundNamesIterator(
+                        dataService, statuskey);
+
+                while (iter.hasNext()) {
+                    String key = iter.next();
+                    foundKeys.add(key);
+                    logger.log(Level.SEVERE, 
+                            "Found unexpected mapping for {0}", key);
+                    ok = false;
+
+                }
+            }
+
+        }
+        public String getBaseTaskType() {
+            return this.getClass().getName();
+        }
+
+        boolean allOK() {
+            return ok;
+        }
+
+        Set<String> found() {
+            return foundKeys;
+        }
+    }
+    
+    
 }
     

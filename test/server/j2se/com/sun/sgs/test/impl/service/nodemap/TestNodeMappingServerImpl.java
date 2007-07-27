@@ -5,7 +5,6 @@
 package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -300,7 +299,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         nodeMappingServer.assignNode(DataService.class, id);      
         verifyMapCorrect(id); 
         Set<String> found = getFoundKeys(id);
-        assertEquals(3, found.size());
+        assertEquals(3, found.size()); 
     }
     
      public void testAssignNodeTwice() throws Exception {
@@ -376,32 +375,49 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         verifyMapCorrect(id);
 
-        Set<String> foundFirst = getFoundKeys(id);
+        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
         // We expect the to see the id, node, and one status key.
         assertEquals(3, foundFirst.size());
-        for (String s : foundFirst) {
-            System.out.println("FOUNDFIRST " + s);
-        }
-        
+       
         // Get the method, as it's not public
-        Method moveIdMethod = 
-                (NodeMappingServerImpl.class).getDeclaredMethod("moveIdentity", 
-                        new Class[]{String.class, Identity.class, Node.class});
-        moveIdMethod.setAccessible(true);
-        Node node = new NodeImpl(0);
+        Method moveMethod = 
+                (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
+                        new Class[]{Identity.class, String.class, Node.class});
+        moveMethod.setAccessible(true);
+        Node node = new NodeImpl(nodeMappingServer.getNodeForIdentity(id));
         
-        moveIdMethod.invoke(nodeMappingServer, null, id, node);
+        moveMethod.invoke(nodeMappingServer, id, null, node);
 
-        Set<String> foundSecond = getFoundKeys(id);
-
-        for (String s : foundSecond) {
-            System.out.println("FOUNDSECOND " + s);
-        }
+        Set<String> foundSecond = getFoundKeys(id, "SECOND");
         verifyMapCorrect(id);
         // There should now be zero status keys.
         assertEquals(2, foundSecond.size());
 
     }
+    
+    /* -- Test node failure -- */
+    public void testNodeFailed() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId = nodeMappingServer.getNodeForIdentity(id);
+        
+        // Not sure how to test this with watchdog
+        nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
+        // Wait for things to settle down
+        Thread.sleep(1000);
+        long secondNodeId = nodeMappingServer.getNodeForIdentity(id);
+        
+        Set<String> foundSecond = getFoundKeys(id, "SECOND");
+        verifyMapCorrect(id);
+        // There should now be zero status keys.
+        assertEquals(2, foundSecond.size());
+        assertTrue(firstNodeId != secondNodeId);
+    }
+    
      
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
@@ -512,9 +528,19 @@ public class TestNodeMappingServerImpl extends TestCase {
     }
     
     private Set<String> getFoundKeys(Identity id) throws Exception {
+        return getFoundKeys(id, null);
+    }
+    
+    private Set<String> getFoundKeys(Identity id, String msg) throws Exception {
         createTransaction();
         try {
-            return (nodeMappingServer.reportFound(id));
+            Set<String> found = nodeMappingServer.reportFound(id);
+            if (msg != null) {
+                for (String s : found) {
+                    System.out.println(msg + ": " + s);
+                }
+            }
+            return found;
         } finally {
             commitTransaction();
         }

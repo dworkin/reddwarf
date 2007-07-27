@@ -23,6 +23,8 @@ interface NodeAssignPolicy {
      *
      * @param id the identity which needs an assignment.
      * @return the chosen node
+     *
+     * @throw IllegalStateException if there are no live nodes to assign to
      */
     Node chooseNode(Identity id);
     

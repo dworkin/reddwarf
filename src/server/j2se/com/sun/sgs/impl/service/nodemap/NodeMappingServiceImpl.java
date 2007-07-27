@@ -73,7 +73,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 //    private WatchdogService watchdogService;
     
     /** The context factory for map change transactions. */
-    private MapContextFactory contextFactory; 
+    private ContextFactory contextFactory; 
     
 
     /** The task scheduler. */
@@ -223,7 +223,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
  	                    joinTransaction();
                 dataService = registry.getComponent(DataService.class);
                 
-                contextFactory = new MapContextFactory(txnProxy);
+                contextFactory = new ContextFactory(txnProxy);
                 proxyOwner = txnProxy.getCurrentOwner();
 //                nonDurableTaskScheduler = 
 //                        new NonDurableTaskScheduler(taskScheduler, proxyOwner, 
@@ -355,6 +355,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
                     System.out.println("assignnode worked on try " + tryCount);
                     done = true;
                     tryCount = MAX_RETRY;
+                } catch (IllegalStateException ise) {
+                    // Maybe we just need some nodes to come on line?
+                    tryCount++;
+                    logger.logThrow(Level.FINEST, ise, 
+                            "Exception encountered on try {0}: {1}",
+                            tryCount, ise);
                 } catch (IOException ioe) {
                     tryCount++;
                     logger.logThrow(Level.FINEST, ioe, 
@@ -367,8 +373,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         if (!done) {
             logger.log(Level.FINEST, "Assigning {0} to this node", identity);
 
-            AssignNodeLocallyRunnable localTask = 
-                    new AssignNodeLocallyRunnable(service.getName(), 
+            AssignNodeLocallyTask localTask = 
+                    new AssignNodeLocallyTask(service.getName(), 
                                                   identity, localNodeId);
             try {
                 
@@ -424,7 +430,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * Task for assigning an identity to this local node. 
      * Currently, this is only used when we cannot contact the server.
      */
-    private class AssignNodeLocallyRunnable implements KernelRunnable {
+    private class AssignNodeLocallyTask implements KernelRunnable {
         private final String idkey;
         private final String nodekey;
         private final String statuskey;
@@ -432,7 +438,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         /** return value, true if id added to map */
         private boolean added = true;
         
-        AssignNodeLocallyRunnable(String name, Identity id, Long nodeId) {
+        AssignNodeLocallyTask(String name, Identity id, Long nodeId) {
             idkey = NodeMapUtil.getIdentityKey(id);
             nodekey = NodeMapUtil.getNodeKey(nodeId, id);
             statuskey = NodeMapUtil.getStatusKey(id, nodeId, name);
@@ -500,8 +506,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
             String statuskey = 
                     NodeMapUtil.getStatusKey(identity, localNodeId, 
                                              service.getName());
-            SetStatusRunnable stask = 
-                    new SetStatusRunnable(statuskey, idmo, active);
+            SetStatusTask stask = 
+                    new SetStatusTask(statuskey, idmo, active);
             try {
                 runTransactionally(stask);
             } catch (NameNotBoundException nnbe) {
@@ -538,7 +544,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * Task for setting a status and returning information about
      * whether the identity is considered dead by this node.
      */
-    private class SetStatusRunnable implements KernelRunnable {
+    private class SetStatusTask implements KernelRunnable {
         final private boolean active;
         final private String statuskey;
         final private IdentityMO idmo;
@@ -546,7 +552,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         /** return value, true if reference count goes to zero */
         private boolean canRemove = false;
 
-        SetStatusRunnable(String statuskey, IdentityMO idmo, boolean active) {
+        SetStatusTask(String statuskey, IdentityMO idmo, boolean active) {
             this.statuskey = statuskey;
             this.idmo = idmo;
             this.active = active;         
@@ -788,10 +794,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
             
     /* -- Implement transaction participant/context for 'getNode' -- */
 
-    private class MapContextFactory
+    private class ContextFactory
 	extends TransactionContextFactory<Context>
     {
-	MapContextFactory(TransactionProxy txnProxy) {
+	ContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 	

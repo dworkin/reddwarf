@@ -5,17 +5,14 @@
 package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.kernel.ResourceCoordinator;
-
-import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.nodemap.NodeImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.service.DataService;

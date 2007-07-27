@@ -61,6 +61,9 @@ public interface NodeMappingService extends Service {
      * @param service the class of the caller
      * @param identity the identity to assign to a node
      *
+     * @throws IllegalStateException if there are no live nodes available for 
+     *             mapping
+     *
      */
     void assignNode(Class service, Identity identity);
     
