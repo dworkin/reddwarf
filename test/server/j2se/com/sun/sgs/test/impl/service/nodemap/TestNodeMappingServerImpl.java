@@ -379,9 +379,9 @@ public class TestNodeMappingServerImpl extends TestCase {
         Set<String> foundFirst = getFoundKeys(id);
         // We expect the to see the id, node, and one status key.
         assertEquals(3, foundFirst.size());
-//        for (String s : foundFirst) {
-//            System.out.println("FOUNDFIRST " + s);
-//        }
+        for (String s : foundFirst) {
+            System.out.println("FOUNDFIRST " + s);
+        }
         
         // Get the method, as it's not public
         Method moveIdMethod = 
@@ -390,16 +390,16 @@ public class TestNodeMappingServerImpl extends TestCase {
         moveIdMethod.setAccessible(true);
         Node node = new NodeImpl(0);
         
-        moveIdMethod.invoke(nodeMappingServer, NodeMappingServerImpl.class.getName(), id, node);
+        moveIdMethod.invoke(nodeMappingServer, null, id, node);
 
         Set<String> foundSecond = getFoundKeys(id);
 
-//        for (String s : foundSecond) {
-//            System.out.println("FOUNDSECOND " + s);
-//        }
+        for (String s : foundSecond) {
+            System.out.println("FOUNDSECOND " + s);
+        }
         verifyMapCorrect(id);
-        // There should now be two status keys.
-        assertEquals(4, foundSecond.size());
+        // There should now be zero status keys.
+        assertEquals(2, foundSecond.size());
 
     }
      

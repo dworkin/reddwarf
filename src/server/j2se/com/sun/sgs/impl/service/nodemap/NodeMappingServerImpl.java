@@ -5,6 +5,7 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -288,8 +289,8 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 //        }
 //    }
     
-    private long moveIdentity(String serviceName, Identity id, Node oldNode) {
-        assert(serviceName != null);
+    private long moveIdentity(String serviceName, Identity id, final Node oldNode) {
+//        assert(serviceName != null);
         assert(id != null);
         
         // Choose the node.  This needs to occur outside of a transaction,
@@ -307,53 +308,56 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         final long newNodeId = newNode.getId();
         final String idkey = NodeMapUtil.getIdentityKey(id);
         final String nodekey = NodeMapUtil.getNodeKey(newNodeId, id);
-        final String statuskey = NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
+        final String statuskey = (serviceName == null) ? null :
+                NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
         
-        // if moving, want to look up the old IdentityMO?  I'll need to remove it.
         final IdentityMO idmo = new IdentityMO(id, newNodeId);
+        
+        final String oldNodeKey = (oldNode == null) ? null :
+            NodeMapUtil.getNodeKey(oldNode.getId(), id);
+        final String oldStatusKey = (oldNode == null) ? null :
+            NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
+//        final int oldStatusKeyLen = (oldNode == null) ? -1 : oldStatusKey.length();
+//        final String partStatusKey = (oldNode == null) ? null :
+//                NodeMapUtil.getPartialStatusKey(id, newNodeId);
 
-        final Node old = oldNode;
-        // Set correctly only if old not null.
-        long oid = -1;
-        int len = -1;
-        String ostatusk = null;
-        String onodek = null;
-        String pstatusk = null;
-        if (oldNode != null) {
-            oid = old.getId();
-            ostatusk =  NodeMapUtil.getPartialStatusKey(id, oid);
-            len = ostatusk.length();
-            onodek = NodeMapUtil.getNodeKey(oid, id);
-            pstatusk = NodeMapUtil.getPartialStatusKey(id, newNodeId);
-        }
-        // Copy locals into final variables for use by inner class
-        final String oldStatusKey = ostatusk;
-        final String oldNodeKey = onodek;
-        final String partStatusKey = pstatusk;
-        final long oldId = oid;
-        final int oldStatusKeyLen = len;
+
         try {
             runTransactionally(new AbstractKernelRunnable() {
                 public void run() {                   
                     // First, we clean up any old mappings.
-                    if (old != null) {
+                    if (oldNode != null) {
+                        // Find the old IdentityMO, with the old node info.
                         IdentityMO oldidmo = dataService.getServiceBinding(idkey, IdentityMO.class);
                         //Remove the old node->id key.
                         dataService.removeServiceBinding(oldNodeKey);
 
-                        // For each status key for the old node, copy that
-                        // status to the new node.  JANE check this.. should
-                        // the functionality really be like the failure case,
-                        // where the old votes go to inactive?
+//                        // For each status key for the old node, copy that
+//                        // status to the new node.  JANE check this.. should
+//                        // the functionality really be like the failure case,
+//                        // where the old votes go to inactive?
+//                        Iterator<String> iter =
+//                            BoundNamesUtil.getServiceBoundNamesIterator(
+//                                dataService, oldStatusKey);
+//
+//                        while (iter.hasNext()) {
+//                            String key = iter.next();
+//                            String newkey = partStatusKey + 
+//                                   key.substring(oldStatusKeyLen, key.length());
+//                            dataService.setServiceBinding(newkey, idmo);
+//                            iter.remove();
+//                        }
+                        // Remove the old status information.  We don't 
+                        // retain any info about the old node's status.
                         Iterator<String> iter =
                             BoundNamesUtil.getServiceBoundNamesIterator(
                                 dataService, oldStatusKey);
 
                         while (iter.hasNext()) {
                             String key = iter.next();
-                            String newkey = partStatusKey + 
-                                   key.substring(oldStatusKeyLen, key.length());
-                            dataService.setServiceBinding(newkey, idmo);
+//                            String newkey = partStatusKey + 
+//                                   key.substring(oldStatusKeyLen, key.length());
+//                            dataService.setServiceBinding(newkey, idmo);
                             iter.remove();
                         }
                         // Remove the old IdentityMO with the old node info.
@@ -364,7 +368,9 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                     // Add the node->id mapping
                     dataService.setServiceBinding(nodekey, idmo);
                     // Reference count
-                    dataService.setServiceBinding(statuskey, idmo);
+                    if (statuskey != null) {
+                        dataService.setServiceBinding(statuskey, idmo);
+                    }
                 }});
         } catch (Exception e) {
             logger.logThrow(Level.WARNING, e, 
@@ -498,8 +504,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                     notifyListeners(new NodeImpl(rtask.nodeId()), null, id);
                 }
             } catch (Exception ex) {
-                // JANE ??
-                ex.printStackTrace();
+                logger.logThrow(Level.WARNING, ex, "Removing {0} failed", id);
             } finally {
                 removeMap.remove(id);
             }
@@ -519,36 +524,22 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
             idkey = NodeMapUtil.getIdentityKey(id);
             statuskey = NodeMapUtil.getPartialStatusKey(id);
         }
-        public void run() {
-            IdentityMO idmo = null;
-            {
-                try {
-                    idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-                } catch (NameNotBoundException e) {
-                    // ??
-                    e.printStackTrace();
-                } 
-            }
-            if (idmo != null) { 
-                try {
-                    // Check the status, and remove it if still dead.  We'd
-                    // expect to find NO bound names for any node
-                    String name = dataService.nextServiceBoundName(statuskey);
-                    dead = (name == null || !name.startsWith(statuskey));
-                } catch (NameNotBoundException e) {
-                    e.printStackTrace();
-                }
-                if (dead) {
-                    nodeId = idmo.getNodeId();
-                    // Update the node info (note:  ids are only on one node
-                    // at a time)
-                    String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
-                    dataService.removeServiceBinding(nodekey);
+        
+        public void run() throws Exception {
+            // Check the status, and remove it if still dead.  
+            String name = dataService.nextServiceBoundName(statuskey);
+            dead = (name == null || !name.startsWith(statuskey));
 
-                    // Finally, remove the id
-                    dataService.removeObject(idmo);
-                    dataService.removeServiceBinding(idkey);
-                }
+            if (dead) {
+                IdentityMO idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                nodeId = idmo.getNodeId();
+                // Remove the node->id binding.  
+                String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
+                dataService.removeServiceBinding(nodekey);
+
+                // Remove the id->node binding, and the object.
+                dataService.removeServiceBinding(idkey);
+                dataService.removeObject(idmo);
             }
 
         }
