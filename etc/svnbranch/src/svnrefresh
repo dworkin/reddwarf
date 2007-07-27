@@ -3,7 +3,7 @@
 # Merges changes made in a Subversion trunk into a working copy for an
 # associated branch.
 
-# $Id: svnrefresh 1446 2005-07-29 12:03:23Z tb97327 $
+# $Id$
 
 ################
 # Use
@@ -32,7 +32,7 @@ require "$program_dir/svnmergeutil.pl";
 ################
 
 # Subversion ID for this revision
-my $id ='$Id: svnrefresh 1446 2005-07-29 12:03:23Z tb97327 $';
+my $id ='$Id$';
 
 # Usage message
 my $usage = "Usage: " . escape($0) .
@@ -65,8 +65,7 @@ should end in '/branches/BRANCHNAME'.  A branch and a trunk are related
 if the portions of their URLs to the left of these endings are the same.
 
 If the -f option is specified, forces the refresh to proceed even if the
-changes being refreshed include moves, or if the branch working copy
-contains modifications.
+branch working copy contains modifications.
 
 If the -h option is specified, prints this help message and exits.
 
@@ -77,9 +76,7 @@ exits.  Use this option to note refreshes that have been performed
 without using this utility.
 
 If the -n option is specified, prints information about the operations
-that would be carried out if the commands were actually run.  By
-default, prints a dry run of the 'svn merge' command that would be used
-to perform the refresh.
+that would be carried out if the commands were actually run.
 
 If the -p option is specified, prints the revision the branch is
 currently refreshed to.  It is an error to specify both the -i and -p
@@ -95,16 +92,13 @@ executables available in the current path.
 Exits with a non-zero status if:
 - The current directory is not the top level directory of a working copy
   for a branch
-- The branch working copy needs to be updated
-- The branch working copy contains modifications and the -f flag is not
-  specified
+- The branch working copy needs to be updated or contains modifications
+  and neither -f or -n flag is not specified
 - The trunk argument is specified and is not a repository URL or working
   copy pathname for the top level directory of the trunk
 - The trunk argument specifies a working copy that contains
   modifications or needs to be updated
 - The branch and trunk are not associated
-- The trunk changes appear to include moves and the -f option was not
-  specified
 
 $id";
 
@@ -139,9 +133,6 @@ my $log_command;
 
 # The contents of the log of changes to refresh from the trunk.
 my @log_contents;
-
-# Set to 1 if the changes contain moves
-my $contains_moves = 0;
 
 # Declare global flags for options
 our($opt_f, $opt_h, $opt_i, $opt_n, $opt_p, $opt_v);
@@ -235,7 +226,12 @@ sub check_branch_and_trunk {
     }
     my $result = get_update_modified(".", !$opt_f);
     if ($result) {
-	die "Error: Branch working copy $result: " . `pwd`;
+	my $msg = "Branch working copy $result: " . `pwd`;
+	if ($opt_n) {
+	    warn "Warning: $msg";
+	} else {
+	    die "Error: $msg";
+	}
     }
 }
 
@@ -279,12 +275,7 @@ sub check_moves {
     @log_contents = command($log_command);
     my $moves = get_moves($trunk_url, @log_contents);
     if ($moves) {
-	$contains_moves = 1;
-	if ($opt_f) {
-	    print "Warning: Trunk changes contain moves:\n$moves";
-	} else {
-	    warn "Error: Trunk changes contain moves:\n$moves";
-	}
+	warn "Warning: Trunk changes contain moves:\n$moves";
     }
     # Check for moves in the branch not reflected in the trunk
     my $created = get_branch_first_revision(".", $branch_rev);
@@ -297,20 +288,7 @@ sub check_moves {
 	$moves = get_moves(
 	    $branch_url, command("$svn log -v -r $log_start:$branch_rev ."));
 	if ($moves) {
-	    $contains_moves = 1;
-	    if ($opt_f) {
-		print "Warning: Branch contains moves:\n$moves";
-	    } else {
-		warn "Error: Branch contains moves:\n$moves";
-	    }
-	}
-    }
-    if (!$contains_moves) {
-	return;
-    } elsif (!$opt_f) {
-	warn "Account for moves manually and then call 'svnrefresh -f'\n";
-	if (!$opt_n) {
-	    exit 1;
+	    warn "Warning: Branch contains moves:\n$moves";
 	}
     }
 }
@@ -351,11 +329,7 @@ sub merge {
 	print "Refreshed working copy for branch $branch_name " .
 	    "to trunk revision $trunk_rev\n";
     }
-    if ($contains_moves && !$opt_f) {
-	exit 1;
-    } else {
-	exit 0;
-    }
+    exit 0;
 }
 
 # Check the output from a merge and print information about conflicts.

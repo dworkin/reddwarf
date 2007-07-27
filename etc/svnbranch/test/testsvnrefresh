@@ -240,14 +240,14 @@ test("Branch directory modified",
 	  "cd $escaped_branch",
 	  "date > file2.txt"),
      "$svnrefresh -n",
-     check_diff_fail("Error: Branch working copy is modified: $branch"),
+     check_diff_pass("Warning: Branch working copy is modified: $branch"),
      "svn revert -R .");
 
 test("Force branch directory modified",
      join(" &&\n",
 	  "cd $escaped_branch",
 	  "date > file2.txt"),
-     "$svnrefresh -fn",
+     "$svnrefresh -f",
      check_pass(),
      "svn revert -R .");
 
@@ -271,7 +271,7 @@ test("Branch directory needs updating",
 	  "svn commit file2.txt -m \"Modify file2.txt\"",
 	  "cd $escaped_branch_copy"),
      "$svnrefresh -n",
-     check_diff_fail("Error: Branch working copy needs to be updated: " .
+     check_diff_pass("Warning: Branch working copy needs to be updated: " .
 		     $branch_copy));
 
 test("Trunk modified and needs updating",
@@ -298,8 +298,8 @@ test("Branch modified and needs updating",
 	  "date > $escaped_branch_copy/file2.txt",
 	  "cd $escaped_branch_copy"),
      "$svnrefresh -n",
-     check_diff_fail(
-	 "Error: Branch working copy needs to be updated and is modified: " .
+     check_diff_pass(
+	 "Warning: Branch working copy needs to be updated and is modified: " .
 	 $branch_copy),
      "svn revert -R $escaped_branch_copy");
 
@@ -345,7 +345,7 @@ test("Refresh after merging",
 ####
 
 {
-    my $name = "Don't refresh moves without -f";
+    my $name = "Print refresh moves without -f";
     my $time = time();
     test($name,
 	 join(" &&\n",
@@ -361,13 +361,9 @@ test("Refresh after merging",
 	      "svn commit -m \"Move new file\"",
 	      "cd $escaped_branch"),
 	 "$svnrefresh -n",
-	 join(" &&\n",
-	      check_non_zero_exit(),
-	      check_diff(
-		  "Error: Trunk changes contain moves:\n" .
-		  "  svn mv file-a-$time file-b-$time\n" .
-		  "Account for moves manually and then call" .
-		  " 'svnrefresh -f'")),
+	 check_diff_pass(
+	     "Warning: Trunk changes contain moves:\n" .
+	     "  svn mv file-a-$time file-b-$time"),
 	 join(" &&\n",
 	      "$svnrefresh -f",
 	      "svn commit -m \"Refresh move\""));
@@ -390,7 +386,9 @@ test("Refresh after merging",
 	      "svn commit -m \"Move new file\"",
 	      "cd $escaped_branch"),
 	 "$svnrefresh -f",
-	 check_pass(),
+	 check_diff_pass(
+	     "Warning: Trunk changes contain moves:\n" .
+	     "  svn mv file-a-$time file-b-$time"),
 	 "svn commit -m \"Refresh move\"");
 }
 
@@ -418,10 +416,8 @@ test("Refresh after merging",
 	      "svn commit -m ''",
 	      "cd $escaped_branch"),
 	 "$svnrefresh -n",
-	 check_diff("Error: Branch contains moves:\n" .
-		    "  svn mv file-a-$time file-b-$time\n" .
-		    "Account for moves manually and then call" .
-		    " 'svnrefresh -f'"),
+	 check_diff_pass("Warning: Branch contains moves:\n" .
+			 "  svn mv file-a-$time file-b-$time"),
 	 join(" &&\n",
 	      # Refresh modifications to moved file
 	      "svn merge $escaped_trunk/file-a-$time\@\$trunk_before" .
