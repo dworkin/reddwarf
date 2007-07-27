@@ -21,8 +21,8 @@ import com.sun.sgs.io.Connector;
  * A basic implementation of a {@code ClientConnector} which uses an 
  * {@code Connector} to establish connections. <p>
  *
- * The {@link #SimpleClientConnector constructor} supports the
- * following properties: <p>
+ * The {@link SimpleClientConnector#SimpleClientConnector(Properties)
+ * constructor} supports the following properties: <p>
  *
  * <ul>
  *
