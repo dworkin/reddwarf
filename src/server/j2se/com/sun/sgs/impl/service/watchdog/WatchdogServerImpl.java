@@ -565,10 +565,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			try {
 			    notifyClientsLock.wait();
 			} catch (InterruptedException e) {
+			    return;
 			}
-		    }
-		    if (shuttingDown()) {
-			return;
 		    }
 		}
 

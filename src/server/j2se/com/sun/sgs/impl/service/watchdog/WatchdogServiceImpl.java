@@ -327,6 +327,11 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    shuttingDown = true;
 	}
 	renewThread.interrupt();
+	try {
+	    renewThread.join();
+	} catch (InterruptedException e) {
+	    return false;
+	}
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}
