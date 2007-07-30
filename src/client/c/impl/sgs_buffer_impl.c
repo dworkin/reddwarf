@@ -158,19 +158,19 @@ size_t sgs_buffer_size(const sgs_buffer_impl *buffer) {
  */
 int sgs_buffer_write(sgs_buffer_impl *buffer, const uint8_t *data, size_t len) {
     size_t writable = writable_len(buffer);
-  
+    
     if (len > sgs_buffer_remaining_capacity(buffer)) {
         errno = ENOBUFS;
         return -1;
     }
-  
+    
     if (writable >= len) {
         memcpy(buffer->buf + tailpos(buffer), data, len);
     } else {
         memcpy(buffer->buf + tailpos(buffer), data, writable);
         memcpy(buffer->buf, data + writable, len - writable);
     }
-  
+    
     buffer->size += len;
     return 0;
 }
