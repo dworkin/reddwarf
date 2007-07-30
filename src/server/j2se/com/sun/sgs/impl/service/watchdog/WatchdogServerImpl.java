@@ -136,8 +136,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final Thread notifyClientsThread = new NotifyClientsThread();
 
     /** The queue of nodes whose status has changed. */
-    private final Queue<NodeImpl> statusChangedNodes =
-	new ConcurrentLinkedQueue<NodeImpl>();
+    private final Queue<Node> statusChangedNodes =
+	new ConcurrentLinkedQueue<Node>();
 
     /** The task owner. */
     private TaskOwner taskOwner;
@@ -312,7 +312,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    throw new NodeRegistrationFailedException(
 		"interrupted while obtaining node ID");
 	}
-	final NodeImpl node = new NodeImpl(nodeId, hostname, client, 0);
+	final NodeImpl node = new NodeImpl(nodeId, hostname, client);
 	assert !nodeMap.containsKey(nodeId);
 	nodeMap.put(nodeId,  node);
 	
@@ -529,6 +529,14 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
     }
 
+    /**
+     * this thread informs all currently known clients of node status
+     * changes (either nodes started or failed) as they occur.  This
+     * thread is notified by {@link #registerNode registerNode) when
+     * nodes are registered, or by the {@code CheckExpirationThread}
+     * when nodes fail to renew before their expiration time has
+     * lapsed.
+     */
     private final class NotifyClientsThread extends Thread {
 
 	/** Constructs an instance of this class as a daemon thread. */
@@ -536,7 +544,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    super(CLASSNAME + "$NotifyClientsThread");
 	    setDaemon(true);
 	}
-	
+
+	/** {@inheritDoc} */
 	public void run() {
 
 	    while (!shuttingDown()) {
@@ -545,7 +554,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			try {
 			    notifyClientsLock.wait();
 			} catch (InterruptedException e) {
-			    
 			}
 		    }
 		}
@@ -554,8 +562,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    return;
 		}
 
-		Iterator<NodeImpl> iter = statusChangedNodes.iterator();
-		Collection<NodeImpl> changedNodes = new ArrayList<NodeImpl>();
+		Iterator<Node> iter = statusChangedNodes.iterator();
+		Collection<Node> changedNodes = new ArrayList<Node>();
 		while (iter.hasNext()) {
 		    changedNodes.add(iter.next());
 		    iter.remove();
@@ -566,8 +574,14 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
     }
 
+    /**
+     * This thread is created when the server (re)starts, and notifies
+     * all previous clients (whose node information is present in the
+     * data service) that all previous nodes have failed.
+     */
     private final class NotifyClientsOnRestartThread extends Thread {
 
+	/** A collection of nodes. */
 	private final Collection<NodeImpl> nodes;
 	
 	/**
@@ -582,21 +596,45 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    setDaemon(true);
 	    this.nodes = nodes;
 	}
-	
+
+	/** {@inheritDoc} */
 	public void run() {
 	    notifyClients(nodes,  nodes);
 	}
     }
 
+    /**
+     * Notifies the {@code WatchdogClient} of each node in the
+     * collection of {@code notifyNodes} of the node status changes in
+     * {@code changedNodes}.  After all clients are notified, all
+     * failed nodes in {@code changedNodes} are removed from transient
+     * and persistent storage.
+     *
+     * @param	notifyNodes nodes whose clients should be notified
+     * @param	changedNodes nodes with status changes
+     */
     private void notifyClients(Collection<NodeImpl> notifyNodes,
-			       Collection<NodeImpl> changedNodes)
+			       Collection<? extends Node> changedNodes)
     {
+	// Assemble node information into arrays.
+	int size = changedNodes.size();
+	long[] ids = new long[size];
+	String[] hosts = new String[size];
+	boolean[] status = new boolean[size];
 
+	int i = 0;
+	for (Node changedNode : changedNodes) {
+	    ids[i] = changedNode.getId();
+	    hosts[i] = changedNode.getHostName();
+	    status[i] = changedNode.isAlive();
+	    i++;
+	}
+	
 	// Notify clients of status changes.
 	for (NodeImpl notifyNode : notifyNodes) {
 	    WatchdogClient client = notifyNode.getWatchdogClient();
 	    try {
-		client.nodeStatusChange(changedNodes);
+		client.nodeStatusChanges(ids, hosts, status);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the
@@ -609,22 +647,21 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 
 	// Remove failed nodes from transient map and persistent store.
-	for (NodeImpl changedNode : changedNodes) {
+	for (Node changedNode : changedNodes) {
 	    if (! changedNode.isAlive()) {
-		final NodeImpl node = changedNode;
+		final long nodeId = changedNode.getId();
 		try {
 		    runTransactionally(new AbstractKernelRunnable() {
 			    public void run() {
-				node.removeNode(dataService);
+				NodeImpl.removeNode(dataService,  nodeId);
 			    }});
 		} catch (Exception e) {
 		    logger.logThrow(
 			Level.WARNING, e,
-			"Removing failed node {0} throws",
-			node.getId());
+			"Removing failed node {0} throws", nodeId);
 			    
 		}
-		nodeMap.remove(node.getId());
+		nodeMap.remove(nodeId);
 	    }
 	}
     }

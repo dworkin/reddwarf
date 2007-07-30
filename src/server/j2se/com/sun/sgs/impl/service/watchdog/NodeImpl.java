@@ -55,25 +55,34 @@ class NodeImpl
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, {@code client}, and {@code
-     * expiration}.  This instance's alive staus is set to {@code
-     * true}.
+     * nodeId}, {@code hostname}, and {@code client}.  This instance's
+     * alive staus is set to {@code true}.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
      * @param	client a watchdog client
-     * @param	expiration the node's expiration time
      */
-    NodeImpl(long nodeId,
-	     String hostName,
-	     WatchdogClient client,
-	     long expiration)
-    {
+    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
 	this.id = nodeId;
 	this.host = hostName;
 	this.client = client;
-	this.expiration = expiration;
 	this.isAlive = true;
+    }
+
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostname}, and {@code isAlive} status.  This
+     * instance's watchdog client is set to {@code null}.
+     *
+     * @param 	nodeId a node ID
+     * @param 	hostName a host name, or {@code null}
+     * @param	isAlive if {@code true}, this node is considered alive
+     */
+    NodeImpl(long nodeId, String hostName, boolean isAlive) {
+	this.id = nodeId;
+	this.host = hostName;
+	this.client = null;
+	this.isAlive = isAlive;
     }
 
     /**
@@ -149,7 +158,7 @@ class NodeImpl
     /* -- package access methods -- */
 
     /**
-     * Returns the watchdog client.
+     * Returns the watchdog client, or {@code null}.
      */
     WatchdogClient getWatchdogClient() {
 	return client;
@@ -211,24 +220,26 @@ class NodeImpl
     }
 
     /**
-     * Removes this instance and binding from the specified {@code
-     * dataService}.  This method should only be called within a
-     * transaction.
+     * Removes the node with the specified {@code nodeId} and its
+     * binding from the specified {@code dataService}.  If the binding
+     * has already been removed from the {@code dataService} this
+     * method takes no action.  This method should only be called
+     * within a transaction.
      *
      * @param	dataService a data service
-     * @throws	ObjectNotFoundException if this node was not already
-     *		stored in the data service
+     * @param	nodeId a node ID
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    synchronized void removeNode(DataService dataService) {
-	String key = getNodeKey(id);
+    static void removeNode(DataService dataService, long nodeId) {
+	String key = getNodeKey(nodeId);
+	NodeImpl node;
 	try {
+	    node = dataService.getServiceBinding(key, NodeImpl.class);
 	    dataService.removeServiceBinding(key);
+	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
 	}
-	dataService.markForUpdate(this);
-	dataService.removeObject(this);
     }
 
     /**

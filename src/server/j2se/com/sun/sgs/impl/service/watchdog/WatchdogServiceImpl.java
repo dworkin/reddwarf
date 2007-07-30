@@ -699,8 +699,14 @@ public class WatchdogServiceImpl implements WatchdogService {
     private class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChange(Collection<NodeImpl> nodes) {
-	    for (Node node : nodes) {
+	public void nodeStatusChanges(
+	    long[] ids, String hosts[], boolean[] status)
+	{
+	    if (ids.length != hosts.length || hosts.length != status.length) {
+		throw new IllegalArgumentException("array lengths don't match");
+	    }
+	    for (int i = 0; i < ids.length; i++) {
+		Node node = new NodeImpl(ids[i], hosts[i], status[i]);
 		notifyListeners(node);
 	    }
 	}
