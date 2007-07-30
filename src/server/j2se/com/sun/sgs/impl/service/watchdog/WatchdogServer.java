@@ -64,7 +64,7 @@ public interface WatchdogServer extends Remote {
 
     /**
      * Returns {@code true} if this watchdog considers the node with
-     * the specified (@code nodeId} to be alive, otherwise returns
+     * the specified {@code nodeId} to be alive, otherwise returns
      * {@code false}.
      *
      * @param	nodeId	a node ID

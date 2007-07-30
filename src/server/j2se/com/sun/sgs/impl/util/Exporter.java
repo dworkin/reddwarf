@@ -54,9 +54,11 @@ public class Exporter<T extends Remote> {
     }
 
     /**
-     * Makes the server available on the network on the specified port.  If
-     * the port is 0, chooses an anonymous port.  Returns the actual port
-     * on which the server is available.
+     * Makes the server available on the network on the specified
+     * port, and binds the server's proxy in a registry on the same
+     * port with the specified name.  If the port is 0, chooses an
+     * anonymous port.  Returns the actual port on which the server is
+     * available.
      *
      * @param	server	the server
      * @param	name	the name of the server's proxy in the registry
@@ -77,6 +79,18 @@ public class Exporter<T extends Remote> {
 	return ssf.getLocalPort();
     }
 
+    /**
+     * Makes the server available on the network on the specified port.  If
+     * the port is 0, chooses an anonymous port.  Returns the actual port
+     * on which the server is available.
+     *
+     * @param	server	the server
+     * @param	port	the network port for the server
+     *
+     * @return	the port on which the server is available
+     *
+     * @throws	IOException if there is a problem exporting the server
+     */
     public int export(T server, int port) throws IOException {
 	this.server = server;
 	assert server != null;
@@ -86,6 +100,13 @@ public class Exporter<T extends Remote> {
 	return ssf.getLocalPort();
     }
 
+    /**
+     * Returns the exported server's proxy which is available after
+     * {@code export} is invoked successfully.  Before the server is
+     * exported, this method returns {@code null}.
+     *
+     * @return	the server's proxy, or {@code null}
+     */
     public T getProxy() {
 	return proxy;
     }

@@ -23,9 +23,7 @@ import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.SortedSet;
@@ -63,6 +61,12 @@ import java.util.logging.Logger;
  *	{@link #renewNode renewNode} method). The interval must be greater
  *	than or equal to  {@code 5} milliseconds and less than or equal to
  *	{@code 10000} milliseconds (10 seconds).<p>
+ *
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.id.block.size} <br>
+ *	<i>Default:</i> {@code 256}<br>
+ *	Specifies the block size to use when reserving node IDs.  The value
+ *	must be greater than {@code 8}.<p>
  * </ul> <p>
 
  */

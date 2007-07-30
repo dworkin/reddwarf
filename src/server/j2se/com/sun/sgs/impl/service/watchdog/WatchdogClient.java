@@ -6,7 +6,6 @@ package com.sun.sgs.impl.service.watchdog;
 
 import java.io.IOException;
 import java.rmi.Remote;
-import java.util.Collection;
 
 /**
  * A remote interface for callbacks from the Watchdog server.
