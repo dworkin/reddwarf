@@ -155,18 +155,18 @@ public class TestWatchdogServiceImpl extends TestCase {
             }
             txn = null;
         }
-        if (taskService != null) {
-            taskService.shutdown();
-            taskService = null;
-        }
-        if (dataService != null) {
-            dataService.shutdown();
-            dataService = null;
-        }
 	if (watchdogService != null) {
 	    watchdogService.shutdown();
 	    watchdogService = null;
 	}
+        if (dataService != null) {
+            dataService.shutdown();
+            dataService = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }

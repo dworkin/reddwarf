@@ -297,6 +297,12 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	exporter.unexport();
 	checkExpirationThread.interrupt();
 	notifyClientsThread.interrupt();
+	try {
+	    checkExpirationThread.join();
+	    notifyClientsThread.join();
+	} catch (InterruptedException e) {
+	    return false;
+	}
 	return true;
     }
     
@@ -527,8 +533,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    }});
 		
 	    } catch (Exception e) {
-		logger.logThrow(Level.SEVERE, e,
-				"Updating node failed: {0}", node.getId());
+		logger.logThrow(
+		    Level.SEVERE, e,
+		    "Updating node failed: {0}", node.getId());
 	    }
 	}
     }
@@ -560,10 +567,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			} catch (InterruptedException e) {
 			}
 		    }
-		}
-		
-		if (shuttingDown()) {
-		    return;
+		    if (shuttingDown()) {
+			return;
+		    }
 		}
 
 		Iterator<Node> iter = statusChangedNodes.iterator();
