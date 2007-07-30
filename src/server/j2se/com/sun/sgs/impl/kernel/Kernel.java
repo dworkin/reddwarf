@@ -104,6 +104,8 @@ class Kernel {
         "com.sun.sgs.impl.service.session.ClientSessionServiceImpl";
     private static final String DEFAULT_DATA_SERVICE =
         "com.sun.sgs.impl.service.data.DataServiceImpl";
+    private static final String DEFAULT_NODE_MAPPING_SERVICE =
+        "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
     private static final String DEFAULT_TASK_SERVICE =
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
 
@@ -422,6 +424,27 @@ class Kernel {
                      dataManagerClass, managerSet, properties,
                      systemRegistry);
 
+        if (StandardService.ClientSessionService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+
+        // the ClientSessionService is a special case, since it has no
+        // manager, so when created it's also registered for profiling,
+        // if appropriate
+        String nodeMappingServiceClass =
+            properties.getProperty(StandardProperties.
+                                   NODE_MAPPING_SERVICE,
+                                   DEFAULT_NODE_MAPPING_SERVICE);
+        Service nodeMappingService =
+            createService(Class.forName(nodeMappingServiceClass),
+                          properties, systemRegistry);
+        serviceList.add(nodeMappingService);
+        if (nodeMappingService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer)nodeMappingService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+        
         if (StandardService.TaskService.ordinal() >
             finalStandardService.ordinal())
             return;

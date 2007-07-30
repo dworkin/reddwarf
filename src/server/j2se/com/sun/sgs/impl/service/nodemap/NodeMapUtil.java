@@ -9,28 +9,11 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 
 /**
- * Static utility methods used by both the service and server.
- * Class and selected methods are public for use by unit tests.
+ * Static utility methods used by both the server and service.
  */
 public final class NodeMapUtil {
     /** Package name of this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
-    
-    /**
-     * The property that specifies whether the server should be instantiated
-     * in this stack.
-     */
-    private static final String START_SERVER_PROPERTY = 
-                                             PKG_NAME + ".start.server";
-    
-    /** The property name for the server hose. */
-    private static final String HOST_PROPERTY = PKG_NAME + ".server.host";
-    
-    /** The property name for the server port. */
-    private static final String PORT_PROPERTY = PKG_NAME + ".server.port";
-
-    /** The default value of the server port. */
-    private static final int DEFAULT_PORT = 44533;
     
     /** The prefix of a node key which maps to its mapped Identities. */
     private static final String NODE_KEY_PREFIX = PKG_NAME + ".node.";
@@ -106,45 +89,6 @@ public final class NodeMapUtil {
         return sb.toString();	
     }
     
-    /** 
-     * Returns the property name for starting the server.
-     * Public for testing.
-     * @return the property name for starting the server
-     */
-    static public String getStartServerProperty() {
-        return START_SERVER_PROPERTY;
-    }
-    
-    /**
-     * Returns the server host property name.
-     */
-    static String getServerHostProperty() {
-        return HOST_PROPERTY;
-    }
-    
-    /**
-     * Returns the server port property name.
-     * Public for testing.
-     * @return the server port property name
-     */
-    static public String getServerPortProperty() {
-        return PORT_PROPERTY;
-    }
-    
-    /**
-     * Returns the default server port.
-     */
-    static int getDefaultServerPort() {
-        return DEFAULT_PORT;
-    }
-    
-    /**
-     * Name used by the server when exporting itself.
-     */
-    static String getServerExportName() {
-        return "NodeMappingServer";
-    }
-    
     /**
      * Task which gets an IdentityMO from a data service.  This is
      * a separate task so we can retrieve the result.  An exception
@@ -192,5 +136,4 @@ public final class NodeMapUtil {
             return idmo;
         }
     }
-
 }

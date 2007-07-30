@@ -12,6 +12,8 @@ import com.sun.sgs.service.Node;
  * Interface for node assignment.  I expect that we'll replace
  * these every so often, so the actual policy to be used is configurable
  * in the node mapping server.
+ * <p>
+ * This will probably morph into node assignment plus node balancing policy.
  * 
  */
 interface NodeAssignPolicy {
@@ -24,7 +26,7 @@ interface NodeAssignPolicy {
      * @param id the identity which needs an assignment.
      * @return the chosen node
      *
-     * @throw IllegalStateException if there are no live nodes to assign to
+     * @throws IllegalStateException if there are no live nodes to assign to
      */
     Node chooseNode(Identity id);
     

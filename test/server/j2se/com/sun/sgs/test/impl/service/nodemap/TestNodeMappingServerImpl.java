@@ -12,7 +12,6 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
-import com.sun.sgs.impl.service.nodemap.NodeMapUtil;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeImpl;
 import com.sun.sgs.service.DataService;
@@ -50,7 +49,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     private static Properties serviceProps = createProperties(
         StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
         DataStoreImplClassName + ".directory", DB_DIRECTORY,
-        NodeMapUtil.getServerPortProperty(), Integer.toString(SERVER_PORT));
+        NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(SERVER_PORT));
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
@@ -60,9 +59,13 @@ public class TestNodeMappingServerImpl extends TestCase {
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
     
-    // Our services.   Will need to add watchdog.
+    /** The services. */
+    // TODO add watchdog
     private DataServiceImpl dataService;
     private NodeMappingServerImpl nodeMappingServer;
+    
+    /** The number of nodes we start up for testing. */
+    private final int NUM_NODES = 5;
     
     private boolean passed = false;
 
@@ -89,7 +92,7 @@ public class TestNodeMappingServerImpl extends TestCase {
 	    
 	// create services
 	dataService = createDataService(systemRegistry);
-        
+       
         nodeMappingServer = new NodeMappingServerImpl(serviceProps, systemRegistry);
 
 	createTransaction(10000);
@@ -103,8 +106,12 @@ public class TestNodeMappingServerImpl extends TestCase {
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
         nodeMappingServer.configure(serviceRegistry, txnProxy);
-	
+
 	commitTransaction();
+        
+        for (int i = 1; i <= NUM_NODES; i++) {
+            nodeMappingServer.addDummyNode(i);
+        }
 	createTransaction();
         
         passed = false;
@@ -181,7 +188,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         Properties properties = createProperties(
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMapUtil.getServerPortProperty(), Integer.toString(PORT));
+            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(PORT));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
@@ -196,7 +203,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testNegPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMapUtil.getServerPortProperty(), Integer.toString(-1));
+            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(-1));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
@@ -213,7 +220,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testBigPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMapUtil.getServerPortProperty(), Integer.toString(65536));
+            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(65536));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
@@ -295,6 +302,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     
     public void testAssignNode() throws Exception {
         commitTransaction();
+        
         Identity id = new DummyIdentity();
         nodeMappingServer.assignNode(DataService.class, id);      
         verifyMapCorrect(id); 
@@ -392,7 +400,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         verifyMapCorrect(id);
         // There should now be zero status keys.
         assertEquals(2, foundSecond.size());
-
     }
     
     /* -- Test node failure -- */
@@ -405,7 +412,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertEquals(3, foundFirst.size());
         long firstNodeId = nodeMappingServer.getNodeForIdentity(id);
         
-        // Not sure how to test this with watchdog
+        // Not sure how to handle this with the watchdog.
         nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
         // Wait for things to settle down
         Thread.sleep(1000);
@@ -418,6 +425,31 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertTrue(firstNodeId != secondNodeId);
     }
     
+        /* -- Test node failure -- */
+    public void testAllNodesFailed() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId = nodeMappingServer.getNodeForIdentity(id);
+        
+        // Not sure how to test this with watchdog
+        for (int i = 1; i <= NUM_NODES; i++) {
+            nodeMappingServer.nodeFailed(new NodeImpl(i));
+        }
+        
+        // Wait for things to settle down
+        Thread.sleep(1000);
+        long secondNodeId = nodeMappingServer.getNodeForIdentity(id);
+        
+        Set<String> foundSecond = getFoundKeys(id, "SECOND");
+        verifyMapCorrect(id);
+        // There should now be zero status keys.
+        assertEquals(2, foundSecond.size());
+        assertTrue(firstNodeId != secondNodeId);
+    }
      
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
@@ -521,12 +553,13 @@ public class TestNodeMappingServerImpl extends TestCase {
 	}
     }
     
+    /** These methods use the server invariant checking methods */
     private void verifyMapCorrect(Identity id) throws Exception {    
         createTransaction();
         assertTrue(nodeMappingServer.assertValid(id));
         commitTransaction();
-    }
-    
+    }  
+
     private Set<String> getFoundKeys(Identity id) throws Exception {
         return getFoundKeys(id, null);
     }
@@ -534,7 +567,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     private Set<String> getFoundKeys(Identity id, String msg) throws Exception {
         createTransaction();
         try {
-            Set<String> found = nodeMappingServer.reportFound(id);
+            Set<String> found = nodeMappingServer.reportFoundKeys(id);
             if (msg != null) {
                 for (String s : found) {
                     System.out.println(msg + ": " + s);

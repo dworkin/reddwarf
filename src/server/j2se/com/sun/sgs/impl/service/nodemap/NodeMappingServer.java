@@ -63,4 +63,15 @@ interface NodeMappingServer extends Remote {
      *          invoking this method 
      */
     void unregisterNodeListener(long nodeId) throws IOException;
+    
+    /**
+     * Check the validity of the data store for a particular identity.
+     * Used for testing.
+     *
+     * @param identity the identity
+     * @return {@code true} if all is well, {@code false} if there is a problem
+     *
+     * @throws Exception if any error occurs
+     */
+    public boolean assertValid(Identity identity) throws Exception;
 }
