@@ -611,12 +611,12 @@ normally necessary)\n");
         result = hextobytes(token, bytebuf);
         
         if (result == -1) {
-            printf("Error: invalid recipient ID.\n");
+            printf("Error: invalid recipient ID (%s).\n", token);
             return;
         }
         
-        if (sgs_id_init(&recipient, bytebuf, result) == -1) {
-            printf("Error: invalid recipient ID.\n");
+        if (sgs_id_init(&recipient, bytebuf, strlen(token)/2) == -1) {
+            printf("Error: invalid recipient ID (%s).\n", token);
             return;
         }
         
