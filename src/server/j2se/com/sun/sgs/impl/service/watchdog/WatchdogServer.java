@@ -27,7 +27,7 @@ public interface WatchdogServer extends Remote {
      *
      * When a node fails or a new node starts, the given {@code
      * client} will be notified of these status changes via its {@link
-     * WatchdogClient#nodeStatusChange nodeStatusChange} method.
+     * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *
      * @param	hostname  a hostname
      * @param	client a watchdog client
