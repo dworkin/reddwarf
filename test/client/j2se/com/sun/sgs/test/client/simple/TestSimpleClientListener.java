@@ -35,6 +35,7 @@ public class TestSimpleClientListener
     MockClientConnector  mockConnector;
     Properties connectionProps;
     SimpleClient client;
+    volatile ClientChannel testChannel = null;
 
     static final String DEFAULT_USER = "alice";
     static final String DEFAULT_PASS = "s3cR37";
@@ -53,6 +54,7 @@ public class TestSimpleClientListener
             new MockConnectorFactory(mockConnector));
 
         connectionProps = new Properties();
+        testChannel = null;
     }
 
     @Override
@@ -61,6 +63,7 @@ public class TestSimpleClientListener
         mockConnector = null;
         mockConnection = null;
         connectionProps = null;
+        testChannel = null;
         client = null;
     }
 
@@ -90,9 +93,11 @@ public class TestSimpleClientListener
     }
 
     public void testNullChannelListener() throws IOException {
+        byte[] message = new byte[1];
         ClientListenerBase listener = new ClientListenerBase() {
             @Override
             public ClientChannelListener joinedChannel(ClientChannel channel) {
+                testChannel = channel;
                 return null;
             }
         };
@@ -104,10 +109,49 @@ public class TestSimpleClientListener
         try {
             mockConnection.mockDeliverRecv();
         } catch (NullPointerException expected) {
-            // passed
-            return;
+            try {
+                testChannel.send(message);
+            } catch (IOException e) {
+                e.printStackTrace();
+                Assert.fail("Expected IllegalStateException");
+            } catch (IllegalStateException e) {
+                // passed
+                return;                
+            }
+            Assert.fail("Expected failure to send on channel");
         }
         Assert.fail("Expected NullPointerException");
+    }
+
+    public void testChannelJoinedException() throws IOException {
+        byte[] message = new byte[1];
+        ClientListenerBase listener = new ClientListenerBase() {
+            @Override
+            public ClientChannelListener joinedChannel(ClientChannel channel) {
+                testChannel = channel;
+                throw new RuntimeException("Intentionally testing exception");
+            }
+        };
+        connect(listener);
+        mockConnection.mockConnect();
+        queueLoggedIn(1, 1);
+        mockConnection.mockDeliverRecv();
+        queueChannelJoin("foo", 1);
+        try {
+            mockConnection.mockDeliverRecv();
+        } catch (RuntimeException expected) {
+            try {
+                testChannel.send(message);
+            } catch (IOException e) {
+                e.printStackTrace();
+                Assert.fail("Expected IllegalStateException");
+            } catch (IllegalStateException e) {
+                // passed
+                return;                
+            }
+            Assert.fail("Expected failure to send on channel");
+        }
+        Assert.fail("Expected RuntimeException");
     }
 
     public void testChannelJoinedBeforeLoggedIn() throws IOException {

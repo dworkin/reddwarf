@@ -632,24 +632,28 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            if (!  isJoined.compareAndSet(false, true)) {
+            if (! isJoined.compareAndSet(false, true)) {
                 throw new IllegalStateException(
                     "Already joined to channel " + channelName);
             }
 
             assert listener == null;
 
-            listener = clientListener.joinedChannel(this);
+            try {
+                listener = clientListener.joinedChannel(this);
 
-            if (listener == null) {
+                if (listener == null) {
+                    throw new NullPointerException(
+                        "The returned ClientChannelListener must not be null");
+                }
+            } catch (RuntimeException ex) {
                 isJoined.set(false);
-                throw new NullPointerException(
-                    "The returned ClientChannelListener must not be null");
+                throw ex;
             }
         }
 
         void left() {
-            if (!  isJoined.compareAndSet(true, false)) {
+            if (! isJoined.compareAndSet(true, false)) {
                 throw new IllegalStateException(
                     "Cannot leave unjoined channel " + channelName);
             }
@@ -661,14 +665,12 @@ public class SimpleClient implements ServerSession {
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            final ClientChannelListener l = this.listener;
-
             if (!  isJoined.get()) {
                 throw new IllegalStateException(
                     "Cannot receive on unjoined channel " + channelName);
             }
 
-            l.receivedMessage(this, sid, message);
+            listener.receivedMessage(this, sid, message);
         }
 
         void sendInternal(Set<SessionId> recipients, byte[] message)
