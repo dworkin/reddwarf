@@ -162,6 +162,8 @@ public class TestSimpleClientListener
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
+                } catch (IllegalStateException e) {
+                    e.printStackTrace();
                 }
                 return new ClientChannelListenerBase();
             }
@@ -224,7 +226,7 @@ public class TestSimpleClientListener
      */
     public void testChannelSendInLeftCallback() throws IOException {
         ClientListenerBase listener = new ClientListenerBase() {
-            boolean sentChannelMessage = false;
+            boolean passed = false;
 
             @Override
             public ClientChannelListener joinedChannel(ClientChannel channel) {
@@ -238,12 +240,13 @@ public class TestSimpleClientListener
                             int sentBefore = mockConnection.sendQueue.size();
                             ch.send(message);
                             if (mockConnection.sendQueue.size() == (sentBefore + 1)) {
-                                sentChannelMessage = true;
                                 System.err.println("Sent channel message");
                             } else {
                             }
                         } catch (IOException e) {
                             e.printStackTrace();
+                        } catch (IllegalStateException e) {
+                            passed = true;
                         }
                     }
                 };
@@ -251,9 +254,9 @@ public class TestSimpleClientListener
 
             @Override
             void validate() {
-                Assert.assertFalse(
-                    "Expected not to send a message after channel left",
-                    sentChannelMessage);
+                Assert.assertTrue(
+                    "Expected IllegalStateExeception trying to send " +
+                    "during leftChannel", passed);
             }
         };
         connect(listener);

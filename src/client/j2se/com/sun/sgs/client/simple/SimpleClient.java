@@ -632,8 +632,12 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
+            if (!  isJoined.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                    "Already joined to channel " + channelName);
+            }
+
             assert listener == null;
-            assert isJoined.compareAndSet(false, true);
 
             listener = clientListener.joinedChannel(this);
 
@@ -645,18 +649,24 @@ public class SimpleClient implements ServerSession {
         }
 
         void left() {
+            if (!  isJoined.compareAndSet(true, false)) {
+                throw new IllegalStateException(
+                    "Cannot leave unjoined channel " + channelName);
+            }
+
             final ClientChannelListener l = this.listener;
             this.listener = null;
-            assert l != null;
-            assert isJoined.compareAndSet(true, false);
 
             l.leftChannel(this);
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
             final ClientChannelListener l = this.listener;
-            assert l != null;
-            assert isJoined.get();
+
+            if (!  isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot receive on unjoined channel " + channelName);
+            }
 
             l.receivedMessage(this, sid, message);
         }
@@ -665,9 +675,8 @@ public class SimpleClient implements ServerSession {
             throws IOException
         {
             if (! isJoined.get()) {
-                throw new IOException(
-                    "Cannot send on channel " + channelName +
-                    ": not a member");
+                throw new IllegalStateException(
+                    "Cannot send on unjoined channel " + channelName);
             }
             int totalSessionLength = 0;
             if (recipients != null) {
@@ -694,8 +703,8 @@ public class SimpleClient implements ServerSession {
             } else {
                 msg.putShort(recipients.size());
                 for (SessionId recipientId : recipients) {
-                    msg.putBytes(((SimpleSessionId) recipientId).getCompactId().
-				 getExternalForm());
+                    msg.putBytes(((SimpleSessionId) recipientId).
+                        getCompactId().getExternalForm());
                 }
             }
             msg.putByteArray(message);
