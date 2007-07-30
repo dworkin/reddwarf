@@ -11,9 +11,14 @@ else
   LINKFLAGS =
 endif
 
-ODIR = obj
-BINDIR = bin
-SRCDIR = src/client/c
+# directories to look in / put things
+BINDIR  = bin
+DISTDIR = dist
+ODIR    = obj
+SRCDIR  = src/client/c
+
+# the base name (sans suffix) of the distribution file to create ("make tar") or ("make zip")
+DISTFILE = sgs_c_api
 
 HEADERS = $(wildcard $(SRCDIR)/*.h) $(wildcard $(SRCDIR)/impl/*.h)
 SRCS = $(notdir $(wildcard $(SRCDIR)/*.c)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.c)))
@@ -25,17 +30,15 @@ OBJS = $(addprefix $(ODIR)/, $(SRCS:.c=.o))
 #  $? = all prerequisites that are newer than the target
 #  $^ = all prerequisites
 
-.PHONY:	clean tar run
-
-all:	chatclient tests
-
-$(ODIR)/%.o: $(SRCDIR)/%.c $(HEADERS)
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
+.PHONY:	clean tar zip
 
 chatclient: $(OBJS) $(ODIR)/example/sgs_chat_client.o
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/chatclient $^
+
+$(ODIR)/%.o: $(SRCDIR)/%.c $(HEADERS)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I $(SRCDIR) -I $(SRCDIR)/impl -c $< -o $@
 
 buffertest: $(ODIR)/impl/sgs_buffer_impl.o $(ODIR)/test/sgs_buffer_test.o
 	@mkdir -p $(BINDIR)
@@ -53,11 +56,19 @@ messagetest: $(ODIR)/sgs_message.o $(ODIR)/impl/sgs_compact_id.o $(ODIR)/sgs_hex
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) $(LINKFLAGS) -o $(BINDIR)/messagetest $^
 
+all: chatclient tests
+
 tests: buffertest idtest maptest messagetest
 
-tar:
-	mv -f c_backups.tar c_backups.tar.prev
-	tar cf c_backups.tar $(SRCDIR)
+tar: chatclient
+	@mkdir -p $(DISTDIR)
+	rm -f $(DISTDIR)/$(DISTFILE).tar
+	tar cvf $(DISTDIR)/$(DISTFILE).tar README.txt Makefile $(HEADERS) $(addprefix $(SRCDIR)/, $(SRCS)) $(SRCDIR)/example/sgs_chat_client.c
+
+zip: chatclient
+	@mkdir -p $(DISTDIR)
+	rm -f $(DISTDIR)/$(DISTFILE).zip
+	zip -v $(DISTDIR)/$(DISTFILE).zip README.txt Makefile $(HEADERS) $(addprefix $(SRCDIR)/, $(SRCS)) $(SRCDIR)/example/sgs_chat_client.c
 
 clean:
 	rm -f *~ core callbacks.out $(SRCDIR)/*~ $(SRCDIR)/*/*~ $(SRCDIR)/*.gch $(SRCDIR)/*/*.gch
