@@ -656,7 +656,23 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    if (channel == null) {
 		ChannelState channelState;
 		try {
-		    BigInteger refId = new BigInteger(channelId.getId());
+                    byte[] idBytes = channelId.getId();
+                    /*
+                     * The BigInteger constructor will interpret the
+                     * byte[] id as a signed representation, but in fact
+                     * it is unsigned.  So we prepend a zero-byte if the
+                     * high bit of the first byte is one.
+                     */
+                    byte[] intBytes;
+                    if ((idBytes[0] & 0x80) == 0) {
+                        intBytes = idBytes;
+                    } else {
+                        intBytes = new byte[idBytes.length + 1];
+                        intBytes[0] = 0;
+                        System.arraycopy(
+                            idBytes, 0, intBytes, 1, idBytes.length);
+                    }
+                    BigInteger refId = new BigInteger(intBytes);
 		    ManagedReference stateRef =
 			dataService.createReferenceForId(refId);
 		    channelState = stateRef.get(ChannelState.class);
