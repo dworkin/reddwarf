@@ -152,7 +152,8 @@ class NodeImpl
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + id + "]@" + host;
+	return getClass().getName() + "[" + id + "," +
+	    (isAlive() ? "alive" : "failed") + "]@" + host;
     }
 
     /* -- package access methods -- */

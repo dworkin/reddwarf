@@ -590,6 +590,47 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
+    public void testAddNodeListenerNodeStarted() throws Exception {
+	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerClassName + ".port", Integer.toString(port));
+	DummyNodeListener listener = new DummyNodeListener();
+	watchdogService.addNodeListener(listener);
+
+	try {
+	    for (int i = 0; i < 5; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry);
+		createTransaction();
+		watchdog.configure(serviceRegistry, txnProxy);
+		commitTransaction();
+		watchdogs.add(watchdog);
+	    }
+	    // wait for all nodes to get notified...
+	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+
+	    Set<Node> nodes = listener.getStartedNodes();
+	    System.err.println("startedNodes: " + nodes);
+	    if (nodes.size() != 6) {
+		fail("Expected 6 started nodes, got " + nodes.size());
+	    }
+	    for (Node node : nodes) {
+		System.err.println(node);
+		if (!node.isAlive()) {
+		    fail("Node " + node.getId() + " is not alive!");
+		}
+	    }
+	    
+	} finally {
+	    // shutdown nodes...
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
     public void testAddNodeListenerNodeFailed() throws Exception {
 	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
 	int port = watchdogService.getServer().getPort();
