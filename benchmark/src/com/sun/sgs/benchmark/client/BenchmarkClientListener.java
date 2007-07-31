@@ -63,39 +63,57 @@ public class BenchmarkClientListener
     // Public Methods
     
     public void registerChannelMessageListener(ChannelMessageListener listener) {
-        channelMessageListeners.add(listener);
+        synchronized (channelMessageListeners) {
+            channelMessageListeners.add(listener);
+        }
     }
     
     public void registerDisconnectedListener(DisconnectedListener listener) {
-        disconnectedListeners.add(listener);
+        synchronized (disconnectedListeners) {
+            disconnectedListeners.add(listener);
+        }
     }
     
     public void registerJoinedChannelListener(JoinedChannelListener listener) {
-        joinedChannelListeners.add(listener);
+        synchronized (joinedChannelListeners) {
+            joinedChannelListeners.add(listener);
+        }
     }
     
     public void registerLeftChannelListener(LeftChannelListener listener) {
-        leftChannelListeners.add(listener);
+        synchronized (leftChannelListeners) {
+            leftChannelListeners.add(listener);
+        }
     }
     
     public void registerLoggedInListener(LoggedInListener listener) {
-        loggedInListeners.add(listener);
+        synchronized (loggedInListeners) {
+            loggedInListeners.add(listener);
+        }
     }
     
     public void registerLoginFailedListener(LoginFailedListener listener) {
-        loginFailedListeners.add(listener);
+        synchronized (loginFailedListeners) {
+            loginFailedListeners.add(listener);
+        }
     }
     
     public void registerReconnectedListener(ReconnectedListener listener) {
-        reconnectedListeners.add(listener);
+        synchronized (reconnectedListeners) {
+            reconnectedListeners.add(listener);
+        }
     }
     
     public void registerReconnectingListener(ReconnectingListener listener) {
-        reconnectingListeners.add(listener);
+        synchronized (reconnectingListeners) {
+            reconnectingListeners.add(listener);
+        }
     }
     
     public void registerServerMessageListener(ServerMessageListener listener) {
-        serverMessageListeners.add(listener);
+        synchronized (serverMessageListeners) {
+            serverMessageListeners.add(listener);
+        }
     }
     
     public void setPasswordAuthentication(String login, String password) {
@@ -103,39 +121,57 @@ public class BenchmarkClientListener
     }
     
     public boolean unregisterChannelMessageListener(ChannelMessageListener listener) {
-        return channelMessageListeners.remove(listener);
+        synchronized (channelMessageListeners) {
+            return channelMessageListeners.remove(listener);
+        }
     }
     
     public boolean unregisterDisconnectedListener(DisconnectedListener listener) {
-        return disconnectedListeners.remove(listener);
+        synchronized (disconnectedListeners) {
+            return disconnectedListeners.remove(listener);
+        }
     }
     
     public boolean unregisterJoinedChannelListener(JoinedChannelListener listener) {
-        return joinedChannelListeners.remove(listener);
+        synchronized (joinedChannelListeners) {
+            return joinedChannelListeners.remove(listener);
+        }
     }
     
     public boolean unregisterLeftChannelListener(LeftChannelListener listener) {
-        return leftChannelListeners.remove(listener);
+        synchronized (leftChannelListeners) {
+            return leftChannelListeners.remove(listener);
+        }
     }
     
     public boolean unregisterLoggedInListener(LoggedInListener listener) {
-        return loggedInListeners.remove(listener);
+        synchronized (loggedInListeners) {
+            return loggedInListeners.remove(listener);
+        }
     }
     
     public boolean unregisterLoginFailedListener(LoginFailedListener listener) {
-        return loginFailedListeners.remove(listener);
+        synchronized (loginFailedListeners) {
+            return loginFailedListeners.remove(listener);
+        }
     }
     
     public boolean unregisterReconnectedListener(ReconnectedListener listener) {
-        return reconnectedListeners.remove(listener);
+        synchronized (reconnectedListeners) {
+            return reconnectedListeners.remove(listener);
+        }
     }
     
     public boolean unregisterReconnectingListener(ReconnectingListener listener) {
-        return reconnectingListeners.remove(listener);
+        synchronized (reconnectingListeners) {
+            return reconnectingListeners.remove(listener);
+        }
     }
     
     public boolean unregisterServerMessageListener(ServerMessageListener listener) {
-        return serverMessageListeners.remove(listener);
+        synchronized (serverMessageListeners) {
+            return serverMessageListeners.remove(listener);
+        }
     }
     
     // Implement SimpleClientListener
@@ -144,8 +180,10 @@ public class BenchmarkClientListener
      * {@inheritDoc}
      */
     public void loggedIn() {
-        for (LoggedInListener listener : loggedInListeners)
-            listener.loggedIn();
+        synchronized (loggedInListeners) {
+            for (LoggedInListener listener : loggedInListeners)
+                listener.loggedIn();
+        }
     }
 
     /**
@@ -159,40 +197,50 @@ public class BenchmarkClientListener
      * {@inheritDoc}
      */
     public void loginFailed(String reason) {
-        for (LoginFailedListener listener : loginFailedListeners)
-            listener.loginFailed(reason);
+        synchronized (loginFailedListeners) {
+            for (LoginFailedListener listener : loginFailedListeners)
+                listener.loginFailed(reason);
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void disconnected(boolean graceful, String reason) {
-        for (DisconnectedListener listener : disconnectedListeners)
-            listener.disconnected(graceful, reason);
+        synchronized (disconnectedListeners) {
+            for (DisconnectedListener listener : disconnectedListeners)
+                listener.disconnected(graceful, reason);
+        }
     }
     
     /**
      * {@inheritDoc}
      */
     public void reconnecting() {
-        for (ReconnectingListener listener : reconnectingListeners)
-            listener.reconnecting();
+        synchronized (reconnectingListeners) {
+            for (ReconnectingListener listener : reconnectingListeners)
+                listener.reconnecting();
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void reconnected() {
-        for (ReconnectedListener listener : reconnectedListeners)
-            listener.reconnected();
+        synchronized (reconnectedListeners) {
+            for (ReconnectedListener listener : reconnectedListeners)
+                listener.reconnected();
+        }
     }
     
     /**
      * {@inheritDoc}
      */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
-        for (JoinedChannelListener listener : joinedChannelListeners)
-            listener.joinedChannel(channel);
+        synchronized (joinedChannelListeners) {
+            for (JoinedChannelListener listener : joinedChannelListeners)
+                listener.joinedChannel(channel);
+        }
         
         return this;
     }
@@ -201,8 +249,10 @@ public class BenchmarkClientListener
      * {@inheritDoc}
      */
     public void receivedMessage(byte[] message) {
+        synchronized (serverMessageListeners) {
             for (ServerMessageListener listener : serverMessageListeners)
                 listener.receivedMessage(message);
+        }
     }
 
     // Implement ClientChannelListener
@@ -213,15 +263,19 @@ public class BenchmarkClientListener
     public void receivedMessage(ClientChannel channel, SessionId sender,
             byte[] message)
     {
-        for (ChannelMessageListener listener : channelMessageListeners)
-            listener.receivedMessage(channel.getName(), sender, message);
+        synchronized (channelMessageListeners) {
+            for (ChannelMessageListener listener : channelMessageListeners)
+                listener.receivedMessage(channel.getName(), sender, message);
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void leftChannel(ClientChannel channel) {
-        for (LeftChannelListener listener : leftChannelListeners)
-            listener.leftChannel(channel.getName());
+        synchronized (leftChannelListeners) {
+            for (LeftChannelListener listener : leftChannelListeners)
+                listener.leftChannel(channel.getName());
+        }
     }
 }
