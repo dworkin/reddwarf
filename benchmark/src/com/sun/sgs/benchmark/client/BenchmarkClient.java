@@ -177,11 +177,9 @@ public class BenchmarkClient {
         
         masterListener.registerLoggedInListener(new LoggedInListener() {
                 public void loggedIn() {
-                    SessionId session = client.getSessionId();
-                    
                     if (printNotices || printAllEvents)
-                        System.out.println("Notice: Logged in with session ID " +
-                            session);
+                        System.out.println("Notice: Logged in with sessionId: " +
+                            client.getSessionId());
                 }
             });
         
@@ -295,6 +293,10 @@ public class BenchmarkClient {
     }
     
     /** Public Methods */
+    
+    public SessionId getSessionId() { return client.getSessionId(); }
+    
+    public boolean isConnected() { return client.isConnected(); }
     
     public void printAllEvents(boolean enable) { printAllEvents = enable; }
     
