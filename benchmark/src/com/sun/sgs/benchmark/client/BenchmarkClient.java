@@ -18,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import com.sun.sgs.benchmark.client.listener.*;
 import com.sun.sgs.benchmark.shared.MethodRequest;
@@ -660,22 +661,26 @@ public class BenchmarkClient {
                 System.out.println("PRINT: " + cmd.getPrintArg());
                 return;
                 
+            case SEND_PM:
             case SEND_CHANNEL:
-                String channelName = cmd.getChannelNameArg();
-                ClientChannel channel = channels.get(channelName);
+                ClientChannel channel = channels.get(cmd.getChannelNameArg());
                 
                 if (channel == null) {
                     throw new IllegalArgumentException("Error: unknown channel" +
-                        "\"" + channelName + "\"");
+                        "\"" + cmd.getChannelNameArg() + "\"");
                 } else {
-                    channel.send(toMessageBytes(cmd.getMessageArg()));
+                    Set<SessionId> recipients = cmd.getRecipients();
+                    if (recipients == null)
+                        channel.send(toMessageBytes(cmd.getMessageArg()));
+                    else
+                        channel.send(recipients, toMessageBytes(cmd.getMessageArg()));
                 }
                 break;
-                    
+                
             case SEND_DIRECT:
                 sendServerMessage(cmd.getMessageArg());
                 break;
-                    
+                
             case WAIT_FOR:
                 /** Register listener to call notify() when event happens. */
                 modifyNotificationEventHandler(cmd.getEventArg(), true);

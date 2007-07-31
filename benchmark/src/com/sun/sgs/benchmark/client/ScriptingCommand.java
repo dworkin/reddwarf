@@ -7,10 +7,11 @@ package com.sun.sgs.benchmark.client;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.sun.sgs.benchmark.shared.CustomTaskType;
+import com.sun.sgs.client.SessionId; 
 
 /*
  *
@@ -49,7 +50,7 @@ public class ScriptingCommand {
     private String login = null, password = null;
     private ScriptingEvent event = null;
     private CustomTaskType taskType = null;
-    private List<String> recips = new LinkedList<String>();
+    private Set<SessionId> recipients = null;
     
     /** Constructors */
     
@@ -128,8 +129,11 @@ public class ScriptingCommand {
     
     public String getPrintArg() { return printArg; }
     
-    public List<String> getRecipientArgs() {
-        return Collections.unmodifiableList(recips);
+    public Set<SessionId> getRecipients() {
+        if (recipients == null)
+            return null;
+        else
+            return Collections.unmodifiableSet(recipients);
     }
     
     public int getSizeArg() { return size; }
@@ -426,6 +430,21 @@ public class ScriptingCommand {
             msg = stripQuotes(strJoin(args));
             return;
             
+        case SEND_PM:
+            if (args.length >= 3) {
+                try {
+                    channelName = args[0];
+                    recipients =
+                        Collections.singleton(sessionIdFromHex(args[1]));
+                    msg = stripQuotes(strJoin(args, 2));
+                    return;
+                } catch (IllegalArgumentException iae) {
+                    throw new ParseException("Invalid sessionId argument: " +
+                        args[1], 0);
+                }
+            }
+            break;
+
         case START_BLOCK:
             if (args.length == 0) return;  /** No arguments */
             break;
@@ -586,6 +605,9 @@ public class ScriptingCommand {
         case SEND_DIRECT:
             return "message   (may contain spaces)";
             
+        case SEND_PM:
+            return "channel recipientSessionId message   (message may contain spaces, but not channel)";
+            
         case START_BLOCK:
             return "";
             
@@ -640,6 +662,37 @@ public class ScriptingCommand {
         return sb.toString();
     }
     
+    private static SessionId sessionIdFromHex(String hex) {
+        int start = 0;
+        byte[] ba;
+
+        if ((hex.length() % 2) == 1) {
+            // Assume that first byte is 0.
+            ba = new byte[(hex.length() >> 1) + 1];
+            ba[0] = hex2byte(hex.charAt(0));
+            start = 1;
+        }
+        else {
+            ba = new byte[hex.length() >> 1];
+        }
+
+        for (int i=start; i < ba.length; i++) {
+            ba[i] = (byte)((hex2byte(hex.charAt(2*i - start)) << 4) +
+                hex2byte(hex.charAt(2*i + 1 - start)));
+        }
+        
+        return SessionId.fromBytes(ba);
+    }
+    
+    private static byte hex2byte(char c) {
+        int b = Character.digit(c, 16);
+
+        if (b == -1)
+            throw new IllegalArgumentException("Not a valid hex character: " + c);
+        else
+            return (byte)b;
+    }
+
     private static String strJoin(String[] strs) {
         return strJoin(strs, 0, strs.length);
     }

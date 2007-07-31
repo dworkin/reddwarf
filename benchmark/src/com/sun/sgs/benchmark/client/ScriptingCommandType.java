@@ -33,6 +33,7 @@ public enum ScriptingCommandType {
     REQ_RESPONSE     (new String[] { "req_response", "req_resp", "request_response", "send_me" }),
     SEND_CHANNEL     (new String[] { "send_channel", "channel_send", "chsend" }),
     SEND_DIRECT      (new String[] { "send_direct", "send_server", "direct_send" }),
+    SEND_PM          (new String[] { "send_pm", "send_one", "pm" }),
     START_BLOCK      ("{"),
     START_TASK       (new String[] { "start_task", "do_task", "task" }),
     TAG              (new String[] { "tag", "sub" }),
