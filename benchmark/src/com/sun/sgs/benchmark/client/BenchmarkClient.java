@@ -179,7 +179,7 @@ public class BenchmarkClient {
                 public void loggedIn() {
                     if (printNotices || printAllEvents)
                         System.out.println("Notice: Logged in with sessionId: " +
-                            client.getSessionId());
+                            formatSession(client.getSessionId()));
                 }
             });
         
