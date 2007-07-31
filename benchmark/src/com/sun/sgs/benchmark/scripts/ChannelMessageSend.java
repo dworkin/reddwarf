@@ -57,49 +57,15 @@ public class ChannelMessageSend {
             
 	    List<Thread> threads = new LinkedList<Thread>();
             
+            /** Create all of the threads. */
 	    for (int i = 0; i < clients; ++i) {
-		final int j = i;
-		threads.add(new Thread() {
-			public void run() {
-			    try {
-				BenchmarkClient c = new BenchmarkClient();
-                                c.printCommands(false);
-                                c.printNotices(true);
-                                c.processInput("config " + HOSTNAME);
-				c.processInput("login sender-" + j + " pswd");
-                                c.processInput("wait_for login");
-                                c.processInput("join " + CHANNEL_NAME);
-				c.processInput("wait_for join_channel");
-				Thread.sleep(1000);
-                                
-                                String sendCmd;
-                                
-                                if (BCAST_TEST) {
-                                    sendCmd = String.format("chsend %s %s",
-                                        CHANNEL_NAME, message);
-                                } else {
-                                    int recipientId = (j == 0) ? 1 : j - 1;
-                                    
-                                    sendCmd = String.format("pm %s %s %s",
-                                        CHANNEL_NAME,
-                                        Integer.toHexString(recipientId),
-                                        message);
-                                }
-                                
-				while (true) {
-				    sleep(delay);
-                                    c.processInput(sendCmd);
-				}
-			    }
-			    catch (Throwable t) {
-				t.printStackTrace();
-			    }				
-			}
-		    });
+		threads.add(new SenderClientThread(i));
 	    }
             
+            /** Pause 1 second just to calm down... */
 	    try { Thread.sleep(1000); } catch (Throwable t) { }
             
+            /* Start up each thread with a small random pause after each one. */
 	    for (Thread t : threads) {
 		t.start();
 		try {
@@ -113,6 +79,21 @@ public class ChannelMessageSend {
 	}		    
     }
     
+    /**
+     * Returns a string constructed with the contents of the byte
+     * array converted to hex format.
+     *
+     * @param bytes a byte array to convert
+     * @return the converted byte array as a hex-formatted string
+     */
+    private static String toHexString(byte[] bytes) {
+        StringBuffer buf = new StringBuffer(2 * bytes.length);
+        for (byte b : bytes) {
+            buf.append(String.format("%02X", b));
+        }
+        return buf.toString();
+    }
+
     private static void usage() {
 	System.out.println("Usage: java ChannelMessageSend "
 			   + "<#clients> <delay (ms)> "
@@ -137,5 +118,77 @@ public class ChannelMessageSend {
 	}
 	else
 	    new ChannelMessageSend().run();
+    }
+    
+    /**
+     * Inner class: SenderClientThread
+     */
+    public class SenderClientThread extends Thread {
+        /**
+         * Local ID for this client.
+         */
+        private final int id;
+        
+        /**
+         * Creates a new {@code SenderClientThread}.
+         */
+        public SenderClientThread(int id) {
+            super();
+            this.id = id;
+        }
+        
+        @Override
+        public void run() {
+            try {
+                BenchmarkClient client = new BenchmarkClient();
+                client.printCommands(false);
+                client.printNotices(true);
+                client.processInput("config " + HOSTNAME);
+                client.processInput("login sender-" + id + " pswd");
+                client.processInput("wait_for login");
+                client.processInput("join " + CHANNEL_NAME);
+                client.processInput("wait_for join_channel");
+                Thread.sleep(1000);
+                
+                String sendCmd;
+                String hexSessionId =
+                    toHexString(client.getSessionId().toBytes());
+                
+                if (BCAST_TEST) {
+                    System.out.println(String.format("Client #%d [%s] will" +
+                                           " broadcast to channel.", id,
+                                           hexSessionId));
+                    
+                    sendCmd = String.format("chsend %s %s", CHANNEL_NAME,
+                        message);
+                } else {
+                    long longSessionId = Long.parseLong(hexSessionId, 16);
+                    long longRecipSessionId;
+                    
+                    if (longSessionId <= 1)
+                        longRecipSessionId = 2;
+                    else
+                        longRecipSessionId = longSessionId - 1;
+                    
+                    String hexRecipSessionId =
+                        Long.toHexString(longRecipSessionId);
+                    
+                    System.out.println(String.format("Client #%d [%s] will" +
+                                           " send to recipient [%s].", id,
+                                           hexSessionId, hexRecipSessionId));
+                    
+                    sendCmd = String.format("pm %s %s %s", CHANNEL_NAME,
+                        hexRecipSessionId, message);
+                }
+                
+                while (true) {
+                    sleep(delay);
+                    client.processInput(sendCmd);
+                }
+            }
+            catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
     }
 }
