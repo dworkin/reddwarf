@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -544,7 +545,7 @@ public class SimpleClient implements ServerSession {
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel = channels.get(channelId);
                 if (channel == null) {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Ignore message on channel {0}: not a member",
                         channelId);
                     return;
@@ -574,7 +575,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -585,7 +586,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -596,7 +597,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
     }
@@ -614,6 +615,8 @@ public class SimpleClient implements ServerSession {
          * or null if the client is no longer a member of this channel.
          */
         private volatile ClientChannelListener listener = null;
+
+        private final AtomicBoolean isJoined = new AtomicBoolean(false);
 
         SimpleClientChannel(String name, CompactId id) {
             this.channelName = name;
@@ -657,25 +660,43 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            assert (listener == null);
+            if (! isJoined.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                    "Already joined to channel " + channelName);
+            }
 
-            listener = clientListener.joinedChannel(this);
+            assert listener == null;
 
-            if (listener == null) {
-                throw new NullPointerException(
-                    "The returned ClientChannelListener must not be null");
+            try {
+                listener = clientListener.joinedChannel(this);
+
+                if (listener == null) {
+                    throw new NullPointerException(
+                        "The returned ClientChannelListener must not be null");
+                }
+            } catch (RuntimeException ex) {
+                isJoined.set(false);
+                throw ex;
             }
         }
 
         void left() {
-            assert (listener != null);
+            if (! isJoined.compareAndSet(true, false)) {
+                throw new IllegalStateException(
+                    "Cannot leave unjoined channel " + channelName);
+            }
 
-            listener.leftChannel(this);
-            listener = null;
+            final ClientChannelListener l = this.listener;
+            this.listener = null;
+
+            l.leftChannel(this);
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            assert (listener != null);
+            if (!  isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot receive on unjoined channel " + channelName);
+            }
 
             listener.receivedMessage(this, sid, message);
         }
@@ -683,13 +704,9 @@ public class SimpleClient implements ServerSession {
         void sendInternal(Set<SessionId> recipients, byte[] message)
             throws IOException
         {
-            if (listener == null) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot send on channel {0}: not a member",
-                        channelName);
-                }
-                return;
+            if (! isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot send on unjoined channel " + channelName);
             }
             int totalSessionLength = 0;
             if (recipients != null) {
@@ -699,7 +716,7 @@ public class SimpleClient implements ServerSession {
 			    getExternalFormByteCount();
                 }
             }
-            
+
             MessageBuffer msg =
                 new MessageBuffer(3 +
 		    channelId.getExternalFormByteCount() +
@@ -716,8 +733,8 @@ public class SimpleClient implements ServerSession {
             } else {
                 msg.putShort(recipients.size());
                 for (SessionId recipientId : recipients) {
-                    msg.putBytes(((SimpleSessionId) recipientId).getCompactId().
-				 getExternalForm());
+                    msg.putBytes(((SimpleSessionId) recipientId).
+                        getCompactId().getExternalForm());
                 }
             }
             msg.putByteArray(message);
