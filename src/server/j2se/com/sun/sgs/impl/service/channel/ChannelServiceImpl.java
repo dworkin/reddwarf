@@ -656,7 +656,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    if (channel == null) {
 		ChannelState channelState;
 		try {
-		    BigInteger refId = new BigInteger(channelId.getId());
+		    BigInteger refId = new BigInteger(1, channelId.getId());
 		    ManagedReference stateRef =
 			dataService.createReferenceForId(refId);
 		    channelState = stateRef.get(ChannelState.class);
