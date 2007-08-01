@@ -138,7 +138,7 @@ public class ChannelMessageSend {
          * Creates a new {@code SenderClientThread}.
          */
         public SenderClientThread(int id) {
-            super();
+            super("SenderClientThread-" + id);
             this.id = id;
         }
         
