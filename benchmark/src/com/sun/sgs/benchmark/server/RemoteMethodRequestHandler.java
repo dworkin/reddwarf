@@ -3,6 +3,7 @@ package com.sun.sgs.benchmark.server;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
@@ -72,10 +73,16 @@ public class RemoteMethodRequestHandler
             try {
                 operation.run();
             }
-            // NOTE: not sure what to catch here
             catch (Exception e) {
-                // REMINDER: add logging
-                e.printStackTrace();
+                if (e instanceof ExceptionRetryStatus) {
+                    /**
+                     * Not really an error since this can happen during normal
+                     * operations, so just ignore.
+                     */
+                } else {
+                    // REMINDER: add logging
+                    e.printStackTrace();
+                }
             }
         }
     }

@@ -16,7 +16,6 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
@@ -78,14 +77,6 @@ public class JoinChannelModule extends AbstractModuleImpl implements Serializabl
 		    } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client tried to join a " +
                             "non-existent channel: " + channelName);
-                    } catch (TransactionConflictException tce) {
-                        /**
-                         * Do nothing; we catch this simply because its not
-                         * truly an error case (we expect this to happen
-                         * normally during periods of high contention) and thus
-                         * we don't want it propagating up and printing to
-                         * stdout. 
-                         */
                     }
 		}
 	    });

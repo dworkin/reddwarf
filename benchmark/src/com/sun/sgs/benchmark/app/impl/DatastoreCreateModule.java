@@ -20,7 +20,6 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
@@ -140,15 +139,7 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                     } catch (NotSerializableException nse) {
                         System.err.println("**Error: Cannot add object " +
                             " name to datastore; not serializable.");
-		    } catch (TransactionConflictException tce) {
-                        /**
-                         * Do nothing; we catch this simply because its not
-                         * truly an error case (we expect this to happen
-                         * normally during periods of high contention) and thus
-                         * we don't want it propagating up and printing to
-                         * stdout. 
-                         */
-                    }
+		    }
                 }
 	    });
 	return operations;
