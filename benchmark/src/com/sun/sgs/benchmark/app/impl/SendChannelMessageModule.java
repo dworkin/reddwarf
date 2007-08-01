@@ -80,7 +80,8 @@ public class SendChannelMessageModule extends AbstractModuleImpl implements Seri
                         chan.send(message.getBytes());
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Sending on channel \"%s\" " +
-                                ": %s\n", channelName, message);
+                                ": %s\n", "SendChannelMessageModule",
+                                channelName, message);
 		    } catch (NameNotBoundException nnbe) {
 			System.err.println("**Error: Client requested " +
                             "that server send a message on a non-existent " +

@@ -67,8 +67,8 @@ public class CpuIntensiveModule extends AbstractModuleImpl implements Serializab
                     double junk = 0.0;
                     
                     if (BehaviorModule.ENABLE_INFO_OUTPUT)
-                        System.out.printf("%s: running for %d ms.\n", this,
-                            duration);
+                        System.out.printf("%s: running for %d ms.\n",
+                            "CpuIntensiveModule", duration);
                     
                     while (System.currentTimeMillis() < stopTime) {
                         junk += Math.random();

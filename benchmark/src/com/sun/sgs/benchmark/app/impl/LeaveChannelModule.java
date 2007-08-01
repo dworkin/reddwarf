@@ -19,6 +19,7 @@ import com.sun.sgs.app.NameNotBoundException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
+import com.sun.sgs.benchmark.shared.Formatter;
 
 /**
  * TODO
@@ -73,7 +74,8 @@ public class LeaveChannelModule extends AbstractModuleImpl implements Serializab
 			chan.leave(session);
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Removed %s from channel " +
-                                "\"%s\".\n", this, session, channelName);
+                                "\"%s\".\n", "LeaveChannelModule",
+                                Formatter.format(session), channelName);
 		    } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client tried to leave a " +
                             "non-existent channel: " + channelName);

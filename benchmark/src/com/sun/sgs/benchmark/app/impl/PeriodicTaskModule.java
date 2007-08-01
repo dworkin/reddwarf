@@ -124,7 +124,8 @@ public class PeriodicTaskModule extends AbstractModuleImpl implements Serializab
                     if (BehaviorModule.ENABLE_INFO_OUTPUT)
                         System.out.printf("%s: Scheduled custom task.  " +
                             "type=%s, #commands=%d, delay=%d, period=%d.\n",
-                            this, type, commands.size(), delay, period);
+                            "PeriodicTaskModule", type, commands.size(), delay,
+                            period);
 		}
 	    });
 	return operations;

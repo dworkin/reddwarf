@@ -76,7 +76,8 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
                             count);
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Creating array %s[%d].\n",
-                                this, clazz.getComponentType().getName(), count);
+                                getClass().getName(),
+                                clazz.getComponentType().getName(), count);
                     } else {
                         try {
                             // keep a pointer so they all stay in memory at once
@@ -88,7 +89,8 @@ public class MallocModule extends AbstractModuleImpl implements Serializable {
                             }
                             if (BehaviorModule.ENABLE_INFO_OUTPUT)
                                 System.out.printf("%s: Creating %d instances " +
-                                    "of %s.\n", this, count, clazz.getName());
+                                    "of %s.\n", getClass().getName(), count,
+                                    clazz.getName());
                         } catch (IllegalAccessException iae) {
                             System.err.println("**Error in " + this + ": " + iae);
                         } catch (InstantiationException ie) {

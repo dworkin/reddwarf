@@ -33,7 +33,7 @@ public class NoOpModule implements BehaviorModule, Serializable {
         throws BehaviorException
     {
         if (BehaviorModule.ENABLE_INFO_OUTPUT)
-            System.out.printf("%s called.\n", this);
+            System.out.printf("%s called.\n", getClass().getSimpleName());
         return new LinkedList<Runnable>();
     }
     
@@ -44,7 +44,7 @@ public class NoOpModule implements BehaviorModule, Serializable {
         throws BehaviorException
     {
         if (BehaviorModule.ENABLE_INFO_OUTPUT)
-            System.out.printf("%s called.\n", this);
+            System.out.printf("%s called.\n", getClass().getSimpleName());
         return new LinkedList<Runnable>();
     }
 }

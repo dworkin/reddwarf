@@ -9,6 +9,8 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 
+import com.sun.sgs.benchmark.shared.Formatter;
+
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -58,8 +60,7 @@ public class MasterTask implements AppListener, Serializable {
     }
 
     public ClientSessionListener loggedIn(ClientSession session) {
-
-	System.out.printf("client connected: %s\n", session);
+	System.out.printf("client connected: %s\n", Formatter.format(session));
 
 	// create a new ClientSessionHandler to generate tasks
 	return new RemoteMethodRequestHandler(session);

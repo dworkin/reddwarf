@@ -80,7 +80,8 @@ public class DatastoreAccessorModule extends AbstractModuleImpl implements Seria
                         
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Accessed object \"%s\" " +
-                                "from DataStore (for %s).\n", this, name,
+                                "from DataStore (for %s).\n",
+                                "DatastoreAccessorModule", name,
                                 (markForUpdate ? "writing" : "reading"));
                     } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client attempted to read" +

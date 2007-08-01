@@ -135,7 +135,8 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Created DataStore binding " +
                                 "for object of type %s under name \"%s\".\n",
-                                this, obj.getClass().getName(), name);
+                                "DatastoreCreateModule",
+                                obj.getClass().getName(), name);
                     } catch (NotSerializableException nse) {
                         System.err.println("**Error: Cannot add object " +
                             " name to datastore; not serializable.");

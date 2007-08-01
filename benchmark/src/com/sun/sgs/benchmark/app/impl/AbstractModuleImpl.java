@@ -35,7 +35,7 @@ public abstract class AbstractModuleImpl implements BehaviorModule {
     protected abstract List<Runnable> getOperations(ClientSession session,
         ObjectInputStream in)
         throws BehaviorException, ClassNotFoundException, IOException;
-    
+
     /**
      * Casts the objects in {@code args} to the types in {@code types} and
      * assigns them to {@code vars}.

@@ -71,7 +71,7 @@ public class CreateChannelModule extends AbstractModuleImpl implements Serializa
 			cm.createChannel(channelName, null, Delivery.RELIABLE);
 			if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: created new channel \"%s\"\n",
-                                this, channelName);
+                                "CreateChannelModule", channelName);
 		    } catch (NameExistsException nee) {
                         System.err.println("**Error: Client tried to create " +
                             "an existing channel: " + channelName);

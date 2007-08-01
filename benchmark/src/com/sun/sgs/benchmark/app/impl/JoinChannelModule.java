@@ -19,6 +19,7 @@ import com.sun.sgs.app.NameNotBoundException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
+import com.sun.sgs.benchmark.shared.Formatter;
 
 /**
  * TODO
@@ -73,7 +74,8 @@ public class JoinChannelModule extends AbstractModuleImpl implements Serializabl
 			chan.join(session, null);
                         if (BehaviorModule.ENABLE_INFO_OUTPUT)
                             System.out.printf("%s: Joined %s to channel \"%s\"\n",
-                                this, session, channelName);
+                                "JoinChannelModule", Formatter.format(session),
+                                channelName);
 		    } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client tried to join a " +
                             "non-existent channel: " + channelName);

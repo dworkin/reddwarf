@@ -10,6 +10,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
 import com.sun.sgs.benchmark.app.BehaviorException;
+import com.sun.sgs.benchmark.shared.Formatter;
 import com.sun.sgs.benchmark.shared.MethodRequest;
 
 import java.io.ByteArrayInputStream;
@@ -91,7 +92,7 @@ public class RemoteMethodRequestHandler
 
     public void receivedMessage(byte[] message) {
         if (DEBUG) System.out.printf("Received %d bytes from client %s\n",
-            message.length, session);
+            message.length, Formatter.format(session));
         
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(message);
@@ -114,7 +115,6 @@ public class RemoteMethodRequestHandler
          * because the task may fail and retry, but this print occurs every time
          * even if the task fails.
          */
-	System.out.printf("%s [%s] disconnected\n", session.getName(),
-            session.toString());
+	System.out.printf("client disconnected: %s\n", Formatter.format(session));
     }
 }
