@@ -27,7 +27,8 @@ public interface Node {
 
     /**
      * Returns {@code true} if the node is known to be alive, and
-     * {@code false} if it thought to have failed.
+     * {@code false} if the node is thought to have failed or is
+     * unknown.
      *
      * @return	{@code true} if the node is alive, and {@code false}
      * 		otherwise

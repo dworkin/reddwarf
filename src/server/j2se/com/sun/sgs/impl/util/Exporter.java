@@ -68,13 +68,20 @@ public class Exporter<T extends Remote> {
      *
      * @throws	IOException if there is a problem exporting the server
      */
-    public int export(T server, String name, int port) throws IOException {
+    public synchronized int export(T server, String name, int port)
+	throws IOException
+    {
+	if (server == null) {
+	    throw new NullPointerException("null server");
+	} else if (name == null) {
+	    throw new NullPointerException("null name");
+	}
 	this.server = server;
 	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	registry = LocateRegistry.createRegistry(port, null, ssf);
-	proxy =
-	    type.cast(UnicastRemoteObject.exportObject(server, port, null, ssf));
+	proxy = type.cast(
+	    UnicastRemoteObject.exportObject(server, port, null, ssf));
 	registry.rebind(name, proxy);
 	return ssf.getLocalPort();
     }
@@ -91,7 +98,10 @@ public class Exporter<T extends Remote> {
      *
      * @throws	IOException if there is a problem exporting the server
      */
-    public int export(T server, int port) throws IOException {
+    public synchronized int export(T server, int port) throws IOException {
+	if (server == null) {
+	    throw new NullPointerException("null server");
+	}
 	this.server = server;
 	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
@@ -107,7 +117,7 @@ public class Exporter<T extends Remote> {
      *
      * @return	the server's proxy, or {@code null}
      */
-    public T getProxy() {
+    public synchronized T getProxy() {
 	return proxy;
     }
 
@@ -120,7 +130,7 @@ public class Exporter<T extends Remote> {
      * @throws	IllegalStateException if the server has already been
      *		removed from the network
      */
-    public boolean unexport() {
+    public synchronized boolean unexport() {
 	if (registry == null) {
 	    throw new IllegalStateException(
 		"The server is already shut down");

@@ -41,16 +41,18 @@ public interface WatchdogServer extends Remote {
      * 		registering the node
      */
     long[] registerNode(String hostname, WatchdogClient client)
-	throws IOException;
+	throws NodeRegistrationFailedException, IOException;
 
     /**
      * Notifies this watchdog that the node with the specified {@code
      * nodeId} is alive.  This method returns {@code true} if this
      * watchdog still considers the node alive, and returns {@code
      * false} otherwise.  This watchdog considers the node to have
-     * failed if a renew request is not received from the node before the
-     * assigned interval, returned from {@link #registerNode
-     * registerNode}, expires.
+     * failed if a renew request is not received from the node before
+     * the assigned interval, returned from {@link #registerNode
+     * registerNode}, expires.  If this method returns {@code false}
+     * for a given {@code nodeId}, the caller should not retry this
+     * method because the node is considered to have failed.
      *
      * @param	nodeId	a node ID
      *

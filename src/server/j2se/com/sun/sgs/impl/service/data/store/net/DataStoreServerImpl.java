@@ -14,10 +14,6 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.rmi.NoSuchObjectException;
-import java.rmi.server.RMIServerSocketFactory;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -95,7 +91,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
-    private static final LoggerWrapper logger =
+    static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE + ".server"));
 
     /** The property that specifies the maximum transaction timeout. */

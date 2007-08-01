@@ -40,34 +40,39 @@ import java.util.logging.Logger;
  * The {@link #WatchdogServerImpl constructor} supports the following
  * properties: <p>
  *
- * <ul>
- * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the app name. <p>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.port} <br>
- *	<i>Default:</i> {@code 44533} <br>
- *	Specifies the network port for the server.  This value must be greater 
- *	than or equal to {@code 0} and no greater than {@code 65535}.  If the
- *	value specified is {@code 0}, then an anonymous port will be chosen.
- *	The value chosen will be logged, and can also be accessed with the
- *	{@link #getPort getPort} method. <p>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44533}
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.renew.interval} <br>
+ * <dd style="padding-top: .5em">Specifies the network port for the server.
+ *	This value must be greater than or equal to {@code 0} and no greater
+ *	than {@code 65535}.  If the value specified is {@code 0}, then an
+ *	anonymous port will be chosen.	The value chosen will be logged, and
+ *	can also be accessed with the {@link #getPort getPort} method. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.renew.interval
+ *	</b></code><br>
  *	<i>Default:</i> {@code 1000} (one second)<br>
+ *
+ * <dd style="padding-top: .5em"> 
  *	Specifies the renew interval which is returned by the
  *	{@link #renewNode renewNode} method). The interval must be greater
  *	than or equal to  {@code 5} milliseconds and less than or equal to
  *	{@code 10000} milliseconds (10 seconds).<p>
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.id.block.size} <br>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.id.block.size
+ *	</b></code><br>
  *	<i>Default:</i> {@code 256}<br>
+ *
+ * <dd style="padding-top: .5em"> 
  *	Specifies the block size to use when reserving node IDs.  The value
  *	must be greater than {@code 8}.<p>
- * </ul> <p>
+ * </dl> <p>
 
  */
 public class WatchdogServerImpl implements WatchdogServer, Service {
@@ -80,17 +85,22 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** The prefix for server properties. */
+    private static final String SERVER_PROPERTY_PREFIX =
+	"com.sun.sgs.impl.service.watchdog.server";
+
+    /** The server name in the registry. */
     static final String WATCHDOG_SERVER_NAME = "WatchdogServer";
 
     /** The property name for the server port. */
-    static final String PORT_PROPERTY = CLASSNAME + ".port";
+    static final String PORT_PROPERTY = SERVER_PROPERTY_PREFIX + ".port";
 
     /** The default value of the server port. */
     static final int DEFAULT_PORT = 44533;
 
     /** The property name for the renew interval. */
     private static final String RENEW_INTERVAL_PROPERTY =
-	CLASSNAME + ".renew.interval";
+	SERVER_PROPERTY_PREFIX + ".renew.interval";
 
     /** The default value of the renew interval. */
     private static final int DEFAULT_RENEW_INTERVAL = 1000;
@@ -103,11 +113,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** The name of the ID generator. */
     private static final String ID_GENERATOR_NAME =
-	CLASSNAME + ".id.generator";
+	SERVER_PROPERTY_PREFIX + ".id.generator";
 
     /** The property name for the ID block size. */
     private static final String ID_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".id.block.size";
+	SERVER_PROPERTY_PREFIX + ".id.block.size";
 
     /** The default ID block size for the ID generator. */
     private static final int DEFAULT_ID_BLOCK_SIZE = 256;
@@ -115,7 +125,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
 
-    /** The lock. */
+    /** The lock for  {@code dataService}, {@code shuttingDown}, and
+     * {@code callsInProgress} fields. */
     private final Object lock = new Object();
     
     /** The server port. */
@@ -167,6 +178,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** The thread for notifying failed nodes on restart. */
     private Thread notifyClientsOnRestartThread;
+
+    /** The count of calls in progress. */
+    private int callsInProgress = 0;
     
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -192,32 +206,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    throw new NullPointerException("null registry");
 	}
 	int requestedPort = wrappedProps.getIntProperty(
-	    PORT_PROPERTY, DEFAULT_PORT);
-	if (requestedPort < 0 || requestedPort > 65535) {
-	    throw new IllegalArgumentException(
-		"The " + PORT_PROPERTY + " property value must be " +
-		"greater than or equal to 0 and less than 65535: " +
-		requestedPort);
-	}
+ 	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
 	renewInterval = wrappedProps.getLongProperty(
-	    RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL);
-	if (renewInterval < RENEW_INTERVAL_LOWER_BOUND ||
-	    renewInterval > RENEW_INTERVAL_UPPER_BOUND)
-	{
-	    throw new IllegalArgumentException(
-		"The " + RENEW_INTERVAL_PROPERTY + " property value must be " +
-		"greater than or equal to " + RENEW_INTERVAL_LOWER_BOUND +
-		" and less than or equal to " + RENEW_INTERVAL_UPPER_BOUND +
-		": " + renewInterval);
-	}
+	    RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL,
+	    RENEW_INTERVAL_LOWER_BOUND, RENEW_INTERVAL_UPPER_BOUND);
 	idBlockSize = wrappedProps.getIntProperty(
- 	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE);
-	if (idBlockSize < IdGenerator.MIN_BLOCK_SIZE) {
-	    throw new IllegalArgumentException(
-		"The " + ID_BLOCK_SIZE_PROPERTY + " property value " +
-		"must be greater than or equal to " +
-		IdGenerator.MIN_BLOCK_SIZE);
-	}
+ 	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
+	    IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
 	
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
@@ -225,6 +220,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
 	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	// TBD:  use ResourceCoordinator.startTask?
 	checkExpirationThread.start();
 	notifyClientsThread.start();
     }
@@ -277,11 +273,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    }
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to configure WatchdogServerImpl");
-	    }
+	    logger.logThrow(
+		Level.CONFIG, e,
+		"Failed to configure WatchdogServerImpl");
 	    throw e;
 	}
     }
@@ -290,9 +284,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     public boolean shutdown() {
 	synchronized (lock) {
 	    if (shuttingDown) {
-		throw new IllegalStateException("already shutting down");
+		return false;
 	    }
 	    shuttingDown = true;
+	    while (callsInProgress > 0) {
+		try {
+		    lock.wait();
+		} catch (InterruptedException e) {
+		    return false;
+		}
+	    }
 	}
 	exporter.unexport();
 	checkExpirationThread.interrupt();
@@ -311,64 +312,82 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * {@inheritDoc}
      */
-    public long[] registerNode(String hostname, WatchdogClient client) {
-	checkState();
-	
-	// Get next node ID, and put new node in transient map.
-	long nodeId;
-	try {
-	    nodeId = idGenerator.next();
-	} catch (InterruptedException e) {
-	    throw new NodeRegistrationFailedException(
-		"interrupted while obtaining node ID");
-	}
-	final NodeImpl node = new NodeImpl(nodeId, hostname, client);
-	assert !nodeMap.containsKey(nodeId);
-	nodeMap.put(nodeId,  node);
-	
-	// Persist node, and back out transient mapping on failure.
-	try {
-	    runTransactionally(new AbstractKernelRunnable() {
-		public void run() {
-		    node.putNode(dataService);
-		}});
-	} catch (Exception e) {
-	    nodeMap.remove(nodeId);
-	    throw new NodeRegistrationFailedException(
-		"registration failed: " + nodeId, e);
-	}
+    public long[] registerNode(String hostname, WatchdogClient client)
+	throws NodeRegistrationFailedException
+    {
+	callStarted();
 
-	// Put node in set, sorted by expiration.
-	node.setExpiration(calculateExpiration());
-	synchronized (expirationSet) {
-	    expirationSet.add(node);
-	}
-
-	// Notify clients of new node.
-	statusChangedNodes.add(node);
-	synchronized (notifyClientsLock) {
-	    notifyClientsLock.notifyAll();
-	}
+	try {
+	    if (client == null) {
+		throw new IllegalArgumentException("null client");
+	    }
 	
-	return new long[]{nodeId, renewInterval};
+	    // Get next node ID, and put new node in transient map.
+	    long nodeId;
+	    try {
+		nodeId = idGenerator.next();
+	    } catch (InterruptedException e) {
+		throw new NodeRegistrationFailedException(
+		    "interrupted while obtaining node ID");
+	    }
+	    final NodeImpl node = new NodeImpl(nodeId, hostname, client);
+	    assert !nodeMap.containsKey(nodeId);
+	
+	    // Persist node, and back out transient mapping on failure.
+	    try {
+		runTransactionally(new AbstractKernelRunnable() {
+		    public void run() {
+			node.putNode(dataService);
+		    }});
+	    } catch (Exception e) {
+		throw new NodeRegistrationFailedException(
+		    "registration failed: " + nodeId, e);
+	    }
+
+	    // Put node in set, sorted by expiration.
+	    node.setExpiration(calculateExpiration());
+	    nodeMap.put(nodeId,  node);
+
+	    // TBD: use a ConcurrentSkipListSet?
+	    synchronized (expirationSet) {
+		expirationSet.add(node);
+	    }
+
+	    // Notify clients of new node.
+	    statusChangedNodes.add(node);
+	    synchronized (notifyClientsLock) {
+		notifyClientsLock.notifyAll();
+	    }
+	
+	    return new long[]{nodeId, renewInterval};
+	    
+	} finally {
+	    callFinished();
+	}
     }
 
     /**
      * {@inheritDoc}
      */
     public boolean renewNode(long nodeId) throws IOException {
-	checkState();
-	NodeImpl node = nodeMap.get(nodeId);
-	if (node == null || !node.isAlive()) {
-	    return false;
-	}
+	callStarted();
 
-	synchronized (expirationSet) {
-	    // update expiration time in sorted set.
-	    expirationSet.remove(node);
-	    node.setExpiration(calculateExpiration());
-	    expirationSet.add(node);
-	    return true;
+	try {
+	    NodeImpl node = nodeMap.get(nodeId);
+	    if (node == null || !node.isAlive() || node.isExpired()) {
+		return false;
+	    }
+
+	    synchronized (expirationSet) {
+		// update expiration time in sorted set.
+		expirationSet.remove(node);
+		node.setExpiration(calculateExpiration());
+		expirationSet.add(node);
+		return true;
+	    }
+
+	} finally {
+	    callFinished();
 	}
     }
     
@@ -376,12 +395,17 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * {@inheritDoc}
      */
     public boolean isAlive(long nodeId) throws IOException {
-	checkState();
-	NodeImpl node = nodeMap.get(nodeId);
-	if (node == null) {
-	    return false;
-	} else {
-	    return node.isAlive();
+	callStarted();
+
+	try {
+	    NodeImpl node = nodeMap.get(nodeId);
+	    if (node == null || node.isExpired()) {
+		return false;
+	    } else {
+		return node.isAlive();
+	    }
+	} finally {
+	    callFinished();
 	}
     }
 
@@ -432,15 +456,37 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     }
 
     /**
-     * Throws {@code IllegalStateException} if this service is not
-     * configured or is shutting down.
+     * Increments the number of calls in progress.  This method should
+     * be invoked by remote methods to both increment in progress call
+     * count and to check the state of this server.  When the call has
+     * completed processing, the remote method should invoke {@link
+     * #callFinished callFinished} before returning.
+     *
+     * @throws	IllegalStateException if this service is not configured
+     *		or is shutting down
      */
-    private void checkState() {
+    private void callStarted() {
 	synchronized (lock) {
 	    if (dataService == null) {
 		throw new IllegalStateException("service not configured");
 	    } else if (shuttingDown) {
 		throw new IllegalStateException("service shutting down");
+	    }
+	    callsInProgress++;
+	}
+    }
+
+    /**
+     * Decrements the in progress call count, and if this server is
+     * shutting down and the count reaches 0, then notify the waiting
+     * shutdown thread that it is safe to continue.  A remote method
+     * should invoke this method when it has completed processing.
+     */
+    private void callFinished() {
+	synchronized (lock) {
+	    callsInProgress--;
+	    if (shuttingDown && callsInProgress == 0) {
+		lock.notifyAll();
 	    }
 	}
     }
@@ -494,7 +540,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			statusChangedNodes.add(node);
 			notifyClients = true;
 			expirationSet.remove(node);
-			// TBD: when should node be removed from nodeMap?
 		    }
 		}
 		
@@ -520,7 +565,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 * status change.
 	 */
 	private void setFailed(final NodeImpl node) {
-	    node.setFailed();
 
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "Node failed: {0}", node.getId());
@@ -529,7 +573,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    try {
 		runTransactionally(new AbstractKernelRunnable() {
 		    public void run() {
-			node.updateNode(dataService);
+			node.setFailed(dataService);
 		    }});
 		
 	    } catch (Exception e) {
@@ -541,7 +585,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     }
 
     /**
-     * this thread informs all currently known clients of node status
+     * This thread informs all currently known clients of node status
      * changes (either nodes started or failed) as they occur.  This
      * thread is notified by {@link #registerNode registerNode) when
      * nodes are registered, or by the {@code CheckExpirationThread}
@@ -570,6 +614,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    }
 		}
 
+		// TBD: possibly wait for more updates to batch?
+		
 		Iterator<Node> iter = statusChangedNodes.iterator();
 		Collection<Node> changedNodes = new ArrayList<Node>();
 		while (iter.hasNext()) {
@@ -655,9 +701,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 
 	// Remove failed nodes from transient map and persistent store.
-	for (Node changedNode : changedNodes) {
-	    if (! changedNode.isAlive()) {
-		final long nodeId = changedNode.getId();
+	for (int n = 0; n < ids.length; n++) {
+	    if (status[n] == false) {
+		final long nodeId = ids[n];
 		try {
 		    runTransactionally(new AbstractKernelRunnable() {
 			    public void run() {

@@ -59,6 +59,8 @@ public interface WatchdogService extends Service {
      * @param	nodeId	a node ID
      * @return	node status information for the specified {@code
      * 		nodeId}
+     * @throws	IllegalArgumentException if the specified {@code nodeId}
+     *		is not within the range of valid IDs
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */

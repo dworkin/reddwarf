@@ -5,7 +5,6 @@
 package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -39,48 +38,53 @@ import java.util.logging.Logger;
 /**
  * The {@link WatchdogService} implementation. <p>
  *
- * In addition to the properties supported by the {@link DataServiceImpl}
- * class, the {@link #WatchdogServiceImpl constructor} supports the following
+ * The {@link #WatchdogServiceImpl constructor} supports the following
  * properties: <p>
  *
- * <ul>
- * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the app name. <p>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.start} <br>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.start
+ *	</b></code><br>
  *	<i>Default:</i> {@code false} <br>
  *	Specifies whether the watchdog server should be started by this service.
  *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
- *	{@link WatchdogServerImpl} class must be specified.<p>
+ *	{@link WatchdogServerImpl} class should be specified.<p>
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.host} <br>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.host
+ *	</b></code><br>
  *	<i>Default:</i> the local host name <br>
+ *
+ * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
  *	contacts (and, optionally, starts).<p>
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.port} <br>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.server.port
+ *	</b></code><br>
  *	<i>Default:</i> {@code 44533} <br>
+ *
+ * <dd style="padding-top: .5em">
  *	Specifies the network port for the watchdog server that this service
  *	contacts (and, optionally, starts).  If the {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServerImpl.start} property
+ *	com.sun.sgs.impl.service.watchdog.server.start} property
  *	is {@code true}, then the value must be greater than or equal to
  *	{@code 0} and no greater than {@code 65535}, otherwise the value
- *
  *	must be non-zero, positive, and no greater than	{@code 65535}.<p>
- *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl.port} <br>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.client.port
+ *	</b></code><br>
  *	<i>Default:</i> {@code 0} (anonymous port) <br>
+ *
+ * <dd style="padding-top: .5em">
  *	Specifies the network port for this watchdog service for receiving
  *	node status change notifications from the watchdog server.  The value
  *	must be greater than or equal to {@code 0} and no greater than
  *	{@code 65535}.<p>
- * </ul> <p>
+ * </dl> <p>
  */
 public class WatchdogServiceImpl implements WatchdogService {
 
@@ -92,16 +96,21 @@ public class WatchdogServiceImpl implements WatchdogService {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    private static final String WATCHDOG_SERVER_CLASSNAME =
-	WatchdogServerImpl.class.getName();
+    /** The prefix for server properties. */
+    private static final String SERVER_PROPERTY_PREFIX =
+	"com.sun.sgs.impl.service.watchdog.server";
+
+    /** The prefix for client properties. */
+    private static final String CLIENT_PROPERTY_PREFIX =
+	"com.sun.sgs.impl.service.watchdog.client";
 
     /** The property to specify that the watchdog server should be started. */
     private static final String START_SERVER_PROPERTY =
-	WATCHDOG_SERVER_CLASSNAME + ".start";
+	SERVER_PROPERTY_PREFIX + ".start";
 
     /** The property name for the watchdog server host. */
     private static final String HOST_PROPERTY =
-	WATCHDOG_SERVER_CLASSNAME +  ".host";
+	SERVER_PROPERTY_PREFIX +  ".host";
 
     /** The property name for the watchdog server port. */
     private static final String SERVER_PORT_PROPERTY =
@@ -112,7 +121,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	WatchdogServerImpl.DEFAULT_PORT;
 
     /** The property name for the watchdog client port. */
-    private static final String CLIENT_PORT_PROPERTY = CLASSNAME + ".port";
+    private static final String CLIENT_PORT_PROPERTY =
+	CLIENT_PROPERTY_PREFIX + ".port";
 
     /** The default value of the client port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
@@ -141,7 +151,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The watchdog server impl. */
     private final WatchdogServerImpl serverImpl;
 
-    /** The watchdog server proxy. */
+    /** The watchdog server proxy, or {@code null}. */
     private final WatchdogServer serverProxy;
 
     /** The watchdog client impl. */
@@ -222,24 +232,11 @@ public class WatchdogServiceImpl implements WatchdogService {
 		serverImpl = null;
 		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
 		serverPort = wrappedProps.getIntProperty(
-		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
-		if (serverPort <= 0 || serverPort > 65535) {
-		    throw new IllegalArgumentException(
-			"The " + SERVER_PORT_PROPERTY + " property value " +
-			"must be greater than 0 and less than 65535: " +
-			serverPort);
-		}
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
 
 	    int clientPort = wrappedProps.getIntProperty(
-		    CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT);
-	    if (clientPort < 0 || clientPort > 65535) {
-		throw new IllegalArgumentException(
-		    "The " + CLIENT_PORT_PROPERTY + " property value " +
-		    "must be greater than 0 and less than 65535: " +
-		    clientPort);
-	    }
-
+		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
 
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
@@ -247,18 +244,16 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
-	    exporter.export(clientImpl, 0);
+	    exporter.export(clientImpl, clientPort);
 	    clientProxy = exporter.getProxy();
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
 	    
 	} catch (Exception e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to create WatchdogServiceImpl");
-	    }
+	    logger.logThrow(
+		Level.CONFIG, e,
+		"Failed to create WatchdogServiceImpl");
 	    throw e;
 	}
     }
@@ -322,7 +317,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     public boolean shutdown() {
 	synchronized (stateLock) {
 	    if (shuttingDown) {
-		throw new IllegalStateException("already shutting down");
+		return false;
 	    }
 	    shuttingDown = true;
 	}
@@ -349,7 +344,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive(boolean checkTransactionally) {
 	checkState();
-	boolean aliveStatus = isAlive();
+	boolean aliveStatus = isLocalNodeAlive();
 	if (aliveStatus == false || !checkTransactionally) {
 	    return aliveStatus;
 	} else {
@@ -373,6 +368,9 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** {@inheritDoc} */
     public Node getNode(long nodeId) {
 	checkState();
+	if (nodeId < 0) {
+	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
+	}
 	Node node = NodeImpl.getNode(dataService, nodeId);
 	return
 	    node != null ?
@@ -525,7 +523,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (isAlive() && ! shuttingDown()) {
+	    while (isLocalNodeAlive() && ! shuttingDown()) {
 
 		try {
 		    Thread.currentThread().sleep(nextRenewInterval);
@@ -536,6 +534,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
 			setFailedThenNotify(true);
+			break;
 		    }
 		    long now = System.currentTimeMillis();
 		    if (now - lastRenewTime > renewInterval) {
@@ -622,7 +621,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Returns the local alive status: {@code true} if this node is
      * considered alive.
      */
-    private boolean isAlive() {
+    private boolean isLocalNodeAlive() {
 	synchronized (stateLock) {
 	    return isAlive;
 	}
@@ -649,22 +648,21 @@ public class WatchdogServiceImpl implements WatchdogService {
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId);
+	    Node node = new NodeImpl(localNodeId, localHost, false);
 	    notifyListeners(node);
 	}
     }
 
     /**
      * Notifies the appropriate registered node listeners of the
-     * status change of the specified {@code node}.  If {@code failed}
-     * is (@code true}, the {@code NodeListener#nodeFailed nodeFailed}
+     * status change of the specified {@code node}.  If invoking
+     * {@link Node#isAlive isAlive} on the {@code node} returns
+     * {@code false}, the {@code NodeListener#nodeFailed nodeFailed}
      * method is invoked on each node listener, otherwise the {@code
      * NodeListener#nodeStarted nodeStarted} method is invoked on each
      * node listener.
      *
      * @param	node a node
-     * @param 	failed {@code true} if node has failed, {@code false}
-     * 		otherwise
      */
     private void notifyListeners(final Node node) {
 

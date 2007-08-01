@@ -21,9 +21,6 @@ import java.util.Iterator;
  * bound name:
  *
  * <p><code>com.sun.sgs.impl.service.watchdog.NodeImpl.<i>nodeId</i></code>
- *
- * <p>This implementation is not thread-safe, and therefore must be
- * synchronized by the caller.
  */
 class NodeImpl
     implements Node, ManagedObject, Serializable, Comparable<NodeImpl>
@@ -50,13 +47,18 @@ class NodeImpl
     /** If true, this node is considered alive. */
     private boolean isAlive;
 
-    /** The expiration time for this node. */
+    /**
+     * The expiration time for this node. A value of {@code 0} means
+     * that either the value has not been intialized or the value is
+     * not meaningful because the node has failed.
+     */
     private transient long expiration;
 
     /**
      * Constructs an instance of this class with the given {@code
      * nodeId}, {@code hostname}, and {@code client}.  This instance's
-     * alive staus is set to {@code true}.
+     * alive status is set to {@code true}.  The expiration time for
+     * this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
@@ -123,28 +125,30 @@ class NodeImpl
     /** {@inheritDoc} */
     public int compareTo(NodeImpl o) {
 	long difference = getExpiration() - o.getExpiration();
-	if (difference < 0) {
-	    return -1;
-	} else if (difference == 0) {
-	    return 0;
-	} else {
-	    return 1;
+	if (difference == 0) {
+	    difference = id - o.id;
+	    if (difference == 0) {
+		difference = compareStrings(host, o.host);
+	    }
 	}
+	return (int) difference;
     }
 
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
     public boolean equals(Object obj) {
-	if (this == obj) {
+	if (obj == null) {
+	    throw new NullPointerException("obj is null");
+	} else if (this == obj) {
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && host.equals(node.host);
+	    return id == node.id && compareStrings(host, node.host) == 0;
 	}
 	return false;
     }
-    
+
     /** {@inheritDoc} */
     public int hashCode() {
 	return (int) id;
@@ -166,7 +170,11 @@ class NodeImpl
     }
     
     /**
-     * Returns the expiration time.
+     * Returns the expiration time.  A value of {@code 0} means that
+     * either the value has not been intialized or the value is not
+     * meaningful because the node has failed.  If {@link #isAlive}
+     * returns {@code false} the value returned from this method is
+     * not meaningful.
      */
     synchronized long getExpiration() {
 	return expiration;
@@ -178,48 +186,46 @@ class NodeImpl
     synchronized void setExpiration(long newExpiration) {
 	expiration = newExpiration;
     }
+
+    /**
+     * Returns {@code true} if the node is expired, and {@code false}
+     * otherwise.
+     *
+     * @return	{@code true} if the node is expired, and {@code false}
+     *		otherwise
+     */
+    synchronized boolean isExpired() {
+	return expiration <= System.currentTimeMillis();
+    }
     
     /**
-     * Sets the alive status of this node instance to {@code false}.
-     * Subsequent calls to {@link #isAlive isAlive} will return {@code false}.
+     * Sets the alive status of this node instance to {@code false},
+     * and updates the node's state in the specified {@code
+     * dataService}.  Subsequent calls to {@link #isAlive isAlive}
+     * will return {@code false}.
+     *
+     * @param	dataService a data service
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
      */
-    synchronized void setFailed() {
+    synchronized void setFailed(DataService dataService) {
 	isAlive = false;
+	dataService.markForUpdate(this);
     }
 
     /**
      * Stores this instance in the specified {@code dataService}.
-     * this method should only be called within a transaction.
+     * This method should only be called within a transaction.
      *
      * @param	dataService a data service
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
     synchronized void putNode(DataService dataService) {
-	dataService.markForUpdate(this); // is this necessary?
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
     
-    /**
-     * Updates the node's state in the specified {@code dataService}.
-     * This method should only be called within a transaction.
-     *
-     * @param	dataService a data service
-     * @throws	ObjectNotFoundException if this node was not already
-     *		bound in the data service
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    synchronized void updateNode(DataService dataService) {
-	NodeImpl node = getNode(dataService, id);
-	if (node == null) {
-	    throw new ObjectNotFoundException("node not found: " + id);
-	} else {
-	    dataService.markForUpdate(node);
-	    node.isAlive = isAlive;
-	}
-    }
-
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding
@@ -265,6 +271,16 @@ class NodeImpl
 	return node;
     }
 
+    /**
+     * Marks all nodes currently bound in the specified {@code
+     * dataService} as failed, and returns a collection of those
+     * nodes.  This method should only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @return	a collection of currently bound nodes, each marked as failed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
     static Collection<NodeImpl> markAllNodesFailed(DataService dataService) {
 	Collection<NodeImpl> nodes = new ArrayList<NodeImpl>();
 	for (String key :
@@ -272,24 +288,12 @@ class NodeImpl
 		dataService, NODE_PREFIX))
 	{
 	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
-	    dataService.markForUpdate(node);
-	    node.setFailed();
+	    node.setFailed(dataService);
 	    nodes.add(node);
 	}
 	return nodes;
     }
 
-    /**
-     * Returns the key to access from the data service the {@code
-     * Node} instance with the specified {@code nodeId}.
-     *
-     * @param	a node ID
-     * @return	a key for acessing the {@code Node} instance
-     */
-    private static String getNodeKey(long nodeId) {
-	return NODE_PREFIX + "." + nodeId;
-    }
-    
     /**
      * Returns an iterator for {@code Node} instances to be retrieved
      * from the specified {@code dataService}.  The returned iterator
@@ -306,6 +310,41 @@ class NodeImpl
 	return new NodeIterator(dataService);
     }
 
+    /* -- private methods and classes -- */
+
+    /**
+     * Compares the specified strings and returns -1, 0, or 1
+     * according to whether the first string is less than, equal to,
+     * or greater than the second string in a lexicographic ordering.
+     * In this ordering, a string with a value of {@code null} is less
+     * than any non-{@code null} string.
+     *
+     * @param	s1 a string, or {@code null}
+     * @param	s2 a string, or {@code null}
+     * @return	-1, 0, or 1 according to whether {@code s1} is less than,
+     *		equal to, or greater than {@code s2}
+     */
+    private static int compareStrings(String s1, String s2) {
+	if (s1 == null) {
+	    return (s2 == null) ? 0 : -1;
+	} else if (s2 == null) {
+	    return 1;
+	} else {
+	    return s1.compareTo(s2);
+	}
+    }
+    
+    /**
+     * Returns the key to access from the data service the {@code
+     * Node} instance with the specified {@code nodeId}.
+     *
+     * @param	a node ID
+     * @return	a key for acessing the {@code Node} instance
+     */
+    private static String getNodeKey(long nodeId) {
+	return NODE_PREFIX + "." + nodeId;
+    }
+    
     /**
      * An iterator for node state.
      */
@@ -344,6 +383,4 @@ class NodeImpl
 	    throw new UnsupportedOperationException("remove is not supported");
 	}
     }
-    
-    
 }

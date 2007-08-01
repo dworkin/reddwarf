@@ -9,7 +9,7 @@ package com.sun.sgs.impl.service.watchdog;
  *
  * @see	WatchdogServer#registerNode Watchdog.registerNode
  */
-public class NodeRegistrationFailedException extends RuntimeException {
+public class NodeRegistrationFailedException extends Exception {
 
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;

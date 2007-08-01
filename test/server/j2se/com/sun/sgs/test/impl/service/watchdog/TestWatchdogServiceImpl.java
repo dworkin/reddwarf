@@ -4,7 +4,6 @@
 
 package com.sun.sgs.test.impl.service.watchdog;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -39,8 +38,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	DataStoreImpl.class.getName();
 
     /** The name of the WatchdogServerImpl class. */
-    private static final String WatchdogServerClassName =
-	WatchdogServerImpl.class.getName();
+    private static final String WatchdogServerPropertyPrefix =
+	"com.sun.sgs.impl.service.watchdog.server";
     
     /** Directory used for database shared across multiple tests. */
     private static final String DB_DIRECTORY =
@@ -56,9 +55,9 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** Properties for the watchdog server and data service. */
     private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	WatchdogServerClassName + ".start", "true",
-	WatchdogServerClassName + ".port", Integer.toString(WATCHDOG_PORT),
-	WatchdogServerClassName + ".renew.interval",
+	WatchdogServerPropertyPrefix + ".start", "true",
+	WatchdogServerPropertyPrefix + ".port", Integer.toString(WATCHDOG_PORT),
+	WatchdogServerPropertyPrefix + ".renew.interval",
 	    Long.toString(RENEW_INTERVAL));
 
     /** Properties for creating the shared database. */
@@ -138,7 +137,6 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
-        Thread.sleep(100);
 	passed = true;
     }
     
@@ -203,7 +201,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
 	Properties properties = createProperties(
-	    WatchdogServerClassName + ".port", Integer.toString(WATCHDOG_PORT));
+	    WatchdogServerPropertyPrefix + ".port",
+	    Integer.toString(WATCHDOG_PORT));
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -215,7 +214,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorZeroPort() throws Exception {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(0));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -227,7 +226,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorPortTooLarge() throws Exception {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(65536));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -241,9 +240,9 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".start", "true",
-	    WatchdogServerClassName + ".port", "0",
-	    WatchdogServerClassName + ".renew.interval", "0");
+	    WatchdogServerPropertyPrefix + ".start", "true",
+	    WatchdogServerPropertyPrefix + ".port", "0",
+	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -257,9 +256,9 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".start", "true",
-	    WatchdogServerClassName + ".port", "0",
-	    WatchdogServerClassName + ".renew.interval", "10001");
+	    WatchdogServerPropertyPrefix + ".start", "true",
+	    WatchdogServerPropertyPrefix + ".port", "0",
+	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -332,7 +331,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(port));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry);
 	try {
@@ -383,7 +382,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(port));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
@@ -395,7 +394,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		System.err.println("watchdog service id: " +
 				   watchdog.getLocalNodeId());
 	    }
-	    // ensure that watchdogs have a chance to re
+	    // ensure that watchdogs have a chance to register
 	    Thread.currentThread().sleep(RENEW_INTERVAL);
 	    createTransaction();
 	    Iterator<Node> iter = watchdogService.getNodes();
@@ -465,7 +464,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(port));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
@@ -595,7 +594,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(port));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
 
@@ -636,7 +635,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerClassName + ".port", Integer.toString(port));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
 	

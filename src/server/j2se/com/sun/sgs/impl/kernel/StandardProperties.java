@@ -92,6 +92,12 @@ public class StandardProperties {
     public static final String TASK_MANAGER = NS + "app.taskManager";
 
     /**
+     * An optional key specifying a specific class to use fo an application's
+     * {@code WatchdogService}.
+     */
+    public static final String WATCHDOG_SERVICE = NS + "app.watchdogService";
+
+    /**
      * An optional key specifying a specific class to use for an application's
      * <code>ClientSessionService</code>.
      */
