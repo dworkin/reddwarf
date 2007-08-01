@@ -11,14 +11,18 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.sgs.benchmark.client.listener.*;
 import com.sun.sgs.benchmark.shared.MethodRequest;
@@ -75,7 +79,13 @@ public class BenchmarkClient {
     
     /** The {@link Charset} encoding for client/server messages */
     public static final String MESSAGE_CHARSET = "UTF-8";
-    
+
+    /** Static counter used to generate unique client IDs. */
+    private static AtomicInteger instanceCount = new AtomicInteger(0);
+
+    /** Unique id for this client. */
+    private final int id;
+
     /** Server to connect to */
     private String serverHostname, serverPort;        
     
@@ -126,12 +136,20 @@ public class BenchmarkClient {
      */
     private List<ScriptingCommand> tagCmdList;
     
+    /**
+     * Used when printing out informational messages.
+     */
+    private DateFormat dateFormat = new SimpleDateFormat("MMM d yyyy HH:mm:ss");
+
     // Constructor
 
     /**
      * Creates a new {@code BenchmarkClient}.
      */
     public BenchmarkClient() {
+        /** Assign unique ID for this client. */
+        id = instanceCount.addAndGet(1);
+        
         /** Default values */
         serverHostname = System.getProperty(HOST_PROPERTY, DEFAULT_HOST);
         serverPort = System.getProperty(PORT_PROPERTY, DEFAULT_PORT);
@@ -142,19 +160,19 @@ public class BenchmarkClient {
                     byte[] message)
                 {
                     if (printAllEvents)
-                        System.out.println("Received message \"" +
-                            fromMessageBytes(message) + "\" from \"" +
-                            formatSession(sender) + "\" on channel \"" +
-                            channelName + "\"");
+                        printMsg(String.format("Received message \"%s\" from" +
+                                     "\"%s\" on channel \"%s\"",
+                                     fromMessageBytes(message),
+                                     formatSession(sender), channelName));
                 }
             });
         
         masterListener.registerDisconnectedListener(new DisconnectedListener() {
                 public void disconnected(boolean graceful, String reason) {
                     if (printNotices || printAllEvents)
-                        System.out.println("Notice: Disconnected " +
-                            (graceful ? "gracefully" : "ungracefully") +
-                            ": " + reason);
+                        printMsg(String.format("Disconnected %s: %s",
+                                     (graceful ? "gracefully" : "ungracefully"),
+                                     reason));
                 }
             });
         
@@ -163,53 +181,53 @@ public class BenchmarkClient {
                     channels.put(channel.getName(), channel);
                     
                     if (printAllEvents)
-                        System.out.println("Notice: Joined channel \"" +
-                            channel.getName() + "\"");
+                        printMsg(String.format("Joined channel \"%s\"",
+                                     channel.getName()));
                 }
             });
         
         masterListener.registerLeftChannelListener(new LeftChannelListener() {
                 public void leftChannel(String channelName) {
                     if (printAllEvents)
-                        System.out.println("Notice: Left channel \"" +
-                            channelName + "\"");
+                        printMsg(String.format("Left channel \"%s\"",
+                                     channelName));
                 }
             });
         
         masterListener.registerLoggedInListener(new LoggedInListener() {
                 public void loggedIn() {
                     if (printNotices || printAllEvents)
-                        System.out.println("Notice: Logged in with sessionId: " +
-                            formatSession(client.getSessionId()));
+                        printMsg(String.format("Logged in with sessionId: %s",
+                                     formatSession(client.getSessionId())));
                 }
             });
         
         masterListener.registerLoginFailedListener(new LoginFailedListener() {
                 public void loginFailed(String reason) {
                     if (printNotices || printAllEvents)
-                        System.out.println("Notice: Login failed: " + reason);
+                        printMsg(String.format("Login failed: %s", reason));
                 }
             });
         
         masterListener.registerReconnectedListener(new ReconnectedListener() {
                 public void reconnected() {
                     if (printAllEvents)
-                        System.out.println("Notice: Reconnected.");
+                        printMsg("Reconnected.");
                 }
             });
         
         masterListener.registerReconnectingListener(new ReconnectingListener() {
                 public void reconnecting() {
                     if (printAllEvents)
-                        System.out.println("Notice: Reconnecting.");
+                        printMsg("Reconnecting.");
                 }
             });
         
         masterListener.registerServerMessageListener(new ServerMessageListener() {
                 public void receivedMessage(byte[] message) {
                     if (printNotices || printAllEvents)
-                        System.out.println("Notice: (from server) " +
-                            fromMessageBytes(message));
+                        printMsg(String.format("(from server) %s",
+                                     fromMessageBytes(message)));
                 }
             });
     }
@@ -587,7 +605,7 @@ public class BenchmarkClient {
     private void executeCommand(ScriptingCommand cmd) {
         try {
             if (printCommands)
-                System.out.println("# Executing: " + cmd.getType());
+                printMsg(String.format("Executing: %s", cmd.getType()));
             
             /** If required, send a method request. */
             MethodRequest request = createMethodRequest(cmd);
@@ -607,8 +625,8 @@ public class BenchmarkClient {
                 }
                 else {
                     /** Just a query */
-                    System.out.println("Server is currently configured to " +
-                        serverHostname + ":" + serverPort);
+                    System.out.printf("Server is currently configured to" +
+                        " %s:%s\n", serverHostname, serverPort);
                 }
                 break;
                 
@@ -663,7 +681,7 @@ public class BenchmarkClient {
                 break;
                 
             case PRINT:
-                System.out.println("PRINT: " + cmd.getPrintArg());
+                printMsg(String.format("PRINT: %s", cmd.getPrintArg()));
                 return;
                 
             case SEND_PM:
@@ -672,7 +690,7 @@ public class BenchmarkClient {
                 
                 if (channel == null) {
                     throw new IllegalArgumentException("Error: unknown channel" +
-                        "\"" + cmd.getChannelNameArg() + "\"");
+                        " \"" + cmd.getChannelNameArg() + "\"");
                 } else {
                     Set<SessionId> recipients = cmd.getRecipients();
                     if (recipients == null)
@@ -728,6 +746,20 @@ public class BenchmarkClient {
         else {
             System.err.println("Error executing tag \"" + tagName + "\": tag" +
                 " not found.");
+        }
+    }
+    
+    /**
+     * Nicely format a {@link SessionId} for printed display.
+     *
+     * @param session the {@code SessionId} to format
+     * @return the formatted string
+     */
+    private String formatSession(SessionId session) {
+        if (session == null) {
+            return "[null]";
+        } else {
+            return "[" + HexDumper.toHexString(session.toBytes()) + "]";
         }
     }
     
@@ -832,6 +864,14 @@ public class BenchmarkClient {
         }
     }
     
+    /**
+     * Formatted output to {@code System.out}.
+     */
+    private void printMsg(String msg) {
+        System.out.printf("%s\tBenchmarkClient-%d\t%s\n",
+            dateFormat.format(new Date()), id, msg);
+    }
+    
     private void sendLogin(String login, String password) throws IOException {
         /**
          * The "master listener" needs the login and password for
@@ -840,8 +880,8 @@ public class BenchmarkClient {
         masterListener.setPasswordAuthentication(login, password);
         
         if (printNotices || printAllEvents)
-            System.out.println("Notice: Connecting to " + serverHostname +
-                ":" + serverPort);
+            printMsg(String.format("Connecting to %s:%s", serverHostname,
+                         serverPort));
         
         Properties props = new Properties();
         props.put("host", serverHostname);
@@ -867,19 +907,7 @@ public class BenchmarkClient {
         client.send(toMessageBytes(message));
     }
     
-    /**
-     * Nicely format a {@link SessionId} for printed display.
-     *
-     * @param session the {@code SessionId} to format
-     * @return the formatted string
-     */
-    private String formatSession(SessionId session) {
-        if (session == null) {
-            return "[null]";
-        } else {
-            return "[" + HexDumper.toHexString(session.toBytes()) + "]";
-        }
-    }
+    // utility methods
     
     /**
      * Decodes the given {@code bytes} into a message string.
