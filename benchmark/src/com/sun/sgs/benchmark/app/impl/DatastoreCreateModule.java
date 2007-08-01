@@ -20,6 +20,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;

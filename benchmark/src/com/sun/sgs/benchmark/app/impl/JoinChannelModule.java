@@ -16,6 +16,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
