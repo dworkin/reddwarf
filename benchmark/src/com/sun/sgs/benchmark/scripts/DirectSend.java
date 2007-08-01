@@ -83,14 +83,14 @@ public class DirectSend {
     
     public static void main(String[] args) {
 	if (args.length > 0) {
-	    if (args.length != 4) {
+	    if (args.length != 3) {
 		usage();
             } else {
                 int clients = 0, delay = 0, bytes = 0;
                 try {
                     clients = Integer.parseInt(args[0]);
-                    delay = Integer.parseInt(args[2]);
-                    bytes = Integer.parseInt(args[3]);
+                    delay = Integer.parseInt(args[1]);
+                    bytes = Integer.parseInt(args[2]);
                     new DirectSend(clients,delay,bytes).run();
                 }
                 catch (Throwable t) {
