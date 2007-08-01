@@ -22,6 +22,10 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
+  <!-- Values for controlling execution -->
+  <!-- (not used in all targets, so far just benchmark-client* -->
+  <property name="cmdargs" value="" />
+
   <!-- Where to find Ruby on the current platform -->
   <property name="ruby" location="/usr/bin/ruby"/>
 
