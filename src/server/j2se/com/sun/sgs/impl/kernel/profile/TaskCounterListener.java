@@ -31,7 +31,7 @@ public class TaskCounterListener implements ProfileOperationListener {
      * that the update might not occur exactly on window crossing due
      * to concurrent updates.
      */
-    private static final int WINDOW_SIZE = 500;
+    private static final int WINDOW_SIZE = 5000;
 
     // statistics updated for the aggregate window
     private final AtomicLong taskCount;

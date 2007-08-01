@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class HistogramListener implements ProfileOperationListener {
 
-    private static final int WINDOW_SIZE = 500;
+    private static final int WINDOW_SIZE = 5000;
 
     private static final int NUM_BUCKETS = 15;
 
