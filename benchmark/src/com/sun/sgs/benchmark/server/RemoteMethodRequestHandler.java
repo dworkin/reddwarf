@@ -108,6 +108,13 @@ public class RemoteMethodRequestHandler
     }
     
     public void disconnected(boolean graceful) {
-	System.out.printf("%s disconnected\n", session);
+        /**
+         * Note: it is not uncommon for this to print out multiple times per
+         * disconnection (particularly if many users disconnect all at once)
+         * because the task may fail and retry, but this print occurs every time
+         * even if the task fails.
+         */
+	System.out.printf("%s [%s] disconnected\n", session.getName(),
+            session.toString());
     }
 }
