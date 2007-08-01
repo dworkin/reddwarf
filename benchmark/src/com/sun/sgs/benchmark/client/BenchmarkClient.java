@@ -161,7 +161,7 @@ public class BenchmarkClient {
                 {
                     if (printAllEvents)
                         printMsg(String.format("Received message \"%s\" from" +
-                                     "\"%s\" on channel \"%s\"",
+                                     " \"%s\" on channel \"%s\"",
                                      fromMessageBytes(message),
                                      formatSession(sender), channelName));
                 }
