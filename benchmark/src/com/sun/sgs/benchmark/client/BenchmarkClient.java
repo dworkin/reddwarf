@@ -234,22 +234,25 @@ public class BenchmarkClient {
             }
             else if (args[i].equals("-h")) {
                 System.out.println("Usage: java com.sun.sgs.benchmark.client." +
-                    "BenchmarkClient [-c] [-e] [-h] [-n] [-q] [-s]");
-                System.out.println("  -c   Enable messages to stdout whenever" +
-                    " a command is executed (default: enabled). Think" +
-                    " 'commands'.");
-                System.out.println("  -e   Enable message to stdout whenever" +
-                    " any event occurs (default: disabled). Think 'events'.");
-                System.out.println("  -h   Print this help message");
-                System.out.println("  -n   Enable notification messages to" + 
-                    " stdout when certain significant events occur (default:" +
-                    " enabled).  Think 'notify'.");
-                System.out.println("  -q   Quit JVM on any syntax error when" +
-                    " processing input, instead of simply printing an error" +
-                    " and waiting for more input (default: disabled).  Think" +
-                    " 'quit'.");
-                System.out.println("  -s   Disable all informational messages." +
-                    " Think 'squelch'.");
+                    "BenchmarkClient [-c] [-e] [-h] [-n] [-q] [-s]\n" +
+                    "  -c   Enable messages to stdout whenever a command is" +
+                    " executed (default:\n" +
+                    "       enabled). Think 'commands'.\n" +
+                    "  -e   Enable message to stdout whenever ANY event occurs" +
+                    " (default:\n" +
+                    "       disabled). Think 'events'.\n" +
+                    "  -h   Print this help message\n" +
+                    "  -n   Enable notification messages to stdout when" +
+                    " certain significant\n" +
+                    "       events occur (default: enabled). Think 'notify'.\n" +
+                    "  -q   Quit JVM on any syntax error when processing input" +
+                    ", instead of\n" +
+                    "       just printing an error (default: disabled). Think" +
+                    " 'quit'.\n" +
+                    "  -s   Disable all informational messages. Think" +
+                    " 'squelch'.");
+                
+                System.exit(0);
             }
             else if (args[i].equals("-n")) {
                 client.printNotices(true);
@@ -263,7 +266,6 @@ public class BenchmarkClient {
                 client.printNotices(false);
             }
         }
-        
         
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));    
         String line;
