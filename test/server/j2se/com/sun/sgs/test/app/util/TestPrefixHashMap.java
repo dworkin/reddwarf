@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -265,7 +267,7 @@ public class TestPrefixHashMap extends TestCase {
     }
 
 
-    @Test public void testPutAndRemoveLopsided() throws Exception {
+    @Test public void testPutAndRemoveLopsidedPositiveKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
@@ -287,7 +289,7 @@ public class TestPrefixHashMap extends TestCase {
         txn.commit();
     }
 
-    @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
+    @Test public void testPutAndRemoveLopsidedNegativeKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
@@ -295,15 +297,101 @@ public class TestPrefixHashMap extends TestCase {
 
 	for (int i = 0; i < 128; ++i) {
 	    
+	    test.put(-i, i);
+	    control.put(-i, i);
+	}
+
+	for (int i = 0; i < 128; i += 2) {
+	    test.remove(-i);
+	    control.remove(-i);
+	}
+	
+	assertEquals(control, test);
+	
+        txn.commit();
+    }
+
+
+    @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+
+	for (int i = 0; i < 96; ++i) {
+	    
 	    test.put(i, i);
 	    test.put(-i, -i);
 	    control.put(i, i);
 	    control.put(-i, -i);
 	}
 
+// 	System.out.println(test.treeDiag() + "\n\n");
+
+	for (int i = 0; i < 127; i += 2) {
+	    assertEquals(control.remove(i), test.remove(i));
+	    // control.remove(i);
+	}
+	
+// 	System.out.println(test.treeDiag());
+
+// 	System.out.println("\n\n" + test.treeLeaves());
+
+	assertEquals(control.size(), test.size());
+
+	assertTrue(control.keySet().containsAll(test.keySet()));
+	       
+	assertEquals(control, test);
+	
+        txn.commit();
+    }
+
+    @Test public void testPutAndRemoveRandomKeys() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+
+	int[] vals = new int[128];
+
+	for (int i = 0; i < 128; ++i) {
+	    int j = (i < 64) ? -RANDOM.nextInt() : RANDOM.nextInt();
+	    vals[i] = j;
+	    test.put(j, i);
+	    control.put(j, i);	    
+	}
+
 	for (int i = 0; i < 128; i += 2) {
-	    test.remove(i);
-	    control.remove(i);
+	    test.remove(vals[i]);
+	    control.remove(vals[i]);
+	}
+	
+	assertEquals(control.size(), test.size());
+
+	assertTrue(control.keySet().containsAll(test.keySet()));
+	       
+	assertEquals(control, test);
+	
+        txn.commit();
+    }
+
+    
+
+    @Test public void testPutAndRemoveNegative() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+
+	for (int i = 0; i < 128; ++i) {
+	    
+	    test.put(-i, -i);
+	    control.put(-i, -i);
+	}
+
+	for (int i = 0; i < 128; i += 2) {
+	    test.remove(-i);
+	    control.remove(-i);
 	}
 	
 	assertEquals(control.size(), test.size());
@@ -513,6 +601,46 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
+    @Test public void testRepeatedPutAndRemove() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[400];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,j);
+	    control.put(j,j);
+	}
+
+	for (int i = 0; i < inputs.length; i += 4) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
+	assertEquals(control, test);
+
+	for (int i = 0; i < inputs.length; i += 3) {
+	    test.put(inputs[i],inputs[i]);
+	    control.put(inputs[i],inputs[i]);
+	}
+	assertEquals(control, test);
+
+
+	for (int i = 0; i < inputs.length; i += 2) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
+
+	assertEquals(control, test);
+
+
+	txn.commit();
+    }
+
+
 
     @Test public void testPutAll() throws Exception {
         txn = createTransaction();
@@ -604,6 +732,70 @@ public class TestPrefixHashMap extends TestCase {
 
 	txn.commit();
     }
+
+    @Test public void testValues() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Collection<Integer> control = new ArrayList<Integer>(50);
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	    control.add(-j);
+	}
+
+	assertTrue(control.containsAll(test.values()));
+
+	txn.commit();
+    }
+
+    @Test public void testValuesOnSplitTree() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Collection<Integer> control = new ArrayList<Integer>(50);
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	    control.add(-j);
+	}
+
+	assertTrue(control.containsAll(test.values()));
+
+	txn.commit();
+    }
+
+    
+
+    @Test public void testContainsValue() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	}
+
+	for (int i = 0; i < inputs.length; i++) {
+	    assertTrue(test.containsValue(-inputs[i]));
+	}
+
+	txn.commit();
+    }
+
 
     @Test public void testContainsValueOnSplitTree() throws Exception {
         txn = createTransaction();

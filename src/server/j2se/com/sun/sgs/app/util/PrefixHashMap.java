@@ -21,9 +21,12 @@ import com.sun.sgs.app.ManagedReference;
  * A concurrent, distributed {@code Map} implementation that
  * automatically manages the mapping storage within the datstore, and
  * supports concurrent writes.  This class is intended as a drop-in
- * replacement for the {@link HashMap} class as needed.  Developers
- * are encouraged to use this class when the size of a {@link HashMap}
- * causes sufficient contention due to serialization overhead.
+ * replacement for the {@link java.util.HashMap} class as needed.
+ * Developers are encouraged to use this class when the size of a
+ * {@link java.util.HashMap} causes sufficient contention due to
+ * serialization overhead.
+ *
+ * <p>
  *
  * As the number of mappings increases, the mappings are distributed
  * through multiple objects in the datastore, thereby mitigating the
@@ -32,6 +35,8 @@ import com.sun.sgs.app.ManagedReference;
  * in size, mutable operations change only a small number of managed
  * objects, thereby increasing the concurrency for multiple writes.
  *
+ * <p>
+ *
  * This implementation supports the contract that all keys and values
  * must be {@link Serializable}.  If a developer provides a {@code
  * Serializable} key or value that is <i>not</i> a {@code
@@ -39,7 +44,9 @@ import com.sun.sgs.app.ManagedReference;
  * the lifetime of that object in the datastore.  The developer will
  * be responsible for the lifetime of all {@link ManagedObject} stored
  * in this map.
- * 
+ *
+ * <p>
+ *
  * The {@code PrefixHashMap} is implemented as a prefix tree of hash
  * maps, which provides {@code O(log(n))} performance for the
  * following operations: {@code get}, {@code put}, {@code remove},
@@ -51,6 +58,8 @@ import com.sun.sgs.app.ManagedReference;
  * the tree, which takes {@code O(n + log(n))}, where {@code n} is the
  * number of leaves.  The {@code isEmpty} operation, however, is still
  * {@code O(1)}.
+ *
+ * <p>
  *
  * An instance of {@code PrefixHashMap} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
@@ -65,17 +74,21 @@ import com.sun.sgs.app.ManagedReference;
  * poor hashing will minimize the actual number of possible concurrent
  * writes, regardless of the {@code minConcurrency} value.
  *
+ * <p>
+ *
  * This class implements all of the optional {@code Map} operations
  * and supports both {@code null} keys and values.  This map provides
  * no guarantees on the order of elements when iterating over the key
  * set, values or entry set.
  * 
+ * <p>
+ *
  * The iterator for this implemenation will never throw a {@link
- * ConcurrentModificationException}, unlike many of the other {@code
- * Map} implementations.   
+ * java.util.ConcurrentModificationException}, unlike many of the
+ * other {@code Map} implementations.
  *
  * @since 1.0
- * @version 1.2
+ * @version 1.3
  *
  * @see Object#hashCode()
  * @see Map
@@ -108,7 +121,7 @@ public class PrefixHashMap<K,V>
 
     
     /**
-     * The default number of {@code ManagedReference} entries per
+     * The default number of {@code PrefixEntry} entries per
      * array for a leaf table.
      */
     // NOTE: this should almost certainly be updated to include class
@@ -124,7 +137,7 @@ public class PrefixHashMap<K,V>
      * The parent node directly above this.  For the root node, this
      * should always be null.
      */
-    ManagedReference parent;
+    private ManagedReference parent;
 
 
     // NOTE: the leftLeaf and rightLeaf references allow us to quickly
@@ -135,13 +148,13 @@ public class PrefixHashMap<K,V>
      * The leaf table immediately to the left of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    ManagedReference leftLeaf;
+    private ManagedReference leftLeaf;
 
     /**
      * The leaf table immediately to the right of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    ManagedReference rightLeaf;
+    private ManagedReference rightLeaf;
 
 
     // NOTE: either both the left and right child will be present, or
@@ -150,12 +163,12 @@ public class PrefixHashMap<K,V>
     /**
      * The leaf table, if any, under this table to the left
      */
-    ManagedReference leftChild;
+    private ManagedReference leftChild;
 
     /**
      * The leaf table, if any, under this table to the right
      */
-    ManagedReference rightChild;
+    private ManagedReference rightChild;
 	
     /**
      * The fixed-size table for storing all Map entries.
@@ -163,8 +176,8 @@ public class PrefixHashMap<K,V>
     // NOTE: this is actually an array of type PrefixEntry<K,V> but
     //       generic arrays are not allowed, so we cast the elements
     //       as necessary
-    transient PrefixEntry[] table;    
-
+    private transient PrefixEntry[] table;    
+    
     /**
      * The number of elements in this table.  Note that this is
      * <i>not</i> the total number of elements in the entire tree.
@@ -289,7 +302,7 @@ public class PrefixHashMap<K,V>
 	// causes the children to be created in depth-first fashion,
 	// which prevents the leaf references from being correctly
 	// established
-	if (depth == 0)
+	if (depth == 0) 
 	    ensureDepth(minDepth);
     }
 
@@ -422,10 +435,6 @@ public class PrefixHashMap<K,V>
      * {@inheritDoc}
      */
     public boolean containsValue(Object value) {
-	// short circuit for empty maps
-	if (size() == 0) 
-	    return false;
-
 	for (V v : values()) {
 	    if (v == value || (v != null && v.equals(value)))
 		return true;
@@ -539,8 +548,8 @@ public class PrefixHashMap<K,V>
 	    // have a different prefix next
 	    for (PrefixEntry<K,V> e = table[i]; e != null; e = e.next) {
 		
-		//e.prefix.shiftLeft(); 		
-		((e.leadingBit() == 1) ? leftChild_ : rightChild_).
+		((((e.hash << (depth)) >>> 31) == 1) ? leftChild_ : rightChild_).
+		//((e.leadingBit() == 1) ? leftChild_ : rightChild_).
 		    addEntry(e, i);
 	    }
 	}
@@ -592,11 +601,12 @@ public class PrefixHashMap<K,V>
     private PrefixHashMap<K,V> lookup(int prefix) {
 	// a leading bit of 1 indicates the left child prefix
 	PrefixHashMap<K,V> leaf;
-	for (leaf = this; leaf.leftChild != null && leaf.depth < MAX_DEPTH-1;
-	     leaf = ((prefix & 0x80000000) == 0x80000000) 
-		 ? leaf.leftChild.get(PrefixHashMap.class)
-		 : leaf.rightChild.get(PrefixHashMap.class))
-	    prefix <<= 1;
+ 	for (leaf = this; leaf.leftChild != null && leaf.depth < MAX_DEPTH-1;) {
+	    leaf = ((prefix >>> 31) == 1) 
+		? leaf.leftChild.get(PrefixHashMap.class)
+		: leaf.rightChild.get(PrefixHashMap.class);
+ 	    prefix <<= 1;
+	}
 	return leaf;
     }
 
@@ -630,19 +640,43 @@ public class PrefixHashMap<K,V>
 
     /**
      * A secondary hash function for better distributing the keys.
-     * This function is borrowed from the 1.72 version of {@link
-     * HashMap}.
      *
      * @param h the initial hash value
      * @return a re-hashed version of the provided hash value
      */
     static int hash(int h) {
-	// This function ensures that hashCodes that differ only
-	// by constant multiples at each bit position have a
-	// bounded number of collisions (approximately 8 at
-	// default load factor).
+	
+	/*
+	 * This hash function is based on a fixed 4-byte version of
+	 * lookup3.c by Bob Jenkins.  See
+	 * http://burtleburtle.net/bob/c/lookup3.c for details.  This
+	 * is supposed a superior hash function but testing reveals
+	 * that it performs slightly worse than the current version
+	 * from the JDK 1.6 HashMap.  It is being left in for future
+	 * consideration once a more realistic key set can be tested
+	 *  
+	 * int a, b, c;
+	 * a = b = 0x9e3779b9; // golden ratio, (arbitrary initial value)
+	 * c = h + 4;
+	 * 	
+	 * a += h;
+	 * 
+	 * // mix, with rotations on the original values
+	 * c ^= b; c -= ((b << 14) | (b >>> -14));
+	 * a ^= c; a -= ((c << 11) | (c >>> -11));
+	 * b ^= a; b -= ((a << 25) | (a >>> -25));
+	 * c ^= b; c -= ((b << 16) | (b >>> -16));
+	 * a ^= c; a -= ((c <<  4) | (c >>>  -4));
+	 * b ^= a; b -= ((a << 14) | (a >>> -14));
+	 * c ^= b; c -= ((b << 24) | (b >>> -24));
+	 * 
+	 * return c;
+	 */
+	
+	// the HashMap.hash() function from JDK 1.6
 	h ^= (h >>> 20) ^ (h >>> 12);
 	return h ^ (h >>> 7) ^ (h >>> 4);
+
     }
 
     /**
@@ -674,7 +708,7 @@ public class PrefixHashMap<K,V>
 	}
 	    
 	// we found no key match, so add an entry
-	leaf.addEntry(hash, key, value, i, hash);
+	leaf.addEntry(hash, key, value, i);
 
 	return null;	
     }
@@ -700,13 +734,10 @@ public class PrefixHashMap<K,V>
      * @param value the value to be mapped to the key
      * @param the index in the table at which the mapping should be
      *        stored.
-     * @param prefix the value of the prefix at the time the subtable
-     *        was identified.
      */
-    private void addEntry(int hash, K key, V value, int index, int prefix) {
+    private void addEntry(int hash, K key, V value, int index) {
 	PrefixEntry<K,V> prev = table[index];
-	table[index] = new PrefixEntry<K,V>(hash, key, value, 
-					    prev, prefix, depth);
+	table[index] = new PrefixEntry<K,V>(hash, key, value, prev);
 
 	// ensure that the prefix has enough precision to support
 	// another split operation	    
@@ -727,7 +758,7 @@ public class PrefixHashMap<K,V>
      */
     private void addEntry(PrefixEntry copy, int index) {
  	PrefixEntry<K,V> prev = table[index];
-	table[index] = new PrefixEntry<K,V>(copy, prev, depth); 
+	table[index] = new PrefixEntry<K,V>(copy, prev); 
  	size++;
     }
     
@@ -757,8 +788,11 @@ public class PrefixHashMap<K,V>
  	int totalSize = 0;
  	PrefixHashMap cur = leftMost();
   	totalSize += cur.size;
-  	while(cur.rightLeaf != null)
-	    totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
+  	while(cur.rightLeaf != null) {
+	    int s = (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
+	    //totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
+	    totalSize += s;    
+	}
 	
   	return totalSize;
     }
@@ -775,7 +809,7 @@ public class PrefixHashMap<K,V>
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	PrefixHashMap<K,V> leaf = lookup(hash);
-
+	
 	int i = indexFor(hash, leaf.table.length);
 	PrefixEntry<K,V> e = leaf.table[i]; 
 	PrefixEntry<K,V> prev = e;
@@ -869,20 +903,23 @@ public class PrefixHashMap<K,V>
 	return "ROOT: " + 
 	    ((leftChild == null) 
 	     ? "conents: " + treeString()
-	     : AppContext.getDataManager().createReference(this) + "\n"
+	     : "(id: " 
+	     + AppContext.getDataManager().createReference(this).getId() + ")\n"
 	     + leftChild.get(PrefixHashMap.class).treeDiag(1) + "\n"
 	     + rightChild.get(PrefixHashMap.class).treeDiag(1));	    
     }
 
     private String treeDiag(int depth) {
 	String s; int i = 0;
-	for (s = "\t"; ++i < depth; s += "\t")
+	for (s = "  "; ++i < depth; s += "  ")
 	    ;
 	s += (leftChild == null)
-	    ? "LEAF " + AppContext.getDataManager().createReference(this) 
+	    ? "LEAF (id: " 
+	    + AppContext.getDataManager().createReference(this).getId() + ")" 
 	    + " contents: "+ treeString()
-	    : "INTR " + AppContext.getDataManager().createReference(this) + "\n"
-	    + leftChild.get(PrefixHashMap.class).treeDiag(depth+1)  + "\n"
+	    : "INTR (id: "
+	    + AppContext.getDataManager().createReference(this).getId() + ")\n"
+	    + leftChild.get(PrefixHashMap.class).treeDiag(depth+1)
 	    + rightChild.get(PrefixHashMap.class).treeDiag(depth+1);
 	return s + "\n";
     }
@@ -903,16 +940,18 @@ public class PrefixHashMap<K,V>
      * whether the {@link PrefixHashMap} is responsible for the
      * persistent lifetime of the value.
      *
+     * <p>
+     *
      * If an object that does not implement {@link ManagedObject} is
      * stored in the map, then it is wrapped using the {@link
-     * ManagedWrapper} utility class so that the entry may have a
+     * ManagedSerializable} utility class so that the entry may have a
      * {@code ManagedReference} to the value, rather than a Java
      * reference.  This causes accesses to the entries to only
      * deserialize the keys.
      *
-     * @see ManagedWrapper
+     * @see ManagedSerializable
      */	
-    static class PrefixEntry<K,V> implements Map.Entry<K,V>, Serializable {
+    private static class PrefixEntry<K,V> implements Map.Entry<K,V>, Serializable {
 
 	private static final long serialVersionUID = 1;
 	    
@@ -940,24 +979,14 @@ public class PrefixHashMap<K,V>
 	final int hash;
 
 	/**
-	 * The current prefix for where this entry is stored.
-	 */
-	int prefix;
-
-	/**
-	 * The depth of this entry in the tree
-	 */
-	int depth;
-
-	/**
 	 * Whether the key stored in this entry is actually stored
-	 * as a {@link ManagedWrapper}
+	 * as a {@link ManagedSerializable}
 	 */
 	boolean isKeyWrapped;
 
 	/**
 	 * Whether the value stored in this entry is actually stored
-	 * as a {@link ManagedWrapper}
+	 * as a {@link ManagedSerializable}
 	 */
 	boolean isValueWrapped;
 
@@ -968,52 +997,35 @@ public class PrefixHashMap<K,V>
 	 * @param k the key
 	 * @param v the value
 	 * @param next the next {@link PrefixEntry} in this bucked
-	 * @param prefix the prefix value for when the entry was
-	 *        originally created
 	 */
-	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next, int prefix, int depth) {
+	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next) { 
 
-	    if (k instanceof ManagedObject) {
-		// if k is already a ManagedObject, then put it in the
-		// datastore
-		keyRef = AppContext.getDataManager().
-		    createReference((ManagedObject)k);
-		isKeyWrapped = false;
-	    }
-	    else {
-		// otherwise, we need to wrap it in a ManagedObject
-		keyRef = AppContext.getDataManager().
-		    createReference(new ManagedWrapper<K>(k));
-		isKeyWrapped = true;
-	    }
+	    DataManager dm = AppContext.getDataManager();
 
-	    if (v instanceof ManagedObject) {
-		// if v is already a ManagedObject, then put it in the
-		// datastore
-		valueRef = AppContext.getDataManager().
-		    createReference((ManagedObject)v);
-		isValueWrapped = false;
-	    }
-	    else {
-		// otherwise, we need to wrap it in a ManagedObject
-		valueRef = AppContext.getDataManager().
-		    createReference(new ManagedWrapper<V>(v));
-		isValueWrapped = true;
-	    }
+	    // For the key and value, if each is already a
+	    // ManagedObject, then we obtain a ManagedReference to the
+	    // object itself, otherwise, we need to wrap it in a
+	    // ManagedSerializable and get a ManagedReference to that
+	    keyRef = (isKeyWrapped = !(k instanceof ManagedObject))
+		? dm.createReference(new ManagedSerializable<K>(k))
+		: dm.createReference((ManagedObject)k);
+
+
+	    valueRef = (isValueWrapped = !(v instanceof ManagedObject))
+		? dm.createReference(new ManagedSerializable<V>(v))
+		: dm.createReference((ManagedObject)v);
 
 	    this.next = next;
 	    this.hash = h;
-	    this.prefix = prefix;
 	}
 
-	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next, int depth) {
+	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next) { 
 	    this.hash = clone.hash;
 	    this.keyRef = clone.keyRef;
-	    this.next = next;
-	    this.prefix = clone.prefix;
 	    this.valueRef = clone.valueRef;
 	    this.isValueWrapped = clone.isValueWrapped;
 	    this.isKeyWrapped = clone.isKeyWrapped;
+	    this.next = next;
 	}
   
 	/**
@@ -1021,7 +1033,8 @@ public class PrefixHashMap<K,V>
 	 */
 	public final K getKey() {
 	    return (isKeyWrapped)
-		? ((ManagedWrapper<K>)(keyRef.get(ManagedWrapper.class))).object
+		? ((ManagedSerializable<K>)
+		   (keyRef.get(ManagedSerializable.class))).get()
 		: (K)(keyRef.get(Object.class));
 	}
 	    
@@ -1038,18 +1051,10 @@ public class PrefixHashMap<K,V>
 	//       the map is responsible for managing
 	public final V getValue() {
 	    return (isValueWrapped) 
-		? ((ManagedWrapper<V>)(valueRef.get(ManagedWrapper.class))).object
+		? ((ManagedSerializable<V>)
+		   (valueRef.get(ManagedSerializable.class))).get()
 		: (V)(valueRef.get(Object.class));
 	}
-
-	/**
-	 * Returns the leading bit for the prefix of this entry.
-	 *
-	 * @return the leading bit of the prefix
-	 */
- 	public byte leadingBit() {
- 	    return (byte)(((prefix << depth) & 0x80000000) >>> 31);
- 	}
 
 	/**
 	 * Replaces the previous value of this entry with the provided
@@ -1062,16 +1067,14 @@ public class PrefixHashMap<K,V>
 	 */
 	public final V setValue(V newValue) {
 	    V oldValue;
-	    if (isValueWrapped) {
-		// unpack the value from the wrapper prior to
-		// returning it
-		ManagedWrapper<V> wrapper = valueRef.get(ManagedWrapper.class);
-		oldValue = wrapper.object;
-		AppContext.getDataManager().removeObject(wrapper);
-	    }
-	    else {
-		oldValue = (V)(valueRef.get(Object.class));
-	    } 
+	    ManagedSerializable<V> wrapper = null;
+
+	    // unpack the value from the wrapper prior to
+	    // returning it
+	    oldValue = (isValueWrapped) 
+		? (wrapper = valueRef.get(ManagedSerializable.class)).get()
+		: (V)(valueRef.get(Object.class));
+	 
 
 	    if (newValue instanceof ManagedObject) {
 		// if v is already a ManagedObject, then do not put it
@@ -1079,18 +1082,30 @@ public class PrefixHashMap<K,V>
 		valueRef = AppContext.getDataManager().
 		    createReference((ManagedObject)newValue);
 		isValueWrapped = false;
+
+		// if the previous value was wrapper, remove the
+		// wrapper from the datastore
+		if (wrapper != null)
+		    AppContext.getDataManager().removeObject(wrapper);
 	    }
 	    else {
-		// otherwise, we need to wrap it in a ManagedObject
-		valueRef = AppContext.getDataManager().
-		    createReference(new ManagedWrapper<V>(newValue));
-		isValueWrapped = true;
+		// re-use the old wrapper if we have one to avoid
+		// making another create call
+		if (wrapper != null)
+		    wrapper.set(newValue);
+		// otherwise, we need to wrap it in a new
+		// ManagedSerializable
+		else {		    
+		    valueRef = AppContext.getDataManager().
+			createReference(new ManagedSerializable<V>(newValue));
+		    isValueWrapped = true; // already true in the if-case
+		}
 	    }
 	    return oldValue;
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public final boolean equals(Object o) {
 	    if (!(o instanceof Map.Entry))
@@ -1108,7 +1123,7 @@ public class PrefixHashMap<K,V>
 	}
 	
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public final int hashCode() {
 	    return (keyRef==null   ? 0 : keyRef.hashCode()) ^
@@ -1134,12 +1149,14 @@ public class PrefixHashMap<K,V>
 	final void unmanage() {
 	    if (isKeyWrapped) {
 		// unpack the key from the wrapper 
-		ManagedWrapper<V> wrapper = keyRef.get(ManagedWrapper.class);
+		ManagedSerializable<V> wrapper = 
+		    keyRef.get(ManagedSerializable.class);
 		AppContext.getDataManager().removeObject(wrapper);
 	    }
 	    if (isValueWrapped) {
 		// unpack the value from the wrapper 
-		ManagedWrapper<V> wrapper = valueRef.get(ManagedWrapper.class);
+		ManagedSerializable<V> wrapper = 
+		    valueRef.get(ManagedSerializable.class);
 		AppContext.getDataManager().removeObject(wrapper);
 	    }
 	}
@@ -1192,7 +1209,7 @@ public class PrefixHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public final boolean hasNext() {
 	    return next != null;
@@ -1269,7 +1286,7 @@ public class PrefixHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public Map.Entry<K,V> next() {
 	    return nextEntry();
@@ -1292,7 +1309,7 @@ public class PrefixHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public K next() {
 	    return nextEntry().getKey();
@@ -1316,7 +1333,7 @@ public class PrefixHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritdoc}
+	 * {@inheritDoc}
 	 */
 	public V next() {
 	    return nextEntry().getValue();
@@ -1477,36 +1494,6 @@ public class PrefixHashMap<K,V>
 	}
     }
 
-
-    /**
-     * A wrapper and marker class for holding {@code Serializable}
-     * objects for which this map is responsible.  When a value is put
-     * into the map that is not a {@link ManagedObject}, the value is
-     * stored in the data store by means of this class.  Upon its
-     * removal, this object is removed from the data store.
-     *
-     * @see PrefixEntry
-     */
-    private static class ManagedWrapper<T> 
-	implements ManagedObject, Serializable {
-	
-	private static final long serialVersionUID = 1;
-	
-	/**
-	 * The serializable object being wrapped by this instance
-	 */
-	public final T object;
-	
-	/**
-	 * Constructs a managed wrapper around this object
-	 *
-	 * @param object the object to be stored in the datastore
-	 */
-	public ManagedWrapper(T object) {
-	    this.object = object;
-	}
-    }
-
     /**
      * Saves the state of this {@code PrefixHashMap} instance to the
      * provided stream.
@@ -1530,9 +1517,16 @@ public class PrefixHashMap<K,V>
 	
 	// if this was a leaf node, write out all the elments in it
 	if (table != null) {
-	    for (int i = 0; i < table.length; ++i) {
-		if (table[i] != null)
+	    // iterate over all the table, stopping when all the
+	    // entries have been seen
+	    PrefixEntry e;
+	    for (int i = 0, j = 0; j < size; ++i) {
+		if ((e = table[i]) != null) {
+		    j++;
 		    s.writeObject(table[i]);
+		    for (; (e = e.next) != null; ++j)
+			;
+		}
 	    }
 	}
     }
@@ -1555,10 +1549,11 @@ public class PrefixHashMap<K,V>
 		
 	// read in entries and assign them back their positions in the
 	// table, noting that some positions may have chained entries
-	for (int i = 0; i < size; ) {
+	for (int i = 0; i < size; i++) {
 	    PrefixEntry<K,V> e = (PrefixEntry<K,V>) s.readObject();
 	    table[indexFor(e.hash, leafCapacity)] = e;
-	    for (int j = ++i; (e = e.next) != null; ++i);
+	    for (; (e = e.next) != null; ++i)
+		; // count chained entries
 	}
     }
 }
