@@ -25,11 +25,11 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
@@ -167,12 +167,8 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final Thread renewThread = new RenewThread();
 
     /** The set of node listeners for all nodes. */
-    private final Set<NodeListener> nodeListeners =
-	Collections.synchronizedSet(new HashSet<NodeListener>());
-
-    /** The map of node listeners registered for particular node IDs. */
-    private final Map<Long, Set<NodeListener>>  nodeListenerMap =
-	new HashMap<Long, Set<NodeListener>>();
+    private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
+	new ConcurrentHashMap<NodeListener, NodeListener>();
 
     /** The data service. */
     private DataService dataService;
@@ -384,23 +380,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	if (listener == null) {
 	    throw new NullPointerException("null listener");
 	}
-	nodeListeners.add(listener);
-    }
-
-    /** {@inheritDoc} */
-    public void addNodeListener(long nodeId, NodeListener listener) {
-	checkState();
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
-	synchronized (nodeListenerMap) {
-	    Set<NodeListener> listeners = nodeListenerMap.get(nodeId);
-	    if (listeners == null) {
-		listeners = new HashSet<NodeListener>();
-		nodeListenerMap.put(nodeId, listeners);
-	    }
-	    listeners.add(listener);
-	}
+	nodeListeners.putIfAbsent(listener, listener);
     }
 
     /* -- Implement transaction participant/context for 'configure' -- */
@@ -666,20 +646,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      */
     private void notifyListeners(final Node node) {
 
-	Set<NodeListener> listenersToNotify;
-	synchronized (nodeListenerMap) {
-	    Set<NodeListener> listenersForNode =
-		nodeListenerMap.get(node.getId());
-	    if (listenersForNode == null) {
-		listenersToNotify =  nodeListeners;
-	    } else {
-		listenersToNotify =
-		    new HashSet<NodeListener>(listenersForNode);
-		listenersToNotify.addAll(nodeListeners);
-	    }
-	}
-
-	for (NodeListener listener : listenersToNotify) {
+	for (NodeListener listener : nodeListeners.keySet()) {
 	    final NodeListener nodeListener = listener;
 	    nonDurableTaskScheduler.scheduleNonTransactionalTask(
 		new AbstractKernelRunnable() {

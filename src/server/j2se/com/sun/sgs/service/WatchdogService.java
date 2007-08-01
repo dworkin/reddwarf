@@ -74,14 +74,4 @@ public interface WatchdogService extends Service {
      * @param	listener a node listener
      */
     void addNodeListener(NodeListener listener);
-
-    /**
-     * Registers a {@code listener} to be notified when the node with
-     * the specified {@code nodeId} starts or fails.  Registered
-     * listeners are notified outside of a transaction.
-     *
-     * @param	nodeId a node ID
-     * @param	listener a node listener
-     */
-    void addNodeListener(long nodeId, NodeListener listener);
 }
