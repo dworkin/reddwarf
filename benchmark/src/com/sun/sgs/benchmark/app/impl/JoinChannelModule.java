@@ -77,7 +77,15 @@ public class JoinChannelModule extends AbstractModuleImpl implements Serializabl
 		    } catch (NameNotBoundException nnbe) {
                         System.err.println("**Error: Client tried to join a " +
                             "non-existent channel: " + channelName);
-		    }
+                    } catch (TransactionConflictException tce) {
+                        /**
+                         * Do nothing; we catch this simply because its not
+                         * truly an error case (we expect this to happen
+                         * normally during periods of high contention) and thus
+                         * we don't want it propagating up and printing to
+                         * stdout. 
+                         */
+                    }
 		}
 	    });
 	return operations;

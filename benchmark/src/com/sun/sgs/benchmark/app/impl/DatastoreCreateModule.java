@@ -139,6 +139,14 @@ public class DatastoreCreateModule extends AbstractModuleImpl implements Seriali
                     } catch (NotSerializableException nse) {
                         System.err.println("**Error: Cannot add object " +
                             " name to datastore; not serializable.");
+		    } catch (TransactionConflictException tce) {
+                        /**
+                         * Do nothing; we catch this simply because its not
+                         * truly an error case (we expect this to happen
+                         * normally during periods of high contention) and thus
+                         * we don't want it propagating up and printing to
+                         * stdout. 
+                         */
                     }
                 }
 	    });
