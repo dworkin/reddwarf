@@ -1086,6 +1086,7 @@
 	  description="Runs the benchmark client">
     <java classname="com.sun.sgs.benchmark.client.BenchmarkClient"
 	  fork="true">
+      <arg line="${cmdargs}" />
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="com.sun.sgs.config.file"
                    file="${test.logging}"/>
@@ -1095,7 +1096,7 @@
         <path refid="server.classpath"/>
       </classpath>
       <sysproperty key="BenchmarkClient.host"
-                   value="slytherin.east.sun.com" />
+                   value="dstar2" />
       <sysproperty key="BenchmarkClient.port"
                    value="6168" />
     </java>
@@ -1105,8 +1106,9 @@
   <target name="benchmark-client-stresstest" depends="benchmark-classes"
 	  description="Runs the benchmark client">
     <!-- insert classname to run below -->
-    <java classname="com.sun.sgs.benchmark.scripts.DirectSend"
+    <java classname="com.sun.sgs.benchmark.scripts.ChannelMessageSend"
 	  fork="true">
+      <arg line="${cmdargs}" />
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg line="-server"/>
       <jvmarg line="-XX:+UseParallelGC"/>
@@ -1120,7 +1122,7 @@
         <path refid="server.classpath"/>
       </classpath>
       <sysproperty key="BenchmarkClient.host"
-                   value="slytherin.east.sun.com" />
+                   value="dstar2" />
       <sysproperty key="BenchmarkClient.port"
                    value="6168" />
     </java>
