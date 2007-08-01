@@ -1,12 +1,14 @@
 package com.sun.sgs.benchmark.scripts;
 
-import com.sun.sgs.benchmark.client.*;
-
+import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+
+import com.sun.sgs.benchmark.client.*;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 
 public class ChannelMessageSend {
     public static enum SendType {
@@ -32,7 +34,6 @@ public class ChannelMessageSend {
     private final int clients;
     private final long interval;
     private final int bytes;
-    private final String message;
     
     public ChannelMessageSend(int clients, long interval, int bytes) {
 	this.clients = clients;
@@ -42,10 +43,6 @@ public class ChannelMessageSend {
         System.out.printf("Starting up with clients=%d,  interval=%d ms" +
             ", strlen=%d, sendType=%s\n", clients, interval, bytes,
             sendType.toString());
-        
-        StringBuffer sb = new StringBuffer();
-        for (int i=0; i < bytes; i++) sb.append("A");
-        message = sb.toString();
     }
 
     public ChannelMessageSend() {
@@ -56,15 +53,15 @@ public class ChannelMessageSend {
 	try {
 	    BenchmarkClient client = new BenchmarkClient();
             client.processInput("config " + HOSTNAME);
-            client.processInput("login user password");
+            client.processInput("login ch_creator password");
             client.processInput("wait_for login");
 	    client.processInput("create_channel " + CHANNEL_NAME);
             
 	    List<Thread> threads = new LinkedList<Thread>();
             
-            /** Create all of the threads. */
+            /** Create all of the client threads. */
 	    for (int i = 0; i < clients; ++i) {
-		threads.add(new SenderClientThread(i));
+		threads.add(new SenderClientThread(i, bytes));
 	    }
             
             /** Pause 1 second just to calm down... */
@@ -84,25 +81,10 @@ public class ChannelMessageSend {
 	}		    
     }
     
-    /**
-     * Returns a string constructed with the contents of the byte
-     * array converted to hex format.
-     *
-     * @param bytes a byte array to convert
-     * @return the converted byte array as a hex-formatted string
-     */
-    private static String toHexString(byte[] bytes) {
-        StringBuffer buf = new StringBuffer(2 * bytes.length);
-        for (byte b : bytes) {
-            buf.append(String.format("%02X", b));
-        }
-        return buf.toString();
-    }
-
     private static void usage() {
-	System.out.println("Usage: java ChannelMessageSend "
-			   + "<#clients> <interval (ms)> "
-			   + "<message size (bytes)>");
+	System.out.println("Usage: java ChannelMessageSend " +
+            "<#clients> <interval (ms)> <message size (bytes)>");
+        
 	System.exit(1);
     }
 
@@ -110,6 +92,7 @@ public class ChannelMessageSend {
 	if (args.length > 0) {
 	    if (args.length != 3)
 		usage();
+            
 	    int clients = 0, interval = 0, bytes = 0;
 	    try {
 		clients = Integer.parseInt(args[0]);
@@ -133,13 +116,31 @@ public class ChannelMessageSend {
          * Local ID for this client.
          */
         private final int id;
-        
+
+        /**
+         * The length of each message that is sent.
+         */
+        private final int msgLen;
+
+        /**
+         * Local sequence number for this client (only used if {@code msgLen} is
+         * at least 8 - otherwise there is not room for it).
+         */
+        private long seqNum = 0;
+
+        /**
+         * Formatter for sequence numbers; enforces fixed-width of 20.
+         */
+        private DecimalFormat formatter =
+            new DecimalFormat("00000000000000000000");
+
         /**
          * Creates a new {@code SenderClientThread}.
          */
-        public SenderClientThread(int id) {
+        public SenderClientThread(int id, int msgLen) {
             super("SenderClientThread-" + id);
             this.id = id;
+            this.msgLen = msgLen;
         }
         
         @Override
@@ -155,17 +156,18 @@ public class ChannelMessageSend {
                 client.processInput("wait_for join_channel");
                 Thread.sleep(1000);
                 
+                /** The full command, minus the message string itself. */
                 String sendCmd = null;
-                String hexSessionId =
-                    toHexString(client.getSessionId().toBytes());
                 
+                String hexSessionId =
+                    HexDumper.toHexString(client.getSessionId().toBytes());
+
                 switch (sendType) {
                 case BCAST:
                     System.out.printf("Client #%d [%s] will broadcast to" +
                         " channel.\n", id, hexSessionId);
                     
-                    sendCmd = String.format("chsend %s %s", CHANNEL_NAME,
-                        message);
+                    sendCmd = String.format("chsend %s ", CHANNEL_NAME);
                     break;
 
                 case SINGLE:
@@ -183,8 +185,8 @@ public class ChannelMessageSend {
                     System.out.printf("Client #%d [%s] will send to recipient" +
                         " [%s].\n", id, hexSessionId, hexRecipSessionId);
                     
-                    sendCmd = String.format("pm %s %s %s", CHANNEL_NAME,
-                        hexRecipSessionId, message);
+                    sendCmd = String.format("pm %s %s ", CHANNEL_NAME,
+                        hexRecipSessionId);
                     break;
 
                 case NONE:
@@ -197,7 +199,18 @@ public class ChannelMessageSend {
                 
                 while (true) {
                     sleep(interval);
-                    if (sendCmd != null) client.processInput(sendCmd);
+                    
+                    if (sendCmd != null) {
+                        StringBuffer msgBuf = new StringBuffer();
+                        
+                        if (msgLen >= 20)
+                            msgBuf.append(formatter.format(seqNum++));
+                        
+                        while (msgBuf.length() < msgLen)
+                            msgBuf.append('A');
+                        
+                        client.processInput(sendCmd + msgBuf.toString());
+                    }
                 }
             }
             catch (Throwable t) {
