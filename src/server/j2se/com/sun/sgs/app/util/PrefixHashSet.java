@@ -16,6 +16,8 @@ import com.sun.sgs.app.ManagedReference;
  * {@link PrefixHashMap}.  This class is intended as a drop-in
  * replacement for {@code java.util.HashSet}.
  *
+ * <p>
+ *
  * This class offers constant time operations for {@code add}, {@code
  * remove}, {@code contains}, and {@code isEmpty}.  Unlike {@code
  * HashSet}, the {@code size} and {@code clear} operations are not
@@ -23,12 +25,16 @@ import com.sun.sgs.app.ManagedReference;
  * implementation.  Like {@code HashSet}, this class permits the
  * {@code null} element.
  *
+ * <p>
+ *
  * This implementation supports the contract that all elements must be
  * {@link Serializable}.  If a developer provides a {@code
  * Serializable} element that is <i>not</i> a {@code ManagedObject},
  * this implementation will take responsibility for the lifetime of
  * that object in the datastore.  The developer will be responsible
  * for the lifetime of all {@link ManagedObject} stored in this set.
+ *
+ * <p>
  *
  * An instance of {@code PrefixHashSet} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
@@ -47,7 +53,7 @@ import com.sun.sgs.app.ManagedReference;
  *
  * @see Object#hashCode()
  * @see Set
- * @see HashSet
+ * @see java.util.HashSet
  * @see PrefixHashMap
  * @see Serializable
  * @see ManagedObject
