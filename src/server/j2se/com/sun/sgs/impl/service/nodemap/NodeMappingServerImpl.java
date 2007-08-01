@@ -5,7 +5,6 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -18,12 +17,12 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.rmi.RemoteException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,59 +44,96 @@ import java.util.logging.Logger;
  * class, the {@link #NodeMappingServerImpl constructor} supports the following
  * properties: <p>
  *
- * <ul>
- * <li> <i>Key:</i> {@code
- *      com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl.port} <br>
- *      <i>Default:</i> {@code 44533} <br>
- *      Specifies the network port for the server.  This value must be greater
- *      than or equal to {@code 0} and no greater than {@code 65535}.  If the
- *      value specified is {@code 0}, then an anonymous port will be chosen.
- *      The value chosen will be logged, and can also be accessed with the
- *      {@link #getPort getPort} method. <p>
+ * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl.policy.class
+ *	com.sun.sgs.impl.service.nodemap.policy.class
  *	</b></code> <br>
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.nodemap.RoundRobinPolicy</code>
  *
- ** <dd style="padding-top: .5em">The name of the class that implements {@link
- *	NotifyClient}, used for the node assignment policy. The class should be
- *      public, not abstract, and should provide a public constructor with a 
- *      {@link Properties} parameter. <p>
- * </ul> <p>
+ * <dd style="padding-top: .5em">
+ *      The name of the class that implements {@link
+ *	NodeAssignPolicy}, used for the node assignment policy. The class 
+ *      should be public, not abstract, and should provide a public constructor
+ *      with a {@link Properties} parameter. <p>
  *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.remove.expire.time
+ *	</b></code> <br>
+ *      <i>Default:</i> {@code 5000} 
+ *
+ * <dd style="padding-top: .5em">
+ *      The mimimum time, in milliseconds, that this server will wait before
+ *      removing a potentially inactive identity from the map.   This value
+ *      must be greater than {@code 0}.   Shorter expiration times cause the
+ *      map to be cleaned up more frequently, potentially causing more
+ *      {@link NodeMappingService#assignNode(Class, Identity) assignNode} 
+ *      calls;  longer expiration times will increase the chance that an 
+ *      identity will become active again before it can be removed. <p>
+ *
+ *  <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.remove.sleep.time
+ *	</b></code> <br>
+ *      <i>Default:</i> {@code 5000} <br>
+ *
+ * <dd style="padding-top: .5em">
+ *      The time, in milliseconds, that the thread which attempts to remove
+ *      identities sleeps once it has run out of work.  This value must be
+ *      greater than {@code 0}.  <p>
+ *
+ * </dl> <p>
+ *
+ * This class is public for testing.
  */
-public class NodeMappingServerImpl implements NodeMappingServer, Service {
+public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The name of this class. */
     private static final String CLASSNAME = 
             NodeMappingServerImpl.class.getName();
     
-    /** Package name for this class */
+    /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
-    /** The property name for the server hose. */
-    static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
-    
     /** The property name for the server port. */
-    public static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
+    static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
 
     /** The default value of the server port. */
     static final int DEFAULT_SERVER_PORT = 44533;
     
+    /** The name we export ourselves under. */
     static final String SERVER_EXPORT_NAME = "NodeMappingServer";
-    
-    /** The logger for this class. */
-    private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
     /**
      * The property that specifies the name of the class that implements
      * DataStore.
      */
     private static final String ASSIGN_POLICY_CLASS_PROPERTY =
-	CLASSNAME + ".policy.class";
+            PKG_NAME + ".policy.class";
+    
+    /** The property name for the amount of time to wait before removing an
+     * identity from the node map.
+     */
+    private static final String REMOVE_EXPIRE_PROPERTY = 
+            PKG_NAME + ".remove.expire.time";
+    
+    /** Default time to wait before removing an identity, in milliseconds. */
+    private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
+    
+    /** The property name for controlling the amount of time the remove
+     * thread sleeps before waking up to check for identities that can be
+     * removed.
+     */
+    private static final String REMOVE_SLEEP_PROPERTY = 
+            PKG_NAME + ".remove.sleep.time";
+    
+    /** The default remove thread sleep time. */
+    private static final int DEFAULT_REMOVE_SLEEP_TIME = 5000;
+    
+    
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+            new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
     /** The port we've been exported on. */
     private final int port;
@@ -124,21 +160,28 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      *  the load balancing policy, as well. */
     private final NodeAssignPolicy assignPolicy;
 
+    /** The thread that removes inactive identities */
+    private Thread removeThread;
     
-    /** The set of identities that are waiting to be removed,
-     *  mapped to the thread that will do the removal. 
+    /** The remove thread sleep time. */
+    private final long removeSleepTime;
+    
+    /** The remove expiration time. */
+    private final long removeExpireTime;
+    
+    /** Identities waiting to be removed, with the time they were
+     *  entered in the map.
      *
-     *  For fail-over, these need to be persisted.
+     *  TODO For failover, will need to persist these identities.
      */
-    private final Map<Identity, RemoveThread> removeMap =
-        Collections.synchronizedMap(new HashMap<Identity, RemoveThread>());
-    
-    
+    private final Map<Identity, Long> removeMap =
+            Collections.synchronizedMap(new HashMap<Identity, Long> ());
+
     /** 
      * The set of clients of this server who wish to be notified if
      * there's a change in the map.
      *
-     * For fail-over, these need to be persisted.
+     * TODO For failover, these need to be persisted.
      */
     private final Map<Long, NotifyClient> notifyMap =
                                     new HashMap<Long, NotifyClient>();   
@@ -180,22 +223,44 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                 new Class[] { Properties.class }, properties);
         }
         
+        removeSleepTime = wrappedProps.getLongProperty(
+                REMOVE_SLEEP_PROPERTY, DEFAULT_REMOVE_SLEEP_TIME);
+        if (removeSleepTime < 0) {
+            throw new IllegalArgumentException(
+                    "The " + REMOVE_SLEEP_PROPERTY + 
+                    " property value must be greater than 0: " + 
+                    removeSleepTime);
+        }
+        
+        removeExpireTime = wrappedProps.getLongProperty(
+                REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME);
+        if (removeSleepTime < 0) {
+            throw new IllegalArgumentException(
+                    "The " + REMOVE_EXPIRE_PROPERTY + 
+                    " property value must be greater than 0: " + 
+                    removeExpireTime);
+        }
+        
+        
         exporter = new Exporter<NodeMappingServer>();
         port = exporter.export(this, requestedPort, SERVER_EXPORT_NAME);
         if (requestedPort == 0) {
             logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
-        }
-        
+        }     
     }
     
-    /* -- Implement Service -- */
-    /*  OK, this object is really an implementation detail of the service.
-     *  But it's convenient to be able to inherit the javadoc comments, as
-     *  we need to abide by the same rules at configuration and shutdown time.
-     */
+    /*- service like methods, which support lifecycle activities -*/
     
-    /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+    /**
+     * Configure this server.  Called from the instantiating service,
+     * and follows the rules of
+     * {@link Service#configure(ComponentRegistry, TransactionProxy)}
+     *
+     * @param registry the {@code ComponentRegistry} of already configured
+     *                 services
+     * @param proxy the proxy used to resolve details of the current transaction
+     */
+    void configure(ComponentRegistry registry, TransactionProxy proxy) {
         logger.log(Level.CONFIG, "Configuring NodeMappingServerImpl");
 
         if (registry == null) {
@@ -224,9 +289,16 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 
         }
         
+        // Restore any old data from the data service.
+        NodeMapUtil.handleDataVersion(dataService, logger);
+        
         // Register our node listener with the watchdog service.
 //        watchdogService.addNodeListener(new Listener());
           
+        // Create our remove thread; this is started when the instantiating
+        // service's configure transaction is committed.
+        removeThread = new RemoveThread(removeSleepTime, removeExpireTime);
+
     }
     
     /**
@@ -235,28 +307,35 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      * the transaction, and is called from the service during its transaction
      * abort handling.
      */ 
-    void unconfigure() {
+    void abortConfigure() {
         dataService = null;
         assignPolicy.reset();
+        // If we did some work to handle version number changes, they
+        // won't be rolled back here.  Is that a problem?
     }
     
-    /** {@inheritDoc} */
-    public boolean shutdown() {
+    /**
+     * Performs any actions needed when the instantiating service's
+     * configure method commits.
+     */
+    void commitConfigure() {
+        removeThread.start();
+    }
+    
+    /** 
+     * Shut down this server.  Called from the instantiating service.
+     * 
+     * @return {@code true} if everything shut down cleanly
+     */
+    boolean shutdown() {
         boolean ok = exporter.unexport();
-        
-        Collection<RemoveThread> threads = removeMap.values();
-        for (RemoveThread t : threads) {
-            System.out.println("interrupt pending remove thread");
-            t.interrupt();
+        if (removeThread != null) {
+            removeThread.interrupt();
         }
         return ok;
     }
     
-    /** {@inheritDoc} */
-    public String getName() {
-        return toString();
-    }
-    
+
     
     
     /* -- Implement NodeMappingServer -- */
@@ -314,58 +393,79 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
-        // Some node believes that an identity is no longer being used.
-        // Wait for a bit to see if that's true, then remove it.
-        // remove wait should be a property
-        final long REMOVEWAIT = 1000;
-        if (removeMap.containsKey(id)) {
-            return;
-        } 
-        
-        RemoveThread thread = new RemoveThread(id, REMOVEWAIT);
-        removeMap.put(id, thread);
-        thread.start();
+        removeMap.put(id, System.currentTimeMillis());
     }
     
+    /**
+     * The thread that handles removing inactive identities from the map.
+     * <p>
+     * Candidates for removal are held in the removeMap.  This thread
+     * periodically wakes up and looks at each entry in the removeMap.
+     * If an appropriate amount of time has passed since the entry was
+     * put in the removeMap (which allows the system some settling time, 
+     * so we don't thrash removing and adding an identity), the data store
+     * is checked to see if the identity can still be removed.  A service
+     * could have called {@link #NodeMappingService.setStatus setStatus}
+     * during our waiting time, marking the identity as active, during the
+     * waiting time.  If it is still appropriate to remove the identity,
+     * all traces of it are removed from the data store.
+     */
     private class RemoveThread extends Thread {
-        private final Identity id;
-        private final long waitTime;
-        
-        RemoveThread(Identity identity, long wait) {
-            id = identity;
-            waitTime = wait;
+        private final long expireTime;   // milliseconds
+        private final long sleepTime; // milliseconds
+        private boolean done = false;
+        RemoveThread(long expireTime, long sleepTime) { 
+            this.expireTime = expireTime;
+            this.sleepTime = sleepTime;
         }
         public void run() {
-            System.out.println("in remove thread run .." + System.currentTimeMillis());
-            try {
-                sleep(waitTime);
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
-                removeMap.remove(id);
-                return;
-            }
-            System.out.println("back from sleep .." + System.currentTimeMillis());
-
-            RemoveTask rtask = new RemoveTask(id);
-            try {
-                runTransactionally(rtask);
-                if (rtask.isDead()) {
-                    notifyListeners(new NodeImpl(rtask.nodeId()), null, id);
+            while (!done) {
+                try {
+                    sleep(sleepTime);
+                } catch (InterruptedException ex) {
+                    done = true;
+                    logger.log(Level.FINE, "Remove thread interrupted");
+                    break;
                 }
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex, "Removing {0} failed", id);
-            } finally {
-                removeMap.remove(id);
+                Long time = System.currentTimeMillis() - expireTime;
+                // Take a snapshot of the removeMap
+                Set<Map.Entry<Identity, Long>> removeSet = removeMap.entrySet();
+                for (Map.Entry<Identity, Long> entry : removeSet) {
+                    // Check for expiration.  
+                    if (entry.getValue() < time) {
+                        Identity id = entry.getKey();
+                        RemoveTask rtask = new RemoveTask(id);
+                        try {
+                            runTransactionally(rtask);
+                            if (rtask.isDead()) {
+                                notifyListeners(new NodeImpl(rtask.nodeId()), 
+                                                null, id);
+                                logger.log(Level.FINE, "Removed {0}", id);
+                            }
+                            removeMap.remove(id);
+
+                        } catch (Exception ex) {
+                            logger.logThrow(Level.WARNING, ex, 
+                                            "Removing {0} failed", id);
+                        }
+                    }
+                }
             }
         }
     }
     
+    /** 
+     * Task which, under a transaction, checks that it's still appropriate
+     * to remove an identity, and, if so, removes the service bindings and
+     * object.
+     */
     private class RemoveTask implements KernelRunnable {
         private final Identity id;
         private final String idkey;
         private final String statuskey;
+        // return value, identity was found to be dead and was removed
         private boolean dead = true;
-        // set if dead == true
+        // set if dead == true;  tells us the node the identity was removed from
         private long nodeId;
         
         RemoveTask(Identity id) {
@@ -380,7 +480,8 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
             dead = (name == null || !name.startsWith(statuskey));
 
             if (dead) {
-                IdentityMO idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                IdentityMO idmo = 
+                        dataService.getServiceBinding(idkey, IdentityMO.class);
                 nodeId = idmo.getNodeId();
                 // Remove the node->id binding.  
                 String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
@@ -390,15 +491,17 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                 dataService.removeServiceBinding(idkey);
                 dataService.removeObject(idmo);
             }
-
         }
+        
         public String getBaseTaskType() {
             return this.getClass().getName();
         }
         
+        /** Returns {@code true} if the identity was removed. */
         boolean isDead() {
             return dead;
         }
+        /** Returns the node id for the node the identity was removed from. */
         long nodeId() {
             return nodeId;
         } 
@@ -427,8 +530,12 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
         }
     }    
     
-    // Perhaps need to have a separate thread do this work.
+    // TODO Perhaps need to have a separate thread do this work.
+    // TODO Perhaps will want to batch notifications.
     private void notifyListeners(Node oldNode, Node newNode, Identity id) {
+        logger.log(Level.FINE, "In notifyListeners, identity: {0}, " +
+                               "oldNode: {1}, newNode: {2}", 
+                               id, oldNode, newNode);
         System.out.println("In notifyListeners, id is " + id + " oldNode: " + oldNode + " newNode: " + newNode);
         NotifyClient oldClient = null;
         NotifyClient newClient = null;
@@ -476,7 +583,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      *
      * @return  the port
      */
-    public int getPort() {
+    int getPort() {
         return port;
     }
     
@@ -575,7 +682,18 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
                     // Reference count
                     if (newStatuskey != null) {
                         dataService.setServiceBinding(newStatuskey, newidmo);
+                    } else {
+                        // This server has started the move, either through
+                        // a node failure or load balancing.  Add the identity
+                        // to the remove list so we will notice if the client
+                        // never logs back in.
+                        try {
+                            canRemove(newidmo.getIdentity());
+                        } catch (IOException ex) {
+                            // won't happen;  this is a local call
+                        }
                     }
+                    
                 }});
                 
             // Tell our listeners
@@ -602,14 +720,14 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
 //            
 //        }
 //        
-//        /** {@inheritDoc} */
+        /** {@inheritDoc} */
         public void nodeStarted(Node node){
             // Do nothing.  We find out about nodes being available when
             // services register with us.
 //            assignPolicy.nodeStarted(node.getId());      
         }
         
-//        /** {@inheritDoc} */
+        /** {@inheritDoc} */
         public void nodeFailed(Node node){
             long nodeId = node.getId();          
             try {
@@ -713,7 +831,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      *
      * @param nodeId the node id of the fake node
      */
-    public void addDummyNode(long nodeId)  {
+    void addDummyNode(long nodeId)  {
         assignPolicy.nodeStarted(nodeId);
     }
     
@@ -726,7 +844,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      *
      * @throws Exception if any error occurs
      */
-    public long getNodeForIdentity(Identity id) throws Exception {
+    long getNodeForIdentity(Identity id) throws Exception {
         String idkey = NodeMapUtil.getIdentityKey(id);
         NodeMapUtil.GetIdTask idtask = 
                 new NodeMapUtil.GetIdTask(dataService, idkey);
@@ -746,7 +864,7 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
      *
      * @throws Exception if any error occurs
      */
-    public Set<String> reportFoundKeys(Identity identity) throws Exception {
+    Set<String> reportFoundKeys(Identity identity) throws Exception {
         AssertTask atask = new AssertTask(identity, dataService);
         try {
             runTransactionally(atask);
@@ -858,7 +976,5 @@ public class NodeMappingServerImpl implements NodeMappingServer, Service {
             return foundKeys;
         }
     }
-    
-    
 }
     

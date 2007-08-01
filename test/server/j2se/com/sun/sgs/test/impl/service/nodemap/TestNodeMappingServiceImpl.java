@@ -51,14 +51,14 @@ public class TestNodeMappingServiceImpl extends TestCase {
         "TestNodeMappingServiceImpl.db";
 
     /** The port for the server. */
-    private static int SERVER_PORT = 0;
+    private static final int SERVER_PORT = 0;
+
+    /** Amount of time to wait before something might be removed. */
+    private static final int REMOVE_TIME = 250;
 
     /** Properties for the nodemap server and data service. */
-    private static Properties serviceProps = createProperties(
-        StandardProperties.APP_NAME, "TestNodeMappingServiceImpl",
-        DataStoreImplClassName + ".directory", DB_DIRECTORY,
-        NodeMappingServiceImpl.START_SERVER_PROPERTY, "true",
-        NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(SERVER_PORT));
+    private static Properties serviceProps;
+    
     
     /** Properties for creating the shared database. */
 //    private static Properties dbProps = createProperties(
@@ -66,10 +66,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
 //	DB_DIRECTORY,
 //	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
     
-    private static DummyTransactionProxy txnProxy =
+    private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
-            
-
+           
 
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
@@ -91,11 +90,14 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** Reflective stuff, for non-public members. */
     private Field serverImplField;
     private Field localNodeIdField;
+    private Method assertValidMethod;
+    private Method getPortMethod;
+    
+    private String serverPortPropertyName;
     
     /** Constructs a test instance. */
     public TestNodeMappingServiceImpl(String name) throws Exception {
         super(name);
-        
 
         serverImplField = 
             NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
@@ -104,6 +106,44 @@ public class TestNodeMappingServiceImpl extends TestCase {
         localNodeIdField = 
                 NodeMappingServiceImpl.class.getDeclaredField("localNodeId");
         localNodeIdField.setAccessible(true);
+        
+        assertValidMethod =
+                NodeMappingServiceImpl.class.getDeclaredMethod(
+                    "assertValid",
+                    new Class[] {Identity.class});
+        assertValidMethod.setAccessible(true);
+        
+        getPortMethod = 
+                NodeMappingServerImpl.class.getDeclaredMethod("getPort");
+        getPortMethod.setAccessible(true);
+        
+        Field serverPortPropertyField = 
+           NodeMappingServerImpl.class.getDeclaredField("SERVER_PORT_PROPERTY");
+        serverPortPropertyField.setAccessible(true);
+        serverPortPropertyName = (String) serverPortPropertyField.get(null);
+        
+        Field removeExpireField =
+         NodeMappingServerImpl.class.getDeclaredField("REMOVE_EXPIRE_PROPERTY");
+        removeExpireField.setAccessible(true);
+        String removeExpireName = (String) removeExpireField.get(null);
+        
+        Field removeSleepField =
+         NodeMappingServerImpl.class.getDeclaredField("REMOVE_SLEEP_PROPERTY");
+        removeSleepField.setAccessible(true);
+        String removeSleepName = (String) removeSleepField.get(null);
+        
+        Field startServiceField =
+         NodeMappingServiceImpl.class.getDeclaredField("START_SERVER_PROPERTY");
+        startServiceField.setAccessible(true);
+        String startServiceName = (String) startServiceField.get(null);
+        
+        serviceProps = createProperties(
+            StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
+            DataStoreImplClassName + ".directory", DB_DIRECTORY,
+            startServiceName, "true",
+            removeExpireName, Integer.toString(REMOVE_TIME),
+            removeSleepName, Integer.toString(REMOVE_TIME/2),
+            serverPortPropertyName, Integer.toString(SERVER_PORT));
     }
 
     /** Test setup. */
@@ -122,7 +162,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
         
 	// create services
-	dataService = createDataService(systemRegistry);	     
+	dataService = createDataService(systemRegistry);	
         nodeMappingService = 
                 new NodeMappingServiceImpl(serviceProps, systemRegistry);
 
@@ -149,16 +189,15 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // status by node.
         NodeMappingServerImpl server = 
                 (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
-        
+        int serverPort = (Integer) getPortMethod.invoke(server); 
         /** Properties for the nodemap server and data service. */
         Properties props = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServiceImpl",
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
-            NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
-                Integer.toString(server.getPort()));
+            serverPortPropertyName, Integer.toString(serverPort));
         nodemap = new HashMap<Long, NodeMappingService>();
         for (int i = 0; i < NUM_NODES; i++) {
-            createTransaction();
+            createTransaction(500);
             NodeMappingService service = 
                     new NodeMappingServiceImpl(props, systemRegistry);
             service.configure(serviceRegistry, txnProxy);
@@ -394,7 +433,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         createTransaction();
         Node node = nodeMappingService.getNode(id);
-        System.out.println("Node id is " + node.getId());
     }
     
     // Check to see if identities are changing in a transaction
@@ -410,6 +448,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         Node node1 = nodeMappingService.getNode(id);
         Node node2 = nodeMappingService.getNode(id);
         Node node3 = nodeMappingService.getNode(id);
+        commitTransaction();
         assertEquals(node1, node2);
         assertEquals(node1, node3);
         assertEquals(node2, node3);
@@ -479,14 +518,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
             createTransaction(1000);
            
             Iterator<Identity> idIter = 
-                    nodeMappingService.getIdentities(node.getId());
-             
-            System.out.println("Node id is " + node.getId());
-            int index = 0;
+                    nodeMappingService.getIdentities(node.getId());   
             while (idIter.hasNext()) {
-                Identity ident = idIter.next();
-                System.out.println(" Found id: " + ident);
-                
+                Identity ident = idIter.next();         
                 assertTrue(s.contains(ident));
             }
             commitTransaction();
@@ -539,9 +573,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         assertNotNull(service);
         service.setStatus(NodeMappingService.class, id, false);
-        
-        // This should be something * property for removewait
-        Thread.sleep(10000);
+
+        Thread.sleep(REMOVE_TIME * 2);
         // Identity should now be gone
         createTransaction();
         try {
@@ -576,8 +609,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // Likewise, it should be OK to make multiple "false" calls.
         service.setStatus(NodeMappingService.class, id, false);
         service.setStatus(NodeMappingService.class, id, false);
-        // This should be something * property for removewait
-        Thread.sleep(10000);
+
+        Thread.sleep(REMOVE_TIME * 2);
         // Identity should now be gone
         createTransaction();
         try {
@@ -604,7 +637,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         nodeMappingService.setStatus(NodeMappingService.class, id, true);
-        Thread.sleep(10*1000);
+        Thread.sleep(REMOVE_TIME * 2);
         // Error if we cannot find the identity!
         createTransaction();
         try {
@@ -612,6 +645,106 @@ public class TestNodeMappingServiceImpl extends TestCase {
         } catch (UnknownIdentityException e) {
             fail("Unexpected UnknownIdentityException");
         }
+    }
+    
+    /* -- Tests to see what happens if the server isn't available --*/
+    public void testEvilServerAssignNode() throws Exception {
+        // replace the serverimpl with our evil proxy
+        commitTransaction();
+        swapToEvilServer(nodeMappingService);
+        
+        Identity id = new DummyIdentity();
+        // This will just assign to the local node, currently.
+        // Not too interesting.
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+    }
+    
+
+    
+    public void testEvilServerGetNode() throws Exception {
+        // replace the serverimpl with our evil proxy
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+        
+        swapToEvilServer(nodeMappingService);
+        
+        createTransaction();
+        // Reads should cause no trouble
+        Node node = nodeMappingService.getNode(id);
+      
+    }
+    
+    public void testEvilServerGetIdentities() throws Exception {
+        commitTransaction();
+        // put an identity in with a node
+        // try to getNode that identity.
+        Identity id1 = new DummyIdentity();
+        nodeMappingService.assignNode(NodeMappingService.class, id1);
+        
+        createTransaction();
+        
+        swapToEvilServer(nodeMappingService);
+        
+        // Reads should cause no trouble
+        Node node = nodeMappingService.getNode(id1);
+        Iterator<Identity> ids = nodeMappingService.getIdentities(node.getId());
+        while (ids.hasNext()) {
+            Identity id = ids.next();
+            assertEquals(id, id1);
+        }
+    }
+    
+    public void testEvilServerSetStatus() throws Exception {
+                commitTransaction();
+        // If we simply call assignNode, then setStatus with false using
+        // the nodeMappingService, the object won't be removed:  assignNode
+        // will set the status for our service on the assigned node. 
+        // We're not running in a truely multi-node manner, so we don't
+        // have multiple services running.
+        Identity id = new DummyIdentity();
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+        
+        createTransaction();
+        
+        // Find the node that we assigned to.  That's the one who needs
+        // to set the status to false!
+        NodeMappingService service = null;
+        try {        
+            Node node = nodeMappingService.getNode(id);
+            service = nodemap.get(node.getId());
+        } catch (UnknownIdentityException e) {
+            fail("Unexpected UnknownIdentityException");
+        }
+        commitTransaction();
+        
+        assertNotNull(service);
+        swapToEvilServer(service);
+
+        service.setStatus(NodeMappingService.class, id, false);
+
+        Thread.sleep(REMOVE_TIME * 2);
+        // Identity should now be gone... this is a hole in the
+        // implementation, currently.  It won't be removed.
+        createTransaction();
+        try {
+            Node node = nodeMappingService.getNode(id);
+            // This line should be uncommented if we want to support
+            // disconnected servers.
+//            fail("Expected UnknownIdentityException");
+        } catch (UnknownIdentityException e) {
+
+        }
+    }
+    
+    private void swapToEvilServer(NodeMappingService service) throws Exception {
+        Field serverField = 
+            NodeMappingServiceImpl.class.getDeclaredField("server");
+        serverField.setAccessible(true);
+        
+        Object server = serverField.get(service);
+        Object proxy = EvilProxy.proxyFor(server);
+        serverField.set(service,proxy);
     }
     
 //    public void testShutdown() {
@@ -723,7 +856,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** Use the invariant checking method */
     private void verifyMapCorrect(Identity id) throws Exception {  
         createTransaction();
-        assertTrue(nodeMappingService.assertValid(id));
+        boolean valid = 
+                (Boolean) assertValidMethod.invoke(nodeMappingService, id);
+        assertTrue(valid);
         commitTransaction();
     }  
 }

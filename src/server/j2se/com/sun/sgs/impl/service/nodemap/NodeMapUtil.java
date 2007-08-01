@@ -4,31 +4,97 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
+import java.io.Serializable;
+import java.util.logging.Level;
 
 /**
- * Static utility methods used by both the server and service.
+ * Static utility methods used by both the server and service for
+ * data service name bindings.
  */
-public final class NodeMapUtil {
-    /** Package name of this class */
-    private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
+final class NodeMapUtil {
+    private static final String PREFIX = "nodemap";
     
-    /** The prefix of a node key which maps to its mapped Identities. */
-    private static final String NODE_KEY_PREFIX = PKG_NAME + ".node.";
+    /** The major and minor version numbers for the layout of
+     *  keys and data persisted by the node mapping service.
+     */
+    private static final int major_version = 1;
+    private static final int minor_version = 0;
+    
+    /** The version key. */
+    private static final String VERSION_KEY = PREFIX + ".version";
     
     /** The prefix of a identity key which maps to its assigned node. */
-    private static final String IDENTITY_KEY_PREFIX = PKG_NAME + ".identity.";
+    private static final String IDENTITY_KEY_PREFIX = PREFIX + ".identity.";
+    
+    /** The prefix of a node key which maps to its mapped Identities. */
+    private static final String NODE_KEY_PREFIX = PREFIX + ".node."; 
     
     /** The prefix of the status markers. */
-    private static final String STATUS_KEY_PREFIX = PKG_NAME + ".status.";
+    private static final String STATUS_KEY_PREFIX = PREFIX + ".status.";
     
     /** Never to be instantiated */
     private NodeMapUtil() {
         throw new AssertionError("Should not instantiate");
     }
        
+    /**
+     * Checks if the current stored version is the same as the current
+     * version, and, if they are not the same, converts the current 
+     * persisted data to the current version.  Stores the current version
+     * in the data store.
+     * <p>
+     * This method must be called within a transaction.  It should be
+     * called at configuration time:  migrating versions could take time.
+     * <p>
+     *
+     * 
+     * @param dataService the data service for accessing persisted data
+     * @param logger the {@code Logger} for logging information 
+     *
+     * @return {@code true} if the versions were the same, {@code false}
+     *         otherwise
+     * @throw TransactionException if the operation failed because of a problem
+     *        with the current transaction
+     */
+    static boolean handleDataVersion(DataService dataService, 
+                                     LoggerWrapper logger) 
+    {
+        boolean ok = true;
+        VersionMO currentVersion = new VersionMO(major_version, minor_version);
+        try {
+            VersionMO oldVersion = 
+                    dataService.getServiceBinding(VERSION_KEY, VersionMO.class);
+            logger.log(Level.CONFIG, "Found version " + oldVersion);
+            ok = currentVersion.equals(oldVersion);
+            if (!ok) {
+                dataService.removeObject(oldVersion);
+                
+                // Convert the old data to the new, as required.
+                // Generally, conversion should only be required for major
+                // version number changes.   Typically, will want to add
+                // private methods to convert from the previous version
+                // to the current, and code here should make multiple method
+                // calls, causing version-by-version upgrades, until the
+                // data service is at the current version.
+            }
+        } catch (NameNotBoundException ex) {
+            // All is ok.  This is the first time a version has been put
+            // in this data service.
+        } finally {
+            // Store the new version.
+            dataService.setServiceBinding(VERSION_KEY, currentVersion);
+            logger.log(Level.CONFIG, "Storing version " + currentVersion);
+        }
+
+        return ok;
+    }
+    
     /**
      * Returns a identity key for the given {@code identity}. 
      */
@@ -87,6 +153,69 @@ public final class NodeMapUtil {
         StringBuilder sb = buildStatusKey(id, nodeId);
         sb.append(serviceName);
         return sb.toString();	
+    }
+    
+    /**
+     * An immutable class to hold the current version of the keys
+     * and data persisted by the node mapping service.
+     */   
+    static class VersionMO implements ManagedObject, Serializable {
+        /** Serialization version. */
+        private static final long serialVersionUID = 1L;
+        
+        private int major_version;
+        private int minor_version;
+        
+        VersionMO(int major, int minor) {
+            major_version = major;
+            minor_version = minor;
+        }
+        
+        /**
+         * Returns the major version number.
+         * @return the major version number
+         */
+        public int getMajorVersion() {
+            return major_version;
+        }
+        
+        /**
+         * Returns the minor version number.
+         * @return the minor version number
+         */
+        public int getMinorVersion() {
+            return minor_version;
+        }
+        
+        /** {@inheritDoc} */
+        @Override
+        public String toString() {
+            return "VersionMO[major : " + major_version + 
+                    ", minor : " + minor_version + "]";
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            } else if (obj.getClass() == this.getClass()) {
+                VersionMO other = (VersionMO) obj;
+                return major_version == other.major_version && 
+                       minor_version == other.minor_version;
+
+            }
+            return false;
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public int hashCode() {
+            int result = 17;
+            result = 37*result + major_version;
+            result = 37*result + minor_version;
+            return result;              
+        }
     }
     
     /**

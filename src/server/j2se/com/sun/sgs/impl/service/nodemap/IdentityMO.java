@@ -21,9 +21,11 @@ class IdentityMO implements ManagedObject, Serializable {
     private final Identity id;
     /** The node the identity is mapped to */
     private final long nodeId;
+    
+    /* The hashcode, lazily calculated (this is an immutable object). */
+    private volatile int hashCode = 0;
 
     /**
-     * 
      * Returns a new IdentityMO instance.
      *
      * @param id  the identity
@@ -54,5 +56,30 @@ class IdentityMO implements ManagedObject, Serializable {
     @Override
     public String toString() {
         return "IdentityMO[id : " + id + ", nodeId : " + nodeId + "]";
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        } else if (obj.getClass() == this.getClass()) {
+            IdentityMO other = (IdentityMO) obj;
+            return id.equals(other.id) && nodeId == other.nodeId;
+        }
+        return false;
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+        // Recipe from Effective Java
+        if (hashCode == 0) {
+            int result = 17;
+            result = 37*result + id.hashCode();
+            result = 37*result + (int) (nodeId ^ (nodeId >>>32));
+            hashCode = result;
+        }
+        return hashCode;
     }
 }

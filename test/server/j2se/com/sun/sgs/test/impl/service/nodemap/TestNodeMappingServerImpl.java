@@ -5,6 +5,7 @@
 package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -14,15 +15,20 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 
@@ -44,12 +50,12 @@ public class TestNodeMappingServerImpl extends TestCase {
 
     /** The port for the server. */
     private static int SERVER_PORT = 0;
+    
+    /** Amount of time to wait before something might be removed. */
+    private static int REMOVE_TIME = 250;
 
     /** Properties for the nodemap server and data service. */
-    private static Properties serviceProps = createProperties(
-        StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-        DataStoreImplClassName + ".directory", DB_DIRECTORY,
-        NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(SERVER_PORT));
+    private static Properties serviceProps;
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
@@ -69,9 +75,77 @@ public class TestNodeMappingServerImpl extends TestCase {
     
     private boolean passed = false;
 
+    /** non-pubic methods in NodeMappingServerImpl */
+    private Method configureMethod;
+    private Method commitConfigureMethod;
+    private Method shutdownMethod;
+    private Method addDummyNodeMethod;
+    private Method getNodeForIdentityMethod;
+    private Method reportFoundKeysMethod;
+    private Method getPortMethod;
+    
+    private String serverPortPropertyName;
+    
     /** Constructs a test instance. */
-    public TestNodeMappingServerImpl(String name) {
+    public TestNodeMappingServerImpl(String name) throws Exception {
         super(name);
+        
+        configureMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "configure",
+                new Class[] {ComponentRegistry.class, TransactionProxy.class});
+        configureMethod.setAccessible(true);
+        
+        commitConfigureMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "commitConfigure",
+                new Class[] {});
+        commitConfigureMethod.setAccessible(true);
+        
+        shutdownMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "shutdown",
+                new Class[] {});
+        shutdownMethod.setAccessible(true);
+        
+        addDummyNodeMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "addDummyNode",
+                new Class[] {long.class});
+        addDummyNodeMethod.setAccessible(true);
+        
+        getNodeForIdentityMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "getNodeForIdentity",
+                new Class[] {Identity.class});
+        getNodeForIdentityMethod.setAccessible(true);
+        
+        reportFoundKeysMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "reportFoundKeys",
+                new Class[] {Identity.class});
+        reportFoundKeysMethod.setAccessible(true);
+        
+        getPortMethod = NodeMappingServerImpl.class.getDeclaredMethod(
+                "getPort",
+                new Class[] {});
+        getPortMethod.setAccessible(true);
+        
+        Field serverPortPropertyField = 
+           NodeMappingServerImpl.class.getDeclaredField("SERVER_PORT_PROPERTY");
+        serverPortPropertyField.setAccessible(true);
+        serverPortPropertyName = (String) serverPortPropertyField.get(null);
+        
+        Field removeExpireField =
+         NodeMappingServerImpl.class.getDeclaredField("REMOVE_EXPIRE_PROPERTY");
+        removeExpireField.setAccessible(true);
+        String removeExpireName = (String) removeExpireField.get(null);
+        
+        Field removeSleepField =
+         NodeMappingServerImpl.class.getDeclaredField("REMOVE_SLEEP_PROPERTY");
+        removeSleepField.setAccessible(true);
+        String removeSleepName = (String) removeSleepField.get(null);
+        
+        serviceProps = createProperties(
+            StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
+            DataStoreImplClassName + ".directory", DB_DIRECTORY,
+            removeExpireName, Integer.toString(REMOVE_TIME),
+            removeSleepName, Integer.toString(REMOVE_TIME/2),
+            serverPortPropertyName, Integer.toString(SERVER_PORT));
     }
 
     /** Test setup. */
@@ -105,12 +179,14 @@ public class TestNodeMappingServerImpl extends TestCase {
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-        nodeMappingServer.configure(serviceRegistry, txnProxy);
+        configureMethod.invoke(nodeMappingServer, serviceRegistry, txnProxy);
 
 	commitTransaction();
         
+        commitConfigureMethod.invoke(nodeMappingServer, (Object[])null);
+        
         for (int i = 1; i <= NUM_NODES; i++) {
-            nodeMappingServer.addDummyNode(i);
+            addDummyNodeMethod.invoke(nodeMappingServer, i);
         }
 	createTransaction();
         
@@ -144,7 +220,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         }
         
         if (nodeMappingServer != null) {
-            nodeMappingServer.shutdown();
+            shutdownMethod.invoke(nodeMappingServer);
             nodeMappingServer = null;
         }
         
@@ -164,7 +240,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             nodemap = new NodeMappingServerImpl(serviceProps, systemRegistry);
         } finally {
             if (nodemap != null) { 
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -178,7 +254,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             System.err.println(e);
         } finally {
             if (nodemap != null) { 
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -188,14 +264,15 @@ public class TestNodeMappingServerImpl extends TestCase {
         Properties properties = createProperties(
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(PORT));
+            serverPortPropertyName, Integer.toString(PORT));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
-            assertEquals(PORT, nodemap.getPort());
+            int nodemapPort = (Integer) getPortMethod.invoke(nodemap);
+            assertEquals(PORT, nodemapPort);
         } finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -203,7 +280,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testNegPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(-1));
+            serverPortPropertyName, Integer.toString(-1));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
@@ -212,7 +289,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             System.err.println(e);
         } finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -220,7 +297,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testBigPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            NodeMappingServerImpl.SERVER_PORT_PROPERTY, Integer.toString(65536));
+            serverPortPropertyName, Integer.toString(65536));
         NodeMappingServerImpl nodemap = null;
         try {
             nodemap = new NodeMappingServerImpl(properties, systemRegistry);
@@ -229,7 +306,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             System.err.println(e);
         } finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -241,13 +318,18 @@ public class TestNodeMappingServerImpl extends TestCase {
         try {
             nodemap = 
                 new NodeMappingServerImpl(serviceProps, systemRegistry);
-            nodemap.configure(null, new DummyTransactionProxy());
+            configureMethod.invoke(nodemap, null, new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof NullPointerException) {
+                System.err.println(cause);
+            } else {
+                fail("Expected NullPointerException");
+            }
 	} finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -257,13 +339,18 @@ public class TestNodeMappingServerImpl extends TestCase {
 	try {
             nodemap =
                 new NodeMappingServerImpl(serviceProps, systemRegistry);
-            nodemap.configure(serviceRegistry, null);
+            configureMethod.invoke(nodemap, serviceRegistry, null);
 	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
+	} catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof NullPointerException) {
+                System.err.println(cause);
+            } else {
+                fail("Expected NullPointerException");
+            }
 	} finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -273,10 +360,10 @@ public class TestNodeMappingServerImpl extends TestCase {
         try {
             nodemap =
                 new NodeMappingServerImpl(serviceProps, systemRegistry);
-            nodemap.configure(serviceRegistry, txnProxy);
+            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);
         } finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap); 
             }
         }
     }
@@ -286,14 +373,19 @@ public class TestNodeMappingServerImpl extends TestCase {
         try {   
             nodemap = 
 	     new NodeMappingServerImpl(serviceProps, systemRegistry);
-            nodemap.configure(serviceRegistry, txnProxy);
-            nodemap.configure(serviceRegistry, txnProxy);
+            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);
+            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);          
 	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
+	} catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IllegalStateException) {
+                System.err.println(cause);
+            } else {
+                fail("Expected IllegalStateException");
+            }
 	} finally {
             if (nodemap != null) {
-                nodemap.shutdown(); 
+                shutdownMethod.invoke(nodemap);
             }
         }
     }
@@ -353,8 +445,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         nodeMappingServer.canRemove(id);
         
-        // This should be something * property for removewait
-        Thread.sleep(10000);
+        Thread.sleep(REMOVE_TIME * 2);
 
         verifyMapCorrect(id);
         found = getFoundKeys(id);
@@ -367,8 +458,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         nodeMappingServer.assignNode(NodeMappingServerImpl.class, id);
         // We can't remove this, as the status is still set.
         nodeMappingServer.canRemove(id);
-        // This should be something * property for removewait
-        Thread.sleep(10000);
+        Thread.sleep(REMOVE_TIME * 2);
 
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);
@@ -383,7 +473,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         verifyMapCorrect(id);
 
-        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
+        Set<String> foundFirst = getFoundKeys(id);
         // We expect the to see the id, node, and one status key.
         assertEquals(3, foundFirst.size());
        
@@ -392,11 +482,13 @@ public class TestNodeMappingServerImpl extends TestCase {
                 (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
                         new Class[]{Identity.class, String.class, Node.class});
         moveMethod.setAccessible(true);
-        Node node = new NodeImpl(nodeMappingServer.getNodeForIdentity(id));
+        long nodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        Node node = new NodeImpl(nodeId);
         
         moveMethod.invoke(nodeMappingServer, id, null, node);
 
-        Set<String> foundSecond = getFoundKeys(id, "SECOND");
+        Set<String> foundSecond = getFoundKeys(id);
         verifyMapCorrect(id);
         // There should now be zero status keys.
         assertEquals(2, foundSecond.size());
@@ -407,25 +499,57 @@ public class TestNodeMappingServerImpl extends TestCase {
         commitTransaction();
         Identity id = new DummyIdentity();
         nodeMappingServer.assignNode(DataService.class, id);
-        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
+        Set<String> foundFirst = getFoundKeys(id);
         // We expect the to see the id, node, and one status key.
         assertEquals(3, foundFirst.size());
-        long firstNodeId = nodeMappingServer.getNodeForIdentity(id);
+        long firstNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
         
         // Not sure how to handle this with the watchdog.
         nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
-        // Wait for things to settle down
-        Thread.sleep(1000);
-        long secondNodeId = nodeMappingServer.getNodeForIdentity(id);
+        // Wait for things to settle down, but not enough time for
+        // the remover to kick in
+        Thread.sleep(REMOVE_TIME/2);
+        long secondNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
         
-        Set<String> foundSecond = getFoundKeys(id, "SECOND");
+        Set<String> foundSecond = getFoundKeys(id);
         verifyMapCorrect(id);
         // There should now be zero status keys.
         assertEquals(2, foundSecond.size());
         assertTrue(firstNodeId != secondNodeId);
     }
     
-        /* -- Test node failure -- */
+
+    public void testNodeFailedRemove() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id);
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        // Not sure how to handle this with the watchdog.
+        nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
+        // Wait for things to settle down, and this time we let it
+        // go ahead and renove the id.
+        Thread.sleep(REMOVE_TIME * 2);
+        try {
+            long secondNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+            fail("Expected NameNotBoundException");
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof NameNotBoundException) {
+                System.err.println(cause);
+            } else {
+                fail("Expected NameNotBoundException");
+            }
+        }
+    }
+    
     public void testAllNodesFailed() throws Exception {
         commitTransaction();
         Identity id = new DummyIdentity();
@@ -433,7 +557,8 @@ public class TestNodeMappingServerImpl extends TestCase {
         Set<String> foundFirst = getFoundKeys(id, "FIRST:");
         // We expect the to see the id, node, and one status key.
         assertEquals(3, foundFirst.size());
-        long firstNodeId = nodeMappingServer.getNodeForIdentity(id);
+        long firstNodeId =
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
         
         // Not sure how to test this with watchdog
         for (int i = 1; i <= NUM_NODES; i++) {
@@ -441,8 +566,9 @@ public class TestNodeMappingServerImpl extends TestCase {
         }
         
         // Wait for things to settle down
-        Thread.sleep(1000);
-        long secondNodeId = nodeMappingServer.getNodeForIdentity(id);
+        Thread.sleep(REMOVE_TIME/2);
+        long secondNodeId =
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
         
         Set<String> foundSecond = getFoundKeys(id, "SECOND");
         verifyMapCorrect(id);
@@ -567,13 +693,27 @@ public class TestNodeMappingServerImpl extends TestCase {
     private Set<String> getFoundKeys(Identity id, String msg) throws Exception {
         createTransaction();
         try {
-            Set<String> found = nodeMappingServer.reportFoundKeys(id);
+            Set f = (Set) reportFoundKeysMethod.invoke(nodeMappingServer, id);
+            Set<String> found = new HashSet<String>(f.size());
+            for (Object o : f) {
+                found.add((String)o);
+            }
             if (msg != null) {
                 for (String s : found) {
                     System.out.println(msg + ": " + s);
                 }
             }
             return found;
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception)cause;
+            } else {
+                cause.printStackTrace();
+                fail("Unexpected exception");
+                return null;
+            }
+
         } finally {
             commitTransaction();
         }

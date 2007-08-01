@@ -10,7 +10,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -21,7 +20,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
@@ -48,7 +46,7 @@ import java.util.logging.Logger;
 /**
  * Maps Identities to Nodes.
  * <p>
- * In addition to the properties supported by the {@link DataServiceImpl}
+ * In addition to the properties supported by the {@link DataService}
  * class, the {@link #NodeMappingServiceImpl constructor} supports the
  * following properties: 
  * <p>
@@ -93,10 +91,120 @@ import java.util.logging.Logger;
  *      {@code NodeMapppingServer}. This value must be no less than {@code 0} 
  *      and no greater than {@code 65535}.   <p>
  * </dl> 
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.server.class
+ *	</b></code> <br>
+ *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.nodemap.NodemappingServerImpl</code>
+ *
+ * <dd style="padding-top: .5em">
+ *      The name of the class that implements {@link
+ *	NodeMappingServer}, the global server for this service. The class 
+ *      should be public, not abstract, and should provide a public constructor
+ *      with parameters {@link Properties} and {@link ComponentRegistry}. 
+ *      Being able to specify this class is useful for testing.  <p>
  * <p>
  */
 public class NodeMappingServiceImpl implements NodeMappingService 
 {
+    // Design notes:  
+    //
+    // The node mapping service maps identities to nodes.  When an identity
+    // is mapped to a node, resources required for that identity will be
+    // used on the node (for example, a client would log into that node, and
+    // tasks run on behalf of the client would run on that node).  
+    //
+    // Instances of the node mapping service run on each node, and are backed 
+    // by a single global node mapping server.
+    // The service maps identities to available nodes in the system.
+    //
+    // The server is responsible, generally, for adding and removing
+    // map entries, as well as modifying map entries by moving identities
+    // to another node.  These moves would occur because of node failure
+    // or for load balancing (load balancing is not yet designed or 
+    // implemented - but the part of the system that assigns identities
+    // to a node must be certain to work in concert with the part of the
+    // system that is making load balancing decisions).
+    // 
+    // Identities are added to the map through an assignNode call.  This
+    // method causes the server to find an optimal node assignment, or does
+    // nothing if the identity is already assigned to a node.
+    // 
+    // Identities are removed from the map through a simple reference counting
+    // scheme:  when a service knows they are using an entry, they call
+    // setStatus with active=true, and when they are done with it, they
+    // call setStatus with active=false.  Each service on each node is 
+    // tracked;  when all services on a node who expressed interest in
+    // an identity say they believe the identity is not active, the identity
+    // is considered inactive on the node.  When an identity is inactive
+    // on all nodes, it is eligible to be removed from the map.  The actual
+    // removal from the map occurs at some point in the future (controlled
+    // by a property), giving time for any service to say they are interested
+    // in the identity again.
+    // 
+    // AssignNode has the side effect of calling setStatus for the 
+    // calling service on the assigned node. 
+    //
+    // Because both assignNode and setStatus can make remote calls to the
+    // global server, they should not be called from within a transaction.
+    //
+    // Reads of the map, getNode and getIdentities, must be called from within
+    // a transaction.  All map information is stored through the data service,
+    // and is (of course) changed within a transaction;  services can rely
+    // on mappings not changing during one of their transactions.
+    //
+    // Note that whether an identity is currently assigned to a node (mapped
+    // in this service) or not is an optimization.  All services use getNode
+    // to ensure there's an assignment if they will be consuming resources
+    // on behalf of an identity;  if there is no current assignment, assignNode
+    // needs to be called.
+    // 
+    // The data store is used to persist information about the mapping
+    // (both from id->node and node->ids).   An immutible object, an
+    // IdentityMO, which holds the identity and assigned node id, is stored 
+    // under various service bindings:
+    //
+    // <PREFIX>.identity.<identity>              the id->node mapping
+    // <PREFIX>.node.<nodeId>.<identity>         the node->id mapping
+    //      note: iterating on all <PREFIX>.node.nodeId entries gives us the
+    //            set of all identities on a node
+    // <PREFIX>.status.<identity>.<nodeId>.<serviceName>  
+    //          the services which believe <identity> is active on <nodeId>
+    //      note: when there are no <PREFIX>.status.<identity> bindings,
+    //            the identity can be removed
+    //
+    // The first two bindings, .identity and .node, are always created and 
+    // removed at the same time.  When the .identity binding is removed, the
+    // IdentityMO object is deleted.  These modifications are typically done
+    // by the global server, although we may support locally creating them
+    // in the future (removes will always be at the server).
+    //
+    // The .status bindings are created and removed by the local services.
+    // The global server is contacted only when we detect there are no more
+    // bindings for an identity.
+    //
+    // Additionally, there is a version object stored by the server.  When
+    // the server starts up, it checks that the current version (in NodeMapUtil)
+    // matches the stored version.  If the stored version is not the same,
+    // persisted data is converted, as necessary, to the new version format.
+    // The version is stored as:
+    //
+    // <PREFIX>.version       with a NodeMapUtil.VersionMO 
+    //
+    //
+    // XXX TODO XXX
+    //  - Identities currently don't have a uuid associated with them!
+    //    This code assumes they ARE unique and there is a method which
+    //    will return a unique string for them.
+    //  - Need to figure out how assignNode will work when we have identities
+    //    that are to be assigned locally, from within a transaction (example:
+    //    creating an AI identity from game code).
+    //  - AssignNode will probably want to take location hints (say, assign
+    //    the identity close by a set of other identities)
+    //    
+    //
+    
     /** The name of this class */
     private static final String CLASSNAME = 
             NodeMappingServiceImpl.class.getName();
@@ -108,8 +216,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * The property that specifies whether the server should be instantiated
      * in this stack.  Also used by the unit tests.
      */
-    public static final String START_SERVER_PROPERTY = 
+    private static final String START_SERVER_PROPERTY = 
             PKG_NAME + ".start.server";
+    
+    /** The property name for the server host. */
+    static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
     
     /** The property name for the client port. */
     private static final String CLIENT_PORT_PROPERTY = 
@@ -178,6 +289,21 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** Lock object for service state */
     private final Object stateLock = new Object();
     
+    /** The possible states of this instance. */
+    enum State {
+	/** Before configure has been called */
+	UNINITIALIZED,
+	/** After configure and before shutdown */
+	RUNNING,
+	/** After start of a call to shutdown and before call finishes */
+	SHUTTING_DOWN,
+	/** After shutdown has completed successfully */
+	SHUTDOWN
+    }
+
+    /** The current state of this instance. */
+    private State state = State.UNINITIALIZED;
+    
     /** The number of times we should try to contact the backend before
      *  giving up. 
      */
@@ -222,8 +348,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 port = serverImpl.getPort();
             } else {
                 serverImpl = null;
-                host = wrappedProps.getProperty(
-                        NodeMappingServerImpl.SERVER_HOST_PROPERTY, localHost);
+                host = 
+                    wrappedProps.getProperty(SERVER_HOST_PROPERTY, localHost);
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT);
@@ -305,10 +431,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 proxyOwner = txnProxy.getCurrentOwner();
             }
             
-//          watchdogService = registry.getComponent(WatchdogService.class); 
-            localNodeId = (new NodeImpl()).getId();
-//          localNodeId = watchdogservice.getLocalNodeId();
-            
+    //          watchdogService = registry.getComponent(WatchdogService.class); 
+                localNodeId = (new NodeImpl()).getId();
+    //          localNodeId = watchdogservice.getLocalNodeId();
+
             if (serverImpl != null) {
                 serverImpl.configure(registry, txnProxy);
             } else {
@@ -318,25 +444,27 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 try {
                     server.registerNodeListener(changeNotifier, localNodeId);
                 } catch (IOException ex) {
-                    // JANE will need to retry
-                    ex.printStackTrace();
+                    // This is very bad.
+                    logger.logThrow(Level.CONFIG, ex,
+                            "Failed to contact server");
+                    throw new RuntimeException(ex);
                 }
             }
 
-
-	    
 	} catch (RuntimeException e) {
             logger.logThrow(Level.CONFIG, e,
                             "Failed to configure NodeMappingServiceImpl");
 	    throw e;
 	}
-
     }
     
    
     /** {@inheritDoc} */
     public boolean shutdown() {
-        // JANE need to get shutdown correct
+        synchronized(stateLock) {
+            state = State.SHUTTING_DOWN;
+        }
+
         boolean ok = true;
 
         try {
@@ -352,11 +480,35 @@ public class NodeMappingServiceImpl implements NodeMappingService
         
         // Ordering counts here.  We need to do whatever we might with
         // the server (say, unregister the node listeners) before we
-        // cause it to shut down).
+        // cause it to shut down.
         if (serverImpl != null) {
             ok = serverImpl.shutdown();
         }
+        synchronized(stateLock) {
+            state = State.SHUTDOWN;
+        }
         return ok;
+    }
+    
+    /**
+     * Throws {@code IllegalStateException} if this service is not running.
+     * Code swiped from the data service.
+     */
+    private void checkState() {
+	synchronized (stateLock) {
+	    switch (state) {
+	    case UNINITIALIZED:
+		throw new IllegalStateException("Service is not configured");
+	    case RUNNING:
+		break;
+	    case SHUTTING_DOWN:
+		break;
+	    case SHUTDOWN:
+		throw new IllegalStateException("Service is shut down");
+	    default:
+		throw new AssertionError();
+	    }
+	}
     }
     
     /* -- Implement NodeMappingService -- */
@@ -369,6 +521,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      *  a remote call will be made to determine a node assignment.
      */
     public void assignNode(Class service, final Identity identity) {
+        checkState();
         if (service == null) {
             throw new NullPointerException("null service");
         }
@@ -382,31 +535,27 @@ public class NodeMappingServiceImpl implements NodeMappingService
         // server's work.  Best to always ask the server to handle it.
         
         boolean done = false;
-        
-        if (server != null) {
-            int tryCount = 0;
-            
-            while (!done && tryCount < MAX_RETRY) {
-                try {
-                    server.assignNode(service, identity);
-                    System.out.println("assignnode worked on try " + tryCount);
-                    done = true;
-                    tryCount = MAX_RETRY;
-                } catch (IllegalStateException ise) {
-                    // Maybe we just need some nodes to come on line?
-                    tryCount++;
-                    logger.logThrow(Level.FINEST, ise, 
-                            "Exception encountered on try {0}: {1}",
-                            tryCount, ise);
-                } catch (IOException ioe) {
-                    tryCount++;
-                    logger.logThrow(Level.FINEST, ioe, 
-                            "Exception encountered on try {0}: {1}",
-                            tryCount, ioe);
-                }
+        int tryCount = 0;
+
+        while (!done && tryCount < MAX_RETRY) {
+            try {
+                server.assignNode(service, identity);
+                done = true;
+                tryCount = MAX_RETRY;
+            } catch (IllegalStateException ise) {
+                // Maybe we just need some nodes to come on line?
+                tryCount++;
+                logger.logThrow(Level.FINEST, ise, 
+                        "Exception encountered on try {0}: {1}",
+                        tryCount, ise);
+            } catch (IOException ioe) {
+                tryCount++;
+                logger.logThrow(Level.FINEST, ioe, 
+                        "Exception encountered on try {0}: {1}",
+                        tryCount, ioe);
             }
         }
-        
+ 
         if (!done) {
             // If we cannot talk to our server, we don't want the system
             // to stop functioning.  We'll just assign to our local node
@@ -418,7 +567,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // have a way to let the server know we changed things behind
             // its back (probably a generation number?),  as well as a
             // way to eventually reconnect to the server.
-
+            //
+            // After discussions with Tim:  we should just assume that the
+            // server is always available.  This code could be useful, though,
+            // if we eventually have a transactional assignNode method that
+            // only assigns for AIs - or other things we want to assign locally.
             logger.log(Level.FINEST, "Assigning {0} to this node", identity);
 
             AssignNodeLocallyTask localTask = 
@@ -490,6 +643,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     public void setStatus(Class service, Identity identity, boolean active) 
         throws UnknownIdentityException
     {
+        checkState();
         if (service == null) {
             throw new NullPointerException("null service");
         }
@@ -517,11 +671,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // We got an exception above.
             throw new UnknownIdentityException("id: " + identity);
         } else {
+            String removekey = NodeMapUtil.getPartialStatusKey(identity);
             String statuskey = 
                     NodeMapUtil.getStatusKey(identity, localNodeId, 
                                              service.getName());
             SetStatusTask stask = 
-                    new SetStatusTask(statuskey, idmo, active);
+                    new SetStatusTask(statuskey, removekey, idmo, active);
             try {
                 runTransactionally(stask);
             } catch (NameNotBoundException nnbe) {
@@ -562,13 +717,16 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private class SetStatusTask implements KernelRunnable {
         final private boolean active;
         final private String statuskey;
+        final private String removekey;
         final private IdentityMO idmo;
         
         /** return value, true if reference count goes to zero */
         private boolean canRemove = false;
 
-        SetStatusTask(String statuskey, IdentityMO idmo, boolean active) {
+        SetStatusTask(String statuskey, String removekey, 
+                      IdentityMO idmo, boolean active) {
             this.statuskey = statuskey;
+            this.removekey = removekey;
             this.idmo = idmo;
             this.active = active;         
         }
@@ -586,8 +744,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 // Note that NameNotBoundException can be thrown
                 // if this is our second time calling this method.
                 dataService.removeServiceBinding(statuskey);
-                String name = dataService.nextServiceBoundName(statuskey);
-                canRemove = (name == null || !name.startsWith(statuskey));
+                String name = dataService.nextServiceBoundName(removekey);
+                canRemove = (name == null || !name.startsWith(removekey));
             }
         }
         
@@ -596,6 +754,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     /** {@inheritDoc} */
     public Node getNode(Identity id) throws UnknownIdentityException {   
+        checkState();
         if (id == null) {
             throw new NullPointerException("null identity");
         }
@@ -609,8 +768,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
     public Iterator<Identity> getIdentities(long nodeId) 
         throws UnknownNodeException 
     {
+        checkState();
         String key = NodeMapUtil.getPartialNodeKey(nodeId);
-        if (dataService.nextServiceBoundName(key) == null) {
+        String next = dataService.nextServiceBoundName(key);
+        if (next == null || !next.startsWith(key)) {
             throw new UnknownNodeException("node id: " + nodeId);
         }
         logger.log(Level.FINEST, "getIdentities successful");
@@ -674,7 +835,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
         MapChangeNotifier() { }
         
         public void removed(final Identity id, final Node newNode) {
-            System.out.println("LISTENER IN REMOVED");
             Set<NodeMappingListener> listeners;
             // Grab a snapshot
             listenersRead.lock();
@@ -698,19 +858,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 Thread thread = new Thread(service);
                 thread.setDaemon(true);
                 thread.start();
-                
-//                This can't work, I cannot use the task service.
-//                nonDurableTaskScheduler.scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-//                    public void run() {
-//                        System.out.println("LISTENER removed: " + listener + " id: " + id + "node: " + newNode);
-//                        listener.mappingRemoved(id, newNode);
-//                    }
-//                });
             }
         }
 
         public void added(final Identity id, final Node oldNode) {
-            System.out.println("LISTENER IN ADDED");
             Set<NodeMappingListener> listeners;
             // Grab a snapshot
             listenersRead.lock();
@@ -733,7 +884,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 thread.start();
             }
         }
-        
     }
     
         
@@ -783,9 +933,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
             synchronized (stateLock) {
                 dataService = null;
             }
-
             if (serverImpl != null) {
-                serverImpl.unconfigure();
+                serverImpl.abortConfigure();
             }
             
             if (server != null) {
@@ -800,9 +949,13 @@ public class NodeMappingServiceImpl implements NodeMappingService
 
         /** {@inheritDoc} */
         public void commit() {
-            isCommitted = true;
-            
-            
+            isCommitted = true;          
+            if (serverImpl != null) {
+                serverImpl.commitConfigure();
+            }
+            synchronized(stateLock) {
+                state = State.RUNNING;
+            }
         }
     }
             
@@ -858,7 +1011,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	    try {                
 		IdentityMO idmo = 
                         dataService.getServiceBinding(key, IdentityMO.class);
-                System.out.println("GET:   key is " + key + "  idmo is " + idmo);
                 node = new NodeImpl(idmo.getNodeId());
 //                node = watchdogService.getNode(nodeId);
                 Node old = idcache.put(identity, node);
@@ -885,7 +1037,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      *
      * @throws Exception if any error occurs
      */
-    public boolean assertValid(Identity identity) throws Exception {
+    boolean assertValid(Identity identity) throws Exception {
         return server.assertValid(identity);        
     }
 }
