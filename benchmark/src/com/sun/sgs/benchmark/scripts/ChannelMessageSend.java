@@ -9,9 +9,14 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class ChannelMessageSend {
+    public static enum SendType {
+        BCAST,  /* send to all on channel */
+        SINGLE, /* send to one recipient*/
+        NONE;   /* don't send anything */
+    };
     
     static final int DEFAULT_CLIENTS = 60;
-    static final long DEFAULT_DELAY = 500;
+    static final long DEFAULT_INTERVAL = 500;
     static final int DEFAULT_BYTES = 500;
     
     /** The host that the server is running on. */
@@ -20,23 +25,23 @@ public class ChannelMessageSend {
     public static final String CHANNEL_NAME = "ChannelMessageSend_script";
     
     /** 
-     * If true, all clients send to all recipients on the channel; if false,
-     * clients just send to one recipient on the channel.
+     * Dictates the type of test being run.
      */
-    public static final boolean BCAST_TEST = false;
+    public static final SendType sendType = SendType.BCAST;
     
     private final int clients;
-    private final long delay;
+    private final long interval;
     private final int bytes;
     private final String message;
     
-    public ChannelMessageSend(int clients, long delay, int bytes) {
+    public ChannelMessageSend(int clients, long interval, int bytes) {
 	this.clients = clients;
-	this.delay = delay;
+	this.interval = interval;
 	this.bytes = bytes;
         
-        System.out.println("Starting up with #client=" + clients +
-            ",  delay=" + delay + "ms,  bytes=" + bytes + ".");
+        System.out.printf("Starting up with clients=%d,  interval=%d ms" +
+            ", strlen=%d, sendType=%s\n", clients, interval, bytes,
+            sendType.toString());
         
         StringBuffer sb = new StringBuffer();
         for (int i=0; i < bytes; i++) sb.append("A");
@@ -44,7 +49,7 @@ public class ChannelMessageSend {
     }
 
     public ChannelMessageSend() {
-	this(DEFAULT_CLIENTS, DEFAULT_DELAY, DEFAULT_BYTES);
+	this(DEFAULT_CLIENTS, DEFAULT_INTERVAL, DEFAULT_BYTES);
     }
     
     public void run() {
@@ -96,7 +101,7 @@ public class ChannelMessageSend {
 
     private static void usage() {
 	System.out.println("Usage: java ChannelMessageSend "
-			   + "<#clients> <delay (ms)> "
+			   + "<#clients> <interval (ms)> "
 			   + "<message size (bytes)>");
 	System.exit(1);
     }
@@ -105,16 +110,16 @@ public class ChannelMessageSend {
 	if (args.length > 0) {
 	    if (args.length != 3)
 		usage();
-	    int clients = 0, delay = 0, bytes = 0;
+	    int clients = 0, interval = 0, bytes = 0;
 	    try {
 		clients = Integer.parseInt(args[0]);
-		delay = Integer.parseInt(args[1]);
+		interval = Integer.parseInt(args[1]);
 		bytes = Integer.parseInt(args[2]);
 	    }
 	    catch (Throwable t) {
 		usage();
 	    }
-	    new ChannelMessageSend(clients,delay,bytes).run();
+	    new ChannelMessageSend(clients,interval,bytes).run();
 	}
 	else
 	    new ChannelMessageSend().run();
@@ -150,18 +155,20 @@ public class ChannelMessageSend {
                 client.processInput("wait_for join_channel");
                 Thread.sleep(1000);
                 
-                String sendCmd;
+                String sendCmd = null;
                 String hexSessionId =
                     toHexString(client.getSessionId().toBytes());
                 
-                if (BCAST_TEST) {
-                    System.out.println(String.format("Client #%d [%s] will" +
-                                           " broadcast to channel.", id,
-                                           hexSessionId));
+                switch (sendType) {
+                case BCAST:
+                    System.out.printf("Client #%d [%s] will broadcast to" +
+                        " channel.\n", id, hexSessionId);
                     
                     sendCmd = String.format("chsend %s %s", CHANNEL_NAME,
                         message);
-                } else {
+                    break;
+
+                case SINGLE:
                     long longSessionId = Long.parseLong(hexSessionId, 16);
                     long longRecipSessionId;
                     
@@ -173,17 +180,24 @@ public class ChannelMessageSend {
                     String hexRecipSessionId =
                         Long.toHexString(longRecipSessionId);
                     
-                    System.out.println(String.format("Client #%d [%s] will" +
-                                           " send to recipient [%s].", id,
-                                           hexSessionId, hexRecipSessionId));
+                    System.out.printf("Client #%d [%s] will send to recipient" +
+                        " [%s].\n", id, hexSessionId, hexRecipSessionId);
                     
                     sendCmd = String.format("pm %s %s %s", CHANNEL_NAME,
                         hexRecipSessionId, message);
+                    break;
+
+                case NONE:
+                    System.out.printf("Client $%d [%s] will not send at all.\n",
+                        id, hexSessionId);
+                    
+                    sendCmd = null;
+                    break;
                 }
                 
                 while (true) {
-                    sleep(delay);
-                    client.processInput(sendCmd);
+                    sleep(interval);
+                    if (sendCmd != null) client.processInput(sendCmd);
                 }
             }
             catch (Throwable t) {
