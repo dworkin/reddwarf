@@ -9,7 +9,9 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -27,19 +29,14 @@ import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -144,7 +141,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
     // in the identity again.
     // 
     // AssignNode has the side effect of calling setStatus for the 
-    // calling service on the assigned node. 
+    // calling service on the assigned node.  If we did not have this 
+    // behavior, we could persist less information about per-node status:
+    // the global server would only need to know if *any* service on a node
+    // believes an identity is active, and the local nodes could transiently
+    // maintain a set of services voting active for a particular identity.
+    // We might want to look into having the server communicate with the
+    // client nodes about setStatus calls it performs on the client's behalf,
+    // as we expect the setStatus calls to be fairly frequent.
     //
     // Because both assignNode and setStatus can make remote calls to the
     // global server, they should not be called from within a transaction.
@@ -201,14 +205,37 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //    that are to be assigned locally, from within a transaction (example:
     //    creating an AI identity from game code).
     //  - AssignNode will probably want to take location hints (say, assign
-    //    the identity close by a set of other identities)
+    //    the identity close by a set of other identities).  This will be
+    //    decided when we work on the load balancer.
+    //  - The server doesn't persist everything it needs to in case it crashes
+    //    (the goal is that we be able to have a hot backup standing by).
+    //  - API issue:  setStatus is currently NOT transactional.  It can be
+    //    implemented to be run under a transaction if that makes things
+    //    easier for the clients of this method (see note below for how).
+    //    I waffle on this issue because it seems better for the API to have
+    //    anything that modfies the node map potentially go through the server.
+    //  - This service almost runs correctly if the server is unavailable,
+    //    (say, if there's a transient network partition), except:
+    //       - remove:  any identity that we detected could be removed
+    //           during the partition won't be removed.  There's a unit
+    //           test that demonstrates this.   The remove list needs to
+    //           be persisted anyway, so perhaps the best thing is to have
+    //           the client store the potentially removable identity in
+    //           the data service, and have the server check for new additions
+    //           periodically.
+    //  - Look into simplifying setStatus persisted information, as discussed
+    //    above.  The issue is the server, through assignNode, atomically
+    //    sets the status for a service on a node.
+    //  - Potential issue:  when the server moves identities (because of 
+    //    load balancing or node failure), it does NOT retain any setStatus
+    //    settings for the old node.  This is clearly correct for node failure,
+    //    but is it correct for load balancing?  Or should load balancing cause
+    //    the information to be carried to the new node?  
+    //  - This service assumes the server will be up before services attempt
+    //    to connect to it.  Is that reasonable?
     //    
     //
-    
-    /** The name of this class */
-    private static final String CLASSNAME = 
-            NodeMappingServiceImpl.class.getName();
-    
+
     /** Package name for this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -231,11 +258,18 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
+            new LoggerWrapper(
+                Logger.getLogger(NodeMappingServiceImpl.class.getName()));
+    
     /** The transaction proxy, or null if configure has not been called. */    
     private static TransactionProxy txnProxy;
 
+    /** The task scheduler. */
+    private final TaskScheduler taskScheduler;
+    
+    /** The owner for tasks I initiate. */
+    private TaskOwner taskOwner;
+    
     /** The data service. */
     private DataService dataService;
     
@@ -245,29 +279,13 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** The context factory for map change transactions. */
     private ContextFactory contextFactory;    
 
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-    
-    /** The task scheduler for non-durable tasks. */
-//    private NonDurableTaskScheduler nonDurableTaskScheduler;
-    
-    /** The owner for tasks I initiate. */
-    private TaskOwner proxyOwner;
-    
+
     /** The registered registry change listeners. There is no need
      *  to persist these:  these are all local services, and if the
      *  node goes down, they'll need to re-register.
      */
     private final Set<NodeMappingListener> nodeChangeListeners =
-	new HashSet<NodeMappingListener>();
-    
-    /** Lock for the change listeners.  We assume there will be many
-     *  more reads to the nodeChangeListeners than writes.
-     */
-    private final ReadWriteLock nodeChangeListenersLock =
-            new ReentrantReadWriteLock();
-    private final Lock listenersRead = nodeChangeListenersLock.readLock();
-    private final Lock listenersWrite = nodeChangeListenersLock.writeLock();
+            new CopyOnWriteArraySet<NodeMappingListener>();
     
     /** The remote backend to this service. */
     private final NodeMappingServer server;
@@ -277,12 +295,21 @@ public class NodeMappingServiceImpl implements NodeMappingService
      *  enforced.
      */
     private final NodeMappingServerImpl serverImpl;
-    
+
     /** The object we send to our global server for callbacks when there
      *  are map changes on this node.
      */
-    private final MapChangeNotifier changeNotifier;
+    private final NotifyClient changeNotifier; 
+        
+    /** Our instantiated change notifier object.  This reference
+     *  is held so the object is not garbage collected;  it is also
+     *  used for local calls.
+     */
+    private final MapChangeNotifier changeNotifierImpl;
 
+    /** The exporter for the service */
+    private final Exporter<NotifyClient> exporter;
+    
     /** The local node id, as determined from the watchdog */
     private long localNodeId;
     
@@ -352,16 +379,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
                     wrappedProps.getProperty(SERVER_HOST_PROPERTY, localHost);
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
-                        NodeMappingServerImpl.DEFAULT_SERVER_PORT);
-                if (port < 0 || port > 65535) {
-                    throw new IllegalArgumentException(
-                        "The " + NodeMappingServerImpl.SERVER_PORT_PROPERTY + 
-                        " property value must be greater than or equal" +
-                        " to 0 and less than 65535: " + port);
-                }
+                        NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
             }          
           
-       // JANE JANE
             // This code assumes that the server has already been started.
             // Perhaps it'd be better to block until the server is available?
             Registry registry = LocateRegistry.getRegistry(host, port);
@@ -370,22 +390,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
             
             final int clientPort = wrappedProps.getIntProperty(
                                         CLIENT_PORT_PROPERTY, 
-                                        DEFAULT_CLIENT_PORT);
-            if (clientPort < 0 || clientPort > 65535) {
-                    throw new IllegalArgumentException(
-                        "The " + CLIENT_PORT_PROPERTY + 
-                        " property value must be greater than or equal" +
-                        " to 0 and less than 65535: " + clientPort);
-                }
+                                        DEFAULT_CLIENT_PORT, 0, 65535);
             
-            changeNotifier = new MapChangeNotifier();
-            try {
-                // JANE JANE
-                // Is this the best way to do this?  Ask Tim & Ann.
-                UnicastRemoteObject.exportObject(changeNotifier, clientPort);
-            } catch (RemoteException re) {
-                re.printStackTrace();
-            }
+            changeNotifierImpl = new MapChangeNotifier();
+            exporter = new Exporter<NotifyClient>(NotifyClient.class);
+            exporter.export(changeNotifierImpl, clientPort);
+            changeNotifier = exporter.getProxy();
 
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
@@ -428,7 +438,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 dataService = registry.getComponent(DataService.class);
                 
                 contextFactory = new ContextFactory(txnProxy);
-                proxyOwner = txnProxy.getCurrentOwner();
+                taskOwner = txnProxy.getCurrentOwner();
             }
             
     //          watchdogService = registry.getComponent(WatchdogService.class); 
@@ -468,7 +478,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         boolean ok = true;
 
         try {
-            UnicastRemoteObject.unexportObject(changeNotifier, true);
+            exporter.unexport();
             if (dataService != null) {
                 // We've been configured
                 server.unregisterNodeListener(localNodeId);
@@ -584,7 +594,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
                                 "Local assignment for {0} failed", identity);
             }
             if (localTask.added()) {
-                changeNotifier.added(identity, null);
+                changeNotifierImpl.added(identity, null);
             }
         }
     }
@@ -816,12 +826,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
-        listenersWrite.lock();
-        try {
-            nodeChangeListeners.add(listener);
-        } finally {
-            listenersWrite.unlock();
-        }
+        nodeChangeListeners.add(listener);
         logger.log(Level.FINEST, "addNodeMappingListener successful");
     }
     
@@ -835,53 +840,26 @@ public class NodeMappingServiceImpl implements NodeMappingService
         MapChangeNotifier() { }
         
         public void removed(final Identity id, final Node newNode) {
-            Set<NodeMappingListener> listeners;
-            // Grab a snapshot
-            listenersRead.lock();
-            try {
-                listeners = 
-                        new HashSet<NodeMappingListener>(nodeChangeListeners);
-            } finally {
-                listenersRead.unlock();
-            }
-            
-            for (final NodeMappingListener listener : listeners) {
-                Runnable service = new Runnable() {
-                    public void run() {
-                        System.out.println("LISTENER removed: " + listener + " id: " + id + "node: " + newNode);
-                        listener.mappingRemoved(id, newNode);
-                    }
-                };
-                
-                // Mark these as daemon threads, in case the callback is taking
-                // a very long time and we need to shut down.
-                Thread thread = new Thread(service);
-                thread.setDaemon(true);
-                thread.start();
+            for (final NodeMappingListener listener : nodeChangeListeners) {
+                taskScheduler.scheduleTask( 
+                        new AbstractKernelRunnable() {
+                            public void run() {
+                                System.out.println("LISTENER removed: " + listener + " id: " + id + "node: " + newNode);
+                                listener.mappingRemoved(id, newNode);
+                            }                    
+                        }, taskOwner);
             }
         }
 
         public void added(final Identity id, final Node oldNode) {
-            Set<NodeMappingListener> listeners;
-            // Grab a snapshot
-            listenersRead.lock();
-            try {
-                listeners = 
-                        new HashSet<NodeMappingListener>(nodeChangeListeners);
-            } finally {
-                listenersRead.unlock();
-            }
-            
-            for (final NodeMappingListener listener : listeners) {
-                Runnable service = new Runnable() {
-                    public void run() {
-                        System.out.println("LISTENER added: " + listener + " id: " + id + "node: " + oldNode);
-                        listener.mappingAdded(id, oldNode);
-                    }
-                }; 
-                Thread thread = new Thread(service);
-                thread.setDaemon(true);
-                thread.start();
+            for (final NodeMappingListener listener : nodeChangeListeners) {
+                taskScheduler.scheduleTask(
+                        new AbstractKernelRunnable() {
+                            public void run() {
+                                System.out.println("LISTENER added: " + listener + " id: " + id + "node: " + oldNode);
+                                listener.mappingAdded(id, oldNode);
+                            }                    
+                        }, taskOwner);
             }
         }
     }
@@ -892,7 +870,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
-        taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);
+        taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
     }
     
     /* -- Implement transaction participant/context for 'configure' -- */

@@ -23,13 +23,12 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.rmi.RemoteException;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -87,11 +86,6 @@ import java.util.logging.Logger;
  * This class is public for testing.
  */
 public class NodeMappingServerImpl implements NodeMappingServer {
-    
-    /** The name of this class. */
-    private static final String CLASSNAME = 
-            NodeMappingServerImpl.class.getName();
-    
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -129,11 +123,11 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The default remove thread sleep time. */
     private static final int DEFAULT_REMOVE_SLEEP_TIME = 5000;
-    
-    
+       
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(CLASSNAME));
+            new LoggerWrapper(
+                Logger.getLogger(NodeMappingServerImpl.class.getName()));
     
     /** The port we've been exported on. */
     private final int port;
@@ -144,18 +138,18 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** The transaction proxy, or null if configure has not been called. */ 
     private static TransactionProxy txnProxy;
     
+    /** The task scheduler, for our transactional, synchronous tasks. */
+    private final TaskScheduler taskScheduler;
+    
+    /** The proxy owner for our transactional, synchronous tasks. */
+    private TaskOwner taskOwner;
+    
         /** The data service. */
     private DataService dataService;
     
     /** The watchdog service. */
 //    private Watchdog watchdogService;
     
-    /** The task scheduler, for our transactional, synchronous tasks. */
-    private final TaskScheduler taskScheduler;
-    
-    /** The proxy owner for our transactional, synchronous tasks. */
-    private TaskOwner proxyOwner;
-
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
     private final NodeAssignPolicy assignPolicy;
@@ -175,7 +169,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      *  TODO For failover, will need to persist these identities.
      */
     private final Map<Identity, Long> removeMap =
-            Collections.synchronizedMap(new HashMap<Identity, Long> ());
+                new ConcurrentHashMap<Identity, Long>();
 
     /** 
      * The set of clients of this server who wish to be notified if
@@ -184,7 +178,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * TODO For failover, these need to be persisted.
      */
     private final Map<Long, NotifyClient> notifyMap =
-                                    new HashMap<Long, NotifyClient>();   
+                new ConcurrentHashMap<Long, NotifyClient>();   
 
     /**
      * Creates a new instance of NodeMappingServerImpl, called from the
@@ -204,14 +198,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
-                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
-        if (requestedPort < 0 || requestedPort > 65535) {
-            throw new IllegalArgumentException(
-                "The " + SERVER_PORT_PROPERTY + 
-                " property value must be " +
-                "greater than or equal to 0 and less than 65535: " +
-                requestedPort);
-        } 
+                SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
         
         String policyClassName = wrappedProps.getProperty(
 		ASSIGN_POLICY_CLASS_PROPERTY);	    
@@ -224,26 +211,15 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         }
         
         removeSleepTime = wrappedProps.getLongProperty(
-                REMOVE_SLEEP_PROPERTY, DEFAULT_REMOVE_SLEEP_TIME);
-        if (removeSleepTime < 0) {
-            throw new IllegalArgumentException(
-                    "The " + REMOVE_SLEEP_PROPERTY + 
-                    " property value must be greater than 0: " + 
-                    removeSleepTime);
-        }
+                REMOVE_SLEEP_PROPERTY, DEFAULT_REMOVE_SLEEP_TIME, 
+                1, Long.MAX_VALUE);
         
         removeExpireTime = wrappedProps.getLongProperty(
-                REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME);
-        if (removeSleepTime < 0) {
-            throw new IllegalArgumentException(
-                    "The " + REMOVE_EXPIRE_PROPERTY + 
-                    " property value must be greater than 0: " + 
-                    removeExpireTime);
-        }
+                REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME,
+                1, Long.MAX_VALUE);
         
-        
-        exporter = new Exporter<NodeMappingServer>();
-        port = exporter.export(this, requestedPort, SERVER_EXPORT_NAME);
+        exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
+        port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
         if (requestedPort == 0) {
             logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
         }     
@@ -283,7 +259,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             }
             dataService = registry.getComponent(DataService.class);
 
-            proxyOwner = txnProxy.getCurrentOwner();
+            taskOwner = txnProxy.getCurrentOwner();
 
 //                watchdogService = registry.getComponent(WatchdogService.class);
 
@@ -427,10 +403,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     logger.log(Level.FINE, "Remove thread interrupted");
                     break;
                 }
+                
                 Long time = System.currentTimeMillis() - expireTime;
-                // Take a snapshot of the removeMap
-                Set<Map.Entry<Identity, Long>> removeSet = removeMap.entrySet();
-                for (Map.Entry<Identity, Long> entry : removeSet) {
+                
+                for (Map.Entry<Identity, Long> entry : removeMap.entrySet()) {
                     // Check for expiration.  
                     if (entry.getValue() < time) {
                         Identity id = entry.getKey();
@@ -511,10 +487,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
-        synchronized(notifyMap) {
-            notifyMap.put(nodeId, client);
-        }
-         assignPolicy.nodeStarted(nodeId);
+        notifyMap.put(nodeId, client);
+        assignPolicy.nodeStarted(nodeId);
     }
     
     /**
@@ -524,10 +498,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     public void unregisterNodeListener(long nodeId) throws IOException {
         // Tell the assign policy to stop assigning to the node
         assignPolicy.nodeStopped(nodeId);
-        
-        synchronized(notifyMap) {
-            notifyMap.remove(nodeId);
-        }
+        notifyMap.remove(nodeId);
     }    
     
     // TODO Perhaps need to have a separate thread do this work.
@@ -537,36 +508,30 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
         System.out.println("In notifyListeners, id is " + id + " oldNode: " + oldNode + " newNode: " + newNode);
-        NotifyClient oldClient = null;
-        NotifyClient newClient = null;
-        synchronized(notifyMap) {
-            if (oldNode != null) {
-                oldClient = notifyMap.get(oldNode.getId());
-            }
-            if (newNode != null) {
-                newClient = notifyMap.get(newNode.getId());
+
+        if (oldNode != null) {
+            NotifyClient oldClient = notifyMap.get(oldNode.getId());
+            if (oldClient != null) {
+                try {
+                    oldClient.removed(id, newNode);
+                } catch (RemoteException ex) {
+                    logger.logThrow(Level.WARNING, ex, 
+                            "A communication error occured while notifying" +
+                            " node {0} that {1} has been removed", oldClient, id);
+                }
             }
         }
-
-        // Tell the old node that the identity moved
-        if (oldClient != null) {
-            try {
-                oldClient.removed(id, newNode);
-            } catch (RemoteException ex) {
-                logger.logThrow(Level.WARNING, ex, 
-                        "A communication error occured while notifying" +
-                        " node {0} that {1} has been removed", oldClient, id);
-            }
-        }
-
-        // Tell the new node that the identity moved
-        if (newClient != null) {
-            try {
-                newClient.added(id, oldNode);
-            } catch (RemoteException ex) {
-                logger.logThrow(Level.WARNING, ex, 
-                        "A communication error occured while notifying" +
-                        " node {0} that {1} has been added", newClient, id);
+        
+        if (newNode != null) {
+            NotifyClient newClient = notifyMap.get(newNode.getId());
+            if (newClient != null) {
+                try {
+                    newClient.added(id, oldNode);
+                } catch (RemoteException ex) {
+                    logger.logThrow(Level.WARNING, ex, 
+                            "A communication error occured while notifying" +
+                            " node {0} that {1} has been added", newClient, id);
+                }
             }
         }
     }
@@ -594,7 +559,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {   
-        taskScheduler.runTask(new TransactionRunner(task), proxyOwner, true);      
+        taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);      
     }
     
     /**
@@ -852,7 +817,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         IdentityMO idmo = idtask.getId();
         return idmo.getNodeId();
     }
-    
 
 
     /**
@@ -866,13 +830,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     Set<String> reportFoundKeys(Identity identity) throws Exception {
         AssertTask atask = new AssertTask(identity, dataService);
-        try {
-            runTransactionally(atask);
-            return atask.found();
-        } catch (Exception ex) {
-            logger.logThrow(Level.SEVERE, ex, "Unexpected exception");
-            return new HashSet<String>();
-        }   
+        runTransactionally(atask);
+        return atask.found();    
     }
 
     /**

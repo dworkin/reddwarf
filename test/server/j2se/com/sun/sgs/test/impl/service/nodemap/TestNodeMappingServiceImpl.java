@@ -306,9 +306,11 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     public void testConfigure() throws Exception {
+        commitTransaction();
         NodeMappingService nodemap = null;
         try {
             nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
+            createTransaction();
             nodemap.configure(serviceRegistry, txnProxy);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
