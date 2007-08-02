@@ -21,20 +21,27 @@ public interface WatchdogService extends Service {
 
     /**
      * Returns {@code true} if the local node is considered alive,
-     * otherwise returns {@code false}.  If {@code checkTransactionally}
-     * is {@code true}, the check happens in the current transaction,
-     * otherwise this method returns the most recent information known.
+     * otherwise returns {@code false}.  This method should only be
+     * called from within a transaction.
      *
-     * @param 	checkTransactionally if {@code true}, the check happens
-     * 		in the current transaction, otherwise the most recent
-     * 		information is returned
      * @return	{@code true} if the local node is considered alive, and
      * 		{@code false} otherwise
-     * @throws 	TransactionException if {@code checkTransactionally} is
-     * 		{@code true} and there is a problem with the current
-     *		transaction
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
      */
-    boolean isLocalNodeAlive(boolean checkTransactionally);
+    boolean isLocalNodeAlive();
+
+    /**
+     * Returns {@code true} if the local node is considered alive,
+     * otherwise returns {@code false}.  This method returns the most
+     * recent information known to this service and may not be
+     * definitive.  For definitive information, use the {@link
+     * #isLocalNodeAlive isLocalNodeAlive} method.
+     *
+     * @return	{@code true} if the local node is considered alive, and
+     * 		{@code false} otherwise
+     */
+    boolean isLocalNodeAliveNonTransactional();
 
     /**
      * Returns an iterator for the set of nodes that this service
@@ -53,12 +60,12 @@ public interface WatchdogService extends Service {
 
     /**
      * Returns node status information for the node with the specified
-     * {@code nodeId}.  This method should only be called within a
-     * transaction.
+     * {@code nodeId}, or {@code null} if the node is unknown.  This
+     * method should only be called within a transaction.
      *
      * @param	nodeId	a node ID
-     * @return	node status information for the specified {@code
-     * 		nodeId}
+     * @return	node status information for the specified {@code nodeId},
+     *		or {@code null}
      * @throws	IllegalArgumentException if the specified {@code nodeId}
      *		is not within the range of valid IDs
      * @throws 	TransactionException if there is a problem with the

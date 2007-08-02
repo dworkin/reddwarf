@@ -335,11 +335,10 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
 
     /** {@inheritDoc} */
-    public boolean isLocalNodeAlive(boolean checkTransactionally) {
+    public boolean isLocalNodeAlive() {
 	checkState();
-	boolean aliveStatus = isLocalNodeAlive();
-	if (aliveStatus == false || !checkTransactionally) {
-	    return aliveStatus;
+	if (getIsAlive() == false) {
+	    return false;
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || node.isAlive() == false) {
@@ -351,6 +350,12 @@ public class WatchdogServiceImpl implements WatchdogService {
 	}
     }
 
+    /** {@inheritDoc} */
+    public boolean isLocalNodeAliveNonTransactional() {
+	checkState();
+	return getIsAlive();
+    }
+    
     /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
 	checkState();
@@ -364,11 +369,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	if (nodeId < 0) {
 	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
 	}
-	Node node = NodeImpl.getNode(dataService, nodeId);
-	return
-	    node != null ?
-	    node :
-	    new NodeImpl(nodeId);
+	return NodeImpl.getNode(dataService, nodeId);
     }
 
     /** {@inheritDoc} */
@@ -500,24 +501,21 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (isLocalNodeAlive() && ! shuttingDown()) {
+	    while (getIsAlive() == true && ! shuttingDown()) {
 
 		try {
 		    Thread.currentThread().sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
 		    return;
 		}
-		
+
+		boolean renewed = false;
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
 			setFailedThenNotify(true);
 			break;
 		    }
-		    long now = System.currentTimeMillis();
-		    if (now - lastRenewTime > renewInterval) {
-			setFailedThenNotify(true);
-		    }
-		    lastRenewTime = now;
+		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
 		    
 		} catch (IOException e) {
@@ -530,6 +528,14 @@ public class WatchdogServiceImpl implements WatchdogService {
 			"renewing with watchdog server throws");
 		    nextRenewInterval =
 			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
+		}
+		long now = System.currentTimeMillis();
+		if (now - lastRenewTime > renewInterval) {
+		    setFailedThenNotify(true);
+		    break;
+		}
+		if (renewed) {
+		    lastRenewTime = now;
 		}
 	    }
 	}
@@ -598,7 +604,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Returns the local alive status: {@code true} if this node is
      * considered alive.
      */
-    private boolean isLocalNodeAlive() {
+    private boolean getIsAlive() {
 	synchronized (stateLock) {
 	    return isAlive;
 	}

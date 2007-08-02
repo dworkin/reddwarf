@@ -125,7 +125,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The transaction proxy for this class. */
     private static TransactionProxy txnProxy;
 
-    /** The lock for  {@code dataService}, {@code shuttingDown}, and
+    /** The lock for {@code dataService}, {@code shuttingDown}, and
      * {@code callsInProgress} fields. */
     private final Object lock = new Object();
     

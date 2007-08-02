@@ -375,6 +375,158 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
+    /* -- Test isLocalNodeAlive -- */
+
+    public void testIsLocalNodeAlive() throws Exception {
+	createTransaction();
+	if (! watchdogService.isLocalNodeAlive()) {
+	    fail("Expected watchdogService.isLocalNodeAlive() to return true");
+	}
+	commitTransaction();
+
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(props, systemRegistry);
+	try {
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    commitTransaction();
+	    createTransaction();
+	    if (! watchdog.isLocalNodeAlive()) {
+		fail("Expected watchdog.isLocalNodeAlive() to return true");
+	    }
+	    commitTransaction();
+	    watchdogService.shutdown();
+	    // wait for watchdog's renew to fail...
+	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+	    createTransaction();
+	    if (watchdog.isLocalNodeAlive()) {
+		fail("Expected watchdog.isLocalNodeAlive() to return false");
+	    }
+	    commitTransaction();
+	    
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testIsLocalNodeAliveServiceNotConfigured() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	try {
+	    watchdog.isLocalNodeAlive();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testIsLocalNodeAliveServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	watchdog.shutdown();
+	try {
+	    watchdog.isLocalNodeAlive();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testIsLocalNodeAliveNoTransaction() throws Exception {
+	try {
+	    watchdogService.isLocalNodeAlive();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test isLocalNodeAliveNonTransactional -- */
+
+    public void testIsLocalNodeAliveNonTransactional() throws Exception {
+	if (! watchdogService.isLocalNodeAliveNonTransactional()) {
+	    fail("Expected watchdogService.isLocalNodeAlive" +
+		 "NonTransactional() to return true");
+	}
+
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(props, systemRegistry);
+	try {
+	    createTransaction();
+	    watchdog.configure(serviceRegistry, txnProxy);
+	    commitTransaction();
+	    if (! watchdog.isLocalNodeAliveNonTransactional()) {
+		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
+		     "to return true");
+	    }
+	    watchdogService.shutdown();
+	    // wait for watchdog's renew to fail...
+	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+	    if (watchdog.isLocalNodeAliveNonTransactional()) {
+		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
+		     "to return false");
+	    }
+	    
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testIsLocalNodeAliveNonTransactionalServiceNotConfigured()
+	throws Exception
+    {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	try {
+	    watchdog.isLocalNodeAliveNonTransactional();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    watchdog.shutdown();
+	}
+    }
+
+    public void testIsLocalNodeAliveNonTransactionalServiceShuttingDown()
+	throws Exception
+    {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	createTransaction();
+	watchdog.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+	watchdog.shutdown();
+	try {
+	    watchdog.isLocalNodeAliveNonTransactional();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testIsLocalNodeAliveNonTransactionalNoTransaction()
+	throws Exception
+    {
+	try {
+	    watchdogService.isLocalNodeAliveNonTransactional();
+	} catch (TransactionNotActiveException e) {
+	    fail("caught TransactionNotActiveException!");
+	}
+    }
+
     /* -- Test getNodes -- */
 
     public void testGetNodes() throws Exception {
@@ -478,6 +630,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 		long id = watchdog.getLocalNodeId();
 		createTransaction();
 		Node node = watchdogService.getNode(id);
+		if (node == null) {
+		    fail("Expected node for ID " + id + " got " +  node);
+		}
 		System.err.println(node);
 		if (id != node.getId()) {
 		    fail("Expected node ID " + id + " got, " + node.getId());
@@ -538,14 +693,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	createTransaction();
 	Node node = watchdogService.getNode(29);
 	System.err.println(node);
-	if (node.getId() != 29) {
-	    fail("Expected node ID 29, got " + node.getId());
-	} else if (node.isAlive()) {
-	    fail("Node 29 is alive!");
-	} else if (node.getHostName() != null) {
-	    fail("Expected null host name, got " + node.getHostName());
+	if (node != null) {
+	    fail("Expected null node, got " + node);
 	}
-
     }
 
     /* -- Test addNodeListener -- */
@@ -651,6 +801,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    long id = watchdog.getLocalNodeId();
 	    createTransaction();
 	    Node node = watchdogService.getNode(id);
+	    if (node == null) {
+		fail("Expected node for ID " + id + " got " +  node);
+	    }
 	    System.err.println(node);
 	    if (id != node.getId()) {
 		fail("Expected node ID " + id + " got, " + node.getId());
