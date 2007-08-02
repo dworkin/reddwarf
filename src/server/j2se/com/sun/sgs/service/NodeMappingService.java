@@ -36,9 +36,10 @@ import java.util.Iterator;
  * tasks to be run for that client's identity.  In order to determine whether an
  * identity is quiescent, services which manage resources being used on an
  * identity's behalf inform this mapping service when the identity is active
- * or inactive by calling {@link #setStatus setStatus}.   The node mapping
- * service will use this information for a simple reference counting 
- * garbage collection scheme within the map. 
+ * or inactive on a node by calling {@link #setStatus setStatus}.   The node 
+ * mapping service will use this information for a simple reference counting 
+ * garbage collection scheme within the map.   Status is tracked per node, so
+ * services should consider only their local node state when calling setStatus.
  *              
  * <p>
  * <b> A variation of "assignNode" which adds hints for identities the input
@@ -54,8 +55,8 @@ public interface NodeMappingService extends Service {
      * though {@link #setStatus setStatus(service, identity, true)} had
      * been called on the assigned node.
      * <p>
-     * This method should not be called while in a transaction.
-     * <b> clarify this</b>
+     * This method should not be called while in a transaction, as this
+     * method call could entail remote communication.
      * <p>
      *
      * @param service the class of the caller
@@ -69,14 +70,14 @@ public interface NodeMappingService extends Service {
     
     /**
      * Inform the {@code NodeMappingService} that a service instance has observed
-     * a change in status of an identity.  When all services which 
+     * a change in status of an identity on this node.  When all services which 
      * have previously noted an identity as active set the status to false,
      * the identity can be removed from the map.  If a node fails or the 
      * node mapping service initiates a mapping change (for load balancing), all 
      * status votes for the failing or old node are implicitly set to inactive.  
      * <p>
-     * This method should not be called while in a transaction.
-     * <b> clarify this</b>
+     * This method should not be called while in a transaction, as this
+     * method call could entail remote communication.
      * <p>
      * @param service the class of the calling service
      * @param identity the identity for which {@code service} has observed a 
@@ -90,7 +91,9 @@ public interface NodeMappingService extends Service {
                    boolean active) throws UnknownIdentityException;
     
     /** 
-     * Returns the node to which the identity is assigned.
+     * Returns the node to which the identity is assigned.  
+     * <p>
+     * This method must be called from within a transaction.
      *
      * @param identity the identity 
      * @return node information for the specified {@code identity} 
@@ -106,6 +109,8 @@ public interface NodeMappingService extends Service {
      * The set will be empty if no identities are assigned to the node.
      * <p>
      * The {@code remove} method of the returned iterator does nothing.
+     * <p>
+     * This method must be called from within a transaction.
      * 
      * @param nodeId a node ID
      * @return an iterator for all identities assigned to this node

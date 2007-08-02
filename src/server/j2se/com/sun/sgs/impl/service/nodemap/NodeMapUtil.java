@@ -59,7 +59,7 @@ final class NodeMapUtil {
      *
      * @return {@code true} if the versions were the same, {@code false}
      *         otherwise
-     * @throw TransactionException if the operation failed because of a problem
+     * @throws TransactionException if the operation failed because of a problem
      *        with the current transaction
      */
     static boolean handleDataVersion(DataService dataService, 
