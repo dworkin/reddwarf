@@ -67,6 +67,10 @@ public class ChannelMessageSend {
             /** Pause 1 second just to calm down... */
 	    try { Thread.sleep(1000); } catch (Throwable t) { }
             
+            /* channel-creator client no longer needed. */
+            client.processInput("logout");
+            client = null;
+            
             /* Start up each thread with a small random pause after each one. */
 	    for (Thread t : threads) {
 		t.start();
