@@ -9,10 +9,10 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -142,8 +142,8 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
-    /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
+    /** The task owner. */
+    private TaskOwner taskOwner;
 
     /** The watchdog server impl. */
     private final WatchdogServerImpl serverImpl;
@@ -286,10 +286,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		(new ConfigureServiceContextFactory(txnProxy)).
 		    joinTransaction();
 		dataService = registry.getComponent(DataService.class);
-		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(
-			taskScheduler, proxy.getCurrentOwner(),
-			registry.getComponent(TaskService.class));
+		taskOwner = proxy.getCurrentOwner();
 	    }
 
 	    if (serverImpl != null) {
@@ -511,7 +508,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 		boolean renewed = false;
 		try {
-		    if (!serverProxy.renewNode(localNodeId)) {
+		    if (! serverProxy.renewNode(localNodeId)) {
 			setFailedThenNotify(true);
 			break;
 		    }
@@ -624,7 +621,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      */
     private void setFailedThenNotify(boolean notify) {
 	synchronized (stateLock) {
-	    if (!isAlive) {
+	    if (! isAlive) {
 		return;
 	    }
 	    isAlive = false;
@@ -651,7 +648,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 	for (NodeListener listener : nodeListeners.keySet()) {
 	    final NodeListener nodeListener = listener;
-	    nonDurableTaskScheduler.scheduleNonTransactionalTask(
+	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			if (node.isAlive()) {
@@ -660,7 +657,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 			    nodeListener.nodeFailed(node);
 			}
 		    }
-		});
+		}, taskOwner);
 	}
     }
 

@@ -9,7 +9,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -141,9 +140,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
-    /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
-
     /** The lock for notifying the {@code NotifyClientsThread}. */
     private final Object notifyClientsLock = new Object();
 
@@ -257,15 +253,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		}
 		dataService = registry.getComponent(DataService.class);
 		taskOwner = proxy.getCurrentOwner();
-		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(
-			taskScheduler, taskOwner,
-			registry.getComponent(TaskService.class));
 		idGenerator =
 		    new IdGenerator(ID_GENERATOR_NAME,
 				    idBlockSize,
 				    txnProxy,
-				    nonDurableTaskScheduler);
+				    taskScheduler);
 		Collection<NodeImpl> failedNodes =
 		    NodeImpl.markAllNodesFailed(dataService);
 		notifyClientsOnRestartThread =
@@ -331,7 +323,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    "interrupted while obtaining node ID");
 	    }
 	    final NodeImpl node = new NodeImpl(nodeId, hostname, client);
-	    assert !nodeMap.containsKey(nodeId);
+	    assert ! nodeMap.containsKey(nodeId);
 	
 	    // Persist node, and back out transient mapping on failure.
 	    try {
@@ -374,7 +366,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
 	try {
 	    NodeImpl node = nodeMap.get(nodeId);
-	    if (node == null || !node.isAlive() || node.isExpired()) {
+	    if (node == null || ! node.isAlive() || node.isExpired()) {
 		return false;
 	    }
 
@@ -526,7 +518,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 */
 	public void run() {
 
-	    while (!shuttingDown()) {
+	    while (! shuttingDown()) {
 
 		long now = System.currentTimeMillis();
 		boolean notifyClients = false;
@@ -603,7 +595,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	/** {@inheritDoc} */
 	public void run() {
 
-	    while (!shuttingDown()) {
+	    while (! shuttingDown()) {
 		while (statusChangedNodes.isEmpty()) {
 		    synchronized (notifyClientsLock) {
 			try {

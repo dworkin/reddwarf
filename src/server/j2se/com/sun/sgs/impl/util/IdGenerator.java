@@ -6,9 +6,12 @@ package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 
 /**
@@ -23,7 +26,8 @@ public class IdGenerator {
     private final String name;
     private final int blockSize;
     private final TransactionProxy txnProxy;
-    private final NonDurableTaskScheduler scheduler;
+    private final TaskScheduler scheduler;
+    private final TaskOwner owner;
     private final TransactionContextFactory<Context> contextFactory;
     private final Object lock = new Object();
     private ReserveIdBlockTask reserveTask = null;
@@ -46,7 +50,7 @@ public class IdGenerator {
     public IdGenerator(
 	String name, int blockSize,
 	TransactionProxy proxy,
-	NonDurableTaskScheduler scheduler)
+	TaskScheduler scheduler)
     {
 	if (name == null) {
 	    throw new NullPointerException("null name");
@@ -61,8 +65,9 @@ public class IdGenerator {
 	}
 	this.name = name;
 	this.blockSize = blockSize;
-	this.scheduler = scheduler;
 	this.txnProxy = proxy;
+	this.scheduler = scheduler;
+	this.owner = proxy.getCurrentOwner();
 	this.contextFactory = new ContextFactory(proxy);
     }
 
@@ -84,7 +89,8 @@ public class IdGenerator {
 		if (reserveTask == null) {
 		    // schedule task to reserve next block
 		    reserveTask = new ReserveIdBlockTask();
-		    scheduler.scheduleTask(reserveTask);
+		    scheduler.scheduleTask(
+			new TransactionRunner(reserveTask), owner);
 		} else {
 		    lock.wait();
 		}

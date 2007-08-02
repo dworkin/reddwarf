@@ -261,7 +261,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    new IdGenerator(ID_GENERATOR_NAME,
 				    idBlockSize,
 				    txnProxy,
-				    nonDurableTaskScheduler);
+				    taskScheduler);
 		ServerSocketEndpoint endpoint =
 		    new ServerSocketEndpoint(
 		        new InetSocketAddress(port), TransportType.RELIABLE);
