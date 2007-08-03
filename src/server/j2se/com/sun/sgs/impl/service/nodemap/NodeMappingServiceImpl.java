@@ -27,6 +27,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
@@ -274,7 +275,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private DataService dataService;
     
     /** The watchdog service. */
-//    private WatchdogService watchdogService;
+    private WatchdogService watchdogService;
     
     /** The context factory for map change transactions. */
     private ContextFactory contextFactory;    
@@ -441,9 +442,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 taskOwner = txnProxy.getCurrentOwner();
             }
             
-    //          watchdogService = registry.getComponent(WatchdogService.class); 
-                localNodeId = (new NodeImpl()).getId();
-    //          localNodeId = watchdogservice.getLocalNodeId();
+            watchdogService = registry.getComponent(WatchdogService.class); 
+            localNodeId = watchdogService.getLocalNodeId();
 
             if (serverImpl != null) {
                 serverImpl.configure(registry, txnProxy);
@@ -989,8 +989,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	    try {                
 		IdentityMO idmo = 
                         dataService.getServiceBinding(key, IdentityMO.class);
-                node = new NodeImpl(idmo.getNodeId());
-//                node = watchdogService.getNode(nodeId);
+                node = watchdogService.getNode(idmo.getNodeId());
                 Node old = idcache.put(identity, node);
                 assert (old == null);
                 return node;

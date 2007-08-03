@@ -131,7 +131,7 @@ public class Exporter<T extends Remote> {
      *		removed from the network
      */
     public synchronized boolean unexport() {
-	if (registry == null) {
+	if (server == null) {
 	    throw new IllegalStateException(
 		"The server is already shut down");
 	}

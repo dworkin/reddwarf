@@ -14,11 +14,13 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -41,6 +43,10 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private static final String DataStoreImplClassName =
         DataStoreImpl.class.getName();
 
+    /** The name of the WatchdogServerImpl class. */
+    private static final String WatchdogServerPropertyPrefix =
+        "com.sun.sgs.impl.service.watchdog.server";
+    
     /** The name of the NodeMappingServiceImpl class. */
     private static final String NodeMappingServiceClassName =
         NodeMappingServiceImpl.class.getName();
@@ -50,6 +56,12 @@ public class TestNodeMappingServiceImpl extends TestCase {
         System.getProperty("java.io.tmpdir") + File.separator +
         "TestNodeMappingServiceImpl.db";
 
+    /** The port for the watchdog */
+    private static final int WATCHDOG_PORT = 0;
+
+    /** The watchdog renew interval */
+    private static long RENEW_INTERVAL = 500;
+    
     /** The port for the server. */
     private static final int SERVER_PORT = 0;
 
@@ -76,7 +88,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private DummyTransaction txn;
     
     private DataServiceImpl dataService;
-
+    private WatchdogServiceImpl watchdogService;
     private NodeMappingServiceImpl nodeMappingService; 
     
     private boolean passed;
@@ -140,6 +152,10 @@ public class TestNodeMappingServiceImpl extends TestCase {
         serviceProps = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
+            WatchdogServerPropertyPrefix + ".start", "true",
+            WatchdogServerPropertyPrefix + ".port", Integer.toString(WATCHDOG_PORT),
+            WatchdogServerPropertyPrefix + ".renew.interval",
+                Long.toString(RENEW_INTERVAL),
             startServiceName, "true",
             removeExpireName, Integer.toString(REMOVE_TIME),
             removeSleepName, Integer.toString(REMOVE_TIME/2),
@@ -162,7 +178,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
         
 	// create services
-	dataService = createDataService(systemRegistry);	
+	dataService = createDataService(systemRegistry);
+        watchdogService = new WatchdogServiceImpl(serviceProps, systemRegistry);
         nodeMappingService = 
                 new NodeMappingServiceImpl(serviceProps, systemRegistry);
 
@@ -175,9 +192,21 @@ public class TestNodeMappingServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-	
+        
+        commitTransaction();
+        createTransaction(10000);
+        
+	// configure watchdog service
+        watchdogService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(WatchdogService.class, watchdogService);
+        txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
+        serviceRegistry.setComponent(WatchdogService.class, watchdogService);
+        serviceRegistry.setComponent(WatchdogServiceImpl.class, watchdogService);
+
 	serviceRegistry.registerAppContext();
 
+        commitTransaction();
+        createTransaction(10000);
         nodeMappingService.configure(serviceRegistry, txnProxy);
 	
 

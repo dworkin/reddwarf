@@ -17,10 +17,12 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.HashSet;
@@ -148,7 +150,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private DataService dataService;
     
     /** The watchdog service. */
-//    private Watchdog watchdogService;
+    private WatchdogService watchdogService;
     
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
@@ -258,23 +260,17 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 throw new IllegalStateException("Already configured");
             }
             dataService = registry.getComponent(DataService.class);
-
+            watchdogService = registry.getComponent(WatchdogService.class);
+            
             taskOwner = txnProxy.getCurrentOwner();
-
-//                watchdogService = registry.getComponent(WatchdogService.class);
-
         }
         
         // Restore any old data from the data service.
         NodeMapUtil.handleDataVersion(dataService, logger);
-        
-        // Register our node listener with the watchdog service.
-//        watchdogService.addNodeListener(new Listener());
           
         // Create our remove thread; this is started when the instantiating
         // service's configure transaction is committed.
         removeThread = new RemoveThread(removeSleepTime, removeExpireTime);
-
     }
     
     /**
@@ -295,6 +291,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * configure method commits.
      */
     void commitConfigure() {
+        // Register our node listener with the watchdog service.
+        watchdogService.addNodeListener(new Listener());
         removeThread.start();
     }
     
@@ -310,7 +308,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         }
         return ok;
     }
-    
 
     
     
@@ -414,8 +411,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                         try {
                             runTransactionally(rtask);
                             if (rtask.isDead()) {
-                                notifyListeners(new NodeImpl(rtask.nodeId()), 
-                                                null, id);
+                                notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
                             removeMap.remove(id);
@@ -442,7 +438,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         // return value, identity was found to be dead and was removed
         private boolean dead = true;
         // set if dead == true;  tells us the node the identity was removed from
-        private long nodeId;
+        private Node node;
         
         RemoveTask(Identity id) {
             this.id = id;
@@ -458,7 +454,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             if (dead) {
                 IdentityMO idmo = 
                         dataService.getServiceBinding(idkey, IdentityMO.class);
-                nodeId = idmo.getNodeId();
+                long nodeId = idmo.getNodeId();
+                node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
                 String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
                 dataService.removeServiceBinding(nodekey);
@@ -478,8 +475,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             return dead;
         }
         /** Returns the node id for the node the identity was removed from. */
-        long nodeId() {
-            return nodeId;
+        Node getNode() {
+            return node;
         } 
     }
     
@@ -582,21 +579,21 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
         final Node oldNode = old;
-        final Node newNode;
+        final long newNodeId;
         try {
-            newNode = assignPolicy.chooseNode(id);
+            newNodeId = assignPolicy.chooseNode(id);
         } catch (IllegalStateException ex) {
             logger.logThrow(Level.WARNING, ex, "Move {0} from {1} failed"
                     + " because no live nodes are available", id, oldNode);
             throw ex;
         }
 
-        if (newNode == oldNode) {
+        if (oldNode != null && newNodeId == oldNode.getId()) {
             // We picked the same node.  Not sure how to best handle this...
             // it probably needs to be dealt with at a higher level, or the
             // assignPolicy could have an API saying "pick a node, but NOT
             // this one".
-            return newNode.getId();
+            return newNodeId;
         }
         
         // Calculate the lookup keys for both the old and new nodes.
@@ -609,7 +606,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         final String oldStatusKey = (oldNode == null) ? null :
             NodeMapUtil.getPartialStatusKey(id, oldNode.getId());
 
-        final long newNodeId = newNode.getId();
         final String newNodekey = NodeMapUtil.getNodeKey(newNodeId, id);
         final String newStatuskey = (serviceName == null) ? null :
                 NodeMapUtil.getStatusKey(id, newNodeId, serviceName);
@@ -661,35 +657,62 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     
                 }});
                 
+            GetNodeTask atask = new GetNodeTask(newNodeId);
+            runTransactionally(atask);
+
             // Tell our listeners
-            notifyListeners(oldNode, newNode, id);
+            notifyListeners(oldNode, atask.getNode(), id);
         } catch (Exception e) {
             // Hmmm.  we've probably left some cruft in the data store.
             // The most likely problem is one in our own code.
             logger.logThrow(Level.WARNING, e, 
                             "Move {0} mappings from {1} to {2} failed", 
-                            id, oldNode, newNode);
+                            id, oldNode.getId(), newNodeId);
         }
 
         return newNodeId;
     }
-        
+    
+    private class GetNodeTask implements KernelRunnable {
+        /** Return value, the new node.  Must be obtained under transaction. */
+        private Node node = null;
+                        
+        private final long nodeId;
+                            
+        GetNodeTask(long nodeId) {
+            this.nodeId = nodeId; 
+        }               
+                    
+        public void run() {
+            node = watchdogService.getNode(nodeId);
+        }           
+                    
+        public String getBaseTaskType() {
+            return this.getClass().getName(); 
+        }               
+                    
+        /**             
+         * Returns the node found by the watchdog service, or null if
+         * this task has not run.
+         */
+        public Node getNode() {
+            return node;
+        }
+    }    
         
     /** 
      * The listener registered with the watchdog service.  These methods
      * will be notified if a node starts or stops.
      */
-//    private class Listener implements NodeListener {
-//        
-//        Listener() {
-//            
-//        }
-//        
+    private class Listener implements NodeListener {    
+        Listener() {
+            
+        }
+        
         /** {@inheritDoc} */
         public void nodeStarted(Node node){
             // Do nothing.  We find out about nodes being available when
-            // services register with us.
-//            assignPolicy.nodeStarted(node.getId());      
+            // our client services register with us.     
         }
         
         /** {@inheritDoc} */
@@ -732,7 +755,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 }
             }
         }
-//    }
+    }
     
     /**
      *  Task to support node failure, run under a transaction.
