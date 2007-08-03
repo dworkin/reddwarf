@@ -2,10 +2,8 @@ package com.sun.sgs.benchmark.scripts;
 
 import java.text.DecimalFormat;
 import java.text.ParseException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import com.sun.sgs.benchmark.client.*;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -17,120 +15,258 @@ public class ChannelMessageSend {
         NONE;   /* don't send anything */
     };
     
-    static final int DEFAULT_CLIENTS = 60;
-    static final long DEFAULT_INTERVAL = 500;
-    static final int DEFAULT_BYTES = 500;
+    public static final int DEFAULT_NUM_CLIENTS = 60;
+    public static final long DEFAULT_INTERVAL = 500;
+    public static final int DEFAULT_MSG_LEN = 500;
+    
+    /**
+     * Number of {@link Timer} objects (threads) that run in parallel.
+     */
+    public static final int NUM_TIMER_THREADS = 32;
     
     /** The host that the server is running on. */
     public static final String HOSTNAME = "dstar3";
     
+    /** The name of the channel created on the server. */
     public static final String CHANNEL_NAME = "ChannelMessageSend_script";
     
     /** 
      * Dictates the type of test being run.
      */
     public static final SendType sendType = SendType.BCAST;
+
+    /**
+     * String of arbitrary characters that is append to the end of the mutable
+     * portion of channel messages (i.e. the sequence number portion) in order
+     * to bring the total length of each message up to the required length:
+     * {@code msgLen}.
+     */
+    private final String msgSuffix;
+
+    /**
+     * The client sessions.
+     */
+    private BenchmarkClient[] clients;
+
+    /**
+     * Each client's individual sequence number.
+     */
+    private long[] seqNums;
+
+    /**
+     * A set of timers to schedule tasks on.
+     */
+    private Timer[] timers;
     
-    private final int clients;
+    /**
+     * Test parameters.
+     */
+    private final int numClients;
     private final long interval;
-    private final int bytes;
+    private final int msgLen;
     
-    public ChannelMessageSend(int clients, long interval, int bytes) {
-	this.clients = clients;
+    public ChannelMessageSend(int numClients, long interval, int msgLen) {
+	this.numClients = numClients;
 	this.interval = interval;
-	this.bytes = bytes;
+	this.msgLen = msgLen;
         
-        System.out.printf("Starting up with clients=%d,  interval=%d ms" +
-            ", strlen=%d, sendType=%s\n", clients, interval, bytes,
+        System.out.printf("Starting up with numClients=%d,  interval=%d ms" +
+            ", strlen=%d, sendType=%s\n", numClients, interval, msgLen,
             sendType.toString());
+        
+        StringBuffer msgBuf = new StringBuffer();
+        
+        for (int i=0; i < (msgLen - 20); i++)
+            msgBuf.append('A');
+        
+        msgSuffix = msgBuf.toString();
     }
 
     public ChannelMessageSend() {
-	this(DEFAULT_CLIENTS, DEFAULT_INTERVAL, DEFAULT_BYTES);
+	this(DEFAULT_NUM_CLIENTS, DEFAULT_INTERVAL, DEFAULT_MSG_LEN);
     }
     
-    public void run() {
-	try {
-	    BenchmarkClient client = new BenchmarkClient();
-            client.processInput("config " + HOSTNAME);
-            client.processInput("login ch_creator password");
-            client.processInput("wait_for login");
-	    client.processInput("create_channel " + CHANNEL_NAME);
-            
-	    List<Thread> threads = new LinkedList<Thread>();
-            
-            /** Create all of the client threads. */
-	    for (int i = 0; i < clients; ++i) {
-		threads.add(new SenderClientThread(i, bytes));
-	    }
-            
-            /** Pause 1 second just to calm down... */
-	    try { Thread.sleep(1000); } catch (Throwable t) { }
-            
-            /* channel-creator client no longer needed. */
-            client.processInput("logout");
-            client = null;
-            
-            /* Start up each thread with a small random pause after each one. */
-	    for (Thread t : threads) {
-		t.start();
-		try {
-		    Thread.sleep(500 + (int)(1000 * Math.random()));
-		}
-		catch (InterruptedException ie) { } // silent
-	    }
-	}
-	catch (ParseException e) {
-	    e.printStackTrace();
-	}		    
-    }
-    
-    private static void usage() {
-	System.out.println("Usage: java ChannelMessageSend " +
-            "<#clients> <interval (ms)> <message size (bytes)>");
+    public void run() throws ParseException {
+        BenchmarkClient channelCreator = new BenchmarkClient();
+        channelCreator.processInput("config " + HOSTNAME);
+        channelCreator.processInput("login ch_creator password");
+        channelCreator.processInput("wait_for login");
+        channelCreator.processInput("create_channel " + CHANNEL_NAME);
         
-	System.exit(1);
+        /** wait a second for the channel to be created. */
+        try { Thread.sleep(1000); } catch (InterruptedException ignore) { }
+        
+        /* channel-creator client no longer needed. */
+        channelCreator.processInput("logout");
+        channelCreator.processInput("wait_for disconnected");
+        channelCreator = null;
+        
+        /** Create all of the channel clients and their sequence numbers. */
+        clients = new BenchmarkClient[numClients];
+        seqNums = new long[numClients];
+        for (int i=0; i < numClients; i++) clients[i] = new BenchmarkClient();
+        for (int i=0; i < numClients; i++) seqNums[i] = 0;
+        
+        /** Create all of the scheduling timers. */
+        timers = new Timer[NUM_TIMER_THREADS];
+        for (int i=0; i < NUM_TIMER_THREADS; i++) timers[i] = new Timer();
+        
+        /** Pause a bit since we just started a bunch of threads... */
+        try { Thread.sleep(3000); } catch (InterruptedException ignore) { }
+        
+        /** Schedule client startup tasks with a random pause after each. */
+        for (int i=0; i < numClients; i++) {
+            getTimerForClient(i).schedule(new ClientStartupTask(i), 0);
+            
+            try {
+                /** pause = 1 +/- 0.5 seconds */
+                Thread.sleep(500 + (int)(1000 * Math.random()));
+            }
+            catch (InterruptedException ignore) { }
+        }
+    }
+    
+    private Timer getTimerForClient(int clientId) {
+        return timers[clientId % timers.length];
+    }
+    
+    private static void printUsage() {
+	System.out.println("usage: java ChannelMessageSend " +
+            "<#clients> <interval (ms)> <message size (msgLen)>");
     }
 
     public static void main(String[] args) {
+        ChannelMessageSend tester;
+        
 	if (args.length > 0) {
-	    if (args.length != 3)
-		usage();
+	    if (args.length != 3) {
+		printUsage();
+                System.exit(1);
+            }
             
-	    int clients = 0, interval = 0, bytes = 0;
+	    int numClients = 0, interval = 0, msgLen = 0;
 	    try {
-		clients = Integer.parseInt(args[0]);
+		numClients = Integer.parseInt(args[0]);
 		interval = Integer.parseInt(args[1]);
-		bytes = Integer.parseInt(args[2]);
+		msgLen = Integer.parseInt(args[2]);
 	    }
 	    catch (Throwable t) {
-		usage();
+		printUsage();
+                System.exit(1);
 	    }
-	    new ChannelMessageSend(clients,interval,bytes).run();
-	}
-	else
-	    new ChannelMessageSend().run();
+            
+            tester = new ChannelMessageSend(numClients, interval, msgLen);
+	} else {
+            tester = new ChannelMessageSend();  /** default parameters */
+        }
+        
+        try {
+            tester.run();
+        } catch (ParseException pe) {
+            pe.printStackTrace();
+        }
     }
     
     /**
-     * Inner class: SenderClientThread
+     * Inner class: ClientStartupTask()
      */
-    public class SenderClientThread extends Thread {
+    class ClientStartupTask extends TimerTask {
         /**
-         * Local ID for this client.
+         * The index of the {@link BenchmarkClient} for which this task was
+         * scheduled.
          */
-        private final int id;
+        private int id;
 
         /**
-         * The length of each message that is sent.
+         * Creates a new {@code ClientStartupTask}.
          */
-        private final int msgLen;
+        public ClientStartupTask(int id) {
+            super();
+            this.id = id;
+        }
 
         /**
-         * Local sequence number for this client (only used if {@code msgLen} is
-         * at least 8 - otherwise there is not room for it).
+         * {@inheritDoc}
+         * <p>
+         * Sends commands to client to: login, join channel.
+         * Then reschedules a chaining task to send on the channel.
          */
-        private long seqNum = 0;
+        @Override
+        public void run() {
+            BenchmarkClient client = clients[id];
+            client.printCommands(false);
+            client.printNotices(true);
+            
+            try {
+                client.processInput("config " + HOSTNAME);
+                client.processInput("login sender-" + id + " pswd");
+                client.processInput("wait_for login");
+                client.processInput("join " + CHANNEL_NAME);
+                client.processInput("wait_for join_channel");
+            } catch (ParseException pe) {
+                System.err.println("ParseException in client " + id);
+                pe.printStackTrace(); 
+            }
+            
+            String hexSessionId =
+                HexDumper.toHexString(client.getSessionId().toBytes());
+            
+            switch (sendType) {
+            case BCAST:
+                System.out.printf("Client #%d [%s] will broadcast to" +
+                    " channel.\n", id, hexSessionId);
+                break;
+                
+            case SINGLE:
+                long longSessionId = Long.parseLong(hexSessionId, 16);
+                long longRecipSessionId;
+                
+                if (longSessionId <= 1)
+                    longRecipSessionId = 2;
+                else
+                    longRecipSessionId = longSessionId - 1;
+                
+                String hexRecipSessionId =
+                    Long.toHexString(longRecipSessionId);
+                
+                System.out.printf("Client #%d [%s] will send to recipient" +
+                    " [%s].\n", id, hexSessionId, hexRecipSessionId);
+                break;
+                
+            case NONE:
+                System.out.printf("Client $%d [%s] will not send at all.\n",
+                    id, hexSessionId);
+                break;
+
+            default:
+                throw new UnsupportedOperationException("Unknown sendType" +
+                    " value: " + sendType);
+            }
+            
+            /**
+             * Schedule recurring task to send on the channel.
+             */
+            getTimerForClient(id).scheduleAtFixedRate(new SendChannelTask(id),
+                interval, interval);
+        }
+    }
+
+    /**
+     * Inner class: SendChannelTask
+     */
+    class SendChannelTask extends TimerTask {
+        /**
+         * The index of the {@link BenchmarkClient} for which this task was
+         * scheduled.
+         */
+        private int id;
+
+        /**
+         * Command to send to client (to get it to send on the channel), without
+         * the message to send itself, which should be concatenated on to this.
+         * {@code null} if this client should not send on the channel.
+         */
+        private String sendCommand;
 
         /**
          * Formatter for sequence numbers; enforces fixed-width of 20.
@@ -139,86 +275,70 @@ public class ChannelMessageSend {
             new DecimalFormat("00000000000000000000");
 
         /**
-         * Creates a new {@code SenderClientThread}.
+         * Creates a new {@code SendChannelTask}.
          */
-        public SenderClientThread(int id, int msgLen) {
-            super("SenderClientThread-" + id);
+        public SendChannelTask(int id) {
+            super();
             this.id = id;
-            this.msgLen = msgLen;
+            
+            BenchmarkClient client = clients[id];
+            
+            String hexSessionId =
+                HexDumper.toHexString(client.getSessionId().toBytes());
+            
+            switch (sendType) {
+            case BCAST:
+                sendCommand = String.format("chsend %s ", CHANNEL_NAME);
+                break;
+                
+            case SINGLE:
+                long longSessionId = Long.parseLong(hexSessionId, 16);
+                long longRecipSessionId;
+                
+                if (longSessionId <= 1)
+                    longRecipSessionId = 2;
+                else
+                    longRecipSessionId = longSessionId - 1;
+                
+                String hexRecipSessionId =
+                    Long.toHexString(longRecipSessionId);
+                
+                sendCommand = String.format("pm %s %s ", CHANNEL_NAME,
+                    hexRecipSessionId);
+                break;
+                
+            case NONE:
+                sendCommand = null;
+                break;
+            }    
         }
-        
+
+        /**
+         * {@inheritDoc} 
+         * <p>
+         * Sends a command to the client to send a message on the channel.
+         */
         @Override
         public void run() {
-            try {
-                BenchmarkClient client = new BenchmarkClient();
-                client.printCommands(false);
-                client.printNotices(true);
-                client.processInput("config " + HOSTNAME);
-                client.processInput("login sender-" + id + " pswd");
-                client.processInput("wait_for login");
-                client.processInput("join " + CHANNEL_NAME);
-                client.processInput("wait_for join_channel");
-                Thread.sleep(1000);
+            BenchmarkClient client = clients[id];
+            
+            if (sendCommand != null) {
+                StringBuffer msgBuf = new StringBuffer();
                 
-                /** The full command, minus the message string itself. */
-                String sendCmd = null;
-                
-                String hexSessionId =
-                    HexDumper.toHexString(client.getSessionId().toBytes());
-
-                switch (sendType) {
-                case BCAST:
-                    System.out.printf("Client #%d [%s] will broadcast to" +
-                        " channel.\n", id, hexSessionId);
-                    
-                    sendCmd = String.format("chsend %s ", CHANNEL_NAME);
-                    break;
-
-                case SINGLE:
-                    long longSessionId = Long.parseLong(hexSessionId, 16);
-                    long longRecipSessionId;
-                    
-                    if (longSessionId <= 1)
-                        longRecipSessionId = 2;
-                    else
-                        longRecipSessionId = longSessionId - 1;
-                    
-                    String hexRecipSessionId =
-                        Long.toHexString(longRecipSessionId);
-                    
-                    System.out.printf("Client #%d [%s] will send to recipient" +
-                        " [%s].\n", id, hexSessionId, hexRecipSessionId);
-                    
-                    sendCmd = String.format("pm %s %s ", CHANNEL_NAME,
-                        hexRecipSessionId);
-                    break;
-
-                case NONE:
-                    System.out.printf("Client $%d [%s] will not send at all.\n",
-                        id, hexSessionId);
-                    
-                    sendCmd = null;
-                    break;
+                if (msgLen >= 20) {
+                    msgBuf.append(formatter.format(seqNums[id]++));
+                    msgBuf.append(msgSuffix);
+                } else {
+                    while (msgBuf.length() < msgLen)
+                        msgBuf.append('A');
                 }
                 
-                while (true) {
-                    sleep(interval);
-                    
-                    if (sendCmd != null) {
-                        StringBuffer msgBuf = new StringBuffer();
-                        
-                        if (msgLen >= 20)
-                            msgBuf.append(formatter.format(seqNum++));
-                        
-                        while (msgBuf.length() < msgLen)
-                            msgBuf.append('A');
-                        
-                        client.processInput(sendCmd + msgBuf.toString());
-                    }
+                try {
+                    client.processInput(sendCommand + msgBuf.toString());
+                } catch (ParseException pe) {
+                    System.err.println("ParseException in client " + id);
+                    pe.printStackTrace();
                 }
-            }
-            catch (Throwable t) {
-                t.printStackTrace();
             }
         }
     }
