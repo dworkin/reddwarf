@@ -287,7 +287,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    }
 	}
 
-	// Unexport server and stop threads expiration and notify threads.
+	// Unexport server and stop threads.
 	exporter.unexport();
 	checkExpirationThread.interrupt();
 	notifyClientsThread.interrupt();
@@ -302,6 +302,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 	statusChangedNodes.clear();
 
+	// Mark all nodes failed and notify clients of failure.
 	final Collection<NodeImpl> failedNodes = nodeMap.values();
 	try {
 	    runTransactionally(new AbstractKernelRunnable() {
