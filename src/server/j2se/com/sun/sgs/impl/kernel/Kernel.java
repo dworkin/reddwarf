@@ -104,10 +104,12 @@ class Kernel {
         "com.sun.sgs.impl.service.session.ClientSessionServiceImpl";
     private static final String DEFAULT_DATA_SERVICE =
         "com.sun.sgs.impl.service.data.DataServiceImpl";
-    private static final String DEFAULT_NODE_MAPPING_SERVICE =
-        "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
     private static final String DEFAULT_TASK_SERVICE =
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
+    private static final String DEFAULT_WATCHDOG_SERVICE =
+	"com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl";
+    private static final String DEFAULT_NODE_MAPPING_SERVICE =
+        "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
@@ -424,7 +426,24 @@ class Kernel {
                      dataManagerClass, managerSet, properties,
                      systemRegistry);
 
-        if (StandardService.ClientSessionService.ordinal() >
+        if (StandardService.WatchdogService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+	
+        String watchdogServiceClass =
+            properties.getProperty(StandardProperties.WATCHDOG_SERVICE,
+                                   DEFAULT_WATCHDOG_SERVICE);
+        Service watchdogService =
+            createService(Class.forName(watchdogServiceClass),
+                          properties, systemRegistry);
+        serviceList.add(watchdogService);
+        if (watchdogService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer) watchdogService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+
+        if (StandardService.NodeMappingService.ordinal() >
             finalStandardService.ordinal())
             return;
 
@@ -444,7 +463,7 @@ class Kernel {
                 ((ProfileProducer)nodeMappingService).
                     setProfileRegistrar(profileRegistrar);
         }
-        
+
         if (StandardService.TaskService.ordinal() >
             finalStandardService.ordinal())
             return;

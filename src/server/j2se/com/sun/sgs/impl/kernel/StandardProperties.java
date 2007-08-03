@@ -99,6 +99,12 @@ public class StandardProperties {
 
     /**
      * An optional key specifying a specific class to use for an application's
+     * {@code WatchdogService}.
+     */
+    public static final String WATCHDOG_SERVICE = NS + "app.watchdogService";
+
+    /**
+     * An optional key specifying a specific class to use for an application's
      * <code>ClientSessionService</code>.
      */
     public static final String CLIENT_SESSION_SERVICE =
