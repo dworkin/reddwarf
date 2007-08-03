@@ -61,8 +61,6 @@ public class TestIdGenerator extends TestCase {
     private DataServiceImpl dataService;
     private TaskServiceImpl taskService;
     private TaskScheduler taskScheduler;
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
-
 
     /** Constructs a test instance. */
     public TestIdGenerator(String name) {
@@ -107,7 +105,6 @@ public class TestIdGenerator extends TestCase {
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
 	//serviceRegistry.registerAppContext();
-	nonDurableTaskScheduler = createNonDurableTaskScheduler();
 
 	commitTransaction();
 	createTransaction();
@@ -151,7 +148,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullName() {
 	try {
 	    new IdGenerator(null, IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -161,7 +158,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorEmptyName() {
 	try {
 	    new IdGenerator("", IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -171,7 +168,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorBadBlockSize() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE-1,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -181,7 +178,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullProxy() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
-			    null, nonDurableTaskScheduler);
+			    null, taskScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -219,7 +216,7 @@ public class TestIdGenerator extends TestCase {
     private void doNextTest(int blockSize, int iterations) throws Exception {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    long generatedId = generator.next();
@@ -233,7 +230,7 @@ public class TestIdGenerator extends TestCase {
     private void doNextBytesTest(int blockSize, int iterations) throws Exception {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    byte[] generatedIdBytes = generator.nextBytes();
@@ -328,11 +325,5 @@ public class TestIdGenerator extends TestCase {
 	    }
 	}
 	return new DataServiceImpl(dbProps, registry);
-    }
-
-
-    private NonDurableTaskScheduler createNonDurableTaskScheduler() {
-	return new NonDurableTaskScheduler(
-	    taskScheduler, txnProxy.getCurrentOwner(), taskService);
     }
 }

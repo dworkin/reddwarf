@@ -457,25 +457,23 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(name, "test");
 	    client.logout();
-	    DummyClientSessionListener sessionListener =
-		getClientSessionListener(name);
-	    if (sessionListener == null) {
-		fail("listener is null!");
-	    } else {
-		synchronized (disconnectedCallbackLock) {
-
-		    if (!sessionListener.receivedDisconnectedCallback) {
-			disconnectedCallbackLock.wait(WAIT_TIME);
-			sessionListener = getClientSessionListener(name);
-		    }
-
-		    if (!sessionListener.receivedDisconnectedCallback) {
-			fail("disconnected callback not invoked");
-		    } else if (!sessionListener.graceful) {
-			fail("disconnection was not graceful");
-		    }
-		    System.err.println("Logout successful");
+	    synchronized (disconnectedCallbackLock) {
+		DummyClientSessionListener sessionListener =
+		    getClientSessionListener(name);
+		if (sessionListener == null ||
+		    !sessionListener.receivedDisconnectedCallback)
+		{
+		    disconnectedCallbackLock.wait(WAIT_TIME);
+		    sessionListener = getClientSessionListener(name);
 		}
+		if (sessionListener == null) {
+		    fail ("sessionListener is null!");
+		} else if (!sessionListener.receivedDisconnectedCallback) {
+		    fail("disconnected callback not invoked");
+		} else if (!sessionListener.graceful) {
+		    fail("disconnection was not graceful");
+		}
+		System.err.println("Logout successful");
 	    }
 	} catch (InterruptedException e) {
 	    e.printStackTrace();
