@@ -25,8 +25,10 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -829,6 +831,54 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    System.err.println(node);
 	    if (node.isAlive()) {
 		fail("Node " + node.getId() + " is alive!");
+	    }
+	}
+    }
+
+    /* -- test shutdown -- */
+
+    public void testShutdownAndNotifyFailedNodes() throws Exception {
+	Map<WatchdogServiceImpl, DummyNodeListener> watchdogMap =
+	    new HashMap<WatchdogServiceImpl, DummyNodeListener>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+
+	try {
+	    for (int i = 0; i < 5; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry);
+		createTransaction();
+		watchdog.configure(serviceRegistry, txnProxy);
+		commitTransaction();
+		DummyNodeListener listener = new DummyNodeListener();
+		watchdog.addNodeListener(listener);
+		watchdogMap.put(watchdog, listener);
+	    }
+	
+	    // shutdown watchdog server
+	    watchdogService.shutdown();
+
+	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
+		DummyNodeListener listener = watchdogMap.get(watchdog);
+		Set<Node> nodes = listener.getFailedNodes();
+		System.err.println(
+		    "failedNodes for " + watchdog.getLocalNodeId() +
+		    ": " + nodes);
+		if (nodes.size() != 6) {
+		    fail("Expected 6 failed nodes, got " + nodes.size());
+		}
+		for (Node node : nodes) {
+		    System.err.println(node);
+		    if (node.isAlive()) {
+			fail("Node " + node.getId() + " is alive!");
+		    }
+		}
+	    }
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
+		watchdog.shutdown();
 	    }
 	}
     }

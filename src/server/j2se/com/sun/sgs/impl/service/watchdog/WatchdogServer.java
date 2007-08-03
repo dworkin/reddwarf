@@ -25,7 +25,10 @@ public interface WatchdogServer extends Remote {
      * for the specified node to be considered alive.
      * </ul>
      *
-     * When a node fails or a new node starts, the given {@code
+     * <p>If this method throws {@code NodeRegistrationFailedException},
+     * the caller should not retry as this indicates a fatal error.
+     *
+     * <p>When a node fails or a new node starts, the given {@code
      * client} will be notified of these status changes via its {@link
      * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *

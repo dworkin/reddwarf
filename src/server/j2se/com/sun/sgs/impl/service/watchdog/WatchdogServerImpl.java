@@ -16,7 +16,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
@@ -80,13 +79,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private static final String CLASSNAME =
 	WatchdogServerImpl.class.getName();
 
-    /** The logger for this class. */
-    private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
     /** The prefix for server properties. */
     private static final String SERVER_PROPERTY_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.server";
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(SERVER_PROPERTY_PREFIX));
 
     /** The server name in the registry. */
     static final String WATCHDOG_SERVER_NAME = "WatchdogServer";
@@ -132,7 +131,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final int port;
 
     /** The renew interval. */
-    private final long renewInterval;
+    final long renewInterval;
 
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
@@ -141,20 +140,20 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final TaskScheduler taskScheduler;
 
     /** The lock for notifying the {@code NotifyClientsThread}. */
-    private final Object notifyClientsLock = new Object();
+    final Object notifyClientsLock = new Object();
 
     /** The thread to notify clients of node status changes. */
     private final Thread notifyClientsThread = new NotifyClientsThread();
 
     /** The queue of nodes whose status has changed. */
-    private final Queue<Node> statusChangedNodes =
+    final Queue<Node> statusChangedNodes =
 	new ConcurrentLinkedQueue<Node>();
 
     /** The task owner. */
     private TaskOwner taskOwner;
 
     /** The data service. */
-    private DataService dataService;
+    DataService dataService;
 
     /** The ID block size for the IdGenerator. */
     private int idBlockSize;
@@ -167,7 +166,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	new ConcurrentHashMap<Long, NodeImpl>();
 
     /** The set of node information, sorted by renew expiration time. */
-    private final SortedSet<NodeImpl> expirationSet = new TreeSet<NodeImpl>();
+    final SortedSet<NodeImpl> expirationSet = new TreeSet<NodeImpl>();
 
     /** The thread for checking node expiration times. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
@@ -287,6 +286,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		}
 	    }
 	}
+
+	// Unexport server and stop threads expiration and notify threads.
 	exporter.unexport();
 	checkExpirationThread.interrupt();
 	notifyClientsThread.interrupt();
@@ -296,6 +297,27 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	} catch (InterruptedException e) {
 	    return false;
 	}
+	synchronized (expirationSet) {
+	    expirationSet.clear();
+	}
+	statusChangedNodes.clear();
+
+	final Collection<NodeImpl> failedNodes = nodeMap.values();
+	try {
+	    runTransactionally(new AbstractKernelRunnable() {
+		public void run() {
+		    for (NodeImpl node : failedNodes) {
+			node.setFailed(dataService);
+		    }
+		}});
+	} catch (Exception e) {
+	    logger.logThrow(
+		Level.WARNING, e,
+		"Failed to update failed nodes during shutdown, throws");
+	    return false;
+	}
+	notifyClients(failedNodes, failedNodes);
+	
 	return true;
     }
     
@@ -310,7 +332,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	callStarted();
 
 	try {
-	    if (client == null) {
+	    if (hostname == null) {
+		throw new IllegalArgumentException("null hostname");
+	    } else if (client == null) {
 		throw new IllegalArgumentException("null client");
 	    }
 	
@@ -318,14 +342,17 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    long nodeId;
 	    try {
 		nodeId = idGenerator.next();
-	    } catch (InterruptedException e) {
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Failed to obtain node ID for host:{0}, throws", hostname);
 		throw new NodeRegistrationFailedException(
-		    "interrupted while obtaining node ID");
+		    "Exception occurred while obtaining node ID", e);
 	    }
 	    final NodeImpl node = new NodeImpl(nodeId, hostname, client);
 	    assert ! nodeMap.containsKey(nodeId);
 	
-	    // Persist node, and back out transient mapping on failure.
+	    // Persist node
 	    try {
 		runTransactionally(new AbstractKernelRunnable() {
 		    public void run() {

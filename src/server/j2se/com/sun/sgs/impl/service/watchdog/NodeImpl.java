@@ -61,7 +61,7 @@ class NodeImpl
      * this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
-     * @param 	hostName a host name, or {@code null}
+     * @param 	hostName a host name
      * @param	client a watchdog client
      */
     NodeImpl(long nodeId, String hostName, WatchdogClient client) {
@@ -85,22 +85,6 @@ class NodeImpl
 	this.host = hostName;
 	this.client = null;
 	this.isAlive = isAlive;
-    }
-
-    /**
-     * Constructs and instance of this class with the given {@code
-     * nodeId}, a {@code null} {@code hostname}, a {@code null} {@code
-     * client}, and a {@code 0} {@code expiration}.  This instance's
-     * alive staus is set to {@code false}.
-     *
-     * @param 	nodeId a node ID
-     */
-    NodeImpl(long nodeId) {
-	this.id = nodeId;
-	host = null;
-	client = null;
-	expiration = 0;
-	isAlive = false;
     }
 
     /* -- Implement Node -- */
@@ -131,7 +115,7 @@ class NodeImpl
 		difference = compareStrings(host, o.host);
 	    }
 	}
-	return (int) difference;
+	return difference < 0 ? -1 : (difference > 0 ? 1 : 0);
     }
 
     /* -- Implement Object -- */
@@ -151,7 +135,7 @@ class NodeImpl
 
     /** {@inheritDoc} */
     public int hashCode() {
-	return (int) id;
+	return ((int) id >>> 32) ^ ((int) id);
     }
 
     /** {@inheritDoc} */

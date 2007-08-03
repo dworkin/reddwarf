@@ -57,7 +57,8 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    "com.sun.sgs.app.name", "SimpleApp",
 	    "com.sun.sgs.app.port", String.valueOf(getPort()),
-	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath());
+	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
+	    "com.sun.sgs.impl.service.watchdog.server.start", "true");
 	/* Create logging properties to log at WARNING or higher */
 	logging = createProperties(
 	    ".level", "WARNING",

@@ -17,7 +17,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -56,7 +55,11 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
- *	contacts (and, optionally, starts).<p>
+ *	contacts.  If the {@code
+ *	com.sun.sgs.impl.service.watchdog.server.start} property
+ *	is {@code true}, then this property's default is used (since
+ *	the watchdog server to contact will be the one started on
+ *	the local host).
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.port
@@ -91,7 +94,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(
+	    Logger.getLogger("com.sun.sgs.impl.service.watchdog.service"));
 
     /** The prefix for server properties. */
     private static final String SERVER_PROPERTY_PREFIX =
@@ -131,7 +135,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private static TransactionProxy txnProxy;
 
     /** The lock for this service's state. */
-    private final Object stateLock = new Object();
+    final Object stateLock = new Object();
     
     /** The application name */
     private final String appName;
@@ -146,38 +150,38 @@ public class WatchdogServiceImpl implements WatchdogService {
     private TaskOwner taskOwner;
 
     /** The watchdog server impl. */
-    private final WatchdogServerImpl serverImpl;
+    final WatchdogServerImpl serverImpl;
 
     /** The watchdog server proxy, or {@code null}. */
-    private final WatchdogServer serverProxy;
+    final WatchdogServer serverProxy;
 
     /** The watchdog client impl. */
     private final WatchdogClientImpl clientImpl;
 
     /** The watchdog client proxy. */
-    private final WatchdogClient clientProxy;
+    final WatchdogClient clientProxy;
 
     /** The name of the local host. */
-    private final String localHost;
+    final String localHost;
     
     /** The thread that renews the node with the watchdog server. */
-    private final Thread renewThread = new RenewThread();
+    final Thread renewThread = new RenewThread();
 
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
 	new ConcurrentHashMap<NodeListener, NodeListener>();
 
     /** The data service. */
-    private DataService dataService;
+    DataService dataService;
 
     /** The local nodeId. */
-    private volatile long localNodeId;
+    volatile long localNodeId;
 
     /** The time to wait for registration to complete. */
     private long registrationWaitTime = 500;
 
     /** If true, this node has completed registration with server. */
-    private boolean isRegistered = false;
+    boolean isRegistered = false;
 
     /** If true, this node is alive; initially, true. */
     private boolean isAlive = true;
@@ -541,7 +545,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     /* -- other methods -- */
 
     /**
-     * Returns the server.
+     * Returns the server.  This method is used for testing.
      *
      * @return	the server
      */
@@ -665,7 +669,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Implements the WatchdogClient that receives callbacks from the
      * WatchdogServer.
      */
-    private class WatchdogClientImpl implements WatchdogClient {
+    private final class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
 	public void nodeStatusChanges(

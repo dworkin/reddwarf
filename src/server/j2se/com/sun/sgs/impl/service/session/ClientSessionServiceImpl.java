@@ -372,9 +372,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    byte[] nextId;
 	    try {
 		nextId = idGenerator.nextBytes();
-	    } catch (InterruptedException e) {
-		// This shouldn't happen; noone should be interrupting
-		// this thread.
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Failed to obtain client session ID, throws");
 		return null;
 	    }
 	    ClientSessionImpl session =

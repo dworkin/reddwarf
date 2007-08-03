@@ -18,8 +18,7 @@ public interface Node {
     long getId();
 
     /** 
-     * Returns this node's hostname, or {@code null} if host is
-     * unknown.
+     * Returns this node's hostname.
      *
      * @return	this node's hostname
      */

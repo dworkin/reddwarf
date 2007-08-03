@@ -13,7 +13,9 @@ import java.util.Iterator;
 public interface WatchdogService extends Service {
 
     /**
-     * Returns the node ID for the local node.
+     * Returns the node ID for the local node.  The node ID for a node
+     * remains fixed for the lifetime of the node (i.e., until it
+     * fails).
      *
      * @return the node ID for the local node
      */
