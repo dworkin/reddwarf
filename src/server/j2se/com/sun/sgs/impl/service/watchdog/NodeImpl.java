@@ -135,7 +135,7 @@ class NodeImpl
 
     /** {@inheritDoc} */
     public int hashCode() {
-	return ((int) id >>> 32) ^ ((int) id);
+	return ((int) (id >>> 32)) ^ ((int) id);
     }
 
     /** {@inheritDoc} */

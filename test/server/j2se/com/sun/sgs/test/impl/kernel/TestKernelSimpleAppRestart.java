@@ -19,8 +19,8 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 
     /** Run a simple application */
     public void testRunSimpleApp() throws Exception {
-        logging.setProperty(".level", "SEVERE");
-        logging.setProperty("java.util.logging.ConsoleHandler.level", "SEVERE");
+        logging.setProperty(
+	    "com.sun.sgs.impl.service.watchdog.server.level", "SEVERE");
 	runApp(3);
 	runApp(6);
     }
