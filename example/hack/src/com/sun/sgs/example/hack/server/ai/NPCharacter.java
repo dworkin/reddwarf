@@ -5,7 +5,7 @@
  *
  * Project Darkstar Server is free software: you can redistribute it
  * and/or modify it under the terms of the GNU General Public License
- * version 3 as published by the Free Software Foundation and
+ * version 2 as published by the Free Software Foundation and
  * distributed hereunder to you.
  *
  * Project Darkstar Server is distributed in the hope that it will be useful,
