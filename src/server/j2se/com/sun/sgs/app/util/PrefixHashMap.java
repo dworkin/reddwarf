@@ -109,24 +109,38 @@ public class PrefixHashMap<K,V>
     private static final int DEFAULT_MINIMUM_CONCURRENCY = 1;    
 
     /**
-     * The split factor used when none is specified in the constructor.
-     */
-    private static final float DEFAULT_SPLIT_FACTOR = 1.0f;    
-
-    /**
-     * The split factor used when none is specified in the
+     * The split threshold used when none is specified in the
      * constructor.
      */
-    private static final float DEFAULT_MERGE_FACTOR = .25f;
+    // NOTE: through emprical testing, it has been shown that 96
+    // elements is the maximum number of PrefixEntries that will fit
+    // onto a 4K page.  As the datastore page size changes (or if
+    // object level locking becomes used), this should be adjusted to
+    // minimize page-level contention from writes the leaf nodes
+    private static final int DEFAULT_SPLIT_THRESHOLD = 96;
+
+    /**
+     * The merge threshold used when none is specified in the
+     * constructor.
+     */
+    private static final int DEFAULT_MERGE_THRESHOLD = 
+	DEFAULT_SPLIT_THRESHOLD / 4;
 
     
     /**
      * The default number of {@code PrefixEntry} entries per
      * array for a leaf table.
      */
-    // NOTE: this should almost certainly be updated to include class
-    //       overhead for the object that contains this array
-    private static final int DEFAULT_LEAF_CAPACITY = 128;
+    // NOTE: *must* be a power of 2.
+    private static final int DEFAULT_LEAF_CAPACITY = 1 << 9;
+
+    /**
+     * The name space prefix for storing items reference by this into
+     * the data store.
+     */
+    private static final String NAME_SPACE =
+	"com.sun.sgs.app.util.PrefixHashMap";
+    
 
     /**
      * The maximum depth of this tree
@@ -185,16 +199,16 @@ public class PrefixHashMap<K,V>
     private int size;
 
     /**
-     * The maximum number of elements in this table before it will
-     * split this table into two leaf tables.
+     * The maximum number of {@code PrefixEntry} entries in this table
+     * before it will split this table into two leaf tables.
      *
      * @see #split()
      */
     private int splitThreshold;
 
     /**
-     * The minimum number of elements in this table before it will
-     * attempt to merge itself with its sibling.
+     * The minimum number of {@code PrefixEntry} entries in this table
+     * before it will attempt to merge itself with its sibling.
      *
      * @see #merge()
      */
@@ -202,25 +216,9 @@ public class PrefixHashMap<K,V>
 
 
     /**
-     * The number of {@code PrefixEntry} at leaf node.
+     * The size of the {@code PrefixEntry} table.
      */
     private final int leafCapacity;
-
-    /**
-     * The fraction of the leaf capacity that will cause the leaf to
-     * split.
-     *
-     * @see #split()
-     */
-    private final float splitFactor;
-
-    /**
-     * The fraction of the leaf capacity that will cause the leaf to
-     * merge.
-     *
-     * @see #merge()
-     */
-    private final float mergeFactor;
 
     /**
      * The minimum number of concurrent write operations to support.
@@ -247,20 +245,24 @@ public class PrefixHashMap<K,V>
      * @param depth the depth of this table in the tree
      * @param minConcurrency the minimum number of concurrent write
      *        operations to support
-     * @param splitFactor the fraction of the leaf capacity that will
-     *        cause the leaf to split
-     * @param mergeFactor the fraction of the leaf capacity that will
-     *        cause the leaf to attempt merging with its sibling
+     * @param splitThreshold the number of entries at a leaf node that
+     *        will cause the leaf to split
+     * @param mergeTheshold the numer of entries at a leaf node that
+     *        will cause the leaf to attempt merging with its sibling
      *
      * @throws IllegalArgumentException if the depth is out of the
      *         range of valid prefix lengths
      * @throws IllegalArgumentException if minConcurrency is non positive
-     * @throws IllegalArgumentException if the split factor is non positive
-     * @throws IllegalArgumentException if the merge factor is less
-     *         than zero or greater than or equal to the split factor
+     * @throws IllegalArgumentException if the split threshold is non
+     *         positive
+     * @throws IllegalArgumentException if the merge threshold is less
+     *         than zero or greater than or equal to the split
+     *         threshold
      */
-    private PrefixHashMap(int depth, int minConcurrency, float splitFactor,
-			  float mergeFactor) {
+    // NOTE: this constructor is currently left private but future
+    // implementations could expose these implementation details.
+    private PrefixHashMap(int depth, int minConcurrency, int splitThreshold,
+			  int mergeThreshold) {
 	if (depth < 0 || depth > 32) {
 	    throw new IllegalArgumentException("Illegal tree depth: " + 
 					       depth);	    
@@ -269,13 +271,13 @@ public class PrefixHashMap<K,V>
 	    throw new IllegalArgumentException("Illegal minimum concurrency: " 
 					       + minConcurrency);	    
 	}
-	if (splitFactor <= 0) {
-	    throw new IllegalArgumentException("Illegal split factor: " + 
-					      splitFactor);	    
+	if (splitThreshold <= 0) {
+	    throw new IllegalArgumentException("Illegal split threshold: " + 
+					      splitThreshold);	    
 	}
-	if (mergeFactor < 0 || mergeFactor >= splitFactor) {
-	    throw new IllegalArgumentException("Illegal merge factor: " + 
-					       mergeFactor);	    
+	if (mergeThreshold < 0 || mergeThreshold >= splitThreshold) {
+	    throw new IllegalArgumentException("Illegal merge threshold: " + 
+					       mergeThreshold);	    
 	}
 
 	this.depth = depth;
@@ -290,14 +292,10 @@ public class PrefixHashMap<K,V>
 	rightChild = null;
 	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
-	this.splitFactor = splitFactor;
-	this.mergeFactor = mergeFactor;
-	// ensure that the split threshold is at least 1
-	this.splitThreshold = Math.max((int)(splitFactor * leafCapacity), 1);
-	// ensure that the merge threshold is at least one less than
-	// the split threshold
-	this.mergeThreshold = Math.min((int)(splitFactor * leafCapacity), 
-				       splitThreshold-1);       
+
+	this.splitThreshold = splitThreshold;
+	this.mergeThreshold = mergeThreshold;
+
 	// Only the root note should ensure depth, otherwise this call
 	// causes the children to be created in depth-first fashion,
 	// which prevents the leaf references from being correctly
@@ -316,7 +314,8 @@ public class PrefixHashMap<K,V>
      * @throws IllegalArgumentException if minConcurrency is non positive
      */
     public PrefixHashMap(int minConcurrency) {
-	this(0, minConcurrency, DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
+	this(0, minConcurrency, DEFAULT_SPLIT_THRESHOLD, 
+	     DEFAULT_MERGE_THRESHOLD);
     }
 
 
@@ -326,13 +325,13 @@ public class PrefixHashMap<K,V>
      */
     public PrefixHashMap() {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
-	     DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
+	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD);
     }
 
     /**
      * Constructs a new {@code PrefixHashMap} with the same mappings
      * as the specified {@code Map}, and the default 
-     * minimum concurrency (1.0).
+     * minimum concurrency (1).
      *
      * @param m the mappings to include
      *
@@ -340,7 +339,7 @@ public class PrefixHashMap<K,V>
      */
     public PrefixHashMap(Map<? extends K, ? extends V> m) {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
-	     DEFAULT_SPLIT_FACTOR, DEFAULT_MERGE_FACTOR);
+	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD);
 	if (m == null)
 	    throw new NullPointerException("The provided map is null");
 	putAll(m);
@@ -535,10 +534,10 @@ public class PrefixHashMap<K,V>
 
 	PrefixHashMap<K,V> leftChild_ = 
 	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
-				   splitFactor, mergeFactor);
+				   splitThreshold, mergeThreshold);
 	PrefixHashMap<K,V> rightChild_ = 
 	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
-				   splitFactor, mergeFactor);
+				   splitThreshold, mergeThreshold);
 
 	// iterate over all the entries in this table and assign
 	// them to either the right child or left child
@@ -546,11 +545,11 @@ public class PrefixHashMap<K,V>
 
 	    // go over each entry in the bucket since each might
 	    // have a different prefix next
-	    for (PrefixEntry<K,V> e = table[i]; e != null; e = e.next) {
-		
-		((((e.hash << (depth)) >>> 31) == 1) ? leftChild_ : rightChild_).
-		//((e.leadingBit() == 1) ? leftChild_ : rightChild_).
+	    for (PrefixEntry<K,V> e = table[i], next = null; e != null;) {
+		next = e.next;
+		((((e.hash << depth) >>> 31) == 1) ? leftChild_ : rightChild_).
 		    addEntry(e, i);
+		e = next;
 	    }
 	}
 
@@ -737,6 +736,7 @@ public class PrefixHashMap<K,V>
      */
     private void addEntry(int hash, K key, V value, int index) {
 	PrefixEntry<K,V> prev = table[index];
+	int c = 0; PrefixEntry<K,V> t;
 	table[index] = new PrefixEntry<K,V>(hash, key, value, prev);
 
 	// ensure that the prefix has enough precision to support
@@ -746,19 +746,19 @@ public class PrefixHashMap<K,V>
     }
     
     /**
-     * Copies the values of the specified entry, excluding the {@code
-     * PrefixEntry#next} reference, and adds to the the current leaf,
-     * but does not perform the size check for splitting.  This should
-     * only be called from {@link #split()} or {@link #merge()} when
-     * adding children entries.
+     * Adds the provided entry to the the current leaf, chaining as
+     * necessary, but does <i>not</i> perform the size check for
+     * splitting.  This should only be called from {@link #split()} or
+     * {@link #merge()} when adding children entries.
      *
-     * @param copy the entry whose fields should be copied and added
-     *        as a new entry to this leaf.
+     * @param e the entry that should be added as a new entry to this
+     *        leaf
      * @param index the index where the new entry should be put
      */
-    private void addEntry(PrefixEntry copy, int index) {
+    private void addEntry(PrefixEntry e, int index) {
  	PrefixEntry<K,V> prev = table[index];
-	table[index] = new PrefixEntry<K,V>(copy, prev); 
+	e.next = prev;
+	table[index] = e;
  	size++;
     }
     
@@ -789,9 +789,7 @@ public class PrefixHashMap<K,V>
  	PrefixHashMap cur = leftMost();
   	totalSize += cur.size;
   	while(cur.rightLeaf != null) {
-	    int s = (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
-	    //totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
-	    totalSize += s;    
+	    totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
 	}
 	
   	return totalSize;
@@ -878,7 +876,7 @@ public class PrefixHashMap<K,V>
     }
 
     // for debugging, remove later
-    public String treeString() {
+    String treeString() {
 	if (leftChild == null) {
 	    String s = "(";
 	    for (PrefixEntry e : table) {
@@ -899,7 +897,7 @@ public class PrefixHashMap<K,V>
 	}
     }
 
-    public String treeDiag() {
+    String treeDiag() {
 	return "ROOT: " + 
 	    ((leftChild == null) 
 	     ? "conents: " + treeString()
@@ -924,7 +922,7 @@ public class PrefixHashMap<K,V>
 	return s + "\n";
     }
 
-    public String treeLeaves() {	
+    String treeLeaves() {	
 	String s = "";
 	PrefixHashMap cur = leftMost(); 
 	for (ManagedReference r = AppContext.getDataManager().createReference(cur);
@@ -961,23 +959,23 @@ public class PrefixHashMap<K,V>
 	 * the key
 	 */	
 	private final ManagedReference keyRef;
-
+	
 	/**
 	 * A reference to the value.  The class type of this reference
 	 * will depend on whether this map is managing the value
 	 */ 
 	private ManagedReference valueRef;
-
+	
 	/**
 	 * The next chained entry in this entry's bucket
 	 */
-	PrefixEntry<K,V> next;
-
+	private PrefixEntry<K,V> next;
+	
 	/**
 	 * The hash value for this entry
 	 */
-	final int hash;
-
+	private final int hash;
+	
 	/**
 	 * Whether the key stored in this entry is actually stored
 	 * as a {@link ManagedSerializable}
@@ -1507,8 +1505,6 @@ public class PrefixHashMap<K,V>
      */
     private void writeObject(java.io.ObjectOutputStream s) 
 	throws java.io.IOException {
-	// parent, leafs, children, stable, size, splitThresh, mergeThresh,
-	// leafCapacity, splitFactor, mergeFactor, minDepth, depth
 	// write out all the non-transient state
 	s.defaultWriteObject();
 
