@@ -53,4 +53,11 @@ public class DummyComponentRegistry implements ComponentRegistry {
     public void registerAppContext() {
 	new DummyAbstractKernelAppContext(this);
     }
+
+    /**
+     * Clears all components from the registry.
+     */
+    public void clearComponents() {
+	components.clear();
+    }
 }

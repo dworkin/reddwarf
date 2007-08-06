@@ -48,6 +48,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.UtilMisc;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -86,12 +87,12 @@ public class TestChannelServiceImpl extends TestCase {
     private static int PORT = 0;
 
     /** Properties for the channel service and client session service. */
-    private static Properties serviceProps = createProperties(
+    private static Properties serviceProps = UtilMisc.createProperties(
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	StandardProperties.APP_PORT, Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
+    private static Properties dbProps = UtilMisc.createProperties(
 	DataStoreImplClassName + ".directory", DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestChannelServiceImpl");
 
@@ -238,6 +239,7 @@ public class TestChannelServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
         MinimalTestKernel.destroyContext(appContext);
+	//serviceRegistry.clearComponents();
     }
 
     /* -- Test constructor -- */
@@ -1482,18 +1484,6 @@ public class TestChannelServiceImpl extends TestCase {
 	txn = null;
     }
     
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
- 
     /**
      * Creates a new data service.  If the database directory does
      * not exist, one is created.

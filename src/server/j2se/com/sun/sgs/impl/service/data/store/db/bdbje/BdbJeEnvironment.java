@@ -14,6 +14,7 @@ import com.sleepycat.je.LockNotGrantedException;
 import com.sleepycat.je.RunRecoveryException;
 import com.sleepycat.je.StatsConfig;
 import com.sleepycat.je.XAEnvironment;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.Scheduler;
@@ -32,13 +33,15 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.transaction.xa.XAException;
+import static javax.transaction.xa.XAException.XA_RBBASE;
 import static javax.transaction.xa.XAException.XA_RBDEADLOCK;
+import static javax.transaction.xa.XAException.XA_RBEND;
 import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
 
 /**
  * Provides a database implementation based on <a href=
  * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB, Java
- * Edition</a> <p>
+ * Edition</a>. <p>
  * 
  * Operations on classes in this package will throw an {@link Error} if the
  * underlying Berkeley DB database requires recovery.  In that case, callers
@@ -90,18 +93,14 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	je.checkpointer.bytesInterval
- *	</b></code> <br>
+ * <dt> <i>Property:</i> <code><b>je.checkpointer.bytesInterval</b></code> <br>
  *	<i>Value:</i> <code>1000000</code>
  *
  * <dd style="padding-top: .5em">Perform checkpoints after 1 MB of changes.
- * This setting improves performance when there are large number of changes
+ * This setting improves performance when there are a large number of changes
  * being committed. <p>
  *
- * <dt> <i>Property:</i> <code><b>
- *	je.env.sharedLatches
- *	</b></code> <br>
+ * <dt> <i>Property:</i> <code><b>je.env.sharedLatches</b></code> <br>
  *	<i>Value:</i> <code>true</code>
  *
  * <dd style="padding-top: .5em">Use shared latches to improve concurrency. <p>
@@ -151,25 +150,24 @@ public class BdbJeEnvironment implements DbEnvironment {
      */
     private static final Properties defaultProperties = new Properties();
     static {
-	/*
-	 * Perform checkpoints after 1 MB of changes.  This setting improves
-	 * performance when there are large number of changes being committed.
-	 */
-	defaultProperties.setProperty(
-	    "je.checkpointer.bytesInterval", "1000000");
-	/* Use shared latches to improve concurrency. */
-	defaultProperties.setProperty(
-	    "je.env.sharedLatches", "true");
+	defaultProperties.setProperty("je.checkpointer.bytesInterval",
+				      "1000000");
+	defaultProperties.setProperty("je.env.sharedLatches", "true");
     }
 
     /** The Berkeley DB environment. */
     private final XAEnvironment env;
 
+    /** The stats task or null. */
+    private StatsRunnable statsTask;
+
     /** Used to cancel the stats task, if non-null. */
     private TaskHandle statsTaskHandle;
 
     /** A Berkeley DB exception listener that uses logging. */
-    private static class LoggingExceptionListener implements ExceptionListener {
+    private static class LoggingExceptionListener
+	implements ExceptionListener
+    {
 	public void exceptionThrown(ExceptionEvent event) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(Level.WARNING, event.getException(),
@@ -182,17 +180,24 @@ public class BdbJeEnvironment implements DbEnvironment {
     /** A runnable that logs database statistics. */
     private class StatsRunnable implements Runnable {
 	private final StatsConfig statsConfig = new StatsConfig();
+	private boolean cancelled = false;
 	StatsRunnable() {
 	    statsConfig.setClear(true);
 	}
-	public void run() {
-	    try {
-		if (logger.isLoggable(Level.INFO)) {
-		    logger.log(Level.INFO, "Database stats:\n{0}",
-			       env.getStats(statsConfig));
+	/** Prevents this task from running in the future. */
+	synchronized void cancel() {
+	    cancelled = true;
+	}
+	public synchronized void run() {
+	    if (!cancelled) {
+		try {
+		    if (logger.isLoggable(Level.INFO)) {
+			logger.log(Level.INFO, "Database stats:\n{0}",
+				   env.getStats(statsConfig));
+		    }
+		} catch (Throwable e) {
+		    logger.logThrow(Level.WARNING, e, "Stats failed");
 		}
-	    } catch (Throwable e) {
-		logger.logThrow(Level.WARNING, e, "Stats failed");
 	    }
 	}
     }
@@ -208,6 +213,12 @@ public class BdbJeEnvironment implements DbEnvironment {
     public BdbJeEnvironment(
 	String directory, Properties properties, Scheduler scheduler)
     {
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG,
+		       "BdbJeEnvironment directory:{0}, properties:{1}, " +
+		       "scheduler:{2}",
+		       directory, properties, scheduler);
+	}
 	Properties propertiesWithDefaults = new Properties();
 	propertiesWithDefaults.putAll(defaultProperties);
 	propertiesWithDefaults.putAll(properties);
@@ -237,32 +248,33 @@ public class BdbJeEnvironment implements DbEnvironment {
 	    env = new XAEnvironment(new File(directory), config);
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
+	} catch (Error e) {
+	    logger.logThrow(
+		Level.SEVERE, e, "BdbJeEnvironment initialization failed");
+	    throw e;
 	}
 	if (stats >= 0) {
+	    statsTask = new StatsRunnable();
 	    statsTaskHandle = scheduler.scheduleRecurringTask(
-		new StatsRunnable(), stats);
+		statsTask, stats);
 	}
     }
 	
     /**
-     * Returns the correct SGS exception for a Berkeley DB DatabaseException
-     * thrown during an operation.  Throws an Error if recovery is needed.
-     * Only converts Berkeley DB transaction exceptions to the associated SGS
-     * exceptions if convertTxnExceptions is true.
+     * Returns the correct exception for a Berkeley DB DatabaseException, or
+     * XAException, thrown during an operation.  Throws an Error if recovery is
+     * needed.  Only converts Berkeley DB transaction exceptions to the
+     * associated exceptions if convertTxnExceptions is true.
      */
     static RuntimeException convertException(
-	Exception e, boolean convertTxnExceptions) {
-	/*
-	 * Don't include DatabaseExceptions as the cause because, even though
-	 * that class implements Serializable, the Environment object
-	 * optionally contained within them is not.  -tjb@sun.com (01/19/2007)
-	 */
+	Exception e, boolean convertTxnExceptions)
+    {
 	if (convertTxnExceptions && e instanceof LockNotGrantedException) {
 	    return new TransactionTimeoutException(
-		"Transaction timed out: " + e);
+		"Transaction timed out: " + e, e);
 	} else if (convertTxnExceptions && e instanceof DeadlockException) {
 	    return new TransactionConflictException(
-		"Transaction conflict: " + e);
+		"Transaction conflict: " + e, e);
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
@@ -279,20 +291,22 @@ public class BdbJeEnvironment implements DbEnvironment {
 	    throw error;
 	} else if (e instanceof XAException) {
 	    int errorCode = ((XAException) e).errorCode;
-	    switch (errorCode) {
-	    case XA_RBTIMEOUT:
+	    if (errorCode == XA_RBTIMEOUT) {
 		throw new TransactionTimeoutException(
 		    "Transaction timed out: " + e, e);
-	    case XA_RBDEADLOCK:
+	    } else if (errorCode == XA_RBDEADLOCK) {
 		throw new TransactionConflictException(
 		    "Transaction conflict: " + e, e);
-	    default:
+	    } else if (errorCode >= XA_RBBASE && errorCode <= XA_RBEND) {
+		throw new TransactionAbortedException(
+		    "Transaction aborted: " + e, e);
+	    } else {
 		throw new DbDatabaseException(
 		    "Unexpected database exception: " + e, e);
 	    }
 	} else {
 	    throw new DbDatabaseException(
-		"Unexpected database exception: " + e);
+		"Unexpected database exception: " + e, e);
 	}
     }
 
@@ -315,6 +329,7 @@ public class BdbJeEnvironment implements DbEnvironment {
     /** {@inheritDoc} */
     public void close() {
 	if (statsTaskHandle != null) {
+	    statsTask.cancel();
 	    statsTaskHandle.cancel();
 	    statsTaskHandle = null;
 	}

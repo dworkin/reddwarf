@@ -73,6 +73,7 @@ public class TestDataEncoding extends TestCase {
 	    DataEncoding.decodeShort(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -150,6 +151,7 @@ public class TestDataEncoding extends TestCase {
 	    DataEncoding.decodeInt(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -224,6 +226,7 @@ public class TestDataEncoding extends TestCase {
 	    DataEncoding.decodeLong(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -242,6 +245,7 @@ public class TestDataEncoding extends TestCase {
 	    DataEncoding.encodeString(longString);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
 	verifyEncodeString("", zero);
 	verifyEncodeString("hi", b('h'), b('i'), zero);
@@ -274,18 +278,37 @@ public class TestDataEncoding extends TestCase {
 	    DataEncoding.decodeString(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
 	bytes = new byte[] { ff, ff, zero };
 	try {
 	    DataEncoding.decodeString(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
 	bytes = new byte[] { b(0xef), ff, zero };
 	try {
 	    DataEncoding.decodeString(bytes);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	bytes = new byte[] { (byte) 'a', (byte) 'b' };
+	try {
+	    DataEncoding.decodeString(bytes);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	bytes = new byte[Short.MAX_VALUE + 2];
+	Arrays.fill(bytes, (byte) 'a');
+	bytes[bytes.length - 1] = 0;
+	try {
+	    DataEncoding.decodeString(bytes);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 

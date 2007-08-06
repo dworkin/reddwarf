@@ -25,9 +25,10 @@ public interface DbEnvironment {
     DbTransaction beginTransaction(long timeout);
 
     /**
-     * Opens a database.  If the implementation can be configured with a
-     * default directory, then relative database filenames will be interpreted
-     * relative to that directory.
+     * Opens a database.  Relative database filenames will be interpreted
+     * relative to the {@code directory} argument passed to {@link
+     * DbEnvironmentFactory#getEnvironment
+     * DbEnvironmentFactory.getEnvironment}.
      *
      * @param	txn the transaction under which the database should be opened
      * @param	fileName the name of the file containing the database
@@ -45,7 +46,8 @@ public interface DbEnvironment {
     /**
      * Closes the environment, releasing any associated resources.  This
      * environment should not be used after this method is called.  This method
-     * should not be called if there are any open transactions or databases.
+     * should not be called if any of the  transactions or databases associated
+     * with this environment are still open.
      *
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */

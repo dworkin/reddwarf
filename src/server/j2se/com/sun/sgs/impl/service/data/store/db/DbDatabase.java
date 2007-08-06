@@ -5,8 +5,9 @@
 package com.sun.sgs.impl.service.data.store.db;
 
 /**
- * The interface to a database.  Databases must not be used after the {@link
- * #close close} method is called.
+ * The interface to a database.  Databases are associated with a single
+ * database environment, and must be closed before the environment is closed.
+ * Databases must not be used after the {@link #close close} method is called.
  */
 public interface DbDatabase {
 
@@ -42,8 +43,8 @@ public interface DbDatabase {
     void put(DbTransaction txn, byte[] key, byte[] value);
 
     /**
-     * Sets the value associated with a key in this database, if the key does
-     * not already have an associated value.
+     * Sets the value associated with a key in this database, but only if the
+     * key does not already have an associated value.
      *
      * @param	txn the transaction for this operation
      * @param	key the key
@@ -74,8 +75,8 @@ public interface DbDatabase {
     boolean delete(DbTransaction txn, byte[] key);
 
     /**
-     * Returns a cursor for iterating over the contents of this database.  Note
-     * that cursors need to be closed before the associated transaction ends.
+     * Returns a cursor for iterating over the contents of this database.  The
+     * cursor needs to be closed before the associated transaction ends.
      *
      * @return	the cursor
      * @throws	IllegalArgumentException if {@code txn} was not created by the

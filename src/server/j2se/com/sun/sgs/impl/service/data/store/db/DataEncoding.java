@@ -50,7 +50,7 @@ public final class DataEncoding {
     public static short decodeShort(byte[] bytes) {
 	if (bytes.length > 2) {
 	    throw new IllegalArgumentException(
-		"The argument must have a length of at least 2");
+		"The argument must not have a length longer than 2");
 	}
 	int n = (bytes[0] & 0xff) ^ 0x80;
 	n <<= 8;
@@ -106,7 +106,7 @@ public final class DataEncoding {
     public static int decodeInt(byte[] bytes) {
 	if (bytes.length > 4) {
 	    throw new IllegalArgumentException(
-		"The argument must have a length of at least 4");
+		"The argument must not have a length longer than 4");
 	}
 	return decodeInt(bytes, 0);
     }
@@ -169,7 +169,7 @@ public final class DataEncoding {
     public static long decodeLong(byte[] bytes) {
 	if (bytes.length > 8) {
 	    throw new IllegalArgumentException(
-		"The argument must have a length of at least 8");
+		"The argument must not have a length longer than 8");
 	}
 	long n = (bytes[0] & 0xff) ^ 0x80;
 	n <<= 8;
@@ -192,10 +192,12 @@ public final class DataEncoding {
     /**
      * Encodes a {@code String} into an array of bytes encoded in modified
      * UTF-8 format, as documented by {@link DataInput}, but with the two byte
-     * initial size omitted and with a terminating null byte.  Leaving out the
-     * size means that the strings will sort properly when used as keys, and
-     * adding a null termination means not needing to depend on the length of
-     * the array to find the end of the data.
+     * size value omitted from the start of the encoding, and with a
+     * terminating null byte.  Removing the size from the start of the encoding
+     * means that the strings will sort properly when used as keys, and adding
+     * a null termination removes the need to depend on the length of the array
+     * to find the end of the data, which turns out to be useful for Berkeley
+     * DB.
      *
      * @param	string the string to encode
      * @return	the encoded byte array
@@ -223,13 +225,14 @@ public final class DataEncoding {
     }
 
     /**
-     * Decodes an array of bytes encoded as modified UTF-8, but with no initial
-     * two-byte size and with a null termination, into a {@code String}.
+     * Decodes an array of bytes encoded as modified UTF-8, but with the
+     * two-byte size value omitted from the start and with a null termination,
+     * into a {@code String}.
      *
      * @param	bytes the byte array to decode
      * @return	the decoded string
-     * @throws	IllegalArgumentException if the format the bytes is not valid
-     *		UTF-8 data
+     * @throws	IllegalArgumentException if the format of the bytes is not
+     *		valid UTF-8 data
      */
     public static String decodeString(byte[] bytes) {
 	int length;
@@ -241,6 +244,9 @@ public final class DataEncoding {
 	if (length >= bytes.length) {
 	    throw new IllegalArgumentException(
 		"Problem decoding string: Null termination not found");
+	} else if (length > Short.MAX_VALUE) {
+	    throw new IllegalArgumentException(
+		"Problem decoding string: Length is too large: " + length);
 	}
 	byte[] newBytes = new byte[length + 2];
 	newBytes[0] = (byte) (length >>> 8);

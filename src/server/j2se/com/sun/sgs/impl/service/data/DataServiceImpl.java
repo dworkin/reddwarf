@@ -416,6 +416,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
+	} catch (Error e) {
+	    logger.logThrow(
+		Level.SEVERE, e, "DataService initialization failed");
+	    throw e;
 	}
     }
 

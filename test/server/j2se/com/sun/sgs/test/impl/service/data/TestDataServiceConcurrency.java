@@ -20,6 +20,7 @@ import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.UtilMisc;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -140,7 +141,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    MinimalTestKernel.getSystemRegistry(
 		MinimalTestKernel.createContext())
 	    .getComponent(TaskScheduler.class));
-	props = createProperties(
+	props = UtilMisc.createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
     }
@@ -393,20 +394,6 @@ public class TestDataServiceConcurrency extends TestCase {
 		    "Failed to delete directory: " + dir);
 	    }
 	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	/* Include system properties and allow them to override */
-	props.putAll(System.getProperties());
-	return props;
     }
 
     /** Returns the data service to test. */

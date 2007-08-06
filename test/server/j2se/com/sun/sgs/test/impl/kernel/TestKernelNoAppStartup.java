@@ -54,7 +54,7 @@ public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
         logging.setProperty(".level", "INFO");
         logging.setProperty("java.util.logging.ConsoleHandler.level", "INFO");
         new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
-            void handleInput(String line) {}
+            void handleInput(String line) { }
             void handleError(String line) {
                 if (line.equals("INFO: " + APP_NAME + ": non-application " +
                                 "context is ready"))

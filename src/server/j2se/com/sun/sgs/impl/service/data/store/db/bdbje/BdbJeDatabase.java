@@ -51,6 +51,7 @@ public class BdbJeDatabase implements DbDatabase {
      * @param	txn the Berkeley DB transaction
      * @param	fileName the name of the file containing the database
      * @param	create whether to create the database if it does not exist
+     * @throws	FileNotFoundException if the database file is not found
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
     BdbJeDatabase(

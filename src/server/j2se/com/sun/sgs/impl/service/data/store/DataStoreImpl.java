@@ -322,9 +322,6 @@ public class DataStoreImpl
     /** Stores transaction information. */
     private static class TxnInfo {
 
-	/** The SGS transaction. */
-	final Transaction txn;
-
 	/** The associated database transaction. */
 	final DbTransaction dbTxn;
 
@@ -347,7 +344,6 @@ public class DataStoreImpl
 	private String lastCursorKey;
 
 	TxnInfo(Transaction txn, DbEnvironment env) {
-	    this.txn = txn;
 	    dbTxn = env.beginTransaction(txn.getTimeout());
 	}
 
@@ -515,6 +511,10 @@ public class DataStoreImpl
 	} catch (RuntimeException e) { 
 	    throw convertException(
 		null, Level.SEVERE, e, "DataStore initialization");
+	} catch (Error e) {
+	    logger.logThrow(
+		Level.SEVERE, e, "DataStore initialization failed");
+	    throw e;
 	} finally {
 	    if (dbTxn != null && !done) {
 		try {
@@ -533,9 +533,8 @@ public class DataStoreImpl
     private Databases getDatabases(DbTransaction dbTxn) {
 	Databases dbs = new Databases();
 	boolean create = false;
-	String infoFileName = directory + File.separator + "info";
 	try {
-	    dbs.info = env.openDatabase(dbTxn, infoFileName, false);
+	    dbs.info = env.openDatabase(dbTxn, "info", false);
 	    int minorVersion = DataStoreHeader.verify(dbs.info, dbTxn);
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG, "Found existing header {0}",
@@ -543,7 +542,7 @@ public class DataStoreImpl
 	    }
 	} catch (FileNotFoundException e) {
 	    try {
-		dbs.info = env.openDatabase(dbTxn, infoFileName, true);
+		dbs.info = env.openDatabase(dbTxn, "info", true);
 	    } catch (FileNotFoundException e2) {
 		throw new DataStoreException(
 		    "Problem creating database: " + e2.getMessage(), e2);
@@ -556,22 +555,19 @@ public class DataStoreImpl
 	    create = true;
 	}
 	try {
-	    dbs.classes = env.openDatabase(
-		dbTxn, directory + File.separator + "classes", create);
+	    dbs.classes = env.openDatabase(dbTxn, "classes", create);
 	} catch (FileNotFoundException e) {
 	    throw new DataStoreException(
 		"Classes database not found: " + e.getMessage(), e);
 	}
 	try {
-	    dbs.oids = env.openDatabase(
-		dbTxn, directory + File.separator + "oids", create);
+	    dbs.oids = env.openDatabase(dbTxn, "oids", create);
 	} catch (FileNotFoundException e) {
 	    throw new DataStoreException(
 		"Oids database not found: " + e.getMessage(), e);
 	}
 	try {
-	    dbs.names = env.openDatabase(
-		dbTxn, directory + File.separator + "names", create);
+	    dbs.names = env.openDatabase(dbTxn, "names", create);
 	} catch (FileNotFoundException e) {
 	    throw new DataStoreException(
 		"Names database not found: " + e.getMessage(), e);
@@ -962,17 +958,18 @@ public class DataStoreImpl
 			result = found
 			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
 			byte[] idKey = getKeyFromClassId(result);
-			boolean ok = cursor.putNoOverwrite(idKey, classInfo);
-			if (!ok) {
+			boolean success =
+			    cursor.putNoOverwrite(idKey, classInfo);
+			if (!success) {
 			    throw new DataStoreException(
 				"Class ID key already present");
 			}
 		    } finally {
 			cursor.close();
 		    }
-		    boolean ok = classesDb.putNoOverwrite(
+		    boolean success = classesDb.putNoOverwrite(
 			dbTxn, hashKey, DataEncoding.encodeInt(result));
-		    if (!ok) {
+		    if (!success) {
 			throw new DataStoreException(
 			    "Class hash already present");
 		    }
@@ -1380,11 +1377,9 @@ public class DataStoreImpl
      * level argument is used to log the exception.  The operation argument
      * will be included in newly created exceptions and the log, and should
      * describe the operation that was underway when the exception was thrown.
-     * The supplied exception may also be a RuntimeException, which will be
-     * logged and returned.
      */
     private RuntimeException convertException(
-	Transaction txn, Level level, Exception e, String operation)
+	Transaction txn, Level level, RuntimeException e, String operation)
     {
 	RuntimeException re;
 	if (e instanceof TransactionTimeoutException) {
@@ -1397,11 +1392,8 @@ public class DataStoreImpl
 	} else if (e instanceof DbDatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
-	} else if (e instanceof RuntimeException) {
-	    re = (RuntimeException) e;
 	} else {
-	    re = new DataStoreException(
-		operation + " failed: " + e.getMessage(), e);
+	    re = (RuntimeException) e;
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was

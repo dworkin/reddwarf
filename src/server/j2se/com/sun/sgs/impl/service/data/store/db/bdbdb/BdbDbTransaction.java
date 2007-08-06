@@ -9,7 +9,7 @@ import com.sleepycat.db.Environment;
 import com.sleepycat.db.Transaction;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 
-/** Provide a transaction implementation using Berkeley DB. */
+/** Provides a transaction implementation using Berkeley DB. */
 class BdbDbTransaction implements DbTransaction {
 
     /** The Berkeley DB transaction. */

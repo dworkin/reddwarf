@@ -9,6 +9,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import com.sun.sgs.test.util.UtilMisc;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,7 +87,7 @@ public class TestDataStoreServerImpl extends TestCase {
     /** Prints the test case. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	props = createProperties(
+	props = UtilMisc.createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
@@ -423,18 +424,6 @@ public class TestDataStoreServerImpl extends TestCase {
 		"Failed to create directory: " + dir);
 	}
 	System.err.println("Cleaned directory");
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 
     /** Use this thread to control a call to shutdown that may block. */

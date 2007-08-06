@@ -19,6 +19,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
+import com.sun.sgs.test.util.UtilMisc;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -133,7 +134,7 @@ public class TestDataStoreImpl extends TestCase {
         if (!dataDir.mkdir()) {
             throw new RuntimeException("Failed to create sub-dir: " + dataDir);
         }
-        Properties props = createProperties(
+        Properties props = UtilMisc.createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
         DataStore testStore = createDataStore(props);
@@ -1658,18 +1659,6 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
     /** Creates a DataStore using the default properties. */
     protected DataStore createDataStore() throws Exception {
 	return createDataStore(props);
@@ -1682,7 +1671,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /** Returns the default properties to use for creating data stores. */
     protected Properties getProperties() throws Exception {
-	return createProperties(
+	return UtilMisc.createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory);
     }
 

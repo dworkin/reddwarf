@@ -12,7 +12,7 @@ import java.util.Arrays;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 
-/** Provide a transaction implementation using Berkeley DB, Java Edition. */
+/** Provides a transaction implementation using Berkeley DB, Java Edition. */
 class BdbJeTransaction implements DbTransaction {
 
     /** The Berkeley DB environment. */
@@ -22,10 +22,9 @@ class BdbJeTransaction implements DbTransaction {
     private final Transaction txn;
 
     /**
-     * Implement an Xid whose format is always 1, and whose branch qualifier is
-     * null.
+     * Implement an Xid whose format is 1, and whose branch qualifier is null.
      */
-    private final class SimpleXid implements Xid {
+    private static final class SimpleXid implements Xid {
 	/** The global transaction ID. */
 	private byte[] gid;
 

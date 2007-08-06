@@ -29,10 +29,11 @@ public final class DbEnvironmentFactory {
      * three parameters: a {@link String}, which specifies the directory
      * containing database files, {@link Properties}, which specifies
      * configuration options, and a {@link Scheduler}, which the implementation
-     * can use to run asynchronous periodic tasks.  If the property is present,
-     * the results of calling the constructor with the arguments passed to this
-     * method will be returned.  Otherwise, an instance of {@link
-     * BdbDbEnvironment}, constructed with the arguments, will be returned.
+     * can use to run asynchronous, periodic tasks.  If the property is
+     * present, the results of calling the constructor with the arguments
+     * passed to this method will be returned.  Otherwise, an instance of
+     * {@link BdbDbEnvironment}, constructed with the arguments, will be
+     * returned.
      *
      * @param	directory the directory containing database files
      * @param	properties the properties to configure the implementation

@@ -108,12 +108,6 @@ public class BdbDbEnvironment implements DbEnvironment {
     private static final long DEFAULT_CHECKPOINT_SIZE = 100000;
 
     /**
-     * The property that specifies whether to automatically remove log files.
-     */
-    private static final String REMOVE_LOGS_PROPERTY =
-	PACKAGE + ".remove.logs";
-
-    /**
      * The property that specifies whether to flush changes to disk on
      * transaction boundaries.  The property is set to false by default.  If
      * false, some recent transactions may be lost in the event of a crash,
@@ -122,8 +116,17 @@ public class BdbDbEnvironment implements DbEnvironment {
     private static final String FLUSH_TO_DISK_PROPERTY =
 	PACKAGE + ".flush.to.disk";
 
+    /**
+     * The property that specifies whether to automatically remove log files.
+     */
+    private static final String REMOVE_LOGS_PROPERTY =
+	PACKAGE + ".remove.logs";
+
     /** The Berkeley DB environment. */
     private final Environment env;
+
+    /** The checkpoint task. */
+    private final CheckpointRunnable checkpointTask;
 
     /** Used to cancel the checkpoint task. */
     private final TaskHandle checkpointTaskHandle;
@@ -149,14 +152,21 @@ public class BdbDbEnvironment implements DbEnvironment {
     /** A runnable that performs a periodic database checkpoint. */
     private class CheckpointRunnable implements Runnable {
 	private final CheckpointConfig config = new CheckpointConfig();
+	private boolean cancelled = false;
 	CheckpointRunnable(long size) {
 	    config.setKBytes((int) (size / 1000));
 	}
-	public void run() {
-	    try {
-		env.checkpoint(config);
-	    } catch (Throwable e) {
-		logger.logThrow(Level.WARNING, e, "Checkpoint failed");
+	/** Prevents this task from running in the future. */
+	synchronized void cancel() {
+	    cancelled = true;
+	}
+	public synchronized void run() {
+	    if (!cancelled) {
+		try {
+		    env.checkpoint(config);
+		} catch (Throwable e) {
+		    logger.logThrow(Level.WARNING, e, "Checkpoint failed");
+		}
 	    }
 	}
     }
@@ -172,18 +182,24 @@ public class BdbDbEnvironment implements DbEnvironment {
     public BdbDbEnvironment(
 	String directory, Properties properties, Scheduler scheduler)
     {
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG,
+		       "BdbDbEnvironment directory:{0}, properties:{1}, " +
+		       "scheduler:{2}",
+		       directory, properties, scheduler);
+	}
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	boolean flushToDisk = wrappedProps.getBooleanProperty(
-	    FLUSH_TO_DISK_PROPERTY, false);
 	long cacheSize = wrappedProps.getLongProperty(
 	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE, MIN_CACHE_SIZE,
 	    Long.MAX_VALUE);
-	boolean removeLogs = wrappedProps.getBooleanProperty(
-	    REMOVE_LOGS_PROPERTY, false);
 	long checkpointInterval = wrappedProps.getLongProperty(
 	    CHECKPOINT_INTERVAL_PROPERTY, DEFAULT_CHECKPOINT_INTERVAL);
 	long checkpointSize = wrappedProps.getLongProperty(
 	    CHECKPOINT_SIZE_PROPERTY, DEFAULT_CHECKPOINT_SIZE);
+	boolean flushToDisk = wrappedProps.getBooleanProperty(
+	    FLUSH_TO_DISK_PROPERTY, false);
+	boolean removeLogs = wrappedProps.getBooleanProperty(
+	    REMOVE_LOGS_PROPERTY, false);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setCacheSize(cacheSize);
@@ -205,18 +221,20 @@ public class BdbDbEnvironment implements DbEnvironment {
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
 	}
+	checkpointTask = new CheckpointRunnable(checkpointSize);
 	checkpointTaskHandle = scheduler.scheduleRecurringTask(
-	    new CheckpointRunnable(checkpointSize), checkpointInterval);
+	    checkpointTask, checkpointInterval);
     }
 	
     /**
-     * Returns the correct SGS exception for a Berkeley DB DatabaseException
-     * thrown during an operation.  Throws an Error if recovery is needed.
-     * Only converts Berkeley DB transaction exceptions to the associated SGS
-     * exceptions if convertTxnExceptions is true.
+     * Returns the correct exception for a Berkeley DB DatabaseException thrown
+     * during an operation.  Throws an Error if recovery is needed.  Only
+     * converts Berkeley DB transaction exceptions to the associated exceptions
+     * if convertTxnExceptions is true.
      */
     static RuntimeException convertException(
-	DatabaseException e, boolean convertTxnExceptions) {
+	DatabaseException e, boolean convertTxnExceptions)
+    {
 	/*
 	 * Don't include DatabaseExceptions as the cause because, even though
 	 * that class implements Serializable, the Environment object
@@ -266,6 +284,7 @@ public class BdbDbEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public void close() {
+	checkpointTask.cancel();
 	checkpointTaskHandle.cancel();
 	try {
 	    env.close();

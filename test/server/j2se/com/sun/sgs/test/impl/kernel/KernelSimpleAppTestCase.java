@@ -4,6 +4,7 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import com.sun.sgs.test.util.UtilMisc;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -52,21 +53,21 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	/* Create the DataStore subdirectory */
 	new File(dir, "dsdb").mkdir();
 	/* Create application configuration properties */
-	config = createProperties(
+	config = UtilMisc.createProperties(
 	    "com.sun.sgs.app.listener",
 	    "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    "com.sun.sgs.app.name", "SimpleApp",
 	    "com.sun.sgs.app.port", String.valueOf(getPort()),
 	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath());
 	/* Create logging properties to log at WARNING or higher */
-	logging = createProperties(
+	logging = UtilMisc.createProperties(
 	    ".level", "WARNING",
 	    "handlers", "java.util.logging.ConsoleHandler",
 	    "java.util.logging.ConsoleHandler.formatter",
 	    "java.util.logging.SimpleFormatter",
 	    "java.util.logging.ConsoleHandler.level", "WARNING");
 	/* Create system properties */
-	system = createProperties();
+	system = UtilMisc.createProperties();
     }
 
     /** Returns the port to use for this application. */
@@ -138,6 +139,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 		}
 	    }
 	    void handleLine(String line) {
+		System.err.println("stdin: " + line);
 		handleInput(line);
 	    }
 	}
@@ -147,6 +149,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 		super(err);
 	    }
 	    void handleLine(String line) {
+		System.err.println("stderr: " + line);
 		handleError(line);
 	    }
 	}
@@ -207,17 +210,5 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	abstract void handleInput(String line);
 	/** Handles a line of input from standard error. */
 	abstract void handleError(String line);
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 }

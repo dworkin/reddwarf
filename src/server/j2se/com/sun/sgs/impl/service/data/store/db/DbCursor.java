@@ -7,7 +7,7 @@ package com.sun.sgs.impl.service.data.store.db;
 /**
  * The interface to a cursor for iterating over the contents of a database.  A
  * newly created cursor has no current key or value.  Cursors are associated
- * with a single transaction, and must be opened and closed within that single
+ * with a single transaction, and must be created and closed within that single
  * transaction.  Cursors must not be used after the {@link #close close} method
  * is called.  Cursor implementations are not required to be synchronized.
  */
@@ -17,7 +17,7 @@ public interface DbCursor {
      * Returns the current key, or {@code null} if the cursor has no current
      * key.
      *
-     * @return	the key or {@code null}
+     * @return	the current key or {@code null}
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -28,7 +28,7 @@ public interface DbCursor {
      * Returns the current value, or {@code null} if the cursor has no current
      * value.
      *
-     * @return	the value or {@code null}
+     * @return	the current value or {@code null}
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
@@ -62,11 +62,10 @@ public interface DbCursor {
 
     /**
      * Searches for the first key that is greater than or equal to the
-     * specified key.  If the result is {@code true}, then the {@link #getKey
-     * getKey} and {@link #getValue getValue} methods will return the key found
-     * and its associated value.
+     * specified key.  If the result is {@code true}, then sets the current key
+     * and value to the key found and its associated value.
      *
-     * @return	{@code true} if a key was found, else {@code false}
+     * @return	{@code true} if the next key was found, else {@code false}
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs

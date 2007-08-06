@@ -208,7 +208,9 @@ public class PropertiesWrapper {
      * @return	the new instance or <code>null</code> if the property is not
      *		found
      * @throws	IllegalArgumentException if the property is found and a problem
-     *		occurs creating the instance
+     *		occurs creating the instance, or if the constructor throws a
+     *		checked exception
+     * @throws	RuntimeException if it is thrown by the constructor
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)
@@ -250,11 +252,17 @@ public class PropertiesWrapper {
 		e);
 	} catch (InvocationTargetException e) {
 	    Throwable cause = e.getCause();
-	    throw new IllegalArgumentException(
-		"Problem calling the constructor for the class " +
-		"specified by the " + name + " property: " +
-		className + ": " + cause,
-		cause);
+	    if (cause instanceof RuntimeException) {
+		throw (RuntimeException) cause;
+	    } else if (cause instanceof Error) {
+		throw (Error) cause;
+	    } else {
+		throw new IllegalArgumentException(
+		    "Problem calling the constructor for the class " +
+		    "specified by the " + name + " property: " +
+		    className + ": " + cause,
+		    cause);
+	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
 		"Problem creating an instance of the class specified by the " +
