@@ -436,6 +436,7 @@
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy file="${build.dir}/lib/sgs.jar" todir="${build.dir}/sgs/lib"/>
+    <mkdir dir="${build.dir}/sgs/lib/bdb"/>
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"/>
     </copy>
@@ -481,39 +482,39 @@
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
     <copy file="etc/LICENSE-bdb" tofile="${build.dir}/bdb/LICENSE"/>
-    <copy todir="${build.dir}/bdb/lib/bdb"
+    <copy todir="${build.dir}/bdb"
 	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
-    <copy todir="${build.dir}/bdb/lib/bdb/macosx-ppc">
+    <copy todir="${build.dir}/bdb/macosx-ppc">
       <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/macosx-x86">
+    <copy todir="${build.dir}/bdb/macosx-x86">
       <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/solaris-x86">
+    <copy todir="${build.dir}/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/solaris-sparc">
+    <copy todir="${build.dir}/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/linux-x86">
+    <copy todir="${build.dir}/bdb/linux-x86">
       <fileset dir="${bdb.builds.dir}/linux-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/linux-x86_64">
+    <copy todir="${build.dir}/bdb/linux-x86_64">
       <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/bdb/lib/bdb/win32-x86/">
+    <copy todir="${build.dir}/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>

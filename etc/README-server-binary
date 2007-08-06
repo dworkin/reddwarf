@@ -77,7 +77,7 @@ from:
 
   http://www.slf4j.org/
 
-The slf4j-api-@SLF4J.VERSION@.jar and slf4j-jdk14-@SFL4J.VERSION@.jar
+The slf4j-api-@SLF4J.VERSION@.jar and slf4j-jdk14-@SLF4J.VERSION@.jar
 JAR files should be copied to the lib subdirectory.
 
 DEVELOPING AND RUNNING
