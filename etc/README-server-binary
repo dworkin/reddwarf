@@ -29,8 +29,8 @@ subdirectories:
   Documentation for the server API
 
 - lib
-  JAR files and native libraries needed to develop for the Project
-  Darkstar Server, and to run server applications
+  JAR files needed to develop for the Project Darkstar Server, and to
+  run server applications
 
 - tutorial
   Documentation and sample code for the server tutorial
@@ -52,10 +52,33 @@ It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
 1.5.0_07 on Mac OS X platforms.
 
-The SDK requires Berkeley DB version 4.5.20.  The distribution includes
-builds of version 4.5.20 for all supported platforms.  Berkeley DB is
-highly portable; you can obtain and compile it for unsupported
-platforms.
+The SDK requires Berkeley DB version 4.5.20, which may be bundled with
+this distribution, or else can be obtained and compiled from:
+
+  http://www.oracle.com/database/berkeley-db/db/index.html
+
+The bundled files should be copied to the lib/bdb subdirectory.  If
+using files compiled separately, the Berkeley DB JAR file should be
+copied to the lib/bdb subdirectory, and the natives libraries for the
+current platform should be copied to proper subdirectory as specified in
+the startup scripts.
+
+The SDK requires Apache MINA, version 1.1, which may be bundled with
+this distribution, or else can be obtained from:
+
+  http://mina.apache.org/
+
+The mina-core-@MINA.VERSION@.jar JAR file should be copied to the lib
+subdirectory.
+
+MINA also requires Simple Logging Facade for Java (SLF4J), version 1.4,
+which may be bundled with this distribution, or else can be obtained
+from:
+
+  http://www.slf4j.org/
+
+The slf4j-api-@SLF4J.VERSION@.jar and slf4j-jdk14-@SFL4J.VERSION@.jar
+JAR files should be copied to the lib subdirectory.
 
 DEVELOPING AND RUNNING
 

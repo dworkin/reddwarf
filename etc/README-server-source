@@ -62,17 +62,17 @@ lib subdirectory:
 
 - Apache MINA, version 1.1:
 
-  http://mina.apache.org/downloads.html
+  http://mina.apache.org/
 
 - Simple Logging Facade for Java (SLF4J), version 1.4:
 
-  http://www.slf4j.org/download.html
+  http://www.slf4j.org/
 
 The binaries for Berkeley DB are also needed:
 
 - Berkeley DB, version 4.5.22:
 
-  http://www.oracle.com/technology/software/products/berkeley-db/db/index.html
+  http://www.oracle.com/database/berkeley-db/db/index.html
 
 These binaries need to be installed in a directory that you specify as
 the value of the bdb.lib.dir property when using Ant.
@@ -82,7 +82,7 @@ subdirectory in order to run the tests:
 
 - JUnit version 4.1 (or better)
 
-  http://junit.org/index.htm
+  http://junit.org/
 
 
 KNOWN ISSUES
