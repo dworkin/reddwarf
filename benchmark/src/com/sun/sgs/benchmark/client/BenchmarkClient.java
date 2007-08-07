@@ -90,7 +90,7 @@ public class BenchmarkClient {
     private String serverHostname, serverPort;        
     
     /** Handles listener multiplexing. */
-    private BenchmarkClientListener masterListener = new BenchmarkClientListener();
+    protected BenchmarkClientListener masterListener = new BenchmarkClientListener();
     
     /** Used for communication with the server */
     private SimpleClient client = new SimpleClient(masterListener);
@@ -755,7 +755,7 @@ public class BenchmarkClient {
      * @param session the {@code SessionId} to format
      * @return the formatted string
      */
-    private String formatSession(SessionId session) {
+    public static String formatSession(SessionId session) {
         if (session == null) {
             return "[null]";
         } else {
