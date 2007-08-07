@@ -64,8 +64,8 @@ public class ChannelMonitor extends BenchmarkClient
         super();
     }
 
-    private static void log(String s) {
-        System.out.println(System.currentTimeMillis() + ": " + s);
+    private static void logln(String s) {
+        System.out.println(System.currentTimeMillis() + "\t" + s);
     }
 
     public static void printUsage() {
@@ -88,7 +88,7 @@ public class ChannelMonitor extends BenchmarkClient
             try {
                 seqNum = Long.valueOf(msg.substring(0, 20));
             } catch (NumberFormatException nfe) {
-                log("Bad message received: " + msg);
+                logln("Bad message received: " + msg);
                 return;
             }
 
@@ -99,7 +99,7 @@ public class ChannelMonitor extends BenchmarkClient
                     if (seqNum == (prevSeqNum + 1)) {
                         /** good message. */
                     } else {
-                        log(String.format("** Missed %d messages from %s\n",
+                        logln(String.format("** Missed %d messages from %s",
                                 (seqNum - (prevSeqNum + 1)), client));
                     }
 
@@ -113,7 +113,7 @@ public class ChannelMonitor extends BenchmarkClient
                         if (err > windowMaxError) windowMaxError = err;
                     }
                 } else {
-                    log(String.format("New sender: %s.  Total senders = %d\n",
+                    logln(String.format("New sender: %s.  Total senders = %d",
                             client, seqNumMap.keySet().size() + 1));
                 }
 
@@ -129,8 +129,8 @@ public class ChannelMonitor extends BenchmarkClient
     public void startMonitoring(int senderTimeout, int msgInterval) {
         this.msgInterval = msgInterval;
         
-        log(String.format("Configured with: sender-timout = %dms" +
-                ", message-interval=%dms\n", senderTimeout, msgInterval));
+        logln(String.format("Configured with: sender-timout = %dms" +
+                ", message-interval = %dms", senderTimeout, msgInterval));
         
         Timer timer = new Timer();
         timer.scheduleAtFixedRate(new MonitorTask(senderTimeout),
@@ -174,7 +174,7 @@ public class ChannelMonitor extends BenchmarkClient
             }
         }
         
-        log("Starting MonitorChannel on channel \"" + channelName + "\"\n");
+        logln("Starting MonitorChannel on channel \"" + channelName + "\"");
         
         ChannelMonitor monitor = new ChannelMonitor();
 
@@ -231,8 +231,8 @@ public class ChannelMonitor extends BenchmarkClient
                     if (elapsed > senderTimeout) {
                         /** Clear from timeouts map to avoid repeating this. */
                         iter.remove();
-                        log(String.format("Timeout for sender %s (%dms elapsed" +
-                                ").  Active sender=%d.\n", client, elapsed,
+                        logln(String.format("Timeout for sender %s (%dms elapsed" +
+                                ").  Active sender=%d.", client, elapsed,
                                 timestampMap.keySet().size()));
                     }
                 }
@@ -252,12 +252,12 @@ public class ChannelMonitor extends BenchmarkClient
         @Override
         public void run() {
             synchronized (lock) {
-                log(String.format("WINDOW\tmsgCount=%d\tavgErr=%f\tmaxErr=%d\n",
+                logln(String.format("WINDOW\tmsgCount %d\tavgErr %s\tmaxErr %d",
                         windowMsgCount, formatter.format(windowMsgCount > 0 ?
                             windowSumError/(double)windowMsgCount : 0),
                         windowMaxError));
                 
-                log(String.format("TOTAL \tmsgCount=%d\tavgErr=%f\tmaxErr=%d\n",
+                logln(String.format("TOTAL \tmsgCount %d\tavgErr %s\tmaxErr %d",
                         globalMsgCount, formatter.format(globalMsgCount > 0 ?
                             globalSumError/(double)globalMsgCount : 0),
                         globalMaxError));
