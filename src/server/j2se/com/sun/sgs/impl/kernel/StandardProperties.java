@@ -93,6 +93,12 @@ public class StandardProperties {
 
     /**
      * An optional key specifying a specific class to use for an application's
+     * {@code WatchdogService}.
+     */
+    public static final String WATCHDOG_SERVICE = NS + "app.watchdogService";
+
+    /**
+     * An optional key specifying a specific class to use for an application's
      * <code>ClientSessionService</code>.
      */
     public static final String CLIENT_SESSION_SERVICE =
@@ -145,17 +151,17 @@ public class StandardProperties {
      * ordering represents the order in which the services are configured.
      */
     public enum StandardService {
-        /** Enumeration for the Data Service */
+        /** Enumeration for the Data Service. */
         DataService,
-        /** Enumeration for the Watchdog Service */
+        /** Enumeration for the Watchdog Service. */
         WatchdogService,
-        /** Enumeration for the Registration Service */
-        RegistrationService,
-        /** Enumeration for the Task Service */
+        /** Enumeration for the Node Mapping Service. */
+        NodeMappingService,
+        /** Enumeration for the Task Service. */
         TaskService,
-        /** Enumeration for the Client Session Service */
+        /** Enumeration for the Client Session Service. */
         ClientSessionService,
-        /** Enumeration for the Channel Service */
+        /** Enumeration for the Channel Service. */
         ChannelService;
 
         /** The last service that gets configured for an application. */
