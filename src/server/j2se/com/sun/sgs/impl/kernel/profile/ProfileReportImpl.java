@@ -11,8 +11,10 @@ import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +24,24 @@ import java.util.Set;
  * Package-private implementation of <code>ProfileReport</code>.
  */
 class ProfileReportImpl implements ProfileReport {
+
+    /**
+     * An empty map for returning when no profile counters have been
+     * updated.
+     */
+    private static final Map<String,Long> EMPTY_MAP = 
+	Collections.emptyMap();
+
+    /**
+     * An empty map for returning when no profile samples have been
+     * updated.
+     */
+    // NOTE: we need this map as well because typing issues prevent us
+    // from using Collections.emptyMap()
+    private static final Map<String,List<Long>> EMPTY_SAMPLE_MAP = 
+	Collections.unmodifiableMap(new HashMap<String,List<Long>>());
+
+
 
     // the final fields, set by the constructor
     final KernelRunnable task;
@@ -35,6 +55,8 @@ class ProfileReportImpl implements ProfileReport {
     boolean succeeded = false;
     long runningTime = 0;
     int tryCount = 0;
+    Exception exception = null;
+
     List<ProfileOperation> ops = new ArrayList<ProfileOperation>();
     Set<ProfileParticipantDetail> participants =
         new HashSet<ProfileParticipantDetail>();
@@ -42,6 +64,9 @@ class ProfileReportImpl implements ProfileReport {
     // counters that are updated through methods on this class
     Map<String,Long> aggCounters = null;
     Map<String,Long> taskCounters = null;
+
+    Map<String,List<Long>> localSamples;
+    Map<String,List<Long>> lifetimeSamples;
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -60,6 +85,9 @@ class ProfileReportImpl implements ProfileReport {
         this.scheduledStartTime = scheduledStartTime;
         this.readyCount = readyCount;
         this.actualStartTime = System.currentTimeMillis();
+	
+	localSamples = null;
+	lifetimeSamples = null;
     }
 
     /**
@@ -93,6 +121,41 @@ class ProfileReportImpl implements ProfileReport {
                 currentValue = taskCounters.get(counter);
         }
         taskCounters.put(counter, currentValue + value);
+    }
+
+    /**
+     *
+     */
+    void addLocalSample(String sampleName, long value) {
+	List<Long> samples;
+        if (localSamples == null) {
+            localSamples = new HashMap<String,List<Long>>();
+	    samples = new LinkedList<Long>();
+	    localSamples.put(sampleName, samples);
+        } else {
+            if (localSamples.containsKey(sampleName))
+		samples = localSamples.get(sampleName);
+	    else {
+		samples = new LinkedList<Long>();
+		localSamples.put(sampleName, samples);		
+	    }
+        }
+	samples.add(value);
+    }
+
+    /**
+     *
+     */
+    void registerLifetimeSamples(String sampleName, 
+				 List<Long> samples) {
+        if (lifetimeSamples == null) {
+            lifetimeSamples = new HashMap<String,List<Long>>();
+	    lifetimeSamples.put(sampleName, 
+				Collections.unmodifiableList(samples));
+        } 
+	else if (!lifetimeSamples.containsKey(sampleName))
+	    lifetimeSamples.put(sampleName, 
+				Collections.unmodifiableList(samples));
     }
 
     /**
@@ -169,21 +232,43 @@ class ProfileReportImpl implements ProfileReport {
      * {@inheritDoc}
      */
     public Map<String,Long> getUpdatedAggregateCounters() {
-        return aggCounters;
+        return (aggCounters == null) ? EMPTY_MAP : aggCounters;
     }
 
     /**
      * {@inheritDoc}
      */
     public Map<String,Long> getUpdatedTaskCounters() {
-        return taskCounters;
+        return (taskCounters == null) ? EMPTY_MAP : taskCounters;
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String,List<Long>> getUpdatedTaskSamples() {
+	return (localSamples == null) ? EMPTY_SAMPLE_MAP : localSamples;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String,List<Long>> getUpdatedLifetimeSamples() {
+	return (lifetimeSamples == null) ? EMPTY_SAMPLE_MAP : lifetimeSamples;
+    }
+
 
     /**
      * {@inheritDoc}
      */
     public int getReadyCount() {
         return readyCount;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Exception getException() {
+	return exception;
     }
 
 }

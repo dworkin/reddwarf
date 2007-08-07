@@ -10,12 +10,18 @@ import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ProfileParticipantDetail;
+import com.sun.sgs.kernel.ProfileSample;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,17 +35,27 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class ProfileCollectorImpl implements ProfileCollector {
 
+    // NOTE: this is not used by this class but is necessary for other
+    //       classes which reference it for determining how many
+    //       operations they should support
+    static final int MAX_OPS = 1024; 
+
     // the next free operation identifier to use
     private AtomicInteger nextOpId;
 
-    // the maximum number of operations we allow
-    // NOTE: this should become dynamic, but for now we will never
-    // hit this upper-bound
-    static final int MAX_OPS = 256;
+    private final AtomicInteger opIdCounter;
 
-    // the set of already-allocated operations
-    private ProfileOperationImpl [] ops = new ProfileOperationImpl[MAX_OPS];
+    private final ConcurrentHashMap<String,ProfileOperationImpl> ops;
 
+    private final ConcurrentHashMap<String,ProfileSample> taskLocalSamples;
+
+    private final ConcurrentHashMap<String,ProfileSample> lifetimeSamples;
+
+    private final ConcurrentHashMap<String,ProfileCounter> taskLocalCounters;
+
+    private final ConcurrentHashMap<String,ProfileCounter> lifetimeCounters;
+
+    
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
 
@@ -65,10 +81,18 @@ public class ProfileCollectorImpl implements ProfileCollector {
      *                            to run collecting and reporting tasks
      */
     public ProfileCollectorImpl(ResourceCoordinator resourceCoordinator) {
-        nextOpId = new AtomicInteger(0);
+
         schedulerThreadCount = 0;
+	ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
         listeners = new ArrayList<ProfileOperationListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
+	opIdCounter = new AtomicInteger(0);
+
+	lifetimeSamples = new ConcurrentHashMap<String,ProfileSample>(); 
+	taskLocalSamples = new ConcurrentHashMap<String,ProfileSample>();
+
+	lifetimeCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
+	taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
 
         // start a long-lived task to consume the other end of the queue
         resourceCoordinator.startTask(new CollectorRunnable(), null);
@@ -80,8 +104,8 @@ public class ProfileCollectorImpl implements ProfileCollector {
     public void addListener(ProfileOperationListener listener) {
         listeners.add(listener);
         listener.notifyThreadCount(schedulerThreadCount);
-        for (int i = 0; i < nextOpId.get(); i++)
-            listener.notifyNewOp(ops[i]);
+	for (ProfileOperationImpl p : ops.values()) 
+	    listener.notifyNewOp(p);
     }
 
     /**
@@ -144,6 +168,14 @@ public class ProfileCollectorImpl implements ProfileCollector {
      * {@inheritDoc}
      */
     public void finishTask(int tryCount, boolean taskSucceeded) {
+	finishTask(tryCount, taskSucceeded, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void finishTask(int tryCount, boolean taskSucceeded, 
+			   Exception exception) {
         long stopTime = System.currentTimeMillis();
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
@@ -154,10 +186,12 @@ public class ProfileCollectorImpl implements ProfileCollector {
         profileReport.runningTime = stopTime - profileReport.actualStartTime;
         profileReport.tryCount = tryCount;
         profileReport.succeeded = taskSucceeded;
-
+	profileReport.exception = exception;
+	taskLocalSamples.clear();
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
     }
+
 
     /**
      * Package-private method used by <code>ProfileConsumerImpl</code> to
@@ -168,21 +202,21 @@ public class ProfileCollectorImpl implements ProfileCollector {
      *                     registering this operation
      *
      * @return a new <code>ProfileOperation</code> that will report back
-     *         to this collector
+     *         to this collector.
      *
      * @throws IllegalStateException if no more operations can be registered
      */
     ProfileOperation registerOperation(String opName, String producerName) {
-        int opId = nextOpId.getAndIncrement();
-        if (opId >= MAX_OPS) {
-            nextOpId.set(MAX_OPS);
-            throw new IllegalStateException("No more operations may be " +
-                                            "registered in the collector");
-        }
-        ops[opId] = new ProfileOperationImpl(opName, opId);
+	String name = producerName + "::" + opName;
+	int opId = opIdCounter.getAndIncrement();
+	ProfileOperationImpl op = new ProfileOperationImpl(opName, opId);
+	ProfileOperationImpl prev = ops.putIfAbsent(name,op);
+	if (prev != null)
+	    op = prev;
+
         for (ProfileOperationListener listener : listeners)
-            listener.notifyNewOp(ops[opId]);
-        return ops[opId];
+            listener.notifyNewOp(op);
+        return op;
     }
 
     /**
@@ -229,14 +263,34 @@ public class ProfileCollectorImpl implements ProfileCollector {
      *                  <code>false</code> otherwise
      *
      * @return a new <code>ProfileCounter</code> that will report back
-     *         to this collector
+     *         to this collector or the previously registered {@code
+     *         ProfileCounter} with the provided name.
      */
     ProfileCounter registerCounter(String counterName, String producerName,
                                    boolean taskLocal) {
-        if (taskLocal)
-            return new TaskLocalProfileCounter(counterName);
-        else
-            return new AggregateProfileCounter(counterName);
+
+	String name = producerName + "::" + counterName;
+	if (taskLocal) {
+	    if (taskLocalCounters.containsKey(name))
+		return taskLocalCounters.get(name);
+	    else {
+		ProfileCounter counter = 
+		    new TaskLocalProfileCounter(counterName);
+		taskLocalCounters.put(name, counter);
+		return counter;
+	    }
+	}	
+	else {
+	    if (lifetimeCounters.containsKey(name)) {
+		return lifetimeCounters.get(name);
+	    }
+	    else {
+		ProfileCounter counter = 
+		    new AggregateProfileCounter(counterName);
+		lifetimeCounters.put(name, counter);
+		return counter;
+	    }
+	}
     }
 
     /**
@@ -288,6 +342,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
+
     /**
      * The concrete implementation of <code>AbstractProfileCounter</code> used
      * for counters that are local to tasks.
@@ -306,6 +361,133 @@ public class ProfileCollectorImpl implements ProfileCollector {
             getReport().incrementTaskCounter(getCounterName(), value);
         }
     }
+
+
+    /**
+     * Package-private method used by <code>ProfileConsumerImpl</code> to
+     * handle sample registrations.
+     *
+     * @param name the name of the sample
+     * @param taskLocal <code>true</code> if this counter is local to tasks,
+     *                  <code>false</code> otherwise
+     * @param maxSamples the maximum number of samples to keep at one
+     *        time before lossy behavior starts and the oldest values
+     *        are removed
+     *
+     * @return a new {@code ProfileCounter} that will report back to
+     *         this collector or the previously registered {@code
+     *         ProfileSample} with the provided name.
+     */
+    public ProfileSample registerSampleSource(String name, boolean taskLocal,
+					       long maxSamples) {
+	// REMINDER: this assume maxSamples isn't necessary when
+	// deciding whether a sample source is already present.
+	if (taskLocal) {
+	    if (taskLocalSamples.containsKey(name))
+		return taskLocalSamples.get(name);
+	    else {
+		ProfileSample sample = new TaskLocalProfileSample(name);
+		taskLocalSamples.put(name, sample);
+		return sample;
+	    }
+	}	
+	else {
+	    if (lifetimeSamples.containsKey(name)) {
+		return lifetimeSamples.get(name);
+	    }
+	    else {
+		ProfileSample sample = 
+		    new LifetimeProfileSample(name, maxSamples);
+		lifetimeSamples.put(name,sample);
+		return sample;
+	    }
+	}
+    }
+
+    /**
+     * A base-class for creating {@code ProfileSample}s.
+     */
+    private abstract class AbstractProfileSample implements ProfileSample {
+
+        private final String name;
+
+        private final boolean taskLocal;
+
+        AbstractProfileSample(String name, boolean taskLocal) {
+            this.name = name;
+            this.taskLocal = taskLocal;
+        }
+
+        public String getSampleName() {
+            return name;
+        }
+
+        public boolean isTaskLocal() {
+            return taskLocal;
+        }
+
+        protected ProfileReportImpl getReport() {
+            ProfileReportImpl profileReport = profileReports.get();
+            if (profileReport == null)
+                throw new IllegalStateException("Cannot report operation " +
+                                                "because no task is active");
+            return profileReport;
+        }
+
+    }
+
+    /**
+     * The task-local implementation of {@code ProfileSample}
+     */
+    private class TaskLocalProfileSample extends AbstractProfileSample {
+       
+ 
+	TaskLocalProfileSample(String name) {
+            super(name, true);
+        }
+        public void addSample(long value) {
+            getReport().addLocalSample(getSampleName(), value);
+        }
+
+    }
+
+
+    /**
+     * The {@code ProfileSample} implementation that collects samples
+     * for the lifetime the program.
+     */
+    private class LifetimeProfileSample extends AbstractProfileSample {
+        
+	private final LinkedList<Long> samples;
+
+	private final long maxSamples;       
+	
+	LifetimeProfileSample(String name, long maxSamples) {
+            super(name, false);
+	    this.maxSamples = maxSamples;
+	    samples = new LinkedList<Long>();
+        }
+
+        public void addSample(long value) {
+	    if (samples.size() == maxSamples)
+		samples.removeFirst(); // remove oldest
+	    samples.add(value);
+	    // NOTE: we return a sub-list view to ensure that the
+	    // ProfileReport only sees the samples that were added,
+	    // during its lifetime.  Creating a sub-list view is much
+	    // faster than copying the list, and is suitable for this
+	    // situation.  However, we still rely on the the
+	    // ProfileReport to make the view unmodifyable.  This
+	    // isn't done here since we can avoid doing that operation
+	    // until the getSamples() call, instead of having to do it
+	    // for each sample addition
+	    getReport().registerLifetimeSamples(getSampleName(), 
+						samples.subList(0, samples.size()));
+        }
+
+    }
+
+
 
     /**
      * Private class that implements the long-running collector and reporter
@@ -357,5 +539,4 @@ public class ProfileCollectorImpl implements ProfileCollector {
             } catch (InterruptedException ie) {}
         }
     }
-
 }

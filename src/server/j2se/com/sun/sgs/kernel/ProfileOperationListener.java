@@ -6,23 +6,32 @@ package com.sun.sgs.kernel;
 
 
 /**
- * This interface is used to listen for profiling data as reported by the
- * system. Unlike the individual operations provided to
+ * This interface is used to listen for profiling data as reported by
+ * the system. Unlike the individual operations provided to
  * <code>ProfileConsumer</code>, the data provided here is aggregated
  * data representing events in the scheduler or collected data about a
- * complete task run through the scheduler.
+ * complete task run through the scheduler.  Implementaions of this
+ * class will only be called within a single-threaded context, and
+ * therefore should not include multithreaded constructs, such as
+ * synchronization.
+ *
  * <p>
+ *
  * In order to create listeners with all of the facilities that they need,
  * all implementations of <code>ProfileOperationListener</code> must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
  * <code>com.sun.sgs.kernel.TaskScheduler</code>,
  * <code>com.sun.sgs.kernel.ResourceCoordinator</code>).
+ *
  * <p>
+ *
  * Note that this interface is not complete. It is provided as an initial
  * attempt to capture basic aspects of operation. As more profiling and
  * investigation is done on the system, expect to see the information
  * provided here evolve.
+ *
+ * @see ProfileReport
  */
 public interface ProfileOperationListener {
 

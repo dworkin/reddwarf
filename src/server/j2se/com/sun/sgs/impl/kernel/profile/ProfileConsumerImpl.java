@@ -8,6 +8,7 @@ import com.sun.sgs.kernel.ProfileConsumer;
 import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileSample;
 
 
 /**
@@ -55,5 +56,16 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public ProfileCounter registerCounter(String name, boolean taskLocal) {
         return profileCollector.registerCounter(name, producerName, taskLocal);
     }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public ProfileSample registerSampleSource(String name, boolean taskLocal,
+					       long maxSamples) {
+	return profileCollector.registerSampleSource(name, taskLocal, 
+						     maxSamples);
+    }
+
 
 }

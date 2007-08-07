@@ -99,29 +99,56 @@ public interface ProfileReport {
     public List<ProfileOperation> getReportedOperations();
 
     /**
-     * Returns the updated values of the aggregate counters that were updated
-     * during the running of the task. If no aggregate counters were updated,
-     * then <code>null</code> is returned. The <code>Map</code> is a mapping
-     * from counter name to counter value. Note that the reported values are
-     * the values observed during the running of the task, not the value
-     * (which may have changed) at the time this report is provided to any
-     * listeners.
+     * Returns the updated values of the aggregate counters that were
+     * updated during the running of the task. If no aggregate
+     * counters were updated, an empty {@code Map} is returned. The
+     * <code>Map</code> is a mapping from counter name to counter
+     * value. Note that the reported values are the values observed
+     * during the running of the task, not the value (which may have
+     * changed) at the time this report is provided to any listeners.
      *
-     * @return a <code>Map</code> from counter name to observed value, or
-     *         <code>null</code> if no aggregate counters were updated
+     * @return a <code>Map</code> from counter name to observed value
      */
     public Map<String,Long> getUpdatedAggregateCounters();
 
     /**
      * Returns the values of the task-local counters that were updated
-     * during the running of the task. If no task-local counters were updated,
-     * then <code>null</code> is returned. The <code>Map</code> is a mapping
-     * from counter name to counter value.
+     * during the running of the task. If no task-local counters were
+     * updated, then an empty {@code Map} is returned. The
+     * <code>Map</code> is a mapping from counter name to counter
+     * value.
      *
-     * @return a <code>Map</code> from counter name to observed value, or
-     *         <code>null</code> if no task-local counters were updated
+     * @return a <code>Map</code> from counter name to observed value
      */
     public Map<String,Long> getUpdatedTaskCounters();
+
+
+    /**
+     * Returns the list of values for the task-local samples that were
+     * updated during the running of the task. If no task-local
+     * samples were updated, then an empty {@code Map} is
+     * returned. The <code>Map</code> is a mapping from sample name
+     * to an oldest-first list of sample values.
+     *
+     * @return a <code>Map</code> from sample name to a list of values
+     *         added during the task.
+     */
+    public Map<String,List<Long>> getUpdatedTaskSamples();
+
+    
+    /**
+     * Returns a mapping for each sample that records for the lifetime
+     * of the application that was updated, to the entire list of
+     * samples for that name. If no lifetime samples were updated,
+     * then an empty {@code Map} is returned. The <code>Map</code> is
+     * a mapping from sample name to an oldest-first list of sample
+     * values.
+     *
+     * @return a <code>Map</code> from sample name to a list of values
+     *         added during the task.     
+     */
+    public Map<String,List<Long>> getUpdatedLifetimeSamples();
+
 
     /**
      * Returns the number of tasks in the same context as this report's task
@@ -134,5 +161,15 @@ public interface ProfileReport {
      * @return the number of ready tasks in the same context.
      */
     public int getReadyCount();
+
+
+    /**
+     * Returns any exception that occurred during the execution of this
+     * report's task, or {@code null} if no exception occurred.
+     * 
+     * @return the exception that occurred or {@code null} if none
+     *         occurred.
+     */
+    public Exception getException();
 
 }
