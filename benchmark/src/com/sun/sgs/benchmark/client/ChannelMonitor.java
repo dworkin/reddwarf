@@ -111,6 +111,9 @@ public class ChannelMonitor extends BenchmarkClient
 
                         windowSumError += err;
                         if (err > windowMaxError) windowMaxError = err;
+                    } else {
+                        logln(String.format("Sender %s is active again following" +
+                                  " a timeout.", client));
                     }
                 } else {
                     logln(String.format("New sender: %s.  Total senders = %d",
