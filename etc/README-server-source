@@ -1,4 +1,4 @@
-Project Darkstar Server Source Distribution
+Project Darkstar Server, Source Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,18 +7,19 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Server Source Distribution contains the source code
-for developing game servers that run as applications in the Project
-Darkstar Server environment.  Information about building client
+The source distribution of the Project Darkstar Server contains the
+source code for developing game servers that run as applications in the
+Project Darkstar Server environment.  Information about building client
 applications is available as a separate download.
 
-In addition to the documents, APIs and examples, this kit contains the
-source code for a complete single-system version of the Project Darkstar
-Server.  The APIs in this version are the same as those that will be
-included in the full-scale, multi-node version of the system, which will
-be released in the future. The current system allows development of
-games that run on a single server. The server system will make use of
-the multi-threading capabilities of that server when they are available.
+In addition to the documents, APIs and examples, this distribution
+contains the source code for a complete single-system version of the
+Project Darkstar Server.  The APIs in this version are the same as those
+that will be included in the full-scale, multi-node version of the
+system, which will be released in the future. The current system allows
+development of games that run on a single server. The server system will
+make use of the multi-threading capabilities of that server when they
+are available.
 
 CONTENTS
 
