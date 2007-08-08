@@ -14,12 +14,7 @@ applications is available as a separate download.
 
 In addition to the documents, APIs and examples, this distribution
 contains the source code for a complete single-system version of the
-Project Darkstar Server.  The APIs in this version are the same as those
-that will be included in the full-scale, multi-node version of the
-system, which will be released in the future. The current system allows
-development of games that run on a single server. The server system will
-make use of the multi-threading capabilities of that server when they
-are available.
+Project Darkstar Server.
 
 CONTENTS
 
