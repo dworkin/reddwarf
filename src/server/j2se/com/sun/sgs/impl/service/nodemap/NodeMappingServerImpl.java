@@ -24,7 +24,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
-import java.rmi.RemoteException;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -40,9 +39,8 @@ import java.util.logging.Logger;
  * as selecting a node for an identity.
  * Additionally, all changes to the map are made by the server so it
  * can notify listeners of changes, no matter which node is affected.
- *
- * In addition to the properties supported by the {@link DataService}
- * class, the {@link #NodeMappingServerImpl constructor} supports the following
+ * <p>
+ * The {@link #NodeMappingServerImpl constructor} supports the following
  * properties: <p>
  *
  * <dl style="margin-left: 1em">
@@ -95,7 +93,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
 
     /** The default value of the server port. */
-    static final int DEFAULT_SERVER_PORT = 44533;
+    // TODO:  does the exporter allow all servers to use the same port?
+    static final int DEFAULT_SERVER_PORT = 44535;
     
     /** The name we export ourselves under. */
     static final String SERVER_EXPORT_NAME = "NodeMappingServer";
@@ -128,8 +127,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
        
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-            new LoggerWrapper(
-                Logger.getLogger(NodeMappingServerImpl.class.getName()));
+            new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
     
     /** The port we've been exported on. */
     private final int port;
@@ -157,6 +155,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final NodeAssignPolicy assignPolicy;
 
     /** The thread that removes inactive identities */
+    // TODO:  should this be a TaskScheduler.scheduleRecurringTask? Or
+    // maybe called via ResourceCoordinator.startTask?
     private Thread removeThread;
     
     /** The remove thread sleep time. */
@@ -164,6 +164,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The remove expiration time. */
     private final long removeExpireTime;
+    
+     /** Our watchdog node listener. */
+    private final NodeListener watchdogNodeListener;
     
     /** Identities waiting to be removed, with the time they were
      *  entered in the map.
@@ -219,6 +222,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         removeExpireTime = wrappedProps.getLongProperty(
                 REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
+        watchdogNodeListener = new Listener();
         
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
         port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
@@ -292,7 +296,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     void commitConfigure() {
         // Register our node listener with the watchdog service.
-        watchdogService.addNodeListener(new Listener());
+        watchdogService.addNodeListener(watchdogNodeListener);
         removeThread.start();
     }
     
@@ -304,8 +308,14 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     boolean shutdown() {
         logger.log(Level.FINEST, "Shutting down");
         boolean ok = exporter.unexport();
+        try {
         if (removeThread != null) {
             removeThread.interrupt();
+            removeThread.join();
+        }
+        } catch (InterruptedException e) {
+            logger.logThrow(Level.FINEST, e, "Failure while shutting down");
+            ok = false;
         }
         return ok;
     }
@@ -404,7 +414,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 
                 Long time = System.currentTimeMillis() - expireTime;
                 
-                for (Map.Entry<Identity, Long> entry : removeMap.entrySet()) {
+                Iterator<Map.Entry<Identity, Long>> iter =
+                        removeMap.entrySet().iterator();
+                while (iter.hasNext()) {
+                    Map.Entry<Identity, Long> entry = iter.next();
                     // Check for expiration.  
                     if (entry.getValue() < time) {
                         Identity id = entry.getKey();
@@ -415,7 +428,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
-                            removeMap.remove(id);
+                            iter.remove();
 
                         } catch (Exception ex) {
                             logger.logThrow(Level.WARNING, ex, 
@@ -487,6 +500,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     {
         notifyMap.put(nodeId, client);
         assignPolicy.nodeStarted(nodeId);
+        logger.log(Level.FINE, "Registered node listener for {0} ", nodeId);
     }
     
     /**
@@ -497,6 +511,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         // Tell the assign policy to stop assigning to the node
         assignPolicy.nodeStopped(nodeId);
         notifyMap.remove(nodeId);
+        logger.log(Level.FINE, "Unregistered node listener for {0} ", nodeId);
     }    
     
     // TODO Perhaps need to have a separate thread do this work.
@@ -510,7 +525,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             if (oldClient != null) {
                 try {
                     oldClient.removed(id, newNode);
-                } catch (RemoteException ex) {
+                } catch (IOException ex) {
                     logger.logThrow(Level.WARNING, ex, 
                             "A communication error occured while notifying" +
                             " node {0} that {1} has been removed", oldClient, id);
@@ -523,7 +538,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             if (newClient != null) {
                 try {
                     newClient.added(id, oldNode);
-                } catch (RemoteException ex) {
+                } catch (IOException ex) {
                     logger.logThrow(Level.WARNING, ex, 
                             "A communication error occured while notifying" +
                             " node {0} that {1} has been added", newClient, id);
@@ -551,7 +566,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /**
      *  Run the given task synchronously, and transactionally, retrying
-     *  if the exception is of type <@code ExcetpionRetryStatus>.
+     *  if the exception is of type <@code ExceptionRetryStatus>.
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {   
@@ -588,10 +603,13 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         }
 
         if (oldNode != null && newNodeId == oldNode.getId()) {
-            // We picked the same node.  Not sure how to best handle this...
-            // it probably needs to be dealt with at a higher level, or the
-            // assignPolicy could have an API saying "pick a node, but NOT
-            // this one".
+            // We picked the same node.  This might be OK - the system might
+            // only have one node, or the current node might simply be the
+            // best one available.
+            //
+            // TBD - we might want a method on chooseNode which explicitly
+            // excludes the current node, and returns something (a negative
+            // number?) if there is no other choice.
             return newNodeId;
         }
         

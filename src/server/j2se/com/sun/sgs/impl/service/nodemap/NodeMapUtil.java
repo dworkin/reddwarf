@@ -73,7 +73,12 @@ final class NodeMapUtil {
             logger.log(Level.CONFIG, "Found version " + oldVersion);
             ok = currentVersion.equals(oldVersion);
             if (!ok) {
-                dataService.removeObject(oldVersion);
+                // Need to implement something if we bump the version number!
+                logger.log(Level.CONFIG, 
+                        "Version conversion code not implemented!");
+                throw 
+                    new RuntimeException("Version conversion code not present");
+                // dataService.removeObject(oldVersion);
                 
                 // Convert the old data to the new, as required.
                 // Generally, conversion should only be required for major
@@ -82,12 +87,14 @@ final class NodeMapUtil {
                 // to the current, and code here should make multiple method
                 // calls, causing version-by-version upgrades, until the
                 // data service is at the current version.
+                
+                // Store the new version.
+//                dataService.setServiceBinding(VERSION_KEY, currentVersion);
+//                logger.log(Level.CONFIG, "Storing version " + currentVersion);
             }
         } catch (NameNotBoundException ex) {
             // All is ok.  This is the first time a version has been put
             // in this data service.
-        } finally {
-            // Store the new version.
             dataService.setServiceBinding(VERSION_KEY, currentVersion);
             logger.log(Level.CONFIG, "Storing version " + currentVersion);
         }
@@ -99,9 +106,7 @@ final class NodeMapUtil {
      * Returns a identity key for the given {@code identity}. 
      */
     static String getIdentityKey(Identity id) {    
-        StringBuilder sb = new StringBuilder(IDENTITY_KEY_PREFIX);
-        sb.append(id.getName());
-        return sb.toString();
+        return IDENTITY_KEY_PREFIX + id.getName();
     }
     
     /**
@@ -190,8 +195,8 @@ final class NodeMapUtil {
         /** {@inheritDoc} */
         @Override
         public String toString() {
-            return "VersionMO[major : " + major_version + 
-                    ", minor : " + minor_version + "]";
+            return "VersionMO[major:" + major_version + 
+                    ", minor:" + minor_version + "]";
         }
 
         /** {@inheritDoc} */
@@ -199,6 +204,8 @@ final class NodeMapUtil {
         public boolean equals(Object obj) {
             if (this == obj) {
                 return true;
+            } else if (obj == null) {
+                return false;
             } else if (obj.getClass() == this.getClass()) {
                 VersionMO other = (VersionMO) obj;
                 return major_version == other.major_version && 

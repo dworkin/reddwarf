@@ -45,7 +45,10 @@ interface NodeMappingServer extends Remote {
     
     /**
      * Register a {@link NotifyClient} object to be called when changes
-     * occur on a particular node.
+     * occur on a particular node.  Only one listener object can be 
+     * registered per {@code nodeId}, and registering a listener a 
+     * {@code nodeId} will clear any previously registered listener for
+     * that {@code nodeId}.
      *
      * @param client the callback client
      * @param nodeId the node which {@code client} is interested in changes to
@@ -73,5 +76,5 @@ interface NodeMappingServer extends Remote {
      *
      * @throws Exception if any error occurs
      */
-    public boolean assertValid(Identity identity) throws Exception;
+    boolean assertValid(Identity identity) throws Exception;
 }

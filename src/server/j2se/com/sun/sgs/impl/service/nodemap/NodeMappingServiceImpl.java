@@ -45,14 +45,13 @@ import java.util.logging.Logger;
 /**
  * Maps Identities to Nodes.
  * <p>
- * In addition to the properties supported by the {@link DataService}
- * class, the {@link #NodeMappingServiceImpl constructor} supports the
+ * The {@link #NodeMappingServiceImpl constructor} supports the
  * following properties: 
  * <p>
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.start.server
+ *	com.sun.sgs.impl.service.nodemap.server.start
  *	</b></code><br>
  *	<i>Default:</i> <code>false</code>
  *
@@ -63,7 +62,7 @@ import java.util.logging.Logger;
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
- *	<i>Required</i>
+ *	<i>Default:</i> the local host name <br>
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	NodeMappingServer}. <p>
@@ -71,7 +70,7 @@ import java.util.logging.Logger;
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.port
  *	</b></code><br>
- *	<i>Default:</i> {@code 44533}
+ *	<i>Default:</i> {@code 44535}
  *
  * <dd style="padding-top: .5em">The network port for the {@code
  *	NodeMappingServer}.  This value must be no less than {@code 0} and no
@@ -200,17 +199,24 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //
     //
     // XXX TODO XXX
-    //  - Identities currently don't have a uuid associated with them!
-    //    This code assumes they ARE unique and there is a method which
-    //    will return a unique string for them.
-    //  - Need to figure out how assignNode will work when we have identities
+    //  - Need to figure out how assignNode will work if we have identities
     //    that are to be assigned locally, from within a transaction (example:
-    //    creating an AI identity from game code).
+    //    creating an AI identity from game code).  Because we'd be called
+    //    while we're in a transaction, we cannot make a remote call to the
+    //    server.  Also, we'll probably want a transactional version of
+    //    assignNode (another method) for this case, rather than allowing
+    //    assignNode to be called in both a transactional and non-transactional
+    //    manner.
     //  - AssignNode will probably want to take location hints (say, assign
     //    the identity close by a set of other identities).  This will be
     //    decided when we work on the load balancer.
     //  - The server doesn't persist everything it needs to in case it crashes
     //    (the goal is that we be able to have a hot backup standing by).
+    //    It needs to persist entries which are candidates for removal and
+    //    the client node mapping service listeners which have registered
+    //    with it.   For the client listeners, it's currently unclear whether
+    //    they will ever need to be persisted:  if the server goes down, does
+    //    this imply all services have failed?
     //  - API issue:  setStatus is currently NOT transactional.  It can be
     //    implemented to be run under a transaction if that makes things
     //    easier for the clients of this method (see note below for how).
@@ -245,8 +251,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * The property that specifies whether the server should be instantiated
      * in this stack.  Also used by the unit tests.
      */
-    private static final String START_SERVER_PROPERTY = 
-            PKG_NAME + ".start.server";
+    private static final String SERVER_START_PROPERTY = 
+            PKG_NAME + ".server.start";
     
     /** The property name for the server host. */
     static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
@@ -255,13 +261,17 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private static final String CLIENT_PORT_PROPERTY = 
             PKG_NAME + ".client.port";
 
+    /** The number of times we should try to contact the backend before
+     *  giving up. 
+     */
+    private final static int MAX_RETRY = 5;
+    
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-            new LoggerWrapper(
-                Logger.getLogger(NodeMappingServiceImpl.class.getName()));
+            new LoggerWrapper(Logger.getLogger(PKG_NAME));
     
     /** The transaction proxy, or null if configure has not been called. */    
     private static TransactionProxy txnProxy;
@@ -280,9 +290,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     /** The context factory for map change transactions. */
     private ContextFactory contextFactory;    
-
-
-    /** The registered registry change listeners. There is no need
+    
+    /** The registered node change listeners. There is no need
      *  to persist these:  these are all local services, and if the
      *  node goes down, they'll need to re-register.
      */
@@ -309,7 +318,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      */
     private final MapChangeNotifier changeNotifierImpl;
 
-    /** The exporter for the service */
+    /** The exporter for the client */
     private final Exporter<NotifyClient> exporter;
     
     /** The local node id, as determined from the watchdog */
@@ -338,10 +347,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      */
     private final boolean fullStack;
 
-    /** The number of times we should try to contact the backend before
-     *  giving up. 
-     */
-    private final static int MAX_RETRY = 5;
+
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -366,7 +372,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	try {
 
             boolean instantiateServer =  wrappedProps.getBooleanProperty(
-                                  START_SERVER_PROPERTY, false);
+                                  SERVER_START_PROPERTY, false);
             String localHost = InetAddress.getLocalHost().getHostName();           
             
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -389,7 +395,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
             }          
           
-            // This code assumes that the server has already been started.
+            // TODO This code assumes that the server has already been started.
             // Perhaps it'd be better to block until the server is available?
             Registry registry = LocateRegistry.getRegistry(host, port);
             server = (NodeMappingServer) 
@@ -500,7 +506,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 server.unregisterNodeListener(localNodeId);
             }
         } catch (IOException ex) {
-            ex.printStackTrace();
+            logger.logThrow(Level.WARNING, ex, 
+                    "Problem encountered during shutdown");
             ok = false;
         }
         
@@ -633,10 +640,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
         /** return value, true if id added to map */
         private boolean added = true;
         
-        AssignNodeLocallyTask(String name, Identity id, Long nodeId) {
+        AssignNodeLocallyTask(String serverName, Identity id, Long nodeId) {
             idkey = NodeMapUtil.getIdentityKey(id);
             nodekey = NodeMapUtil.getNodeKey(nodeId, id);
-            statuskey = NodeMapUtil.getStatusKey(id, nodeId, name);
+            statuskey = NodeMapUtil.getStatusKey(id, nodeId, serverName);
             
             idmo = new IdentityMO(id, nodeId);
         }
@@ -688,9 +695,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
         try {
             runTransactionally(idtask);
         } catch (NameNotBoundException nnbe) {
-            throw new UnknownIdentityException("id: " + identity);
+            throw new UnknownIdentityException("id: " + identity, nnbe);
         } catch (ObjectNotFoundException onfe) {
-            throw new UnknownIdentityException("id: " + identity);
+            throw new UnknownIdentityException("id: " + identity, onfe);
         } catch (Exception ex) {
             logger.logThrow(Level.WARNING, ex, 
                                 "Setting status for {0} failed", identity);
@@ -800,13 +807,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
         throws UnknownNodeException 
     {
         checkState();
-        String key = NodeMapUtil.getPartialNodeKey(nodeId);
-        String next = dataService.nextServiceBoundName(key);
-        if (next == null || !next.startsWith(key)) {
+        IdentityIterator iter = new IdentityIterator(dataService, nodeId);
+        if (!iter.hasNext()) {
             throw new UnknownNodeException("node id: " + nodeId);
         }
         logger.log(Level.FINEST, "getIdentities successful");
-        return new IdentityIterator(dataService, nodeId);
+        return iter;
     }
     
     private static class IdentityIterator implements Iterator<Identity> {

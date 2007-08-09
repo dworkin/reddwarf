@@ -447,9 +447,6 @@ class Kernel {
             finalStandardService.ordinal())
             return;
 
-        // the ClientSessionService is a special case, since it has no
-        // manager, so when created it's also registered for profiling,
-        // if appropriate
         String nodeMappingServiceClass =
             properties.getProperty(StandardProperties.
                                    NODE_MAPPING_SERVICE,

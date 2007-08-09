@@ -155,7 +155,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         String removeSleepName = (String) removeSleepField.get(null);
         
         Field startServiceField =
-         NodeMappingServiceImpl.class.getDeclaredField("START_SERVER_PROPERTY");
+         NodeMappingServiceImpl.class.getDeclaredField("SERVER_START_PROPERTY");
         startServiceField.setAccessible(true);
         String startServiceName = (String) startServiceField.get(null);
         

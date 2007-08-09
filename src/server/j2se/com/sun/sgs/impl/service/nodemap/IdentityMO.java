@@ -55,7 +55,7 @@ class IdentityMO implements ManagedObject, Serializable {
     /** {@inheritDoc} */
     @Override
     public String toString() {
-        return "IdentityMO[id : " + id + ", nodeId : " + nodeId + "]";
+        return "IdentityMO[id:" + id + ", nodeId:" + nodeId + "]";
     }
     
     /** {@inheritDoc} */
@@ -63,6 +63,8 @@ class IdentityMO implements ManagedObject, Serializable {
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;
+        } else if (obj == null) {
+            return false;
         } else if (obj.getClass() == this.getClass()) {
             IdentityMO other = (IdentityMO) obj;
             return id.equals(other.id) && nodeId == other.nodeId;

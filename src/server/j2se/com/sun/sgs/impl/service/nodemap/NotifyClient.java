@@ -6,8 +6,8 @@ package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.service.Node;
+import java.io.IOException;
 import java.rmi.Remote;
-import java.rmi.RemoteException;
 
 /**
  *  Callback for clients of the server to update them with information
@@ -21,9 +21,9 @@ interface NotifyClient extends Remote {
      * @param id the identity
      * @param oldNode the last node the identity was assigned to, or
      *           {@code null} if this is a new node assignment
-     * @throws RemoteException if there is a communication problem
+     * @throws IOException if there is a communication problem
      */
-    void added(Identity id, Node oldNode) throws RemoteException;
+    void added(Identity id, Node oldNode) throws IOException;
     
     /**
      *
@@ -33,7 +33,7 @@ interface NotifyClient extends Remote {
      * @param newNode the new node the identity is assigned to, or 
      *          {@code null} if the identity is being removed from
      *          the map
-     * @throws RemoteException 
+     * @throws IOException if there is a communication problem 
      */
-    void removed(Identity id, Node newNode) throws RemoteException;
+    void removed(Identity id, Node newNode) throws IOException;
 }
