@@ -302,6 +302,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @return {@code true} if everything shut down cleanly
      */
     boolean shutdown() {
+        logger.log(Level.FINEST, "Shutting down");
         boolean ok = exporter.unexport();
         if (removeThread != null) {
             removeThread.interrupt();
@@ -504,8 +505,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         logger.log(Level.FINE, "In notifyListeners, identity: {0}, " +
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
-        System.out.println("In notifyListeners, id is " + id + " oldNode: " + oldNode + " newNode: " + newNode);
-
         if (oldNode != null) {
             NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {

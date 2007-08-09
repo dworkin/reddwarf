@@ -7,6 +7,7 @@ package com.sun.sgs.impl.service.nodemap;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -332,6 +333,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** The current state of this instance. */
     private State state = State.UNINITIALIZED;
     
+    /** Are we running an application?  If not, assume that we don't
+     *  have a full stack.
+     */
+    private final boolean fullStack;
+
     /** The number of times we should try to contact the backend before
      *  giving up. 
      */
@@ -398,6 +404,13 @@ public class NodeMappingServiceImpl implements NodeMappingService
             exporter.export(changeNotifierImpl, clientPort);
             changeNotifier = exporter.getProxy();
 
+            // Check if we're running on a full stack. 
+            String finalService =
+                properties.getProperty(StandardProperties.FINAL_SERVICE);
+            fullStack = (finalService == null) ? true :
+                !(properties.getProperty(StandardProperties.APP_LISTENER)
+                    .equals(StandardProperties.APP_LISTENER_NONE));
+            
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");
@@ -447,7 +460,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
 
             if (serverImpl != null) {
                 serverImpl.configure(registry, txnProxy);
-            } else {
+            }
+            
+            // Don't register ourselves if we're not running an application.
+            if (fullStack) {
                 // Register myself with my server using local node id.
                 // We don't register if we created the server because
                 // we might not be running a full stack.
@@ -494,6 +510,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         if (serverImpl != null) {
             ok = serverImpl.shutdown();
         }
+
         synchronized(stateLock) {
             state = State.SHUTDOWN;
         }
@@ -505,6 +522,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * Code swiped from the data service.
      */
     private void checkState() {
+        if (!fullStack) {
+            throw 
+                new IllegalStateException("No application running");
+        }
 	synchronized (stateLock) {
 	    switch (state) {
 	    case UNINITIALIZED:
@@ -844,7 +865,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 taskScheduler.scheduleTask( 
                         new AbstractKernelRunnable() {
                             public void run() {
-                                System.out.println("LISTENER removed: " + listener + " id: " + id + "node: " + newNode);
                                 listener.mappingRemoved(id, newNode);
                             }                    
                         }, taskOwner);
@@ -856,7 +876,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 taskScheduler.scheduleTask(
                         new AbstractKernelRunnable() {
                             public void run() {
-                                System.out.println("LISTENER added: " + listener + " id: " + id + "node: " + oldNode);
                                 listener.mappingAdded(id, oldNode);
                             }                    
                         }, taskOwner);

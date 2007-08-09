@@ -17,6 +17,7 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
@@ -29,9 +30,11 @@ import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -60,7 +63,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private static final int WATCHDOG_PORT = 0;
 
     /** The watchdog renew interval */
-    private static long RENEW_INTERVAL = 500;
+    private static long RENEW_INTERVAL = 1000;
     
     /** The port for the server. */
     private static final int SERVER_PORT = 0;
@@ -68,36 +71,42 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** Amount of time to wait before something might be removed. */
     private static final int REMOVE_TIME = 250;
 
-    /** Properties for the nodemap server and data service. */
+    /** Properties for the servers. */
     private static Properties serviceProps;
-    
-    
-    /** Properties for creating the shared database. */
-//    private static Properties dbProps = createProperties(
-//	DataStoreImplClassName + ".directory",
-//	DB_DIRECTORY,
-//	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
     
     private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
-           
+          
+    /** Number of other services we'll start up */
+    private final int NUM_NODES = 3;
 
-    private DummyAbstractKernelAppContext appContext;
-    private DummyComponentRegistry systemRegistry;
-    private DummyComponentRegistry serviceRegistry;
+    private DummyAbstractKernelAppContext[] appContext = 
+            new DummyAbstractKernelAppContext[NUM_NODES];
+    private DummyComponentRegistry[] systemRegistry =
+            new DummyComponentRegistry[NUM_NODES];
+    private DummyComponentRegistry[] serviceRegistry =
+            new DummyComponentRegistry[NUM_NODES];
     private DummyTransaction txn;
     
+    /** Last ones created */
     private DataServiceImpl dataService;
     private WatchdogServiceImpl watchdogService;
     private NodeMappingServiceImpl nodeMappingService; 
     
+    /** Ports actually used by initial services */
+    private int serverPort;
+    private int watchdogPort;
+    
+    private NodeMappingServerImpl server;
+    
     private boolean passed;
     
-    /** Number of other services we'll start up */
-    private final int NUM_NODES = 5;
     
     /** A mapping of node id -> services, used for remove tests */
     private Map<Long, NodeMappingService> nodemap;
+    
+    /** A mapping of node id ->NodeMappingListener, for listener checks */
+    private Map<Long, TestListener> nodeListenerMap;
     
     /** Reflective stuff, for non-public members. */
     private Field serverImplField;
@@ -111,6 +120,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public TestNodeMappingServiceImpl(String name) throws Exception {
         super(name);
 
+        // Get all the things we need to find through reflection.
         serverImplField = 
             NodeMappingServiceImpl.class.getDeclaredField("serverImpl");
         serverImplField.setAccessible(true);
@@ -173,30 +183,50 @@ public class TestNodeMappingServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
         
-	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+        nodemap = new HashMap<Long, NodeMappingService>();
+        nodeListenerMap = new HashMap<Long, TestListener>();
+        
+	appContext[0] = MinimalTestKernel.createContext();
+	systemRegistry[0] = MinimalTestKernel.getSystemRegistry(appContext[0]);
+	serviceRegistry[0] = MinimalTestKernel.getServiceRegistry(appContext[0]);
+        // only one data service for now: not configured correctly
+        dataService = createDataService(systemRegistry[0]);
+        createTransaction(10000);
+	// configure data service
+        dataService.configure(serviceRegistry[0], txnProxy);
+        commitTransaction();
+        
+        // Create the initial stack and grab our server field.
+        createStack(appContext[0], systemRegistry[0], serviceRegistry[0], 
+                    serviceProps, true);
+        server = 
+            (NodeMappingServerImpl)serverImplField.get(nodeMappingService);        
+               
+	createTransaction();
+    }
+    
+    private void createStack(DummyAbstractKernelAppContext appContext,
+                             DummyComponentRegistry systemRegistry,
+                             DummyComponentRegistry serviceRegistry,
+                             Properties props, boolean special) 
+                 throws Exception
+    {
         
 	// create services
-	dataService = createDataService(systemRegistry);
-        watchdogService = new WatchdogServiceImpl(serviceProps, systemRegistry);
+        // We are running with a non-multinode data service.
+        watchdogService = new WatchdogServiceImpl(props, systemRegistry);
         nodeMappingService = 
-                new NodeMappingServiceImpl(serviceProps, systemRegistry);
+                new NodeMappingServiceImpl(props, systemRegistry);
 
-	createTransaction(10000);
-
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
+	// set data service classes in serviceRegistry
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        
-        commitTransaction();
+
+        // configure watchdog service
         createTransaction(10000);
-        
-	// configure watchdog service
         watchdogService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(WatchdogService.class, watchdogService);
         txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
@@ -206,38 +236,54 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	serviceRegistry.registerAppContext();
 
         commitTransaction();
+        
+        // configure node mapping service
         createTransaction(10000);
         nodeMappingService.configure(serviceRegistry, txnProxy);
-	
-
+        txnProxy.setComponent(NodeMappingService.class, nodeMappingService);
+        txnProxy.setComponent(NodeMappingServiceImpl.class, nodeMappingService);
+        serviceRegistry.setComponent(NodeMappingService.class, nodeMappingService);
+        serviceRegistry.setComponent(NodeMappingServiceImpl.class, nodeMappingService);
 	commitTransaction();
         
-        // Create a few services, so we have more than one node to
-        // assign to.  For the remove tests, we also need to be careful
-        // to call setStatus from the correct service, as setStatus tracks
-        // status by node.
-        NodeMappingServerImpl server = 
+        if (special) {
+            NodeMappingServerImpl server = 
                 (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
-        int serverPort = (Integer) getPortMethod.invoke(server); 
-        /** Properties for the nodemap server and data service. */
+            serverPort = (Integer) getPortMethod.invoke(server); 
+            watchdogPort = watchdogService.getServer().getPort();
+        }
+        
+        // Add to our test data structures, so we can find these nodes
+        // and listeners.
+        Long id = (Long) localNodeIdField.get(nodeMappingService);
+        nodemap.put(id, nodeMappingService);
+
+        TestListener listener = new TestListener();        
+        nodeMappingService.addNodeMappingListener(listener);
+        nodeListenerMap.put(id, listener);
+    }
+    
+    /** Add additional nodes.  We only do this as required by the tests. */
+    private void addNodes() throws Exception {
+        /** Properties for the full stacks, don't start servers. */
         Properties props = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServiceImpl",
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
+            WatchdogServerPropertyPrefix + ".renew.interval",
+                Long.toString(RENEW_INTERVAL),
+            WatchdogServerPropertyPrefix + ".port", Integer.toString(watchdogPort),
             serverPortPropertyName, Integer.toString(serverPort));
-        nodemap = new HashMap<Long, NodeMappingService>();
-        for (int i = 0; i < NUM_NODES; i++) {
-            createTransaction(500);
-            NodeMappingService service = 
-                    new NodeMappingServiceImpl(props, systemRegistry);
-            service.configure(serviceRegistry, txnProxy);
-            commitTransaction();
-            
-            Long id = (Long)localNodeIdField.get(service);
-            nodemap.put(id, service);
+
+        // Create the other nodes
+        for (int i = 1; i < NUM_NODES; i++) {
+            appContext[i] = MinimalTestKernel.createContext();
+            systemRegistry[i] = 
+                    MinimalTestKernel.getSystemRegistry(appContext[i]);
+            serviceRegistry[i] = 
+                    MinimalTestKernel.getServiceRegistry(appContext[i]);
+            createStack(appContext[i], systemRegistry[i], serviceRegistry[i], 
+                    props, false);
         }
-        
-        
-	createTransaction();
     }
     
     /** Sets passed if the test passes. */
@@ -267,11 +313,30 @@ public class TestNodeMappingServiceImpl extends TestCase {
             }
         }
         
-        if (nodeMappingService != null) {
-            nodeMappingService.shutdown();
-            nodeMappingService = null;
+        // Shut them down in backwards order:  we want the servers shut
+        // down last
+        for (int i = NUM_NODES - 1; i >= 0; i--) {
+            if (serviceRegistry[i] == null) {
+                // we didn't add any additional nodes
+                break;
+            }
+            
+            watchdogService = serviceRegistry[i].getComponent(
+                    WatchdogServiceImpl.class);
+            nodeMappingService = serviceRegistry[i].getComponent(
+                    NodeMappingServiceImpl.class);
+
+            if (nodeMappingService != null) {
+                nodeMappingService.shutdown();
+                nodeMappingService = null;
+            }
+            
+            if (watchdogService != null) {
+                watchdogService.shutdown();
+                watchdogService = null;
+            }
         }
-        
+        // Finally, shut down our data service.
         if (dataService != null) {
             dataService.shutdown();
             dataService = null;
@@ -279,14 +344,16 @@ public class TestNodeMappingServiceImpl extends TestCase {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        // Static class: there is really only one context maintained.
+        MinimalTestKernel.destroyContext(appContext[0]);
+        
     }
 
     ////////     The tests     /////////
     public void testConstructor() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
+            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
@@ -295,7 +362,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testConstructorNullProperties() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(null, systemRegistry);
+            nodemap = new NodeMappingServiceImpl(null, systemRegistry[0]);
             fail("Expected NullPointerException");
         } catch (NullPointerException e) {
             System.err.println(e);
@@ -309,7 +376,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testConfigureNullRegistry() throws Exception {
         NodeMappingService nodemap = null;
 	try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
+            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
             nodemap.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -324,8 +391,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
 	try {
             nodemap =
-                new NodeMappingServiceImpl(serviceProps, systemRegistry);
-            nodemap.configure(serviceRegistry, null);
+                new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
+            nodemap.configure(serviceRegistry[0], null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -338,9 +405,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
         commitTransaction();
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry);
+            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
             createTransaction();
-            nodemap.configure(serviceRegistry, txnProxy);
+            nodemap.configure(serviceRegistry[0], txnProxy);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
@@ -348,7 +415,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     public void testConfigureTwice() throws Exception {
 	try {
-            nodeMappingService.configure(serviceRegistry, txnProxy);
+            nodeMappingService.configure(serviceRegistry[0], txnProxy);
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException ex) {
 	    System.err.println(ex);
@@ -369,6 +436,19 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // Now expect to be able to find the identity
         createTransaction();
         Node node = nodeMappingService.getNode(id);
+        
+        // Make sure we got a notification
+        TestListener listener = nodeListenerMap.get(node.getId());
+        List<Identity> addedIds = listener.getAddedIds();
+        List<Node> addedNodes = listener.getAddedNodes();
+        assertEquals(1, addedIds.size());
+        assertEquals(1, addedNodes.size());
+        assertTrue(addedIds.contains(id));
+        // no old node
+        assertTrue(addedNodes.contains(null));
+        
+        assertEquals(0, listener.getRemovedIds().size());
+        assertEquals(0, listener.getRemovedNodes().size());
     }
     
     public void testAssignNodeNullServer() throws Exception {
@@ -418,7 +498,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // assign one node, or the same node twice
         commitTransaction();
         
-        final int MAX = 4;
+        addNodes();
+        
+        final int MAX = 25;
         Identity ids[] = new Identity[MAX];
         for (int i = 0; i < MAX; i++) {
             ids[i] = new DummyIdentity("identity" + i);
@@ -433,7 +515,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     public void testAssignNodeInTransaction() throws Exception {
-        // JANE should API specify a transaction exception will be thrown?
+        // TODO should API specify a transaction exception will be thrown?
         nodeMappingService.assignNode(NodeMappingService.class, new DummyIdentity());
     }
     
@@ -513,6 +595,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     public void testGetIdentitiesMultiple() throws Exception {
         commitTransaction();
+        
+        addNodes();
+        
         final int MAX = 8;
         Identity ids[] = new Identity[MAX];
         for (int i = 0; i < MAX; i++ ) {
@@ -594,25 +679,43 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // Find the node that we assigned to.  That's the one who needs
         // to set the status to false!
         NodeMappingService service = null;
+        Node node = null;
         try {        
-            Node node = nodeMappingService.getNode(id);
-            service = nodemap.get(node.getId());
+            node = nodeMappingService.getNode(id);
+            service = nodemap.get(node.getId());     
         } catch (UnknownIdentityException e) {
             fail("Unexpected UnknownIdentityException");
         }
         commitTransaction();
+        // clear out the listener
+        TestListener listener = nodeListenerMap.get(node.getId());
+        listener.clear();
         
         assertNotNull(service);
+        
+
         service.setStatus(NodeMappingService.class, id, false);
 
         Thread.sleep(REMOVE_TIME * 2);
         // Identity should now be gone
         createTransaction();
         try {
-            Node node = nodeMappingService.getNode(id);
+            node = nodeMappingService.getNode(id);
             fail("Expected UnknownIdentityException");
         } catch (UnknownIdentityException e) {
-
+            // Make sure we got a notification
+//            listener = nodeListenerMap.get(node.getId());
+            assertEquals(0, listener.getAddedIds().size());
+            assertEquals(0, listener.getAddedNodes().size());
+            
+            List<Identity> removedIds = listener.getRemovedIds();
+            List<Node> removedNodes = listener.getRemovedNodes();
+            assertEquals(1, removedIds.size());
+            assertEquals(1, removedNodes.size());
+            assertTrue(removedIds.contains(id));
+            // no new node
+            assertTrue(removedNodes.contains(null));
+    
         }
     }
     
@@ -654,7 +757,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
     public void testSetStatusNoRemove() throws Exception {
         commitTransaction();
-        // Assign outside a transaction
+
         Identity id = new DummyIdentity();
         nodeMappingService.assignNode(NodeMappingService.class, id);
         
@@ -678,6 +781,70 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
+    public void testListenersOnMove() throws Exception {   
+        commitTransaction();
+        // We need some additional nodes for this test to work correctly.
+        addNodes();
+        Identity id = new DummyIdentity();
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+
+        createTransaction();
+        Node firstNode = nodeMappingService.getNode(id);
+        commitTransaction();
+        // clear out the listener
+        TestListener firstNodeListener = nodeListenerMap.get(firstNode.getId());
+        firstNodeListener.clear();
+        
+        // Get the method, as it's not public
+        Method moveMethod = 
+                (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
+                        new Class[]{Identity.class, String.class, Node.class});
+        moveMethod.setAccessible(true);
+        moveMethod.invoke(server, id, null, firstNode);
+        
+        createTransaction();
+        Node secondNode = nodeMappingService.getNode(id);
+        commitTransaction();
+        TestListener secondNodeListener = 
+                nodeListenerMap.get(secondNode.getId());
+        
+        // The id was removed from the first node
+        assertEquals(0, firstNodeListener.getAddedIds().size());
+        assertEquals(0, firstNodeListener.getAddedNodes().size());
+
+        List<Identity> removedIds = firstNodeListener.getRemovedIds();
+        List<Node> removedNodes = firstNodeListener.getRemovedNodes();
+        assertEquals(1, removedIds.size());
+        assertEquals(1, removedNodes.size());
+        assertTrue(removedIds.contains(id));
+        // It moved to secondNode
+        assertTrue(removedNodes.contains(secondNode));
+        
+        // Check the other node's listener
+        assertEquals(0, secondNodeListener.getRemovedIds().size());
+        assertEquals(0, secondNodeListener.getRemovedNodes().size());
+        
+        List<Identity> addedIds = secondNodeListener.getAddedIds();
+        List<Node> addedNodes = secondNodeListener.getAddedNodes();
+        assertEquals(1, addedIds.size());
+        assertEquals(1, addedNodes.size());
+        assertTrue(addedIds.contains(id));
+        // firstNode was old node
+        assertTrue(addedNodes.contains(firstNode));
+        
+        // Make sure no other listeners were affected
+        for (TestListener listener : nodeListenerMap.values()) {
+            if (listener != firstNodeListener && 
+                listener != secondNodeListener) 
+            {
+                assertEquals(0, listener.getAddedIds().size());
+                assertEquals(0, listener.getAddedNodes().size());
+                assertEquals(0, listener.getRemovedIds().size());
+                assertEquals(0, listener.getRemovedNodes().size());
+            }
+        }
+    }
+        
     /* -- Tests to see what happens if the server isn't available --*/
     public void testEvilServerAssignNode() throws Exception {
         // replace the serverimpl with our evil proxy
@@ -685,9 +852,19 @@ public class TestNodeMappingServiceImpl extends TestCase {
         swapToEvilServer(nodeMappingService);
         
         Identity id = new DummyIdentity();
-        // This will just assign to the local node, currently.
-        // Not too interesting.
+
+        // Nothing much will happen. Eventually, we'll cause the
+        // stack to shut down.
         nodeMappingService.assignNode(NodeMappingService.class, id);
+         
+        // JANE - actually -current code assigns locally
+//        createTransaction();
+//        try {
+//            nodeMappingService.getNode(id);
+//            fail("Expected UnknownIdentityException");
+//        } catch (UnknownIdentityException ex) {
+//            System.err.println(ex);
+//        }
     }
     
 
@@ -727,7 +904,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     public void testEvilServerSetStatus() throws Exception {
-                commitTransaction();
+        commitTransaction();
         // If we simply call assignNode, then setStatus with false using
         // the nodeMappingService, the object won't be removed:  assignNode
         // will set the status for our service on the assigned node. 
@@ -751,6 +928,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         assertNotNull(service);
         swapToEvilServer(service);
+
+        // JANE this test needs work
 
         service.setStatus(NodeMappingService.class, id, false);
 
@@ -892,4 +1071,34 @@ public class TestNodeMappingServiceImpl extends TestCase {
         assertTrue(valid);
         commitTransaction();
     }  
+    
+    /** A test node mapping listener */
+    private class TestListener implements NodeMappingListener {
+        private final List<Identity> addedIds = new ArrayList<Identity>();
+        private final List<Node> addedNodes = new ArrayList<Node>();
+        private final List<Identity> removedIds = new ArrayList<Identity>();
+        private final List<Node> removedNodes = new ArrayList<Node>();
+        
+        public void mappingAdded(Identity identity, Node node) {
+            addedIds.add(identity);
+            addedNodes.add(node);
+        }
+
+        public void mappingRemoved(Identity identity, Node node) {
+            removedIds.add(identity);
+            removedNodes.add(node);
+        }
+        
+        public void clear() {
+            addedIds.clear();
+            addedNodes.clear();
+            removedIds.clear();
+            removedNodes.clear();
+        }
+        
+        public List<Identity> getAddedIds()   { return addedIds; }
+        public List<Node> getAddedNodes()     { return addedNodes; }
+        public List<Identity> getRemovedIds() { return removedIds; }
+        public List<Node> getRemovedNodes()   { return removedNodes; }
+    }
 }

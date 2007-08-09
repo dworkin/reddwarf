@@ -5,6 +5,7 @@
 package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -17,6 +18,7 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -29,6 +31,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 
@@ -93,6 +96,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     private Method getNodeForIdentityMethod;
     private Method reportFoundKeysMethod;
     private Method getPortMethod;
+    private Field watchdogNodeListenerField;
     
     private String serverPortPropertyName;
     
@@ -149,6 +153,10 @@ public class TestNodeMappingServerImpl extends TestCase {
          NodeMappingServerImpl.class.getDeclaredField("REMOVE_SLEEP_PROPERTY");
         removeSleepField.setAccessible(true);
         String removeSleepName = (String) removeSleepField.get(null);
+        
+        watchdogNodeListenerField =
+          NodeMappingServerImpl.class.getDeclaredField("watchdogNodeListener");
+        watchdogNodeListenerField.setAccessible(true);
         
         serviceProps = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
@@ -527,87 +535,108 @@ public class TestNodeMappingServerImpl extends TestCase {
     }
     
     /* -- Test node failure -- */
-//    public void testNodeFailed() throws Exception {
-//        commitTransaction();
-//        Identity id = new DummyIdentity();
-//        nodeMappingServer.assignNode(DataService.class, id);
-//        Set<String> foundFirst = getFoundKeys(id);
-//        // We expect the to see the id, node, and one status key.
-//        assertEquals(3, foundFirst.size());
-//        long firstNodeId = 
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//        
-//        // Not sure how to handle this with the watchdog.
-//        nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
-//        // Wait for things to settle down, but not enough time for
-//        // the remover to kick in
-//        Thread.sleep(REMOVE_TIME/2);
-//        long secondNodeId = 
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//        
-//        Set<String> foundSecond = getFoundKeys(id);
-//        verifyMapCorrect(id);
-//        // There should now be zero status keys.
-//        assertEquals(2, foundSecond.size());
-//        assertTrue(firstNodeId != secondNodeId);
-//    }
-//    
-//
-//    public void testNodeFailedRemove() throws Exception {
-//        commitTransaction();
-//        Identity id = new DummyIdentity();
-//        nodeMappingServer.assignNode(DataService.class, id);
-//        Set<String> foundFirst = getFoundKeys(id);
-//        // We expect the to see the id, node, and one status key.
-//        assertEquals(3, foundFirst.size());
-//        long firstNodeId = 
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//        
-//        // Not sure how to handle this with the watchdog.
-//        nodeMappingServer.nodeFailed(new NodeImpl(firstNodeId));
-//        // Wait for things to settle down, and this time we let it
-//        // go ahead and renove the id.
-//        Thread.sleep(REMOVE_TIME * 2);
-//        try {
-//            long secondNodeId = 
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//            fail("Expected NameNotBoundException");
-//        } catch (InvocationTargetException e) {
-//            Throwable cause = e.getCause();
-//            if (cause instanceof NameNotBoundException) {
-//                System.err.println(cause);
-//            } else {
-//                fail("Expected NameNotBoundException");
-//            }
-//        }
-//    }
-//    
-//    public void testAllNodesFailed() throws Exception {
-//        commitTransaction();
-//        Identity id = new DummyIdentity();
-//        nodeMappingServer.assignNode(DataService.class, id);
-//        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
-//        // We expect the to see the id, node, and one status key.
-//        assertEquals(3, foundFirst.size());
-//        long firstNodeId =
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//        
-//        // Not sure how to test this with watchdog
-//        for (int i = 1; i <= NUM_NODES; i++) {
-//            nodeMappingServer.nodeFailed(new NodeImpl(i));
-//        }
-//        
-//        // Wait for things to settle down
-//        Thread.sleep(REMOVE_TIME/2);
-//        long secondNodeId =
-//                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-//        
-//        Set<String> foundSecond = getFoundKeys(id, "SECOND");
-//        verifyMapCorrect(id);
-//        // There should now be zero status keys.
-//        assertEquals(2, foundSecond.size());
-//        assertTrue(firstNodeId != secondNodeId);
-//    }
+    public void testNodeFailed() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id);
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        NodeListener listener = 
+                (NodeListener) watchdogNodeListenerField.get(nodeMappingServer);
+        createTransaction();
+        Node first = watchdogService.getNode(firstNodeId);    
+        commitTransaction();    
+        listener.nodeFailed(first);
+        
+        // Wait for things to settle down, but not enough time for
+        // the remover to kick in
+        Thread.sleep(REMOVE_TIME/2);
+        long secondNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        Set<String> foundSecond = getFoundKeys(id);
+        verifyMapCorrect(id);
+        // There should now be zero status keys.
+        assertEquals(2, foundSecond.size());
+        assertTrue(firstNodeId != secondNodeId);
+    }
+    
+    public void testNodeFailedRemove() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id);
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        NodeListener listener = 
+                (NodeListener) watchdogNodeListenerField.get(nodeMappingServer);
+        createTransaction();
+        Node first = watchdogService.getNode(firstNodeId); 
+        commitTransaction();
+        listener.nodeFailed(first);
+        
+        // Wait for things to settle down, and this time we let it
+        // go ahead and renove the id.
+        Thread.sleep(REMOVE_TIME * 2);
+        try {
+            long secondNodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+            fail("Expected NameNotBoundException");
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof NameNotBoundException) {
+                System.err.println(cause);
+            } else {
+                fail("Expected NameNotBoundException");
+            }
+        }
+    }
+    
+    public void testAllNodesFailed() throws Exception {
+        commitTransaction();
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        Set<String> foundFirst = getFoundKeys(id, "FIRST:");
+        // We expect the to see the id, node, and one status key.
+        assertEquals(3, foundFirst.size());
+        long firstNodeId =
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        NodeListener listener = 
+                (NodeListener) watchdogNodeListenerField.get(nodeMappingServer);
+        
+        Set<Node> nodes = new HashSet<Node>();;
+        createTransaction();
+        Iterator<Node> iter = watchdogService.getNodes();
+        int i = 0;
+        while (iter.hasNext()) {
+            nodes.add(iter.next());
+            i++;
+        }
+        commitTransaction();
+        
+        for (Node n : nodes) {
+            listener.nodeFailed(n);
+        }
+        
+        // Wait for things to settle down
+        Thread.sleep(REMOVE_TIME/2);
+        long secondNodeId =
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        Set<String> foundSecond = getFoundKeys(id, "SECOND");
+        verifyMapCorrect(id);
+        // There should now be zero status keys.
+        assertEquals(2, foundSecond.size());
+        assertTrue(firstNodeId != secondNodeId);
+    }
      
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
