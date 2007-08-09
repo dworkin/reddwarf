@@ -404,6 +404,8 @@
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
+    <copy file="etc/NOTICE-server-gpl"
+	  tofile="${build.dir}/sgs-src/NOTICE-gpl"/>
     <copy file="etc/THIRDPARTYLICENSE-non-gpl.txt"
 	  tofile="${build.dir}/sgs-src/THIRDPARTYLICENSE.txt"/>
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
