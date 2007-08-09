@@ -24,6 +24,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -115,16 +116,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
-    /** The property name for controlling the amount of time the remove
-     * thread sleeps before waking up to check for identities that can be
-     * removed.
-     */
-    private static final String REMOVE_SLEEP_PROPERTY = 
-            PKG_NAME + ".remove.sleep.time";
-    
-    /** The default remove thread sleep time. */
-    private static final int DEFAULT_REMOVE_SLEEP_TIME = 5000;
-       
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -159,14 +150,32 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     // maybe called via ResourceCoordinator.startTask?
     private Thread removeThread;
     
-    /** The remove thread sleep time. */
-    private final long removeSleepTime;
-    
     /** The remove expiration time. */
     private final long removeExpireTime;
     
      /** Our watchdog node listener. */
     private final NodeListener watchdogNodeListener;
+    
+    /** Lock object for service state */
+    private final Object stateLock = new Object();
+    
+    /** The possible states of this instance. */
+    enum State {
+	/** Before configure has been called */
+	UNINITIALIZED,
+	/** After configure and before shutdown */
+	RUNNING,
+	/** After start of a call to shutdown and before call finishes */
+	SHUTTING_DOWN,
+	/** After shutdown has completed successfully */
+	SHUTDOWN
+    }
+
+    /** The current state of this instance. */
+    private State state = State.UNINITIALIZED;
+    
+    /** Our string representation, used by toString(). */
+    private final String fullName;
     
     /** Identities waiting to be removed, with the time they were
      *  entered in the map.
@@ -215,10 +224,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 new Class[] { Properties.class }, properties);
         }
         
-        removeSleepTime = wrappedProps.getLongProperty(
-                REMOVE_SLEEP_PROPERTY, DEFAULT_REMOVE_SLEEP_TIME, 
-                1, Long.MAX_VALUE);
-        
         removeExpireTime = wrappedProps.getLongProperty(
                 REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
@@ -229,6 +234,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         if (requestedPort == 0) {
             logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
         }     
+        
+        fullName = "NodeMappingServiceImpl[host:" + 
+                   InetAddress.getLocalHost().getHostName() + 
+                   ", port:" + port + "]";
     }
     
     /*- service like methods, which support lifecycle activities -*/
@@ -274,7 +283,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
           
         // Create our remove thread; this is started when the instantiating
         // service's configure transaction is committed.
-        removeThread = new RemoveThread(removeSleepTime, removeExpireTime);
+        removeThread = new RemoveThread(removeExpireTime);
     }
     
     /**
@@ -295,6 +304,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * configure method commits.
      */
     void commitConfigure() {
+        synchronized(stateLock) {
+            state = State.RUNNING;
+        }
         // Register our node listener with the watchdog service.
         watchdogService.addNodeListener(watchdogNodeListener);
         removeThread.start();
@@ -307,6 +319,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     boolean shutdown() {
         logger.log(Level.FINEST, "Shutting down");
+        synchronized(stateLock) {
+            state = State.SHUTTING_DOWN;
+        }
+
         boolean ok = exporter.unexport();
         try {
         if (removeThread != null) {
@@ -317,10 +333,22 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             logger.logThrow(Level.FINEST, e, "Failure while shutting down");
             ok = false;
         }
+        synchronized(stateLock) {
+            state = State.SHUTDOWN;
+        }
+
         return ok;
     }
 
-    
+    /**
+     * Returns a string representation of this instance.
+     *
+     * @return	a string representation of this instance
+     */
+    @Override
+    public String toString() {
+	return fullName;
+    }
     
     /* -- Implement NodeMappingServer -- */
 
@@ -352,8 +380,16 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         
         final IdentityMO foundId = idtask.getId();
         if (foundId == null) {
-            long newNodeId = mapToNewNode(id, serviceName, null);
-            logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNodeId);
+            try {
+                long newNodeId = mapToNewNode(id, serviceName, null);
+                logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNodeId);
+            } catch (NoNodesAvailableException ex) {
+                // This should only occur if no nodes are available, which
+                // can only happen if our client shutdown and unregistered
+                // while we were in this call.
+                // Ignore the error.
+                logger.logThrow(Level.INFO, ex, "Exception ignored");
+            }
         } else {
             long foundNodeId = foundId.getNodeId();
             try {
@@ -396,16 +432,14 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
-        private final long sleepTime; // milliseconds
         private boolean done = false;
-        RemoveThread(long expireTime, long sleepTime) { 
+        RemoveThread(long expireTime) { 
             this.expireTime = expireTime;
-            this.sleepTime = sleepTime;
         }
         public void run() {
             while (!done) {
                 try {
-                    sleep(sleepTime);
+                    sleep(expireTime);
                 } catch (InterruptedException ex) {
                     done = true;
                     logger.log(Level.FINE, "Remove thread interrupted");
@@ -585,9 +619,11 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @param oldNode the last node the identity was mapped to, or null if there
      *        was no prior mapping
      *
-     * @throws IllegalStateException if there are no live nodes to map to
+     * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    private long mapToNewNode(Identity id, String serviceName, Node old) {
+    private long mapToNewNode(Identity id, String serviceName, Node old) 
+        throws NoNodesAvailableException
+    {
         assert(id != null);
         
         // Choose the node.  This needs to occur outside of a transaction,
@@ -596,9 +632,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         final long newNodeId;
         try {
             newNodeId = assignPolicy.chooseNode(id);
-        } catch (IllegalStateException ex) {
-            logger.logThrow(Level.WARNING, ex, "Move {0} from {1} failed"
-                    + " because no live nodes are available", id, oldNode);
+        } catch (NoNodesAvailableException ex) {
+            logger.logThrow(Level.WARNING, ex, "mapToNewNode: id {0} from {1}"
+                    + " failed because no live nodes are available", 
+                    id, oldNode);
             throw ex;
         }
 
@@ -749,6 +786,13 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             
             boolean done = false;
             while (!done) {
+                synchronized(stateLock) {
+                    // Break out of the loop if we're shutting down.
+                    if (state != State.RUNNING) {
+                        done = true;
+                        break;
+                    }
+                }
                 try {
                     // Find an identity on the node
                     runTransactionally(task);
@@ -756,15 +800,23 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 
                     // Move it, removing old mapping
                     if (!done) {
-                        mapToNewNode(task.getId().getIdentity(), null, node);
+                        Identity id = task.getId().getIdentity();
+                        try {
+                            mapToNewNode(id, null, node);
+                        } catch (NoNodesAvailableException e) {
+                            // This can be thrown from mapToNewNode if there are
+                            // no live nodes.  Stop our loop.
+                            //
+                            // TODO - not convinced this is correct.
+                            // I think the task service needs a positive
+                            // action here.  I think I need to keep a list
+                            // somewhere of failed nodes, and have a background
+                            // thread that tries to move them.
+                            removeMap.put(id, System.currentTimeMillis());
+                            done = true;
+                        }
                     }
-                } catch (IllegalStateException ise) {
-                    // This can be thrown from mapToNewNode if there are
-                    // no live nodes.
-                    done = true;
-                    logger.logThrow(Level.WARNING, ise, 
-                        "Failed to move identity {0} from failed node {1}", 
-                        task.getId(), node);
+                
                 } catch (Exception ex) {
                     logger.logThrow(Level.WARNING, ex, 
                         "Failed to move identity {0} from failed node {1}", 

@@ -149,11 +149,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
         removeExpireField.setAccessible(true);
         String removeExpireName = (String) removeExpireField.get(null);
         
-        Field removeSleepField =
-         NodeMappingServerImpl.class.getDeclaredField("REMOVE_SLEEP_PROPERTY");
-        removeSleepField.setAccessible(true);
-        String removeSleepName = (String) removeSleepField.get(null);
-        
         Field startServiceField =
          NodeMappingServiceImpl.class.getDeclaredField("SERVER_START_PROPERTY");
         startServiceField.setAccessible(true);
@@ -168,7 +163,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
                 Long.toString(RENEW_INTERVAL),
             startServiceName, "true",
             removeExpireName, Integer.toString(REMOVE_TIME),
-            removeSleepName, Integer.toString(REMOVE_TIME/2),
             serverPortPropertyName, Integer.toString(SERVER_PORT));
     }
 
@@ -422,9 +416,12 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
-    /* -- Test NodeMappingService -- */
+    /* -- Test Service -- */
+    public void testgetName() {
+        System.out.println(nodeMappingService.getName());
+    }
     
-    
+    /* -- Test NodeMappingService -- */    
     public void testAssignNode() throws Exception {
         commitTransaction();
         

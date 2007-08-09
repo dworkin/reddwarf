@@ -222,6 +222,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //    easier for the clients of this method (see note below for how).
     //    I waffle on this issue because it seems better for the API to have
     //    anything that modfies the node map potentially go through the server.
+    //  - If the server is not available (we get IOException errors when
+    //    we try to contact it), we retry a few times and then give up.
+    //    We're discussing adding a method to the watchdog service to allow
+    //    services to tell it that we need to shut down the stack.
     //  - This service almost runs correctly if the server is unavailable,
     //    (say, if there's a transient network partition), except:
     //       - remove:  any identity that we detected could be removed
@@ -347,6 +351,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
      */
     private final boolean fullStack;
 
+    /** Our string representation, used by toString() and getName(). */
+    private final String fullName;
 
     
     /**
@@ -401,21 +407,26 @@ public class NodeMappingServiceImpl implements NodeMappingService
             server = (NodeMappingServer) 
                       registry.lookup(NodeMappingServerImpl.SERVER_EXPORT_NAME);	    
             
-            final int clientPort = wrappedProps.getIntProperty(
+            int clientPort = wrappedProps.getIntProperty(
                                         CLIENT_PORT_PROPERTY, 
                                         DEFAULT_CLIENT_PORT, 0, 65535);
             
             changeNotifierImpl = new MapChangeNotifier();
             exporter = new Exporter<NotifyClient>(NotifyClient.class);
-            exporter.export(changeNotifierImpl, clientPort);
+            clientPort = exporter.export(changeNotifierImpl, clientPort);
             changeNotifier = exporter.getProxy();
 
+            
             // Check if we're running on a full stack. 
             String finalService =
                 properties.getProperty(StandardProperties.FINAL_SERVICE);
             fullStack = (finalService == null) ? true :
                 !(properties.getProperty(StandardProperties.APP_LISTENER)
                     .equals(StandardProperties.APP_LISTENER_NONE));
+            
+            fullName = "NodeMappingServiceImpl[host:" + localHost + 
+                       ", clientPort:" + clientPort + 
+                       ", fullStack:" + fullStack + "]";
             
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
@@ -572,20 +583,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
         // more complicated, and it means we duplicate some of the
         // server's work.  Best to always ask the server to handle it.
         
-        boolean done = false;
         int tryCount = 0;
-
-        while (!done && tryCount < MAX_RETRY) {
+        while (tryCount < MAX_RETRY) {
             try {
                 server.assignNode(service, identity);
-                done = true;
                 tryCount = MAX_RETRY;
-            } catch (IllegalStateException ise) {
-                // Maybe we just need some nodes to come on line?
-                tryCount++;
-                logger.logThrow(Level.FINEST, ise, 
-                        "Exception encountered on try {0}: {1}",
-                        tryCount, ise);
             } catch (IOException ioe) {
                 tryCount++;
                 logger.logThrow(Level.FINEST, ioe, 
@@ -593,81 +595,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
                         tryCount, ioe);
             }
         }
- 
-        if (!done) {
-            // If we cannot talk to our server, we don't want the system
-            // to stop functioning.  We'll just assign to our local node
-            // and hope things will right themselves.
-            //
-            // TODO
-            // This logic is half-baked, at best.  If we cannot contact
-            // the server and want to assign locally, we'll need to also
-            // have a way to let the server know we changed things behind
-            // its back (probably a generation number?),  as well as a
-            // way to eventually reconnect to the server.
-            //
-            // After discussions with Tim:  we should just assume that the
-            // server is always available.  This code could be useful, though,
-            // if we eventually have a transactional assignNode method that
-            // only assigns for AIs - or other things we want to assign locally.
-            logger.log(Level.FINEST, "Assigning {0} to this node", identity);
-
-            AssignNodeLocallyTask localTask = 
-                    new AssignNodeLocallyTask(service.getName(), 
-                                              identity, localNodeId);
-            try {              
-                runTransactionally(localTask);
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex, 
-                                "Local assignment for {0} failed", identity);
-            }
-            if (localTask.added()) {
-                changeNotifierImpl.added(identity, null);
-            }
-        }
-    }
-    
-    /**
-     * Task for assigning an identity to this local node. 
-     * Currently, this is only used when we cannot contact the server,
-     * but might also be used in the future for non-client identity assignments.
-     */
-    private class AssignNodeLocallyTask implements KernelRunnable {
-        private final String idkey;
-        private final String nodekey;
-        private final String statuskey;
-        private IdentityMO idmo;
-        /** return value, true if id added to map */
-        private boolean added = true;
-        
-        AssignNodeLocallyTask(String serverName, Identity id, Long nodeId) {
-            idkey = NodeMapUtil.getIdentityKey(id);
-            nodekey = NodeMapUtil.getNodeKey(nodeId, id);
-            statuskey = NodeMapUtil.getStatusKey(id, nodeId, serverName);
-            
-            idmo = new IdentityMO(id, nodeId);
-        }
-        
-        public String getBaseTaskType() {
-            return this.getClass().getName();
-        }
-        
-        public void run() {  
-            try {
-                idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-            } catch (NameNotBoundException e) {     
-                added = true;
-                // Add the id->node mapping.
-                dataService.setServiceBinding(idkey, idmo);
-                // Add the node->id mapping
-                dataService.setServiceBinding(nodekey, idmo);
-            }
-            // Update reference count whether we just added or not.
-            dataService.setServiceBinding(statuskey, idmo);
-            
-        }
-
-        boolean added() { return added; }
     }
     
     /** 
@@ -735,13 +662,16 @@ public class NodeMappingServiceImpl implements NodeMappingService
             }
             
             if (stask.canRemove()) {
-                try {
-                    server.canRemove(identity);
-                } catch (IOException ioe) {
-                    // TODO need to create a scheme for handling not being
-                    // able to contact the server.
-                    logger.logThrow(Level.WARNING, ioe, 
-                                "Could not tell server OK to delete {0}", idmo);
+                int tryCount = 0;
+                while (tryCount < MAX_RETRY) {
+                    try {
+                        server.canRemove(identity);
+                        tryCount = MAX_RETRY;
+                    } catch (IOException ioe) {
+                        tryCount++;
+                        logger.logThrow(Level.WARNING, ioe, 
+                               "Could not tell server OK to delete {0}", idmo);
+                    }
                 }
             }
             logger.log(Level.FINEST, "setStatus key: {0}", statuskey);
@@ -889,7 +819,17 @@ public class NodeMappingServiceImpl implements NodeMappingService
         }
     }
     
-        
+     
+    /**
+     * Returns a string representation of this instance.
+     *
+     * @return	a string representation of this instance
+     */
+    @Override
+    public String toString() {
+	return fullName;
+    }
+    
     /**
      *  Run the given task synchronously, and transactionally.
      * @param task the task

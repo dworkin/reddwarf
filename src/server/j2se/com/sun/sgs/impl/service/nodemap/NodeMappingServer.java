@@ -25,7 +25,6 @@ interface NodeMappingServer extends Remote {
      * @param id the identity to assign
      *    <b> should this be a set? </b>
      *
-     * @throws IllegalStateException if no live nodes exist
      * @throws	IOException if a communication problem occurs while
      *          invoking this method
      */

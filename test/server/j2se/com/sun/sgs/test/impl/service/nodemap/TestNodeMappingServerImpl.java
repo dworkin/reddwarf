@@ -148,12 +148,7 @@ public class TestNodeMappingServerImpl extends TestCase {
          NodeMappingServerImpl.class.getDeclaredField("REMOVE_EXPIRE_PROPERTY");
         removeExpireField.setAccessible(true);
         String removeExpireName = (String) removeExpireField.get(null);
-        
-        Field removeSleepField =
-         NodeMappingServerImpl.class.getDeclaredField("REMOVE_SLEEP_PROPERTY");
-        removeSleepField.setAccessible(true);
-        String removeSleepName = (String) removeSleepField.get(null);
-        
+
         watchdogNodeListenerField =
           NodeMappingServerImpl.class.getDeclaredField("watchdogNodeListener");
         watchdogNodeListenerField.setAccessible(true);
@@ -166,7 +161,6 @@ public class TestNodeMappingServerImpl extends TestCase {
             WatchdogServerPropertyPrefix + ".renew.interval",
                 Long.toString(RENEW_INTERVAL),
             removeExpireName, Integer.toString(REMOVE_TIME),
-            removeSleepName, Integer.toString(REMOVE_TIME/2),
             serverPortPropertyName, Integer.toString(SERVER_PORT));
 
     }

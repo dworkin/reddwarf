@@ -27,11 +27,11 @@ class RoundRobinPolicy implements NodeAssignPolicy {
     }
     
     /** {@inheritDoc} */
-    public long chooseNode(Identity id) {
+    public long chooseNode(Identity id) throws NoNodesAvailableException {
         if (liveNodes.size() < 1) {
             // We don't have any live nodes to assign to.
             // Let the caller figure it out.
-            throw new IllegalStateException("no live nodes available");
+            throw new NoNodesAvailableException("no live nodes available");
         }
         return liveNodes.get(nextNode.getAndIncrement() % liveNodes.size());
     }
