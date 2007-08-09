@@ -1,4 +1,4 @@
-Project Darkstar Client, Binary Distribution
+Project Darkstar Client SDK, Binary Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,7 +7,7 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The binary distribution of the Project Darkstar Client contains
+The binary distribution of the Project Darkstar Client SDK contains
 everything you need to develop and run game clients that communicate
 with each other and with game servers implemented with the Project
 Darkstar Server.  The Project Darkstar Server is available as a separate
@@ -54,7 +54,7 @@ classpath:
 
 KNOWN ISSUES
 
-This version of the Project Darkstar Client has the following
+This version of the Project Darkstar Client SDK has the following
 limitations:
 
 - It only includes a J2SE client implementation.  Developers can use the
