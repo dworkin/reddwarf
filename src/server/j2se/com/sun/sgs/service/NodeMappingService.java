@@ -16,7 +16,7 @@ import java.util.Iterator;
  * <li> decide when the mapping should change (e.g. when a new
  *      client joins the system, a client account is canceled, an AI object
  *      is created, node failure, load balancing, an identity is quiescent)
- * <li> notify interested services of changes in the mapping at a local node
+ * <li> notify interested services of changes in the mapping
  * </ul>
  * 
  * While decisions about changes to the map will be made outside a 
@@ -42,8 +42,8 @@ import java.util.Iterator;
  * services should consider only their local node state when calling setStatus.
  *              
  * <p>
- * <b> A variation of "assignNode" which adds hints for identities the input
- *     might want to colocate with will probably be added later. </b>
+ * <b> TODO A variation of "assignNode" which adds hints for identities the 
+ *     input might want to colocate with will probably be added later. </b>
  */
 public interface NodeMappingService extends Service {
         
@@ -55,6 +55,10 @@ public interface NodeMappingService extends Service {
      * though {@link #setStatus setStatus(service, identity, true)} had
      * been called on the assigned node.
      * <p>
+     * <b> TBD:  Perhaps this atomic setService doesn't help.  It seems as
+     *  though each service instance on a node needs to call setStatus 
+     *  anyway, and it complicates the implementation of this servcie. </b>
+     * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.
      * <p>
@@ -62,19 +66,17 @@ public interface NodeMappingService extends Service {
      * @param service the class of the caller
      * @param identity the identity to assign to a node
      *
-     * @throws IllegalStateException if there are no live nodes available for 
-     *             mapping
-     *
      */
     void assignNode(Class service, Identity identity);
     
     /**
-     * Inform the {@code NodeMappingService} that a service instance has observed
-     * a change in status of an identity on this node.  When all services which 
-     * have previously noted an identity as active set the status to false,
-     * the identity can be removed from the map.  If a node fails or the 
-     * node mapping service initiates a mapping change (for load balancing), all 
-     * status votes for the failing or old node are implicitly set to inactive.  
+     * Inform the {@code NodeMappingService} that a service instance has 
+     * observed a change in status of an identity on this node.  When all
+     * services which have previously noted an identity as active set the 
+     * status to false, the identity can be removed from the map.  If a node
+     * fails or the node mapping service initiates a mapping change (for 
+     * load balancing), all status votes for the failing or old node are 
+     * implicitly set to inactive.  
      * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.
@@ -91,16 +93,16 @@ public interface NodeMappingService extends Service {
                    boolean active) throws UnknownIdentityException;
     
     /** 
-     * Returns the node to which the identity is assigned.  
+     * Returns the live node to which the identity is assigned.  
      * <p>
      * This method must be called from within a transaction.
      *
      * @param identity the identity 
-     * @return node information for the specified {@code identity} 
+     * @return node information for the specified {@code identity}
      *
      * @throws UnknownIdentityException if the identity is not in the map
-     * @throws TransactionException if the operation failed because of a problem
-     *         with the current transaction
+     * @throws TransactionException if the operation failed because of
+     *         a problem with the current transaction
      */
     Node getNode(Identity identity) throws UnknownIdentityException;
     
@@ -108,27 +110,29 @@ public interface NodeMappingService extends Service {
      * Returns an {@code Iterator} for the set of identities assigned to a node.
      * The set will be empty if no identities are assigned to the node.
      * <p>
-     * The {@code remove} method of the returned iterator does nothing.
+     * The {@code remove} operation of the returned iterator is not supported
+     * and will throw {@code UnsupportedOperationException} if invoked.
      * <p>
-     * This method must be called from within a transaction.
+     * This method should only be called within a transaction, and the 
+     * returned iterator should only be used within that transaction.
      * 
      * @param nodeId a node ID
      * @return an iterator for all identities assigned to this node
      *
      * @throws UnknownNodeException if the nodeId is unknown
-     * @throws TransactionException if the operation failed because of a problem
-     *         with the current transaction
+     * @throws TransactionException if the operation failed because of
+     *         a problem with the current transaction
      */
     Iterator<Identity> getIdentities(long nodeId) throws UnknownNodeException;
     
     /** 
      * Adds a {@code listener} to be notified when the identity
      * mapping for this node is modified.   This method is not performed
-     * under a transaction;  {@code listeners} are held locally on nodes.
+     * under a transaction; {@code listeners} are held locally on nodes.
      * <p>
      * If a {@code Service} needs to take actions when identities are added to
      * or removed from a local node, it should register one (or more) 
-     * {@code listener} objects when it is configured.  The order of callbacks
+     * {@code listener} objects when it is constructed.  The order of callbacks
      * to listener objects is not specified, and the callbacks will occur
      * asynchronously.
      *

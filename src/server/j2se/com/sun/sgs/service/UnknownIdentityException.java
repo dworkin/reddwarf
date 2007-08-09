@@ -20,4 +20,15 @@ public class UnknownIdentityException extends Exception {
     public UnknownIdentityException(String message) {
         super(message);
     }
+    
+    /**
+     * Creates an instance of this class with the specified detail message and
+     * cause.
+     *
+     * @param	message the detail message or {@code null}
+     * @param	cause the cause or {@code null}
+     */
+    public UnknownIdentityException(String message, Throwable cause) {
+	super(message, cause);
+    }
 }

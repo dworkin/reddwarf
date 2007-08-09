@@ -19,4 +19,15 @@ public class UnknownNodeException extends Exception {
     public UnknownNodeException(String message) {
         super(message);
     }
+    
+    /**
+     * Creates an instance of this class with the specified detail message and
+     * cause.
+     *
+     * @param	message the detail message or {@code null}
+     * @param	cause the cause or {@code null}
+     */
+    public UnknownNodeException(String message, Throwable cause) {
+	super(message, cause);
+    }
 }

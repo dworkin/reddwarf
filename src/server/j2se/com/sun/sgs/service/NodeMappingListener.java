@@ -31,7 +31,7 @@ public interface NodeMappingListener {
      * Notifies this listener that an identity has been removed from this node.
      *
      * @param id the removed identity
-     * @param newNode  the new node assignment for the idenity, or {@code null} 
+     * @param newNode  the new node assignment for the identity, or {@code null} 
      *                 if the identity has been removed from the system
      */
     void mappingRemoved(Identity id, Node newNode);
