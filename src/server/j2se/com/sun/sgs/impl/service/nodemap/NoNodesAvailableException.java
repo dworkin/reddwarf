@@ -19,8 +19,8 @@ class NoNodesAvailableException extends Exception {
      *
      * @param	message the detail message or <code>null</code>
      */
-    public NoNodesAvailableException(String msg) {
-        super(msg);
+    public NoNodesAvailableException(String message) {
+        super(message);
     }
     
     /**
@@ -30,7 +30,7 @@ class NoNodesAvailableException extends Exception {
      * @param	message the detail message or <code>null</code>
      * @param	cause the cause or <code>null</code>
      */
-    public NoNodesAvailableException(String msg, Throwable cause) {
-        super(msg, cause);
+    public NoNodesAvailableException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

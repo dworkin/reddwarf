@@ -29,8 +29,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -182,14 +184,14 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      *
      *  TODO For failover, will need to persist these identities.
      */
-    private final Map<Identity, Long> removeMap =
-                new ConcurrentHashMap<Identity, Long>();
-
+    private final Queue<RemoveInfo> removeQueue =
+            new ConcurrentLinkedQueue<RemoveInfo>();
     /** 
      * The set of clients of this server who wish to be notified if
      * there's a change in the map.
      *
-     * TODO For failover, these need to be persisted.
+     * TODO For failover, these need to be persisted if we have a way
+     *   to reconnect an existing service to a new server
      */
     private final Map<Long, NotifyClient> notifyMap =
                 new ConcurrentHashMap<Long, NotifyClient>();   
@@ -413,16 +415,16 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
-        removeMap.put(id, System.currentTimeMillis());
+        removeQueue.add(new RemoveInfo(id));
     }
     
     /**
      * The thread that handles removing inactive identities from the map.
      * <p>
-     * Candidates for removal are held in the removeMap.  This thread
-     * periodically wakes up and looks at each entry in the removeMap.
+     * Candidates for removal are held in the removeQueue.  This thread
+     * periodically wakes up and looks at each entry in the removeQueue.
      * If an appropriate amount of time has passed since the entry was
-     * put in the removeMap (which allows the system some settling time, 
+     * put in the removeQueue (which allows the system some settling time, 
      * so we don't thrash removing and adding an identity), the data store
      * is checked to see if the identity can still be removed.  A service
      * could have called {@link #NodeMappingService.setStatus setStatus}
@@ -448,13 +450,11 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 
                 Long time = System.currentTimeMillis() - expireTime;
                 
-                Iterator<Map.Entry<Identity, Long>> iter =
-                        removeMap.entrySet().iterator();
-                while (iter.hasNext()) {
-                    Map.Entry<Identity, Long> entry = iter.next();
-                    // Check for expiration.  
-                    if (entry.getValue() < time) {
-                        Identity id = entry.getKey();
+                boolean workToDo = true;
+                while (workToDo) {
+                    RemoveInfo info = removeQueue.peek();
+                    if (info != null && info.getTimeInserted() < time) {
+                        Identity id = info.getIdentity();
                         RemoveTask rtask = new RemoveTask(id);
                         try {
                             runTransactionally(rtask);
@@ -462,16 +462,33 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
-                            iter.remove();
+                            removeQueue.poll();
 
                         } catch (Exception ex) {
                             logger.logThrow(Level.WARNING, ex, 
                                             "Removing {0} failed", id);
                         }
+                    } else {
+                        workToDo = false;
                     }
                 }
             }
         }
+    }
+    
+    /**
+     * Immutable object representing an identity which might be removable.
+     */
+    private class RemoveInfo {
+        private final Identity id;
+        private final long timeInserted;
+        
+        RemoveInfo(Identity id) {
+            this.id = id;
+            timeInserted = System.currentTimeMillis();
+        }
+        Identity getIdentity() { return id; }
+        long getTimeInserted() { return timeInserted; }
     }
     
     /** 
@@ -812,7 +829,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                             // action here.  I think I need to keep a list
                             // somewhere of failed nodes, and have a background
                             // thread that tries to move them.
-                            removeMap.put(id, System.currentTimeMillis());
+                            removeQueue.add(new RemoveInfo(id));
                             done = true;
                         }
                     }
