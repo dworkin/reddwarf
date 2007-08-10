@@ -454,6 +454,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 while (workToDo) {
                     RemoveInfo info = removeQueue.peek();
                     if (info != null && info.getTimeInserted() < time) {
+                        // Always remove the item from the list, even if we
+                        // get an exception.  Otherwise, we can loop forever.
+                        info = removeQueue.poll();
                         Identity id = info.getIdentity();
                         RemoveTask rtask = new RemoveTask(id);
                         try {
@@ -462,8 +465,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
-                            removeQueue.poll();
-
                         } catch (Exception ex) {
                             logger.logThrow(Level.WARNING, ex, 
                                             "Removing {0} failed", id);

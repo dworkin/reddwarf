@@ -222,19 +222,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //    easier for the clients of this method (see note below for how).
     //    I waffle on this issue because it seems better for the API to have
     //    anything that modfies the node map potentially go through the server.
-    //  - If the server is not available (we get IOException errors when
-    //    we try to contact it), we retry a few times and then give up.
-    //    We're discussing adding a method to the watchdog service to allow
-    //    services to tell it that we need to shut down the stack.
-    //  - This service almost runs correctly if the server is unavailable,
-    //    (say, if there's a transient network partition), except:
-    //       - remove:  any identity that we detected could be removed
-    //           during the partition won't be removed.  There's a unit
-    //           test that demonstrates this.   The remove list needs to
-    //           be persisted anyway, so perhaps the best thing is to have
-    //           the client store the potentially removable identity in
-    //           the data service, and have the server check for new additions
-    //           periodically.
     //  - Look into simplifying setStatus persisted information, as discussed
     //    above.  The issue is the server, through assignNode, atomically
     //    sets the status for a service on a node.
@@ -242,9 +229,22 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //    load balancing or node failure), it does NOT retain any setStatus
     //    settings for the old node.  This is clearly correct for node failure,
     //    but is it correct for load balancing?  Or should load balancing cause
-    //    the information to be carried to the new node?  
+    //    the information to be carried to the new node?  I chose to not carry
+    //    the information forward because then node failure looks the same
+    //    as a load balancing move to the services using the node mapping
+    //    service.
     //  - This service assumes the server will be up before services attempt
     //    to connect to it.  Is that reasonable?
+    //  - Add logging for all Errors thrown?  Would be useful for debugging
+    //    things like OutOfMemoryErrors.
+    //  - If the server is not available (we get IOException errors when
+    //    we try to contact it), we retry a few times and then give up.
+    //    We're discussing adding a method to the watchdog service to allow
+    //    services to tell it that we need to shut down the stack.
+    //  - This service currently cannot operate if the backing server isn't
+    //    available (see note above).  It's probably very possible to make it
+    //    work correctly and locally if the server isn't available, if we 
+    //    choose to not give up on server disconnects.
     //    
     //
 
@@ -415,7 +415,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             exporter = new Exporter<NotifyClient>(NotifyClient.class);
             clientPort = exporter.export(changeNotifierImpl, clientPort);
             changeNotifier = exporter.getProxy();
-
             
             // Check if we're running on a full stack. 
             String finalService =
@@ -615,67 +614,32 @@ public class NodeMappingServiceImpl implements NodeMappingService
         if (identity == null) {
             throw new NullPointerException("null identity");
         }       
-        
-        String idkey = NodeMapUtil.getIdentityKey(identity);
-        NodeMapUtil.GetIdTask idtask = 
-                new NodeMapUtil.GetIdTask(dataService, idkey);
+
+        SetStatusTask stask = 
+                new SetStatusTask(identity, service.getName(), active);
         try {
-            runTransactionally(idtask);
-        } catch (NameNotBoundException nnbe) {
-            throw new UnknownIdentityException("id: " + identity, nnbe);
-        } catch (ObjectNotFoundException onfe) {
-            throw new UnknownIdentityException("id: " + identity, onfe);
-        } catch (Exception ex) {
-            logger.logThrow(Level.WARNING, ex, 
+            runTransactionally(stask);
+        } catch (Exception e) {
+            logger.logThrow(Level.WARNING, e, 
                                 "Setting status for {0} failed", identity);
+            throw new UnknownIdentityException("id: " + identity, e);
         }
-        
-        IdentityMO idmo = idtask.getId();
-        
-        if (idmo == null) {
-            // We got an exception above.
-            throw new UnknownIdentityException("id: " + identity);
-        } else {
-            String removekey = NodeMapUtil.getPartialStatusKey(identity);
-            String statuskey = 
-                    NodeMapUtil.getStatusKey(identity, localNodeId, 
-                                             service.getName());
-            SetStatusTask stask = 
-                    new SetStatusTask(statuskey, removekey, idmo, active);
-            try {
-                runTransactionally(stask);
-            } catch (NameNotBoundException nnbe) {
-                // Ignore.  This can be thrown if active = false, and this is
-                // our second call to this method.  
-            } catch (ObjectNotFoundException onfe) {
-                // If we're racing with the server's delete thread, we might
-                // get an ObjectNotFoundException (suppose we're trying to
-                // add active for an deletable identity:  we could get the 
-                // idmo and have the server delete the object before we 
-                // reached this code).
-                // We treat this as though the idmo was deleted before we
-                // entered this method.
-                throw new UnknownIdentityException("id: " + identity);               
-            } catch (Exception e) {
-                logger.logThrow(Level.WARNING, e, 
-                                "Setting status for {0} failed", statuskey);
-            }
-            
-            if (stask.canRemove()) {
-                int tryCount = 0;
-                while (tryCount < MAX_RETRY) {
-                    try {
-                        server.canRemove(identity);
-                        tryCount = MAX_RETRY;
-                    } catch (IOException ioe) {
-                        tryCount++;
-                        logger.logThrow(Level.WARNING, ioe, 
-                               "Could not tell server OK to delete {0}", idmo);
-                    }
+
+        if (stask.canRemove()) {
+            int tryCount = 0;
+            while (tryCount < MAX_RETRY) {
+                try {
+                    server.canRemove(identity);
+                    tryCount = MAX_RETRY;
+                } catch (IOException ioe) {
+                    tryCount++;
+                    logger.logThrow(Level.WARNING, ioe, 
+                           "Could not tell server OK to delete {0}", identity);
                 }
             }
-            logger.log(Level.FINEST, "setStatus key: {0}", statuskey);
         }
+        logger.log(Level.FINEST, "setStatus key: {0} , active: {1}", 
+                stask.statusKey(), active);
     }
     
     /**
@@ -683,41 +647,51 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * whether the identity is considered dead by this node.
      */
     private class SetStatusTask implements KernelRunnable {
+        final private Identity id;
         final private boolean active;
-        final private String statuskey;
-        final private String removekey;
-        final private IdentityMO idmo;
+        final private String idKey;
+        final private String removeKey;
+        final private String statusKey;
         
         /** return value, true if reference count goes to zero */
         private boolean canRemove = false;
 
-        SetStatusTask(String statuskey, String removekey, 
-                      IdentityMO idmo, boolean active) {
-            this.statuskey = statuskey;
-            this.removekey = removekey;
-            this.idmo = idmo;
-            this.active = active;         
+        SetStatusTask(Identity id, String serviceName, boolean active) {
+            this.id = id;
+            this.active = active;
+            idKey = NodeMapUtil.getIdentityKey(id);
+            removeKey = NodeMapUtil.getPartialStatusKey(id);
+            statusKey = NodeMapUtil.getStatusKey(id, localNodeId, serviceName);
         }
         
         public String getBaseTaskType() {
             return this.getClass().getName();
         }
         
-        public void run() {         
+        public void run() throws UnknownIdentityException { 
+            // Exceptions thrown by getServiceBinding are handled by caller.
+            IdentityMO idmo = 
+                    dataService.getServiceBinding(idKey, IdentityMO.class);
+            
             if (active) {
-                // Note that ObjectNotFoundException can be thrown
-                // if we're racing with the server's delete thread
-                dataService.setServiceBinding(statuskey, idmo);
+                dataService.setServiceBinding(statusKey, idmo);
             } else {
                 // Note that NameNotBoundException can be thrown
                 // if this is our second time calling this method.
-                dataService.removeServiceBinding(statuskey);
-                String name = dataService.nextServiceBoundName(removekey);
-                canRemove = (name == null || !name.startsWith(removekey));
+                try {
+                    dataService.removeServiceBinding(statusKey);
+                } catch (NameNotBoundException ex) {
+                    // This is OK - it can be thrown if this is our second
+                    // time calling this method.
+                    return;
+                }
+                String name = dataService.nextServiceBoundName(removeKey);
+                canRemove = (name == null || !name.startsWith(removeKey));
             }
         }
         
         boolean canRemove() { return canRemove; }
+        String statusKey()  { return statusKey; }  // used for logging
     }
     
     /** {@inheritDoc} */
@@ -966,7 +940,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
  
         }  
     }
-    
 
     /* -- For testing. -- */
     
