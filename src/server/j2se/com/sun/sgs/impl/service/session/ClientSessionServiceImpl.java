@@ -37,6 +37,7 @@ import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -128,25 +129,25 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final Object lock = new Object();
 
     /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    NonDurableTaskScheduler nonDurableTaskScheduler;
+    final NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
-    private TransactionContextFactory<Context> contextFactory;
+    private final TransactionContextFactory<Context> contextFactory;
     
     /** The data service. */
-    DataService dataService;
+    final DataService dataService;
 
     /** The identity manager. */
-    IdentityManager identityManager;
+    final IdentityManager identityManager;
 
     /** The ID block size for the IdGenerator. */
-    private int idBlockSize;
+    private final int idBlockSize;
     
     /** The IdGenerator. */
-    private IdGenerator idGenerator;
+    private final IdGenerator idGenerator;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -156,9 +157,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      *
      * @param properties service properties
      * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
      */
-    public ClientSessionServiceImpl(
-	Properties properties, ComponentRegistry systemRegistry)
+    public ClientSessionServiceImpl(Properties properties,
+				    ComponentRegistry systemRegistry,
+				    TransactionProxy txnProxy)
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
@@ -169,6 +172,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	try {
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
+	    } else if (txnProxy == null) {
+		throw new NullPointerException("null txnProxy");
 	    }
 	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
@@ -206,6 +211,55 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		systemRegistry.getComponent(IdentityManager.class);
 	    flushContextsThread.start();
 
+	    synchronized (ClientSessionServiceImpl.class) {
+		if (ClientSessionServiceImpl.txnProxy == null) {
+		    ClientSessionServiceImpl.txnProxy = txnProxy;
+		} else {
+		    assert ClientSessionServiceImpl.txnProxy == txnProxy;
+		}
+	    }
+	    contextFactory = new ContextFactory(txnProxy);
+	    dataService = txnProxy.getService(DataService.class);
+	    nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+	    try {
+		taskScheduler.runTask(
+		    new TransactionRunner(
+			new AbstractKernelRunnable() {
+			    public void run() {
+				notifyDisconnectedSessions();
+			    }
+			}),
+		    txnProxy.getCurrentOwner(), true);
+	    } catch (RuntimeException e) {
+		throw e;
+	    } catch (Exception e) {
+		throw new AssertionError(e);
+	    }
+	    idGenerator =
+		new IdGenerator(ID_GENERATOR_NAME,
+				idBlockSize,
+				txnProxy,
+				taskScheduler);
+	    ServerSocketEndpoint endpoint =
+		new ServerSocketEndpoint(
+		    new InetSocketAddress(port), TransportType.RELIABLE);
+	    try {
+		acceptor = endpoint.createAcceptor();
+		acceptor.listen(acceptorListener);
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(
+			Level.CONFIG,
+			"configure: listen successful. port:{0,number,#}",
+			getListenPort());
+		}
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	    // TBD: listen for UNRELIABLE connections as well?
+
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -224,70 +278,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "Configuring ClientSessionServiceImpl");
-	}
-	try {
-	    if (registry == null) {
-		throw new NullPointerException("null registry");
-	    } else if (proxy == null) {
-		throw new NullPointerException("null transaction proxy");
-	    }
-	    
-	    synchronized (ClientSessionServiceImpl.class) {
-		if (ClientSessionServiceImpl.txnProxy == null) {
-		    ClientSessionServiceImpl.txnProxy = proxy;
-		} else {
-		    assert ClientSessionServiceImpl.txnProxy == proxy;
-		}
-	    }
-	    
-	    synchronized (lock) {
-		if (this.acceptor != null) {
-		    throw new IllegalStateException("Already configured");
-		}
-		(new ConfigureServiceContextFactory(txnProxy)).
-		    joinTransaction();
-		contextFactory = new ContextFactory(txnProxy);
-		dataService = registry.getComponent(DataService.class);
-		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(
-			taskScheduler, proxy.getCurrentOwner(),
-			registry.getComponent(TaskService.class));
-		notifyDisconnectedSessions();
-		idGenerator =
-		    new IdGenerator(ID_GENERATOR_NAME,
-				    idBlockSize,
-				    txnProxy,
-				    taskScheduler);
-		ServerSocketEndpoint endpoint =
-		    new ServerSocketEndpoint(
-		        new InetSocketAddress(port), TransportType.RELIABLE);
-		try {
-                    acceptor = endpoint.createAcceptor();
-		    acceptor.listen(acceptorListener);
-		    if (logger.isLoggable(Level.CONFIG)) {
-			logger.log(
-			    Level.CONFIG,
-			    "configure: listen successful. port:{0,number,#}",
-                            getListenPort());
-		    }
-		} catch (IOException e) {
-		    throw new RuntimeException(e);
-		}
-		// TBD: listen for UNRELIABLE connections as well?
-	    }
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to configure ClientSessionServiceImpl");
-	    }
-	    throw e;
-	}
-    }
+    public void ready() { }
 
     /**
      * Returns the port this service is listening on.

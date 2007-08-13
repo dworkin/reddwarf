@@ -150,16 +150,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	new ConcurrentLinkedQueue<Node>();
 
     /** The task owner. */
-    private TaskOwner taskOwner;
+    private final TaskOwner taskOwner;
 
     /** The data service. */
-    DataService dataService;
+    final DataService dataService;
 
     /** The ID block size for the IdGenerator. */
-    private int idBlockSize;
+    final private int idBlockSize;
     
     /** The ID generator. */
-    private IdGenerator idGenerator;
+    final private IdGenerator idGenerator;
 
     /** The map of registered nodes, from node ID to node information. */
     private final ConcurrentMap<Long, NodeImpl> nodeMap =
@@ -170,9 +170,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** The thread for checking node expiration times. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
-
-    /** The thread for notifying failed nodes on restart. */
-    private Thread notifyClientsOnRestartThread;
 
     /** The count of calls in progress. */
     private int callsInProgress = 0;
@@ -187,18 +184,22 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      *
      * @param	properties server properties
      * @param	systemRegistry the system registry
+     * @param	txnProxy the transaction proxy
      *
-     * @throws	IOException if there is a problem exporting the server
+     * @throws	Exception if there is a problem exporting the server
      */
     public WatchdogServerImpl(Properties properties,
-			      ComponentRegistry systemRegistry)
-	throws IOException
+			      ComponentRegistry systemRegistry,
+			      TransactionProxy txnProxy)
+	throws Exception
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	if (systemRegistry == null) {
 	    throw new NullPointerException("null registry");
+	} else if (txnProxy == null) {
+	    throw new NullPointerException("null txnProxy");
 	}
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
@@ -218,6 +219,32 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	// TBD:  use ResourceCoordinator.startTask?
 	checkExpirationThread.start();
 	notifyClientsThread.start();
+
+	synchronized (WatchdogServerImpl.class) {
+	    if (WatchdogServerImpl.txnProxy == null) {
+		WatchdogServerImpl.txnProxy = txnProxy;
+	    } else {
+		assert WatchdogServerImpl.txnProxy == txnProxy;
+	    }
+	}
+	dataService = txnProxy.getService(DataService.class);
+	taskOwner = txnProxy.getCurrentOwner();
+	idGenerator =
+	    new IdGenerator(ID_GENERATOR_NAME,
+			    idBlockSize,
+			    txnProxy,
+			    taskScheduler);
+	FailedNodes failedNodes = new FailedNodes();
+	runTransactionally(failedNodes);
+	notifyClients(failedNodes.nodes, failedNodes.nodes);
+    }
+
+    /** Calls NodeImpl.markAllNodesFailed. */
+    private class FailedNodes extends AbstractKernelRunnable {
+	Collection<NodeImpl> nodes;
+	public void run() {
+	    nodes = NodeImpl.markAllNodesFailed(dataService);
+	}
     }
 
     /** {@inheritDoc} */
@@ -226,50 +253,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     }
     
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-	
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "Configuring WatchdogServerImpl");
-	}
-	try {
-	    if (registry == null) {
-		throw new NullPointerException("null registry");
-	    } else if (proxy == null) {
-		throw new NullPointerException("null transaction proxy");
-	    }
-	    
-	    synchronized (WatchdogServerImpl.class) {
-		if (WatchdogServerImpl.txnProxy == null) {
-		    WatchdogServerImpl.txnProxy = proxy;
-		} else {
-		    assert WatchdogServerImpl.txnProxy == proxy;
-		}
-	    }
-	    
-	    synchronized (lock) {
-		if (dataService != null) {
-		    throw new IllegalStateException("already configured");
-		}
-		dataService = registry.getComponent(DataService.class);
-		taskOwner = proxy.getCurrentOwner();
-		idGenerator =
-		    new IdGenerator(ID_GENERATOR_NAME,
-				    idBlockSize,
-				    txnProxy,
-				    taskScheduler);
-		Collection<NodeImpl> failedNodes =
-		    NodeImpl.markAllNodesFailed(dataService);
-		notifyClientsOnRestartThread =
-		    new NotifyClientsOnRestartThread(failedNodes);
-	    }
-	    
-	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.CONFIG, e,
-		"Failed to configure WatchdogServerImpl");
-	    throw e;
-	}
-    }
+    public void ready() { }
 
     /** {@inheritDoc} */
     public boolean shutdown() {
@@ -440,26 +424,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	return port;
     }
     
-    /**
-     * Resets the server to an uninitialized state so that configure
-     * can be reinvoked.  This method is invoked by the {@link
-     * WatchdogServiceImpl} if its {@link
-     * WatchdogServiceImpl#configure configure} method aborts.
-     */
-    void abortConfigure() {
-	dataService = null;
-    }
-
-    /**
-     * Performs actions necessary when {@link #configure configure}
-     * method commits.  This method is invoked by the {@link
-     * WatchdogServiceImpl} if its {@link
-     * WatchdogServiceImpl#configure configure} method commits.
-     */
-    void commitConfigure() {
-	notifyClientsOnRestartThread.start();
-    }
-
     /**
      * Runs the specified {@code task} within a transaction.
      *
@@ -645,35 +609,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		
 		notifyClients(nodeMap.values(), changedNodes);
 	    }
-	}
-    }
-
-    /**
-     * This thread is created when the server (re)starts, and notifies
-     * all previous clients (whose node information is present in the
-     * data service) that all previous nodes have failed.
-     */
-    private final class NotifyClientsOnRestartThread extends Thread {
-
-	/** A collection of nodes. */
-	private final Collection<NodeImpl> nodes;
-	
-	/**
-	 * Constructs an instance of this class with the specified
-	 * collection of {@code nodes}, and sets this thread as a
-	 * daemon thread.
-	 *
-	 * @param  nodes the collection of nodes to notify about each other
-	 */
-	NotifyClientsOnRestartThread(Collection<NodeImpl> nodes) {
-	    super(CLASSNAME + "$NotifyClientsOnRestartThread");
-	    setDaemon(true);
-	    this.nodes = nodes;
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
-	    notifyClients(nodes,  nodes);
 	}
     }
 

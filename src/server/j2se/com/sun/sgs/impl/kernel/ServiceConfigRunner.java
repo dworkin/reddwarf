@@ -20,12 +20,9 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
-import java.io.IOException;
-
 import java.lang.reflect.Constructor;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -352,7 +349,7 @@ class ServiceConfigRunner implements Runnable {
                 } else {
                     Class<?> serviceClass = Class.forName(serviceClassNames[i]);
                     Service service = createService(serviceClass);
-                    services.addComponent(services);
+                    services.addComponent(service);
                     if ((profileRegistrar != null) &&
                         (service instanceof ProfileProducer))
                         ((ProfileProducer)service).

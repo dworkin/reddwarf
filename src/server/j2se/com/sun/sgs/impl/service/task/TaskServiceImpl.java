@@ -19,6 +19,7 @@ import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 
@@ -88,11 +89,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
     // the internal value used to represent a task that does not repeat
     private static final long PERIOD_NONE = -1;
 
-    // flags indicating that configuration has been done successfully,
-    // and that we're still in the process of configuring
-    private boolean isConfigured = false;
-    private boolean isConfiguring = false;
-
     // the system's task scheduler, where tasks actually run
     private TaskScheduler taskScheduler = null;
 
@@ -100,10 +96,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
     private static TransactionProxy transactionProxy = null;
 
     // the data service used in the same context
-    private DataService dataService = null;
+    private final DataService dataService;
 
     // the factory used to manage transaction state
-    private TransactionContextFactory<TxnState> ctxFactory;
+    private final TransactionContextFactory<TxnState> ctxFactory;
 
     // the transient map for all recurring tasks' handles
     private ConcurrentHashMap<String,RecurringTaskHandle> recurringMap;
@@ -123,18 +119,32 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      *
      * @param properties startup properties
      * @param systemRegistry the registry of system components
+     * @param txnProxy the transaction proxy
+     * @throws Exception if there is an error creating the service
      */
     public TaskServiceImpl(Properties properties,
-                           ComponentRegistry systemRegistry) {
+                           final ComponentRegistry systemRegistry,
+			   final TransactionProxy txnProxy) 
+	throws Exception
+    {
         if (properties == null)
             throw new NullPointerException("Null properties not allowed");
         if (systemRegistry == null)
             throw new NullPointerException("Null registry not allowed");
+	if (txnProxy == null)
+	    throw new NullPointerException("Null proxy not allowed");
 
         recurringMap = new ConcurrentHashMap<String,RecurringTaskHandle>();
 
         // the scheduler is the only system component that we use
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+
+        // keep track of the proxy and the data service
+        TaskServiceImpl.transactionProxy = txnProxy;
+        dataService = txnProxy.getService(DataService.class);
+
+        // create the factory for managing transaction context
+        ctxFactory = new TransactionContextFactoryImpl(txnProxy);
     }
 
     /**
@@ -144,47 +154,26 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         return NAME;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
-        ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
-
-	if (consumer != null) {
-	    scheduleNDTaskOp =
-		consumer.registerOperation("scheduleNonDurableTask");
-	    scheduleNDTaskDelayedOp =
-		consumer.registerOperation("scheduleNonDurableTaskDelayed");
-	    scheduleNDTaskPrioritizedOp =
-		consumer.registerOperation(
-		    "scheduleNonDurableTaskPrioritized");
+    /** {@inheritDoc} */
+    public void ready() {
+	try {
+	    taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    readyInternal();
+			}
+		    }),
+		transactionProxy.getCurrentOwner(), true);
+	} catch (RuntimeException e) {
+	    throw e;
+	} catch (Exception e) {
+	    throw new AssertionError(e);
 	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void configure(ComponentRegistry serviceRegistry,
-                          TransactionProxy proxy) {
-        if (isConfigured)
-            throw new IllegalStateException("Task Service already configured");
-        isConfiguring = true;
-
-        logger.log(Level.CONFIG, "starting TaskService configuration");
-
-        if (serviceRegistry == null)
-            throw new NullPointerException("null registry not allowed");
-        if (proxy == null)
-            throw new NullPointerException("null proxy not allowed");
-
-        // keep track of the proxy and the data service
-        TaskServiceImpl.transactionProxy = proxy;
-        dataService = serviceRegistry.getComponent(DataService.class);
-
-        // create the factory for managing transaction context
-        ctxFactory = new TransactionContextFactoryImpl(proxy);
-
+    /** Reschedule existing tasks when the stack is ready. */
+    private void readyInternal() {
         logger.log(Level.CONFIG, "re-scheduling pending tasks");
 
         // start iterating from the root of the pending task namespace
@@ -229,6 +218,24 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "re-scheduled {0} tasks", taskCount);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        ProfileConsumer consumer =
+            profileRegistrar.registerProfileProducer(this);
+
+	if (consumer != null) {
+	    scheduleNDTaskOp =
+		consumer.registerOperation("scheduleNonDurableTask");
+	    scheduleNDTaskDelayedOp =
+		consumer.registerOperation("scheduleNonDurableTaskDelayed");
+	    scheduleNDTaskPrioritizedOp =
+		consumer.registerOperation(
+		    "scheduleNonDurableTaskPrioritized");
+	}
     }
 
     /**
@@ -530,11 +537,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         }
         /** {@inheritDoc} */
         public void commit() {
-            // see if we we're committing the configuration transaction
-            if (isConfiguring) {
-                isConfigured = true;
-                isConfiguring = false;
-            }
             // use the reservations...
             if (reservationSet != null)
                 for (TaskReservation reservation : reservationSet)
