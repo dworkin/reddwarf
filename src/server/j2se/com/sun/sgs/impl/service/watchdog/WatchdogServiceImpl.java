@@ -164,6 +164,9 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
+    /** The local nodeId. */
+    final long localNodeId;
+
     /** The interval for renewals with the watchdog server. */
     private final long renewInterval;
 
@@ -173,9 +176,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** The data service. */
     final DataService dataService;
-
-    /** The local nodeId. */
-    volatile long localNodeId;
 
     /** The time to wait for registration to complete. */
     private long registrationWaitTime = 500;
@@ -439,10 +439,8 @@ public class WatchdogServiceImpl implements WatchdogService {
      * Throws {@code IllegalStateException} if this service is shutting down.
      */
     private void checkState() {
-	synchronized (stateLock) {
-	    if (shuttingDown) {
-		throw new IllegalStateException("service shutting down");
-	    }
+	if (shuttingDown()) {
+	    throw new IllegalStateException("service shutting down");
 	}
     }
 

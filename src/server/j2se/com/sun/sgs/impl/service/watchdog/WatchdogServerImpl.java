@@ -186,7 +186,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
      *
-     * @throws	Exception if there is a problem exporting the server
+     * @throws	Exception if there is a problem starting the server
      */
     public WatchdogServerImpl(Properties properties,
 			      ComponentRegistry systemRegistry,
