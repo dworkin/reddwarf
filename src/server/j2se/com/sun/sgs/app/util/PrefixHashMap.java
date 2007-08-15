@@ -76,6 +76,13 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
+ * This map marks itself for update as necessary.  Developers
+ * <i>should not call {@code markForUpdate} or {@code getForUpdate} on
+ * this map ever</i>.  Doing so will eliminate all the concurrency
+ * benefits of this class.
+ *
+ * <p>
+ *
  * This class implements all of the optional {@code Map} operations
  * and supports both {@code null} keys and values.  This map provides
  * no guarantees on the order of elements when iterating over the key
@@ -87,8 +94,8 @@ import com.sun.sgs.app.ManagedReference;
  * java.util.ConcurrentModificationException}, unlike many of the
  * other {@code Map} implementations.
  *
- * @since 1.0
- * @version 1.3
+ * @since 0.9.4
+ * @version 1.4
  *
  * @see Object#hashCode()
  * @see Map
@@ -100,7 +107,7 @@ public class PrefixHashMap<K,V>
     extends AbstractMap<K,V>
     implements Map<K,V>, Serializable, ManagedObject {
 
-    private static final long serialVersionUID = 1337;
+    private static final long serialVersionUID = 0x1337L;
 
     /**
      * The default number of parallel write operations used when none
@@ -137,15 +144,7 @@ public class PrefixHashMap<K,V>
      * array for a leaf table.
      */
     // NOTE: *must* be a power of 2.
-    private static final int DEFAULT_LEAF_CAPACITY = 1 << 9;
-
-    /**
-     * The name space prefix for storing items reference by this into
-     * the data store.
-     */
-    private static final String NAME_SPACE =
-	"com.sun.sgs.app.util.PrefixHashMap";
-    
+    private static final int DEFAULT_LEAF_CAPACITY = 1 << 8; // 256
 
     /**
      * The maximum depth of this tree
@@ -1425,13 +1424,21 @@ public class PrefixHashMap<K,V>
 	 * this reference will depend on whether the map is managing
 	 * the key
 	 */	
-	private final ManagedReference keyRef;
+	private ManagedReference keyRef;
 	
 	/**
 	 * A reference to the value.  The class type of this reference
 	 * will depend on whether this map is managing the value
 	 */ 
 	private ManagedReference valueRef;
+
+	/**
+	 * If both the key and the value are not {@code ManagedObject}
+	 * instances, they will be combined into a single {@link
+	 * KeyValuePair} that is refered to by this {@code
+	 * ManagedReference}.
+	 */
+ 	private ManagedReference keyValuePairRef;
 	
 	/**
 	 * The next chained entry in this entry's bucket
@@ -1456,6 +1463,12 @@ public class PrefixHashMap<K,V>
 	boolean isValueWrapped;
 
 	/**
+	 * Whether the key and value are currently stored together in
+	 * a {@link KeyValuePair}
+	 */
+ 	boolean isKeyValueCombined;
+
+	/**
 	 * Constructs this {@code PrefixEntry}
 	 *
 	 * @param h the hash code for the key
@@ -1466,19 +1479,37 @@ public class PrefixHashMap<K,V>
 	PrefixEntry(int h, K k, V v, PrefixEntry<K,V> next) { 
 
 	    DataManager dm = AppContext.getDataManager();
+	    
+	    // if both the key and value are no ManagedObjects, we can
+	    // save a get() and createReference() call each by merging
+	    // them in a single KeyValuePair
+ 	    if (isKeyValueCombined = 
+ 		!(k instanceof ManagedObject) &&
+ 		!(v instanceof ManagedObject)) {
+ 		keyValuePairRef = 
+ 		    dm.createReference(new KeyValuePair<K,V>(k,v));
 
+ 		keyRef = null;
+ 		valueRef = null;
+ 	    }	 
+   
 	    // For the key and value, if each is already a
 	    // ManagedObject, then we obtain a ManagedReference to the
 	    // object itself, otherwise, we need to wrap it in a
 	    // ManagedSerializable and get a ManagedReference to that
-	    keyRef = (isKeyWrapped = !(k instanceof ManagedObject))
-		? dm.createReference(new ManagedSerializable<K>(k))
-		: dm.createReference((ManagedObject)k);
+ 	    else {
+		keyRef = (isKeyWrapped = !(k instanceof ManagedObject))
+		    ? dm.createReference(new ManagedSerializable<K>(k))
+		    : dm.createReference((ManagedObject)k);
+		
+		
+		valueRef = (isValueWrapped = !(v instanceof ManagedObject))
+		    ? dm.createReference(new ManagedSerializable<V>(v))
+		    : dm.createReference((ManagedObject)v);
 
-
-	    valueRef = (isValueWrapped = !(v instanceof ManagedObject))
-		? dm.createReference(new ManagedSerializable<V>(v))
-		: dm.createReference((ManagedObject)v);
+ 		keyValuePairRef = null;
+ 		isKeyValueCombined = false;
+ 	    }
 
 	    this.next = next;
 	    this.hash = h;
@@ -1488,8 +1519,10 @@ public class PrefixHashMap<K,V>
 	    this.hash = clone.hash;
 	    this.keyRef = clone.keyRef;
 	    this.valueRef = clone.valueRef;
+ 	    this.keyValuePairRef = clone.keyValuePairRef;
 	    this.isValueWrapped = clone.isValueWrapped;
 	    this.isKeyWrapped = clone.isKeyWrapped;
+ 	    this.isKeyValueCombined = clone.isKeyValueCombined;
 	    this.next = next;
 	}
   
@@ -1497,12 +1530,15 @@ public class PrefixHashMap<K,V>
 	 * {@inheritDoc}
 	 */
 	public final K getKey() {
-	    return (isKeyWrapped)
-		? ((ManagedSerializable<K>)
-		   (keyRef.get(ManagedSerializable.class))).get()
-		: (K)(keyRef.get(Object.class));
+ 	    if (isKeyValueCombined)
+ 		return (K)(keyValuePairRef.get(KeyValuePair.class).getKey());
+ 	    else
+		return (isKeyWrapped)
+		    ? ((ManagedSerializable<K>)
+		       (keyRef.get(ManagedSerializable.class))).get()
+		    : (K)(keyRef.get(Object.class));
 	}
-	    
+    
 	/**
 	 * Returns the value stored by this entry.  If the mapping has
 	 * been removed from the backing map before this call is made,
@@ -1515,10 +1551,13 @@ public class PrefixHashMap<K,V>
 	// NOTE: this method will automatically unwrap all value that
 	//       the map is responsible for managing
 	public final V getValue() {
-	    return (isValueWrapped) 
-		? ((ManagedSerializable<V>)
-		   (valueRef.get(ManagedSerializable.class))).get()
-		: (V)(valueRef.get(Object.class));
+ 	    if (isKeyValueCombined)
+ 		return (V)(keyValuePairRef.get(KeyValuePair.class).getValue());
+ 	    else
+		return (isValueWrapped) 
+		    ? ((ManagedSerializable<V>)
+		       (valueRef.get(ManagedSerializable.class))).get()
+		    : (V)(valueRef.get(Object.class));
 	}
 
 	/**
@@ -1533,38 +1572,64 @@ public class PrefixHashMap<K,V>
 	public final V setValue(V newValue) {
 	    V oldValue;
 	    ManagedSerializable<V> wrapper = null;
+ 	    KeyValuePair<K,V> pair = null;
+	    DataManager dm = AppContext.getDataManager();
+	    
+	    if (isKeyValueCombined) {
+		oldValue = 
+		    (pair = keyValuePairRef.get(KeyValuePair.class)).getValue();
+	    }	    
+ 	    // unpack the value from the wrapper prior to
+ 	    // returning it
+	    else {
+		oldValue = (isValueWrapped) 
+		    ? (wrapper = valueRef.get(ManagedSerializable.class)).get()
+		    : (V)(valueRef.get(Object.class));
+	    }
 
-	    // unpack the value from the wrapper prior to
-	    // returning it
-	    oldValue = (isValueWrapped) 
-		? (wrapper = valueRef.get(ManagedSerializable.class)).get()
-		: (V)(valueRef.get(Object.class));
-	 
-
+	    // if v is already a ManagedObject, then do not put it
+	    // in the datastore, and instead get a reference to it	    
 	    if (newValue instanceof ManagedObject) {
-		// if v is already a ManagedObject, then do not put it
-		// in the datastore, and instead get a reference to it
-		valueRef = AppContext.getDataManager().
-		    createReference((ManagedObject)newValue);
-		isValueWrapped = false;
 
+		// if previously the key and value were combined,
+		// split them out.
+		if (isKeyValueCombined) {
+		    K key = pair.getKey();
+		    keyRef = dm.createReference(
+		        new ManagedSerializable<K>(pair.getKey()));
+		    dm.removeObject(pair);
+		    isKeyWrapped = true;
+		}
+
+
+		valueRef = dm.createReference((ManagedObject)newValue);
+		isValueWrapped = false;
+		
 		// if the previous value was wrapper, remove the
 		// wrapper from the datastore
 		if (wrapper != null)
-		    AppContext.getDataManager().removeObject(wrapper);
+		    dm.removeObject(wrapper);	    
 	    }
 	    else {
-		// re-use the old wrapper if we have one to avoid
-		// making another create call
-		if (wrapper != null)
-		    wrapper.set(newValue);
-		// otherwise, we need to wrap it in a new
-		// ManagedSerializable
-		else {		    
-		    valueRef = AppContext.getDataManager().
-			createReference(new ManagedSerializable<V>(newValue));
-		    isValueWrapped = true; // already true in the if-case
-		}
+		// NOTE: if the value has been switched from
+		// Serializable to ManagedObject back to Serializable,
+		// we do not support the case for collapsing back to a
+		// KeyValuePair
+ 		if (isKeyValueCombined)
+ 		    pair.setValue(newValue);
+ 		else {
+		    // re-use the old wrapper if we have one to avoid
+		    // making another create call
+		    if (wrapper != null)
+			wrapper.set(newValue);
+		    // otherwise, we need to wrap it in a new
+		    // ManagedSerializable
+		    else {		    
+			valueRef = dm.createReference(
+			    new ManagedSerializable<V>(newValue));
+			isValueWrapped = true; // already true in the if-case
+		    }
+ 	        }
 	    }
 	    return oldValue;
 	}
@@ -1612,19 +1677,60 @@ public class PrefixHashMap<K,V>
 	 * the map.
 	 */
 	final void unmanage() {
-	    if (isKeyWrapped) {
-		// unpack the key from the wrapper 
-		ManagedSerializable<V> wrapper = 
-		    keyRef.get(ManagedSerializable.class);
-		AppContext.getDataManager().removeObject(wrapper);
+	    if (isKeyValueCombined) {
+		AppContext.getDataManager().
+		    removeObject(keyValuePairRef.get(KeyValuePair.class));
 	    }
-	    if (isValueWrapped) {
-		// unpack the value from the wrapper 
-		ManagedSerializable<V> wrapper = 
-		    valueRef.get(ManagedSerializable.class);
-		AppContext.getDataManager().removeObject(wrapper);
+	    else {
+		if (isKeyWrapped) {
+		    // unpack the key from the wrapper 
+		    ManagedSerializable<V> wrapper = 
+			keyRef.get(ManagedSerializable.class);
+		    AppContext.getDataManager().removeObject(wrapper);
+		}
+		if (isValueWrapped) {
+		    // unpack the value from the wrapper 
+		    ManagedSerializable<V> wrapper = 
+			valueRef.get(ManagedSerializable.class);
+		    AppContext.getDataManager().removeObject(wrapper);
+		}
 	    }
 	}
+    }
+    
+    /**
+     * A utlity class for PrefixEntry for storing a {@code
+     * Serializable} key and value together in a single {@code
+     * ManagedObject}.  By combinging both together, this saves a
+     * {@link ManagedReference#get()} call per access.
+     */
+    private static class KeyValuePair<K,V> 
+	implements Serializable, ManagedObject {
+
+	private static final long serialVersionUID = 0x1L;
+
+	private final K key;
+
+	private V value;
+
+	public KeyValuePair(K key, V value) {
+	    this.key = key;
+	    this.value = value;
+	}
+
+	public K getKey() { 
+	    return key;
+	}
+	
+	public V getValue() {
+	    return value;
+	}
+	
+	public void setValue(V value) {
+	    AppContext.getDataManager().markForUpdate(this);
+	    this.value = value;
+	}
+
     }
 
 
