@@ -102,25 +102,23 @@ final class NodeMapUtil {
         return ok;
     }
     
+    /* -- Various keys used to persist data -- */
+    
+    /* -- The identity key, for identity->node mapping -- */
+    
     /**
-     * Returns a identity key for the given {@code identity}. 
+     * Returns a identity key for the given {@code id}. 
      */
     static String getIdentityKey(Identity id) {    
         return IDENTITY_KEY_PREFIX + id.getName();
     }
     
+
+    /* -- The node key, for node->identity mapping -- */
+    
     /**
-     * Returns a node key for the given {@code node}.  
+     * Returns a node key for the given {@code nodeId} and {@code id}.
      */
-    private static StringBuilder buildNodeKey(long nodeId) {
-        StringBuilder sb = new StringBuilder(NODE_KEY_PREFIX);
-        sb.append(nodeId);
-        sb.append(".");
-        return sb;
-    }
-    static String getPartialNodeKey(long nodeId) {
-	return buildNodeKey(nodeId).toString();
-    }   
     static String getNodeKey(long nodeId, Identity id) {
         StringBuilder sb = buildNodeKey(nodeId);
         sb.append(id.getName());
@@ -128,16 +126,59 @@ final class NodeMapUtil {
     }
     
     /**
-     * Returns a status key for the given {@code identity}.  The status
-     * mappings are held per identity per node.
+     * Returns a node key for the given {@code nodeId};  used for 
+     * iterating through a node for all identities assigned to it.
      */
-    private static StringBuilder buildStatusKey(Identity id) {
-        StringBuilder sb = new StringBuilder(STATUS_KEY_PREFIX);
-        sb.append(id.getName());
+    static String getPartialNodeKey(long nodeId) {
+	return buildNodeKey(nodeId).toString();
+    }   
+    
+    /**
+     * Private helper method; returns a {@code StringBuilder} for
+     * a partial node key.
+     */
+    private static StringBuilder buildNodeKey(long nodeId) {
+        StringBuilder sb = new StringBuilder(NODE_KEY_PREFIX);
+        sb.append(nodeId);
         sb.append(".");
         return sb;
     }
+  
+    /* -- The status key, for tracking which identities are in use -- */
     
+    /**
+     * Returns a status key for the given {@code id}, {@code nodeId},
+     * and {@code serviceName}.  The status mappings are held per 
+     * identity per node.
+     */
+    static String getStatusKey(Identity id, long nodeId, String serviceName) 
+    {
+        StringBuilder sb = buildStatusKey(id, nodeId);
+        sb.append(serviceName);
+        return sb.toString();	
+    }
+    
+    /** 
+     * Returns a status key for the given {@code id} and {@code nodeId}.
+     * Used for finding all status entries for an identity on a particular
+     * node.
+     */
+    static String getPartialStatusKey(Identity id, long nodeId) {
+        return buildStatusKey(id, nodeId).toString();
+    }
+    
+    /**
+     * Returns a status key for a given {@code id}. Used for finding all
+     * status entries for an identity (on all nodes).
+     */
+    static String getPartialStatusKey(Identity id) {
+        return buildStatusKey(id).toString();
+    }
+
+    /**
+     * Private helper method; returns a {@code StringBuilder} for a 
+     * partial status key.
+     */
     private static StringBuilder buildStatusKey(Identity id, long nodeId) {
         StringBuilder sb = buildStatusKey(id);
         sb.append(nodeId);
@@ -145,20 +186,17 @@ final class NodeMapUtil {
         return sb;
     }
 
-    static String getPartialStatusKey(Identity id) {
-        return buildStatusKey(id).toString();
+    /**
+     * Private helper method; returns a {@code StringBuilder} for a 
+     * partial status key.
+     */
+    private static StringBuilder buildStatusKey(Identity id) {
+        StringBuilder sb = new StringBuilder(STATUS_KEY_PREFIX);
+        sb.append(id.getName());
+        sb.append(".");
+        return sb;
     }
-    
-    static String getPartialStatusKey(Identity id, long nodeId) {
-        return buildStatusKey(id, nodeId).toString();
-    }
-    
-    static String getStatusKey(Identity id, long nodeId, String serviceName) 
-    {
-        StringBuilder sb = buildStatusKey(id, nodeId);
-        sb.append(serviceName);
-        return sb.toString();	
-    }
+
     
     /**
      * An immutable class to hold the current version of the keys
@@ -222,54 +260,6 @@ final class NodeMapUtil {
             result = 37*result + major_version;
             result = 37*result + minor_version;
             return result;              
-        }
-    }
-    
-    /**
-     * Task which gets an IdentityMO from a data service.  This is
-     * a separate task so we can retrieve the result.  An exception
-     * will be thrown if the IdentityMO is not found or the name
-     * binding doesn't exist.
-     */
-    static class GetIdTask implements KernelRunnable {
-        private IdentityMO idmo = null;
-        private final DataService dataService;
-        private final String idkey;
-        
-        /**
-         * Create a new instance.
-         *
-         * @param dataService the data service to retrieve from
-         * @param idkey Identitifier key
-         */
-        GetIdTask(DataService dataService, String idkey) {
-            this.dataService = dataService;
-            this.idkey = idkey;
-        }
-        
-        /**
-         * {@inheritDoc}
-         * Get the IdentityMO. 
-         * @throws NameNotBoundException if no object is bound to the id
-         * @throws ObjectNotFoundException if the object has been removed
-         */
-        public void run() {
-            idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
-        }
-        
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return this.getClass().getName();
-        }
-        
-        /**
-         *  The identity MO retrieved from the data store, or null if
-         *  the task has not yet executed or there was an error while
-         *  executing.
-         * @return the IdentityMO
-         */
-        public IdentityMO getId() {
-            return idmo;
         }
     }
 }

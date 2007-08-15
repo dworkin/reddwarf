@@ -77,6 +77,12 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
           
+    /** Reflective stuff, for non-public members. */
+    private static Field serverImplField;
+    private static Field localNodeIdField;
+    private static Method assertValidMethod;
+    private static Method getPortMethod;
+    
     /** Number of other services we'll start up */
     private final int NUM_NODES = 3;
 
@@ -101,18 +107,11 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     private boolean passed;
     
-    
     /** A mapping of node id -> services, used for remove tests */
     private Map<Long, NodeMappingService> nodemap;
     
     /** A mapping of node id ->NodeMappingListener, for listener checks */
     private Map<Long, TestListener> nodeListenerMap;
-    
-    /** Reflective stuff, for non-public members. */
-    private Field serverImplField;
-    private Field localNodeIdField;
-    private Method assertValidMethod;
-    private Method getPortMethod;
     
     private String serverPortPropertyName;
     

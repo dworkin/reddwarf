@@ -42,6 +42,10 @@ import java.util.Iterator;
  * services should consider only their local node state when calling setStatus.
  *              
  * <p>
+ * <b> TODO We might want a transactional method that returns true if
+ *     an identity is both assigned to the local node and the local node
+ *     is alive, as a convenience to other services. </b>
+ * <p>
  * <b> TODO A variation of "assignNode" which adds hints for identities the 
  *     input might want to colocate with will probably be added later. </b>
  */
@@ -57,7 +61,11 @@ public interface NodeMappingService extends Service {
      * <p>
      * <b> TBD:  Perhaps this atomic setService doesn't help.  It seems as
      *  though each service instance on a node needs to call setStatus 
-     *  anyway, and it complicates the implementation of this servcie. </b>
+     *  anyway, and it complicates the implementation of this service. </b>
+     * <p>
+     * <b> TBD:  Maybe the first parameter should be Class<? extends Service>.
+     *  The actual service who cares might be very interesting to the 
+     *  load balancer. </b>
      * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.
@@ -77,6 +85,10 @@ public interface NodeMappingService extends Service {
      * fails or the node mapping service initiates a mapping change (for 
      * load balancing), all status votes for the failing or old node are 
      * implicitly set to inactive.  
+     * <p>
+     * <b> TBD:  Maybe the first parameter should be Class<? extends Service>.
+     *  The actual service who cares might be very interesting to the 
+     *  load balancer. </b>
      * <p>
      * This method should not be called while in a transaction, as this
      * method call could entail remote communication.
@@ -120,6 +132,8 @@ public interface NodeMappingService extends Service {
      * @return an iterator for all identities assigned to this node
      *
      * @throws UnknownNodeException if the nodeId is unknown
+     * @throws	IllegalArgumentException if the specified {@code nodeId}
+     *		is not within the range of valid IDs
      * @throws TransactionException if the operation failed because of
      *         a problem with the current transaction
      */

@@ -103,6 +103,17 @@ import java.util.logging.Logger;
  *      with parameters {@link Properties} and {@link ComponentRegistry}. 
  *      Being able to specify this class is useful for testing.  <p>
  * <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.nodemap</code> to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Initialization failures
+ * <li> {@link Level#CONFIG CONFIG} - Construction information
+ * <li> {@link Level#WARNING WARNING} - Errors
+ * <li> {@link Level#FINEST FINEST} - Trace operations
+ * </ul> <p>
  */
 public class NodeMappingServiceImpl implements NodeMappingService 
 {
@@ -245,7 +256,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
     //    available (see note above).  It's probably very possible to make it
     //    work correctly and locally if the server isn't available, if we 
     //    choose to not give up on server disconnects.
-    //    
+    //  - Perhaps all methods that should NOT be called within a transaction
+    //    should be declared to throw an exception if they are called from
+    //    within a transaction?  This would used for all service APIs with
+    //    non-transactional methods.   Some methods must be called from within
+    //    a transaction, some must not, and for some it won't matter (e.g.
+    //    equals() or toString().
     //
 
     /** Package name for this class */
@@ -480,9 +496,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             
             // Don't register ourselves if we're not running an application.
             if (fullStack) {
-                // Register myself with my server using local node id.
-                // We don't register if we created the server because
-                // we might not be running a full stack.
                 try {
                     server.registerNodeListener(changeNotifier, localNodeId);
                 } catch (IOException ex) {
@@ -504,6 +517,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** {@inheritDoc} */
     public boolean shutdown() {
         synchronized(stateLock) {
+            if (state == State.SHUTTING_DOWN) {
+                return false;
+            } else if (state == State.SHUTDOWN) {
+                throw new IllegalStateException("Service is already shut down");
+            }
             state = State.SHUTTING_DOWN;
         }
 
@@ -528,8 +546,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
             ok = serverImpl.shutdown();
         }
 
-        synchronized(stateLock) {
-            state = State.SHUTDOWN;
+        if (ok) {
+            synchronized(stateLock) {
+                state = State.SHUTDOWN;
+            }
         }
         return ok;
     }
@@ -587,13 +607,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
             try {
                 server.assignNode(service, identity);
                 tryCount = MAX_RETRY;
+                logger.log(Level.FINEST, "assign identity {0}", identity);
             } catch (IOException ioe) {
                 tryCount++;
                 logger.logThrow(Level.FINEST, ioe, 
                         "Exception encountered on try {0}: {1}",
                         tryCount, ioe);
             }
-        }
+        } 
     }
     
     /** 
@@ -647,7 +668,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * whether the identity is considered dead by this node.
      */
     private class SetStatusTask implements KernelRunnable {
-        final private Identity id;
         final private boolean active;
         final private String idKey;
         final private String removeKey;
@@ -657,7 +677,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
         private boolean canRemove = false;
 
         SetStatusTask(Identity id, String serviceName, boolean active) {
-            this.id = id;
             this.active = active;
             idKey = NodeMapUtil.getIdentityKey(id);
             removeKey = NodeMapUtil.getPartialStatusKey(id);
@@ -711,6 +730,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         throws UnknownNodeException 
     {
         checkState();
+        // Verify that the nodeId is valid.
+        watchdogService.getNode(nodeId);
         IdentityIterator iter = new IdentityIterator(dataService, nodeId);
         if (!iter.hasNext()) {
             throw new UnknownNodeException("node id: " + nodeId);
@@ -721,12 +742,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     private static class IdentityIterator implements Iterator<Identity> {
         private DataService dataService;
-        private long nodeId;
         private Iterator<String> iterator;
         
         IdentityIterator(DataService dataService, long nodeId) {
             this.dataService = dataService;
-            this.nodeId = nodeId;
             iterator = 
                 BoundNamesUtil.getServiceBoundNamesIterator(dataService, 
                         NodeMapUtil.getPartialNodeKey(nodeId));
@@ -754,6 +773,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** {@inheritDoc} */
     public void addNodeMappingListener(NodeMappingListener listener) 
     {
+        checkState();
         if (listener == null) {
             throw new NullPointerException("null listener");
         }

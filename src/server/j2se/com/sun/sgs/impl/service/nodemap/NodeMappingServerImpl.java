@@ -74,17 +74,19 @@ import java.util.logging.Logger;
  *      calls;  longer expiration times will increase the chance that an 
  *      identity will become active again before it can be removed. <p>
  *
- *  <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.remove.sleep.time
- *	</b></code> <br>
- *      <i>Default:</i> {@code 5000} <br>
- *
- * <dd style="padding-top: .5em">
- *      The time, in milliseconds, that the thread which attempts to remove
- *      identities sleeps once it has run out of work.  This value must be
- *      greater than {@code 0}.  <p>
- *
  * </dl> <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.nodemap.server</code> to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Initialization or test failures
+ * <li> {@link Level#CONFIG CONFIG} - Construction information
+ * <li> {@link Level#WARNING WARNING} - Errors
+ * <li> {@link Level#FINE FINE} - Map entry remove operations
+ * <li> {@link Level#FINEST FINEST} - Trace operations
+ * </ul> <p>
  *
  * This class is public for testing.
  */
@@ -118,6 +120,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
+    /** The transaction proxy, or null if configure has not been called. */ 
+    private static TransactionProxy txnProxy;
+    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -127,17 +132,14 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The exporter for this server */
     private final Exporter<NodeMappingServer> exporter;
-    
-    /** The transaction proxy, or null if configure has not been called. */ 
-    private static TransactionProxy txnProxy;
-    
+
     /** The task scheduler, for our transactional, synchronous tasks. */
     private final TaskScheduler taskScheduler;
     
     /** The proxy owner for our transactional, synchronous tasks. */
     private TaskOwner taskOwner;
     
-        /** The data service. */
+    /** The data service. */
     private DataService dataService;
     
     /** The watchdog service. */
@@ -175,6 +177,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
     /** The current state of this instance. */
     private State state = State.UNINITIALIZED;
+    
+    /** The count of calls in progress, protected by stateLock. */
+    private int callsInProgress = 0;
     
     /** Our string representation, used by toString(). */
     private final String fullName;
@@ -286,6 +291,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         // Create our remove thread; this is started when the instantiating
         // service's configure transaction is committed.
         removeThread = new RemoveThread(removeExpireTime);
+        
     }
     
     /**
@@ -323,6 +329,13 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         logger.log(Level.FINEST, "Shutting down");
         synchronized(stateLock) {
             state = State.SHUTTING_DOWN;
+            while (callsInProgress > 0) {
+		try {
+		    stateLock.wait();
+		} catch (InterruptedException e) {
+		    return false;
+		}
+	    }
         }
 
         boolean ok = exporter.unexport();
@@ -332,9 +345,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             removeThread.join();
         }
         } catch (InterruptedException e) {
-            logger.logThrow(Level.FINEST, e, "Failure while shutting down");
+            logger.logThrow(Level.WARNING, e, "Failure while shutting down");
             ok = false;
         }
+
         synchronized(stateLock) {
             state = State.SHUTDOWN;
         }
@@ -352,70 +366,118 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 	return fullName;
     }
     
+    /**
+     * Increments the number of calls in progress.  This method should
+     * be invoked by remote methods to both increment in progress call
+     * count and to check the state of this server.  When the call has
+     * completed processing, the remote method should invoke {@link
+     * #callFinished callFinished} before returning.
+     *
+     * @param check {@code true} if we should check the state
+     * @throws	IllegalStateException if this service is not configured
+     *		or is shutting down
+     */
+    private void callStarted(boolean check) {
+	synchronized (stateLock) {
+            if (check && state != State.RUNNING) {
+                System.out.println("state is " + state);
+		throw new IllegalStateException("service not running");
+            }
+	    callsInProgress++;
+	}
+    }
+
+    /**
+     * Decrements the in progress call count, and if this server is
+     * shutting down and the count reaches 0, then notify the waiting
+     * shutdown thread that it is safe to continue.  A remote method
+     * should invoke this method when it has completed processing.
+     */
+    private void callFinished() {
+	synchronized (stateLock) {
+	    callsInProgress--;
+	    if (state == State.SHUTTING_DOWN && callsInProgress == 0) {
+		stateLock.notifyAll();
+	    }
+	}
+    }
+    
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
-    public void assignNode(Class service, Identity id) throws IOException {
-        final String serviceName = service.getName();
+    public void assignNode(Class service, Identity identity) 
+        throws IOException 
+    {
+        callStarted(true);
         
-        if (id == null) {
-            throw new NullPointerException("null id");
-        }
-        
-        // Check to see if we already have an assignment.  If so, we just
-        // need to update the status.  Otherwise, we need to make our
-        // persistent updates and notify listeners. 
-        final String idkey = NodeMapUtil.getIdentityKey(id);      
-        NodeMapUtil.GetIdTask idtask = 
-                new NodeMapUtil.GetIdTask(dataService, idkey);
         try {
-            runTransactionally(idtask);
-        } catch (NameNotBoundException nnbe) {
-            // Do nothing.  We expect this exception if the id isn't in
-            // the map yet.
-        } catch (Exception ex) {
-            // Log the failure, but continue on - treat it as though the
-            // identity wasn't found.
-            logger.logThrow(Level.WARNING, ex, 
-                                "Lookup of {0} failed", id);
-        }
-        
-        final IdentityMO foundId = idtask.getId();
-        if (foundId == null) {
+            final String serviceName = service.getName();
+            final Identity id = identity;
+
+            if (id == null) {
+                throw new NullPointerException("null id");
+            }
+
+            // Check to see if we already have an assignment.  If so, we just
+            // need to update the status.  Otherwise, we need to make our
+            // persistent updates and notify listeners. 
+            final String idkey = NodeMapUtil.getIdentityKey(id);   
+
+            try {
+                runTransactionally(new AbstractKernelRunnable() {
+                    public void run() {
+                        IdentityMO idmo = 
+                            dataService.getServiceBinding(idkey, 
+                                                          IdentityMO.class);
+                        // The identity already has an assignment but we still 
+                        // need to update the status.  TODO functionality still
+                        // required?  Should assignNode not set the status?
+                        final String statuskey = 
+                                NodeMapUtil.getStatusKey(id, idmo.getNodeId(), 
+                                                         serviceName);
+                        dataService.setServiceBinding(statuskey, idmo);
+                        logger.log(Level.FINEST, 
+                                   "assignNode id:{0} already on {1}", 
+                                   id, idmo.getNodeId());
+                    }});
+
+                    return;
+            } catch (NameNotBoundException nnbe) {
+                // Do nothing.  We expect this exception if the id isn't in
+                // the map yet.
+            } catch (Exception ex) {
+                // Log the failure, but continue on - treat it as though the
+                // identity wasn't found.
+                logger.logThrow(Level.WARNING, ex, "Lookup of {0} failed", id);
+            }
+
             try {
                 long newNodeId = mapToNewNode(id, serviceName, null);
-                logger.log(Level.FINEST, "assignNode id:{0} to {1}", id, newNodeId);
+                logger.log(Level.FINEST, 
+                           "assignNode id:{0} to {1}", id, newNodeId);
             } catch (NoNodesAvailableException ex) {
                 // This should only occur if no nodes are available, which
                 // can only happen if our client shutdown and unregistered
                 // while we were in this call.
                 // Ignore the error.
-                logger.logThrow(Level.INFO, ex, "Exception ignored");
+                logger.logThrow(Level.FINEST, ex, "Exception ignored");
             }
-        } else {
-            long foundNodeId = foundId.getNodeId();
-            try {
-                // The identity already has an assignment but we still need to
-                // update the status.
-                final String statuskey = 
-                        NodeMapUtil.getStatusKey(id, foundNodeId, serviceName);
-                runTransactionally(new AbstractKernelRunnable() {
-                    public void run() {
-                        dataService.setServiceBinding(statuskey, foundId);
-                    }});
-            } catch (Exception ex) {
-                logger.logThrow(Level.WARNING, ex, 
-                                "Adding status for {0} failed", foundId);
-            }
-                
-            logger.log(Level.FINEST, "assignNode id:{0} already on {1}", 
-                       id, foundNodeId);
-        }              
+            
+        } finally {
+            callFinished();
+        }
     }
 
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
-        removeQueue.add(new RemoveInfo(id));
+        callStarted(true);
+        
+        try {
+            removeQueue.add(new RemoveInfo(id));
+            
+        } finally {
+            callFinished();
+        }
     }
     
     /**
@@ -480,7 +542,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /**
      * Immutable object representing an identity which might be removable.
      */
-    private class RemoveInfo {
+    private static class RemoveInfo {
         private final Identity id;
         private final long timeInserted;
         
@@ -550,9 +612,17 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
-        notifyMap.put(nodeId, client);
-        assignPolicy.nodeStarted(nodeId);
-        logger.log(Level.FINE, "Registered node listener for {0} ", nodeId);
+        // OK to call any time
+        callStarted(false);
+        
+        try {
+            notifyMap.put(nodeId, client);
+            assignPolicy.nodeStarted(nodeId);
+            logger.log(Level.FINEST, 
+                       "Registered node listener for {0} ", nodeId);
+        } finally {
+            callFinished();
+        }
     }
     
     /**
@@ -560,16 +630,24 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * Also called internally when we hear a node has died.
      */
     public void unregisterNodeListener(long nodeId) throws IOException {
-        // Tell the assign policy to stop assigning to the node
-        assignPolicy.nodeStopped(nodeId);
-        notifyMap.remove(nodeId);
-        logger.log(Level.FINE, "Unregistered node listener for {0} ", nodeId);
+        // OK to call at any time
+        callStarted(false);
+        
+        try {
+            // Tell the assign policy to stop assigning to the node
+            assignPolicy.nodeStopped(nodeId);
+            notifyMap.remove(nodeId);
+            logger.log(Level.FINEST, 
+                       "Unregistered node listener for {0} ", nodeId);
+        } finally {
+            callFinished();
+        }
     }    
     
     // TODO Perhaps need to have a separate thread do this work.
     // TODO Perhaps will want to batch notifications.
     private void notifyListeners(Node oldNode, Node newNode, Identity id) {
-        logger.log(Level.FINE, "In notifyListeners, identity: {0}, " +
+        logger.log(Level.FINEST, "In notifyListeners, identity: {0}, " +
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
         if (oldNode != null) {
@@ -580,7 +658,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 } catch (IOException ex) {
                     logger.logThrow(Level.WARNING, ex, 
                             "A communication error occured while notifying" +
-                            " node {0} that {1} has been removed", oldClient, id);
+                            " node {0} that {1} has been removed", 
+                            oldClient, id);
                 }
             }
         }
@@ -601,9 +680,15 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** {@inheritDoc} */
     public boolean assertValid(Identity identity) throws Exception {
-        AssertTask atask = new AssertTask(identity, dataService);
-        runTransactionally(atask);
-        return atask.allOK();        
+        callStarted(true);
+        
+        try {
+            AssertTask atask = new AssertTask(identity, dataService);
+            runTransactionally(atask);
+            return atask.allOK();  
+        } finally {
+            callFinished();
+        }
     }
     
     /**
@@ -903,6 +988,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /**
      * Add a node.  This is useful for server testing, when we
      * haven't instantiated a service.
+     * <p>
+     * TODO:  remove this, using a NodeAssignPolicy instead?
      *
      * @param nodeId the node id of the fake node
      */
@@ -921,13 +1008,59 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     long getNodeForIdentity(Identity id) throws Exception {
         String idkey = NodeMapUtil.getIdentityKey(id);
-        NodeMapUtil.GetIdTask idtask = 
-                new NodeMapUtil.GetIdTask(dataService, idkey);
+        GetIdTask idtask = new GetIdTask(dataService, idkey);
         runTransactionally(idtask);
         IdentityMO idmo = idtask.getId();
         return idmo.getNodeId();
     }
 
+    /**
+     * Task which gets an IdentityMO from a data service.  This is
+     * a separate task so we can retrieve the result.  An exception
+     * will be thrown if the IdentityMO is not found or the name
+     * binding doesn't exist.
+     */
+    static class GetIdTask implements KernelRunnable {
+        private IdentityMO idmo = null;
+        private final DataService dataService;
+        private final String idkey;
+        
+        /**
+         * Create a new instance.
+         *
+         * @param dataService the data service to retrieve from
+         * @param idkey Identitifier key
+         */
+        GetIdTask(DataService dataService, String idkey) {
+            this.dataService = dataService;
+            this.idkey = idkey;
+        }
+        
+        /**
+         * {@inheritDoc}
+         * Get the IdentityMO. 
+         * @throws NameNotBoundException if no object is bound to the id
+         * @throws ObjectNotFoundException if the object has been removed
+         */
+        public void run() {
+            idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+        }
+        
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return this.getClass().getName();
+        }
+        
+        /**
+         *  The identity MO retrieved from the data store, or null if
+         *  the task has not yet executed or there was an error while
+         *  executing.
+         * @return the IdentityMO
+         */
+        public IdentityMO getId() {
+            return idmo;
+        }
+    }
 
     /**
      * Return the data store keys found for a particular identity.
@@ -948,7 +1081,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * Task to assert some invariants about our use of the data store
      * are true.  Assumes that we are in a transaction.
      */
-    private class AssertTask implements KernelRunnable {
+    private static class AssertTask implements KernelRunnable {
 
         private final Identity id;
         private final DataService dataService;

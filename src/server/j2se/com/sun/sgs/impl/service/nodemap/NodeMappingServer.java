@@ -11,7 +11,7 @@ import java.rmi.Remote;
 
 /**
  * Defines the service interface for the global portion of the
- * {@link NodeMappingService}
+ * {@link NodeMappingService}.
  */
 interface NodeMappingServer extends Remote {
 
@@ -58,7 +58,8 @@ interface NodeMappingServer extends Remote {
         throws IOException;
     
     /**
-     * Unregister the {@link NotifyClient} object for a node.
+     * Unregister the {@link NotifyClient} object for a node if one
+     * is registered.
      *
      * @param nodeId the node
      * @throws	IOException if a communication problem occurs while
