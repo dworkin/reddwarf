@@ -1,0 +1,68 @@
+#! /usr/bin/env perl
+# testclean -- Cleans out the repository and removes working copies for
+# the tests.  By default, uses the 'repos', 'wc', and 'wc2'
+# subdirectories of the temporary directory.  Note that the contents of
+# the repository are removed, but the repository itself is left in
+# place.
+
+################
+# Use
+################
+
+use strict;
+use warnings;
+
+# The directory containing the current program
+my ($program_dir) = $0 =~ m!^(.*)/[^/]*$!;
+if (!$program_dir) {
+    $program_dir = ".";
+}
+
+# Load utilities
+require "$program_dir/testutil.pl";
+
+################
+# Variables
+################
+
+# Import variables from testutil.pl
+our($tmp_dir, $wc, $wc2);
+
+# The repository to create or an existing one
+my $repos = $ENV{"REPOS"} || escape("file://$tmp_dir/repos");
+
+################
+# Main
+################
+
+# Check for the repository and clean it if necesssary
+my @repos_listing = `svn list $repos`;
+if ($? != 0) {
+    print "Repository not found\n";
+} elsif (@repos_listing) {
+    system("svn rm -q $repos/proj1 $repos/proj2 -m \"Clean repository\"");
+    if ($? != 0) {
+	die("Error: Problem cleaning repository\n");
+    }
+    @repos_listing = `svn list $repos`;
+    if ($? != 0) {
+	die("Error: Couldn't check repository contents\n");
+    } elsif (@repos_listing) {
+	die("Error: Repository not empty: " . join(" ", @repos_listing));
+    } else {
+	print "Cleaned repository\n";
+    }
+} else {
+    print "Repository is clean\n";
+}
+
+# Remove working copies
+system("rm -rf " . escape($wc));
+if ($? != 0) {
+    die("Error: Problem removing working copy $wc\n");
+}
+system("rm -rf " . escape($wc2));
+if ($? != 0) {
+    die("Error: Problem removing working copy $wc2\n");
+}
+print "Removed working copies\n";

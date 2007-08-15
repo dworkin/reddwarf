@@ -434,7 +434,7 @@ public class TestTaskHandler extends TestCase {
     {
 	/* Use a transaction coordinator with specified timeout. */
 	Properties p = new Properties();
-	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0");
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "1");
 	TransactionCoordinator txnCoordinator =
 	    new TransactionCoordinatorImpl(p, null);
 	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
@@ -454,10 +454,7 @@ public class TestTaskHandler extends TestCase {
 
     /* -- Other methods and classes -- */
 
-    /**
-     * Calls TaskHandler.runTransactionalTask with the specified task from
-     * within a TransactionalTaskThread.
-     */
+    /** Calls TaskHandler.runTransactionalTask with the specified task. */
     private static void runTransactionalTask(final KernelRunnable task)
 	throws Exception
     {
@@ -487,7 +484,7 @@ public class TestTaskHandler extends TestCase {
 	}
     }
 
-    /** Runs the specified task within a TransactionalTaskThread. */
+    /** Runs the specified task within a thread from the kernel. */
     private static void runInTxnTaskThread(KernelRunnable task)
 	throws Exception
     {

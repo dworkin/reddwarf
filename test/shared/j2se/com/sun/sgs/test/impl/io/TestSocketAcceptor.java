@@ -8,9 +8,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import junit.framework.Assert;
+import junit.framework.TestCase;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -20,21 +19,22 @@ import com.sun.sgs.io.Acceptor;
  * JUnit test class for the SocketAcceptor. 
  * 
  */
-public class SocketAcceptorTest {
-    
+public class TestSocketAcceptor
+    extends TestCase
+{
     private final static int BIND_PORT = 0;
     
     Acceptor<SocketAddress> acceptor;
-    
-    @Before
-    public void init() {
+
+    @Override
+    public void setUp() {
         acceptor = new ServerSocketEndpoint(
                 new InetSocketAddress(BIND_PORT),
                TransportType.RELIABLE).createAcceptor();
     }
     
-    @After
-    public void cleanup() {
+    @Override
+    public void tearDown() {
         if (acceptor != null) {
             acceptor.shutdown();
             acceptor = null;
@@ -46,8 +46,7 @@ public class SocketAcceptorTest {
      *
      * @throws IOException if an unexpected IO problem occurs
      */
-    @Test
-    public void listen() throws IOException {
+    public void testListen() throws IOException {
         acceptor.listen(null);
     }
     
@@ -57,11 +56,16 @@ public class SocketAcceptorTest {
      *
      * @throws IOException if an unexpected IO problem occurs
      */
-    @Test (expected=IllegalStateException.class)
-    public void listenAfterShutdown() throws IOException {
+    public void testListenAfterShutdown() throws IOException {
         acceptor.listen(null);
         acceptor.shutdown();
-        acceptor.listen(null);
+        try {
+            acceptor.listen(null);
+        } catch (IllegalStateException expected) {
+            // passed
+            return;
+        }
+        Assert.fail("Expected IllegalStateException");
     }
 
 }

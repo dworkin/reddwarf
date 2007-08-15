@@ -23,72 +23,103 @@ import java.util.logging.Logger;
 
 /**
  * Provides an implementation of {@code DataStore} by communicating over the
- * network to an implementation of {@link DataStoreServer}. <p>
+ * network to an implementation of {@link DataStoreServer}, and optionally runs
+ * the server. <p>
  *
  * The {@link #DataStoreClient constructor} supports the following properties:
  * <p>
  *
- * <ul>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
- *	<br>
- *	<i>Default:</i> {@code 100} <br>
- *	The number of object IDs to allocate at one time.  This value must be
- *	greater than {@code 0}. <p>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.client.allocation.block.size
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 100}
  *
- *	<i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
- *	<br>
- *	<i>No default &mdash; required</i> <br>
- *	The name of the host running the {@code DataStoreServer}. <p>
+ * <dd style="padding-top: .5em">The number of object IDs to allocate at one
+ *	time.  This value must be greater than {@code 0}. <p>
  *
- *	<i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
- *	<br>
- *	<i>Default:</i> {@code 44530} <br>
- *	The network port for the {@code DataStoreServer}.  This value must
- *	be greater than {@code 0} and no greater than {@code 65535}.
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 600000}
  *
- * </ul> <p>
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that a transaction that uses the data store will be permitted to run
+ *	before it is a candidate for being aborted.  This value must be greater
+ *	than {@code 0}. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.server.run
+ *	</b></code><br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to run the server by creating an
+ *	instance of {@link DataStoreServerImpl}, using the properties provided
+ *	to this instance's constructor. <p>
+
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.server.host
+ *	</b></code><br>
+ *	<i>Required</i>
+ *
+ * <dd style="padding-top: .5em">The name of the host running the {@code
+ *	DataStoreServer}. <p>
+ *
+ * <dt>	<i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44530}
+ *
+ * <dd style="padding-top: .5em">The network port for the {@code
+ *	DataStoreServer}.  This value must be no less than {@code 0} and no
+ *	greater than {@code 65535}.  The value {@code 0} can only be specified
+ *	if the {@code com.sun.sgs.impl.service.data.store.net.server.run}
+ *	property is {@code true}, and means that an anonymous port will be
+ *	chosen for running the server. <p>
+ *
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.DataStoreClient} to log information
+ * com.sun.sgs.impl.service.data.store.net.client} to log information
  * at the following levels: <p>
  *
  * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Problems starting the server
+ * <li> {@link Level#INFO INFO} - Starting the server
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
- * <li> {@link Level#FINE FINE} - Allocating object IDs.
+ * <li> {@link Level#FINE FINE} - Allocating object IDs
  * <li> {@link Level#FINEST FINEST} - Object operations
  * </ul>
  */
 public final class DataStoreClient
     implements DataStore, TransactionParticipant
 {
-    /** The name of this class. */
-    private static final String CLASSNAME = DataStoreClient.class.getName();
+    /** The package for this class. */
+    private static final String PACKAGE =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
 
     /**
      * The property that specifies the number of object IDs to allocate at one
      * time.
      */
     private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocation.block.size";
+	PACKAGE + ".client.allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
 
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
-	CLASSNAME + ".server.host";
+	PACKAGE + ".server.host";
 
     /** The property that specifies the server port. */
     private static final String SERVER_PORT_PROPERTY =
-	CLASSNAME + ".server.port";
+	PACKAGE + ".server.port";
 
     /** The default for the server port. */
     private static final int DEFAULT_SERVER_PORT = 44530;
@@ -107,10 +138,21 @@ public final class DataStoreClient
 
     /**
      * The name of the undocumented property that controls whether to replace
-     * Java RMI with an experimental, socket-based facility.
+     * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
-	CLASSNAME + ".no.rmi");
+	PACKAGE + ".no.rmi");
+
+    /** The property that specifies the maximum transaction timeout. */
+    private static final String MAX_TXN_TIMEOUT_PROPERTY =
+	PACKAGE + ".max.txn.timeout";
+
+    /** The default maximum transaction timeout. */
+    private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
+
+    /** The property that specifies to run the server. */
+    private static final String RUN_SERVER_PROPERTY =
+	PACKAGE + ".server.run";
 
     /** The server host name. */
     private final String serverHost;
@@ -118,11 +160,17 @@ public final class DataStoreClient
     /** The server port. */
     private final int serverPort;
 
-    /** The server. */
+    /** The remote server. */
     private final DataStoreServer server;
+
+    /** The local server or null. */
+    private DataStoreServerImpl localServer = null;
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
+
+    /** The maximum transaction timeout. */
+    private final long maxTxnTimeout;
 
     /** Provides information about the transaction for the current thread. */
     private final ThreadLocal<TxnInfo> threadTxnInfo =
@@ -181,16 +229,16 @@ public final class DataStoreClient
      *
      * @param	properties the properties for configuring this instance
      * @throws	IllegalArgumentException if the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
+     *		com.sun.sgs.impl.service.data.store.net.server.host}
      *		property is not set, if the value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
+     *		com.sun.sgs.impl.service.data.store.net.client.allocation.block.size}
      *		property is not a valid integer greater than zero, or if the
      *		value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
-     *		property is not a valid integer greater than {@code 0} and not
+     *		com.sun.sgs.impl.service.data.store.net.server.port}
+     *		property is not a valid integer not less than {@code 0} and not
      *		greater than {@code 65535}
      * @throws	IOException if a network problem occurs
-     * @throws	NotBoundException if the server is not found in the RMI
+     * @throws	NotBoundException if the server is not found in the Java RMI
      *		registry
      */
     public DataStoreClient(Properties properties)
@@ -204,18 +252,31 @@ public final class DataStoreClient
 	    throw new IllegalArgumentException(
 		"The " + SERVER_HOST_PROPERTY + " property must be specified");
 	}
-	serverPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
-	if (serverPort < 1 || serverPort > 65535) {
-	    throw new IllegalArgumentException(
-		"The " + SERVER_PORT_PROPERTY + " property value must be " +
-		"greater than 0 and less than 65535: " + serverPort);
-	}
+	boolean runServer = wrappedProps.getBooleanProperty(
+	    RUN_SERVER_PROPERTY, false);
+	int specifiedServerPort = wrappedProps.getIntProperty(
+	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, runServer ? 0 : 1,
+	    65535);
 	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
-	if (allocationBlockSize < 1) {
-	    throw new IllegalArgumentException(
-		"The allocation block size must be greater than zero");
+	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
+	    1, Integer.MAX_VALUE);
+	maxTxnTimeout = wrappedProps.getLongProperty(
+	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 1,
+	    Long.MAX_VALUE);
+	if (runServer) {
+	    try {
+		localServer = new DataStoreServerImpl(properties);
+		serverPort = localServer.getPort();
+		logger.log(Level.INFO, "Started server: {0}", localServer);
+	    } catch (IOException t) {
+		logger.logThrow(Level.SEVERE, t, "Problem starting server");
+		throw t;
+	    } catch (RuntimeException t) {
+		logger.logThrow(Level.SEVERE, t, "Problem starting server");
+		throw t;
+	    }
+	} else {
+	    serverPort = specifiedServerPort;
 	}
 	server = getServer();
     }
@@ -234,7 +295,7 @@ public final class DataStoreClient
 		if (nextObjectId > lastObjectId) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
 		    long newNextObjectId = server.allocateObjects(
-			allocationBlockSize);
+			txnInfo.tid, allocationBlockSize);
 		    nextObjectId = newNextObjectId;
 		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
@@ -252,7 +313,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINEST, exception, "createObject txn:" + txn);
+	    txn, txnInfo, Level.FINEST, exception, "createObject txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -277,7 +338,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "markForUpdate txn:" + txn + ", oid:" + oid);
     }
 
@@ -306,7 +367,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "getObject txn:" + txn + ", oid:" + oid +
 			       ", forUpdate:" + forUpdate);
     }
@@ -336,7 +397,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "setObject txn:" + txn + ", oid:" + oid);
     }
 
@@ -359,7 +420,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "setObjects txn:" + txn);
     }
 
@@ -385,7 +446,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "removeObject txn:" + txn + ", oid:" + oid);
     }
 
@@ -412,7 +473,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "getBinding txn:" + txn + ", name:" + name);
     }
 
@@ -441,7 +502,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINEST, exception,
+	    txn, txnInfo, Level.FINEST, exception,
 	    "setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
     }
 
@@ -467,7 +528,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "removeBinding txn:" + txn + ", name:" + name);
     }
 
@@ -493,7 +554,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
@@ -520,12 +581,19 @@ public final class DataStoreClient
 		boolean ok = (txnCount == 0);
 		if (ok) {
 		    txnCount = -1;
+		    if (localServer != null) {
+			if (localServer.shutdown()) {
+			    localServer = null;
+			} else {
+			    ok = false;
+			}
+		    }
 		}
 		logger.log(Level.FINER, "shutdown returns {0}", ok);
 		return ok;
 	    }
 	} catch (RuntimeException e) {
-	    throw convertException(null, Level.FINER, e, "shutdown");
+	    throw convertException(null, null, Level.FINER, e, "shutdown");
 	}
     }
 
@@ -548,7 +616,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
+	    txn, txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -578,7 +646,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception,
+	    txn, txnInfo, Level.FINER, exception,
 	    "getClassInfo txn:" + txn + ", classId:" + classId);
     }
 
@@ -591,6 +659,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
+	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -611,7 +680,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "prepare txn:" + txn);
     }
 
@@ -636,7 +705,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "commit txn:" + txn);
     }
 
@@ -647,6 +716,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
+	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -661,7 +731,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "prepareAndCommit txn:" + txn);
     }
 
@@ -673,7 +743,14 @@ public final class DataStoreClient
 	try {
 	    txnInfo = checkTxnNoJoin(txn, false);
 	    if (!txnInfo.serverAborted) {
-		server.abort(txnInfo.tid);
+		try {
+		    server.abort(txnInfo.tid);
+		} catch (TransactionNotActiveException e) {
+		    logger.logThrow(Level.FINEST, e,
+				    "abort txn:{0} - Transaction already " +
+				    "aborted by server",
+				    txn);
+		}
 	    }
 	    threadTxnInfo.set(null);
 	    decrementTxnCount();
@@ -685,7 +762,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception, "abort txn:" + txn);
+	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
 
     /* -- Other public methods -- */
@@ -741,7 +818,7 @@ public final class DataStoreClient
 	}
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
-	    return joinTransaction(txn);
+	    txnInfo = joinTransaction(txn);
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException(
 		"Wrong transaction: Found " + txnInfo.txn +
@@ -749,6 +826,7 @@ public final class DataStoreClient
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException("Transaction has been prepared");
 	}
+	checkTimeout(txn);
 	return txnInfo;
     }
 
@@ -768,7 +846,7 @@ public final class DataStoreClient
 	try {
 	    txn.join(this);
 	    joined = true;
-	    tid = server.createTransaction();
+	    tid = server.createTransaction(txn.getTimeout());
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
 			   "Created server transaction stid:{0,number,#} " +
@@ -807,16 +885,18 @@ public final class DataStoreClient
 
     /**
      * Returns the correct SGS exception for a IOException thrown during an
-     * operation.  The txnInfo argument, if non-null, is used to abort the
+     * operation.  The txn argument, if non-null, is used to abort the
      * transaction if a TransactionAbortedException is going to be thrown.  The
-     * level argument is used to log the exception.  The operation argument
-     * will be included in newly created exceptions and the log, and should
-     * describe the operation that was underway when the exception was thrown.
-     * The supplied exception may also be a RuntimeException, which will be
-     * logged and returned.
+     * txnInfo argument, if non-null, is used to mark the transaction as
+     * aborted.  The level argument is used to log the exception.  The
+     * operation argument will be included in newly created exceptions and the
+     * log, and should describe the operation that was underway when the
+     * exception was thrown.  The supplied exception may also be a
+     * RuntimeException, which will be logged and returned.
      */
     private RuntimeException convertException(
-	TxnInfo txnInfo, Level level, Exception e, String operation)
+	Transaction txn, TxnInfo txnInfo, Level level, Exception e,
+	String operation)
     {
 	RuntimeException re;
 	if (e instanceof IOException) {
@@ -826,18 +906,20 @@ public final class DataStoreClient
 		e);
 	} else if (e instanceof TransactionAbortedException) {
 	    re = (RuntimeException) e;
-	} else if (e instanceof TransactionNotActiveException &&
-		   txnInfo != null)
-	{
+	} else if (e instanceof TransactionNotActiveException && txn != null) {
 	    /*
-	     * If the transaction is not active on the server, then it must
-	     * have timed out.
+	     * If the transaction is not active on the server, then it may have
+	     * timed out.
 	     */
-	    long duration =
-		System.currentTimeMillis() - txnInfo.txn.getCreationTime();
-	    re = new TransactionTimeoutException(
-		operation + " failed: Transaction timed out after " +
-		duration + " ms");
+	    long duration = System.currentTimeMillis() - txn.getCreationTime();
+	    if (duration > txn.getTimeout()) {
+		re = new TransactionTimeoutException(
+		    operation + " failed: Transaction timed out after " +
+		    duration + " ms",
+		    e);
+	    } else {
+		re = (TransactionNotActiveException) e;
+	    }
 	} else {
 	    re = (RuntimeException) e;
 	}
@@ -845,9 +927,13 @@ public final class DataStoreClient
 	 * If we're throwing an exception saying that the transaction was
 	 * aborted, then make sure to abort the transaction now.
 	 */
-	if (re instanceof TransactionAbortedException && txnInfo != null) {
-	    txnInfo.serverAborted = true;
-	    txnInfo.txn.abort(re);
+	if (re instanceof TransactionAbortedException) {
+	    if (txnInfo != null) {
+		txnInfo.serverAborted = true;
+	    }
+	    if (txn != null) {
+		txn.abort(re);
+	    }
 	}
 	logger.logThrow(level, re, "{0} throws", operation);
 	return re;
@@ -867,6 +953,19 @@ public final class DataStoreClient
 	    if (txnCount <= 0) {
 		txnCountLock.notifyAll();
 	    }
+	}
+    }
+
+    /**
+     * Checks that the transaction has not timed out, including if it has run
+     * for longer than the maximum timeout.
+     */
+    private void checkTimeout(Transaction txn) {
+	long max = Math.min(txn.getTimeout(), maxTxnTimeout);
+	long runningTime = System.currentTimeMillis() - txn.getCreationTime();
+	if (runningTime > max) {
+	    throw new TransactionTimeoutException(
+		"Transaction timed out: " + runningTime + " ms");
 	}
     }
 }

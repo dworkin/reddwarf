@@ -45,8 +45,7 @@ public class GameSimBoot implements AppListener, Serializable {
         "gameData/dungeons";
 
     /**
-     * The Java property you define to override the standard dungeons
-     * file location.
+     * The property you define to override the standard dungeons file location.
      * FIXME: what should this be?
      */
     public static final String DUNGEON_FILE_PROPERTY =

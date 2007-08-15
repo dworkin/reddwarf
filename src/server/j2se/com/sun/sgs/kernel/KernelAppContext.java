@@ -21,9 +21,6 @@ package com.sun.sgs.kernel;
  * <p>
  * All implementations of <code>KernelAppContext</code> must implement
  * <code>hashCode</code> and <code>equals</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface KernelAppContext
 {

@@ -9,11 +9,13 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
@@ -42,7 +44,7 @@ public class TestDataStoreImpl extends TestCase {
 	"TestDataStoreImpl.db";
 
     /** An instance of the data store, to test. */
-    static DataStore store;
+    protected static DataStore store;
 
     /** Make sure an empty version of the directory exists. */
     static {
@@ -56,10 +58,10 @@ public class TestDataStoreImpl extends TestCase {
     protected Properties props;
 
     /** An initial, open transaction. */
-    DummyTransaction txn;
+    protected DummyTransaction txn;
 
     /** The object ID of a newly created object. */
-    long id;
+    protected long id;
 
     /** Creates the test. */
     public TestDataStoreImpl(String name) {
@@ -69,7 +71,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Prints the test case, and creates the data store and an object. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
 	props = getProperties();
 	if (store == null) {
 	    store = createDataStore();
@@ -1127,6 +1129,20 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testPrepareTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 100);
+	store.setObject(txn, id, new byte[] { 1 });
+	Thread.sleep(200);
+	try {
+	    txn.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    txn = null;
+	    System.err.println(e);
+	}
+    }
+
     /* -- Unusual states -- */
     private final Action prepare = new Action() {
 	private TransactionParticipant participant;
@@ -1171,6 +1187,20 @@ public class TestDataStoreImpl extends TestCase {
 	    participant.prepareAndCommit(null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPrepareAndCommitTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.YES, 100);
+	store.setObject(txn, id, new byte[] { 1 });
+	Thread.sleep(200);
+	try {
+	    txn.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    txn = null;
 	    System.err.println(e);
 	}
     }
@@ -1226,6 +1256,42 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
+	}
+    }
+
+    /** Make sure that commits don't timeout. */
+    public void testCommitNoTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.NO, 1000) {
+	    public void join(final TransactionParticipant participant) {
+		super.join(new TransactionParticipant() {
+		    public boolean prepare(Transaction txn) throws Exception {
+			return participant.prepare(txn);
+		    }
+		    public void commit(Transaction txn) {
+			try {
+			    Thread.sleep(2000);
+			    participant.commit(txn);
+			} catch (Exception e) {
+			    fail("Unexpected exception: " + e);
+			}
+		    }
+		    public void prepareAndCommit(Transaction txn)
+			throws Exception
+		    {
+			participant.prepareAndCommit(txn);
+		    }
+		    public void abort(Transaction txn) {
+			participant.abort(txn);
+		    }
+		});
+	    }
+	};
+	store.setBinding(txn, "foo", id);
+	try {
+	    txn.commit();
+	} finally {
+	    txn = null;
 	}
     }
 
@@ -1491,14 +1557,16 @@ public class TestDataStoreImpl extends TestCase {
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = new DummyTransaction(
+		    UsePrepareAndCommit.ARBITRARY, 1000);
 	    }
 	    final long id = store.createObject(txn);
 	    store.setObject(txn, id, new byte[] { 0 });
 	    final long id2 = store.createObject(txn);
 	    store.setObject(txn, id2, new byte[] { 0 });
 	    txn.commit();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = new DummyTransaction(
+		UsePrepareAndCommit.ARBITRARY, 1000);
 	    store.getObject(txn, id, false);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
@@ -1509,7 +1577,7 @@ public class TestDataStoreImpl extends TestCase {
 		    DummyTransaction txn2 = null;
 		    try {
 			txn2 = new DummyTransaction(
-			    UsePrepareAndCommit.ARBITRARY);
+			    UsePrepareAndCommit.ARBITRARY, 1000);
 			store.getObject(txn2, id2, false);
 			flag.release();
 			store.getObject(txn2, id, true);

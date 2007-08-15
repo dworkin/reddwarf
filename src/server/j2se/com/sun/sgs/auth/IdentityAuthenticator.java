@@ -23,9 +23,6 @@ import javax.security.auth.login.LoginException;
  * <p>
  * FIXME: When the IO interfaces are ready, these should also be provided
  * to the constructor.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface IdentityAuthenticator
 {

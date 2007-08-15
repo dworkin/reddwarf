@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-<title>Sun Game Server Configuration Properties</title>
+<title>Project Darkstar Server Configuration Properties</title>
 <link type="text/css" rel="stylesheet" href="config-properties.css">
 </head>
 
@@ -42,17 +42,17 @@
 
 <body>
 
-<h1>Sun Game Server Configuration Properties</h1>
+<h1>Project Darkstar Server Configuration Properties</h1>
 
 This page documents the configuration properties supported by the
-current implementation of the Sun Game Server.  Configuration properties
-may be specified by system properties
+current implementation of the Project Darkstar Server.  Configuration
+properties may be specified by system properties
 (using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
 the application properties files named on the command line.
 
 <h2>General Properties</h2>
 
-These properties control various general facilities in the Sun Game
+These properties control various general facilities in the Project Darkstar
 Server.
 
 <dl>
@@ -226,26 +226,6 @@ the <code>Kernel</code> that schedules tasks.
 <dt>com.sun.sgs.impl.kernel.schedule.InitialConsumerThreads
 <span class="default">4</span>
 <dd>The number of initial consumer threads used to process tasks.
-
-</dl>
-
-<a name="IO"></a>
-<h2>IO Properties</h2>
-
-These properties control the implementation of the <code>IO</code>
-layer, which is the part of the system that manages all input/output
-facilities.
-
-<dl>
-
-<dt>com.sun.sgs.impl.io.ServerSocketEndpoint.reuseAddress
-<span class="default">true</span>
-<dd>Whether to enable reuse of the TCP port without waiting for it to time out
-in the operating system.  This is useful when starting up the server soon
-after it previously quit unexpectedly.  Otherwise, if this property is set to
-<code>false</code>, then you may receive the following exception until the port
-times out and becomes free again:<br>
-<code>java.net.BindException: Address already in use</code> 
 
 </dl>
 

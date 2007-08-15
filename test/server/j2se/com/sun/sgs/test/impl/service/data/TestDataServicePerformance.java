@@ -8,10 +8,12 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
@@ -58,6 +60,10 @@ public class TestDataServicePerformance extends TestCase {
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
+    /** A transaction proxy. */
+    private static DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
+
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
 
@@ -84,9 +90,6 @@ public class TestDataServicePerformance extends TestCase {
     /** Properties for creating services. */
     protected Properties props;
 
-    /** A transaction proxy. */
-    private DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-
     /** A component registry. */
     private DummyComponentRegistry componentRegistry =
 	new DummyComponentRegistry();
@@ -109,6 +112,11 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServicePerformance");
@@ -163,18 +171,18 @@ public class TestDataServicePerformance extends TestCase {
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
-	createTransaction();
+	createTransaction(10000);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
-	createTransaction();
+	createTransaction(10000);
 	service.setBinding("counters", new Counters(items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		createTransaction();
+		createTransaction(10000);
 		Counters counters =
 		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {
@@ -291,6 +299,13 @@ public class TestDataServicePerformance extends TestCase {
     /** Creates a new transaction. */
     private DummyTransaction createTransaction() {
 	txn = new DummyTransaction();
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Creates a new transaction with the specified timeout. */
+    DummyTransaction createTransaction(long timeout) {
+	txn = new DummyTransaction(timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }

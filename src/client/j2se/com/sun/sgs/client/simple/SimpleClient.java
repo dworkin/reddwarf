@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -112,6 +113,10 @@ public class SimpleClient implements ServerSession {
      * @param listener a listener that will receive events for this client
      */
     public SimpleClient(SimpleClientListener listener) {
+        if (listener == null) {
+            throw new NullPointerException(
+                "The SimpleClientListener argument must not be null");
+        }
         this.clientListener = listener;
     }
 
@@ -253,6 +258,15 @@ public class SimpleClient implements ServerSession {
         }
     }
 
+    private void checkLoggedIn() {
+        if (getSessionId() == null) {
+            RuntimeException re =
+                new IllegalStateException("Client not logged in");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
+        }
+    }
+
     /**
      * Receives callbacks on the associated {@code ClientConnection}.
      */
@@ -274,6 +288,12 @@ public class SimpleClient implements ServerSession {
 
             PasswordAuthentication authentication =
                 clientListener.getPasswordAuthentication();
+
+            if (authentication == null) {
+                logout(true);
+                throw new NullPointerException(
+                    "The returned PasswordAuthentication must not be null");
+            }
 
             String user = authentication.getUserName();
             String pass = new String(authentication.getPassword());
@@ -312,6 +332,19 @@ public class SimpleClient implements ServerSession {
                 MessageBuffer msg = new MessageBuffer(message);
                 reason = msg.getString();
             }
+            
+            for (SimpleClientChannel channel : channels.values()) {
+                try {
+                    channel.left();
+                } catch (RuntimeException e) {
+                    logger.logThrow(Level.FINE, e,
+                        "During leftChannel ({0}) on disconnect:",
+                        channel.getName());
+                    // ignore the exception
+                }
+            }
+            channels.clear();
+
             // FIXME ignore graceful from connection for now (not implemented),
             // instead look at the boolean we set when expecting disconnect
             clientListener.disconnected(expectingDisconnect, reason);
@@ -393,6 +426,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.SESSION_MESSAGE:
                 logger.log(Level.FINEST, "Direct receive");
+                checkLoggedIn();
                 msg.getLong(); // FIXME sequence number
                 clientListener.receivedMessage(msg.getByteArray());
                 break;
@@ -446,6 +480,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_JOIN: {
                 logger.log(Level.FINER, "Channel join");
+                checkLoggedIn();
                 String channelName = msg.getString();
 		CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
@@ -453,8 +488,8 @@ public class SimpleClient implements ServerSession {
                 if (channels.putIfAbsent(channelId, channel) == null) {
                     channel.joined();
                 } else {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: already a member",
+                    logger.log(Level.WARNING,
+                        "Cannot join channel {0}: already a member",
                         channelName);
                 }
                 break;
@@ -462,13 +497,14 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_LEAVE: {
                 logger.log(Level.FINER, "Channel leave");
+                checkLoggedIn();
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
                     channels.remove(channelId);
                 if (channel != null) {
                     channel.left();
                 } else {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Cannot leave channel {0}: not a member",
                         channelId);
                 }
@@ -477,10 +513,11 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 logger.log(Level.FINEST, "Channel recv");
+                checkLoggedIn();
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel = channels.get(channelId);
                 if (channel == null) {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Ignore message on channel {0}: not a member",
                         channelId);
                     return;
@@ -510,7 +547,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -521,7 +558,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -532,7 +569,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
     }
@@ -544,8 +581,14 @@ public class SimpleClient implements ServerSession {
 
         private final String channelName;
 	private final CompactId channelId;
-        private volatile boolean joined;
-        private ClientChannelListener listener;
+        
+        /**
+         * The listener for this channel if the client is a member,
+         * or null if the client is no longer a member of this channel.
+         */
+        private volatile ClientChannelListener listener = null;
+
+        private final AtomicBoolean isJoined = new AtomicBoolean(false);
 
         SimpleClientChannel(String name, CompactId id) {
             this.channelName = name;
@@ -589,58 +632,63 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            joined = true;            
-            listener = clientListener.joinedChannel(this);
+            if (! isJoined.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                    "Already joined to channel " + channelName);
+            }
+
+            assert listener == null;
+
+            try {
+                listener = clientListener.joinedChannel(this);
+
+                if (listener == null) {
+                    throw new NullPointerException(
+                        "The returned ClientChannelListener must not be null");
+                }
+            } catch (RuntimeException ex) {
+                isJoined.set(false);
+                throw ex;
+            }
         }
 
         void left() {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: not a member",
-                        channelName);
-                }
-                return;
+            if (! isJoined.compareAndSet(true, false)) {
+                throw new IllegalStateException(
+                    "Cannot leave unjoined channel " + channelName);
             }
-            joined = false;
-            if (listener != null) {
-                listener.leftChannel(this);
-                listener = null;
-            }
+
+            final ClientChannelListener l = this.listener;
+            this.listener = null;
+
+            l.leftChannel(this);
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Ignore message on channel {0}: not a member",
-                        channelName);
-                }
-                return;
+            if (!  isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot receive on unjoined channel " + channelName);
             }
+
             listener.receivedMessage(this, sid, message);
         }
 
         void sendInternal(Set<SessionId> recipients, byte[] message)
             throws IOException
         {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot send on channel {0}: not a member",
-                        channelName);
-                }
-                return;
+            if (! isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot send on unjoined channel " + channelName);
             }
             int totalSessionLength = 0;
             if (recipients != null) {
-                for (SessionId sid : recipients) {
-		    totalSessionLength +=
-			((SimpleSessionId) sid).getCompactId().
+                for (SessionId recipientId : recipients) {
+                    totalSessionLength +=
+			((SimpleSessionId) recipientId).getCompactId().
 			    getExternalFormByteCount();
                 }
             }
-            
+
             MessageBuffer msg =
                 new MessageBuffer(3 +
 		    channelId.getExternalFormByteCount() +
@@ -656,9 +704,9 @@ public class SimpleClient implements ServerSession {
                 msg.putShort(0);
             } else {
                 msg.putShort(recipients.size());
-                for (SessionId sid : recipients) {
-                    msg.putBytes(((SimpleSessionId) sid).getCompactId().
-				 getExternalForm());
+                for (SessionId recipientId : recipients) {
+                    msg.putBytes(((SimpleSessionId) recipientId).
+                        getCompactId().getExternalForm());
                 }
             }
             msg.putByteArray(message);

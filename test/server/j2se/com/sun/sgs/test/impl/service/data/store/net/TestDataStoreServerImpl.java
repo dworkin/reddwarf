@@ -6,6 +6,7 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import java.io.File;
@@ -17,6 +18,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /**
  * Performs specific tests for the DataStoreServerImpl class that can't easily
@@ -24,13 +26,29 @@ import junit.framework.TestCase;
  */
 public class TestDataStoreServerImpl extends TestCase {
 
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataStoreServerImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataStoreServerImpl(testMethod));
+	return suite;
+    }
+
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
-    /** The name of the DataStoreServerImpl class. */
-    private static final String DataStoreServerImplClassName =
-	DataStoreServerImpl.class.getName();
+    /** The name of the DataStoreServerImpl package. */
+    private static final String DataStoreNetPackage =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** Directory used for database shared across multiple tests. */
     private static String dbDirectory =
@@ -70,10 +88,10 @@ public class TestDataStoreServerImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	props = createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
-	    DataStoreServerImplClassName + ".port", "0");
+	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
-	tid = server.createTransaction();
-	oid = server.allocateObjects(1);
+	tid = server.createTransaction(1000);
+	oid = server.allocateObjects(tid, 1);
     }
 
     /** Sets passed if the test passes. */
@@ -186,8 +204,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	server.prepareAndCommit(tid);
 	tid = -1;
 	tearDown();
-	props.setProperty("com.sun.sgs.txnTimeout", "2");
-	props.setProperty(DataStoreServerImplClassName + ".reap.delay", "2");
+	props.setProperty("com.sun.sgs.txn.timeout", "2");
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "2");
 	server = getDataStoreServer();
 	List<TestReaperConcurrencyThread> threads =
 	    new ArrayList<TestReaperConcurrencyThread>();
@@ -237,7 +255,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
 	public void run() {
 	    try {
-		long tid = server.createTransaction();
+		long tid = server.createTransaction(1000);
 		int succeeds = 0;
 		int aborted = 0;
 		int notActive = 0;
@@ -264,7 +282,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			notActive++;
 		    }
 		    if (abort) {
-			tid = server.createTransaction();
+			tid = server.createTransaction(1000);
 		    }
 		}
 		System.err.println(getName() +
@@ -279,6 +297,94 @@ public class TestDataStoreServerImpl extends TestCase {
 		    notifyAll();
 		}
 	    }
+	}
+    }
+
+    /* -- Other tests -- */
+
+    /**
+     * Test that the maximum transaction timeout overrides the standard
+     * timeout.
+     */
+    public void testGetObjectMaxTxnTimeout() throws Exception {
+	server.shutdown();
+	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
+	server = getDataStoreServer();
+	tid = server.createTransaction(2000);
+	oid = server.allocateObjects(tid, 1);
+	Thread.sleep(1000);
+	try {
+	    server.getObject(tid, oid, false);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    tid = -1;
+	    System.err.println(e);
+	} catch (TransactionNotActiveException e) {
+	    tid = -1;
+	    System.err.println(e);
+	}
+    }
+
+    /**
+     * Test that the standard transaction timeout gets applied by the
+     * reaper.
+     */
+    public void testGetObjectTimeoutReap() throws Exception {
+	server.prepareAndCommit(tid);
+	server.shutdown();
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "50");
+	server = getDataStoreServer();
+	tid = server.createTransaction(100);
+	server.setBinding(tid, "dummy", oid);
+	Thread.sleep(200);
+	try {
+	    server.getBinding(tid, "dummy");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	try {
+	    server.abort(tid);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    tid = -1;
+	}
+    }
+
+    /**
+     * Test that the standard transaction timeout gets applied, without the
+     * reaper kicking in.
+     */
+    public void testGetObjectTimeoutNoReap() throws Exception {
+	server.prepareAndCommit(tid);
+	server.shutdown();
+	props.setProperty(DataStoreNetPackage + ".server.reap.delay", "10000");
+	server = getDataStoreServer();
+	tid = server.createTransaction(100);
+	server.setBinding(tid, "dummy", oid);
+	Thread.sleep(200);
+	try {
+	    server.getBinding(tid, "dummy");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** Test illegal argument for bad transaction timeout. */
+    public void testCreateTransactionBadTimeout() {
+	try {
+	    server.createTransaction(-3);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    server.createTransaction(0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -416,9 +522,9 @@ public class TestDataStoreServerImpl extends TestCase {
 	/* Create an object */
 	server.setObject(tid, oid, new byte[0]);
 	server.prepareAndCommit(tid);
-	tid = server.createTransaction();
+	tid = server.createTransaction(1000);
 	/* Get write lock in txn 2 */
-	final long tid2 = server.createTransaction();
+	final long tid2 = server.createTransaction(1000);
 	server.setObject(tid2, oid, new byte[0]);
 	/* Block getting read lock in txn 1 */
 	final Semaphore flag = new Semaphore(0);

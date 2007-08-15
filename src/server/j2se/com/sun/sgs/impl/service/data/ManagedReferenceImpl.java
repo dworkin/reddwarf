@@ -35,6 +35,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    Logger.getLogger(ManagedReferenceImpl.class.getName()));
 
     /**
+     * The logger for messages about managed objects that are modified but for
+     * which markForUpdate was not called.
+     */
+    private static final LoggerWrapper debugDetectLogger =
+	new LoggerWrapper(
+	    Logger.getLogger(
+		DataServiceImpl.class.getName() + ".detect.modifications"));
+
+    /**
      * The possible states of a reference.
      *
      * Here's a table relating state values to the values of the object and
@@ -272,18 +281,23 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
-    @SuppressWarnings("fallthrough")
     public <T> T get(Class<T> type) {
+	return get(type, true);
+    }
+
+    /**
+     * Like get, but with optional checking of the context.  Suppress the check
+     * if the reference was just obtained from the context.
+     */
+    @SuppressWarnings("fallthrough")
+    <T> T get(Class<T> type, boolean checkContext) {
 	if (type == null) {
 	    throw new NullPointerException(
 		"The type argument must not be null");
 	}
 	try {
-	    if (!DataServiceImpl.checkContext(context)) {
-		throw new TransactionNotActiveException(
-		    "Attempt to obtain the object associated with a " +
-		    "managed reference that was created in another " +
-		    "transaction");
+	    if (checkContext) {
+		DataServiceImpl.checkContext(context);
 	    }
 	    switch (state) {
 	    case EMPTY:
@@ -318,6 +332,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		logger.log(Level.FINEST, "get {0} returns {1}", this, object);
 	    }
 	    return type.cast(object);
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to obtain the object associated with a managed " +
+		"reference that was created in another transaction",
+		e);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "get {0} throws", this);
 	    throw e;
@@ -331,12 +350,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		"The type argument must not be null");
 	}
 	try {
-	    if (!DataServiceImpl.checkContext(context)) {
-		throw new TransactionNotActiveException(
-		    "Attempt to obtain the object associated with a " +
-		    "managed reference that was created in another " +
-		    "transaction");
-	    }
+	    DataServiceImpl.checkContext(context);
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
@@ -370,6 +384,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 			   this, object);
 	    }
 	    return type.cast(object);
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to obtain the object associated with a managed " +
+		"reference that was created in another transaction",
+		e);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "getForUpdate {0} throws", this);
 	    throw e;
@@ -387,20 +406,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** Replaces this instance with a canonical instance. */
     private Object readResolve() throws ObjectStreamException {
-	try {
-	    context = DataServiceImpl.getContextNoJoin();
-	    state = State.EMPTY;
-	    validate();
-	    ManagedReferenceImpl ref = context.refs.find(oid);
-	    if (ref == null) {
-		context.refs.add(this);
-		return this;
-	    } else {
-		return ref;
-	    }
-	} catch (RuntimeException e) {
-	    throw (InvalidObjectException) new InvalidObjectException(
-		e.getMessage()).initCause(e);
+	context = DataServiceImpl.getContextNoJoin();
+	state = State.EMPTY;
+	validate();
+	ManagedReferenceImpl ref = context.refs.find(oid);
+	if (ref == null) {
+	    context.refs.add(this);
+	    return this;
+	} else {
+	    return ref;
 	}
     }
 
@@ -502,6 +516,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		SerialUtil.serialize(object, context.classSerial);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
+		debugDetectLogger.log(
+		    Level.FINEST,
+		    "Modified object was not marked for update: {0}", object);
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:

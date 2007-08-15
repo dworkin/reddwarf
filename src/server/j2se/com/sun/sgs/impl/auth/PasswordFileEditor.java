@@ -17,9 +17,6 @@ import java.security.MessageDigest;
  * files consist of one entry per line, where each entry has a name, some
  * whitespace, a SHA-256 hashed password encoded via a call to
  * <code>NamePasswordAuthenticator.encodeBytes</code>, and finally a newline.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class PasswordFileEditor
 {

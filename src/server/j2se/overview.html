@@ -1,7 +1,32 @@
 <html>
 <body>
 
-Provides the interface to the Sun Game Server. <p>
+Provides the interface to the Project Darkstar Server. <p>
+
+<h3>Implementation-specific information</h3>
+
+<h4>Configuration properties</h4>
+
+See <a href="com/sun/sgs/app/doc-files/config-properties.html">this
+document</a> for a list of configuration properties supported by the
+current implementation of the Project Darkstar Server.
+
+<h4>Modifications and updates to managed objects</h4>
+
+You can using logging to obtain information about instances of {@link
+com.sun.sgs.app.ManagedObject} that were modified without being marked
+for update.  Developers can use this information to help determine if
+they can safely disable the automatic detection of object modifications
+&mdash; see the documentation for the <a
+href="com/sun/sgs/app/doc-files/config-properties.html#com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications"
+>com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications</a>
+property. <p>
+
+Information about managed objects that were modified and not marked for
+update is logged to the {@link java.util.logging.Logger Logger} named
+{@code com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications} at
+level {@link java.util.logging.Level#FINEST FINEST}.  This logging is
+only performed if detection of modifications is enabled.
 
 <h3>API conventions</h3>
 

@@ -19,7 +19,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 
 /**
- * Simple example of channel operations in the Sun Game Server.
+ * Simple example of channel operations in the Project Darkstar Server.
  * <p>
  * Extends the {@code HelloEcho} example by joining clients to two
  * channels, one of which has a {@link ChannelListener} set.
