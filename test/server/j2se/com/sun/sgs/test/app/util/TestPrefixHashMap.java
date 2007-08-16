@@ -584,6 +584,54 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
+    @Test public void testNumerousPutAndRemove() throws Exception {
+        txn = createTransaction(10000000);
+
+        DataManager dataManager = AppContext.getDataManager();
+	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[4 * 128];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,j);
+	    control.put(j,j);
+	    assertEquals(control.size(), test.size());
+	    assertEquals(control, test);
+	}
+
+ 	for (int i = 0; i < inputs.length; i++) {
+ 	    test.remove(inputs[i]);
+ 	    control.remove(inputs[i]);
+	    assertEquals(control, test);
+ 	}
+
+ 	assertEquals(control, test);
+
+ 	for (int i = 0; i < inputs.length; i++) {
+ 	    test.put(inputs[i],inputs[i]);
+ 	    control.put(inputs[i],inputs[i]);
+
+	    assertEquals(control, test);
+ 	}
+
+ 	assertEquals(control, test);
+
+
+ 	for (int i = 0; i < inputs.length; i += 2) {
+ 	    test.remove(inputs[i]);
+ 	    control.remove(inputs[i]);
+
+	    assertEquals(control, test);
+ 	}
+
+ 	assertEquals(control, test);
+
+
+	txn.commit();
+    }
 
 
     @Test public void testPutAll() throws Exception {
@@ -904,12 +952,39 @@ public class TestPrefixHashMap extends TestCase {
 	    assertEquals(beforeSize, test.size());
 	}
 	
-	test.clear();
-	assertEquals(0, test.size());
-
         txn.commit();
     }    
 
+    @Test public void testClearVariations() throws Exception {
+        txn = createTransaction(1000000);
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	test.clear();
+	assertEquals(control, test);
+	
+	// add just a few elements
+	for (int i = 0; i < 33; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+
+	// add just enough elements to force a split
+	for (int i = 0; i < 1024; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+	
+	txn.commit();
+    }
+    
 
     @Test public void testIteratorOnSplitTree() throws Exception {
         txn = createTransaction();
