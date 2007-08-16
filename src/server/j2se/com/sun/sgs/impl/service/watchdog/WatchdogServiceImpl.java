@@ -28,6 +28,17 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/*
+ * TODO: Modify implementation to not accept calls before service is ready.
+ * The server should not service incoming remote calls (registerNode, etc.)
+ * until it receives the 'ready' invocation (or finishes construction
+ * successfully).  Some of the fields used in registerNode aren't initialized
+ * until after the server is exported, so it can cause problems if the server
+ * receives an incoming request before it has completed initializing.  In
+ * practice, this flaw is not a problem so long as the server is started first
+ * before starting other nodes.
+ */
+
 /**
  * The {@link WatchdogService} implementation. <p>
  *
@@ -176,9 +187,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 
     /** The data service. */
     final DataService dataService;
-
-    /** The time to wait for registration to complete. */
-    private long registrationWaitTime = 500;
 
     /** If true, this node is alive; initially, true. */
     private boolean isAlive = true;

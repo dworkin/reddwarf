@@ -19,7 +19,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
 
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ResourceCoordinator;

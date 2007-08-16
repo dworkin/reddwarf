@@ -161,6 +161,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The ID generator. */
     final private IdGenerator idGenerator;
 
+    /** Failed nodes that were detected by the constructor. */
+    private final Collection<NodeImpl> failedNodes;
+
     /** The map of registered nodes, from node ID to node information. */
     private final ConcurrentMap<Long, NodeImpl> nodeMap =
 	new ConcurrentHashMap<Long, NodeImpl>();
@@ -234,13 +237,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			    idBlockSize,
 			    txnProxy,
 			    taskScheduler);
-	FailedNodes failedNodes = new FailedNodes();
-	runTransactionally(failedNodes);
-	notifyClients(failedNodes.nodes, failedNodes.nodes);
+	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
+	runTransactionally(failedNodesRunnable);
+	failedNodes = failedNodesRunnable.nodes;
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
-    private class FailedNodes extends AbstractKernelRunnable {
+    private class FailedNodesRunnable extends AbstractKernelRunnable {
 	Collection<NodeImpl> nodes;
 	public void run() {
 	    nodes = NodeImpl.markAllNodesFailed(dataService);
@@ -253,7 +256,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     }
     
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() {
+	if (!failedNodes.isEmpty()) {
+	    notifyClients(failedNodes, failedNodes);
+	    notifyClients(nodeMap.values(), failedNodes);
+	    failedNodes.clear();
+	}
+    }
 
     /** {@inheritDoc} */
     public boolean shutdown() {

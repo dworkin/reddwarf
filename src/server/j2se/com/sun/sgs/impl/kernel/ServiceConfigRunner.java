@@ -111,8 +111,6 @@ class ServiceConfigRunner implements Runnable {
      * Creates each of the <code>Service</code>s in order, in preparation
      * for starting up an application. At completion, this schedules an
      * <code>AppStartupRunner</code> to finish application startup.
-     *
-     * @throws Exception if any failure occurs during service creation
      */
     public void run() {
         if (logger.isLoggable(Level.CONFIG))
@@ -170,8 +168,20 @@ class ServiceConfigRunner implements Runnable {
         ThreadState.setCurrentOwner(owner);
 
         // notify all of the services that the application state is ready
-        for (Object s : services)
-            ((Service)s).ready();
+	try {
+	    for (Object s : services)
+		((Service)s).ready();
+	} catch (Exception e) {
+	    logger.logThrow(
+		Level.SEVERE, e,
+		"{0}: failed when notifying services that application is " +
+		"ready",
+		appName);
+	    // shutdown all of the services
+	    for (Object s : services)
+		((Service)s).shutdown();
+	    return;
+	}
 
         // At this point the services are now created, so the final step
         // is to try booting the application by running a special

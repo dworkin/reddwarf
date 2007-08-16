@@ -254,7 +254,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /**
      * Provides an implementation of Scheduler that uses the TaskScheduler and
-     * TaskOwner.
+     * TaskOwner.  Note that this class is created in the DataServiceImpl
+     * constructor, so the TaskOwner used does not have access to managers or
+     * to the full AppContext.
      */
     private static class DelegatingScheduler implements Scheduler {
 

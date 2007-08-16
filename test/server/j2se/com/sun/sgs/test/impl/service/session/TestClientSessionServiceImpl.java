@@ -236,7 +236,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullProperties() {
+    public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
 		null, new DummyComponentRegistry(),
@@ -247,7 +247,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNullComponentRegistry() {
+    public void testConstructorNullComponentRegistry() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(serviceProps, null,
 					 new DummyTransactionProxy());
@@ -257,7 +257,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNullTransactionProxy() {
+    public void testConstructorNullTransactionProxy() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(serviceProps,
 					 new DummyComponentRegistry(), null);

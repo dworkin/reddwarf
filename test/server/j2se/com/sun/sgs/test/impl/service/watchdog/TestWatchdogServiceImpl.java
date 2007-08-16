@@ -5,20 +5,17 @@
 package com.sun.sgs.test.impl.service.watchdog;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -76,7 +73,6 @@ public class TestWatchdogServiceImpl extends TestCase {
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
     private DataServiceImpl dataService;
-    private TaskServiceImpl taskService;
     private WatchdogServiceImpl watchdogService;
 
     /** True if test passes. */
@@ -115,15 +111,6 @@ public class TestWatchdogServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-	// create task service
-	taskService = new TaskServiceImpl(
-	    new Properties(), systemRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-
 	// create watchdog service
 	watchdogService = new WatchdogServiceImpl(
 	    serviceProps, systemRegistry, txnProxy);
@@ -135,7 +122,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	// services ready
 	dataService.ready();
-	taskService.ready();
 	watchdogService.ready();
     }
 
@@ -165,10 +151,6 @@ public class TestWatchdogServiceImpl extends TestCase {
         if (dataService != null) {
             dataService.shutdown();
             dataService = null;
-        }
-        if (taskService != null) {
-            taskService.shutdown();
-            taskService = null;
         }
         if (clean) {
             deleteDirectory(DB_DIRECTORY);

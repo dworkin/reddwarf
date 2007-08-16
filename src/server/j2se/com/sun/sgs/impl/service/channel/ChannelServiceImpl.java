@@ -183,13 +183,11 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 			     */
 			    removeAllSessionsFromChannels();
 			    removeChannelSets();
-		
-			    sessionService.registerProtocolMessageListener(
-				SimpleSgsProtocol.CHANNEL_SERVICE,
-				protocolMessageListener);
 			}
 		    }),
 		txnProxy.getCurrentOwner(), true);
+	    sessionService.registerProtocolMessageListener(
+		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

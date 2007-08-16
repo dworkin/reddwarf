@@ -155,21 +155,15 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
     }
 
     /** {@inheritDoc} */
-    public void ready() {
-	try {
-	    taskScheduler.runTask(
-		new TransactionRunner(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    readyInternal();
-			}
-		    }),
-		transactionProxy.getCurrentOwner(), true);
-	} catch (RuntimeException e) {
-	    throw e;
-	} catch (Exception e) {
-	    throw new AssertionError(e);
-	}
+    public void ready() throws Exception {
+	taskScheduler.runTask(
+	    new TransactionRunner(
+		new AbstractKernelRunnable() {
+		    public void run() {
+			readyInternal();
+		    }
+		}),
+	    transactionProxy.getCurrentOwner(), true);
     }
 
     /** Reschedule existing tasks when the stack is ready. */

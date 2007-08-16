@@ -38,7 +38,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -123,10 +122,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final Object flushContextsLock = new Object();
 
     /** The Acceptor for listening for new connections. */
-    private Acceptor<SocketAddress> acceptor;
-
-    /** Synchronize on this object before accessing the registry. */
-    private final Object lock = new Object();
+    private final Acceptor<SocketAddress> acceptor;
 
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
@@ -158,10 +154,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * @param properties service properties
      * @param systemRegistry system registry
      * @param txnProxy transaction proxy
+     * @throws Exception if a problem occurs when creating the service
      */
     public ClientSessionServiceImpl(Properties properties,
 				    ComponentRegistry systemRegistry,
 				    TransactionProxy txnProxy)
+	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
@@ -224,20 +222,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		new NonDurableTaskScheduler(
 		    taskScheduler, txnProxy.getCurrentOwner(),
 		    txnProxy.getService(TaskService.class));
-	    try {
-		taskScheduler.runTask(
-		    new TransactionRunner(
-			new AbstractKernelRunnable() {
-			    public void run() {
-				notifyDisconnectedSessions();
-			    }
-			}),
-		    txnProxy.getCurrentOwner(), true);
-	    } catch (RuntimeException e) {
-		throw e;
-	    } catch (Exception e) {
-		throw new AssertionError(e);
-	    }
+	    taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    notifyDisconnectedSessions();
+			}
+		    }),
+		txnProxy.getCurrentOwner(), true);
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
@@ -246,21 +238,26 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
 		    new InetSocketAddress(port), TransportType.RELIABLE);
+	    acceptor = endpoint.createAcceptor();
 	    try {
-		acceptor = endpoint.createAcceptor();
 		acceptor.listen(acceptorListener);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(
-			Level.CONFIG,
-			"configure: listen successful. port:{0,number,#}",
+			Level.CONFIG, "listen successful. port:{0,number,#}",
 			getListenPort());
 		}
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
+	    } catch (Exception e) {
+		if (acceptor != null) {
+		    try {
+			acceptor.shutdown();
+		    } catch (RuntimeException re) {
+		    }
+		}
+		throw e;
 	    }
 	    // TBD: listen for UNRELIABLE connections as well?
 
-	} catch (RuntimeException e) {
+	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e,
@@ -286,13 +283,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * @return the port this service is listening on
      */
     public int getListenPort() {
-	synchronized (lock) {
-	    if (acceptor == null) {
-		throw new IllegalArgumentException("not configured");
-	    }
-	    return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
-		getPort();
-	}
+	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
+	    getPort();
     }
 
     /**
@@ -313,10 +305,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
 
 	try {
-	    if (acceptor != null) {
-		acceptor.shutdown();
-		logger.log(Level.FINEST, "acceptor shutdown");
-	    }
+	    acceptor.shutdown();
+	    logger.log(Level.FINEST, "acceptor shutdown");
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
 	    // swallow exception
@@ -384,74 +374,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
     }
 
-    /* -- Implement transaction participant/context for 'configure' -- */
-
-    private class ConfigureServiceContextFactory
-	extends TransactionContextFactory
-		<ConfigureServiceTransactionContext>
-    {
-	ConfigureServiceContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
-	}
-	
-	/** {@inheritDoc} */
-	public ConfigureServiceTransactionContext
-	    createContext(Transaction txn)
-	{
-	    return new ConfigureServiceTransactionContext(txn);
-	}
-    }
-
-    private final class ConfigureServiceTransactionContext
-	extends TransactionContext
-    {
-	/**
-	 * Constructs a context with the specified transaction.
-	 */
-        private ConfigureServiceTransactionContext(Transaction txn) {
-	    super(txn);
-	}
-	
-	/**
-	 * {@inheritDoc}
-	 *
-	 * Performs cleanup in the case that the transaction invoking
-	 * the service's {@code configure} method aborts.
-	 */
-	public void abort(boolean retryable) {
-	    synchronized (lock) {
-		try {
-		    if (acceptor != null) {
-			acceptor.shutdown();
-		    }
-		} catch (Exception e) {
-		    // ignore exception shutting down acceptor
-		    logger.logThrow(
-			Level.FINEST, e, " exception shutting down acceptor");
-		} finally {
-		    acceptor = null;
-		}
-		
-		for (ClientSessionImpl session : sessions.values()) {
-		    try {
-			session.shutdown();
-		    } catch (Exception e) {
-			// ignore exception shutting down session
-			logger.logThrow(
-			    Level.FINEST, e,
-			    " exception shutting down session");
-		    }
-		}
-		sessions.clear();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void commit() {
-	    isCommitted = true;
-        }
-    }
-	
     /* -- Implement TransactionContextFactory -- */
 
     private class ContextFactory extends TransactionContextFactory<Context> {
@@ -749,7 +671,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * throwing TransactionNotActiveException if there is no current
      * transaction, and throwing IllegalStateException if there is a
      * problem with the state of the transaction or if this service
-     * has not been configured with a transaction proxy.
+     * has not been initialized with a transaction proxy.
      */
     Context checkContext() {
 	return contextFactory.joinTransaction();
@@ -764,7 +686,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     public synchronized static ClientSessionService getInstance() {
 	if (txnProxy == null) {
-	    throw new IllegalStateException("Service not configured");
+	    throw new IllegalStateException("Service not initialized");
 	} else {
 	    return txnProxy.getService(ClientSessionService.class);
 	}

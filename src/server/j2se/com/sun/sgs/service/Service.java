@@ -16,22 +16,22 @@ package com.sun.sgs.service;
  * On startup of an application, services are constructed (see details
  * below). This provides access to the non-transactional core components
  * of the system as well as the other {@code Service}s that have already
- * been created. {@code Service} are created in a known order based
+ * been created. {@code Service}s are created in a known order based
  * on dependencies: {@code DataService}, {@code WatchdogService},
  * {@code NodeMappingService}, {@code TaskService},
  * {@code ClientSessionService}, and the {@code ChannelManager},
  * finishing with any custom {@code Service}s ordered based on the
  * application's configuration.
  * <p>
- * All implementations of {@code Service} must have a constructor of
- * the form ({@code Properties}, {@code ComponentRegistry},
- * {@code TransactionProxy}). This is how the {@code Service} is created
- * on startup. The {@code Properties} parameter provides appliction and
+ * All implementations of {@code Service} must have a constructor with
+ * parameters of types {@code Properties}, {@code ComponentRegistry}, and
+ * {@code TransactionProxy}. This is how the {@code Service} is created
+ * on startup. The {@code Properties} parameter provides application and
  * service-specific properties. The {@code ComponentRegistry} provides
  * access to non-transactional kernel and system components like the
  * {@code TaskScheduler}. The {@code TransactionProxy} provides access to
  * transactional state (when active) and the other available {@code Service}s.
- * If any error occurs in creating a {@code Service} the constructor may
+ * If any error occurs in creating a {@code Service}, the constructor may
  * throw any {@code Exception}, causing the application to shutdown.
  * <p>
  * Note that {@code Service}s are not created in the context of a
@@ -49,12 +49,15 @@ public interface Service {
     public String getName();
 
     /**
-     * Notifies this {@code Service} that the application is fully
-     * configured and ready to start running. This means that all other
-     * {@code Service}s associated with this application have been
-     * successfully created. 
+     * Notifies this {@code Service} that the application context is fully
+     * configured and ready to start running. This means that all other {@code
+     * Service}s associated with this application have been successfully
+     * created. If the method throws an exception, then the application will be
+     * shutdown.
+     *
+     * @throws Exception if an error occurs
      */
-    public void ready();
+    public void ready() throws Exception;
 
     /** 
      * Attempts to shut down this service, returning a value indicating whether
