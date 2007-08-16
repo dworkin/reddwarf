@@ -9,15 +9,12 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.TransactionContext;
-import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -30,6 +27,17 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+/*
+ * TODO: Modify implementation to not accept calls before service is ready.
+ * The server should not service incoming remote calls (registerNode, etc.)
+ * until it receives the 'ready' invocation (or finishes construction
+ * successfully).  Some of the fields used in registerNode aren't initialized
+ * until after the server is exported, so it can cause problems if the server
+ * receives an incoming request before it has completed initializing.  In
+ * practice, this flaw is not a problem so long as the server is started first
+ * before starting other nodes.
+ */
 
 /**
  * The {@link WatchdogService} implementation. <p>
@@ -147,7 +155,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    private TaskOwner taskOwner;
+    private final TaskOwner taskOwner;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;
@@ -167,21 +175,18 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
+    /** The local nodeId. */
+    final long localNodeId;
+
+    /** The interval for renewals with the watchdog server. */
+    private final long renewInterval;
+
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
 	new ConcurrentHashMap<NodeListener, NodeListener>();
 
     /** The data service. */
-    DataService dataService;
-
-    /** The local nodeId. */
-    volatile long localNodeId;
-
-    /** The time to wait for registration to complete. */
-    private long registrationWaitTime = 500;
-
-    /** If true, this node has completed registration with server. */
-    boolean isRegistered = false;
+    final DataService dataService;
 
     /** If true, this node is alive; initially, true. */
     private boolean isAlive = true;
@@ -196,10 +201,12 @@ public class WatchdogServiceImpl implements WatchdogService {
      *
      * @param	properties service (and server) properties
      * @param	systemRegistry system registry
+     * @param	txnProxy transaction proxy
      * @throws	Exception if a problem occurs constructing the service/server
      */
-    public WatchdogServiceImpl(
-	Properties properties, ComponentRegistry systemRegistry)
+    public WatchdogServiceImpl(Properties properties,
+			       ComponentRegistry systemRegistry,
+			       TransactionProxy txnProxy)
 	throws Exception
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl properties:{0}",
@@ -209,6 +216,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	try {
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
+	    } else if (txnProxy == null) {
+		throw new NullPointerException("null txnProxy");
 	    }
 	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
@@ -222,7 +231,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    String host;
 	    int serverPort;
 	    if (startServer) {
-		serverImpl = new WatchdogServerImpl(properties, systemRegistry);
+		serverImpl = new WatchdogServerImpl(
+		    properties, systemRegistry, txnProxy);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -246,6 +256,25 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
+	    synchronized (WatchdogServiceImpl.class) {
+		if (WatchdogServiceImpl.txnProxy == null) {
+		    WatchdogServiceImpl.txnProxy = txnProxy;
+		} else {
+		    assert WatchdogServiceImpl.txnProxy == txnProxy;
+		}
+	    }
+	    dataService = txnProxy.getService(DataService.class);
+	    taskOwner = txnProxy.getCurrentOwner();
+
+	    long[] values = serverProxy.registerNode(localHost, clientProxy);
+	    if (values == null || values.length < 2) {
+		setFailedThenNotify(false);
+		throw new IllegalArgumentException(
+		    "registerNode returned improper array: " + values);
+	    }
+	    localNodeId = values[0];
+	    renewInterval = values[1];
+	    renewThread.start();
 	    
 	} catch (Exception e) {
 	    logger.logThrow(
@@ -263,50 +292,8 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
     
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-	
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "Configuring WatchdogServiceImpl");
-	}
-	try {
-	    if (registry == null) {
-		throw new NullPointerException("null registry");
-	    } else if (proxy == null) {
-		throw new NullPointerException("null transaction proxy");
-	    }
-	    
-	    synchronized (WatchdogServiceImpl.class) {
-		if (WatchdogServiceImpl.txnProxy == null) {
-		    WatchdogServiceImpl.txnProxy = proxy;
-		} else {
-		    assert WatchdogServiceImpl.txnProxy == proxy;
-		}
-	    }
-	    
-	    synchronized (stateLock) {
-		if (dataService != null) {
-		    throw new IllegalStateException("already configured");
-		}
-		(new ConfigureServiceContextFactory(txnProxy)).
-		    joinTransaction();
-		dataService = registry.getComponent(DataService.class);
-		taskOwner = proxy.getCurrentOwner();
-	    }
+    public void ready() { }
 
-	    if (serverImpl != null) {
-		serverImpl.configure(registry, proxy);
-	    }
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to configure WatchdogServiceImpl");
-	    }
-	    throw e;
-	}
-    }
-    
     /** {@inheritDoc} */
     public boolean shutdown() {
 	synchronized (stateLock) {
@@ -382,72 +369,9 @@ public class WatchdogServiceImpl implements WatchdogService {
 	nodeListeners.putIfAbsent(listener, listener);
     }
 
-    /* -- Implement transaction participant/context for 'configure' -- */
-
-    private class ConfigureServiceContextFactory
-	extends TransactionContextFactory
-		<ConfigureServiceTransactionContext>
-    {
-	ConfigureServiceContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
-	}
-	
-	/** {@inheritDoc} */
-	public ConfigureServiceTransactionContext
-	    createContext(Transaction txn)
-	{
-	    return new ConfigureServiceTransactionContext(txn);
-	}
-    }
-
-    private final class ConfigureServiceTransactionContext
-	extends TransactionContext
-    {
-	/**
-	 * Constructs a context with the specified transaction.
-	 */
-        private ConfigureServiceTransactionContext(Transaction txn) {
-	    super(txn);
-	}
-	
-	/**
-	 * {@inheritDoc}
-	 *
-	 * Performs cleanup in the case that the transaction invoking
-	 * the service's {@link #configure configure} method aborts.
-	 */
-	public void abort(boolean retryable) {
-	    synchronized (stateLock) {
-		dataService = null;
-	    }
-
-	    if (serverImpl != null) {
-		serverImpl.abortConfigure();
-	    }
-	}
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * Starts the thread that registers this node with the
-	 * watchdog server, and then continuously renews this node
-	 * with the watchdog server at the appropriate renew interval.
-	 */
-	public void commit() {
-	    isCommitted = true;
-	    renewThread.start();
-	    if (serverImpl != null) {
-		serverImpl.commitConfigure();
-	    }
-        }
-    }
-
-
     /**
-     * This thread registers this node with the watchdog server, and
-     * then continuously renews this node with the watchdog server
-     * before the renew interval (returned when registering the node)
-     * expires.
+     * This thread continuously renews this node with the watchdog server
+     * before the renew interval (returned when registering the node) expires.
      */
     private final class RenewThread extends Thread {
 
@@ -464,40 +388,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 	 * service is shutdown.
 	 */
 	public void run() {
-
-	    long renewInterval;
-	    try {
-		long[] values =
-		    serverProxy.registerNode(localHost, clientProxy);
-		if (values == null || values.length < 2) {
-		    logger.log(
-			Level.SEVERE,
-			"registerNode returned improper array: {0}",
-			values);
-		    setFailedThenNotify(false);
-		    return;
-		}
-		localNodeId = values[0];
-		renewInterval = values[1];
-		synchronized (stateLock) {
-		    isRegistered = true;
-		    stateLock.notifyAll();
-		}
-		
-	    } catch (Exception e) {
-		/*
-		 * Unable to register node with watchdog server, so
-		 * set this node as failed, and exit thread.
-		 */
-		if (! shuttingDown()) {
-		    logger.logThrow(
-			Level.SEVERE, e,
-			"registering with watchdog server throws");
-		    setFailedThenNotify(false);
-		}
-		return;
-	    }
-	    
 	    long startRenewInterval = renewInterval / 2;
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
@@ -554,40 +444,10 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
     
     /**
-     * Throws {@code IllegalStateException} if this service is not
-     * configured or is shutting down, and blocks until this node is
-     * registered with the server.
+     * Throws {@code IllegalStateException} if this service is shutting down.
      */
     private void checkState() {
-	synchronized (stateLock) {
-	    if (dataService == null) {
-		throw new IllegalStateException("service not configured");
-	    } else {
-		checkShutdown();
-	    }
-
-	    while (! isRegistered) {
-		try {
-		    stateLock.wait(registrationWaitTime);
-		} catch (InterruptedException e) {
-		}
-		checkShutdown();
-		if (! isAlive) {
-		    throw new IllegalStateException("node has failed");
-		}
-	    }
-	}
-    }
-
-    /**
-     * Throws {@code IllegalStateException} if this node is shutting
-     * down.  This implementation assumes that the caller is
-     * synchronized on the {@code stateLock}.
-     */
-    private void checkShutdown() {
-	assert Thread.holdsLock(stateLock);
-	
-	if (shuttingDown) {
+	if (shuttingDown()) {
 	    throw new IllegalStateException("service shutting down");
 	}
     }
@@ -679,6 +539,10 @@ public class WatchdogServiceImpl implements WatchdogService {
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
+		if (ids[i] == localNodeId && status[i]) {
+		    /* Don't notify the local node that it is alive. */
+		    continue;
+		}
 		Node node = new NodeImpl(ids[i], hosts[i], status[i]);
 		notifyListeners(node);
 	    }

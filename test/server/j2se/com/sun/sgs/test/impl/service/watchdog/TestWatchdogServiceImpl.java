@@ -5,20 +5,17 @@
 package com.sun.sgs.test.impl.service.watchdog;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -76,7 +73,6 @@ public class TestWatchdogServiceImpl extends TestCase {
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
     private DataServiceImpl dataService;
-    private TaskServiceImpl taskService;
     private WatchdogServiceImpl watchdogService;
 
     /** True if test passes. */
@@ -103,37 +99,30 @@ public class TestWatchdogServiceImpl extends TestCase {
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
 	    
 	// create services
-	dataService = createDataService(systemRegistry);
-	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-	watchdogService = new WatchdogServiceImpl(serviceProps, systemRegistry);
+
 	//identityManager = new DummyIdentityManager();
 	//systemRegistry.setComponent(IdentityManager.class, identityManager);
-	createTransaction(10000);
 
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
+	// create data service
+	dataService = createDataService(systemRegistry);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-	// configure task service
-        taskService.configure(serviceRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-
-	// configure watchdog service
-	watchdogService.configure(serviceRegistry, txnProxy);
+	// create watchdog service
+	watchdogService = new WatchdogServiceImpl(
+	    serviceProps, systemRegistry, txnProxy);
 	txnProxy.setComponent(WatchdogService.class, watchdogService);
 	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
 	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
 	serviceRegistry.setComponent(
 	    WatchdogServiceImpl.class, watchdogService);
-	commitTransaction();
+
+	// services ready
+	dataService.ready();
+	watchdogService.ready();
     }
 
     /** Sets passed if the test passes. */
@@ -163,10 +152,6 @@ public class TestWatchdogServiceImpl extends TestCase {
             dataService.shutdown();
             dataService = null;
         }
-        if (taskService != null) {
-            taskService.shutdown();
-            taskService = null;
-        }
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
@@ -177,7 +162,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     
     public void testConstructor() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	WatchdogServerImpl server = watchdog.getServer();
 	System.err.println("watchdog server: " + server);
 	server.shutdown();
@@ -185,7 +170,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorNullProperties() throws Exception {
 	try {
-	    new WatchdogServiceImpl(null, systemRegistry);
+	    new WatchdogServiceImpl(null, systemRegistry, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -194,7 +179,16 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorNullRegistry() throws Exception {
 	try {
-	    new WatchdogServiceImpl(serviceProps, null);
+	    new WatchdogServiceImpl(serviceProps, null, txnProxy);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullProxy() throws Exception {
+	try {
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -206,7 +200,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(WATCHDOG_PORT));
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -218,7 +212,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -230,7 +224,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -246,7 +240,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -262,64 +256,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	}
-    }
-
-    /* -- Test configure -- */
-
-    public void testConfigureNullRegistry() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	try {
-	    watchdog.configure(null, new DummyTransactionProxy());
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConfigureNullTransactionProxy() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	try {
-	    watchdog.configure(new DummyComponentRegistry(), null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConfigureTwice() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	try {
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConfigureAbortConfigure() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	try {
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    abortTransaction(null);
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    commitTransaction();
-	} finally {
-	    watchdog.shutdown();
 	}
     }
 
@@ -335,11 +275,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    commitTransaction();
 	    id = watchdog.getLocalNodeId();
 	    if (id != 2) {
 		fail("Expected id 2, got " + id);
@@ -349,25 +286,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testGetLocalNodeIdServiceNotConfigured() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	try {
-	    watchdog.getLocalNodeId();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.getLocalNodeId();
@@ -391,11 +312,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    commitTransaction();
 	    createTransaction();
 	    if (! watchdog.isLocalNodeAlive()) {
 		fail("Expected watchdog.isLocalNodeAlive() to return true");
@@ -415,25 +333,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testIsLocalNodeAliveServiceNotConfigured() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	try {
-	    watchdog.isLocalNodeAlive();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testIsLocalNodeAliveServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAlive();
@@ -465,11 +367,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    commitTransaction();
 	    if (! watchdog.isLocalNodeAliveNonTransactional()) {
 		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
 		     "to return true");
@@ -487,29 +386,11 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testIsLocalNodeAliveNonTransactionalServiceNotConfigured()
-	throws Exception
-    {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	try {
-	    watchdog.isLocalNodeAliveNonTransactional();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testIsLocalNodeAliveNonTransactionalServiceShuttingDown()
 	throws Exception
     {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAliveNonTransactional();
@@ -540,10 +421,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry);
-		createTransaction();
-		watchdog.configure(serviceRegistry, txnProxy);
-		commitTransaction();
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		watchdogs.add(watchdog);
 		System.err.println("watchdog service id: " +
 				   watchdog.getLocalNodeId());
@@ -572,26 +450,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testGetNodesServiceNotConfigured() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	try {
-	    watchdog.getNodes();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testGetNodesServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	createTransaction();
 	try {
@@ -622,10 +483,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry);
-		createTransaction();
-		watchdog.configure(serviceRegistry, txnProxy);
-		commitTransaction();
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		watchdogs.add(watchdog);
 	    }
 	    for (WatchdogServiceImpl watchdog : watchdogs) {
@@ -652,26 +510,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
-    public void testGetNodeServiceNotConfigured() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	try {
-	    watchdog.getNode(0);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testGetNodeServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	createTransaction();
 	try {
@@ -702,26 +543,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     /* -- Test addNodeListener -- */
     
-    public void testAddNodeListenerServiceNotConfigured() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	try {
-	    watchdog.addNodeListener(new DummyNodeListener());
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	} finally {
-	    watchdog.shutdown();
-	}
-    }
-
     public void testAddNodeListenerServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry);
-	createTransaction();
-	watchdog.configure(serviceRegistry, txnProxy);
-	commitTransaction();
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 	createTransaction();
 	try {
@@ -753,10 +577,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry);
-		createTransaction();
-		watchdog.configure(serviceRegistry, txnProxy);
-		commitTransaction();
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		watchdogs.add(watchdog);
 	    }
 	    // wait for all nodes to get notified...
@@ -764,8 +585,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    Set<Node> nodes = listener.getStartedNodes();
 	    System.err.println("startedNodes: " + nodes);
-	    if (nodes.size() != 6) {
-		fail("Expected 6 started nodes, got " + nodes.size());
+	    if (nodes.size() != 5) {
+		fail("Expected 5 started nodes, got " + nodes.size());
 	    }
 	    for (Node node : nodes) {
 		System.err.println(node);
@@ -793,10 +614,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	
 	for (int i = 0; i < 5; i++) {
 	    WatchdogServiceImpl watchdog =
-		new WatchdogServiceImpl(props, systemRegistry);
-	    createTransaction();
-	    watchdog.configure(serviceRegistry, txnProxy);
-	    commitTransaction();
+		new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	    watchdogs.add(watchdog);
 	}
 	for (WatchdogServiceImpl watchdog : watchdogs) {
@@ -848,10 +666,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	try {
 	    for (int i = 0; i < 5; i++) {
 		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry);
-		createTransaction();
-		watchdog.configure(serviceRegistry, txnProxy);
-		commitTransaction();
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		DummyNodeListener listener = new DummyNodeListener();
 		watchdog.addNodeListener(listener);
 		watchdogMap.put(watchdog, listener);
@@ -939,7 +754,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, registry);
+	return new DataServiceImpl(dbProps, registry, txnProxy);
     }
 
     /**

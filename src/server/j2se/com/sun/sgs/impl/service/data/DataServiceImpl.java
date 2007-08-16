@@ -16,6 +16,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl.Scheduler;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl.TaskHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -30,12 +31,10 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Properties;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -155,7 +154,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     private final String appName;
 
     /** Scheduler supplied to the data store. */
-    private final DelegatingScheduler scheduler;
+    private final Scheduler scheduler;
 
     /** The underlying data store. */
     private final DataStore store;
@@ -163,17 +162,20 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Table that stores information about classes used in serialization. */
     private final ClassesTable classesTable;
 
+    /** The transaction context factory. */
+    private final TransactionContextFactory<Context> contextFactory;
+
     /**
      * Synchronize on this object before accessing the state,
-     * debugCheckInterval, detectModifications, or contextFactory fields.
+     * debugCheckInterval, or detectModifications fields.
      */
     private final Object stateLock = new Object();
 
     /** The possible states of this instance. */
     enum State {
-	/** Before configure has been called */
+	/** Before constructor has completed */
 	UNINITIALIZED,
-	/** After configure and before shutdown */
+	/** After construction and before shutdown */
 	RUNNING,
 	/** After start of a call to shutdown and before call finishes */
 	SHUTTING_DOWN,
@@ -192,13 +194,6 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
-
-    /**
-     * The transaction context factory.  Note that this field is only set
-     * once, so it can be accessed outside of synchronization on stateLock once
-     * the value of the state field has been checked.
-     */
-    private TransactionContextFactory<Context> contextFactory;
 
     /**
      * Defines the transaction context map for this class.  This class checks
@@ -258,69 +253,41 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /**
-     * Provides an implementation of Scheduler that uses the TaskScheduler, and
-     * waits to schedule tasks until the task owner is supplied in a call to
-     * setTaskOwner.
+     * Provides an implementation of Scheduler that uses the TaskScheduler and
+     * TaskOwner.  Note that this class is created in the DataServiceImpl
+     * constructor, so the TaskOwner used does not have access to managers or
+     * to the full AppContext.
      */
     private static class DelegatingScheduler implements Scheduler {
 
 	/** The task scheduler. */
-	private TaskScheduler taskScheduler;
+	private final TaskScheduler taskScheduler;
 
-	/** The task owner, or null if not yet supplied. */
-	private TaskOwner taskOwner;
+	/** The task owner. */
+	private final TaskOwner taskOwner;
 
-	/**
-	 * Handles for tasks that were scheduled before the task scheduler was
-	 * supplied.
-	 */
-	private Set<Handle> pending = new HashSet<Handle>();
-
-	DelegatingScheduler(TaskScheduler taskScheduler) {
+	DelegatingScheduler(TaskScheduler taskScheduler, TaskOwner taskOwner) {
 	    this.taskScheduler = taskScheduler;
-	}
-
-	public synchronized TaskHandle scheduleRecurringTask(
-	    Runnable task, long period)
-	{
-	    Handle handle = new Handle(task, period);
-	    if (taskOwner != null) {
-		handle.start();
-	    } else {
-		logger.log(Level.FINE, "Adding pending task {0}", handle);
-		pending.add(handle);
-	    }
-	    return handle;
-	}
-
-	/**
-	 * Supplies the task owner that will be used to schedule tasks, and
-	 * schedules any tasks that were already provided.
-	 */
-	public synchronized void setTaskOwner(TaskOwner taskOwner) {
-	    assert taskOwner != null;
 	    this.taskOwner = taskOwner;
-	    for (Iterator<Handle> i = pending.iterator(); i.hasNext(); ) {
-		Handle handle = i.next();
-		i.remove();
-		handle.start();
-	    }
+	}
+
+	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
+	    return new Handle(task, period);
 	}
 
 	/** Implementation of task handle. */
 	private class Handle implements TaskHandle, KernelRunnable {
 	    private final Runnable task;
 	    private final long period;
-
-	    /**
-	     * The associated handle from the task handler, or null if not yet
-	     * scheduled.
-	     */
-	    private RecurringTaskHandle handle;
+	    private final RecurringTaskHandle handle;
 
 	    Handle(Runnable task, long period) {
 		this.task = task;
 		this.period = period;
+		handle = taskScheduler.scheduleRecurringTask(
+		    this, taskOwner, System.currentTimeMillis() + period,
+		    period);
+		handle.start();
 	    }
 
 	    public String toString() {
@@ -336,24 +303,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 
 	    public void cancel() {
-		logger.log(Level.FINE, "Cancelling task {0}", this);
-		synchronized (DelegatingScheduler.this) {
-		    if (handle != null) {
-			handle.cancel();
-		    } else {
-			pending.remove(this);
-		    }
-		}
-	    }
-
-	    /** Schedules a task using the task scheduler. */
-	    private void start() {
-		logger.log(Level.FINE, "Starting task {0}", this);
-		assert Thread.holdsLock(DelegatingScheduler.this);
-		handle = taskScheduler.scheduleRecurringTask(
-		    this, taskOwner, System.currentTimeMillis() + period,
-		    period);
-		handle.start();
+		handle.cancel();
 	    }
 	}
     }
@@ -364,8 +314,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * documentation} for the list of supported properties.
      *
      * @param	properties the properties for configuring this service
-     * @param	componentRegistry the registry of configured {@link Service}
-     *		instances
+     * @param	systemRegistry the registry of available system components
+     * @param	txnProxy the transaction proxy
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
      *		</code> property is not specified, if the value of the <code>
      *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
@@ -373,15 +323,16 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      *		constructor detects an illegal property value
      * @throws	Exception if a problem occurs creating the service
      */
-    public DataServiceImpl(
-	Properties properties, ComponentRegistry componentRegistry)
+    public DataServiceImpl(Properties properties,
+			   ComponentRegistry systemRegistry,
+			   TransactionProxy txnProxy)
 	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
 		       "Creating DataServiceImpl properties:{0}, " +
-		       "componentRegistry:{1}",
-		       properties, componentRegistry);
+		       "systemRegistry:{1}, txnProxy:{2}",
+		       properties, systemRegistry, txnProxy);
 	}
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -390,10 +341,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		throw new IllegalArgumentException(
 		    "The " + StandardProperties.APP_NAME +
 		    " property must be specified");
-	    }
-	    if (componentRegistry == null) {
+	    } else if (systemRegistry == null) {
 		throw new NullPointerException(
-		    "The componentRegistry argument must not be null");
+		    "The systemRegistry argument must not be null");
+	    } else if (txnProxy == null) {
+		throw new NullPointerException(
+		    "The txnProxy argument must not be null");
 	    }
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
@@ -401,8 +354,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
-	    scheduler = new DelegatingScheduler(
-		componentRegistry.getComponent(TaskScheduler.class));
+	    TaskScheduler taskScheduler =
+		systemRegistry.getComponent(TaskScheduler.class);
+	    TaskOwner taskOwner = txnProxy.getCurrentOwner();
+	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
 	    if (dataStoreClassName == null) {
 		store = new DataStoreImpl(properties, scheduler);
 	    } else {
@@ -412,6 +367,37 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
 	    classesTable = new ClassesTable(store);
+	    synchronized (contextMapLock) {
+		if (contextMap == null) {
+		    contextMap = new ContextMap(txnProxy);
+		}
+	    }
+	    contextFactory = new ContextFactory(contextMap);
+	    synchronized (stateLock) {
+		state = State.RUNNING;
+	    }
+	    taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    DataServiceHeader header;
+			    try {
+				header = getServiceBinding(
+				    CLASSNAME + ".header",
+				    DataServiceHeader.class);
+				logger.log(Level.CONFIG,
+					   "Found existing header {0}",
+					   header);
+			    } catch (NameNotBoundException e) {
+				header = new DataServiceHeader(appName);
+				setServiceBinding(
+				    CLASSNAME + ".header", header);
+				logger.log(Level.CONFIG,
+					   "Created new header {0}", header);
+			    }
+			}
+		    }),
+		taskOwner, true);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
@@ -427,51 +413,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry,
-			  TransactionProxy proxy)
-    {
-	if (registry == null || proxy == null) {
-	    throw new NullPointerException("The arguments must not be null");
-	}
-	synchronized (contextMapLock) {
-	    if (contextMap == null) {
-		contextMap = new ContextMap(proxy);
-	    }
-	}
-	synchronized (stateLock) {
-	    if (state != State.UNINITIALIZED) {
-		throw new IllegalStateException(
-		    "Service is already configured");
-	    }
-	    state = State.RUNNING;
-	    boolean addedAbortAction = false;
-	    try {
-		contextFactory = new ContextFactory(contextMap);
-		contextFactory.joinTransaction().addAbortAction(
-		    new Runnable() {
-			public void run() {
-			    state = State.UNINITIALIZED;
-			}
-		    });
-		addedAbortAction = true;
-	    } finally {
-		if (!addedAbortAction) {
-		    state = State.UNINITIALIZED;
-		}
-	    }
-	    scheduler.setTaskOwner(proxy.getCurrentOwner());
-	    DataServiceHeader header;
-	    try {
-		header = getServiceBinding(
-		    CLASSNAME + ".header", DataServiceHeader.class);
-		logger.log(Level.CONFIG, "Found existing header {0}", header);
-	    } catch (NameNotBoundException e) {
-		header = new DataServiceHeader(appName);
-		setServiceBinding(CLASSNAME + ".header", header);
-		logger.log(Level.CONFIG, "Created new header {0}", header);
-	    }
-	}
-    }
+    public void ready() { }
 
     /* -- Implement DataManager -- */
 
@@ -878,7 +820,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	synchronized (stateLock) {
 	    switch (state) {
 	    case UNINITIALIZED:
-		throw new IllegalStateException("Service is not configured");
+		throw new IllegalStateException("Service is not constructed");
 	    case RUNNING:
 		break;
 	    case SHUTTING_DOWN:

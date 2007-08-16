@@ -8,6 +8,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
 import java.util.Properties;
 
@@ -55,7 +56,8 @@ public class TestDataServiceClientConcurrency
      */
     @Override
     protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry)
+					 ComponentRegistry componentRegistry,
+					 TransactionProxy txnProxy)
 	throws Exception
     {
 	String host = serverHost;
@@ -70,6 +72,6 @@ public class TestDataServiceClientConcurrency
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 }
