@@ -247,11 +247,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 			getListenPort());
 		}
 	    } catch (Exception e) {
-		if (acceptor != null) {
-		    try {
-			acceptor.shutdown();
-		    } catch (RuntimeException re) {
-		    }
+		try {
+		    acceptor.shutdown();
+		} catch (RuntimeException re) {
 		}
 		throw e;
 	    }

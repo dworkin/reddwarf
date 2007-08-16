@@ -54,6 +54,16 @@ public interface Service {
      * Service}s associated with this application have been successfully
      * created. If the method throws an exception, then the application will be
      * shutdown.
+     * <p>
+     * Note that before this point, the available application context (provided
+     * by {@code TransactionProxy.getCurrentOwner}) will be incomplete.
+     * Specifically, {@code Manager}s and other facilities provided by the
+     * {@code AppContext} will be unavailable. If you need to use these aspects
+     * of the application context (e.g., for scheduling tasks that run
+     * application level code), or store it for future use, you should do so
+     * once {@code ready} is called, but not before. When your {@code Service}
+     * is constructed, the available context will only provide access to those
+     * services that have already been created.
      *
      * @throws Exception if an error occurs
      */
