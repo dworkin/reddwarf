@@ -47,7 +47,7 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * The {@code PrefixHashMap} is implemented as a prefix tree of hash
+ * The {@code DistributedHashMap} is implemented as a prefix tree of hash
  * maps, which provides {@code O(log(n))} performance for the
  * following operations: {@code get}, {@code put}, {@code remove},
  * {@code containsKey}, where {@code n} is the number of leaves in the
@@ -61,7 +61,7 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * An instance of {@code PrefixHashMap} offers one parameters for
+ * An instance of {@code DistributedHashMap} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  As the
  * map grows, the number of supported parallel operations will also
@@ -103,7 +103,7 @@ import com.sun.sgs.app.ManagedReference;
  * @see ManagedObject
  */
 @SuppressWarnings({"unchecked"})
-public class PrefixHashMap<K,V> 
+public class DistributedHashMap<K,V> 
     extends AbstractMap<K,V>
     implements Map<K,V>, Serializable, ManagedObject {
 
@@ -168,13 +168,13 @@ public class PrefixHashMap<K,V>
      * The leaf table immediately to the left of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    private ManagedReference leftLeaf;
+    ManagedReference leftLeaf;
 
     /**
      * The leaf table immediately to the right of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    private ManagedReference rightLeaf;
+    ManagedReference rightLeaf;
 
 
     // NOTE: During split() operations, children nodes may be replaced
@@ -280,7 +280,7 @@ public class PrefixHashMap<K,V>
     /**
      * The depth of this node in the tree
      */
-    private final int depth;
+    final int depth;
 
     /**
      * The maximum number of levels of the tree to collapse into a
@@ -291,9 +291,10 @@ public class PrefixHashMap<K,V>
     private final int maxCollapse;
     
     /** 
-     * Constructs an empty {@code PrefixHashMap} at the provided
-     * depth, with the specified minimum concurrency, split factor and
-     * load factor.
+     * Constructs an empty {@code DistributedHashMap} at the provided
+     * depth, with the specified minimum concurrency, split threshold,
+     * merge threshold, and the maximum number of tree levels to
+     * collapse.
      *
      * @param depth the depth of this table in the tree
      * @param minConcurrency the minimum number of concurrent write
@@ -302,6 +303,8 @@ public class PrefixHashMap<K,V>
      *        will cause the leaf to split
      * @param mergeTheshold the numer of entries at a leaf node that
      *        will cause the leaf to attempt merging with its sibling
+     * @param maxCollapse the maximum number of tree levels when
+     *        compressing the backing tree
      *
      * @throws IllegalArgumentException if the depth is out of the
      *         range of valid prefix lengths
@@ -315,10 +318,11 @@ public class PrefixHashMap<K,V>
      */
     // NOTE: this constructor is currently left package private but
     // future implementations could expose these implementation
-    // details.
-    PrefixHashMap(int depth, int minConcurrency, int splitThreshold,
-			  int mergeThreshold, int maxCollapse) {
-	if (depth < 0 || depth > 32) {
+    // details.  At no point should depth be exposed as a public
+    // parameter
+    DistributedHashMap(int depth, int minConcurrency, int splitThreshold,
+		       int mergeThreshold, int maxCollapse) {
+	if (depth < 0 || depth > MAX_DEPTH) {
 	    throw new IllegalArgumentException("Illegal tree depth: " + 
 					       depth);	    
 	}
@@ -368,7 +372,7 @@ public class PrefixHashMap<K,V>
     }
 
     /** 
-     * Constructs an empty {@code PrefixHashMap} with the provided
+     * Constructs an empty {@code DistributedHashMap} with the provided
      * minimum concurrency.
      *
      * @param minConcurrency the minimum number of concurrent write
@@ -376,24 +380,24 @@ public class PrefixHashMap<K,V>
      *
      * @throws IllegalArgumentException if minConcurrency is non positive
      */
-    public PrefixHashMap(int minConcurrency) {
+    public DistributedHashMap(int minConcurrency) {
 	this(0, minConcurrency, DEFAULT_SPLIT_THRESHOLD, 
 	     DEFAULT_MERGE_THRESHOLD, DEFAULT_MAX_COLLAPSE);
     }
 
 
     /** 
-     * Constructs an empty {@code PrefixHashMap} with the default
+     * Constructs an empty {@code DistributedHashMap} with the default
      * minimum concurrency (1).
      */
-    public PrefixHashMap() {
+    public DistributedHashMap() {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD, 
 	     DEFAULT_MAX_COLLAPSE);
     }
 
     /**
-     * Constructs a new {@code PrefixHashMap} with the same mappings
+     * Constructs a new {@code DistributedHashMap} with the same mappings
      * as the specified {@code Map}, and the default 
      * minimum concurrency (1).
      *
@@ -401,7 +405,7 @@ public class PrefixHashMap<K,V>
      *
      * @throws NullPointerException if the provided map is null
      */
-    public PrefixHashMap(Map<? extends K, ? extends V> m) {
+    public DistributedHashMap(Map<? extends K, ? extends V> m) {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD,
 	     DEFAULT_MAX_COLLAPSE);
@@ -424,8 +428,8 @@ public class PrefixHashMap<K,V>
 	    return;
 	else {
 	    split(); // split first to ensure breadth-first creation
-	    rightChild.get(PrefixHashMap.class).ensureDepth(minDepth);
-	    leftChild.get(PrefixHashMap.class).ensureDepth(minDepth);
+	    rightChild.get(DistributedHashMap.class).ensureDepth(minDepth);
+	    leftChild.get(DistributedHashMap.class).ensureDepth(minDepth);
 	}
     }
 
@@ -451,14 +455,14 @@ public class PrefixHashMap<K,V>
 	}
 	else {
 	    if (leftChild != null) {
-		PrefixHashMap l = leftChild.get(PrefixHashMap.class);
+		DistributedHashMap l = leftChild.get(DistributedHashMap.class);
 		l.clear();
 		dm.removeObject(l);
 	    }
 	    else 
 		collapsedLeftChild.clear();
 	    if (rightChild != null) {
-		PrefixHashMap r = rightChild.get(PrefixHashMap.class);
+		DistributedHashMap r = rightChild.get(DistributedHashMap.class);
 		r.clear();
 		dm.removeObject(r);
 	    }
@@ -495,7 +499,7 @@ public class PrefixHashMap<K,V>
      */ 
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	PrefixHashMap<K,V> leaf = lookup(hash);
+	DistributedHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; e = e.next) {
 	    
@@ -531,9 +535,10 @@ public class PrefixHashMap<K,V>
     private void merge() {	   
 	DataManager dataManager = AppContext.getDataManager();
 
- 	PrefixHashMap<K,V> leftChild_ = leftChild.get(PrefixHashMap.class);
- 	PrefixHashMap<K,V> rightChild_ = 
- 	    rightChild.get(PrefixHashMap.class);
+ 	DistributedHashMap<K,V> leftChild_ = 
+	    leftChild.get(DistributedHashMap.class);
+ 	DistributedHashMap<K,V> rightChild_ = 
+ 	    rightChild.get(DistributedHashMap.class);
 
 	dataManager.markForUpdate(this);
 
@@ -544,10 +549,10 @@ public class PrefixHashMap<K,V>
 	// this node's table.
 	for (int i = 0; i < table.length; ++i) {
 
- 	    for (PrefixEntry<K,V> e = leftChild_.table[i]; e != null; e = e.next) 
+ 	    for (PrefixEntry e = leftChild_.table[i]; e != null; e = e.next)
 		addEntry(e, i);    
 
- 	    for (PrefixEntry<K,V> e = rightChild_.table[i]; e != null; e = e.next) 
+ 	    for (PrefixEntry e = rightChild_.table[i]; e != null; e = e.next) 
 		addEntry(e, i);	    
 	}
 
@@ -558,12 +563,14 @@ public class PrefixHashMap<K,V>
 	// ensure that the child's neighboring leaf reference now
 	// point to this table
 	if (leftLeaf != null) {
-	    PrefixHashMap leftLeaf_ = leftLeaf.get(PrefixHashMap.class);
+	    DistributedHashMap leftLeaf_ = 
+		leftLeaf.get(DistributedHashMap.class);
 	    dataManager.markForUpdate(leftLeaf_);
 	    leftLeaf_.rightLeaf = dataManager.createReference(this);
 	}
 	if (rightLeaf != null) {
-	    PrefixHashMap rightLeaf_ = rightLeaf.get(PrefixHashMap.class);
+	    DistributedHashMap rightLeaf_ = 
+		rightLeaf.get(DistributedHashMap.class);
 	    dataManager.markForUpdate(rightLeaf_);	    
 	    rightLeaf_.leftLeaf = dataManager.createReference(this);
 	}	
@@ -597,12 +604,12 @@ public class PrefixHashMap<K,V>
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
-	PrefixHashMap<K,V> leftChild_ = 
-	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
-				   splitThreshold, mergeThreshold, maxCollapse);
-	PrefixHashMap<K,V> rightChild_ = 
-	    new PrefixHashMap<K,V>(depth+1, minConcurrency, 
-				   splitThreshold, mergeThreshold, maxCollapse);
+	DistributedHashMap<K,V> leftChild_ = 
+	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
+					mergeThreshold, maxCollapse);
+	DistributedHashMap<K,V> rightChild_ = 
+	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
+					mergeThreshold, maxCollapse);
 
 	// for the collapse, we to determine what prefix will lead to
 	// this node.  Grabbing this from one of our nodes will suffice.
@@ -634,13 +641,15 @@ public class PrefixHashMap<K,V>
 	rightChild = dataManager.createReference(rightChild_);
 	    
 	if (leftLeaf != null) {
-	    PrefixHashMap leftLeaf_ = leftLeaf.get(PrefixHashMap.class);
+	    DistributedHashMap leftLeaf_ = 
+		leftLeaf.get(DistributedHashMap.class);
 	    leftLeaf_.rightLeaf = leftChild;
 
 	}
 	
 	if (rightLeaf != null) {
-	    PrefixHashMap rightLeaf_ = rightLeaf.get(PrefixHashMap.class);
+	    DistributedHashMap rightLeaf_ = 
+		rightLeaf.get(DistributedHashMap.class);
 	    rightLeaf_.leftLeaf = rightChild;
 	}
 
@@ -661,7 +670,7 @@ public class PrefixHashMap<K,V>
 	    depth > minDepth && 
 	    maxCollapse > 0 &&
 	    (depth + 1) % maxCollapse != 0)
- 	    parent.get(PrefixHashMap.class).collapse(depth, prefix);
+ 	    parent.get(DistributedHashMap.class).collapse(depth, prefix);
     }
 
     /**
@@ -673,20 +682,20 @@ public class PrefixHashMap<K,V>
      * @return the leaf table responsible for storing all entries with
      *         the specified prefix
      */
-    private PrefixHashMap<K,V> lookup(int prefix) {
+    private DistributedHashMap<K,V> lookup(int prefix) {
 
 	// a leading bit of 1 indicates the left child prefix
-	PrefixHashMap<K,V> leaf = this;
+	DistributedHashMap<K,V> leaf = this;
 	int original = prefix;
 	
 	while (true) {
 	    // a leading bit of 1 indicates the left child prefix
 	    if ((prefix >>> 31) == 1) { // look left
 		if (leaf.leftChild != null)
-		    leaf = leaf.leftChild.get(PrefixHashMap.class);
+		    leaf = leaf.leftChild.get(DistributedHashMap.class);
 		else if (leaf.collapsedLeftChild != null) {
 		    // walk the compressed tree to find the next
-		    // PrefixHashMap node
+		    // DistributedHashMap node
 		    CollapsedNode<K,V> intermediate = leaf.collapsedLeftChild;
 		    leaf = bypassIntermediate(intermediate, prefix << 1);
 		}
@@ -697,10 +706,10 @@ public class PrefixHashMap<K,V>
 	    }
 	    else { // look right
 		if (leaf.rightChild != null)
-		    leaf = leaf.rightChild.get(PrefixHashMap.class);
+		    leaf = leaf.rightChild.get(DistributedHashMap.class);
 		else if (leaf.collapsedRightChild != null) {
 		    // walk the compressed tree to find the next
-		    // PrefixHashMap node
+		    // DistributedHashMap node
 		    CollapsedNode<K,V> intermediate = leaf.collapsedRightChild;
 		    leaf = bypassIntermediate(intermediate, prefix << 1);
 		}
@@ -716,7 +725,7 @@ public class PrefixHashMap<K,V>
 
 
     /**
-     * Returns the next {@code PrefixHashMap} node on the path
+     * Returns the next {@code DistributedHashMap} node on the path
      * specified by {@code prefix} starting at the tree rooted at
      * {@code node}.  Note that the path specified {@code prefix} must
      * begin immediately (i.e. the highest order bit of {@code prefix}
@@ -725,23 +734,23 @@ public class PrefixHashMap<K,V>
      * @param node the root of the tree to search
      * @param prefix the path to take when searching the tree
      *
-     * @return the next {@code PrefixHashMap} found on the path
+     * @return the next {@code DistributedHashMap} found on the path
      */
-    private static PrefixHashMap bypassIntermediate(CollapsedNode node, 
+    private static DistributedHashMap bypassIntermediate(CollapsedNode node, 
 						    int prefix) {
-	PrefixHashMap next = null;
+	DistributedHashMap next = null;
 	while (next == null) {
 	    if ((prefix >>> 31) == 1) {
 		if (node.leftChild != null)
 		    next = node.leftChild.
-			get(PrefixHashMap.class);
+			get(DistributedHashMap.class);
 		else
 		    node = node.leftCollapsed;
 	    }
 	    else {
 		if (node.rightChild != null)
 		    next = node.rightChild.
-			get(PrefixHashMap.class);
+			get(DistributedHashMap.class);
 		else
 		    node = node.rightCollapsed;
 	    }
@@ -752,7 +761,7 @@ public class PrefixHashMap<K,V>
     }
 
     /**
-     * Finds the specified {@code PrefixHashMap} node in the tree and
+     * Finds the specified {@code DistributedHashMap} node in the tree and
      * replaces with a {@code CollapsedNode}, updating family
      * references as necessary.  This method should <i>only</i> be
      * called from {@link #split()} after the appropriate conditions
@@ -800,7 +809,7 @@ public class PrefixHashMap<K,V>
 	CollapsedNode<K,V> replacement = new CollapsedNode<K,V>();
 	// NOTE: we can directly assign from the Walkable because
 	// the child Walkable is guaranteed to be the
-	// PrefixHashMap that we are going to replace.
+	// DistributedHashMap that we are going to replace.
 	replacement.leftChild = child.map.leftChild;
 	replacement.rightChild = child.map.rightChild;
 
@@ -808,7 +817,7 @@ public class PrefixHashMap<K,V>
 	dm.removeObject(child.map);
 
 	
-	// either the parent of the split node is a PrefixHashMap
+	// either the parent of the split node is a DistributedHashMap
 	// (which will happen for the most immediate notes), or for
 	// all other nodes, its parent will already be a CollapsedNode
 	if (parent.map != null) {
@@ -840,10 +849,12 @@ public class PrefixHashMap<K,V>
 	    }
 	}
 
-	// lastly, set the new PrefixHashMap leaf nodes from the split
-	// to have this node as their parent
-	PrefixHashMap<K,V> l = replacement.leftChild.get(PrefixHashMap.class);
-	PrefixHashMap<K,V> r = replacement.rightChild.get(PrefixHashMap.class);
+	// lastly, set the new DistributedHashMap leaf nodes from the
+	// split to have this node as their parent
+	DistributedHashMap<K,V> l = 
+	    replacement.leftChild.get(DistributedHashMap.class);
+	DistributedHashMap<K,V> r = 
+	    replacement.rightChild.get(DistributedHashMap.class);
 	ManagedReference thisRef = dm.createReference(this);
 	l.parent = thisRef;
 	r.parent = thisRef;
@@ -861,7 +872,7 @@ public class PrefixHashMap<K,V>
      * performing any necessary internal replacements.  When merging
      * two siblings, the parent of the nodes may have been replaced
      * with a {@code CollapsedNode}, and therefore needs to be swapped
-     * out with a {@code PrefixHashMap} node before the {@code merge}
+     * out with a {@code DistributedHashMap} node before the {@code merge}
      * operation can take place.  This method is also responsible for
      * aborting any merge attempts that are invalid due to the sibling
      * still being too large in size, or where the sibling is
@@ -908,19 +919,19 @@ public class PrefixHashMap<K,V>
 	    prefix <<= 1;
 	}
 
-	// check that the child node would have two PrefixHashMap
+	// check that the child node would have two DistributedHashMap
 	// children that could be merged; if the child does, check
 	// that the size of the children is of sufficently small to
 	// warrant a merge.
-	PrefixHashMap<K,V> rightChild_, leftChild_;
+	DistributedHashMap<K,V> rightChild_, leftChild_;
 	if (child.node != null) {
 	    if (child.node.leftChild == null || child.node.rightChild == null) 
 		return;	    
 	    else if (((leftChild_ = 
-		       child.node.leftChild.get(PrefixHashMap.class)).size >
+		       child.node.leftChild.get(DistributedHashMap.class)).size >
 		      mergeThreshold) ||
-		     ((rightChild_ = 
-		       child.node.rightChild.get(PrefixHashMap.class)).size >
+		     ((rightChild_ = child.node.rightChild.
+		       get(DistributedHashMap.class)).size >
 		      mergeThreshold)) 
 		return;
 	}
@@ -928,10 +939,10 @@ public class PrefixHashMap<K,V>
 	    if (child.map.leftChild == null || child.map.rightChild == null) 
 		return;	    
 	    else if (((leftChild_ = 
-		       child.map.leftChild.get(PrefixHashMap.class)).size >
+		       child.map.leftChild.get(DistributedHashMap.class)).size >
 		      mergeThreshold) ||
-		     ((rightChild_ = 
-		       child.map.rightChild.get(PrefixHashMap.class)).size >
+		     ((rightChild_ = child.map.rightChild.
+		       get(DistributedHashMap.class)).size >
 		      mergeThreshold)) 
 		return;	
 	}
@@ -939,14 +950,14 @@ public class PrefixHashMap<K,V>
 	// lastly, perform a check that neither of the children are
 	// the empty root node of a logical node.  This case happens
 	// when a leaf node attempts to merge with its sibling who is
-	// a PrefixHashMap, but is not a leaf node.  A non-leaf
-	// PrefixHashMap will not have a table.	
+	// a DistributedHashMap, but is not a leaf node.  A non-leaf
+	// DistributedHashMap will not have a table.	
 	if (leftChild_.table == null || rightChild_.table == null) 
 	    return;
 	
 	// at this point, both chilren are sufficiently small enough
 	// that the parent node should merge them.  If the child node
-	// is a PrefixHashMap, call merge(), otherwise, the child is
+	// is a DistributedHashMap, call merge(), otherwise, the child is
 	// an intermediate node and must be replaced before the merge
 	// operation can be called
 	
@@ -962,13 +973,13 @@ public class PrefixHashMap<K,V>
 	DataManager dm = AppContext.getDataManager();
 
 	// first, replace the child intermediate node with a
-	// PrefixHashMap
+	// DistributedHashMap
 	
 	// REMINDER: can we speed this up by reusing one of the
 	// children nodes?
 	
-	PrefixHashMap<K,V> replacement = 
-	    new PrefixHashMap<K,V>(rightChild_.depth-1, 
+	DistributedHashMap<K,V> replacement = 
+	    new DistributedHashMap<K,V>(rightChild_.depth-1, 
 				   rightChild_.minConcurrency,
 				   rightChild_.splitThreshold,
 				   rightChild_.mergeThreshold,
@@ -985,7 +996,7 @@ public class PrefixHashMap<K,V>
 	ManagedReference replacementRef = dm.createReference(replacement);
 
 	// next, correct the parent link to the child.  either the
-	// parent of the newly-merged node is a PrefixHashMap (which
+	// parent of the newly-merged node is a DistributedHashMap (which
 	// will happen for the most immediate notes), or for all other
 	// nodes, its parent will already be a CollapsedNode
 	if (parent.map != null) {
@@ -1047,8 +1058,8 @@ public class PrefixHashMap<K,V>
     public V get(Object key) {
 
  	int hash = (key == null) ? 0 : hash(key.hashCode());
-	PrefixHashMap<K,V> leaf = lookup(hash);
-	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)]; 
+	DistributedHashMap<K,V> leaf = lookup(hash);
+	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; 
 	     e = e.next) {	    
 	    Object k;
@@ -1113,7 +1124,7 @@ public class PrefixHashMap<K,V>
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0 : hash(key.hashCode());
-	PrefixHashMap<K,V> leaf = lookup(hash);
+	DistributedHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 
 	int i = indexFor(hash, leaf.table.length);
@@ -1210,10 +1221,11 @@ public class PrefixHashMap<K,V>
  	    return size;
 
  	int totalSize = 0;
- 	PrefixHashMap<K,V> cur = leftMost();
+ 	DistributedHashMap<K,V> cur = leftMost();
   	totalSize += cur.size;
   	while(cur.rightLeaf != null) {
-	    totalSize += (cur = cur.rightLeaf.get(PrefixHashMap.class)).size;
+	    totalSize += 
+		(cur = cur.rightLeaf.get(DistributedHashMap.class)).size;
 	}
 	
   	return totalSize;
@@ -1230,7 +1242,7 @@ public class PrefixHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	PrefixHashMap<K,V> leaf = lookup(hash);
+	DistributedHashMap<K,V> leaf = lookup(hash);
 	
 	int i = indexFor(hash, leaf.table.length);
 	PrefixEntry<K,V> e = leaf.table[i]; 
@@ -1259,10 +1271,10 @@ public class PrefixHashMap<K,V>
 		
 		// lastly, if the leaf size is less than the size
 		// threshold, attempt a merge
-		if ((--leaf.size) <= mergeThreshold && leaf.depth > minDepth && 
+		if ((--leaf.size) <= mergeThreshold && leaf.depth > minDepth &&
 		    leaf.parent != null) {
 		    
-		    leaf.parent.get(PrefixHashMap.class).
+		    leaf.parent.get(DistributedHashMap.class).
 			disperse(leaf.depth-1, hash);
 		}
 		
@@ -1281,7 +1293,7 @@ public class PrefixHashMap<K,V>
      *
      * @return the left-most child under this node
      */
-    private PrefixHashMap<K,V> leftMost() {
+    DistributedHashMap<K,V> leftMost() {
 	// NOTE: the left-most node will have a bit prefix of all
 	// ones, which is what we use when searching for it
 	return lookup(~0x0);
@@ -1323,8 +1335,8 @@ public class PrefixHashMap<K,V>
 	    return s.substring(0, s.length() - 2) + ")";
 	}
 	else {
-	    PrefixHashMap l = leftChild.get(PrefixHashMap.class);
-	    PrefixHashMap r = rightChild.get(PrefixHashMap.class);
+	    DistributedHashMap l = leftChild.get(DistributedHashMap.class);
+	    DistributedHashMap r = rightChild.get(DistributedHashMap.class);
 	    return "(" + l.treeString() + ", " + r.treeString() + ")";
 	}
     }
@@ -1359,10 +1371,10 @@ public class PrefixHashMap<K,V>
 		+ ")\n";
 	    
 	    s += (leftChild != null)
-		? leftChild.get(PrefixHashMap.class).treeDiagram(1) 
+		? leftChild.get(DistributedHashMap.class).treeDiagram(1) 
 		: collapsedLeftChild.treeDiagram(1);
 	    s += (rightChild != null) 
-		? rightChild.get(PrefixHashMap.class).treeDiagram(1)
+		? rightChild.get(DistributedHashMap.class).treeDiagram(1)
 		: collapsedRightChild.treeDiagram(1);
 	}
 	return s;
@@ -1388,10 +1400,10 @@ public class PrefixHashMap<K,V>
 	else {
 	    s += s + "\n";
 	    s += (leftChild != null)
-		? leftChild.get(PrefixHashMap.class).treeDiagram(depth+1) 
+		? leftChild.get(DistributedHashMap.class).treeDiagram(depth+1) 
 		: collapsedLeftChild.treeDiagram(depth+1);
 	    s += (rightChild != null) 
-		? rightChild.get(PrefixHashMap.class).treeDiagram(depth+1)
+		? rightChild.get(DistributedHashMap.class).treeDiagram(depth+1)
 		: collapsedRightChild.treeDiagram(depth+1);
 	}
 
@@ -1401,7 +1413,7 @@ public class PrefixHashMap<K,V>
     /**
      * An implementation of {@code Map.Entry} that incorporates
      * information about the prefix at which it is stored, as well as
-     * whether the {@link PrefixHashMap} is responsible for the
+     * whether the {@link DistributedHashMap} is responsible for the
      * persistent lifetime of the value.
      *
      * <p>
@@ -1415,7 +1427,8 @@ public class PrefixHashMap<K,V>
      *
      * @see ManagedSerializable
      */	
-    private static class PrefixEntry<K,V> implements Map.Entry<K,V>, Serializable {
+    private static class PrefixEntry<K,V> 
+	implements Map.Entry<K,V>, Serializable {
 
 	private static final long serialVersionUID = 1;
 	    
@@ -1671,8 +1684,8 @@ public class PrefixHashMap<K,V>
 	/**
 	 * Removes any {@code Serializable} managed by this entry from
 	 * the datastore.  This should only be called from {@link
-	 * PrefixHashMap#clear()} and {@link
-	 * PrefixHashMap#remove(Object)} under the condition that this
+	 * DistributedHashMap#clear()} and {@link
+	 * DistributedHashMap#remove(Object)} under the condition that this
 	 * entry's map-managed object will never be reference again by
 	 * the map.
 	 */
@@ -1756,14 +1769,14 @@ public class PrefixHashMap<K,V>
 	 * The current table in which the {@code next} reference is
 	 * contained.
 	 */
-	PrefixHashMap<K,V> curTable;
+	DistributedHashMap<K,V> curTable;
 
 	/**
 	 * Constructs the prefix table iterator.
 	 *
 	 * @param start the left-most leaf in the prefix tree
 	 */
-	PrefixTreeIterator(PrefixHashMap<K,V> start) {
+	PrefixTreeIterator(DistributedHashMap<K,V> start) {
 
 	    curTable = start;
 	    index = 0;
@@ -1771,7 +1784,7 @@ public class PrefixHashMap<K,V>
 
 	    // load in the first table that has an element
 	    while (curTable.size == 0 && curTable.rightLeaf != null) 
-		curTable = curTable.rightLeaf.get(PrefixHashMap.class);
+		curTable = curTable.rightLeaf.get(DistributedHashMap.class);
 		
 	    // advance to find the first Entry
 	    for (index = 0; index < curTable.table.length &&
@@ -1811,14 +1824,16 @@ public class PrefixHashMap<K,V>
 		if (next == null) {
 		    
   		    while (curTable.rightLeaf != null) {
-  			curTable = curTable.rightLeaf.get(PrefixHashMap.class);
+  			curTable = 
+			    curTable.rightLeaf.get(DistributedHashMap.class);
 			
   			if (curTable.size == 0) 
  			    continue;
 	
 			// iterate to the next element
 			for (index = 0; index < curTable.table.length &&
-				 (next = curTable.table[index]) == null; ++index) 
+				 (next = curTable.table[index]) == null; 
+			     ++index) 
 			    ;		   		    		    
  			break;
  		    }
@@ -1852,7 +1867,7 @@ public class PrefixHashMap<K,V>
 	 * @param leftModeLeaf the left mode leaf node in the prefix
 	 *        tree
 	 */
-	EntryIterator(PrefixHashMap<K,V> leftMostLeaf) {
+	EntryIterator(DistributedHashMap<K,V> leftMostLeaf) {
 	    super(leftMostLeaf);
 	}
 
@@ -1875,7 +1890,7 @@ public class PrefixHashMap<K,V>
 	 * @param leftModeLeaf the left mode leaf node in the prefix
 	 *        tree
 	 */
-	KeyIterator(PrefixHashMap<K,V> leftMostLeaf) {
+	KeyIterator(DistributedHashMap<K,V> leftMostLeaf) {
 	    super(leftMostLeaf);
 	}
 
@@ -1899,7 +1914,7 @@ public class PrefixHashMap<K,V>
 	 * @param leftModeLeaf the left mode leaf node in the prefix
 	 *        tree
 	 */
-	ValueIterator(PrefixHashMap<K,V> leftMostLeaf) {
+	ValueIterator(DistributedHashMap<K,V> leftMostLeaf) {
 	    super(leftMostLeaf);
 	}
 
@@ -1933,9 +1948,9 @@ public class PrefixHashMap<K,V>
 	/**
 	 * the root node of the prefix tree
 	 */
-	private final PrefixHashMap<K,V> root;
+	private final DistributedHashMap<K,V> root;
 
-	EntrySet(PrefixHashMap<K,V> root) {
+	EntrySet(DistributedHashMap<K,V> root) {
 	    this.root = root;
 	}
 	    
@@ -1987,9 +2002,9 @@ public class PrefixHashMap<K,V>
 	/**
 	 * the root node of the prefix tree
 	 */
-	private final PrefixHashMap<K,V> root;
+	private final DistributedHashMap<K,V> root;
 
-	KeySet(PrefixHashMap<K,V> root) {
+	KeySet(DistributedHashMap<K,V> root) {
 	    this.root = root;
 	}
 	    
@@ -2038,9 +2053,9 @@ public class PrefixHashMap<K,V>
 	/**
 	 * the root node of the prefix tree
 	 */
-	private final PrefixHashMap<K,V> root;
+	private final DistributedHashMap<K,V> root;
 
-	public Values(PrefixHashMap<K,V> root) {
+	public Values(DistributedHashMap<K,V> root) {
 	    this.root = root;
 	}
 
@@ -2072,7 +2087,7 @@ public class PrefixHashMap<K,V>
      * state it once had.  Furthermore, serialization and locking
      * performance can be increased by loading the intermediate node
      * with its parent.  Therefore, a {@code CollapsedNode} is used in
-     * place of a {@code PrefixHashMap} to hold the intermediate
+     * place of a {@code DistributedHashMap} to hold the intermediate
      * state.
      *
      * <p>
@@ -2083,9 +2098,9 @@ public class PrefixHashMap<K,V>
      * point should both of these fields for a child be set to
      * non-{@code null} values; either one or the other will be valid.
      *
-     * @see PrefixHashMap#bypassIntermediate(CollapsedNode,int)
-     * @see PrefixHashMap#disperse(int,int)
-     * @see PrefixHashMap#collapse(int,int)
+     * @see DistributedHashMap#bypassIntermediate(CollapsedNode,int)
+     * @see DistributedHashMap#disperse(int,int)
+     * @see DistributedHashMap#collapse(int,int)
      *
      */
     private static class CollapsedNode<K,V> implements Serializable {
@@ -2113,17 +2128,17 @@ public class PrefixHashMap<K,V>
 
 	/**
 	 * Recursively calls {@code clear()} on the children under it.
-	 * This method is needed by {@link PrefixHashMap#clear()} to
-	 * efficiently and cleanly walk the tree while removing its
+	 * This method is needed by {@link DistributedHashMap#clear()}
+	 * to efficiently and cleanly walk the tree while removing its
 	 * elements.
 	 */
 	void clear() {
 	    if (leftChild != null)
-		leftChild.get(PrefixHashMap.class).clear();
+		leftChild.get(DistributedHashMap.class).clear();
 	    else
 		leftCollapsed.clear();
 	    if (rightChild != null)
-		rightChild.get(PrefixHashMap.class).clear();
+		rightChild.get(DistributedHashMap.class).clear();
 	    else
 		rightCollapsed.clear();
 	}
@@ -2131,9 +2146,10 @@ public class PrefixHashMap<K,V>
 	/**
 	 * Returns a string representation of the tree under this
 	 * intermediate node.  This method is needed by {@code
-	 * PrefixHashMap#treeDiagram(int)} to recursively and cleanly
-	 * build up a string representation of the tree.  See {@code
-	 * treeDiagram()} for a description of the string output.
+	 * DistributedHashMap#treeDiagram(int)} to recursively and
+	 * cleanly build up a string representation of the tree.  See
+	 * {@code treeDiagram()} for a description of the string
+	 * output.
 	 *
 	 * @param depth the depth of this node in the tree
 	 *
@@ -2148,10 +2164,10 @@ public class PrefixHashMap<K,V>
 	    s += "Collapsed Node\n";
 
 	    s += (leftChild != null)
-		? leftChild.get(PrefixHashMap.class).treeDiagram(depth+1) 
+		? leftChild.get(DistributedHashMap.class).treeDiagram(depth+1) 
 		: leftCollapsed.treeDiagram(depth+1);
 	    s += (rightChild != null) 
-		? rightChild.get(PrefixHashMap.class).treeDiagram(depth+1)
+		? rightChild.get(DistributedHashMap.class).treeDiagram(depth+1)
 		: rightCollapsed.treeDiagram(depth+1);
 	    
 	    return s;
@@ -2161,9 +2177,9 @@ public class PrefixHashMap<K,V>
     /**
      * An internal utilty class for wrapping the code necessary to
      * traverse the tree when both {@code CollapsedNode} and {@code
-     * PrefixHashMap} nodes are present.
+     * DistributedHashMap} nodes are present.
      *
-     * @see PrefixHashMap#collapse(int,int)
+     * @see DistributedHashMap#collapse(int,int)
      */
     private static class Walkable {
 
@@ -2174,7 +2190,7 @@ public class PrefixHashMap<K,V>
 	 * leftChild() or rightChild() call traverses too deep in the
 	 * tree
 	 */
-	PrefixHashMap map;
+	DistributedHashMap map;
 	CollapsedNode node;	
 
 	/**
@@ -2182,7 +2198,7 @@ public class PrefixHashMap<K,V>
 	 *
 	 * @param map the root of the walkable tree
 	 */
-	public Walkable(PrefixHashMap map) {
+	public Walkable(DistributedHashMap map) {
 	    this.map = map;
 	    this.node = null;	    
 	}
@@ -2219,12 +2235,12 @@ public class PrefixHashMap<K,V>
 	public Walkable leftChild() {
 	    if (map != null) {
 		return (map.leftChild != null)
-		    ? new Walkable(map.leftChild.get(PrefixHashMap.class))
+		    ? new Walkable(map.leftChild.get(DistributedHashMap.class))
 		    : new Walkable(map.collapsedLeftChild);
 	    }
 	    else { 
 		return (node.leftChild != null)
-		    ? new Walkable(node.leftChild.get(PrefixHashMap.class))
+		    ? new Walkable(node.leftChild.get(DistributedHashMap.class))
 		    : new Walkable(node.leftCollapsed);
 	    }
 	}
@@ -2239,19 +2255,20 @@ public class PrefixHashMap<K,V>
 	public Walkable rightChild() {
 	    if (map != null) {
 		return (map.rightChild != null)
-		    ? new Walkable(map.rightChild.get(PrefixHashMap.class))
+		    ? new Walkable(map.rightChild.get(DistributedHashMap.class))
 		    : new Walkable(map.collapsedRightChild);
 	    }
 	    else {
 		return (node.rightChild != null)
-		    ? new Walkable(node.rightChild.get(PrefixHashMap.class))
+		    ? new Walkable(node.rightChild.
+				   get(DistributedHashMap.class))
 		    : new Walkable(node.rightCollapsed);
 	    }
 	}
     }
 
     /**
-     * Saves the state of this {@code PrefixHashMap} instance to the
+     * Saves the state of this {@code DistributedHashMap} instance to the
      * provided stream.
      *
      * @serialData a {@code boolean} of whether this instance was a
@@ -2286,7 +2303,7 @@ public class PrefixHashMap<K,V>
     }
 
     /**
-     * Reconstructs the {@code PrefixHashMap} from the provided
+     * Reconstructs the {@code DistributedHashMap} from the provided
      * stream.
      */
     private void readObject(java.io.ObjectInputStream s) 

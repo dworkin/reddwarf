@@ -4,7 +4,8 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 
-import com.sun.sgs.app.util.PrefixHashMap;
+import com.sun.sgs.app.util.DistributedHashMap;
+import com.sun.sgs.app.util.TestableDistributedHashMap;
 
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
@@ -50,10 +51,11 @@ import org.junit.runner.RunWith;
 
 import com.sun.sgs.test.util.NameRunner;
 
-/**  Test the PrefixHashMap class. */
+/**  
+ * Test the {@link DistributedHashMap} class. 
+ */
 @RunWith(NameRunner.class)
-//public class TestPrefixHashMap {
-public class TestPrefixHashMap extends TestCase {
+public class TestDistributedHashMap extends TestCase {
 
 
     // the location for the database files
@@ -79,7 +81,7 @@ public class TestPrefixHashMap extends TestCase {
      * Test management.
      */
 
-    public TestPrefixHashMap(String name) {
+    public TestDistributedHashMap(String name) {
 	        super(name);
     }
 
@@ -124,47 +126,73 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testConstructorNoArg() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
 	txn.commit();
     }
 
-    @Test public void testConstructorOneArg() throws Exception {
+    @Test public void testConstructorNoArgDepth() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(1);
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
+	assertEquals(1, test.getMaxTreeDepth());
+	assertEquals(1, test.getMinTreeDepth());
 	txn.commit();
     }
 
+
+    @Test public void testConstructorOneArgDepth() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1);
+	assertEquals(1, test.getMaxTreeDepth());
+	assertEquals(1, test.getMinTreeDepth());
+	txn.commit();
+    }
+
+    @Test public void testConstructorOneArgDepth3() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(3);
+	assertEquals(3, test.getMaxTreeDepth());
+	assertEquals(3, test.getMinTreeDepth());
+	txn.commit();
+    }
+
+
+    @Test public void testConstructorOneArgDepth4() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(5);
+	assertEquals(4, test.getMaxTreeDepth());
+	assertEquals(4, test.getMinTreeDepth());
+	txn.commit();
+    }
+
+
     @Test (expected=IllegalArgumentException.class)
-    public void testConstructorOneArgException() throws Exception {
+    public void testConstructorOneArgWithZeroMaxConcurrencyException() 
+	throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
 	try {
-	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(-1);
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(0);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
 	    return;
 	}
-	assertTrue(false);
 	txn.commit();
+	assertTrue(false);
     }
 
-
-    @Test (expected=IllegalArgumentException.class)
-    public void testConstructorOneArgException1() throws Exception {
-	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	try {
-	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(0);
-	}
-	catch(IllegalArgumentException iae) { 
-	    txn.commit();
-	    return;
-	}
-	assertTrue(false);
-	txn.commit();
-    }
+    // NOTE: we do not test the maximum concurrency in the
+    // constructor, as this would take far too long to test (hours).
 
 
     @Test public void testCopyConstructor() throws Exception {
@@ -174,7 +202,7 @@ public class TestPrefixHashMap extends TestCase {
 	for (int i = 0; i < 32; ++i) 
 	    control.put(i,i);
 	Map<Integer,Integer> test =
-	    new PrefixHashMap<Integer,Integer>(control);
+	    new TestableDistributedHashMap<Integer,Integer>(control);
 	assertEquals(control, test);
 	txn.commit();
     }
@@ -185,7 +213,8 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
  	try {
- 	    Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(null);
+ 	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(null);
  	}
  	catch(NullPointerException npe) { 
 	    txn.commit();
@@ -195,15 +224,82 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
     
+    @Test public void testFourArgConstructor() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	try {
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, 5);
+	}
+	catch(IllegalArgumentException iae) { 
+	    txn.commit();
+	    assertTrue(false);
+	    return;
+	}
+	txn.commit();
+    }
+
+    @Test public void testFourArgConstructorSplitThesholdException() 
+	throws Exception {
+
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	try {
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(1, 0, 4, 5);
+	}
+	catch(IllegalArgumentException iae) { 	    
+	    txn.commit();
+	    return;
+	}
+	txn.commit();
+	assertTrue(false);
+    }
+
+    @Test public void testFourArgConstructorMergeThrehsoldException() 
+	throws Exception {
+
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	try {
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 32, 5);
+	}
+	catch(IllegalArgumentException iae) { 	    
+	    txn.commit();
+	    return;
+	}
+	txn.commit();
+	assertTrue(false);
+    }
+
+    @Test public void testFourArgConstructorMaxCollapseException() 
+	throws Exception {
+
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	try {
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, -1);
+	}
+	catch(IllegalArgumentException iae) { 	    
+	    txn.commit();
+	    return;
+	}
+	txn.commit();
+	assertTrue(false);
+    }
+    
 
     /*
      * test putting and getting
      */
 
-    @Test public void testPutAndGet() throws Exception {
+    @Test public void testPutAndGetOnSingleLeaf() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 64; ++count) {
@@ -212,30 +308,25 @@ public class TestPrefixHashMap extends TestCase {
 	    test.put(~i, ~i);
 	    control.put(i,i);
 	    control.put(~i, ~i);
+	    assertEquals(control, test);
 	}
-
-	for (Integer k : control.keySet()) {
-	    if(!control.get(k).equals(test.get(k))) {
-		throw new Exception("error in PrefixHashMap.get()");
-	    }
-	}
-
+	
         txn.commit();
     }
 
     @Test public void testPutAndGetOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 32; ++count) {
 	    int i = RANDOM.nextInt();
 	    test.put(i, i);
 	    control.put(i,i);
+	    assertEquals(control, test);
 	}
-
-	assertEquals(control, test);    
 
         txn.commit();
     }
@@ -244,8 +335,9 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveSingleLeaf() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();	
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 54; ++i) {
 	    
@@ -266,18 +358,20 @@ public class TestPrefixHashMap extends TestCase {
         txn.commit();
     }
 
-
     @Test public void testPutAndRemoveLopsidedPositiveKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
 	    
 	    test.put(i, i);
 	    control.put(i, i);
 	}
+
+	assertEquals(control, test);
 
 	for (int i = 0; i < 128; i += 2) {
 	    test.remove(i);
@@ -292,14 +386,17 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveLopsidedNegativeKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
 	    
 	    test.put(-i, i);
 	    control.put(-i, i);
 	}
+
+	assertEquals(control, test);
 
 	for (int i = 0; i < 128; i += 2) {
 	    test.remove(-i);
@@ -315,8 +412,9 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 96; ++i) {
 	    
@@ -326,23 +424,22 @@ public class TestPrefixHashMap extends TestCase {
 	    control.put(-i, -i);
 	}
 
+	assertEquals(control, test);
+
 	for (int i = 0; i < 127; i += 2) {
 	    assertEquals(control.remove(i), test.remove(i));
 	}
 	
-	assertEquals(control.size(), test.size());
-
-	assertTrue(control.keySet().containsAll(test.keySet()));
-	       
 	assertEquals(control, test);
 	
         txn.commit();
     }
 
-    @Test public void testPutAndRemoveRandomKeys() throws Exception {
-        txn = createTransaction();
+    @Test public void testPutAndRemoveHalfRandomKeys() throws Exception {
+        txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	int[] vals = new int[128];
@@ -354,15 +451,13 @@ public class TestPrefixHashMap extends TestCase {
 	    control.put(j, i);	    
 	}
 
+	assertEquals(control, test);
+
 	for (int i = 0; i < 128; i += 2) {
 	    test.remove(vals[i]);
 	    control.remove(vals[i]);
 	}
 	
-	assertEquals(control.size(), test.size());
-
-	assertTrue(control.keySet().containsAll(test.keySet()));
-	       
 	assertEquals(control, test);
 	
         txn.commit();
@@ -370,10 +465,11 @@ public class TestPrefixHashMap extends TestCase {
 
     
 
-    @Test public void testPutAndRemoveNegative() throws Exception {
+    @Test public void testPutAndRemoveHalfNegativeKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
@@ -382,15 +478,13 @@ public class TestPrefixHashMap extends TestCase {
 	    control.put(-i, -i);
 	}
 
+	assertEquals(control, test);
+
 	for (int i = 0; i < 128; i += 2) {
 	    test.remove(-i);
 	    control.remove(-i);
 	}
 	
-	assertEquals(control.size(), test.size());
-
-	assertTrue(control.keySet().containsAll(test.keySet()));
-	       
 	assertEquals(control, test);
 	
         txn.commit();
@@ -401,8 +495,8 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = 
-	    new PrefixHashMap<Integer,Integer>();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[12];
@@ -448,7 +542,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 24; ++i) {
@@ -469,13 +563,16 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnSplitTree2() throws Exception {
-        txn = createTransaction();
+    @Test public void testPutAndRemoveOnNoMergeTreeWithNoCollapse() 
+	throws Exception {
+        
+	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 0);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	int[] inputs = new int[100];
+	int[] inputs = new int[1024];
 
 	for (int i = 0; i < inputs.length; ++i) {
 	    int j = RANDOM.nextInt();
@@ -494,61 +591,41 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnSplitTree3() throws Exception {
-        txn = createTransaction();
+    @Test public void testPutAndRemoveOnNoMergeTreeWithColllapse() 
+	throws Exception {
+
+        txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 3);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	int[] inputs = new int[25];
+	int[] inputs = new int[1024];
 
 	for (int i = 0; i < inputs.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
 	    control.put(j,j);
-	    assertEquals(control, test);
 	}
 
 	for (int i = 0; i < inputs.length; i += 2) {
 	    test.remove(inputs[i]);
 	    control.remove(inputs[i]);
-	    assertEquals(control, test);
 	}
+
+	assertEquals(control, test);
 
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnSplitTree4() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,j);
-	    control.put(j,j);
-	    assertEquals(control, test);
-	}
-
-	for (int i = 0; i < inputs.length; i += 2) {
-	    int j = RANDOM.nextInt(inputs.length);
-	    test.remove(inputs[j]);
-	    control.remove(inputs[j]);
-	    assertEquals(control, test);
-	}
-
-	txn.commit();
-    }
 
     @Test public void testRepeatedPutAndRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];
@@ -584,55 +661,89 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testNumerousPutAndRemove() throws Exception {
-        txn = createTransaction(10000000);
-
+    @Test public void testRepeatedPutAndRemoveWithNoMergeAndNoCollapse() 
+	throws Exception {
+        
+	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
-	PrefixHashMap<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,0);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	int[] inputs = new int[4 * 128];
+	int[] inputs = new int[1024];
 
 	for (int i = 0; i < inputs.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
 	    control.put(j,j);
-	    assertEquals(control.size(), test.size());
-	    assertEquals(control, test);
 	}
 
- 	for (int i = 0; i < inputs.length; i++) {
- 	    test.remove(inputs[i]);
- 	    control.remove(inputs[i]);
-	    assertEquals(control, test);
- 	}
+	for (int i = 0; i < inputs.length; i += 4) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
+	assertEquals(control, test);
 
- 	assertEquals(control, test);
-
- 	for (int i = 0; i < inputs.length; i++) {
- 	    test.put(inputs[i],inputs[i]);
- 	    control.put(inputs[i],inputs[i]);
-
-	    assertEquals(control, test);
- 	}
-
- 	assertEquals(control, test);
+	for (int i = 0; i < inputs.length; i += 3) {
+	    test.put(inputs[i],inputs[i]);
+	    control.put(inputs[i],inputs[i]);
+	}
+	assertEquals(control, test);
 
 
- 	for (int i = 0; i < inputs.length; i += 2) {
- 	    test.remove(inputs[i]);
- 	    control.remove(inputs[i]);
+	for (int i = 0; i < inputs.length; i += 2) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
 
-	    assertEquals(control, test);
- 	}
-
- 	assertEquals(control, test);
+	assertEquals(control, test);
 
 
 	txn.commit();
     }
 
+    @Test public void testRepeatedPutAndRemoveWithNoMergeAndCollapse() 
+	throws Exception {
+
+        txn = createTransaction(100000);
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,4);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[400];
+
+	for (int i = 0; i < inputs.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,j);
+	    control.put(j,j);
+	}
+
+	for (int i = 0; i < inputs.length; i += 4) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
+	assertEquals(control, test);
+
+	for (int i = 0; i < inputs.length; i += 3) {
+	    test.put(inputs[i],inputs[i]);
+	    control.put(inputs[i],inputs[i]);
+	}
+	assertEquals(control, test);
+
+
+	for (int i = 0; i < inputs.length; i += 2) {
+	    test.remove(inputs[i]);
+	    control.remove(inputs[i]);
+	}
+
+	assertEquals(control, test);
+
+
+	txn.commit();
+    }
 
     @Test public void testPutAll() throws Exception {
         txn = createTransaction();
@@ -640,7 +751,7 @@ public class TestPrefixHashMap extends TestCase {
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	 for (int i = 0; i < 32; ++i) 
 	     control.put(i,i);
-	 Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	 Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	 test.putAll(control);
 	 assertEquals(control, test);
 	 txn.commit();
@@ -650,7 +761,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullPut() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(16);
+	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -664,7 +775,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullGet() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(16);
+	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
 
 	test.put(null, 0);
 	assertEquals(new Integer(0), test.get(null));
@@ -675,7 +786,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullContainsKey() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(16);
+	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
 
 	test.put(null, 0);
 	assertTrue(test.containsKey(null));
@@ -686,7 +797,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullContainsKeyOnEmptyMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(16);
+	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
 
 	assertFalse(test.containsKey(null));
 	
@@ -696,7 +807,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullContainsValue() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 
 	test.put(0, null);
 	assertTrue(test.containsValue(null));
@@ -707,7 +818,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testContainsKeyOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -728,7 +839,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testValues() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -748,7 +859,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testValuesOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -770,7 +881,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testContainsValue() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -792,7 +903,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testContainsValueOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -816,7 +927,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testNullRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new PrefixHashMap<String,Integer>(16);
+	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -836,7 +947,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testClear() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -857,11 +968,42 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
+    @Test public void testMultipleClearOperations() throws Exception {
+        txn = createTransaction(1000000);
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	test.clear();
+	assertEquals(control, test);
+	
+	// add just a few elements
+	for (int i = 0; i < 33; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+
+	// add just enough elements to force a split
+	for (int i = 0; i < 1024; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+	
+	txn.commit();
+    }
+    
+
 
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -889,12 +1031,36 @@ public class TestPrefixHashMap extends TestCase {
 	txn.commit();
     }
 
+    @Test public void testInvalidGet() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+
+	// put in numbers
+	for (int i = 4000; i < 4100; ++i) {
+	    test.put(i, i);
+	}
+
+	// get from outside the range of the put
+	for (int i = 0; i < 100; ++i) {
+	    	    
+	    assertEquals(null,test.get(i));
+	}
+	
+        txn.commit();
+    }
+
+    /*
+     *
+     * Size Tests
+     *
+     */
 
 
     @Test public void testLeafSize() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
 
@@ -924,7 +1090,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testLeafSizeAfterRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 
 	int SAMPLE_SIZE = 10;
 
@@ -955,65 +1121,12 @@ public class TestPrefixHashMap extends TestCase {
         txn.commit();
     }    
 
-    @Test public void testClearVariations() throws Exception {
-        txn = createTransaction(1000000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	test.clear();
-	assertEquals(control, test);
-	
-	// add just a few elements
-	for (int i = 0; i < 33; ++i) {
-	    int j = RANDOM.nextInt();
-	    test.put(j,j);
-	}
-
-	test.clear();
-	assertEquals(control, test);
-
-	// add just enough elements to force a split
-	for (int i = 0; i < 1024; ++i) {
-	    int j = RANDOM.nextInt();
-	    test.put(j,j);
-	}
-
-	test.clear();
-	assertEquals(control, test);
-	
-	txn.commit();
-    }
-    
-
-    @Test public void testIteratorOnSplitTree() throws Exception {
-        txn = createTransaction();
-
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
-	Set<Integer> control = new HashSet<Integer>();
-
-
-	// get from outside the range of the put
-	for (int i = 0; i < 33; ++i) {
-	    int j = RANDOM.nextInt();
-	    test.put(j,j);
-	    control.add(j);
-	}
-
-	for (Integer i : test.keySet()) {
-	    control.remove(i);
-	}
-	    
-	assertEquals(0, control.size());
-        txn.commit();
-    }    
 
     @Test public void testTreeSizeOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1042,8 +1155,8 @@ public class TestPrefixHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	PrefixHashMap<Integer,Integer> test = 
-	    new PrefixHashMap<Integer,Integer>(16);
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1095,12 +1208,43 @@ public class TestPrefixHashMap extends TestCase {
         txn.commit();
     }    
 
+
+    /*
+     *
+     * Iterator Tests
+     *
+     */
+
+    @Test public void testIteratorOnSplitTree() throws Exception {
+        txn = createTransaction();
+
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Set<Integer> control = new HashSet<Integer>();
+
+
+	// get from outside the range of the put
+	for (int i = 0; i < 33; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	    control.add(j);
+	}
+
+	for (Integer i : test.keySet()) {
+	    control.remove(i);
+	}
+	    
+	assertEquals(0, control.size());
+        txn.commit();
+    }    
+
+
     @Test public void testIteratorOnSplitTreeWithRemovals() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	PrefixHashMap<Integer,Integer> test = 
-	    new PrefixHashMap<Integer,Integer>(16);
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
 	HashMap<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
@@ -1164,31 +1308,10 @@ public class TestPrefixHashMap extends TestCase {
         txn.commit();
     }    
 
-
-
-    @Test public void testInvalidGet() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
-
-	// put in numbers
-	for (int i = 4000; i < 4100; ++i) {
-	    test.put(i, i);
-	}
-
-	// get from outside the range of the put
-	for (int i = 0; i < 100; ++i) {
-	    	    
-	    assertEquals(null,test.get(i));
-	}
-	
-        txn.commit();
-    }
-
     @Test public void testKeyIterator() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -1211,7 +1334,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testKeyIteratorOnSplitMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -1234,7 +1357,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testValuesIterator() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
 	
 	
@@ -1256,7 +1379,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testValuesIteratorOnSplitMap() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
 	
 	
@@ -1281,7 +1404,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testInvalidRemove() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	
 	// put in numbers
 	for (int i = 4000; i < 4100; ++i) {
@@ -1301,7 +1424,7 @@ public class TestPrefixHashMap extends TestCase {
 	@Test public void testLeafSerialization() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[100];
@@ -1323,8 +1446,8 @@ public class TestPrefixHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 	
-	PrefixHashMap<Integer,Integer> m = 
-	    (PrefixHashMap<Integer,Integer>) ois.readObject();
+	TestableDistributedHashMap<Integer,Integer> m = 
+	    (TestableDistributedHashMap<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
 	
@@ -1337,7 +1460,7 @@ public class TestPrefixHashMap extends TestCase {
     @Test public void testSplitTreeSerialization() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new PrefixHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[100];
@@ -1359,8 +1482,8 @@ public class TestPrefixHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 	
-	PrefixHashMap<Integer,Integer> m = 
-	    (PrefixHashMap<Integer,Integer>) ois.readObject();
+	TestableDistributedHashMap<Integer,Integer> m = 
+	    (TestableDistributedHashMap<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
 	
@@ -1420,7 +1543,7 @@ public class TestPrefixHashMap extends TestCase {
       */
 
 //     public static junit.framework.Test suite() {
-// 	return new JUnit4TestAdapter(TestPrefixHashMap.class);
+// 	return new JUnit4TestAdapter(TestDistributedHashMap.class);
 //     }
 
 

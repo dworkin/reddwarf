@@ -13,7 +13,7 @@ import com.sun.sgs.app.ManagedReference;
 
 /**
  * A concurrent, scalable {@code Set} implementation backed by a
- * {@link PrefixHashMap}.  This class is intended as a drop-in
+ * {@link DistributedHashMap}.  This class is intended as a drop-in
  * replacement for {@code java.util.HashSet}.
  *
  * <p>
@@ -36,7 +36,7 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * An instance of {@code PrefixHashSet} offers one parameters for
+ * An instance of {@code DistributedHashSet} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  As the
  * set grows, the number of supported parallel operations will also
@@ -45,9 +45,9 @@ import com.sun.sgs.app.ManagedReference;
  * high will waste space and time, while setting it too low will cause
  * conflicts until the set grows sufficiently to support more
  * concurrent operations.  Furthermore, the efficacy of the
- * concurrency depends on the distribution of hash values; elements with
- * poor hashing will minimize the actual number of possible concurrent
- * writes, regardless of the {@code minConcurrency} value.
+ * concurrency depends on the distribution of hash values; elements
+ * with poor hashing will minimize the actual number of possible
+ * concurrent writes, regardless of the {@code minConcurrency} value.
  *
  * @version 1.0
  *
@@ -59,7 +59,7 @@ import com.sun.sgs.app.ManagedReference;
  * @see ManagedObject
  */
 @SuppressWarnings({"unchecked"})
-public class PrefixHashSet<E>
+public class DistributedHashSet<E>
     extends AbstractSet<E>
     implements Set<E>, Serializable, ManagedObject {
 
@@ -76,19 +76,19 @@ public class PrefixHashSet<E>
     private final ManagedReference map;
 
     /**
-     * Creates a new empty set; the backing {@code PrefixHashMap} has
-     * the default minimum concurrency.
+     * Creates a new empty set; the backing {@code DistributedHashMap}
+     * has the default minimum concurrency.
      *
-     * @see PrefixHashMap#PrefixHashMap()
+     * @see DistributedHashMap#DistributedHashMap()
      */
-    public PrefixHashSet() {
+    public DistributedHashSet() {
 	map = AppContext.getDataManager().
-	    createReference(new PrefixHashMap<E,Marker>());	
+	    createReference(new DistributedHashMap<E,Marker>());	
     }
 
     /**
-     * Creates a new empty set; the backing {@code PrefixHashMap} has
-     * the specified minimum concurrency.
+     * Creates a new empty set; the backing {@code DistributedHashMap}
+     * has the specified minimum concurrency.
      * 
      * @param minConcurrency the minimum number of write operations to
      *        support in parallel
@@ -96,11 +96,11 @@ public class PrefixHashSet<E>
      * @throws IllegalArgumentException if minConcurrency is
      *         non-positive
      *
-     * @see PrefixHashMap#PrefixHashMap(int)
+     * @see DistributedHashMap#DistributedHashMap(int)
      */
-    public PrefixHashSet(int minConcurrency) {
+    public DistributedHashSet(int minConcurrency) {
 	map = AppContext.getDataManager().
-	    createReference(new PrefixHashMap<E,Marker>(minConcurrency));
+	    createReference(new DistributedHashMap<E,Marker>(minConcurrency));
 	
     }
     
@@ -113,7 +113,7 @@ public class PrefixHashSet<E>
      *         specified element
      */
     public boolean add(E e) {
-	return map.get(PrefixHashMap.class).put(e, PRESENT) == null;
+	return map.get(DistributedHashMap.class).put(e, PRESENT) == null;
     }
 
     /**
@@ -122,7 +122,7 @@ public class PrefixHashSet<E>
      * a set takes {@code n log(n)} time.
      */ 
     public void clear() {
-	map.get(PrefixHashMap.class).clear();
+	map.get(DistributedHashMap.class).clear();
     }
 
 
@@ -134,7 +134,7 @@ public class PrefixHashSet<E>
      *         element.
      */
     public boolean contains(Object o) {
-	return map.get(PrefixHashMap.class).containsKey(o);
+	return map.get(DistributedHashMap.class).containsKey(o);
     }
 
 
@@ -144,7 +144,7 @@ public class PrefixHashSet<E>
      * @return {@code true} if this set contains no elements.
      */
     public boolean isEmpty() {
-	return map.get(PrefixHashMap.class).isEmpty();
+	return map.get(DistributedHashMap.class).isEmpty();
     }
 
     /**
@@ -153,7 +153,7 @@ public class PrefixHashSet<E>
      * @return an iterator over the elements in this set
      */
     public Iterator<E> iterator() {
-	return map.get(PrefixHashMap.class).keySet().iterator();
+	return map.get(DistributedHashMap.class).keySet().iterator();
     }
    
 
@@ -164,7 +164,7 @@ public class PrefixHashSet<E>
      *         this set
      */
     public boolean remove(Object o) {
-	return map.get(PrefixHashMap.class).remove(o) == PRESENT;
+	return map.get(DistributedHashMap.class).remove(o) == PRESENT;
     }
 
     /**
@@ -175,7 +175,7 @@ public class PrefixHashSet<E>
      * @return the number of elements in thus set
      */
     public int size() {
-	return map.get(PrefixHashMap.class).size();
+	return map.get(DistributedHashMap.class).size();
     }
 
     /**
