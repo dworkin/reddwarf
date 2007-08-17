@@ -458,13 +458,18 @@
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
       <fileset file="${build.dir}/README"/>
       <zipfileset dir="${build.dir}/sgs" includes="**"
-		  excludes="sgs.sh, lib/bdb/win32-x86/*"
+		  excludes="sgs.sh"
 		  prefix="sgs-${project.version}"/>
       <zipfileset dir="${build.dir}/sgs"
-		  includes="sgs.sh, lib/bdb/win32-x86/*"
+		  includes="sgs.sh"
 		  filemode="755"
 		  prefix="sgs-${project.version}"/>
       <zipfileset dir="${build.dir}/bdb" includes="**"
+		  excludes="win32-x86/*"
+		  prefix="bdb-${bdb.version}"/>
+      <zipfileset dir="${build.dir}/bdb"
+		  includes="win32-x86/*"
+		  filemode="755"
 		  prefix="bdb-${bdb.version}"/>
       <zipfileset dir="${build.dir}/mina" includes="**"
 		  prefix="mina-${mina.version}"/>
