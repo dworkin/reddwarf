@@ -261,9 +261,7 @@ public final class AdaptiveField<T> implements java.io.Serializable {
 	    // invalidate the local copy and move this field into the
 	    // data store
 	    if (this.isLocal) {
-		local  = null;
-		this.local = local;
-		remoteCache = value;
+
 		// null remote values are never stored in the data
 		// store, and the ref should already be null at this
 		// point
@@ -271,16 +269,17 @@ public final class AdaptiveField<T> implements java.io.Serializable {
 		    ref = AppContext.getDataManager().
 			createReference(new ManagedSerializable<T>(value));
 	    }
-	    // the value was already remotely managed
+	    // the value was already remotely managed, so attempt to
+	    // reuse the old ManagedSerializable
 	    else {
-		// previously the remote value was null, so we need to
-		// create a new managed reference
+		// if the previously the remote value was null, we
+		// need to create a new managed reference
 		if (ref == null && value != null)
 		    ref = AppContext.getDataManager().
 			createReference(new ManagedSerializable<T>(value));
 		// we can reuse the previous ManagedSeriazable to hold
 		// the value
-		else if (value != null) {
+		else if (ref != null && value != null) {
 		    ManagedSerializable<T> m = 
 			ref.get(ManagedSerializable.class);
 		    m.set(value);
@@ -288,15 +287,22 @@ public final class AdaptiveField<T> implements java.io.Serializable {
 		// else, the value is null but we had an old value
 		// stored by reference, so remove it from the data
 		// store
-		else 
+		else if (ref != null && value == null)
 		    AppContext.getDataManager().
-			removeObject(ref.get(ManagedSerializable.class));
-		
+			removeObject(ref.get(ManagedSerializable.class));	          
 
 		local = null;
 		remoteCache = value;
-		this.isLocal = isLocal;
+		this.isLocal = isLocal;	    
 	    }
 	}
-    }    
+    }  
+
+
+    private void readObject(java.io.ObjectInputStream s) 
+	throws java.io.IOException, ClassNotFoundException {
+
+	s.defaultReadObject();
+	remoteCache = null;
+    }  
 }

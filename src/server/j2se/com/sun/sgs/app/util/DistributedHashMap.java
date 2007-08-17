@@ -984,15 +984,11 @@ public class DistributedHashMap<K,V>
 				   rightChild_.splitThreshold,
 				   rightChild_.mergeThreshold,
 				   rightChild_.maxCollapse);
-	if (child.map != null) {
-	    replacement.leftChild = child.map.leftChild;
-	    replacement.rightChild = child.map.rightChild;
-	}
-	else {
-	    replacement.leftChild = child.node.leftChild;
-	    replacement.rightChild = child.node.rightChild;
-	}
 
+	// copy over the CollapsedNode's children into the replacement
+	replacement.leftChild = child.node.leftChild;
+	replacement.rightChild = child.node.rightChild;
+	
 	ManagedReference replacementRef = dm.createReference(replacement);
 
 	// next, correct the parent link to the child.  either the
@@ -1154,8 +1150,8 @@ public class DistributedHashMap<K,V>
      * @param m the map to be copied
      */
     public void putAll(Map<? extends K, ? extends V> m) {
-	for (K k : m.keySet())
-	    put(k, m.get(k));
+	for (Map.Entry<? extends K,? extends V> e : m.entrySet())
+	    put(e.getKey(), e.getValue());
     }
 
     /**
@@ -1321,23 +1317,32 @@ public class DistributedHashMap<K,V>
      *         rooted at this node.
      */
     String treeString() {
-	if (leftChild == null) {
-	    String s = "(";
+	if (leftChild == null && collapsedLeftChild == null) {
+	    StringBuffer s = new StringBuffer("(");
+	    int count = 0;
 	    for (PrefixEntry e : table) {
 		if (e != null) {
 		    do {
-			s += (e + ((e.next == null) ? "" : ", "));
+			count++;
+			s.append(e + ((e.next == null) ? "" : ", "));		
 			e = e.next;
 		    } while (e != null);
-		    s += ", ";
+		    if (count < size)
+			s.append(", ");
+		    else
+			break;
 		}
 	    }
-	    return s.substring(0, s.length() - 2) + ")";
+	    return s.append(")").toString();
 	}
 	else {
-	    DistributedHashMap l = leftChild.get(DistributedHashMap.class);
-	    DistributedHashMap r = rightChild.get(DistributedHashMap.class);
-	    return "(" + l.treeString() + ", " + r.treeString() + ")";
+	    return "(" + 
+		((leftChild != null)
+		 ? leftChild.get(DistributedHashMap.class).treeString()
+		 : collapsedLeftChild.treeString()) + ", " +
+		((rightChild != null)
+		 ? rightChild.get(DistributedHashMap.class).treeString() 
+		 : collapsedRightChild.treeString()) + ")";
 	}
     }
 
@@ -1607,11 +1612,11 @@ public class DistributedHashMap<K,V>
 		// if previously the key and value were combined,
 		// split them out.
 		if (isKeyValueCombined) {
-		    K key = pair.getKey();
 		    keyRef = dm.createReference(
 		        new ManagedSerializable<K>(pair.getKey()));
 		    dm.removeObject(pair);
 		    isKeyWrapped = true;
+		    isKeyValueCombined = false;
 		}
 
 
@@ -2155,6 +2160,8 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @return a string representation of the subtree rooted at
 	 *         this node
+	 *
+	 * @see DistributedHashMap#treeDiagram()
 	 */
 	String treeDiagram(int depth) {
 	    String s; int i = 0;
@@ -2171,6 +2178,25 @@ public class DistributedHashMap<K,V>
 		: rightCollapsed.treeDiagram(depth+1);
 	    
 	    return s;
+	}
+
+	/**
+	 * Returns the parenthetically grouped subtrees under this
+	 * intermediate node.
+	 *
+	 * @return a string representation of this subtree
+	 *
+	 * @see DistributedHashMap#treeString()
+	 */
+	String treeString() {
+	    return "(" +
+		((leftChild != null)
+		 ? leftChild.get(DistributedHashMap.class).treeString() 
+		 : leftCollapsed.treeString()) + "," +
+		((rightChild != null) 
+		 ? rightChild.get(DistributedHashMap.class).treeString()
+		 : rightCollapsed.treeString()) + ")";
+
 	}
     }
 
@@ -2291,12 +2317,12 @@ public class DistributedHashMap<K,V>
 	    // iterate over all the table, stopping when all the
 	    // entries have been seen
 	    PrefixEntry e;
-	    for (int i = 0, j = 0; j < size; ++i) {
+	    for (int i = 0, elements = 0; elements < size; ++i) {
 		if ((e = table[i]) != null) {
-		    j++;
+		    elements++;
 		    s.writeObject(table[i]);
-		    for (; (e = e.next) != null; ++j)
-			;
+		    for (; (e = e.next) != null; ++elements)
+			; // count any chained entries
 		}
 	    }
 	}
