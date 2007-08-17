@@ -11,9 +11,11 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
@@ -176,21 +178,17 @@ public class TestDataServiceConcurrency extends TestCase {
     /* -- Tests -- */
 
     public void testConcurrency() throws Throwable {
-	service = getDataService(props, componentRegistry);
+	service = getDataService(props, componentRegistry, txnProxy);
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(
 		((ProfileProducer) service));
 	}
-	DummyTransaction txn = new DummyTransaction(10000);
-	txnProxy.setCurrentTransaction(txn);
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
-	txn.commit();
 	int perThread = objects + objectsBuffer;
 	/* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
-	    txn = new DummyTransaction(10000);
+	    DummyTransaction txn = new DummyTransaction(10000);
 	    txnProxy.setCurrentTransaction(txn);
 	    int start = t * perThread;
 	    for (int i = 0; i < perThread; i++) {
@@ -409,11 +407,12 @@ public class TestDataServiceConcurrency extends TestCase {
     }
 
     /** Returns the data service to test. */
-    protected DataService getDataService(
-	Properties props, DummyComponentRegistry componentRegistry)
+    protected DataService getDataService(Properties props,
+					 ComponentRegistry componentRegistry,
+					 TransactionProxy txnProxy)
 	throws Exception
     {
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /** Returns the binding name to use for the i'th object. */

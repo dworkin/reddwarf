@@ -6,13 +6,17 @@ package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 
 /**
- * Utility class for reserving blocks of non-reusable IDs.
+ * Utility class for reserving blocks of non-reusable IDs.  The
+ * generated IDs start at {@code 1L}.
  */
 public class IdGenerator {
 
@@ -22,10 +26,9 @@ public class IdGenerator {
     private final String name;
     private final int blockSize;
     private final TransactionProxy txnProxy;
-    private final NonDurableTaskScheduler scheduler;
-    private final TransactionContextFactory<Context> contextFactory;
+    private final TaskScheduler scheduler;
+    private final TaskOwner owner;
     private final Object lock = new Object();
-    private ReserveIdBlockTask reserveTask = null;
     private long nextId = 1;
     private long lastReservedId = 0;
 
@@ -45,7 +48,7 @@ public class IdGenerator {
     public IdGenerator(
 	String name, int blockSize,
 	TransactionProxy proxy,
-	NonDurableTaskScheduler scheduler)
+	TaskScheduler scheduler)
     {
 	if (name == null) {
 	    throw new NullPointerException("null name");
@@ -60,9 +63,9 @@ public class IdGenerator {
 	}
 	this.name = name;
 	this.blockSize = blockSize;
-	this.scheduler = scheduler;
 	this.txnProxy = proxy;
-	this.contextFactory = new ContextFactory(proxy);
+	this.scheduler = scheduler;
+	this.owner = proxy.getCurrentOwner();
     }
 
     /**
@@ -74,19 +77,16 @@ public class IdGenerator {
      * outcome of the current transaction (if any).
      *
      * @return	the next ID
-     * @throws	InterruptedException if this method is interrupted
-     *		while waiting for the task to reserve a block of IDs
+     * @throws	Exception if there is a problem reserving a block of IDs
      */
-    public long next() throws InterruptedException {
+    public long next() throws Exception {
 	synchronized (lock) {
-	    while (nextId > lastReservedId) {
-		if (reserveTask == null) {
-		    // schedule task to reserve next block
-		    reserveTask = new ReserveIdBlockTask();
-		    scheduler.scheduleTask(reserveTask);
-		} else {
-		    lock.wait();
-		}
+	    if (nextId > lastReservedId) {
+		ReserveIdBlockTask reserveTask = new ReserveIdBlockTask();
+		scheduler.runTask(
+		    new TransactionRunner(reserveTask), owner, true);
+		nextId = reserveTask.firstId;
+		lastReservedId = reserveTask.lastId;
 	    }
 	    return nextId++;
 	}
@@ -98,10 +98,9 @@ public class IdGenerator {
      * result in a byte array in network byte order.
      *
      * @return	the next ID in a byte array
-     * @throws	InterruptedException if this method is interrupted
-     *		while waiting for the task to reserve a block of IDs
+     * @throws	Exception if there is a problem reserving a block of IDs
      */
-    public byte[] nextBytes() throws InterruptedException {
+    public byte[] nextBytes() throws Exception {
 	long id = next();
 	byte[] idBytes = new byte[8];
 	for (int i = idBytes.length-1; i >=0; i--) {
@@ -113,57 +112,16 @@ public class IdGenerator {
 
     /* -- Other classes -- */
 
-    
-    private class ContextFactory extends TransactionContextFactory<Context> {
-	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
-	}
-	
-	/** {@inheritDoc} */
-	public Context createContext(Transaction txn) {
-	    return new Context(txn);
-	}
-    }
-
-    private final class Context extends TransactionContext {
-	
-	private long firstId;
-	private long lastId;
-
-	/**
-	 * Constructs a context with the specified transaction.
-	 */
-        private Context(Transaction txn) {
-	    super(txn);
-	}
-
-	public void abort(boolean retryable) {
-	    synchronized (lock) {
-		if (! retryable) {
-		    reserveTask = null;
-		}
-		lock.notifyAll();
-	    }
-	}
-
-	public void commit() {
-	    synchronized (lock) {
-		nextId = firstId;
-		lastReservedId = lastId;
-		reserveTask = null;
-		lock.notifyAll();
-	    }
-        }
-    }
-
     /**
      * Task to reserve the next block of IDs for this generator.
      */
-    private class ReserveIdBlockTask extends AbstractKernelRunnable {
+    private final class ReserveIdBlockTask extends AbstractKernelRunnable {
+
+	volatile long firstId;
+	volatile long lastId;
 
 	/** {@inheritDoc} */
 	public void run() {
-	    Context context = contextFactory.joinTransaction();
 	    DataService dataService = txnProxy.getService(DataService.class);
 	    State state;
 	    try {
@@ -173,8 +131,8 @@ public class IdGenerator {
 		dataService.setServiceBinding(name, state);
 	    }
 	    dataService.markForUpdate(state);
-	    context.firstId = state.lastId + 1;
-	    context.lastId = state.reserve(blockSize);
+	    firstId = state.lastId + 1;
+	    lastId = state.reserve(blockSize);
 	}
     }
 

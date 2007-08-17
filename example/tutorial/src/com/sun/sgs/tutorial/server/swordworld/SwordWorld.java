@@ -17,7 +17,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 /**
- * A tiny sample MUD application for the Sun Game Server.
+ * A tiny sample MUD application for the Project Darkstar Server.
  * <p>
  * There is a Room.  In the Room there is a Sword...
  */

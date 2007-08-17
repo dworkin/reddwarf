@@ -4,36 +4,40 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.kernel.ComponentRegistry;
-
 
 /**
  * This is the base interface used for all services. Services support
  * specific funcationality and work in a transactional context. Each
  * service instance works on behalf of a single application, and can only
  * interact with other services working in the same application context.
- * See <code>TransactionParticipant</code> for details on when interaction
- * between <code>Service</code>s is allowed.
+ * See {@code TransactionParticipant} for details on when interaction
+ * between {@code Service}s is allowed.
  * <p>
- * On startup of an application, services are created and configured. This
- * is done in two stages. First, all <code>Service</code>s are constructed
- * (see details below). This provides access to the non-transactional
- * aspects of the system. Second, all <code>Service</code>'s
- * <code>configure</code> methods are called in a transactional context.
- * The order in which the <code>Service</code>'s <code>configure</code>
- * methods are called is always to start with the <code>DataService</code>,
- * then <code>TaskService</code>, next the <code>ChannelManager</code>,
- * and finish with any custom <code>Service</code>s ordered based on the
+ * On startup of an application, services are constructed (see details
+ * below). This provides access to the non-transactional core components
+ * of the system as well as the other {@code Service}s that have already
+ * been created. {@code Service}s are created in a known order based
+ * on dependencies: {@code DataService}, {@code WatchdogService},
+ * {@code NodeMappingService}, {@code TaskService},
+ * {@code ClientSessionService}, and the {@code ChannelManager},
+ * finishing with any custom {@code Service}s ordered based on the
  * application's configuration.
  * <p>
- * All implementations of <code>Service</code> must have a constructor of
- * the form (<code>Properties</code>, <code>ComponentRegistry</code>). This
- * is how the <code>Service</code> is created on startup. The
- * <code>Properties</code> parameter provides service-specific properties.
- * The <code>ComponentRegistry</code> provides access to non-transactional
- * kernel and system components like the <code>TaskScheduler</code>. If
- * there is an error, the constructor may throw any <code>Exception</code>,
- * and this will halt startup of the application.
+ * All implementations of {@code Service} must have a constructor with
+ * parameters of types {@code Properties}, {@code ComponentRegistry}, and
+ * {@code TransactionProxy}. This is how the {@code Service} is created
+ * on startup. The {@code Properties} parameter provides application and
+ * service-specific properties. The {@code ComponentRegistry} provides
+ * access to non-transactional kernel and system components like the
+ * {@code TaskScheduler}. The {@code TransactionProxy} provides access to
+ * transactional state (when active) and the other available {@code Service}s.
+ * If any error occurs in creating a {@code Service}, the constructor may
+ * throw any {@code Exception}, causing the application to shutdown.
+ * <p>
+ * Note that {@code Service}s are not created in the context of a
+ * transaction. If a given constructor needs to do any work transactionally,
+ * it should do so by calling {@code TaskScheduler.runTask} with an instance
+ * of {@code TransactionRunner}.
  */
 public interface Service {
 
@@ -45,54 +49,43 @@ public interface Service {
     public String getName();
 
     /**
-     * This method should be called only once in the lifetime of any given
-     * instance of <code>Service</code>. It is called by the kernel when
-     * an application is starting up. The <code>ComponentRegistry</code>
-     * provides access to any <code>Service</code>s that have already
-     * finished their configuration, and are therefore available for use.
+     * Notifies this {@code Service} that the application context is fully
+     * configured and ready to start running. This means that all other {@code
+     * Service}s associated with this application have been successfully
+     * created. If the method throws an exception, then the application will be
+     * shutdown.
      * <p>
-     * Note that this method is called in a transactional context, and
-     * specifically in the same context in which all other
-     * <code>Service</code>'s <code>configure</code> methods are called. If
-     * this <code>Service</code> does anything during configuration that
-     * requires it to vote or get notified if the transaction is aborted, it
-     * should <code>join</code> the transaction as it would during normal
-     * operation. If there is any error during configuration, and an
-     * <code>Exception</code> is thrown that implements
-     * <code>ExceptionRetryStatus</code>, then the system will consult
-     * the <code>shouldRetry</code> method to see if configuration should
-     * be attempted again. In most if not all cases, configuration should
-     * be retried, since the alternative is to halt startup of the
-     * application.
+     * Note that before this point, the available application context (provided
+     * by {@code TransactionProxy.getCurrentOwner}) will be incomplete.
+     * Specifically, {@code Manager}s and other facilities provided by the
+     * {@code AppContext} will be unavailable. If you need to use these aspects
+     * of the application context (e.g., for scheduling tasks that run
+     * application level code), or store it for future use, you should do so
+     * once {@code ready} is called, but not before. When your {@code Service}
+     * is constructed, the available context will only provide access to those
+     * services that have already been created.
      *
-     * @param registry the <code>ComponentRegistry</code> of already
-     *                 configured <code>Service</code>s
-     * @param proxy the proxy used to resolve details of the current
-     *              transaction
-     *
-     * @throws IllegalStateException if this method has already been called
-     * @throws RuntimeException if there is any trouble configuring this
-     *                          <code>Service</code>
+     * @throws Exception if an error occurs
      */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy);
+    public void ready() throws Exception;
 
     /** 
      * Attempts to shut down this service, returning a value indicating whether
      * the attempt was successful.  The call will throw {@link
      * IllegalStateException} if a call to this method has already completed
-     * with a return value of <code>true</code>. <p>
+     * with a return value of {@code true}. <p>
      *
      * This method does not require a transaction, and should not be called
      * from one because this method will typically not succeed if there are
      * outstanding transactions. <p>
      *
      * Typical implementations will refuse to accept calls associated with
-     * transactions that were not joined prior to the <code>shutdown</code>
-     * call by throwing an <code>IllegalStateException</code>, and will wait
+     * transactions that were not joined prior to the {@code shutdown}
+     * call by throwing an {@code IllegalStateException}, and will wait
      * for already joined transactions to commit or abort before returning,
      * although the precise behavior is implementation specific.
      * Implementations are also permitted, but not required, to return
-     * <code>false</code> if {@link Thread#interrupt Thread.interrupt} is
+     * {@code false} if {@link Thread#interrupt Thread.interrupt} is
      * called on a thread that is currently blocked within a call to this
      * method. <p>
      *
@@ -101,10 +94,10 @@ public interface Service {
      * calling {@link System#exit System.exit}) if the call fails to complete
      * successfully in a certain amount of time.
      *
-     * @return	<code>true</code> if the shut down was successful, else
-     *		<code>false</code>
-     * @throws	IllegalStateException if the <code>shutdown</code> method has
-     *		already been called and returned <code>true</code>
+     * @return	{@code true} if the shut down was successful, else
+     *		{@code false}
+     * @throws	IllegalStateException if the {@code shutdown} method has
+     *		already been called and returned {@code true}
      */
     public boolean shutdown();
 

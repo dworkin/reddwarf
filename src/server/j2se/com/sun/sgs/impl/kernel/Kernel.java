@@ -19,10 +19,8 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
 
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -93,25 +91,7 @@ class Kernel {
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:" +
         "com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener:" +
-	"com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener";
-
-    // the default services
-    private static final String DEFAULT_CHANNEL_SERVICE =
-        "com.sun.sgs.impl.service.channel.ChannelServiceImpl";
-    private static final String DEFAULT_CLIENT_SESSION_SERVICE =
-        "com.sun.sgs.impl.service.session.ClientSessionServiceImpl";
-    private static final String DEFAULT_DATA_SERVICE =
-        "com.sun.sgs.impl.service.data.DataServiceImpl";
-    private static final String DEFAULT_TASK_SERVICE =
-        "com.sun.sgs.impl.service.task.TaskServiceImpl";
-
-    // the default managers
-    private static final String DEFAULT_CHANNEL_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfileChannelManager";
-    private static final String DEFAULT_DATA_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfileDataManager";
-    private static final String DEFAULT_TASK_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfileTaskManager";
+        "com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -308,201 +288,12 @@ class Kernel {
         ComponentRegistryImpl systemRegistry =
             new ComponentRegistryImpl(appSystemComponents);
 
-        // resolve the scheduler
-        MasterTaskScheduler scheduler =
-            systemRegistry.getComponent(MasterTaskScheduler.class);
-
-        // create the services and their associated managers...call out
-        // the standard services, first, because we need to get the
-        // ordering constant and make sure that they're all present, and
-        // then handle any external services
-        ArrayList<Service> serviceList = new ArrayList<Service>();
-        HashSet<Object> managerSet = new HashSet<Object>();
-        ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();
-        try {
-            String dataServiceClass =
-                properties.getProperty(StandardProperties.DATA_SERVICE,
-                                       DEFAULT_DATA_SERVICE);
-            String dataManagerClass =
-                properties.getProperty(StandardProperties.DATA_MANAGER,
-                                       DEFAULT_DATA_MANAGER);
-            String taskServiceClass =
-                properties.getProperty(StandardProperties.TASK_SERVICE,
-                                       DEFAULT_TASK_SERVICE);
-            String taskManagerClass =
-                properties.getProperty(StandardProperties.TASK_MANAGER,
-                                       DEFAULT_TASK_MANAGER);
-            String clientSessionServiceClass =
-                properties.getProperty(StandardProperties.
-                                       CLIENT_SESSION_SERVICE,
-                                       DEFAULT_CLIENT_SESSION_SERVICE);
-            String channelServiceClass =
-                properties.getProperty(StandardProperties.CHANNEL_SERVICE,
-                                       DEFAULT_CHANNEL_SERVICE);
-            String channelManagerClass =
-                properties.getProperty(StandardProperties.CHANNEL_MANAGER,
-                                       DEFAULT_CHANNEL_MANAGER);
-
-            setupService(dataServiceClass, serviceList,
-                         dataManagerClass, managerSet, properties,
-                         systemRegistry);
-            setupService(taskServiceClass, serviceList,
-                         taskManagerClass, managerSet, properties,
-                         systemRegistry);
-
-            // the ClientSessionService is a special case, since it has no
-            // manager, so when created it's also registered for profiling,
-            // if appropriate
-            Service clientSessionService =
-                createService(Class.forName(clientSessionServiceClass),
-                              properties, systemRegistry);
-            serviceList.add(clientSessionService);
-            if (clientSessionService instanceof ProfileProducer) {
-                if (profileRegistrar != null)
-                    ((ProfileProducer)clientSessionService).
-                        setProfileRegistrar(profileRegistrar);
-            }
-
-            setupService(channelServiceClass, serviceList,
-                         channelManagerClass, managerSet, properties,
-                         systemRegistry);
-
-            // now load any external services and their associated managers
-            String externalServices =
-                properties.getProperty(StandardProperties.SERVICES);
-            String externalManagers =
-                properties.getProperty(StandardProperties.MANAGERS);
-            if ((externalServices != null) && (externalManagers != null)) {
-                String [] serviceClassNames = externalServices.split(":", -1);
-                String [] managerClassNames = externalManagers.split(":", -1);
-                if (serviceClassNames.length != managerClassNames.length) {
-                    if (logger.isLoggable(Level.SEVERE))
-                        logger.log(Level.SEVERE, "External service count " +
-                                   "({0}) does not match manager count ({1}).",
-                                   serviceClassNames.length,
-                                   managerClassNames.length);
-                    throw new IllegalArgumentException("Mis-matched service " +
-                                                       "and manager count");
-                }
-
-                for (int i = 0; i < serviceClassNames.length; i++) {
-                    if (! managerClassNames[i].equals("")) {
-                        setupService(serviceClassNames[i], serviceList,
-                                     managerClassNames[i], managerSet,
-                                     properties, systemRegistry);
-                    } else {
-                        Class<?> serviceClass =
-                            Class.forName(serviceClassNames[i]);
-                        serviceList.add(createService(serviceClass, properties,
-                                                      systemRegistry));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e, "Could not setup service");
-            throw e;
-        }
-
-        // register any profiling managers and fill in the manager registry
-        for (Object manager : managerSet) {
-            if (profileRegistrar != null) {
-                if (manager instanceof ProfileProducer)
-                    ((ProfileProducer)manager).
-                        setProfileRegistrar(profileRegistrar);
-            }
-            managerComponents.addComponent(manager);
-        }
-
-        // finally, register the application with the master scheduler
-        // and kick off a task to do the transactional configuration step,
-        // where the services are configured...this in turn will actually
-        // start the application running
-        AppKernelAppContext appContext =
-            new AppKernelAppContext(appName, managerComponents);
-        try {
-            scheduler.registerApplication(appContext, properties);
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e,
-                                "Couldn't setup app scheduler");
-            throw e;
-        }
+        // startup the service creation in a separate thread
         ServiceConfigRunner configRunner =
-            new ServiceConfigRunner(this, serviceList, transactionProxy,
-                                    appName, properties);
-        UnboundedTransactionRunner unboundedTransactionRunner =
-            new UnboundedTransactionRunner(configRunner);
-        IdentityImpl appIdentity = new IdentityImpl("app:" + appName);
-        TaskOwnerImpl owner = new TaskOwnerImpl(appIdentity, appContext);
-        try {
-            scheduler.scheduleTask(unboundedTransactionRunner, owner);
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e,
-                                "Could not start configuration");
-            throw e;
-        }
-    }
-
-    /**
-     * Creates a service with no manager based on fully qualified class names.
-     */
-    private Service createService(Class<?> serviceClass,
-                                  Properties serviceProperties,
-                                  ComponentRegistryImpl systemRegistry)
-        throws Exception
-    {
-        // find the class and constructor
-        Constructor<?> serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class);
-
-        // return a new instance
-        return (Service)(serviceConstructor.newInstance(serviceProperties,
-                                                        systemRegistry));
-    }
-
-    /**
-     * Creates a service and its associated manager based on fully qualified
-     * class names.
-     */
-    private void setupService(String serviceName,
-                              ArrayList<Service> serviceList,
-                              String managerName, HashSet<Object> managerSet,
-                              Properties serviceProperties,
-                              ComponentRegistryImpl systemRegistry)
-        throws Exception
-    {
-        // get the service class and instance
-        Class<?> serviceClass = Class.forName(serviceName);
-        Service service =
-            createService(serviceClass, serviceProperties, systemRegistry);
-
-        // resolve the class and the constructor, checking for constructors
-        // by type since they likely take a super-type of Service
-        Class<?> managerClass = Class.forName(managerName);
-        Constructor<?> [] constructors = managerClass.getConstructors();
-        Constructor<?> managerConstructor = null;
-        for (int i = 0; i < constructors.length; i++) {
-            Class<?> [] types = constructors[i].getParameterTypes();
-            if (types.length == 1) {
-                if (types[0].isAssignableFrom(serviceClass)) {
-                    managerConstructor = constructors[i];
-                    break;
-                }
-            }
-        }
-        
-        // if we didn't find a matching manager constructor, it's an error
-        if (managerConstructor == null)
-            throw new NoSuchMethodException("Could not find a constructor " +
-                                            "that accepted the Service");
-
-        // create the manager, and put both service and manager in their
-        // respective collections
-        managerSet.add(managerConstructor.newInstance(service));
-        serviceList.add(service);
+            new ServiceConfigRunner(this, systemRegistry, profileRegistrar,
+                                    transactionProxy, appName, properties);
+        systemRegistry.getComponent(ResourceCoordinator.class).
+            startTask(configRunner, null);
     }
 
     /**
@@ -520,16 +311,26 @@ class Kernel {
     }
 
     /**
-     * Called when an application has finished loading and has started to
-     * run. This is typically called by <code>AppStartupRunner</code>
-     * after it has started an application.
+     * Called when a context has finished loading and, if there is an
+     * associated application, the application has started to run. This
+     * is typically called by <code>AppStartupRunner</code> after it has
+     * started an application or <code>ServiceConfigRunner</code> when
+     * a context with no application is ready.
      *
      * @param context the application's kernel context
+     * @param hasApplication <code>true</code> if the context is associated
+     *                       with a running application, <code>false</code>
+     *                       otherwise 
      */
-    void applicationReady(AppKernelAppContext context) {
+    void contextReady(AppKernelAppContext context, boolean hasApplication) {
         applications.add(context);
-        if (logger.isLoggable(Level.INFO))
-	    logger.log(Level.INFO, "{0}: application is ready", context);
+        if (logger.isLoggable(Level.INFO)) {
+            if (hasApplication)
+                logger.log(Level.INFO, "{0}: application is ready", context);
+            else
+                logger.log(Level.INFO, "{0}: non-application context is ready",
+                           context);
+        }
     }
 
     /**
@@ -672,7 +473,13 @@ class Kernel {
                 if (logger.isLoggable(Level.CONFIG))
                     logger.log(Level.CONFIG, "Starting up application: {0}",
                                appName);
-                kernel.startupApplication(appProperties);
+                try {
+                    kernel.startupApplication(appProperties);
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.SEVERE))
+                        logger.logThrow(Level.SEVERE, e, "{0}: startup failed",
+                                        appName);
+                }
             }
         }
     }

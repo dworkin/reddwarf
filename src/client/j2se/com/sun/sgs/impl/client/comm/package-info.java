@@ -4,6 +4,6 @@
 
 /**
  * Defines the interfaces for client communication with the
- * Sun Game Server.
+ * Project Darkstar Server.
  */
 package com.sun.sgs.impl.client.comm;

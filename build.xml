@@ -3,7 +3,7 @@
 <project name="sgs" default="build" basedir=".">
 
   <description>
-    Builds the Sun Game Server project
+    Builds Project Darkstar
   </description>
 
   <!-- First load the user's properties -->
@@ -22,13 +22,16 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
+  <!-- Where to find Ruby on the current platform -->
+  <property name="ruby" location="/usr/bin/ruby"/>
+
   <!-- Version information -->
-  <property name="project.release" value="0.9.2"/>
+  <property name="project.release" value="0.9.3"/>
   <!-- Set to true when building an external release -->
   <property name="external.release" value="false"/>
 
   <!-- Values for the JavaDocs -->
-  <property name="project.name" value="Sun Game Server"/>
+  <property name="project.name" value="Project Darkstar"/>
   <tstamp>
     <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
   </tstamp>
@@ -55,13 +58,13 @@
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
 
-  <!-- Directory containing Berkeley DB libraries -->
+  <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
-       containing the full set of JAR and native library files for the
-       current platform -->
+       containing the full set of JAR and native library files for
+       Berkeley DB for the current platform if building the server -->
   <!-- The caller should set the bdb.builds.dir property to a directory
-       containing builds of Berkeley DB for all of the platforms if
-       calling the dist-server task. -->
+       containing builds of Berkeley DB for all platforms if building
+       the server binary distribution -->
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
@@ -188,7 +191,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -204,10 +207,10 @@
   <!-- Build the public Application API JavaDoc -->
   <target name="javadoc-api-server" depends="build-server, project-version"
 	  description="Builds public server application API javadoc">
-    <javadoc sourcepath="src/server/j2se"
+    <javadoc sourcepath="src/server/j2se:src/shared/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
              classpathref="server.classpath"
-             packagenames="com.sun.sgs.app.*"
+             packagenames="com.sun.sgs.app.*, com.sun.sgs.protocol.simple"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name} Server API"
              doctitle="${project.name} Server API"
@@ -219,7 +222,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -250,7 +253,7 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
+        <![CDATA[<font size="-1">Project Darkstar, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
@@ -280,31 +283,158 @@
           includes="sgs-client-apidoc/**"/>
   </target>
 
-  <!-- Creates a source distribution -->
-  <target name="source-dist" depends="project-version"
-	  description="Creates a source distribution">
+  <!-- Creates distribution files -->
+  <target name="dist" depends="dist-client, dist-server"
+	  description="Creates distribution files"/>
+
+  <!-- Creates client distribution files -->
+  <target name="dist-client" depends="dist-client-source, dist-client-binary"
+	  description="Creates client distribution files"/>
+
+  <!-- Creates client source distribution -->
+  <target name="dist-client-source" depends="project-version"
+	  description="Creates client source distribution">
+    <delete dir="${build.dir}/sgs-client-src"/>
+    <copy todir="${build.dir}/sgs-client-src">
+      <fileset dir="."
+	       excludes="**/.svn"
+	       includes="doc/ClientTutorial.*,
+			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
+			 src/client/**,
+			 src/shared/**,
+			 test/client/**"/>
+    </copy>
+    <copy file="etc/CHANGELOG-client"
+	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
+    <copy file="etc/LICENSE-client"
+	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
+    <copy file="etc/README-client-source"
+	  tofile="${build.dir}/sgs-client-src/README">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
+    </copy>
+    <apply executable="${ruby}" logError="true">
+      <arg file="etc/update_copyrights"/>
+      <arg file="etc/COPYRIGHT-client"/>
+      <fileset dir="${build.dir}/sgs-client-src" includes="**/*.java"/>
+    </apply>
+    <delete>
+      <fileset dir="${build.dir}/sgs-client-src" includes="**/*~"/>
+    </delete>
+    <zip destfile="${build.dir}/sgs-client-src-${project.version}.zip">
+      <zipfileset dir="${build.dir}/sgs-client-src"
+		  prefix="sgs-client-src-${project.version}"/>
+    </zip>
+  </target>
+
+  <!-- Creates client binary distribution -->
+  <target name="dist-client-binary"
+	  depends="javadoc-api-client, jar-client, jar-tutorial,
+		   project-version"
+	  description="Creates client binary files for distribution">
+    <delete dir="${build.dir}/sgs-client"/>
+    <copy todir="${build.dir}/sgs-client/doc/sgs-client-api">
+      <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
+    </copy>
+    <copy todir="${build.dir}/sgs-client/lib">
+      <fileset file="${build.dir}/lib/sgs-client.jar"/>
+      <fileset dir="lib"
+	       includes="mina-core-1.1.jar,
+			 slf4j-api-1.4.0.jar,
+			 slf4j-jdk14-1.4.0.jar"/>
+    </copy>
+    <copy todir="${build.dir}/sgs-client/tutorial">
+      <fileset file="${build.dir}/example/tutorial/tutorial-client.jar"/>
+      <fileset file="doc/ClientTutorial.pdf"/>
+    </copy>
+    <copy todir="${build.dir}/sgs-client/tutorial/src">
+      <fileset dir="example/tutorial/src"
+	       includes="com/sun/sgs/tutorial/client/**/*.java"/>
+    </copy>
+    <copy file="etc/CHANGELOG-client"
+	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
+    <copy file="etc/LICENSE-client"
+	  tofile="${build.dir}/sgs-client/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client"/>
+    <copy file="etc/README-client-binary"
+	  tofile="${build.dir}/sgs-client/README">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
+    </copy>
+    <zip destfile="${build.dir}/sgs-client-${project.version}.zip">
+      <zipfileset dir="${build.dir}/sgs-client"
+		  prefix="sgs-client-${project.version}"/>
+    </zip>
+  </target>
+
+  <!-- Creates server distribution files -->
+  <target name="dist-server" depends="dist-server-source, dist-server-binary"
+	  description="Creates server distribution files "/>
+
+  <!-- Creates server source distribution -->
+  <target name="dist-server-source" depends="project-version"
+	  description="Creates server source distribution">
     <delete dir="${build.dir}/sgs-src"/>
-    <exec executable="svn" failOnError="true" logError="true">
-      <arg value="export"/>
-      <arg file="."/>
-      <arg file="${build.dir}/sgs-src"/>
-    </exec>
+    <copy todir="${build.dir}/sgs-src">
+      <fileset dir="."
+	       excludes="**/.svn"
+	       includes="build.xml,
+			 doc/ServerAppTutorial.*,
+			 etc/jdk5.0_package_list/**,
+			 etc/mina1.1_package_list/**,
+			 etc/sgs-config.properties,
+			 etc/sgs-logging.properties,
+			 etc/sgs.bat,
+			 etc/sgs.sh,
+			 example/tutorial/*,
+			 example/tutorial/src/com/sun/sgs/tutorial/server/**,
+			 src/shared/**,
+			 src/server/**,
+			 test/shared/**,
+			 test/server/**"/>
+    </copy>
+    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
+    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
+    <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
+    </copy>
+    <mkdir dir="${build.dir}/sgs-src/lib"/>
     <zip destfile="${build.dir}/sgs-src-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-src"
 		  prefix="sgs-src-${project.version}"/>
     </zip>
   </target>
 
-  <!-- Builds files for distribution -->
-  <target name="dist"
-	  depends="dist-client, dist-server, dist-tutorial, javadoc-api,
+  <!-- Creates server binary distribution -->
+  <target name="dist-server-binary"
+	  depends="-dist-server-binary-clean, dist-server-binary-tutorial,
+		   dist-server-binary-bdb, jar-server, javadoc-api-server,
 		   project-version"
-	  description="Builds files for distribution">
-    <copy todir="${build.dir}/sgs/doc/sgs-client-api">
-      <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
+	  description="Creates server binary distribution">
+    <copy todir="${build.dir}/sgs">
+      <fileset dir="etc"
+	       includes="sgs.*,
+			 sgs-*.properties"/>
+    </copy>
+    <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
+    <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
+    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs"/>
+    <copy file="etc/README-server-binary" tofile="${build.dir}/sgs/README">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
+    </copy>
+    <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
+    <copy todir="${build.dir}/sgs/lib">
+      <fileset file="${build.dir}/lib/sgs.jar"/>
+      <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
     </copy>
     <copy todir="${build.dir}/sgs/doc/sgs-api">
-      <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc/"/>
+      <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"/>
     </copy>
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs" includes="**"
@@ -317,37 +447,13 @@
     </zip>
   </target>
 
-  <!-- Builds client files for distribution -->
-  <target name="dist-client" depends="jar-client"
-	  description="Builds client files for distribution">
-    <copy todir="${build.dir}/sgs/lib" file="${build.dir}/lib/sgs-client.jar"/>
-  </target>
-
-  <!-- Builds server files for distribution -->
-  <target name="dist-server" depends="jar-server, dist-bdb"
-	  description="Builds server files for distribution">
-    <copy todir="${build.dir}/sgs">
-      <fileset dir="etc"
-	       includes="sgs.*,
-			 sgs-*.properties,
-			 CHANGELOG,
-			 LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf"/>
-    </copy>
-    <copy file="etc/README" todir="${build.dir}/sgs">
-      <filterset>
-	<filter token="VERSION" value="${project.version}"/>
-      </filterset>
-    </copy>
-    <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
-    <copy todir="${build.dir}/sgs/lib">
-      <fileset file="${build.dir}/lib/sgs.jar"/>
-      <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
-    </copy>
+  <!-- Cleans the server binary distribution directory -->
+  <target name="-dist-server-binary-clean">
+    <delete dir="${build.dir}/sgs"/>
   </target>
 
   <!-- Builds files for distributing Berkeley DB -->
-  <target name="dist-bdb"
+  <target name="dist-server-binary-bdb"
 	  description="Builds files for distributing Berkeley DB">
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
@@ -689,7 +795,7 @@
   </target>
 
   <!-- Compiles tests -->
-  <target name="-test-shared.classes" depends="build">
+  <target name="-test-shared.classes" depends="-build-shared">
     <mkdir dir="${build.dir}/test/classes/shared"/>
     <depend srcdir="test/shared/j2se"
 	    destdir="${build.dir}/test/classes/shared"
@@ -706,7 +812,7 @@
     </javac>
   </target>
 
-  <target name="-test-server.classes" depends="build">
+  <target name="-test-server.classes" depends="build-server">
     <mkdir dir="${build.dir}/test/classes/server"/>
     <depend srcdir="test/server/j2se"
 	    destdir="${build.dir}/test/classes/server"
@@ -723,7 +829,7 @@
     </javac>
   </target>
 
-  <target name="-test-client.classes" depends="build">
+  <target name="-test-client.classes" depends="build-client">
     <mkdir dir="${build.dir}/test/classes/client"/>
     <depend srcdir="test/client/j2se"
 	    destdir="${build.dir}/test/classes/client"
@@ -918,25 +1024,32 @@
     </java>
   </target>
 
-  <!-- Builds tutorial jar file -->
+  <!-- Builds tutorial jar files -->
   <target name="jar-tutorial" depends="example-classes"
           description="Builds tutorial jar file">
     <mkdir dir="${build.dir}/example/tutorial"/>
     <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
       <fileset dir="${build.dir}/example/classes"
-               includes="com/sun/sgs/tutorial/**"/>
+               includes="com/sun/sgs/tutorial/server/**"/>
+    </jar>
+    <jar destfile="${build.dir}/example/tutorial/tutorial-client.jar">
+      <fileset dir="${build.dir}/example/classes"
+               includes="com/sun/sgs/tutorial/client/**"/>
     </jar>
   </target>
 
-  <!-- Creates the tutorial distribution -->
-  <target name="dist-tutorial" depends="jar-tutorial"
-          description="Creates the tutorial distribution">
+  <!-- Builds tutorial files for the binary server distribution -->
+  <target name="dist-server-binary-tutorial" depends="jar-tutorial"
+          description=
+	    "Builds tutorial files for the binary server distribution">
     <copy todir="${build.dir}/sgs/tutorial">
       <fileset dir="example/tutorial" includes="*.properties"/>
       <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
+      <fileset file="doc/ServerAppTutorial.pdf"/>
     </copy>
     <copy todir="${build.dir}/sgs/tutorial/src">
-      <fileset dir="example/tutorial/src" includes="**/*.java"/>
+      <fileset dir="example/tutorial/src"
+	       includes="com/sun/sgs/tutorial/server/**/*.java"/>
     </copy>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloChannels/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloEcho/dsdb"/>
@@ -949,33 +1062,51 @@
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser2/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
-    <copy todir="${build.dir}/sgs/tutorial">
-      <fileset dir="doc"
-	       includes="ClientTutorial.pdf, ServerAppTutorial.pdf"/>
-    </copy>
     <!-- TODO: generate and package javadoc -->
   </target>
 
   <!-- Runs the data store network server -->
-  <target name="test-data-store-network-server" depends="build"
+  <target name="test-data-store-network-server" depends="build-server"
 	  description="Runs the data store network server">
-    <property name="test.server.host" value="localhost"/>
-    <delete dir="${build.dir}/test/data-store-network-server"/>
-    <mkdir dir="${build.dir}/test/data-store-network-server"/>
-    <java
-       classname="com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl"
-       classpathref="server.classpath"
-       fork="true">
+    <property name="test.server.dir"
+	      location="${build.dir}/test/data-store-network-server"/>
+    <property name="test.server.level" value="INFO"/>
+    <delete dir="${test.server.dir}"/>
+    <mkdir dir="${test.server.dir}"/>
+    <mkdir dir="${test.server.dir}/dsdb"/>
+    <echo file="${test.server.dir}/app.config">
+      com.sun.sgs.app.name = DataStoreServerImpl
+      com.sun.sgs.app.root = ${build.dir}/test/data-store-network-server
+      com.sun.sgs.app.port = 0
+      com.sun.sgs.app.listener = NONE
+      com.sun.sgs.app.finalService = DataService
+      com.sun.sgs.impl.service.data.store.net.server.host = localhost
+      com.sun.sgs.impl.service.data.store.net.server.run = true
+      com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class = \
+        com.sun.sgs.impl.service.data.store.net.DataStoreClient
+    </echo>
+    <echo file="${test.server.dir}/logging.config">
+      .level = ${test.server.level}
+      sun.rmi.level = WARNING
+      handlers = java.util.logging.ConsoleHandler
+      java.util.logging.ConsoleHandler.formatter = \
+        java.util.logging.SimpleFormatter
+      java.util.logging.ConsoleHandler.level = ${test.server.level}
+    </echo>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  classpathref="server.classpath"
+	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file" file="${test.logging}"/>
-      <sysproperty
-	 key="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory"
-	 file="${build.dir}/test/data-store-network-server"/>
-      <sysproperty key="java.rmi.server.hostname" value="${test.server.host}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.server.dir}/logging.config"/>
+      <!-- Set the java.rmi.server.hostname property to use a
+	   non-standard network interface on the server -->
+      <arg file="${test.server.dir}/app.config"/>
       <syspropertyset>
 	<propertyref prefix="test."/>
 	<propertyref prefix="com.sun.sgs."/>
+	<propertyref prefix="java.rmi."/>
       </syspropertyset>
     </java>
   </target>
