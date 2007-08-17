@@ -89,8 +89,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     private boolean passed = false;
 
     /** non-pubic methods in NodeMappingServerImpl */
-    private Method configureMethod;
-    private Method commitConfigureMethod;
+    // TODO consider making these fields static final
     private Method shutdownMethod;
     private Method addDummyNodeMethod;
     private Method getNodeForIdentityMethod;
@@ -103,16 +102,6 @@ public class TestNodeMappingServerImpl extends TestCase {
     /** Constructs a test instance. */
     public TestNodeMappingServerImpl(String name) throws Exception {
         super(name);
-        
-        configureMethod = NodeMappingServerImpl.class.getDeclaredMethod(
-                "configure",
-                new Class[] {ComponentRegistry.class, TransactionProxy.class});
-        configureMethod.setAccessible(true);
-        
-        commitConfigureMethod = NodeMappingServerImpl.class.getDeclaredMethod(
-                "commitConfigure",
-                new Class[] {});
-        commitConfigureMethod.setAccessible(true);
         
         shutdownMethod = NodeMappingServerImpl.class.getDeclaredMethod(
                 "shutdown",
@@ -177,44 +166,30 @@ public class TestNodeMappingServerImpl extends TestCase {
         }
         
 	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-        
+	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext); 
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
 	    
 	// create services
 	dataService = createDataService(systemRegistry);
-        watchdogService = new WatchdogServiceImpl(serviceProps, systemRegistry);
-        nodeMappingServer = new NodeMappingServerImpl(serviceProps, systemRegistry);
-
-	createTransaction(10000);
-
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-
-        commitTransaction();
-        createTransaction(10000);
-            
-        // configure watchdog service
-        watchdogService.configure(serviceRegistry, txnProxy);
+        
+        watchdogService = 
+              new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
         txnProxy.setComponent(WatchdogService.class, watchdogService);
         txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
         serviceRegistry.setComponent(WatchdogService.class, watchdogService);
         serviceRegistry.setComponent(WatchdogServiceImpl.class, watchdogService);
         
-        commitTransaction();
-        createTransaction();
-        
-        configureMethod.invoke(nodeMappingServer, serviceRegistry, txnProxy);
-//        commitConfigureMethod.invoke(nodeMappingServer, (Object[])null);
-        commitTransaction();
-                
-        // This appears to need to be OUTSIDE of a transaction, or we deadlock.
-        commitConfigureMethod.invoke(nodeMappingServer, (Object[])null);
+        nodeMappingServer = 
+              new NodeMappingServerImpl(serviceProps, systemRegistry, txnProxy);
+
+        // services ready
+	dataService.ready();
+	watchdogService.ready();
         
         for (int i = 1; i <= NUM_NODES; i++) {
             addDummyNodeMethod.invoke(nodeMappingServer, i);
@@ -268,7 +243,8 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testConstructor() throws Exception {
         NodeMappingServerImpl nodemap = null;
         try {
-            nodemap = new NodeMappingServerImpl(serviceProps, systemRegistry);
+            nodemap = 
+              new NodeMappingServerImpl(serviceProps, systemRegistry, txnProxy);
         } finally {
             if (nodemap != null) { 
                 shutdownMethod.invoke(nodemap); 
@@ -279,7 +255,22 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testConstructorNullProperties() throws Exception {
         NodeMappingServerImpl nodemap = null;
         try {
-            nodemap = new NodeMappingServerImpl(null, systemRegistry);
+            nodemap = new NodeMappingServerImpl(null, systemRegistry, txnProxy);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            System.err.println(e);
+        } finally {
+            if (nodemap != null) { 
+                shutdownMethod.invoke(nodemap); 
+            }
+        }
+    }
+    
+    public void testConstructorNullProxy() throws Exception {
+        NodeMappingServerImpl nodemap = null;
+        try {
+            nodemap = 
+                new NodeMappingServerImpl(serviceProps, systemRegistry, null);
             fail("Expected NullPointerException");
         } catch (NullPointerException e) {
             System.err.println(e);
@@ -298,7 +289,8 @@ public class TestNodeMappingServerImpl extends TestCase {
             serverPortPropertyName, Integer.toString(PORT));
         NodeMappingServerImpl nodemap = null;
         try {
-            nodemap = new NodeMappingServerImpl(properties, systemRegistry);
+            nodemap = 
+                new NodeMappingServerImpl(properties, systemRegistry, txnProxy);
             int nodemapPort = (Integer) getPortMethod.invoke(nodemap);
             assertEquals(PORT, nodemapPort);
         } finally {
@@ -314,7 +306,8 @@ public class TestNodeMappingServerImpl extends TestCase {
             serverPortPropertyName, Integer.toString(-1));
         NodeMappingServerImpl nodemap = null;
         try {
-            nodemap = new NodeMappingServerImpl(properties, systemRegistry);
+            nodemap = 
+                new NodeMappingServerImpl(properties, systemRegistry, txnProxy);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             System.err.println(e);
@@ -331,7 +324,8 @@ public class TestNodeMappingServerImpl extends TestCase {
             serverPortPropertyName, Integer.toString(65536));
         NodeMappingServerImpl nodemap = null;
         try {
-            nodemap = new NodeMappingServerImpl(properties, systemRegistry);
+            nodemap = 
+                new NodeMappingServerImpl(properties, systemRegistry, txnProxy);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             System.err.println(e);
@@ -341,86 +335,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             }
         }
     }
-    
-    /* -- Test configure -- */
 
-    public void testConfigureNullRegistry() throws Exception {
-        NodeMappingServerImpl nodemap = null;	
-        try {
-            nodemap = 
-                new NodeMappingServerImpl(serviceProps, systemRegistry);
-            configureMethod.invoke(nodemap, null, new DummyTransactionProxy());
-	    fail("Expected NullPointerException");
-        } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof NullPointerException) {
-                System.err.println(cause);
-            } else {
-                fail("Expected NullPointerException");
-            }
-	} finally {
-            if (nodemap != null) {
-                shutdownMethod.invoke(nodemap); 
-            }
-        }
-    }
-    
-    public void testConfigureNullProxy() throws Exception {
-        NodeMappingServerImpl nodemap = null;
-	try {
-            nodemap =
-                new NodeMappingServerImpl(serviceProps, systemRegistry);
-            configureMethod.invoke(nodemap, serviceRegistry, null);
-	    fail("Expected NullPointerException");
-	} catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof NullPointerException) {
-                System.err.println(cause);
-            } else {
-                fail("Expected NullPointerException");
-            }
-	} finally {
-            if (nodemap != null) {
-                shutdownMethod.invoke(nodemap); 
-            }
-        }
-    }
-    
-    public void testConfigure() throws Exception {
-        NodeMappingServerImpl nodemap = null;
-        try {
-            nodemap =
-                new NodeMappingServerImpl(serviceProps, systemRegistry);
-            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);
-        } finally {
-            if (nodemap != null) {
-                shutdownMethod.invoke(nodemap); 
-            }
-        }
-    }
-    
-    public void testConfigureTwice() throws Exception {
-	NodeMappingServerImpl nodemap = null;
-        try {   
-            nodemap = 
-	     new NodeMappingServerImpl(serviceProps, systemRegistry);
-            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);
-            configureMethod.invoke(nodemap, serviceRegistry, txnProxy);          
-	    fail("Expected IllegalStateException");
-	} catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IllegalStateException) {
-                System.err.println(cause);
-            } else {
-                fail("Expected IllegalStateException");
-            }
-	} finally {
-            if (nodemap != null) {
-                shutdownMethod.invoke(nodemap);
-            }
-        }
-    }
-    
     /* -- Test assignNode -- */
     
     public void testAssignNode() throws Exception {
@@ -577,8 +492,8 @@ public class TestNodeMappingServerImpl extends TestCase {
         listener.nodeFailed(first);
         
         // Wait for things to settle down, and this time we let it
-        // go ahead and renove the id.
-        Thread.sleep(REMOVE_TIME * 2);
+        // go ahead and remove the id.
+        Thread.sleep(REMOVE_TIME * 4);
         try {
             long secondNodeId = 
                 (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
@@ -686,7 +601,7 @@ public class TestNodeMappingServerImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(serviceProps, registry);
+	return new DataServiceImpl(serviceProps, registry, txnProxy);
     }
     
     /**

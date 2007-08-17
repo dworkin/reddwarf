@@ -5,7 +5,6 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.service.Node;
 
 /**
  *

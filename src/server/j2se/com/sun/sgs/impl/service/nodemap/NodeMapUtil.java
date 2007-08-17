@@ -8,7 +8,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.DataService;
 import java.io.Serializable;
 import java.util.logging.Level;

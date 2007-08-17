@@ -78,10 +78,11 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	MinimalTestKernel.getTransactionProxy();
           
     /** Reflective stuff, for non-public members. */
-    private static Field serverImplField;
-    private static Field localNodeIdField;
-    private static Method assertValidMethod;
-    private static Method getPortMethod;
+    // TODO consider making these fields static final
+    private Field serverImplField;
+    private Field localNodeIdField;
+    private Method assertValidMethod;
+    private Method getPortMethod;
     
     /** Number of other services we'll start up */
     private final int NUM_NODES = 3;
@@ -184,10 +185,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	serviceRegistry[0] = MinimalTestKernel.getServiceRegistry(appContext[0]);
         // only one data service for now: not configured correctly
         dataService = createDataService(systemRegistry[0]);
-        createTransaction(10000);
-	// configure data service
-        dataService.configure(serviceRegistry[0], txnProxy);
-        commitTransaction();
         
         // Create the initial stack and grab our server field.
         createStack(appContext[0], systemRegistry[0], serviceRegistry[0], 
@@ -207,37 +204,33 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
 	// create services
         // We are running with a non-multinode data service.
-        watchdogService = new WatchdogServiceImpl(props, systemRegistry);
-        nodeMappingService = 
-                new NodeMappingServiceImpl(props, systemRegistry);
-
-	// set data service classes in serviceRegistry
+        // set data service classes in serviceRegistry
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-        // configure watchdog service
-        createTransaction(10000);
-        watchdogService.configure(serviceRegistry, txnProxy);
+        watchdogService = 
+                new WatchdogServiceImpl(props, systemRegistry, txnProxy);
         txnProxy.setComponent(WatchdogService.class, watchdogService);
         txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
         serviceRegistry.setComponent(WatchdogService.class, watchdogService);
         serviceRegistry.setComponent(WatchdogServiceImpl.class, watchdogService);
-
-	serviceRegistry.registerAppContext();
-
-        commitTransaction();
         
-        // configure node mapping service
-        createTransaction(10000);
-        nodeMappingService.configure(serviceRegistry, txnProxy);
+        nodeMappingService = 
+                new NodeMappingServiceImpl(props, systemRegistry, txnProxy);
         txnProxy.setComponent(NodeMappingService.class, nodeMappingService);
         txnProxy.setComponent(NodeMappingServiceImpl.class, nodeMappingService);
         serviceRegistry.setComponent(NodeMappingService.class, nodeMappingService);
         serviceRegistry.setComponent(NodeMappingServiceImpl.class, nodeMappingService);
-	commitTransaction();
+
+	serviceRegistry.registerAppContext();
+        
+        // services ready
+	dataService.ready();
+	watchdogService.ready();
+        nodeMappingService.ready();
         
         if (special) {
             NodeMappingServerImpl server = 
@@ -346,7 +339,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testConstructor() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
+            nodemap = 
+                new NodeMappingServiceImpl(
+                            serviceProps, systemRegistry[0], txnProxy);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
@@ -355,7 +350,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testConstructorNullProperties() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(null, systemRegistry[0]);
+            nodemap = 
+                new NodeMappingServiceImpl(null, systemRegistry[0], txnProxy);
             fail("Expected NullPointerException");
         } catch (NullPointerException e) {
             System.err.println(e);
@@ -364,54 +360,62 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
-    /* -- Test configure -- */
-
-    public void testConfigureNullRegistry() throws Exception {
-        NodeMappingService nodemap = null;
-	try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
-            nodemap.configure(null, txnProxy);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	} finally {
-            if (nodemap != null) { nodemap.shutdown(); }
-        }
-    }
-    
-    public void testConfigureNullProxy() throws Exception {
-	NodeMappingService nodemap = null;
-        
-	try {
-            nodemap =
-                new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
-            nodemap.configure(serviceRegistry[0], null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	} finally {
-            if (nodemap != null) { nodemap.shutdown(); }
-        }
-    }
-    
-    public void testConfigure() throws Exception {
-        commitTransaction();
+    public void testConstructorNullProxy() throws Exception {
         NodeMappingService nodemap = null;
         try {
-            nodemap = new NodeMappingServiceImpl(serviceProps, systemRegistry[0]);
-            createTransaction();
-            nodemap.configure(serviceRegistry[0], txnProxy);
+            nodemap = 
+              new NodeMappingServiceImpl(serviceProps, systemRegistry[0], null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            System.err.println(e);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
     }
     
-    public void testConfigureTwice() throws Exception {
-	try {
-            nodeMappingService.configure(serviceRegistry[0], txnProxy);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException ex) {
-	    System.err.println(ex);
+    public void testReady() throws Exception {
+        NodeMappingService nodemap = null;
+        try {
+            commitTransaction();
+            nodemap = 
+                new NodeMappingServiceImpl(
+                            serviceProps, systemRegistry[0], txnProxy);
+            TestListener listener = new TestListener();        
+            nodemap.addNodeMappingListener(listener);
+            
+            // We have NOT called ready yet.
+            Identity id = new DummyIdentity();
+            nodemap.assignNode(NodeMappingService.class, id);
+            createTransaction();
+            Node node = nodeMappingService.getNode(id);
+            commitTransaction();
+            
+            // Ensure the listeners have not been called yet.
+            List<Identity> addedIds = listener.getAddedIds();
+            List<Node> addedNodes = listener.getAddedNodes();
+            assertEquals(0, addedIds.size());
+            assertEquals(0, addedNodes.size());
+            assertEquals(0, listener.getRemovedIds().size());
+            assertEquals(0, listener.getRemovedNodes().size());
+            
+            nodemap.ready();
+            
+            // Listeners should be notified.
+            Thread.sleep(500);
+            
+            addedIds = listener.getAddedIds();
+            addedNodes = listener.getAddedNodes();
+            assertEquals(1, addedIds.size());
+            assertEquals(1, addedNodes.size());
+            assertTrue(addedIds.contains(id));
+            // no old node
+            assertTrue(addedNodes.contains(null));
+
+            assertEquals(0, listener.getRemovedIds().size());
+            assertEquals(0, listener.getRemovedNodes().size());
+            
+        } finally {
+            if (nodemap != null) { nodemap.shutdown(); }
         }
     }
     
@@ -700,7 +704,6 @@ public class TestNodeMappingServiceImpl extends TestCase {
             fail("Expected UnknownIdentityException");
         } catch (UnknownIdentityException e) {
             // Make sure we got a notification
-//            listener = nodeListenerMap.get(node.getId());
             assertEquals(0, listener.getAddedIds().size());
             assertEquals(0, listener.getAddedNodes().size());
             
@@ -787,15 +790,19 @@ public class TestNodeMappingServiceImpl extends TestCase {
         createTransaction();
         Node firstNode = nodeMappingService.getNode(id);
         commitTransaction();
-        // clear out the listener
         TestListener firstNodeListener = nodeListenerMap.get(firstNode.getId());
-        firstNodeListener.clear();
         
         // Get the method, as it's not public
         Method moveMethod = 
                 (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
                         new Class[]{Identity.class, String.class, Node.class});
         moveMethod.setAccessible(true);
+        
+        // clear out the listeners
+        for (TestListener lis : nodeListenerMap.values()) {
+            lis.clear();
+        }
+        // ... and invoke the method
         moveMethod.invoke(server, id, null, firstNode);
         
         createTransaction();
@@ -851,19 +858,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         // Nothing much will happen. Eventually, we'll cause the
         // stack to shut down.
-        nodeMappingService.assignNode(NodeMappingService.class, id);
-         
-        // JANE - actually -current code assigns locally
-//        createTransaction();
-//        try {
-//            nodeMappingService.getNode(id);
-//            fail("Expected UnknownIdentityException");
-//        } catch (UnknownIdentityException ex) {
-//            System.err.println(ex);
-//        }
+        nodeMappingService.assignNode(NodeMappingService.class, id);        
     }
-    
-
     
     public void testEvilServerGetNode() throws Exception {
         // replace the serverimpl with our evil proxy
@@ -1012,7 +1008,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(serviceProps, registry);
+	return new DataServiceImpl(serviceProps, registry, txnProxy);
     }
     
     /**

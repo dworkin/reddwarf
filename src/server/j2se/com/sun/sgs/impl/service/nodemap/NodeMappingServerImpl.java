@@ -19,7 +19,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
@@ -47,6 +46,18 @@ import java.util.logging.Logger;
  * properties: <p>
  *
  * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.nodemap.server.port
+ *	</b></code><br>
+ *	<i>Default:</i> {@code 44535}
+ *
+ * <dd style="padding-top: .5em">The network port for the {@code
+ *	NodeMappingServer}.  This value must be no less than {@code 0} and no
+ *	greater than {@code 65535}.  The value {@code 0} can only be specified
+ *	if the {@code com.sun.sgs.impl.service.nodemap.start.server}
+ *	property is {@code true}, and means that an anonymous port will be
+ *	chosen for running the server. <p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.policy.class
@@ -120,7 +131,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
-    /** The transaction proxy, or null if configure has not been called. */ 
+    /** The transaction proxy. */ 
     private static TransactionProxy txnProxy;
     
     /** The logger for this class. */
@@ -137,13 +148,13 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final TaskScheduler taskScheduler;
     
     /** The proxy owner for our transactional, synchronous tasks. */
-    private TaskOwner taskOwner;
+    private final TaskOwner taskOwner;
     
     /** The data service. */
-    private DataService dataService;
+    private final DataService dataService;
     
     /** The watchdog service. */
-    private WatchdogService watchdogService;
+    private final WatchdogService watchdogService;
     
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
@@ -152,10 +163,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** The thread that removes inactive identities */
     // TODO:  should this be a TaskScheduler.scheduleRecurringTask? Or
     // maybe called via ResourceCoordinator.startTask?
-    private Thread removeThread;
-    
-    /** The remove expiration time. */
-    private final long removeExpireTime;
+    private final Thread removeThread;
     
      /** Our watchdog node listener. */
     private final NodeListener watchdogNodeListener;
@@ -165,9 +173,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The possible states of this instance. */
     enum State {
-	/** Before configure has been called */
+	/** Before constructor has been called */
 	UNINITIALIZED,
-	/** After configure and before shutdown */
+	/** After ready call and before shutdown */
 	RUNNING,
 	/** After start of a call to shutdown and before call finishes */
 	SHUTTING_DOWN,
@@ -200,23 +208,42 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      */
     private final Map<Long, NotifyClient> notifyMap =
                 new ConcurrentHashMap<Long, NotifyClient>();   
-
+    
     /**
      * Creates a new instance of NodeMappingServerImpl, called from the
      * local NodeMappingService.
      * @param properties service properties
      * @param systemRegistry system registry
+     * @param	txnProxy the transaction proxy
      *
      * @throws Exception if an error occurs during creation
      */
     public NodeMappingServerImpl(Properties properties, 
-            ComponentRegistry systemRegistry)  throws Exception 
+                                 ComponentRegistry systemRegistry,
+                                 TransactionProxy txnProxy)  
+         throws Exception 
     {     
+        if (systemRegistry == null) {
+            throw new NullPointerException("null system registry");
+        } else if (txnProxy == null) {
+            throw new NullPointerException("null transaction proxy");
+        }
+        
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
+        synchronized (NodeMappingServerImpl.class) {
+            if (NodeMappingServerImpl.txnProxy == null) {
+                NodeMappingServerImpl.txnProxy = txnProxy;
+            } else {
+                assert NodeMappingServerImpl.txnProxy == txnProxy;
+            }
+        }
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-        
+        dataService = txnProxy.getService(DataService.class);
+        watchdogService = txnProxy.getService(WatchdogService.class);
+        taskOwner = txnProxy.getCurrentOwner();
+       
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
                 SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
@@ -231,16 +258,36 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 new Class[] { Properties.class }, properties);
         }
         
-        removeExpireTime = wrappedProps.getLongProperty(
+        // Restore any old data from the data service.
+        runTransactionally(
+                new AbstractKernelRunnable() {
+                    public void run() {
+                        NodeMapUtil.handleDataVersion(dataService, logger);
+                    }
+                });
+        
+        // Create and start the remove thread, which removes unused identities
+        // from the map.
+        long removeExpireTime = wrappedProps.getLongProperty(
                 REMOVE_EXPIRE_PROPERTY, DEFAULT_REMOVE_EXPIRE_TIME,
                 1, Long.MAX_VALUE);
-        watchdogNodeListener = new Listener();
+        removeThread = new RemoveThread(removeExpireTime);
+        removeThread.start();
         
+        // Register our node listener with the watchdog service.
+        watchdogNodeListener = new Listener();
+        watchdogService.addNodeListener(watchdogNodeListener);   
+        
+        synchronized(stateLock) {
+            state = State.RUNNING;
+        }
+        
+        // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
         port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
         if (requestedPort == 0) {
             logger.log(Level.CONFIG, "Server is using port {0,number,#}", port);
-        }     
+        } 
         
         fullName = "NodeMappingServiceImpl[host:" + 
                    InetAddress.getLocalHost().getHostName() + 
@@ -248,77 +295,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     }
     
     /*- service like methods, which support lifecycle activities -*/
-    
-    /**
-     * Configure this server.  Called from the instantiating service,
-     * and follows the rules of
-     * {@link Service#configure(ComponentRegistry, TransactionProxy)}
-     *
-     * @param registry the {@code ComponentRegistry} of already configured
-     *                 services
-     * @param proxy the proxy used to resolve details of the current transaction
-     */
-    void configure(ComponentRegistry registry, TransactionProxy proxy) {
-        logger.log(Level.CONFIG, "Configuring NodeMappingServerImpl");
-
-        if (registry == null) {
-            throw new NullPointerException("null registry");
-        } else if (proxy == null) {
-            throw new NullPointerException("null transaction proxy");
-        }
-        
-        synchronized (NodeMappingServerImpl.class) {
-            if (NodeMappingServerImpl.txnProxy == null) {
-                NodeMappingServerImpl.txnProxy = proxy;
-            } else {
-                assert NodeMappingServerImpl.txnProxy == proxy;
-            }
-        }
-
-        synchronized (this) {
-            if (dataService != null) {
-                throw new IllegalStateException("Already configured");
-            }
-            dataService = registry.getComponent(DataService.class);
-            watchdogService = registry.getComponent(WatchdogService.class);
-            
-            taskOwner = txnProxy.getCurrentOwner();
-        }
-        
-        // Restore any old data from the data service.
-        NodeMapUtil.handleDataVersion(dataService, logger);
-          
-        // Create our remove thread; this is started when the instantiating
-        // service's configure transaction is committed.
-        removeThread = new RemoveThread(removeExpireTime);
-        
-    }
-    
-    /**
-     * Removes any configuration effects, in case the transaction
-     * configuring the service aborts.  This is more convenient than joining
-     * the transaction, and is called from the service during its transaction
-     * abort handling.
-     */ 
-    void abortConfigure() {
-        dataService = null;
-        assignPolicy.reset();
-        // If we did some work to handle version number changes, they
-        // won't be rolled back here.  Is that a problem?
-    }
-    
-    /**
-     * Performs any actions needed when the instantiating service's
-     * configure method commits.
-     */
-    void commitConfigure() {
-        synchronized(stateLock) {
-            state = State.RUNNING;
-        }
-        // Register our node listener with the watchdog service.
-        watchdogService.addNodeListener(watchdogNodeListener);
-        removeThread.start();
-    }
     
     /** 
      * Shut down this server.  Called from the instantiating service.
@@ -380,7 +356,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private void callStarted(boolean check) {
 	synchronized (stateLock) {
             if (check && state != State.RUNNING) {
-                System.out.println("state is " + state);
 		throw new IllegalStateException("service not running");
             }
 	    callsInProgress++;
@@ -493,13 +468,18 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * during our waiting time, marking the identity as active, during the
      * waiting time.  If it is still appropriate to remove the identity,
      * all traces of it are removed from the data store.
+     * <p>
+     * TODO:  interrupt handling is not correct.
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
         private boolean done = false;
+        
         RemoveThread(long expireTime) { 
+            super(PKG_NAME + "$RemoveThread");
             this.expireTime = expireTime;
         }
+        
         public void run() {
             while (!done) {
                 try {
