@@ -1702,7 +1702,7 @@ public class DistributedHashMap<K,V>
 	    else {
 		if (isKeyWrapped) {
 		    // unpack the key from the wrapper 
-		    ManagedSerializable<V> wrapper = 
+		    ManagedSerializable<K> wrapper = 
 			keyRef.get(ManagedSerializable.class);
 		    AppContext.getDataManager().removeObject(wrapper);
 		}
