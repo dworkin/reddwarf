@@ -17,7 +17,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -101,16 +100,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    if (listener != null && !(listener instanceof Serializable)) {
 		throw new IllegalArgumentException("listener not serializable");
 	    }
-	    if (!(session instanceof SgsClientSession)) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"join: session does not implement" +
-			"SgsClientSession:{0}", session);
-		}
-		throw new IllegalArgumentException(
-		    "unexpected ClientSession type: " + session);
-	    }
+
 	    if (state.hasSession(session)) {
 		return;
 	    }
@@ -146,16 +136,6 @@ final class ChannelImpl implements Channel, Serializable {
 	    checkClosed();
 	    if (session == null) {
 		throw new NullPointerException("null client session");
-	    }
-	    if (!(session instanceof SgsClientSession)) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"join: session does not implement " +
-			"SgsClientSession:{0}", session);
-		}
-		throw new IllegalArgumentException(
-		    "unexpected ClientSession type: " + session);
 	    }
 
 	    if (!state.hasSession(session)) {
@@ -465,8 +445,8 @@ final class ChannelImpl implements Channel, Serializable {
 	ClientSession session, byte[] message)
     {
         try {
-            ((SgsClientSession) session).
-		sendProtocolMessageOnCommit(message, state.delivery);
+            context.getClientSessionService().sendProtocolMessage(
+		session, message, state.delivery);
         } catch (RuntimeException e) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.logThrow(

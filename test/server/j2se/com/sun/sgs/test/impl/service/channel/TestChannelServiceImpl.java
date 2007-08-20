@@ -43,7 +43,6 @@ import com.sun.sgs.io.Connector;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -1552,7 +1551,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private static class DummyClientSession
-	implements SgsClientSession, Serializable
+	implements ClientSession, Serializable
     {
 	private final static long serialVersionUID = 1L;
 	private static byte nextByte = 0x00;
@@ -1591,7 +1590,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    return true;
 	}
 
-	/* -- Implement SgsClientSession -- */
+	/* -- Implement ClientSession -- */
 
         /** {@inheritDoc} */
         public Identity getIdentity() {

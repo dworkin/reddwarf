@@ -4,6 +4,7 @@
 
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
@@ -14,7 +15,7 @@ import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.session.ClientSessionImpl.
+import com.sun.sgs.impl.service.session.ClientSessionHandler.
     ClientSessionListenerWrapper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -33,7 +34,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
-import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -76,7 +76,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(
+	    "com.sun.sgs.impl.service.session.service"));
 
     /** The name of the IdGenerator. */
     private static final String ID_GENERATOR_NAME =
@@ -106,10 +107,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	Collections.synchronizedMap(
 	    new HashMap<Byte, ProtocolMessageListener>());
 
-    /** A map of current sessions, from session ID to ClientSessionImpl. */
-    private final Map<ClientSessionId, ClientSessionImpl> sessions =
+    /** A map of local session handlers, keyed by session ID . */
+    private final Map<ClientSessionId, ClientSessionHandler> handlers =
 	Collections.synchronizedMap(
-	    new HashMap<ClientSessionId, ClientSessionImpl>());
+	    new HashMap<ClientSessionId, ClientSessionHandler>());
 
     /** Queue of contexts that are prepared (non-readonly) or committed. */
     private final Queue<Context> contextQueue =
@@ -147,6 +148,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The IdGenerator. */
     private IdGenerator idGenerator;
+
+    /** The client session server. */
+    private ClientSessionServer sessionServer;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -290,7 +294,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
 
     /**
-     * Returns the port this service is listening on.
+     * Returns the port this service is listening on for incoming
+     * client session connections.
      *
      * @return the port this service is listening on
      */
@@ -302,6 +307,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
 		getPort();
 	}
+    }
+
+    /**
+     * Returns the client session server
+     *
+     * @return	the client session server
+     */
+    ClientSessionServer getServerProxy() {
+	return sessionServer;
     }
 
     /**
@@ -331,14 +345,21 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    // swallow exception
 	}
 
-	for (ClientSessionImpl session : sessions.values()) {
-	    session.shutdown();
+	for (ClientSessionHandler handler : handlers.values()) {
+	    handler.shutdown();
 	}
-	sessions.clear();
+	handlers.clear();
 
 	flushContextsThread.interrupt();
 	
 	return true;
+    }
+
+    /* -- Implement ClientSessionManager -- */
+    
+    /** {@inheritDoc} */
+    public ClientSession getClientSession(String user) {
+	throw new AssertionError("not implemented");
     }
 
     /* -- Implement ClientSessionService -- */
@@ -351,9 +372,61 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
 
     /** {@inheritDoc} */
-    public SgsClientSession getClientSession(byte[] sessionId) {
-	return sessions.get(new ClientSessionId(sessionId));
+    public ClientSession getClientSession(byte[] sessionId) {
+	// FIXME: this works only for a single node...
+	ClientSessionHandler handler =
+	    handlers.get(new ClientSessionId(sessionId));
+	return (handler != null) ? handler.getClientSession() : null;
     }
+
+    /** {@inheritDoc} */
+    public void sendProtocolMessage(
+	ClientSession session, byte[] message, Delivery delivery)
+    {
+	checkContext().addMessage(
+	    getClientSessionImpl(session), message, delivery);
+    }
+
+    /**
+     * Sends the specified protocol {@code message} to the specified
+     * client {@code session} with the specified {@code delivery}
+     * guarantee.  This method must be called within a transaction.
+     *
+     * <p>The message is placed at the head of the queue of messages sent
+     * during the current transaction and is delivered along with any
+     * other queued messages when the transaction commits.
+     *
+     * @param	session	a client session
+     * @param	message a complete protocol message
+     * @param	delivery a delivery requirement
+     *
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    void sendProtocolMessageFirst(
+	ClientSessionImpl session, byte[] message, Delivery delivery)
+    {
+	checkContext().addMessageFirst(session, message, delivery);
+    }
+
+    /** {@inheritDoc} */
+    public void sendProtocolMessageNonTransactional(
+	ClientSession session, byte[] message, Delivery delivery)
+    {
+	// FIXME: this only works on a single node...
+	ClientSessionHandler handler = handlers.get(session.getSessionId());
+	if (handler != null) {
+	    handler.sendProtocolMessage(message, delivery);
+	} else {
+	    logger.log(Level.WARNING, "session {0} doesn't exist", session);
+	}
+    }
+
+    /** {@inheritDoc} */
+    public void disconnect(ClientSession session) {
+	checkContext().requestDisconnect(getClientSessionImpl(session));
+    }
+
 
     /* -- Implement AcceptorListener -- */
 
@@ -378,10 +451,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    "Failed to obtain client session ID, throws");
 		return null;
 	    }
-	    ClientSessionImpl session =
-		new ClientSessionImpl(ClientSessionServiceImpl.this, nextId);
-	    sessions.put(session.getSessionId(), session);
-	    return session.getConnectionListener();
+	    logger.log(
+		Level.FINEST, "Accepting connection for session:{0}", nextId);
+	    ClientSessionHandler handler = new ClientSessionHandler(nextId);
+	    handlers.put(handler.getSessionId(), handler);
+	    return handler.getConnectionListener();
 	}
 
         /** {@inheritDoc} */
@@ -441,9 +515,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    acceptor = null;
 		}
 		
-		for (ClientSessionImpl session : sessions.values()) {
+		for (ClientSessionHandler handler : handlers.values()) {
 		    try {
-			session.shutdown();
+			handler.shutdown();
 		    } catch (Exception e) {
 			// ignore exception shutting down session
 			logger.logThrow(
@@ -451,7 +525,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 			    " exception shutting down session");
 		    }
 		}
-		sessions.clear();
+		handlers.clear();
 	    }
 	}
 
@@ -657,7 +731,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Contains pending changes for a given client session.
      */
-    private static class Updates {
+    private class Updates {
 
 	/** The client session. */
 	private final ClientSessionImpl session;
@@ -673,11 +747,20 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
 
 	private void flush() {
+	    ClientSessionHandler handler =
+		handlers.get(session.getSessionId());
+	    if (handler == null) {
+		logger.log(Level.WARNING,
+			   "discarding updates, session:{0} disconnected",
+			   session);
+		return;
+	    }
+	    // FIXME: this only works for a single node...
 	    for (byte[] message : messages) {
-		session.sendProtocolMessage(message, Delivery.RELIABLE);
+		handler.sendProtocolMessage(message, Delivery.RELIABLE);
 	    }
 	    if (disconnect) {
-		session.handleDisconnect(false);
+		handler.handleDisconnect(false);
 	    }
 	}
     }
@@ -753,6 +836,19 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /* -- Other methods -- */
 
+    /**
+     * Returns the {@code ClientSessionImpl} corresponding to the
+     * specified client {@code session}.
+     */
+    private ClientSessionImpl getClientSessionImpl(ClientSession session) {
+	if (session instanceof ClientSessionImpl) {
+	    return (ClientSessionImpl) session;
+	} else {
+	    throw new AssertionError(
+		"session not instanceof ClientSessionImpl: " + session);
+	}
+    }
+
    /**
      * Obtains information associated with the current transaction,
      * throwing TransactionNotActiveException if there is no current
@@ -771,11 +867,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * @return the client session service relevant to the current
      * context
      */
-    public synchronized static ClientSessionService getInstance() {
+    public synchronized static ClientSessionServiceImpl getInstance() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not configured");
 	} else {
-	    return txnProxy.getService(ClientSessionService.class);
+	    return (ClientSessionServiceImpl)
+		txnProxy.getService(ClientSessionService.class);
 	}
     }
 
@@ -789,7 +886,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(SgsClientSession session) {
+    void disconnected(ClientSession session) {
 	if (shuttingDown()) {
 	    return;
 	}
@@ -799,7 +896,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	{
 	    serviceListener.disconnected(session);
 	}
-	sessions.remove(session.getSessionId());
+	handlers.remove(session.getSessionId());
     }
 
     /**

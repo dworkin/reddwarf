@@ -4,6 +4,7 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.auth.Identity;
 import java.io.Serializable;
 
 /**
@@ -57,6 +58,13 @@ public interface ClientSession {
      * 		a problem with the current transaction
      */
     String getName();
+
+    /**
+     * Returns the identity for this session.
+     *
+     * @return	the identity for this session
+     */
+    Identity getIdentity();
 
     /**
      * Returns a {@code ClientSessionId} containing the representation

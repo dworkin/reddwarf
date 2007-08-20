@@ -36,7 +36,6 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -115,8 +114,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     /** Map (with weak keys) of client sessions to queues, each containing
      * tasks to forward channel messages sent by the session (the key).
      */
-    private final WeakHashMap<SgsClientSession, NonDurableTaskQueue>
-	taskQueues = new WeakHashMap<SgsClientSession, NonDurableTaskQueue>();
+    private final WeakHashMap<ClientSession, NonDurableTaskQueue>
+	taskQueues = new WeakHashMap<ClientSession, NonDurableTaskQueue>();
     
     /** The sequence number for channel messages originating from the server. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
@@ -368,7 +367,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	implements ProtocolMessageListener
     {
 	/** {@inheritDoc} */
-	public void receivedMessage(SgsClientSession session, byte[] message) {
+	public void receivedMessage(ClientSession session, byte[] message) {
 	    try {
 		MessageBuffer buf = new MessageBuffer(message);
 	    
@@ -430,7 +429,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
 
 	/** {@inheritDoc} */
-	public void disconnected(final SgsClientSession session) {
+	public void disconnected(final ClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
@@ -455,7 +454,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * already been processed by the caller.
      */
     private void handleChannelSendRequest(
-	SgsClientSession sender, MessageBuffer buf)
+	ClientSession sender, MessageBuffer buf)
     {
 	CompactId channelId = CompactId.getCompactId(buf);
 	CachedChannelState cachedState = channelStateCache.get(channelId);
@@ -500,7 +499,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    // Look up recipient sessions and check for channel membership
 	    for (int i = 0; i < numRecipients; i++) {
 		CompactId recipientId = CompactId.getCompactId(buf);
-		SgsClientSession recipient =
+		ClientSession recipient =
 		    sessionService.getClientSession(recipientId.getId());
 		if (recipient != null && cachedState.hasSession(recipient)) {
 		    recipients.add(recipient);
@@ -525,8 +524,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	for (ClientSession session : recipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
-		((SgsClientSession) session).sendProtocolMessage(
-		    protocolMessage, cachedState.delivery);
+		sessionService.sendProtocolMessageNonTransactional(
+		    session, protocolMessage, cachedState.delivery);
 	    }
         }
 
@@ -543,7 +542,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * Returns the task queue for the specified {@code session}.
      * If a queue does not already exist, one is created and returned.
      */
-    private NonDurableTaskQueue getTaskQueue(SgsClientSession session) {
+    private NonDurableTaskQueue getTaskQueue(ClientSession session) {
 	synchronized (taskQueues) {
 	    NonDurableTaskQueue queue = taskQueues.get(session);
 	    if (queue == null) {
@@ -744,6 +743,13 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
 
 	/* -- other methods -- */
+
+	/**
+	 * Returns the client session service.
+	 */
+	ClientSessionService getClientSessionService() {
+	    return sessionService;
+	}
 
 	/**
 	 * Removes the channel with the specified {@code name}.  This

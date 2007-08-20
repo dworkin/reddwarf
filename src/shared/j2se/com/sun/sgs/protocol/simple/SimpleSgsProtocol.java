@@ -108,6 +108,20 @@ public interface SimpleSgsProtocol {
     final byte LOGIN_FAILURE = 0x12;
 
     /**
+     * Login redirect.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * <br>
+     * ServiceId: {@code 0x01} (Application)
+     * <br>
+     * Opcode: {@code 0x13}
+     * <br>
+     * Payload:
+     * <ul>
+     * <li> (String) hostname
+     * </ul>
+     */
+    final byte LOGIN_REDIRECT = 0x13;
+    
+    /**
      * Reconnection request.  Client requesting reconnect to a server.
      * <br>
      * ServiceId: {@code 0x01} (Application)
