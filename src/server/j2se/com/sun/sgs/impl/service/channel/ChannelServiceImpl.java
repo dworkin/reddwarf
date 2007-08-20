@@ -39,6 +39,7 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Collections;
@@ -90,26 +91,23 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     /** The name of this application. */
     private final String appName;
 
-    /** Synchronize on this object before accessing the contextFactory. */
-    private final Object lock = new Object();
-
     /** The listener that receives incoming channel protocol messages. */
     private final ProtocolMessageListener protocolMessageListener;
     
     /** The data service. */
-    private DataService dataService;
+    private final DataService dataService;
 
     /** The client session service. */
-    private ClientSessionService sessionService;
+    private final ClientSessionService sessionService;
 
     /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    NonDurableTaskScheduler nonDurableTaskScheduler;
+    final NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
-    private TransactionContextFactory<Context> contextFactory;
+    private final TransactionContextFactory<Context> contextFactory;
     
     /** Map (with weak keys) of client sessions to queues, each containing
      * tasks to forward channel messages sent by the session (the key).
@@ -118,7 +116,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	taskQueues = new WeakHashMap<ClientSession, NonDurableTaskQueue>();
     
     /** The sequence number for channel messages originating from the server. */
-    private AtomicLong sequenceNumber = new AtomicLong(0);
+    private final AtomicLong sequenceNumber = new AtomicLong(0);
 
     /** A map of channel name to cached channel state, valid as of the
      * last transaction commit. */
@@ -131,9 +129,13 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      *
      * @param properties service properties
      * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
+     * @throws Exception if a problem occurs when creating the service
      */
-    public ChannelServiceImpl(
-	Properties properties, ComponentRegistry systemRegistry)
+    public ChannelServiceImpl(Properties properties,
+			      ComponentRegistry systemRegistry,
+			      TransactionProxy txnProxy)
+	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
@@ -143,6 +145,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	try {
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
+	    } else if (txnProxy == null) {
+		throw new NullPointerException("null txnProxy");
 	    }
 	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
@@ -152,8 +156,39 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }	
 	    protocolMessageListener = new ChannelProtocolMessageListener();
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	    synchronized (ChannelServiceImpl.class) {
+		if (ChannelServiceImpl.txnProxy == null) {
+		    ChannelServiceImpl.txnProxy = txnProxy;
+		    contextMap = new TransactionContextMap<Context>(txnProxy);
+		} else {
+		    assert ChannelServiceImpl.txnProxy == txnProxy;
+		}
+	    }
+	    contextFactory = new ContextFactory(contextMap);
+	    dataService = txnProxy.getService(DataService.class);
+	    sessionService = txnProxy.getService(ClientSessionService.class);
+	    nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+	    taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    /*
+			     * Remove all sessions from all channels since all
+			     * previously stored sessions have been
+			     * disconnected.
+			     */
+			    removeAllSessionsFromChannels();
+			    removeChannelSets();
+			}
+		    }),
+		txnProxy.getCurrentOwner(), true);
+	    sessionService.registerProtocolMessageListener(
+		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 
-	} catch (RuntimeException e) {
+	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e, "Failed to create ChannelServiceImpl");
@@ -170,61 +205,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     }
 
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
-	}
-
-	try {
-	    if (registry == null) {
-		throw new NullPointerException("null registry");
-	    } else if (proxy == null) {
-		throw new NullPointerException("null transaction proxy");
-	    }
-	    synchronized (ChannelServiceImpl.class) {
-		if (ChannelServiceImpl.txnProxy == null) {
-		    ChannelServiceImpl.txnProxy = proxy;
-		    contextMap = new TransactionContextMap<Context>(proxy);
-		} else {
-		    assert ChannelServiceImpl.txnProxy == proxy;
-		}
-	    }
-
-	    synchronized (lock) {
-		if (contextFactory != null) {
-		    throw new IllegalStateException("Already configured");
-		}
-		contextFactory = new ContextFactory(contextMap);
-		dataService = registry.getComponent(DataService.class);
-		sessionService =
-		    registry.getComponent(ClientSessionService.class);
-		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(
-		    	taskScheduler, proxy.getCurrentOwner(),
-			registry.getComponent(TaskService.class));
-
-		/*
-		 * Remove all sessions from all channels since all
-		 * previously stored sessions have been disconnected.
-		 */
-		removeAllSessionsFromChannels();
-		removeChannelSets();
-		
-		sessionService.registerProtocolMessageListener(
-		    SimpleSgsProtocol.CHANNEL_SERVICE,
-		    protocolMessageListener);
-	    }
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to configure ChannelServiceImpl");
-	    }
-	    throw e;
-	}
-    }
+    public void ready() { }
 
     /** {@inheritDoc} */
     public boolean shutdown() {
@@ -347,20 +328,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	return contextMap;
     }
     
-    /**
-     * Returns the transaction context factory.
-     *
-     * @return the transaction context factory
-     */
-    private TransactionContextFactory<Context> getContextFactory() {
-	synchronized (lock) {
-	    if (contextFactory == null) {
-		throw new IllegalStateException("Service is not configured");
-	    }
-	    return contextFactory;
-	}
-    }
-
     /* -- Implement ProtocolMessageListener -- */
 
     private final class ChannelProtocolMessageListener
@@ -433,8 +400,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    nonDurableTaskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			Context context =
-			    getContextFactory().joinTransaction();
+			Context context = contextFactory.joinTransaction();
 			Set<Channel> channels = context.removeSession(session);
 			for (Channel channel : channels) {
 			    channel.leave(session);

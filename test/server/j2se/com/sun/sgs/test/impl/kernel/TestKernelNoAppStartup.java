@@ -59,7 +59,8 @@ public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
                 if (line.equals("INFO: " + APP_NAME + ": non-application " +
                                 "context is ready"))
                     done();
-                if (line.equals("SEVERE: " + APP_NAME + ": startup failed")) {
+                if (line.equals("SEVERE: " + APP_NAME +
+				": failed to create services")) {
                     if (shouldFail)
                         done();
                     else
