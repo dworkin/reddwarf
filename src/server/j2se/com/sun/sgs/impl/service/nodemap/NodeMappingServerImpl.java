@@ -131,9 +131,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** Default time to wait before removing an identity, in milliseconds. */
     private static final int DEFAULT_REMOVE_EXPIRE_TIME = 5000;
     
-    /** The transaction proxy. */ 
-    private static TransactionProxy txnProxy;
-    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME + ".server"));
@@ -173,8 +170,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The possible states of this instance. */
     enum State {
-	/** Before constructor has been called */
-	UNINITIALIZED,
 	/** After ready call and before shutdown */
 	RUNNING,
 	/** After start of a call to shutdown and before call finishes */
@@ -184,7 +179,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     }
 
     /** The current state of this instance. */
-    private State state = State.UNINITIALIZED;
+    private State state;
     
     /** The count of calls in progress, protected by stateLock. */
     private int callsInProgress = 0;
@@ -212,6 +207,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /**
      * Creates a new instance of NodeMappingServerImpl, called from the
      * local NodeMappingService.
+     * <p>
+     * The application context is resolved at construction time (rather
+     * than when {@link NodeMappingServiceImpl#ready} is called), because this 
+     * server will never need Managers and will not run application code.  
+     * Managers are not available until {@code Service.ready} is called.
+     * <p>
      * @param properties service properties
      * @param systemRegistry system registry
      * @param	txnProxy the transaction proxy
@@ -232,13 +233,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
-        synchronized (NodeMappingServerImpl.class) {
-            if (NodeMappingServerImpl.txnProxy == null) {
-                NodeMappingServerImpl.txnProxy = txnProxy;
-            } else {
-                assert NodeMappingServerImpl.txnProxy == txnProxy;
-            }
-        }
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);

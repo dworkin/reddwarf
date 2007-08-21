@@ -296,9 +296,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME));
     
-    /** The transaction proxy. */    
-    private static TransactionProxy txnProxy;
-
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
     
@@ -352,8 +349,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     /** The possible states of this instance. */
     enum State {
-	/** Before constructor has been called */
-	UNINITIALIZED,
         /** After construction, but before ready call */
         CONSTRUCTED,
 	/** After ready call and before shutdown */
@@ -365,7 +360,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     }
 
     /** The current state of this instance. */
-    private State state = State.UNINITIALIZED;
+    private State state;
     
     /** Are we running an application?  If not, assume that we don't
      *  have a full stack.
@@ -386,7 +381,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
     
     /**
      * Constructs an instance of this class with the specified properties.
-     *
+     * <p>
+     * The application context is resolved at construction time (rather
+     * than when {@link #ready} is called), because this service
+     * does not use Managers and will not run application code.  Managers 
+     * are not available until {@code ready} is called.
+     * <p>
      * @param	properties the properties for configuring this service
      * @param	systemRegistry the registry of available system components
      * @param	txnProxy the transaction proxy
@@ -410,13 +410,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
 	try {
-            synchronized (NodeMappingServiceImpl.class) {
-		if (NodeMappingServiceImpl.txnProxy == null) {
-		    NodeMappingServiceImpl.txnProxy = txnProxy;
-		} else {
-		    assert NodeMappingServiceImpl.txnProxy == txnProxy;
-		}                        
-	    }
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
             dataService = txnProxy.getService(DataService.class);
             watchdogService = txnProxy.getService(WatchdogService.class);
@@ -453,6 +446,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
             server = (NodeMappingServer) 
                       registry.lookup(NodeMappingServerImpl.SERVER_EXPORT_NAME);	    
             
+            // Set our state before we export ourselves.
+            synchronized(stateLock) {
+                state = State.CONSTRUCTED;
+            }
+            
             // Export our client object for server callbacks.
             int clientPort = wrappedProps.getIntProperty(
                                         CLIENT_PORT_PROPERTY, 
@@ -488,10 +486,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
                        ", clientPort:" + clientPort + 
                        ", fullStack:" + fullStack + "]";
             
-            synchronized(stateLock) {
-                state = State.CONSTRUCTED;
-            }
-            
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");
@@ -509,6 +503,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
    
     /** {@inheritDoc} */
     public void ready() {
+        // We don't update our taskOwner because we know the initial
+        // context used during construction time is sufficient (this service
+        // does not need to run application code, and does not require
+        // Managers.
+        
         synchronized(stateLock) {
             state = State.RUNNING;
         }
@@ -571,8 +570,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
         }
 	synchronized (stateLock) {
 	    switch (state) {
-	    case UNINITIALIZED:
-		throw new IllegalStateException("Service is not constructed");
             case CONSTRUCTED:
                 break;
 	    case RUNNING:
