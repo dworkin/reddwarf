@@ -56,6 +56,8 @@ class ServiceConfigRunner implements Runnable {
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
     private static final String DEFAULT_WATCHDOG_SERVICE =
         "com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl";
+    private static final String DEFAULT_NODE_MAPPING_SERVICE =
+        "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
@@ -119,7 +121,7 @@ class ServiceConfigRunner implements Runnable {
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
         AppKernelAppContext ctx = 
-                new AppKernelAppContext(appName,  services, services);
+                new AppKernelAppContext(appName, services, services);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -287,6 +289,24 @@ class ServiceConfigRunner implements Runnable {
                     setProfileRegistrar(profileRegistrar);
         }
 
+        // load the node mapping service, which has no associated manager
+
+        if (StandardService.NodeMappingService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+	
+        String nodemapServiceClass =
+            appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
+                                      DEFAULT_NODE_MAPPING_SERVICE);
+        Service nodemapService =
+            createService(Class.forName(nodemapServiceClass));
+        services.addComponent(nodemapService);
+        if (nodemapService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer) nodemapService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+        
         // load the task service
 	
         if (StandardService.TaskService.ordinal() >
