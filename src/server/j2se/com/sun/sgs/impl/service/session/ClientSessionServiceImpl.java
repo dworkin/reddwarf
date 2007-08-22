@@ -128,7 +128,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
+    NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -218,18 +218,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	    contextFactory = new ContextFactory(txnProxy);
 	    dataService = txnProxy.getService(DataService.class);
-	    nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
-		    txnProxy.getService(TaskService.class));
-	    taskScheduler.runTask(
-		new TransactionRunner(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    notifyDisconnectedSessions();
-			}
-		    }),
-		txnProxy.getCurrentOwner(), true);
+
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
@@ -273,7 +262,22 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() throws Exception { 
+        // Update with the application owner
+        nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+        
+        taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    notifyDisconnectedSessions();
+			}
+		    }),
+		txnProxy.getCurrentOwner(), true);
+    }
 
     /**
      * Returns the port this service is listening on.

@@ -118,8 +118,8 @@ class ServiceConfigRunner implements Runnable {
 
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
-        AppKernelAppContext ctx = new AppKernelAppContext(appName, services);
-        ctx.setServices(services);
+        AppKernelAppContext ctx = 
+                new AppKernelAppContext(appName,  services, services);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -162,8 +162,7 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // with the managers created, setup the final context and owner
-        ctx = new AppKernelAppContext(appName, managers);
-        ctx.setServices(services);
+        ctx = new AppKernelAppContext(appName, services, managers);
         owner = new TaskOwnerImpl(id, ctx);
         ThreadState.setCurrentOwner(owner);
 

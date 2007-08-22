@@ -50,10 +50,6 @@ public class DummyAbstractKernelAppContext extends AbstractKernelAppContext {
 	return componentRegistry.getComponent(type);
     }
 
-    public void setServices(ComponentRegistry serviceComponents) {
-	this.componentRegistry = serviceComponents;
-    }
-
     public <T extends Service> T getService(Class<T> type) {
 	return componentRegistry.getComponent(type);
     }

@@ -55,11 +55,6 @@ public class EmptyKernelAppContext extends AbstractKernelAppContext {
     /**
      * {@inheritDoc}
      */
-    void setServices(ComponentRegistry serviceComponents) {}
-
-    /**
-     * {@inheritDoc}
-     */
     <T extends Service> T getService(Class<T> type) {
         throw new MissingResourceException("this context is empty",
                                            type.getName(), null);
