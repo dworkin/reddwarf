@@ -131,9 +131,19 @@ public class Exporter<T extends Remote> {
      *		removed from the network
      */
     public synchronized boolean unexport() {
-	if (registry == null) {
+	if (server == null) {
 	    throw new IllegalStateException(
 		"The server is already shut down");
+	}
+        if (registry != null ) {
+	    try {
+		UnicastRemoteObject.unexportObject(registry, true);
+		registry = null;
+	    } catch (NoSuchObjectException e) {
+		logger.logThrow(
+		    Level.FINE, e, "Problem unexporting registry");
+		return false;
+	    }
 	}
 	if (server != null) {
 	    try {
@@ -142,16 +152,6 @@ public class Exporter<T extends Remote> {
 	    } catch (NoSuchObjectException e) {
 		logger.logThrow(
 		    Level.FINE, e, "Problem unexporting server");
-		return false;
-	    }
-	}
-	if (registry != null ) {
-	    try {
-		UnicastRemoteObject.unexportObject(registry, true);
-		registry = null;
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(
-		    Level.FINE, e, "Problem unexporting registry");
 		return false;
 	    }
 	}

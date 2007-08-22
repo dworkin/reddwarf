@@ -23,7 +23,9 @@ package com.sun.sgs.auth;
 public interface Identity {
 
     /**
-     * Returns the name associated with this identity.
+     * Returns the name associated with this identity.  This name must
+     * be unique within the application, and two identities with the same
+     * name must be equal.
      *
      * @return the identity's name
      */
