@@ -41,8 +41,8 @@ public abstract class AsynchronousChannelProvider {
     /**
      * Initializes a new instance of this class.
      * 
-     * @throws SecurityException if a security manager has been installed and it
-     *          denies RuntimePermission("asynchronousChannelProvider")
+     * @throws SecurityException if a security manager has been installed and
+     *             it denies RuntimePermission("asynchronousChannelProvider")
      */
     protected AsynchronousChannelProvider() {
         SecurityManager sm = System.getSecurityManager();
@@ -52,7 +52,8 @@ public abstract class AsynchronousChannelProvider {
     }
 
     private static boolean loadProviderFromProperty() {
-        String cn = System.getProperty("com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");
+        String cn = System.getProperty(
+            "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");
         if (cn == null)
             return false;
         try {
@@ -125,10 +126,12 @@ public abstract class AsynchronousChannelProvider {
 
     /**
      * Opens an asynchronous server-socket channel.
-     *
-     * @param group the group to which the channel is bound, or null to bind to the default group
+     * 
+     * @param group the group to which the channel is bound, or null to bind
+     *        to the default group
      * @return the new channel
-     * @throws IllegalArgumentException if the provider that created the group differs from this provider
+     * @throws IllegalArgumentException if the provider that created the
+     *         group differs from this provider
      * @throws IOException if an I/O error occurs
      */
     public abstract AsynchronousServerSocketChannel
@@ -137,10 +140,12 @@ public abstract class AsynchronousChannelProvider {
 
     /**
      * Opens an asynchronous socket channel.
-     *
-     * @param group the group to which the channel is bound, or null to bind to the default group
+     * 
+     * @param group the group to which the channel is bound, or null to bind
+     *        to the default group
      * @return the new channel
-     * @throws IllegalArgumentException if the provider that created the group differs from this provider
+     * @throws IllegalArgumentException if the provider that created the
+     *         group differs from this provider
      * @throws IOException if an I/O error occurs
      */
     public abstract AsynchronousSocketChannel
@@ -149,10 +154,12 @@ public abstract class AsynchronousChannelProvider {
 
     /**
      * Opens an asynchronous datagram channel.
-     *
-     * @param group the group to which the channel is bound, or null to bind to the default group
+     * 
+     * @param group the group to which the channel is bound, or null to bind
+     *        to the default group
      * @return the new channel
-     * @throws IllegalArgumentException if the provider that created the group differs from this provider
+     * @throws IllegalArgumentException if the provider that created the
+     *         group differs from this provider
      * @throws IOException if an I/O error occurs
      */
     public abstract AsynchronousDatagramChannel

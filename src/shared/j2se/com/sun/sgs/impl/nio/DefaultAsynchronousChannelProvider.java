@@ -16,18 +16,6 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 public class DefaultAsynchronousChannelProvider
     extends AsynchronousChannelProvider
 {
-    static final class ChannelGroupCleaner implements Runnable {
-        private final AsynchronousChannelGroup group;
-        ChannelGroupCleaner(AsynchronousChannelGroup group) {
-            this.group = group;
-        }
-        public void run() {
-            try {
-                group.shutdownNow();
-            } catch (IOException ignore) { }
-        }
-    }
-
     private AsyncChannelGroupImpl defaultGroupInstance = null;
 
     public static DefaultAsynchronousChannelProvider create() {
@@ -35,7 +23,7 @@ public class DefaultAsynchronousChannelProvider
     }
 
     protected DefaultAsynchronousChannelProvider() {
-        // empty
+        super();
     }
 
     private static ThreadPoolFactory getThreadPoolFactory() {
@@ -62,9 +50,7 @@ public class DefaultAsynchronousChannelProvider
                 ThreadPoolFactory tpf = getThreadPoolFactory();
                 ExecutorService executor = tpf.newThreadPool();
                 defaultGroupInstance = openAsynchronousChannelGroup(executor);
-                // TODO is the cleaner needed/useful? -JM
-                Cleaner.instance().add(
-                    new ChannelGroupCleaner(defaultGroupInstance));
+                // TODO is a cleanup thread needed/useful? -JM
             }
         }
         return defaultGroupInstance;
