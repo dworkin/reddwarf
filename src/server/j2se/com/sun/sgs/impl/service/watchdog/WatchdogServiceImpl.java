@@ -292,7 +292,11 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
     
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() { 
+        if (serverImpl != null) {
+            serverImpl.ready();
+        }
+    }
 
     /** {@inheritDoc} */
     public boolean shutdown() {

@@ -81,6 +81,12 @@ public class StandardProperties {
 
     /**
      * An optional key specifying a specific class to use for an application's
+     * <code>NodeMappingService</code>.
+     */
+    public static final String NODE_MAPPING_SERVICE =
+        NS + "app.nodeMappingService";
+    /**
+     * An optional key specifying a specific class to use for an application's
      * <code>TaskService</code>.
      */
     public static final String TASK_SERVICE = NS + "app.taskService";
