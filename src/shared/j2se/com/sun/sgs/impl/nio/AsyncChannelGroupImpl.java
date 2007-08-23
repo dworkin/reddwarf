@@ -40,14 +40,17 @@ class AsyncChannelGroupImpl
         new LinkedBlockingQueue<Callable<?>>();
     private final ReentrantLock mainLock = new ReentrantLock();
     private final Condition termination = mainLock.newCondition();
-    
+
     private final Condition noTasksWaiting = mainLock.newCondition();
     volatile int numTasksWaiting = 0;
 
     static final int MAX_TASKS_PER_WORK_LOOP = 1;
     static final int MAX_DISPATCHES_PER_WORK_LOOP = 1;
 
-    AsyncChannelGroupImpl(DefaultAsynchronousChannelProvider provider, ExecutorService executor) throws IOException {
+    AsyncChannelGroupImpl(DefaultAsynchronousChannelProvider provider,
+                          ExecutorService executor) 
+        throws IOException
+    {
         super(provider);
         if (executor == null)
             throw new NullPointerException("null ExecutorService");
