@@ -27,6 +27,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.ProtocolMessageListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -73,6 +74,9 @@ class ClientSessionHandler {
     /** Message for indicating login/authentication failure. */
     private static final String LOGIN_REFUSED_REASON = "Login refused";
 
+    /** The LOGIN_FAILURE protocol message. */
+    private static final byte[] loginFailureMessage = getLoginFailureMessage();
+
     /** The client session associated with this session handler,
      * or {@code null} if the session hasn't completed login.
      */
@@ -83,9 +87,9 @@ class ClientSessionHandler {
 
     /** The data service. */
     private final DataService dataService;
-    
+
     /** The Connection for sending messages to the client. */
-    private Connection sessionConnection;
+    private volatile Connection sessionConnection;
 
     /** The session ID. */
     private final CompactId compactId;
@@ -525,28 +529,10 @@ class ClientSessionHandler {
 	    switch (opcode) {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
+
 		String name = msg.getString();
 		String password = msg.getString();
-
-		try {
-		    Identity authenticatedIdentity =
-			authenticate(name, password);
-		    taskQueue =
-			new NonDurableTaskQueue(
-			    sessionService.txnProxy,
-			    sessionService.nonDurableTaskScheduler,
-			    authenticatedIdentity);
-		    sessionImpl.setIdentity(authenticatedIdentity);
-		    identity = authenticatedIdentity;
-		    scheduleTask(new LoginTask());
-		} catch (LoginException e) {
-		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-			public void run() {
-			    sendProtocolMessage(getLoginNackMessage(),
-						Delivery.RELIABLE);
-			    handleDisconnect(false);
-			}});
-		}
+		handleLoginRequest(name, password);
 		break;
 		
 	    case SimpleSgsProtocol.RECONNECT_REQUEST:
@@ -591,6 +577,77 @@ class ClientSessionHandler {
 		    }});
 		break;
 	    }
+	}
+	
+	/**
+	 * Handles a login request for the specified {@code name} and
+	 * {@code password}, scheduling the appropriate response to be
+	 * sent to the client (either LOGIN_SUCCESS, LOGIN_FAILURE, or
+	 * LOGIN_REDIRECT).
+	 */
+	private void handleLoginRequest(String name, String password) {
+
+	    logger.log(
+		Level.FINEST, 
+		"handling login request for name:{0}", name);
+	    
+	    final Identity authenticatedIdentity;
+	    try {
+		authenticatedIdentity = authenticate(name, password);
+	    } catch (LoginException e) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "login authentication failed for name:{0}", name);
+		sendLoginFailureAndDisconnect();
+		return;
+	    }
+
+	    Node node;
+	    try {
+		sessionService.nodeMapService.assignNode(
+		    ClientSessionHandler.class, authenticatedIdentity);
+		GetNodeTask getNodeTask =
+		    new GetNodeTask(authenticatedIdentity);		
+		sessionService.runTransactionalTask(
+		    getNodeTask, authenticatedIdentity);
+		node = getNodeTask.getNode();
+		
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "exception contacting node map service for name:{0}", name);
+		sendLoginFailureAndDisconnect();
+		return;
+	    }
+
+	    if (node.getId() == sessionService.getLocalNodeId()) {
+		taskQueue =
+		    new NonDurableTaskQueue(
+			sessionService.txnProxy,
+			sessionService.nonDurableTaskScheduler,
+			authenticatedIdentity);
+		sessionImpl.setIdentity(authenticatedIdentity);
+		identity = authenticatedIdentity;
+		scheduleTask(new LoginTask());
+		
+	    } else {
+		final byte[] loginRedirectMessage =
+		    getLoginRedirectMessage(node.getHostName());
+		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+		    public void run() {
+			sendProtocolMessage(
+			    loginRedirectMessage, Delivery.RELIABLE);
+			handleDisconnect(false);
+		    }});
+	    }
+	}
+
+	private void sendLoginFailureAndDisconnect() {
+	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
+		    handleDisconnect(false);
+		}});
 	}
     }
 
@@ -714,6 +771,29 @@ class ClientSessionHandler {
     }
 
     /**
+     * This is a transactional task to obtain the node assignment for
+     * a given identity.
+     */
+    private class GetNodeTask extends AbstractKernelRunnable {
+
+	private final Identity authenticatedIdentity;
+	private volatile Node node = null;
+
+	GetNodeTask(Identity authenticatedIdentity) {
+	    this.authenticatedIdentity = authenticatedIdentity;
+	}
+
+	public void run() throws Exception {
+	    node = sessionService.
+		nodeMapService.getNode(authenticatedIdentity);
+	}
+
+	Node getNode() {
+	    return node;
+	}
+    }
+    
+    /**
      * This is a transactional task to notify the application's
      * {@code AppListener} that this session has logged in.
      */
@@ -809,7 +889,7 @@ class ClientSessionHandler {
 		    throw ex;
 		}
 		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, getLoginNackMessage(), Delivery.RELIABLE);
+		    sessionImpl, loginFailureMessage, Delivery.RELIABLE);
 		sessionService.disconnect(sessionImpl);
 	    }
 	}
@@ -818,14 +898,27 @@ class ClientSessionHandler {
     /**
      * Returns a byte array containing a LOGIN_FAILURE protocol message.
      */
-    private static byte[] getLoginNackMessage() {
+    private static byte[] getLoginFailureMessage() {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
-        MessageBuffer ack =
-            new MessageBuffer(3 + stringSize);
+        MessageBuffer ack = new MessageBuffer(3 + stringSize);
         ack.putByte(SimpleSgsProtocol.VERSION).
             putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
             putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(LOGIN_REFUSED_REASON);
         return ack.getBuffer();
     }
+
+    /**
+     * Returns a byte array containing a LOGIN_REDIRECT protocol
+     * message containing the given {@code hostname}.
+     */
+    private static byte[] getLoginRedirectMessage(String hostname) {
+	int hostStringSize = MessageBuffer.getSize(hostname);
+	MessageBuffer ack = new MessageBuffer(3 + hostStringSize);
+        ack.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+            putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
+            putString(hostname);
+        return ack.getBuffer();
+    }	
 }

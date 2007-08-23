@@ -28,8 +28,11 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.Connector;
@@ -38,13 +41,16 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -69,24 +75,32 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
 
+    /** The name of the WatchdogServerImpl class. */
+    private static final String WatchdogServerPropertyPrefix =
+        "com.sun.sgs.impl.service.watchdog.server";
+    
     /** Directory used for database shared across multiple tests. */
     private static String DB_DIRECTORY =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestClientSessionServiceImpl.db";
 
     /** The port for the client session service. */
-    private static int PORT = 2468;
+    private static int APP_PORT = 0;
 
-    /** Properties for the session service. */
-    private static Properties serviceProps = createProperties(
-	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	StandardProperties.APP_PORT, Integer.toString(0));
+    /** The port for the watchdog server. */
+    private static final int WATCHDOG_PORT = 0;
+    
+    /** The port for the nodemap server. */
+    private static final int NODEMAP_PORT = 0;
 
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory",
-	DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
+    /** The watchdog renew interval */
+    private static long RENEW_INTERVAL = 1000;
+    
+    /** Amount of time to wait before something might be removed. */
+    private static final int REMOVE_TIME = 250;
+
+    /** Service properties. */
+    private static Properties serviceProps;
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -111,22 +125,55 @@ public class TestClientSessionServiceImpl extends TestCase {
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
-    
+
+    /** Services. */
     private DataServiceImpl dataService;
-    private ChannelServiceImpl channelService;
-    private ClientSessionServiceImpl sessionService;
+    private WatchdogServiceImpl watchdogService;
+    private NodeMappingServiceImpl nodeMappingService;
     private TaskServiceImpl taskService;
+    private ClientSessionServiceImpl sessionService;
+    private ChannelServiceImpl channelService;
     private static DummyIdentityManager identityManager;
 
     /** The listen port for the client session service. */
-    private int port;
+    private int appPort;
 
     /** True if test passes. */
     private boolean passed;
 
     /** Constructs a test instance. */
-    public TestClientSessionServiceImpl(String name) {
+    public TestClientSessionServiceImpl(String name) throws Exception {
 	super(name);
+
+        Field nodeMapPortPropertyField = 
+           NodeMappingServerImpl.class.getDeclaredField("SERVER_PORT_PROPERTY");
+        nodeMapPortPropertyField.setAccessible(true);
+        String nodeMapPortPropertyName =
+	    (String) nodeMapPortPropertyField.get(null);
+        
+        Field removeExpireField =
+         NodeMappingServerImpl.class.getDeclaredField("REMOVE_EXPIRE_PROPERTY");
+        removeExpireField.setAccessible(true);
+        String removeExpireName = (String) removeExpireField.get(null);
+        
+        Field startNodeMapServiceField =
+         NodeMappingServiceImpl.class.getDeclaredField("SERVER_START_PROPERTY");
+        startNodeMapServiceField.setAccessible(true);
+        String startNodeMapServiceName =
+	    (String) startNodeMapServiceField.get(null);
+        
+        serviceProps = createProperties(
+            StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
+	    StandardProperties.APP_PORT, Integer.toString(APP_PORT),
+            DataStoreImplClassName + ".directory", DB_DIRECTORY,
+            WatchdogServerPropertyPrefix + ".start", "true",
+            WatchdogServerPropertyPrefix + ".port",
+	    	Integer.toString(WATCHDOG_PORT),
+            WatchdogServerPropertyPrefix + ".renew.interval",
+                Long.toString(RENEW_INTERVAL),
+            startNodeMapServiceName, "true",
+            removeExpireName, Integer.toString(REMOVE_TIME),
+            nodeMapPortPropertyName, Integer.toString(NODEMAP_PORT));
     }
 
     /** Creates and configures the session service. */
@@ -153,28 +200,48 @@ public class TestClientSessionServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
+	// create watchdog service
+	watchdogService =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	txnProxy.setComponent(WatchdogService.class, watchdogService);
+	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
+	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
+	serviceRegistry.setComponent(
+	    WatchdogServiceImpl.class, watchdogService);
+
+	// create node mapping service
+        nodeMappingService = new NodeMappingServiceImpl(
+	    serviceProps, systemRegistry, txnProxy);
+        txnProxy.setComponent(NodeMappingService.class, nodeMappingService);
+        txnProxy.setComponent(
+	    NodeMappingServiceImpl.class, nodeMappingService);
+        serviceRegistry.setComponent(
+	    NodeMappingService.class, nodeMappingService);
+        serviceRegistry.setComponent(
+	    NodeMappingServiceImpl.class, nodeMappingService);
+	
 	// create identity manager
 	identityManager = new DummyIdentityManager();
 	systemRegistry.setComponent(IdentityManager.class, identityManager);
 
 	// create task service
-	taskService = new TaskServiceImpl(
-	    new Properties(), systemRegistry, txnProxy);
+	taskService =
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
         serviceRegistry.setComponent(TaskManager.class, taskService);
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-	//serviceRegistry.registerAppContext();
 
 	// create client session service
-	sessionService = new ClientSessionServiceImpl(
-	    serviceProps, systemRegistry, txnProxy);
+	sessionService =
+	    new ClientSessionServiceImpl(
+ 		serviceProps, systemRegistry, txnProxy);
 	serviceRegistry.setComponent(
 	    ClientSessionService.class, sessionService);
 	txnProxy.setComponent(
 	    ClientSessionService.class, sessionService);
-	port = sessionService.getListenPort();
+	appPort = sessionService.getListenPort();
 	
 	// create channel service
 	channelService = new ChannelServiceImpl(
@@ -183,8 +250,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
+	// TBD: does this need to be done?
+	serviceRegistry.registerAppContext();
+	
 	// services ready
 	dataService.ready();
+	watchdogService.ready();
+	nodeMappingService.ready();
 	taskService.ready();
 	sessionService.ready();
 	channelService.ready();
@@ -298,7 +370,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	} catch (Exception e) {
 	    System.err.println("Exception: " + e);
 	    Throwable t = e.getCause();
@@ -316,7 +388,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "success";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "password");
 	} finally {
             client.disconnect(false);
@@ -328,7 +400,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "success";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "password");
 	    if (identityManager.getNotifyLoggedIn(name)) {
 		System.err.println(
@@ -347,7 +419,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(NON_SERIALIZABLE, "password");
 	    fail("expected login failure");
 	} catch (RuntimeException e) {
@@ -372,7 +444,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(RETURN_NULL, "bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
@@ -397,7 +469,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(THROW_RUNTIME_EXCEPTION, "bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
@@ -421,7 +493,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "logout";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "test");
 	    client.logout();
 	    synchronized (disconnectedCallbackLock) {
@@ -455,7 +527,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "logout";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "password");
 	    client.logout();
 	    if (identityManager.getNotifyLoggedIn(name)) {
@@ -481,7 +553,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "testRemoveListener";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "password");
 
 	    Set<String> listenerKeys = getClientSessionListenerKeys();
@@ -560,7 +632,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();
@@ -588,7 +660,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();
@@ -617,7 +689,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();
@@ -676,7 +748,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "client";
 	try {
-	    client.connect(port);
+	    client.connect(appPort);
 	    client.login(name, "dummypassword");
 	    for (int i = 0; i < numMessages; i++) {
 		MessageBuffer buf = new MessageBuffer(4);
@@ -799,7 +871,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, registry, txnProxy);
+	return new DataServiceImpl(serviceProps, registry, txnProxy);
     }
 
     /**
@@ -949,9 +1021,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
 	private boolean logoutAck = false;
+	private boolean loginRedirect = false;
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;
+	private String redirectHost;
 	private CompactId sessionId;
 	private CompactId reconnectionKey;
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
@@ -1191,6 +1265,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.notifyAll();
 		    }
 		    break;
+
+		case SimpleSgsProtocol.LOGIN_REDIRECT:
+		    redirectHost = buf.getString();
+		    synchronized (lock) {
+			loginAck = true;
+			loginRedirect = true;
+			System.err.println("login redirected: " + name +
+					   ", host:" + redirectHost);
+			lock.notifyAll();
+		    } break;
 
 		case SimpleSgsProtocol.LOGOUT_SUCCESS:
                     synchronized (lock) {

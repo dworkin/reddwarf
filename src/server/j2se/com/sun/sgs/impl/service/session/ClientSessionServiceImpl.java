@@ -15,6 +15,7 @@ import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.service.session.ClientSessionHandler.
     ClientSessionListenerWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -32,14 +33,17 @@ import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -117,6 +121,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The port for accepting connections. */
     private final int appPort;
 
+    /** The local node's ID. */
+    private final long localNodeId;
+
     /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
 
@@ -146,6 +153,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
+    /** The task owner. */
+    final TaskOwner taskOwner;
+
     /** The task scheduler for non-durable tasks. */
     final NonDurableTaskScheduler nonDurableTaskScheduler;
 
@@ -154,6 +164,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The data service. */
     final DataService dataService;
+
+    /** The node mapping service. */
+    final NodeMappingService nodeMapService;
 
     /** The identity manager. */
     final IdentityManager identityManager;
@@ -262,9 +275,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	    contextFactory = new ContextFactory(txnProxy);
 	    dataService = txnProxy.getService(DataService.class);
+	    nodeMapService = txnProxy.getService(NodeMappingService.class);
+	    taskOwner = txnProxy.getCurrentOwner();
 	    nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
+		    taskScheduler, taskOwner,
 		    txnProxy.getService(TaskService.class));
 	    taskScheduler.runTask(
 		new TransactionRunner(
@@ -273,12 +288,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 			    notifyDisconnectedSessions();
 			}
 		    }),
-		txnProxy.getCurrentOwner(), true);
+		taskOwner, true);
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
 				txnProxy,
 				taskScheduler);
+	    localNodeId = txnProxy.getService(WatchdogService.class).
+		getLocalNodeId();
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
 		    new InetSocketAddress(appPort), TransportType.RELIABLE);
@@ -950,11 +967,26 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /* -- Other methods -- */
 
+    /**
+     * Returns the {@code ClientSessionImpl} for the specified session
+     * {@code idBytes}.
+     *
+     * @param	idBytes a session ID
+     * @return	a client session impl
+     */
     ClientSessionImpl getLocalClientSession(byte[] idBytes) {
 	ClientSessionHandler handler = getHandler(idBytes);
 	return (handler != null) ? handler.getClientSession() : null;
     }
 
+    /**
+     * Returns the local node's ID.
+     * @return	the local node's ID
+     */
+    long getLocalNodeId() {
+	return localNodeId;
+    }
+    
     /**
      * Returns the key to access from the data service the {@code
      * ClientSessionListener} instance for the specified session {@code
@@ -1054,8 +1086,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * 
      * @see NonDurableTaskScheduler#scheduleNonTransactionalTask(KernelRunnable, Identity)
      */
-    void scheduleNonTransactionalTask(KernelRunnable task,
-            Identity ownerIdentity)
+    void scheduleNonTransactionalTask(
+	KernelRunnable task, Identity ownerIdentity)
     {
         nonDurableTaskScheduler.
             scheduleNonTransactionalTask(task, ownerIdentity);
@@ -1066,6 +1098,20 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     void scheduleTaskOnCommit(KernelRunnable task) {
         nonDurableTaskScheduler.scheduleTaskOnCommit(task);
+    }
+
+    /**
+     * Runs the specified {@code task} immediately, in a transaction.
+     */
+    void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
+	throws Exception
+    {
+	TaskOwner owner =
+	    (ownerIdentity == null) ?
+	    taskOwner :
+	    new TaskOwnerImpl(ownerIdentity, taskOwner.getContext());
+	    
+	taskScheduler.runTask(new TransactionRunner(task), owner, true);
     }
 
     /**
