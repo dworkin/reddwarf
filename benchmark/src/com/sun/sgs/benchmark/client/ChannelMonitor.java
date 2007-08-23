@@ -247,7 +247,7 @@ public class ChannelMonitor extends BenchmarkClient
      * Inner class: PrintStatsTask
      */
     class PrintStatsTask extends TimerTask {
-        private DecimalFormat formatter = new DecimalFormat(".2");
+        private DecimalFormat formatter = new DecimalFormat(".##");
 
         /**
          * {@inheritDoc}
