@@ -239,6 +239,22 @@ public class TestDistributedHashMap extends TestCase {
 	txn.commit();
     }
 
+    @Test public void testPreSplitWithMultipleLevelsConstructor() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	try {
+	    Map<Integer,Integer> test = 
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, 4);
+	}
+	catch(IllegalArgumentException iae) { 
+	    txn.commit();
+	    assertTrue(false);
+	    return;
+	}
+	txn.commit();
+    }
+
+
     @Test public void testFourArgConstructorSplitThesholdException() 
 	throws Exception {
 
@@ -273,7 +289,7 @@ public class TestDistributedHashMap extends TestCase {
 	assertTrue(false);
     }
 
-    @Test public void testFourArgConstructorMaxCollapseException() 
+    @Test public void testFourArgConstructorInvalidTableSize() 
 	throws Exception {
 
         txn = createTransaction();
@@ -569,7 +585,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 0);
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -597,7 +613,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 3);
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -636,12 +652,15 @@ public class TestDistributedHashMap extends TestCase {
 	    test.put(j,j);
 	    control.put(j,j);
 	}
+	assertEquals(control, test);
+// 	System.out.println("puts passed");
 
 	for (int i = 0; i < inputs.length; i += 4) {
 	    test.remove(inputs[i]);
 	    control.remove(inputs[i]);
 	}
 	assertEquals(control, test);
+// 	System.out.println("removes passed");
 
 	for (int i = 0; i < inputs.length; i += 3) {
 	    test.put(inputs[i],inputs[i]);
@@ -667,7 +686,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,0);
+	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -679,16 +698,23 @@ public class TestDistributedHashMap extends TestCase {
 	    control.put(j,j);
 	}
 
+	equals(control, test);
+	assertEquals(control, test);
+
 	for (int i = 0; i < inputs.length; i += 4) {
 	    test.remove(inputs[i]);
 	    control.remove(inputs[i]);
 	}
+
+	equals(control, test);
 	assertEquals(control, test);
 
 	for (int i = 0; i < inputs.length; i += 3) {
 	    test.put(inputs[i],inputs[i]);
 	    control.put(inputs[i],inputs[i]);
 	}
+
+	equals(control, test);
 	assertEquals(control, test);
 
 
@@ -719,7 +745,12 @@ public class TestDistributedHashMap extends TestCase {
 	    inputs[i] = j;
 	    test.put(j,j);
 	    control.put(j,j);
+// 	    if (!equals(control, test))
+// 		System.out.println("put #" + i);
+// 	    assertEquals(control, test);
 	}
+
+	assertEquals(control, test);
 
 	for (int i = 0; i < inputs.length; i += 4) {
 	    test.remove(inputs[i]);
@@ -807,9 +838,22 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullContainsValue() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
+	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+
+	test.put(0, null);
+	assertTrue(test.containsValue(null));
+	
+	txn.commit();
+    }
+
+
+    @Test public void testNullContainsValueOnSplitMap() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
 
 	test.put(0, null);
+
 	assertTrue(test.containsValue(null));
 	
 	txn.commit();
@@ -1050,11 +1094,11 @@ public class TestDistributedHashMap extends TestCase {
         txn.commit();
     }
 
-    /*
-     *
-     * Size Tests
-     *
-     */
+//     /*
+//      *
+//      * Size Tests
+//      *
+//      */
 
 
     @Test public void testLeafSize() throws Exception {
@@ -1495,6 +1539,38 @@ public class TestDistributedHashMap extends TestCase {
     /**
      * Utility routines.
      */
+
+    public boolean equals(Map<Integer,Integer> m1, Map<Integer,Integer> m2) {
+
+	if (m1.size() != m2.size()) {
+	    System.out.printf("sizes not equal: %d != %d\n",
+			      m1.size(), m2.size());
+	    return false;
+	}
+
+	Iterator<Entry<Integer,Integer>> i = m1.entrySet().iterator();
+	while (i.hasNext()) {
+	    Entry<Integer,Integer> e = i.next();
+	    Integer key = e.getKey();
+	    Integer value = e.getValue();
+	    if (value == null) {
+		if (!(m2.get(key)==null && m2.containsKey(key))) {						
+		    System.out.printf("keys not equal, m2 has key: %s? %s\n",
+				      key, m2.containsKey(key));					  
+		    return false;
+		}
+	    } else {
+		if (!value.equals(m2.get(key))) {
+		    System.out.printf("m1.get(%s) not equal: %s: %s\n",
+				      key, value, m2.get(key));
+		    System.out.println("m2.containsKey() ? " + m2.containsKey(key));
+		    return false;
+		}
+	    }
+	}
+	
+	return true;
+    }
 
     private DummyTransaction createTransaction() {
 	DummyTransaction txn = new DummyTransaction();

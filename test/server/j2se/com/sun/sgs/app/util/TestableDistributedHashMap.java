@@ -3,8 +3,9 @@ package com.sun.sgs.app.util;
 import java.util.Map;
 
 /**
- * A wrapper class around {@code DistributedHashMap} that exposes the
- * printing methods for examining the internal layout of the tree.
+ * A wrapper class around {@code DistributedHashMap} that exposes more
+ * parameters of the constructor as well as probes for testing the
+ * depth of the backing trie.
  *
  * @see DistributedHashMap
  */
@@ -13,9 +14,9 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
     private static final long serialVersionUID = 0xDL;
 
     /** 
-     * Constructs an empty {@code TestableDistributedHashMap} at the
-     * provided depth, with the specified minimum concurrency, split
-     * factor and load factor.
+     * Constructs an empty {@code TestableDistributedHashMap} with the
+     * specified minimum concurrency, split and merge thresholds, and
+     * directory size.
      *
      * @param minConcurrency the minimum number of concurrent write
      *        operations to support
@@ -23,39 +24,34 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
      *        will cause the leaf to split
      * @param mergeTheshold the numer of entries at a leaf node that
      *        will cause the leaf to attempt merging with its sibling
-     * @param maxCollapse the maximum number of tree levels when
-     *        compressing the backing tree
+     * @param directorySize the maximum number of entries in the
+     *        directory.  This is equivalent to the maximum number of
+     *        leaves under this node when all children have been added
+     *        to it.
      *
-     * @throws IllegalArgumentException if minConcurrency is non positive
-     * @throws IllegalArgumentException if the split threshold is non
-     *         positive
-     * @throws IllegalArgumentException if the merge threshold is
-     *         greater than or equal to the split threshold
-     * @throws IllegalArgumentException if {@code maxCollapse} is less
-     *         than zero
+     * @throws IllegalArgumentException if: <ul>
+     *         <li> {@code depth} is out of the range of valid prefix lengths
+     *	       <li> {@code minConcurrency} is non-positive
+     *	       <li> {@code splitThreshold} is non-positive
+     *	       <li> {@code mergeThreshold} is greater than or equal to
+     *	            {@code splitThreshold} </ul>
      */
     public TestableDistributedHashMap(int minConcurrency, int splitThreshold, 
-				      int mergeThreshold, int maxCollapse) {
-	super(0, minConcurrency, splitThreshold, mergeThreshold, maxCollapse);
+				      int mergeThreshold, int directorySize) {
+	super(0, minConcurrency, splitThreshold, mergeThreshold, directorySize);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public TestableDistributedHashMap() {
 	super();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public TestableDistributedHashMap(int minConcurrency) {
 	super(minConcurrency);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc}*/
     public TestableDistributedHashMap(Map<? extends K, ? extends V> m) {
 	super(m);
     }
@@ -110,21 +106,6 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
 	    leaves++;
 	}
 	return (maxDepth / leaves) + 1;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public String treeString() {
-	return super.treeString();
-    }
-
-     /**
-      * {@inheritDoc}
-      */
-     public String treeDiagram() {
-	 return super.treeDiagram();
-     }
-     
+    }     
 
 }

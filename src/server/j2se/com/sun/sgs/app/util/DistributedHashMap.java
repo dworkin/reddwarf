@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.app.util;
 
 import java.io.Serializable;
@@ -7,6 +11,7 @@ import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -16,6 +21,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+
 
 /**
  * A concurrent, distributed {@code Map} implementation that
@@ -95,7 +101,7 @@ import com.sun.sgs.app.ManagedReference;
  * other {@code Map} implementations.
  *
  * @since 0.9.4
- * @version 1.4
+ * @version 1.5
  *
  * @see Object#hashCode()
  * @see Map
@@ -134,10 +140,10 @@ public class DistributedHashMap<K,V>
 	DEFAULT_SPLIT_THRESHOLD / 16;
 
     /**
-     * The default value for maximum number of levels of the tree to
-     * collapse when none is specified in the constructor.
+     * The default size of the leaf directory when none is specified
+     * in the constructor.
      */
-    private static final int DEFAULT_MAX_COLLAPSE = 5; // 32 nodes total
+    private static final int DEFAULT_DIRECTORY_SIZE = 32;
     
     /**
      * The default number of {@code PrefixEntry} entries per
@@ -149,8 +155,8 @@ public class DistributedHashMap<K,V>
     /**
      * The maximum depth of this tree
      */
-    // NOTE: this is currently limited by the lenth of the prefix,
-    //       which currently is implemented as an int
+    // NOTE: this is limited by the number of bits in the prefix,
+    //       which currently is implemented as a 32-bit int
     private static final int MAX_DEPTH = 32;
     
     /**
@@ -176,63 +182,17 @@ public class DistributedHashMap<K,V>
      */
     ManagedReference rightLeaf;
 
-
-    // NOTE: During split() operations, children nodes may be replaced
-    //       with CollapsedNode instances, which turn this node into a
-    //       larger logical node.  For this reason, only three
-    //       configurations of children are possible:
-    //   
-    //       1. leftChild == null && collapsedLeftChild == null
-    //          - if this node is a leaf node
-    //
-    //       2. leftChild != null && collapsedLeftChild == null
-    //          - if this node refers to a child that has node been
-    //            collapsed.  This may happen in two circumstances:
-    //            a. if the depth of the child is less than the
-    //               minDepth
-    //            b. if this node roots a new logical node, and its
-    //               child is a leaf node
-    //
-    //       3. leftChild == null && collapsedLeftChild != null
-    //          - if this node roots a new logical node and its
-    //            children are no longer leaf nodes and have therefore
-    //            been collapsed
-    //
-    //       The fourth configuration is invalid and should never
-    //       occur.  Node replacement occurs in the collapse() and
-    //       disperse() operations.  See there for implementation
-    //       details.
-    
     /**
-     * The left child of this node, or {@code null} if this node is a
-     * leaf or if the left leaf has been replaced by a {@code
-     * CollapsedNode}.
+     * The lookup directory for deciding which leaf node to access
+     * based on a provided prefix.  If this instance is a leaf node,
+     * the directory will be {@code null}
      */
-    private ManagedReference leftChild;
-    
-    /**
-     * The collapsed left child of this node or {@code null} if this
-     * node is a leaf node, or if the left child has not yet been
-     * replaced with a {@code CollapsedNode}
-     */
-    private CollapsedNode<K,V> collapsedLeftChild;
+    private ManagedReference[] leafDirectory;
+
 
     /**
-     * The right child of this node, or {@code null} if this node is a
-     * leaf or if the right child has been replaced by a {@code
-     * CollapsedNode}.
-     */
-    private ManagedReference rightChild;
-
-    /**
-     * The collapsed right child of this node or {@code null} if this
-     * node is a leaf node, or if the right child has not yet been
-     * replaced with a {@code CollapsedNode}
-     */	
-    private CollapsedNode<K,V> collapsedRightChild;
-
-    /**
-     * The fixed-size table for storing all Map entries.
+     * The fixed-size table for storing all Map entries.  This table
+     * will be {@code null} if this instance is a directory node.
      */
     // NOTE: this is actually an array of type PrefixEntry<K,V> but
     //       generic arrays are not allowed, so we cast the elements
@@ -262,12 +222,13 @@ public class DistributedHashMap<K,V>
     private int mergeThreshold;
 
     /**
-     * The size of the {@code PrefixEntry} table.
+     * The capacity of the {@code PrefixEntry} table.
      */
     private final int leafCapacity;
 
     /**
      * The minimum number of concurrent write operations to support.
+     * This directly affects the minimum depth of the tree.
      */
     private final int minConcurrency;
 
@@ -275,20 +236,21 @@ public class DistributedHashMap<K,V>
      * The minimum depth of the tree, which is controlled by the
      * minimum concurrency factor
      */
-    private int minDepth;
+    private final int minDepth;
 
     /**
-     * The depth of this node in the tree
+     * The depth of this node in the tree.  
      */
     final int depth;
 
     /**
-     * The maximum number of levels of the tree to collapse into a
-     * single logical node.
-     * 
-     * @see #split()
+     * The number of bits used in the leaf directory.  This is
+     * calculated based on the {@code directorySize} provided in the
+     * constructor.
+     *
+     * @see #addLeavesToDirectory()
      */
-    private final int maxCollapse;
+    private final int dirBits;
     
     /** 
      * Constructs an empty {@code DistributedHashMap} at the provided
@@ -303,25 +265,26 @@ public class DistributedHashMap<K,V>
      *        will cause the leaf to split
      * @param mergeTheshold the numer of entries at a leaf node that
      *        will cause the leaf to attempt merging with its sibling
-     * @param maxCollapse the maximum number of tree levels when
-     *        compressing the backing tree
+     * @param directorySize the maximum number of entries in the
+     *        directory.  This is equivalent to the maximum number of
+     *        leaves under this node when all children have been added
+     *        to it.
      *
-     * @throws IllegalArgumentException if the depth is out of the
-     *         range of valid prefix lengths
-     * @throws IllegalArgumentException if minConcurrency is non positive
-     * @throws IllegalArgumentException if the split threshold is non
-     *         positive
-     * @throws IllegalArgumentException if the merge threshold is
-     *         greater than or equal to the split threshold
-     * @throws IllegalArgumentException if {@code maxCollapse} is less
-     *         than zero
+     * @throws IllegalArgumentException if: <ul>
+     *         <li> {@code depth} is out of the range of valid prefix lengths
+     *	       <li> {@code minConcurrency} is non-positive
+     *	       <li> {@code splitThreshold} is non-positive
+     *	       <li> {@code mergeThreshold} is greater than or equal to
+     *	            {@code splitThreshold}
+     *         <li> {@code directorySize} is less than two </ul>
      */
     // NOTE: this constructor is currently left package private but
-    // future implementations could expose these implementation
-    // details.  At no point should depth be exposed as a public
-    // parameter
+    // future implementations could expose some of these parameters
+    // for performance optimization.  At no point should depth be
+    // exposed as a public parameter.  directorySize should also not
+    // be directly explosed.
     DistributedHashMap(int depth, int minConcurrency, int splitThreshold,
-		       int mergeThreshold, int maxCollapse) {
+		       int mergeThreshold, int directorySize) {
 	if (depth < 0 || depth > MAX_DEPTH) {
 	    throw new IllegalArgumentException("Illegal tree depth: " + 
 					       depth);	    
@@ -338,30 +301,33 @@ public class DistributedHashMap<K,V>
 	    throw new IllegalArgumentException("Illegal merge threshold: " + 
 					       mergeThreshold);	    
 	}
-	if (maxCollapse < 0) {
-	    throw new IllegalArgumentException("Illegal maximum collapse: " + 
-					       maxCollapse);	    
+	if (directorySize < 2) {
+	    throw new IllegalArgumentException("Illegal directory size: " + 
+					       directorySize);	    
 	}
 
 	this.depth = depth;
 	this.minConcurrency = minConcurrency;
-	for (minDepth = 0; (1 << minDepth) < minConcurrency; minDepth++)
+	int tmp;
+	for (tmp = 0; (1 << tmp) < minConcurrency; tmp++)
 	    ;
+	minDepth = tmp;
+
 	size = 0;
 	parent = null;
-	leftLeaf = null;
-	rightLeaf = null;
-	leftChild = null;
-	rightChild = null;
+ 	leftLeaf = null;
+ 	rightLeaf = null;
+
 	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
+	leafDirectory = null;
+
+	for (tmp = 1; (1 << tmp) < directorySize; tmp++)
+	    ;
+	dirBits = tmp;
 
 	this.splitThreshold = splitThreshold;
 	this.mergeThreshold = mergeThreshold;
-
-	collapsedLeftChild = null;
-	collapsedRightChild = null;
-	this.maxCollapse = maxCollapse;
 
 	// Only the root note should ensure depth, otherwise this call
 	// causes the children to be created in depth-first fashion,
@@ -382,7 +348,7 @@ public class DistributedHashMap<K,V>
      */
     public DistributedHashMap(int minConcurrency) {
 	this(0, minConcurrency, DEFAULT_SPLIT_THRESHOLD, 
-	     DEFAULT_MERGE_THRESHOLD, DEFAULT_MAX_COLLAPSE);
+	     DEFAULT_MERGE_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
     }
 
 
@@ -393,7 +359,7 @@ public class DistributedHashMap<K,V>
     public DistributedHashMap() {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD, 
-	     DEFAULT_MAX_COLLAPSE);
+	     DEFAULT_DIRECTORY_SIZE);
     }
 
     /**
@@ -408,7 +374,7 @@ public class DistributedHashMap<K,V>
     public DistributedHashMap(Map<? extends K, ? extends V> m) {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD,
-	     DEFAULT_MAX_COLLAPSE);
+	     DEFAULT_DIRECTORY_SIZE);
 	if (m == null)
 	    throw new NullPointerException("The provided map is null");
 	putAll(m);
@@ -424,13 +390,79 @@ public class DistributedHashMap<K,V>
      * @see #split()
      */
     private void ensureDepth(int minDepth) {
-	if (depth >= minDepth)
-	    return;
-	else {
-	    split(); // split first to ensure breadth-first creation
-	    rightChild.get(DistributedHashMap.class).ensureDepth(minDepth);
-	    leftChild.get(DistributedHashMap.class).ensureDepth(minDepth);
-	}
+	
+ 	if (depth >= minDepth)
+ 	    return;
+ 	else {
+	    // rather than split repeatedly, this method inlines all
+	    // splits at once and links the children together.  This
+	    // is much more efficient
+
+	    table = null; // this node is no longer a leaf
+	    leafDirectory = 
+		new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
+	    
+	    // decide how many leaves to make based on the required
+	    // depth.  Note that we never create more than the maximum
+	    // number of leaves here.  If we need more depth, we will
+	    // use a recursive call to the ensure depth on the leaves.
+	    int leafDepthOffset = Math.min(minDepth - depth, dirBits);
+	    int numLeaves = 1 << leafDepthOffset;
+
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
+	    ManagedReference thisRef = dm.createReference(this);
+
+	    DistributedHashMap[] leaves = new DistributedHashMap[numLeaves];
+	    for (int i = 0; i < numLeaves; ++i) {
+		leaves[i] = new DistributedHashMap(depth + leafDepthOffset,
+						   minConcurrency,
+						   splitThreshold,
+						   mergeThreshold,
+						   1 << dirBits);
+		leaves[i].parent = thisRef;
+	    }
+	    
+	    // link them together
+	    for (int i = 1; i < numLeaves-1; ++i) {
+		leaves[i].leftLeaf = dm.createReference(leaves[i-1]);
+		leaves[i].rightLeaf = dm.createReference(leaves[i+1]);
+	    }
+
+	    // edge updating - Note that since there are guaranteed to
+	    // be at least two leaves, these absolute offset calls are safe
+	    leaves[0].leftLeaf = leftLeaf;
+	    leaves[0].rightLeaf = dm.createReference(leaves[1]);
+	    leaves[numLeaves-1].leftLeaf = 
+		dm.createReference(leaves[numLeaves-2]);
+	    leaves[numLeaves-1].rightLeaf = rightLeaf;
+
+	    // since this node is now a directory, invalidate its
+	    // leaf-list references
+	    leftLeaf = null;
+	    rightLeaf = null;
+   
+	    int entriesPerLeaf = leafDirectory.length / leaves.length;
+
+	    // lastly, fill the directory with the references
+	    for (int i = 0, j = 0; i < leafDirectory.length; ) {
+		leafDirectory[i] = dm.createReference(leaves[j]);
+		if (++i % entriesPerLeaf == 0)
+		    j++;
+	    }
+
+	    StringBuffer s = new StringBuffer();
+	    for (ManagedReference r : leafDirectory)
+		s.append(r.getId().longValue()).append(" ");	    
+	    
+	    // if the maximum depth of any leaf node under this is
+	    // still smaller than the minimum depth, call ensure depth
+	    // on the directory nodes under this
+	    if (depth + leafDepthOffset < minDepth) {
+		for (ManagedReference dirNode : leafDirectory) 
+		    dirNode.get(DistributedHashMap.class).ensureDepth(minDepth);
+	    }
+ 	}
     }
 
     /**
@@ -439,51 +471,28 @@ public class DistributedHashMap<K,V>
      * from the persistence mechanism.
      */
     public void clear() {
-	DataManager dm = AppContext.getDataManager();
-	dm.markForUpdate(this);
 	
-	// special case: leaf node
-	if (leftChild == null && collapsedLeftChild == null) { 
-	    for (PrefixEntry<K,V> e : table) {
-		if (e != null) {
-		    // remove all references that we are responsible
-		    // for, only calling this when we are sure that we
-		    // will never reference these entries again
+	if (table != null) { // this is a leaf node
+	    for (PrefixEntry e : table)
+		if (e != null)
 		    e.unmanage();
-		}
+	}
+	else { // this is a directory node
+	    DataManager dm = AppContext.getDataManager();
+	    ManagedReference leafRef = null;
+	    DistributedHashMap leaf = null; 
+	    for (ManagedReference r : leafDirectory) {
+		if (leafRef == r) 
+		    continue;
+		(leaf = ((leafRef = r).get(DistributedHashMap.class))).clear();
+		dm.removeObject(leaf);
 	    }
 	}
-	else {
-	    if (leftChild != null) {
-		DistributedHashMap l = leftChild.get(DistributedHashMap.class);
-		l.clear();
-		dm.removeObject(l);
-	    }
-	    else 
-		collapsedLeftChild.clear();
-	    if (rightChild != null) {
-		DistributedHashMap r = rightChild.get(DistributedHashMap.class);
-		r.clear();
-		dm.removeObject(r);
-	    }
-	    else
-		collapsedRightChild.clear();
-	}
-
-	// special case: root node	    
-	if (depth == 0) { 
-	    if (table == null) // restore the table, if it was deleted
-		table = new PrefixEntry[leafCapacity];
-	    else // otherwise, clear it
-		Arrays.fill(table, null);
+	
+	if (depth == 0) { // special case for root node;
+	    leafDirectory = null;
+	    table = new PrefixEntry[leafCapacity];
 	    size = 0;
-	    parent = null;
-	    leftLeaf = null;
-	    rightLeaf = null;
-	    leftChild = null;
-	    rightChild = null;
-	    collapsedLeftChild = null;
-	    collapsedRightChild = null;
 	}
     }
 
@@ -495,10 +504,15 @@ public class DistributedHashMap<K,V>
     }
 
     /**
-     * Returns the {@code PrefixEntry} associated with this key
+     * Returns the {@code PrefixEntry} associated with this key.
+     *
+     * @param key the key that is associated with an {@code Entry}
+     *
+     * @return the entry associated with the key or {@code null} if no
+     *         such entry exists
      */ 
     private PrefixEntry<K,V> getEntry(Object key) {
-	int hash = (key == null) ? 0 : hash(key.hashCode());
+	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; e = e.next) {
@@ -514,6 +528,10 @@ public class DistributedHashMap<K,V>
 
     /**
      * {@inheritDoc}
+     *
+     * Note that the execution time of this method grows substatially
+     * as the map size increases due to the cost of accessing the data
+     * store.
      */
     public boolean containsValue(Object value) {
 	for (V v : values()) {
@@ -522,68 +540,6 @@ public class DistributedHashMap<K,V>
 	}
 	return false;
     }
-
-    /**
-     * Merges the children nodes of this node into this node and
-     * removes them.  This method should <i>only</i> be called by
-     * {@code #disperse(int,int)} after the appropriate conditions
-     * have been checked.
-     *
-     * @see #addEntry(PrefixEntry, int)
-     * @see #disperse(int, int)
-     */
-    private void merge() {	   
-	DataManager dataManager = AppContext.getDataManager();
-
- 	DistributedHashMap<K,V> leftChild_ = 
-	    leftChild.get(DistributedHashMap.class);
- 	DistributedHashMap<K,V> rightChild_ = 
- 	    rightChild.get(DistributedHashMap.class);
-
-	dataManager.markForUpdate(this);
-
-	// recreate our table, as it was made null in split()
-	table = new PrefixEntry[leftChild_.table.length];
-
-	// iterate over each child's table, combining the entries into
-	// this node's table.
-	for (int i = 0; i < table.length; ++i) {
-
- 	    for (PrefixEntry e = leftChild_.table[i]; e != null; e = e.next)
-		addEntry(e, i);    
-
- 	    for (PrefixEntry e = rightChild_.table[i]; e != null; e = e.next) 
-		addEntry(e, i);	    
-	}
-
-	// update the remaining family references
-	leftLeaf = leftChild_.leftLeaf;
-	rightLeaf = rightChild_.rightLeaf;
-	
-	// ensure that the child's neighboring leaf reference now
-	// point to this table
-	if (leftLeaf != null) {
-	    DistributedHashMap leftLeaf_ = 
-		leftLeaf.get(DistributedHashMap.class);
-	    dataManager.markForUpdate(leftLeaf_);
-	    leftLeaf_.rightLeaf = dataManager.createReference(this);
-	}
-	if (rightLeaf != null) {
-	    DistributedHashMap rightLeaf_ = 
-		rightLeaf.get(DistributedHashMap.class);
-	    dataManager.markForUpdate(rightLeaf_);	    
-	    rightLeaf_.leftLeaf = dataManager.createReference(this);
-	}	
-	
-	// mark this table as a leaf by removing the child
-	// references
-	leftChild = null;
-	rightChild = null;
-
-	// now delete the leaf tables
-	dataManager.removeObject(leftChild_);
-	dataManager.removeObject(rightChild_);
-     }	
 
     /**
      * Divides the entires in this node into two leaf nodes on the
@@ -598,22 +554,24 @@ public class DistributedHashMap<K,V>
      */
     private void split() {
 	    
-	if (leftChild != null)  // can't split an intermediate node!
+	if (table == null) { // can't split an intermediate node!
+	    System.out.println("trying to split directory node!");
 	    return;
+	}
 	
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
-	DistributedHashMap<K,V> leftChild_ = 
+	DistributedHashMap<K,V> leftChild = 
 	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
-					mergeThreshold, maxCollapse);
-	DistributedHashMap<K,V> rightChild_ = 
+					mergeThreshold, 1 << dirBits);
+	DistributedHashMap<K,V> rightChild = 
 	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
-					mergeThreshold, maxCollapse);
+					mergeThreshold, 1 << dirBits);
 
 	// for the collapse, we to determine what prefix will lead to
 	// this node.  Grabbing this from one of our nodes will suffice.
-	int prefix = 0x0; // this should never stay at its initial value
+	int prefix = 0x0; // this should never stay at its initial value    
 
 	// iterate over all the entries in this table and assign
 	// them to either the right child or left child
@@ -625,7 +583,7 @@ public class DistributedHashMap<K,V>
 
 		prefix = e.hash;
 		next = e.next;		
-		((((e.hash << depth) >>> 31) == 1) ? leftChild_ : rightChild_).
+		((((e.hash << depth) >>> 31) == 0) ? leftChild : rightChild).
 		    addEntry(e, i);
 		e = next;
 	    }
@@ -637,40 +595,60 @@ public class DistributedHashMap<K,V>
 	size = 0;
 		
 	// create the references to the new children
-	leftChild = dataManager.createReference(leftChild_);
-	rightChild = dataManager.createReference(rightChild_);
+	ManagedReference leftChildRef = dataManager.createReference(leftChild);
+	ManagedReference rightChildRef = 
+	    dataManager.createReference(rightChild);
 	    
 	if (leftLeaf != null) {
 	    DistributedHashMap leftLeaf_ = 
 		leftLeaf.get(DistributedHashMap.class);
-	    leftLeaf_.rightLeaf = leftChild;
-
+	    leftLeaf_.rightLeaf = leftChildRef;
+	    leftChild.leftLeaf = leftLeaf;
+	    leftLeaf = null;
 	}
 	
 	if (rightLeaf != null) {
 	    DistributedHashMap rightLeaf_ = 
 		rightLeaf.get(DistributedHashMap.class);
-	    rightLeaf_.leftLeaf = rightChild;
+	    rightLeaf_.leftLeaf = rightChildRef;
+	    rightChild.rightLeaf = rightLeaf;
+	    rightLeaf = null;
 	}
 
 	// update the family links
-	ManagedReference thisRef = dataManager.createReference(this);
-	leftChild_.rightLeaf = rightChild;
-	leftChild_.leftLeaf = leftLeaf;
-	leftChild_.parent = thisRef;
-	rightChild_.leftLeaf = leftChild;
-	rightChild_.rightLeaf = rightLeaf;
-	rightChild_.parent = thisRef;			  
+	leftChild.rightLeaf = rightChildRef;
+	rightChild.leftLeaf = leftChildRef;
 	
-	// invalidate this node's leaf references
-	leftLeaf = null;
-	rightLeaf = null;
-	
- 	if (parent != null && 
-	    depth > minDepth && 
-	    maxCollapse > 0 &&
-	    (depth + 1) % maxCollapse != 0)
- 	    parent.get(DistributedHashMap.class).collapse(depth, prefix);
+	// two cases:
+	// 1. this node is the start of a new directory entry
+	// 2. this node needs to be subsumed by the directory above it	    
+	if (parent == null ||
+	    depth % dirBits == 0 ||
+	    depth <= minDepth) {
+	    // this leaf node is now a directory
+	    
+	    ManagedReference thisRef = dataManager.createReference(this);
+	    rightChild.parent = thisRef;			  
+	    leftChild.parent = thisRef;
+	    
+	    table = null;
+	    leafDirectory = 
+		new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
+
+	    int right = leafDirectory.length / 2;
+
+	    for (int i = 0; i < right; ++i) {
+		leafDirectory[i] = leftChildRef;
+		leafDirectory[i | right] = rightChildRef;
+	    }
+	}
+	else {
+	    // notify the parent to remove this leaf by following
+	    // the provided prefix and then replace it with
+	    // references to the right and left children
+	    parent.get(DistributedHashMap.class).
+		addLeavesToDirectory(prefix, rightChildRef, leftChildRef);
+	}	        
     }
 
     /**
@@ -684,360 +662,95 @@ public class DistributedHashMap<K,V>
      */
     private DistributedHashMap<K,V> lookup(int prefix) {
 
-	// a leading bit of 1 indicates the left child prefix
 	DistributedHashMap<K,V> leaf = this;
 	int original = prefix;
-	
-	while (true) {
-	    // a leading bit of 1 indicates the left child prefix
-	    if ((prefix >>> 31) == 1) { // look left
-		if (leaf.leftChild != null)
-		    leaf = leaf.leftChild.get(DistributedHashMap.class);
-		else if (leaf.collapsedLeftChild != null) {
-		    // walk the compressed tree to find the next
-		    // DistributedHashMap node
-		    CollapsedNode<K,V> intermediate = leaf.collapsedLeftChild;
-		    leaf = bypassIntermediate(intermediate, prefix << 1);
-		}
-		else { // this node is a leaf
-		    break;
-		}
 
-	    }
-	    else { // look right
-		if (leaf.rightChild != null)
-		    leaf = leaf.rightChild.get(DistributedHashMap.class);
-		else if (leaf.collapsedRightChild != null) {
-		    // walk the compressed tree to find the next
-		    // DistributedHashMap node
-		    CollapsedNode<K,V> intermediate = leaf.collapsedRightChild;
-		    leaf = bypassIntermediate(intermediate, prefix << 1);
-		}
-		else { // this node is a leaf
-		    break;
-		}
-	    }
+	while (leaf.table == null) {
+	    leaf = leaf.directoryLookup(prefix);
 	    prefix = original << leaf.depth;
 	}
 
 	return leaf;
     }
 
-
     /**
-     * Returns the next {@code DistributedHashMap} node on the path
-     * specified by {@code prefix} starting at the tree rooted at
-     * {@code node}.  Note that the path specified {@code prefix} must
-     * begin immediately (i.e. the highest order bit of {@code prefix}
-     * should denote the next child to select).
+     * Uses the provide prefix to look up the appropriate leaf node in
+     * the directory.
      *
-     * @param node the root of the tree to search
-     * @param prefix the path to take when searching the tree
+     * @param prefix the current prefix of the lookup at this
+     *        directory node
      *
-     * @return the next {@code DistributedHashMap} found on the path
+     * @return the leaf node that is associated with the prefix
      */
-    private static DistributedHashMap bypassIntermediate(CollapsedNode node, 
-						    int prefix) {
-	DistributedHashMap next = null;
-	while (next == null) {
-	    if ((prefix >>> 31) == 1) {
-		if (node.leftChild != null)
-		    next = node.leftChild.
-			get(DistributedHashMap.class);
-		else
-		    node = node.leftCollapsed;
-	    }
-	    else {
-		if (node.rightChild != null)
-		    next = node.rightChild.
-			get(DistributedHashMap.class);
-		else
-		    node = node.rightCollapsed;
-	    }
-	    prefix <<= 1;
-	}
+    private DistributedHashMap<K,V> directoryLookup(int prefix) {
 	
-	return next;
-    }
+	// first, identify the number of bits in the prefix that will
+	// be valid for a directory at this depth, then shift only the
+	// significant bits down from the prefix and use those as an
+	// index into the directory.
+	int index = (prefix >>> (32 - Math.min(dirBits, MAX_DEPTH - depth)));
+	return leafDirectory[index].get(DistributedHashMap.class);	
+    }		       
 
     /**
-     * Finds the specified {@code DistributedHashMap} node in the tree and
-     * replaces with a {@code CollapsedNode}, updating family
-     * references as necessary.  This method should <i>only</i> be
-     * called from {@link #split()} after the appropriate conditions
-     * have been checked.
+     * Replaces the leaf node pointed to by the provided prefix with
+     * directory entries for its children {@code rightChildRef} and
+     * {@code leftChildRef}.  This method should only be called by
+     * {@link #split()} under the proper conditions.
      *
-     * <p>
-     *
-     * Performing the collapse operation moves the specified child
-     * node into the logical node rooted at this node, by including
-     * the child in the serialization through the node replacement.
-     *
-     * @param depth the depth of the node that needs to be replaced
-     *        with a {@code CollapsedNode}
-     * @param prefix the prefix that leads to the node that should be
+     * @param prefix the prefix that leads to the node that will be
      *        replaced
-     *
-     * @see split()
+     * @param rightChildRef the right child of the node that will be
+     *        replaced
+     * @param leftChildRef the left child of the node that will be
+     *        replaced
      */
-    private void collapse(int depth, int prefix) {
-
-	Walkable child = new Walkable(this), parent = null;
-
-	int p = prefix;
-	
-	// shift off the bits for this node's depth
+    private void addLeavesToDirectory(int prefix, 
+				      ManagedReference rightChildRef,
+				      ManagedReference leftChildRef) {		
 	prefix <<= this.depth;
-	
-	// now walk the tree to see what kind of parent node we need
-	// to modify
-	
-	int curDepth = this.depth;
 
-	while (curDepth < depth) {
-	    
-	    parent = child;
-	    
-	    child = ((prefix >>> 31) == 1) 
-		? child.leftChild() 
-		: child.rightChild();
+	int maxBits = Math.min(dirBits, MAX_DEPTH - depth);
+	int index = prefix >>> (32 - maxBits);
 
-	    curDepth++;
-	    prefix <<= 1;
-	}
-
-	CollapsedNode<K,V> replacement = new CollapsedNode<K,V>();
-	// NOTE: we can directly assign from the Walkable because
-	// the child Walkable is guaranteed to be the
-	// DistributedHashMap that we are going to replace.
-	replacement.leftChild = child.map.leftChild;
-	replacement.rightChild = child.map.rightChild;
+	// the leaf is under this node, so just look it up using the
+	// directory
+	DistributedHashMap<K,V> leaf = leafDirectory[index].get(DistributedHashMap.class);
 
 	DataManager dm = AppContext.getDataManager();
-	dm.removeObject(child.map);
+	dm.removeObject(leaf);
 
-	
-	// either the parent of the split node is a DistributedHashMap
-	// (which will happen for the most immediate notes), or for
-	// all other nodes, its parent will already be a CollapsedNode
-	if (parent.map != null) {
-	    
-	    // determine which of this node's children now needs to be
-	    // the CollapsedNode
-	    if ( ((p << (depth-1)) >>> 31) == 1) {
-		// left child needs to be replaced
-		parent.map.leftChild = null;
-		parent.map.collapsedLeftChild = replacement;
-	    } 
-	    else { // replace the right child
-		parent.map.rightChild = null;
-		parent.map.collapsedRightChild = replacement;
-	    }
-	    
-	}
-	// else, the parent of the node that needs to be replaced is
-	// actually itself a collapsed node
-	else {
-	    if ( ((p << (depth-1)) >>> 31) == 1) {
-		// left child needs to be replaced
-		parent.node.leftChild = null;
-		parent.node.leftCollapsed = replacement;
-	    }
-	    else {
-		parent.node.rightChild = null;
-		parent.node.rightCollapsed = replacement;
-	    }
-	}
-
-	// lastly, set the new DistributedHashMap leaf nodes from the
-	// split to have this node as their parent
-	DistributedHashMap<K,V> l = 
-	    replacement.leftChild.get(DistributedHashMap.class);
-	DistributedHashMap<K,V> r = 
-	    replacement.rightChild.get(DistributedHashMap.class);
+	// update the leaf node to point to this directory node as
+	// their parent
 	ManagedReference thisRef = dm.createReference(this);
-	l.parent = thisRef;
-	r.parent = thisRef;
+	rightChildRef.get(DistributedHashMap.class).parent = thisRef;
+	leftChildRef.get(DistributedHashMap.class).parent = thisRef;
+	
+	// how many bits in the prefix are significant for looking up
+	// the child
+	int sigBits = (leaf.depth - depth);
 
-	// NOTE: we do not need to call markForUpdate on the children,
-	// as this has already been called on these nodes during the
-	// split() operation that led to this call
-	dm.markForUpdate(this);
+	// create a bit mask for the parent's signficant bits
+	int mask = ((1 << sigBits) - 1) << (maxBits - sigBits);
+
+	// directory index where the left child starts
+	int left = index & mask;
+
+	// bit offset between the left and right children in the
+	// directory array.
+	int off = 1 << ((maxBits - sigBits) - 1);
+
+	// exclusive upper bound for where the left child ends
+	int right = left | off;
+	
+	// update all the directory entires for the prefix
+	for (int i = left; i < right; ++i) {
+	    leafDirectory[i] = leftChildRef;
+	    leafDirectory[i | off] = rightChildRef;
+	}
+
+	dm.markForUpdate(this);			
     }
-
-
-    /**
-     * Locates the specified leaf node under the logical node rooted
-     * at this node and attempts to merge it with its sibling, after
-     * performing any necessary internal replacements.  When merging
-     * two siblings, the parent of the nodes may have been replaced
-     * with a {@code CollapsedNode}, and therefore needs to be swapped
-     * out with a {@code DistributedHashMap} node before the {@code merge}
-     * operation can take place.  This method is also responsible for
-     * aborting any merge attempts that are invalid due to the sibling
-     * still being too large in size, or where the sibling is
-     * attempting to merge with a non-leaf. 
-     *
-     *
-     * @param depth the depth of the node that should merge its
-     *        children        
-     * @param prefix the prefix that leads to the node that leads to
-     *        the node that should be merged into its parent
-     *
-     * @see #merge()
-     */
-    private void disperse(int depth, int prefix) {
-
-
-	if (parent == null) // this node is the root!
-	    return; // do not merge
-
-	// child = node that will hold its merged children
-	Walkable child = new Walkable(this), parent = null;
-
-	int p = prefix;
-	
-	// shift off the bits for this node's depth
-	prefix <<= this.depth;
-	
-	// now walk the tree to see what kind of parent node we need
-	// to modify
-	
-	// NOTE: This code is nasty.
-	int curDepth = this.depth;
-
-	// REMINDER: do bounds checking?
-	while (curDepth < depth) {
-	    
-	    parent = child;
-	    
-	    child = ((prefix >>> 31) == 1) 
-		? child.leftChild() 
-		: child.rightChild();
-
-	    curDepth++;
-	    prefix <<= 1;
-	}
-
-	// check that the child node would have two DistributedHashMap
-	// children that could be merged; if the child does, check
-	// that the size of the children is of sufficently small to
-	// warrant a merge.
-	DistributedHashMap<K,V> rightChild_, leftChild_;
-	if (child.node != null) {
-	    if (child.node.leftChild == null || child.node.rightChild == null) 
-		return;	    
-	    else if (((leftChild_ = 
-		       child.node.leftChild.get(DistributedHashMap.class)).size >
-		      mergeThreshold) ||
-		     ((rightChild_ = child.node.rightChild.
-		       get(DistributedHashMap.class)).size >
-		      mergeThreshold)) 
-		return;
-	}
-	else {
-	    if (child.map.leftChild == null || child.map.rightChild == null) 
-		return;	    
-	    else if (((leftChild_ = 
-		       child.map.leftChild.get(DistributedHashMap.class)).size >
-		      mergeThreshold) ||
-		     ((rightChild_ = child.map.rightChild.
-		       get(DistributedHashMap.class)).size >
-		      mergeThreshold)) 
-		return;	
-	}
-	
-	// lastly, perform a check that neither of the children are
-	// the empty root node of a logical node.  This case happens
-	// when a leaf node attempts to merge with its sibling who is
-	// a DistributedHashMap, but is not a leaf node.  A non-leaf
-	// DistributedHashMap will not have a table.	
-	if (leftChild_.table == null || rightChild_.table == null) 
-	    return;
-	
-	// at this point, both chilren are sufficiently small enough
-	// that the parent node should merge them.  If the child node
-	// is a DistributedHashMap, call merge(), otherwise, the child is
-	// an intermediate node and must be replaced before the merge
-	// operation can be called
-	
-	if (child.map != null) {
-	    child.map.merge();
-	    // the parent does not need to update any state, so we can
-	    // return at this point
-	    return;
-	}
-	
-	// at this point, an update to this logical node is
-	// inevitable, so get the DataManager for update calls
-	DataManager dm = AppContext.getDataManager();
-
-	// first, replace the child intermediate node with a
-	// DistributedHashMap
-	
-	// REMINDER: can we speed this up by reusing one of the
-	// children nodes?
-	
-	DistributedHashMap<K,V> replacement = 
-	    new DistributedHashMap<K,V>(rightChild_.depth-1, 
-				   rightChild_.minConcurrency,
-				   rightChild_.splitThreshold,
-				   rightChild_.mergeThreshold,
-				   rightChild_.maxCollapse);
-
-	// copy over the CollapsedNode's children into the replacement
-	replacement.leftChild = child.node.leftChild;
-	replacement.rightChild = child.node.rightChild;
-	
-	ManagedReference replacementRef = dm.createReference(replacement);
-
-	// next, correct the parent link to the child.  either the
-	// parent of the newly-merged node is a DistributedHashMap (which
-	// will happen for the most immediate notes), or for all other
-	// nodes, its parent will already be a CollapsedNode
-	if (parent.map != null) {
-	    
-	    // determine which of this node's children now needs to be
-	    // the CollapsedNode
-	    if ( ((p << (depth-1)) >>> 31) == 1) {
-		// left child needs to be replaced
-		parent.map.leftChild = replacementRef;
-		parent.map.collapsedLeftChild = null;
-	    } 
-	    else { // replace the right child
-		parent.map.rightChild = replacementRef;
-		parent.map.collapsedRightChild = null;
-	    }
-	    
-	}
-	// else, the parent of the node that needs to be replaced is
-	// actually itself a collapsed node
-	else {
-	    if ( ((p << (depth-1)) >>> 31) == 1) {
-		// left child needs to be replaced
-		parent.node.leftChild = replacementRef;
-		parent.node.leftCollapsed = null;
-	    }
-	    else {
-		parent.node.rightChild = replacementRef;
-		parent.node.rightCollapsed = null;
-	    }
-	}
-	
-	// since we modified the parent reference, mark this node as
-	// having changed
-	dm.markForUpdate(this);
-
-	// NOTE: we don't need to re-establish any further family
-	// links because we inherit these from the children after the
-	// merge
-	
-	// once the parent and children links have been updated, call
-	// merge() on the child to have it subsume its children
-	replacement.merge();
-	
-    }
-
 
     /**
      * Returns the value to which this key is mapped or {@code null}
@@ -1053,7 +766,7 @@ public class DistributedHashMap<K,V>
      */
     public V get(Object key) {
 
- 	int hash = (key == null) ? 0 : hash(key.hashCode());
+ 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.table[indexFor(hash, leaf.table.length)];
 	     e != null; 
@@ -1119,7 +832,7 @@ public class DistributedHashMap<K,V>
      */
     public V put(K key, V value) {
 
-	int hash = (key == null) ? 0 : hash(key.hashCode());
+	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 
@@ -1193,13 +906,12 @@ public class DistributedHashMap<K,V>
     }
     
     /**
-     * Returns whether this map has no mappings.  This implemenation
-     * runs in {@code O(1)} time.
+     * Returns whether this map has no mappings.  
      *
      * @return {@code true} if this map contains no mappings
      */
     public boolean isEmpty() {
-	return leftChild != null || size == 0;
+	return (table != null && size == 0) || (minDepth > 0 && size() == 0);
     }
      
      /**
@@ -1211,9 +923,8 @@ public class DistributedHashMap<K,V>
      * @return the size of the tree
      */
     public int size() {
-
-	// leaf node, short-circuit case
- 	if (leftChild == null && collapsedLeftChild == null) 
+	// root is leaf node, short-circuit case
+  	if (table != null)
  	    return size;
 
  	int totalSize = 0;
@@ -1264,16 +975,11 @@ public class DistributedHashMap<K,V>
 		// persistence lifetime of the key or value,
 		// remove them from the datastore
 		e.unmanage();
+
+		--leaf.size;
 		
-		// lastly, if the leaf size is less than the size
-		// threshold, attempt a merge
-		if ((--leaf.size) <= mergeThreshold && leaf.depth > minDepth &&
-		    leaf.parent != null) {
-		    
-		    leaf.parent.get(DistributedHashMap.class).
-			disperse(leaf.depth-1, hash);
-		}
-		
+		// NOTE: this is where we would attempt a merge
+		// operation if we decide to later support one
 		return v;
 		
 	    }		
@@ -1291,8 +997,8 @@ public class DistributedHashMap<K,V>
      */
     DistributedHashMap<K,V> leftMost() {
 	// NOTE: the left-most node will have a bit prefix of all
-	// ones, which is what we use when searching for it
-	return lookup(~0x0);
+	// zeros, which is what we use when searching for it
+	return lookup(0x0);
     }
 	       
 	
@@ -1306,113 +1012,6 @@ public class DistributedHashMap<K,V>
      */
     static int indexFor(int h, int length) {
 	return h & (length-1);
-    }
-
-    /**
-     * Returns a string represntation of all the elements under the
-     * tree rooted at this node.  Each subtree's elements are denoted
-     * by parentheses.
-     *
-     * @return a string represenation of the elements under the tree
-     *         rooted at this node.
-     */
-    String treeString() {
-	if (leftChild == null && collapsedLeftChild == null) {
-	    StringBuffer s = new StringBuffer("(");
-	    int count = 0;
-	    for (PrefixEntry e : table) {
-		if (e != null) {
-		    do {
-			count++;
-			s.append(e + ((e.next == null) ? "" : ", "));		
-			e = e.next;
-		    } while (e != null);
-		    if (count < size)
-			s.append(", ");
-		    else
-			break;
-		}
-	    }
-	    return s.append(")").toString();
-	}
-	else {
-	    return "(" + 
-		((leftChild != null)
-		 ? leftChild.get(DistributedHashMap.class).treeString()
-		 : collapsedLeftChild.treeString()) + ", " +
-		((rightChild != null)
-		 ? rightChild.get(DistributedHashMap.class).treeString() 
-		 : collapsedRightChild.treeString()) + ")";
-	}
-    }
-
-
-    /**
-     * Returns a tree-like string representation of the map, including
-     * all internal nodes.  An example string representation for a
-     * full tree appears as follows:
-     *
-     * <pre>
-     * ROOT:
-     * |--CollapsedNode
-     * o--|--(id: 13) contents: ("key"="value", etc.)
-     * o--|--(id: 14) contents: ("foo"="bar")
-     * |--(id: 12) contents: (...)
-     * </pre>
-     *
-     * The id displayed is the same as the id associated with the
-     * {@code ManagedReference} for that node in the tree.  Collapsed
-     * nodes do not have any ids.
-     *
-     * @return a string representation of the tree
-     */
-    String treeDiagram() {
-	String s = "ROOT: ";
-	if (leftChild == null && collapsedLeftChild == null) 
-	    s += "conents: " + treeString() + "\n";
-	else {
-	    s += "(id: " 
-		+ AppContext.getDataManager().createReference(this).getId() 
-		+ ")\n";
-	    
-	    s += (leftChild != null)
-		? leftChild.get(DistributedHashMap.class).treeDiagram(1) 
-		: collapsedLeftChild.treeDiagram(1);
-	    s += (rightChild != null) 
-		? rightChild.get(DistributedHashMap.class).treeDiagram(1)
-		: collapsedRightChild.treeDiagram(1);
-	}
-	return s;
-    }
-
-    /**
-     * Recursive helper method for {@link #treeDiagram()}.
-     *
-     * @param depth the indentation level for the string
-     *        representation
-     */
-    private String treeDiagram(int depth) {
-	String s; int i = 0;
-	for (s = "|--"; ++i < depth; s = "o--" + s)
-	    ;
-
-	s += "(id: " 
-	    + AppContext.getDataManager().createReference(this).getId() 
-	    + ")";       
-
-	if (leftChild == null && collapsedLeftChild == null) 
-	    s += "contents: " + treeString() + "\n";
-	else {
-	    s += s + "\n";
-	    s += (leftChild != null)
-		? leftChild.get(DistributedHashMap.class).treeDiagram(depth+1) 
-		: collapsedLeftChild.treeDiagram(depth+1);
-	    s += (rightChild != null) 
-		? rightChild.get(DistributedHashMap.class).treeDiagram(depth+1)
-		: collapsedRightChild.treeDiagram(depth+1);
-	}
-
-	return s;
     }
 
     /**
@@ -1464,7 +1063,8 @@ public class DistributedHashMap<K,V>
 	private PrefixEntry<K,V> next;
 	
 	/**
-	 * The hash value for this entry
+	 * The hash value for this entry.  This value is also used to
+	 * compute the prefix.
 	 */
 	private final int hash;
 	
@@ -1487,7 +1087,8 @@ public class DistributedHashMap<K,V>
  	boolean isKeyValueCombined;
 
 	/**
-	 * Constructs this {@code PrefixEntry}
+	 * Constructs a new {@code PrefixEntry} with the provided hash
+	 * code, key, value and chained neighbor.
 	 *
 	 * @param h the hash code for the key
 	 * @param k the key
@@ -1531,17 +1132,6 @@ public class DistributedHashMap<K,V>
 
 	    this.next = next;
 	    this.hash = h;
-	}
-
-	PrefixEntry(PrefixEntry<K,V> clone, PrefixEntry<K,V> next) { 
-	    this.hash = clone.hash;
-	    this.keyRef = clone.keyRef;
-	    this.valueRef = clone.valueRef;
- 	    this.keyValuePairRef = clone.keyValuePairRef;
-	    this.isValueWrapped = clone.isValueWrapped;
-	    this.isKeyWrapped = clone.isKeyWrapped;
- 	    this.isKeyValueCombined = clone.isKeyValueCombined;
-	    this.next = next;
 	}
   
 	/**
@@ -1702,7 +1292,7 @@ public class DistributedHashMap<K,V>
 	    else {
 		if (isKeyWrapped) {
 		    // unpack the key from the wrapper 
-		    ManagedSerializable<K> wrapper = 
+		    ManagedSerializable<V> wrapper = 
 			keyRef.get(ManagedSerializable.class);
 		    AppContext.getDataManager().removeObject(wrapper);
 		}
@@ -1757,7 +1347,7 @@ public class DistributedHashMap<K,V>
      * while subclasses define which data from the entry should be
      * return by {@code next()}.
      */
-    private abstract class PrefixTreeIterator<E> 
+    private abstract class AbstractEntryIterator<E> 
 	implements Iterator<E> {
 	
 	/**
@@ -1781,7 +1371,7 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @param start the left-most leaf in the prefix tree
 	 */
-	PrefixTreeIterator(DistributedHashMap<K,V> start) {
+	AbstractEntryIterator(DistributedHashMap<K,V> start) {
 
 	    curTable = start;
 	    index = 0;
@@ -1864,7 +1454,7 @@ public class DistributedHashMap<K,V>
      * An iterator over the entry set
      */
     private final class EntryIterator
-	extends PrefixTreeIterator<Map.Entry<K,V>> {
+	extends AbstractEntryIterator<Map.Entry<K,V>> {
 	
 	/**
 	 * Constructs the iterator
@@ -1887,7 +1477,7 @@ public class DistributedHashMap<K,V>
     /**
      * An iterator over the keys in the map
      */
-    private final class KeyIterator extends PrefixTreeIterator<K> {
+    private final class KeyIterator extends AbstractEntryIterator<K> {
 
 	/**
 	 * Constructs the iterator
@@ -1911,7 +1501,7 @@ public class DistributedHashMap<K,V>
     /**
      * An iterator over the values in the tree
      */
-    private final class ValueIterator extends PrefixTreeIterator<V> {
+    private final class ValueIterator extends AbstractEntryIterator<V> {
 
 	/**
 	 * Constructs the iterator
@@ -2082,214 +1672,6 @@ public class DistributedHashMap<K,V>
 
 	public void clear() {
 	    root.clear();
-	}
-    }
-
-    /**
-     * The internal, comressed node representation for storing child
-     * references under a logical node.  When a leaf node splits and
-     * becomes an intermediate node, it no longer requires all of the
-     * state it once had.  Furthermore, serialization and locking
-     * performance can be increased by loading the intermediate node
-     * with its parent.  Therefore, a {@code CollapsedNode} is used in
-     * place of a {@code DistributedHashMap} to hold the intermediate
-     * state.
-     *
-     * <p>
-     *
-     * Internally, each {@code CollapsedNode} holds a reference to
-     * both of its children.  A child may be either a {@link
-     * ManagedReference} or another {@code CollapsedNode}.  At no
-     * point should both of these fields for a child be set to
-     * non-{@code null} values; either one or the other will be valid.
-     *
-     * @see DistributedHashMap#bypassIntermediate(CollapsedNode,int)
-     * @see DistributedHashMap#disperse(int,int)
-     * @see DistributedHashMap#collapse(int,int)
-     *
-     */
-    private static class CollapsedNode<K,V> implements Serializable {
-
-	private static final long serialVersionUID = 0x2L;
-
-	/*
-	 * The left child under this node.  Either one or the other of
-	 * these fields should be null, never both.
-	 */
-	ManagedReference leftChild;
-	CollapsedNode<K,V> leftCollapsed;
-	
-
-	/*
-	 * The right child under this node.  Either one or the other of
-	 * these fields should be null, never both.
-	 */
-	ManagedReference rightChild;
-	CollapsedNode<K,V> rightCollapsed;
-	
-	public CollapsedNode() {
-
-	}
-
-	/**
-	 * Recursively calls {@code clear()} on the children under it.
-	 * This method is needed by {@link DistributedHashMap#clear()}
-	 * to efficiently and cleanly walk the tree while removing its
-	 * elements.
-	 */
-	void clear() {
-	    if (leftChild != null)
-		leftChild.get(DistributedHashMap.class).clear();
-	    else
-		leftCollapsed.clear();
-	    if (rightChild != null)
-		rightChild.get(DistributedHashMap.class).clear();
-	    else
-		rightCollapsed.clear();
-	}
-
-	/**
-	 * Returns a string representation of the tree under this
-	 * intermediate node.  This method is needed by {@code
-	 * DistributedHashMap#treeDiagram(int)} to recursively and
-	 * cleanly build up a string representation of the tree.  See
-	 * {@code treeDiagram()} for a description of the string
-	 * output.
-	 *
-	 * @param depth the depth of this node in the tree
-	 *
-	 * @return a string representation of the subtree rooted at
-	 *         this node
-	 *
-	 * @see DistributedHashMap#treeDiagram()
-	 */
-	String treeDiagram(int depth) {
-	    String s; int i = 0;
-	    for (s = "|--"; ++i < depth; s = "o--" + s)
-		;
-	    
-	    s += "Collapsed Node\n";
-
-	    s += (leftChild != null)
-		? leftChild.get(DistributedHashMap.class).treeDiagram(depth+1) 
-		: leftCollapsed.treeDiagram(depth+1);
-	    s += (rightChild != null) 
-		? rightChild.get(DistributedHashMap.class).treeDiagram(depth+1)
-		: rightCollapsed.treeDiagram(depth+1);
-	    
-	    return s;
-	}
-
-	/**
-	 * Returns the parenthetically grouped subtrees under this
-	 * intermediate node.
-	 *
-	 * @return a string representation of this subtree
-	 *
-	 * @see DistributedHashMap#treeString()
-	 */
-	String treeString() {
-	    return "(" +
-		((leftChild != null)
-		 ? leftChild.get(DistributedHashMap.class).treeString() 
-		 : leftCollapsed.treeString()) + "," +
-		((rightChild != null) 
-		 ? rightChild.get(DistributedHashMap.class).treeString()
-		 : rightCollapsed.treeString()) + ")";
-
-	}
-    }
-
-    /**
-     * An internal utilty class for wrapping the code necessary to
-     * traverse the tree when both {@code CollapsedNode} and {@code
-     * DistributedHashMap} nodes are present.
-     *
-     * @see DistributedHashMap#collapse(int,int)
-     */
-    private static class Walkable {
-
-	/*
-	 * Either of these is the internal state of the Walkable.  At
-	 * any time, only one of these should be set to a non-null
-	 * value.  The only way that both should be null is if a
-	 * leftChild() or rightChild() call traverses too deep in the
-	 * tree
-	 */
-	DistributedHashMap map;
-	CollapsedNode node;	
-
-	/**
-	 * Constructs a Walkable starting with the provided map.
-	 *
-	 * @param map the root of the walkable tree
-	 */
-	public Walkable(DistributedHashMap map) {
-	    this.map = map;
-	    this.node = null;	    
-	}
-
-	/**
-	 * Constructs a Walkable starting with the provided
-	 * intermediate node.
-	 *
-	 * @param node the root of the walkable tree
-	 */
-	public Walkable(CollapsedNode node) {
-	    this.node = node;
-	    this.map = null;
-	}
-
-	/**
-	 * Returns {@code true} if this Walkable represents a
-	 * traversal that has gone past the depth of the leaf node.
-	 * 
-	 * @return {@code true} if this Walkable represents a
-	 * traversal that has gone past the depth of the leaf node.
-	 */
-	public boolean isInvalid() {
-	    return map == null && node == null;
-	}
-
-	/**
-	 * Returns the left child under this {@code Walkable}.  If
-	 * this instance is a leaf node, calling {@link #isInvalid()}
-	 * on child will return true.
-	 *
-	 * @return the left child under this {@code Walkable}
-	 */
-	public Walkable leftChild() {
-	    if (map != null) {
-		return (map.leftChild != null)
-		    ? new Walkable(map.leftChild.get(DistributedHashMap.class))
-		    : new Walkable(map.collapsedLeftChild);
-	    }
-	    else { 
-		return (node.leftChild != null)
-		    ? new Walkable(node.leftChild.get(DistributedHashMap.class))
-		    : new Walkable(node.leftCollapsed);
-	    }
-	}
-
-	/**
-	 * Returns the right child under this {@code Walkable}.  If
-	 * this instance is a leaf node, calling {@link #isInvalid()}
-	 * on child will return true.
-	 *
-	 * @return the right child under this {@code Walkable}
-	 */
-	public Walkable rightChild() {
-	    if (map != null) {
-		return (map.rightChild != null)
-		    ? new Walkable(map.rightChild.get(DistributedHashMap.class))
-		    : new Walkable(map.collapsedRightChild);
-	    }
-	    else {
-		return (node.rightChild != null)
-		    ? new Walkable(node.rightChild.
-				   get(DistributedHashMap.class))
-		    : new Walkable(node.rightCollapsed);
-	    }
 	}
     }
 
