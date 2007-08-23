@@ -1,4 +1,9 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.kernel.profile;
+
 
 /**
  * A histogram that bins values according to powers of 2.
@@ -66,10 +71,10 @@ public class PowerOfTwoHistogram implements Histogram {
 
 	// skip the special cases: bin 0 is for zero values.
  	if (value != 0) {
- 	    int i;
- 	    for (i = 0; value > (1 << (i+1)); ++i)
- 		;
- 	    bin = i + 1; // 0 index is for 0 values
+ 	    int i = 0;
+ 	    while (value > (1 << (i+1))) 
+		++i;
+	    bin = i + 1; // 0 index is for 0 values
  	}
 	
 	maxIndex = Math.max(maxIndex, bin);
@@ -140,6 +145,9 @@ public class PowerOfTwoHistogram implements Histogram {
 	StringBuilder b = new StringBuilder(128);
 
 	for (int i = minIndex; i <= maxIndex; ++i) {
+
+	    // special case for the 0 index, as it represents values
+	    // of 0 and therefore can't be shifted for its real value
 	    String n = (i == 0) ? "0" : Integer.toString(1 << (i-1));
 
 	    // make the bars all line up evenly by padding with spaces	    

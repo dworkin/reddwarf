@@ -17,6 +17,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import java.io.IOException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -42,14 +43,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AggregateProfileOpListener implements ProfileOperationListener {
 
-    // NOTE: this only supports MAX_OPS operations, which is fine as long
-    // as the collector will never allow more than this number to be
-    // registered, but when that changes, so too should this code
     private int maxOp = 0;
-    private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
-    private long [] sOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
-    private long [] fOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private Map<Integer,ProfileOperation> registeredOps = new HashMap<Integer,ProfileOperation>();
+    private Map<Integer,Long> sOpCounts = new HashMap<Integer,Long>();
+    private Map<Integer,Long> fOpCounts = new HashMap<Integer,Long>();
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -123,26 +120,20 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
         handle.start();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyNewOp(ProfileOperation op) {
         int id = op.getId();
         if (id > maxOp)
             maxOp = id;
-        registeredOps[id] = op;
+        registeredOps.put(id,op);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyThreadCount(int schedulerThreadCount) {
         // for now, this is ignored
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc}*/
     public void report(ProfileReport profileReport) {
         List<ProfileOperation> ops = profileReport.getReportedOperations();
         if (profileReport.wasTaskSuccessful()) {
@@ -152,14 +143,20 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
             delayTime += (profileReport.getActualStartTime() -
                           profileReport.getScheduledStartTime());
             tryCount += profileReport.getRetryCount();
-            for (ProfileOperation op : ops)
-                sOpCounts[op.getId()]++;
+            for (ProfileOperation op : ops) {
+                Long i = sOpCounts.get(op.getId());
+		sOpCounts.put(op.getId(), (i == null) 
+			      ? new Long(1) : i.longValue() + 1);
+	    }
         } else {
             fTaskCount++;
             fTaskOpCount += ops.size();
             fRunTime += profileReport.getRunningTime();
-            for (ProfileOperation op : ops)
-                fOpCounts[op.getId()]++;
+            for (ProfileOperation op : ops) {
+                Long i = fOpCounts.get(op.getId());
+		fOpCounts.put(op.getId(), (i == null)
+			      ? new Long(1) : i.longValue() + 1);
+	    }
         }
 
         if (profileReport.wasTaskTransactional()) {
@@ -193,9 +190,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
 	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void shutdown() {
         handle.cancel();
     }
@@ -242,9 +237,11 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                 "  AvgOpCountOnFailure=" + avgFailedOps + "\n";
 
             reportStr += "OpCounts:\n";
+	    int j;
             for (int i = 1; i <= maxOp + 1; i++) {
-                reportStr += "   " + registeredOps[i-1] + "=" +
-                    sOpCounts[i-1] + "/" + (sOpCounts[i-1] + fOpCounts[i-1]);
+                reportStr += "   " + registeredOps.get(i-1) + "=" +
+                    (j = sOpCounts.get(i-1).intValue()) + "/" + 
+		    (j + fOpCounts.get(i-1).intValue());
                 if (((i % 3) == 0) || (i == (maxOp + 1)))
                     reportStr += "\n";
             }

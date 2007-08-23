@@ -44,8 +44,8 @@ public interface ProfileConsumer {
      * {@code ProfileCounter}.
      *
      * @param name the name of the counter
-     * @param taskLocal <code>true</code> if this counter is local to tasks,
-     *                  <code>false</code> otherwise
+     * @param taskLocal <code>true</code> if this counter is local to
+     *        tasks, <code>false</code> otherwise
      *
      * @return an instance of <code>ProfileCounter</code>
      */
@@ -53,23 +53,24 @@ public interface ProfileConsumer {
 
     /**
      * Registers the named source of data samples, and returns a
-     * {@code ProfileSamples} that can record each new datum during
+     * {@code ProfileSample} that can record each new datum during
      * the lifetime of a task or the application.  If the sample
      * counting should be local to a task, the current list of samples
      * will be empty upon each start of a task.  Note that registering
      * the same name multiple times on the same consumer <i>will</i>
      * produce the same canonical instance of {@code ProfileSample}.
-     *
-     *
+     * <p>
+     *  A negative value for {@code maxSamples} indicates an infinite
+     *  number of samples.  Note that for non-task-local sample
+     *  sources, this is a potential memory leak as the number of
+     *  samples increases.  Once the limit of samples has been
+     *  reached, older samples will be dropped to make room for the
+     *  newest samples
      *
      * @param name a name or description of the sample type
-     * @param taskLocal <code>true</code> if this counter is local to tasks,
-     *                  <code>false</code> otherwise
-     * @param maxSamples the maximum number of samples to keep.  A
-     *        negative value indicates an infinite number of samples.
-     *        Note that for non-task-local sample sources, this is a
-     *        potential memory leak as the number of samples
-     *        increases.
+     * @param taskLocal <code>true</code> if this counter is local to
+     *        tasks, <code>false</code> otherwise
+     * @param maxSamples the maximum number of samples to keep.  
      *
      * @return a {@code ProfileSample} that collects the data
      */

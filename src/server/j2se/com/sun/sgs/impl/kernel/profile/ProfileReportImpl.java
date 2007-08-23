@@ -29,19 +29,16 @@ class ProfileReportImpl implements ProfileReport {
      * An empty map for returning when no profile counters have been
      * updated.
      */
-    private static final Map<String,Long> EMPTY_MAP = 
+    private static final Map<String,Long> EMPTY_COUNTER_MAP = 
 	Collections.emptyMap();
 
     /**
      * An empty map for returning when no profile samples have been
-     * updated.
-     */
-    // NOTE: we need this map as well because typing issues prevent us
-    // from using Collections.emptyMap()
+     * updated.  We need this map as well because typing issues
+     * prevent us from using {@link Collections#emptyMap()}.
+    */
     private static final Map<String,List<Long>> EMPTY_SAMPLE_MAP = 
 	Collections.unmodifiableMap(new HashMap<String,List<Long>>());
-
-
 
     // the final fields, set by the constructor
     final KernelRunnable task;
@@ -124,7 +121,12 @@ class ProfileReportImpl implements ProfileReport {
     }
 
     /**
+     * Package-private method used to add to a task-local sample. If
+     * this sample hasn't had a value reported yet for this task, then
+     * a new list is made and the the provided value is added to it.
      *
+     * @param counter the name of the sample
+     * @param value the latest value for the sample
      */
     void addLocalSample(String sampleName, long value) {
 	List<Long> samples;
@@ -144,10 +146,18 @@ class ProfileReportImpl implements ProfileReport {
     }
 
     /**
+     * Package-private method used to add to an aggregate sample. If
+     * this sample hasn't had a value reported yet for this task, then
+     * a new list is made and the the provided value is added to it.
      *
+     * @param counter the name of the sample
+     * @param samples the list of all samples for this name
      */
-    void registerLifetimeSamples(String sampleName, 
+    void registerAggregateSamples(String sampleName, 
 				 List<Long> samples) {
+	// NOTE: we make the list unmodifiable so that the user cannot
+	// alter any of the samples.  This is important since the same
+	// list is used for the lifetime of the application.
         if (lifetimeSamples == null) {
             lifetimeSamples = new HashMap<String,List<Long>>();
 	    lifetimeSamples.put(sampleName, 
@@ -232,14 +242,21 @@ class ProfileReportImpl implements ProfileReport {
      * {@inheritDoc}
      */
     public Map<String,Long> getUpdatedAggregateCounters() {
-        return (aggCounters == null) ? EMPTY_MAP : aggCounters;
+        return (aggCounters == null) ? EMPTY_COUNTER_MAP : aggCounters;
     }
 
     /**
      * {@inheritDoc}
      */
     public Map<String,Long> getUpdatedTaskCounters() {
-        return (taskCounters == null) ? EMPTY_MAP : taskCounters;
+        return (taskCounters == null) ? EMPTY_COUNTER_MAP : taskCounters;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String,List<Long>> getUpdatedAggregateSamples() {
+	return (lifetimeSamples == null) ? EMPTY_SAMPLE_MAP : lifetimeSamples;
     }
 
     /**
@@ -248,14 +265,6 @@ class ProfileReportImpl implements ProfileReport {
     public Map<String,List<Long>> getUpdatedTaskSamples() {
 	return (localSamples == null) ? EMPTY_SAMPLE_MAP : localSamples;
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Map<String,List<Long>> getUpdatedLifetimeSamples() {
-	return (lifetimeSamples == null) ? EMPTY_SAMPLE_MAP : lifetimeSamples;
-    }
-
 
     /**
      * {@inheritDoc}

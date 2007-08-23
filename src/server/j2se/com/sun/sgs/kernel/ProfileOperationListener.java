@@ -11,9 +11,8 @@ package com.sun.sgs.kernel;
  * <code>ProfileConsumer</code>, the data provided here is aggregated
  * data representing events in the scheduler or collected data about a
  * complete task run through the scheduler.  Implementaions of this
- * class will only be called within a single-threaded context, and
- * therefore should not include multithreaded constructs, such as
- * synchronization.
+ * class will only be called within a single-threaded context, so
+ * implementations do not need to be concurrent.
  *
  * <p>
  *

@@ -82,9 +82,9 @@ public interface ProfileCollector {
     public void addParticipant(ProfileParticipantDetail participantDetail);
 
     /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is now
-     * finished.
+     * Tells the collector that the current task associated with the
+     * calling thread (as associated by a call to
+     * <code>startTask</code>) has now successfully finished.
      *
      * @param tryCount the number of times that the task has tried to run
      * @param taskSucceeded <code>true</code> if the task ran to completion,
@@ -93,7 +93,7 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void finishTask(int tryCount, boolean taskSucceeded);
+    public void finishTask(int tryCount);
 
     /**
      * Tells the collector that the current task associated with the calling
@@ -101,15 +101,11 @@ public interface ProfileCollector {
      * finished and that an exception occured during its execution.
      *
      * @param tryCount the number of times that the task has tried to run
-     * @param taskSucceeded <code>true</code> if the task ran to completion,
-     *                      <code>false</code> if the task failed and is
-     *                      going to be re-tried or dropped
      * @param exception the exception that occured during the
      *        execution of the task
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void finishTask(int tryCount, boolean taskSucceeded, 
-			   Exception exception);
+    public void finishTask(int tryCount, Exception exception);
 
 }

@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
@@ -26,11 +25,23 @@ import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * A text-output listener that displays the distribution for all
+ * {@link ProfileSample}s updated during a fixed-size window of tasks
+ * as well as the lifetime of the program.  This class uses a {@link
+ * PowerOfTwoHistogram} to display the distribution for each sample
+ *
+ * Note that this class uses a fixed number of tasks between outputs,
+ * rather than a period of time.  The number of tasks can be
+ * comfigured by defining the {@code
+ * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * application properties file.  The default window size for this
+ * class is {@code 5000}.
+ *
+ * @see ProfileProperties
+ * @see ProfileSample
+ */
 public class ProfileSampleListener implements ProfileOperationListener {
-
-
-    static final String WINDOW_SIZE_PROPERTY =
-	"com.sun.sgs.impl.kernel.Kernel.profile.listener.window.size";
 
     /**
      * The window of tasks that are aggregated before the next text
@@ -39,9 +50,8 @@ public class ProfileSampleListener implements ProfileOperationListener {
     private static final int DEFAULT_WINDOW_SIZE = 5000;
 
     /**
-     * How many tasks are aggregated between status updates.  Note
-     * that the update might not occur exactly on window crossing due
-     * to concurrent updates.
+     * How many tasks are aggregated between status updates.  This is
+     * set either by property or the default.
      */
     private final int windowSize;
 
@@ -50,7 +60,18 @@ public class ProfileSampleListener implements ProfileOperationListener {
 
     private final Map<String,Histogram> profileSamples;
 
-
+    /**
+     * Creates an instance of {@code ProfileSampleListener}.
+     *
+     * @param properties the {@code Properties} for this listener
+     * @param owner the {@code TaskOwner} to use for all tasks run by
+     *        this listener
+     * @param taskScheduler the {@code TaskScheduler} to use for
+     *        running short-lived or recurring tasks
+     * @param resourceCoord the {@code ResourceCoordinator} used to
+     *        run any long-lived tasks
+     *
+     */
     public ProfileSampleListener(Properties properties, TaskOwner owner,
 				 TaskScheduler taskScheduler,
 				 ResourceCoordinator resourceCoord) {
@@ -59,26 +80,24 @@ public class ProfileSampleListener implements ProfileOperationListener {
 	profileSamples = new HashMap<String,Histogram>();
 
 	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(WINDOW_SIZE_PROPERTY, DEFAULT_WINDOW_SIZE);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyNewOp(ProfileOperation op) {
-	// don't care
+	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
     }
 
     /**
      * {@inheritDoc}
      */
     public void notifyThreadCount(int schedulerThreadCount) {
-	// don't care
+	// unused
     }
 
-
     /**
-     * {@inheritDoc}
+     * Collects the samples that are updated during this task-window
+     * and when the number of tasks reaches the windowed size, outputs
+     * a histogram for each sample that has been updated during the
+     * window and also a histogram for each sample updated during the
+     * lifetime of the application.
+     *
+     * @param profileReport the summary for the finished {@code Task}
      */
     public void report(ProfileReport profileReport) {
 	
@@ -93,7 +112,6 @@ public class ProfileSampleListener implements ProfileOperationListener {
 
 	    Histogram hist = profileSamples.get(name);
 	    if (hist == null) {
-		// REMINDER: this should configurable
 		hist = new PowerOfTwoHistogram();
 		profileSamples.put(name, hist);
 	    }
@@ -104,18 +122,17 @@ public class ProfileSampleListener implements ProfileOperationListener {
 	}
 	
 	if (taskCount % windowSize == 0) {
-	    // reset the counter for the next entry
 
 	    if (profileSamples.size() > 0) {
 		System.out.printf("Profile samples for the past %d tasks:\n", 
 				  taskCount);
 		
-		for (String name : profileSamples.keySet()) {
-		    
-		    Histogram hist = profileSamples.get(name);
-		    System.out.printf("%s: \n%s\n", name, hist.toString());
-		}
+		for (Map.Entry<String,Histogram> e : profileSamples.entrySet()) 
+		    System.out.printf("%s: (%d samples)\n%s\n", e.getKey(), 
+				      e.getValue().size(), e.getValue());
+		
 
+		// reset the samples for the next window
 		profileSamples.clear();
 	    }
 	}	
@@ -125,7 +142,7 @@ public class ProfileSampleListener implements ProfileOperationListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-	// don't care
+	// unused
     }
     
     

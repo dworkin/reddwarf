@@ -1,15 +1,22 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.kernel.profile;
+
 
 /**
  * A histogram that bins elements based on provided bounds and a step
- * size.
+ * size.  This class is useful for viewing a particular range of data
+ * and specifying how the distribution is grouped.  The lower and
+ * upper bounds should be used to filter out all extraneous data
+ * points.
  */
 public class LinearHistogram implements Histogram {
 
     /**
      * the longest bar in the histogram
      */
-    // REMINDER: should this be a configurable option?
     private final static int MAX_HIST_LENGTH = 40;	
 
     /**
@@ -67,8 +74,7 @@ public class LinearHistogram implements Histogram {
      *        truncated in size
      *
      * @throws IllegalArgumentException if {@code lBound} is not less
-     *         than {@code uBound}
-     * @throws IllegalArgumentException if {@code StepSize} is not
+     *         than {@code uBound}, or if {@code stepSize} is not
      *         strictly positive     
      */
     public LinearHistogram(int lBound, int uBound, long stepSize) {
@@ -94,7 +100,7 @@ public class LinearHistogram implements Histogram {
     /**
      * {@inheritDoc}
      *
-     * Values are binned in the largest bin that is <i>less than<i>
+     * Values are binned in the largest bin that is <i>less than</i>
      * the element is incremented.  Values less than the lower bound
      * or values that are greater than the upper bound are not counted.
      */ 
@@ -102,13 +108,18 @@ public class LinearHistogram implements Histogram {
 	if (value < lBound || value > uBound)
 	    return;
 	
-	int bin = 0, count;
+	// find the appropriate bin for this value, starting at the
+	// lower bound and increasing by the provided step size
+	int bin = 0;
 	for (long i = lBound + stepSize; i < uBound && value > (i += stepSize); bin++)
 	    ;
 		
 	maxIndex = Math.max(maxIndex, bin);
 	minIndex = Math.min(minIndex, bin);
 	
+	// keep track of which bin has the most number of elements,
+	// after incrementing the bin's count
+	int count;
 	if ((count = bins[bin]++) > maxCount)
 	    maxCount = count;       
     }
@@ -148,6 +159,8 @@ public class LinearHistogram implements Histogram {
      * All leading and trailing empty bins are truncated, which may
      * result in the lower and upper bound bins not being displayed.
      * The final line will have a newline at the end.
+     *
+     * @return a string representation of this histogram
      */
     public String toString() {
 	return toString("");
@@ -160,9 +173,13 @@ public class LinearHistogram implements Histogram {
      *
      * <pre>
      * 200ms |***
+     * 400ms |*
+     * 600ms |*****
      * </pre>
      * 
      * @param binLabel the label to append to each of the bins
+     *
+     * @return a string representation of this histogram
      */
     public String toString(String binLabel) {
 	// get the length of the longest string version of the integer

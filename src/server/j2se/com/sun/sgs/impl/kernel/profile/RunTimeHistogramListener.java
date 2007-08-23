@@ -23,15 +23,26 @@ import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+
 /**
- * A text-output listener that displays the histogram for the task
- * execution times, for both a recent window of tasks and the lifetime
- * of the application.
+ * A text-output listener that displays the distribution of successful
+ * task execution times, for both a recent fixed-size window of tasks
+ * and the lifetime of the application.  This class uses a {@link
+ * PowerOfTwoHistogram} to display the distribution of execution
+ * times.
+ *
+ * <p>
+ *
+ * Note that this class uses a fixed number of tasks between outputs,
+ * rather than a period of time.  The number of tasks can be
+ * comfigured by defining the {@code
+ * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * application properties file.  The default window size for this
+ * class is {@code 5000}.
+ *
+ * @see ProfileProperties
  */
 public class RunTimeHistogramListener implements ProfileOperationListener {
-
-    static final String WINDOW_SIZE_PROPERTY =
-	"com.sun.sgs.impl.kernel.Kernel.profile.listener.window.size";
 
     /**
      * The window of tasks that are aggregated before the next text
@@ -43,11 +54,6 @@ public class RunTimeHistogramListener implements ProfileOperationListener {
      * The current number of tasks seen
      */
     private long taskCount;
-
-    /**
-     * The number of tasks seen at the most recent text-output
-     */
-    private long lastCount;
 
     /**
      * The number of tasks aggregated between text outputs
@@ -65,35 +71,51 @@ public class RunTimeHistogramListener implements ProfileOperationListener {
      */
     private final Histogram lifetimeHistogram;
 
+    /**
+     * Creates an instance of {@code RunTimeHistogramListener}.
+     *
+     * @param properties the {@code Properties} for this listener
+     * @param owner the {@code TaskOwner} to use for all tasks run by
+     *        this listener
+     * @param taskScheduler the {@code TaskScheduler} to use for
+     *        running short-lived or recurring tasks
+     * @param resourceCoord the {@code ResourceCoordinator} used to
+     *        run any long-lived tasks
+     *
+     */
     public RunTimeHistogramListener(Properties properties, TaskOwner owner,
-			     TaskScheduler taskScheduler,
-			     ResourceCoordinator resourceCoord) {
+				    TaskScheduler taskScheduler,
+				    ResourceCoordinator resourceCoord) {
   	taskCount = 0;
-	lastCount = 0;
 	lifetimeHistogram = new PowerOfTwoHistogram();
 	windowHistogram = new PowerOfTwoHistogram();
 
 	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(WINDOW_SIZE_PROPERTY, DEFAULT_WINDOW_SIZE);
+	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
     }
 
     /**
      * {@inheritDoc}
      */
     public void notifyNewOp(ProfileOperation op) {
-	// don't care
+	// unused
     }
 
     /**
      * {@inheritDoc}
      */
     public void notifyThreadCount(int schedulerThreadCount) {
-	// don't care
+	// unused
     }
 
 
     /**
-     * 
+     * Aggregates the task execution times for sucessful tasks and
+     * when the number of tasks reaches the windowed limit, outputs a
+     * histogram for the execution times for the window and also the
+     * lifetime of the application.
+     *
+     * @param profileReport the summary for the finished {@code Task}
      */
     public void report(ProfileReport profileReport) {
 
@@ -110,12 +132,11 @@ public class RunTimeHistogramListener implements ProfileOperationListener {
 	if (count % windowSize == 0) {
 	    
 	    // print out the results
-	    System.out.printf("past %d tasks:\n%s", count - lastCount,
+	    System.out.printf("past %d tasks:\n%s", windowSize,
 			      windowHistogram.toString("ms"));
 	    System.out.printf("lifetime of %d tasks:\n%s", count,
 			      lifetimeHistogram.toString("ms"));
 
-	    lastCount = count;
 	    windowHistogram.clear();
 	}	
     }
@@ -125,7 +146,7 @@ public class RunTimeHistogramListener implements ProfileOperationListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-	// don't care
+	// unused
     }
 
 }

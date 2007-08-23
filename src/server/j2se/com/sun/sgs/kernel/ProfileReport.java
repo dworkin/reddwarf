@@ -38,8 +38,8 @@ public interface ProfileReport {
     public boolean wasTaskTransactional();
 
     /**
-     * Returns detail about each participant in the transaction, or an empty
-     * <code>Set</code> if the task was not transactional.
+     * Returns detail about each participant in the transaction, or an
+     * empty <code>Set</code> if the task was not transactional.
      *
      * @return a <code>Set</code> of <code>ProfileParticipantDetail</code>
      */
@@ -101,11 +101,12 @@ public interface ProfileReport {
     /**
      * Returns the updated values of the aggregate counters that were
      * updated during the running of the task. If no aggregate
-     * counters were updated, an empty {@code Map} is returned. The
-     * <code>Map</code> is a mapping from counter name to counter
-     * value. Note that the reported values are the values observed
-     * during the running of the task, not the value (which may have
-     * changed) at the time this report is provided to any listeners.
+     * counters were updated, an empty <code>Map</code> is
+     * returned. The <code>Map</code> is a mapping from counter name
+     * to counter value. Note that the reported values are the values
+     * observed during the running of the task, not the value (which
+     * may have changed) at the time this report is provided to any
+     * listeners.
      *
      * @return a <code>Map</code> from counter name to observed value
      */
@@ -122,6 +123,20 @@ public interface ProfileReport {
      */
     public Map<String,Long> getUpdatedTaskCounters();
 
+    /**
+     * Returns a mapping for each sample that records for the lifetime
+     * of the application that was updated, to the entire list of
+     * samples for that name. If no lifetime samples were updated,
+     * then an empty <code>Map</code> is returned. The
+     * <code>Map</code> is a mapping from sample name to an
+     * oldest-first list of sample values.  The list of samples
+     * includes all samples collected during the lifetime of the
+     * application.
+     *
+     * @return a <code>Map</code> from sample name to a list of values
+     *         added during the task.     
+     */
+    public Map<String,List<Long>> getUpdatedAggregateSamples();
 
     /**
      * Returns the list of values for the task-local samples that were
@@ -133,22 +148,7 @@ public interface ProfileReport {
      * @return a <code>Map</code> from sample name to a list of values
      *         added during the task.
      */
-    public Map<String,List<Long>> getUpdatedTaskSamples();
-
-    
-    /**
-     * Returns a mapping for each sample that records for the lifetime
-     * of the application that was updated, to the entire list of
-     * samples for that name. If no lifetime samples were updated,
-     * then an empty {@code Map} is returned. The <code>Map</code> is
-     * a mapping from sample name to an oldest-first list of sample
-     * values.
-     *
-     * @return a <code>Map</code> from sample name to a list of values
-     *         added during the task.     
-     */
-    public Map<String,List<Long>> getUpdatedLifetimeSamples();
-
+    public Map<String,List<Long>> getUpdatedTaskSamples();  
 
     /**
      * Returns the number of tasks in the same context as this report's task
@@ -164,11 +164,13 @@ public interface ProfileReport {
 
 
     /**
-     * Returns any exception that occurred during the execution of this
-     * report's task, or {@code null} if no exception occurred.
+     * Returns any exception that occurred during the execution of
+     * this report's task, or <code>null</code> if no exception
+     * occurred.  This exception will always be <code>null</code> if
+     * {@link #wasSuccessful()} returns <code>true</code>.
      * 
-     * @return the exception that occurred or {@code null} if none
-     *         occurred.
+     * @return the exception that occurred or <code>null</code> if
+     *         none occurred.
      */
     public Exception getException();
 

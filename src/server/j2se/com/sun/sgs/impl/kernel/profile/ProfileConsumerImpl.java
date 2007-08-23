@@ -57,7 +57,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
         return profileCollector.registerCounter(name, producerName, taskLocal);
     }
 
-
     /**
      * {@inheritDoc}
      */
@@ -66,6 +65,5 @@ class ProfileConsumerImpl implements ProfileConsumer {
 	return profileCollector.registerSampleSource(name, taskLocal, 
 						     maxSamples);
     }
-
 
 }

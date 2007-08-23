@@ -23,6 +23,7 @@ import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+
 /**
  * A text-output listener that generates task-periodic summary reports
  * about the performance of tasks being exexcuted by a server.  Each
@@ -44,13 +45,18 @@ import java.util.concurrent.atomic.AtomicLong;
  *   mean ready count: 3.98,  mean lag time: 9.75ms
  * </pre>
  *
- * @see HistogramListener
+ * <p>
+ *
+ * Note that this class uses a fixed number of tasks between outputs,
+ * rather than a period of time.  The number of tasks can be
+ * comfigured by defining the {@code
+ * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * application properties file.  The default window size for this
+ * class is {@code 5000}.
+ *
+ * @see ProfileProperties
  */
 public class ProfileSummaryListener implements ProfileOperationListener {
-
-
-    static final String WINDOW_SIZE_PROPERTY =
-	"com.sun.sgs.impl.kernel.Kernel.profile.listener.window.size";
 
     /**
      * The window of tasks that are aggregated before the next text
@@ -65,7 +71,6 @@ public class ProfileSummaryListener implements ProfileOperationListener {
      */
     private final int windowSize;
 
-
     // long wall-clock time
     private long lastWindowStart;
 
@@ -77,7 +82,6 @@ public class ProfileSummaryListener implements ProfileOperationListener {
      private long lagTimeSum;
      private long readyCountSum;   
 
-
     // statistics for the lifetime of the program
      private long lifetimeCount;
      private long lifetimeMax;
@@ -86,8 +90,18 @@ public class ProfileSummaryListener implements ProfileOperationListener {
      private long lifetimeLagTime;
      private long lifetimeReadyCountSum;
 
-
-
+    /**
+     * Creates an instance of {@code ProfileSummaryListener}.
+     *
+     * @param properties the {@code Properties} for this listener
+     * @param owner the {@code TaskOwner} to use for all tasks run by
+     *        this listener
+     * @param taskScheduler the {@code TaskScheduler} to use for
+     *        running short-lived or recurring tasks
+     * @param resourceCoord the {@code ResourceCoordinator} used to
+     *        run any long-lived tasks
+     *
+     */
     public ProfileSummaryListener(Properties properties, TaskOwner owner,
 				  TaskScheduler taskScheduler,
 				  ResourceCoordinator resourceCoord) {
@@ -109,21 +123,21 @@ public class ProfileSummaryListener implements ProfileOperationListener {
 	lifetimeReadyCountSum = 0;
 
 	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(WINDOW_SIZE_PROPERTY, DEFAULT_WINDOW_SIZE);
+	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
     }
 
     /**
      * {@inheritDoc}
      */
     public void notifyNewOp(ProfileOperation op) {
-	// don't care
+	// unused
     }
 
     /**
      * {@inheritDoc}
      */
     public void notifyThreadCount(int schedulerThreadCount) {
-	// don't care
+	// unused
     }
 
 
@@ -213,7 +227,7 @@ public class ProfileSummaryListener implements ProfileOperationListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-	// don't care
+	// unused
     }
     
     

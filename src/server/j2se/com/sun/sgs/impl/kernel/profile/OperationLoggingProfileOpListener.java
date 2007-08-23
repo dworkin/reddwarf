@@ -57,13 +57,10 @@ public class OperationLoggingProfileOpListener
     // the number of threads reported as running in the scheduler
     private long threadCount = 0;
 
-    // NOTE: this only supports MAX_OPS operations, which is fine as long
-    // as the collector will never allow more than this number to be
-    // registered, but when that changes, so too should this code
     private int maxOp = 0;
-    private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
-    private long [] opCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private Map<Integer,ProfileOperation> registeredOps = new HashMap<Integer,ProfileOperation>();
+    private Map<Integer,Long> opCounts = new HashMap<Integer,Long>();
+
 
     // the commit/abort total counts, and the reported running time total
     private long commitCount = 0;
@@ -101,26 +98,20 @@ public class OperationLoggingProfileOpListener
 	localCounters = new HashMap<String,Long>();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyNewOp(ProfileOperation op) {
         int id = op.getId();
         if (id > maxOp)
             maxOp = id;
-        registeredOps[id] = op;
+	registeredOps.put(id,op);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyThreadCount(int schedulerThreadCount) {
         threadCount = schedulerThreadCount;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void report(ProfileReport profileReport) {
         if (profileReport.wasTaskSuccessful())
             commitCount++;
@@ -129,8 +120,11 @@ public class OperationLoggingProfileOpListener
 
         totalRunningTime += profileReport.getRunningTime();
 
-        for (ProfileOperation op : profileReport.getReportedOperations())
-            opCounts[op.getId()]++;
+        for (ProfileOperation op : profileReport.getReportedOperations()) {
+	    Long i = opCounts.get(op.getId());
+	    opCounts.put(op.getId(), (i == null)
+			 ? new Long(1) : i.longValue() + 1);	    
+	}
 
 	Map<String,Long> counterMap = profileReport.getUpdatedTaskCounters();
 	if (counterMap != null) {
@@ -150,9 +144,9 @@ public class OperationLoggingProfileOpListener
                 for (int i = 0; i <= maxOp; i++) {
                     if (i != 0)
                         opCountTally += "\n";
-                    opCountTally += "  " + registeredOps[i] + ": " +
-                        opCounts[i];
-                    opCounts[i] = 0;
+                    opCountTally += "  " + registeredOps.get(i) + ": " +
+                        opCounts.get(i);
+                    opCounts.put(i,0L);
                 }
 
 		String counterTally = "";
@@ -172,7 +166,7 @@ public class OperationLoggingProfileOpListener
 			   "\n" + counterTally);
             } else {
                 for (int i = 0; i <= maxOp; i++)
-                    opCounts[i] = 0;
+                    opCounts.put(i,0L);
             }
 
             commitCount = 0;
@@ -183,9 +177,7 @@ public class OperationLoggingProfileOpListener
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void shutdown() {
         // there is nothing to shutdown on this listener
     }
