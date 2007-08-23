@@ -76,7 +76,7 @@ class ClientSessionHandler {
     /** The client session associated with this session handler,
      * or {@code null} if the session hasn't completed login.
      */
-    private final ClientSessionImpl clientSession;
+    private final ClientSessionImpl sessionImpl;
 
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
@@ -87,8 +87,11 @@ class ClientSessionHandler {
     /** The Connection for sending messages to the client. */
     private Connection sessionConnection;
 
-    /** The session id. */
-    private final CompactId sessionId;
+    /** The session ID. */
+    private final CompactId compactId;
+
+    /** The session ID bytes. */
+    private final byte[] idBytes;
 
     /** The reconnection key. */
     private final CompactId reconnectionKey;
@@ -127,9 +130,10 @@ class ClientSessionHandler {
 	this.sessionService = ClientSessionServiceImpl.getInstance();
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
-	this.sessionId = new CompactId(id);
-	this.clientSession = new ClientSessionImpl(sessionId);
-	this.reconnectionKey = sessionId; // not used yet
+	this.compactId = new CompactId(id);
+	this.idBytes = compactId.getId();
+	this.sessionImpl = new ClientSessionImpl(compactId);
+	this.reconnectionKey = compactId; // not used yet
     }
 
     /* -- Instance methods -- */
@@ -139,8 +143,8 @@ class ClientSessionHandler {
      *
      * @return	the client session
      */
-    ClientSession getClientSession() {
-	return clientSession;
+    ClientSessionImpl getClientSession() {
+	return sessionImpl;
     }
 
     /**
@@ -149,7 +153,7 @@ class ClientSessionHandler {
      * @return 	the client session ID
      */
     ClientSessionId getSessionId() {
-        return new ClientSessionId(sessionId.getId());
+        return new ClientSessionId(idBytes);
     }
 
     /**
@@ -240,19 +244,19 @@ class ClientSessionHandler {
 	    }
 	}
 
-	sessionService.disconnected(clientSession);
-
-	final Identity thisIdentity = identity;
-	if (thisIdentity != null) {
+	sessionService.disconnected(sessionImpl);
+	
+	if (identity != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
 	    // may happen out of order with respect to the
 	    // 'notifyLoggedIn' callback.  Also, this notification may
 	    // also happen even though 'notifyLoggedIn' was not invoked.
 	    // Are these behaviors okay?  -- ann (3/19/07)
-	    sessionService.scheduleTask(new AbstractKernelRunnable() {
+	    final Identity thisIdentity = identity;
+	    scheduleTask(new AbstractKernelRunnable() {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
-		    }}, thisIdentity);
+		    }});
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
@@ -282,6 +286,7 @@ class ClientSessionHandler {
 		public void run() throws IOException {
 		    listener.get().disconnected(graceful);
 		    listener.remove();
+		    sessionImpl.removeSession(dataService, idBytes);
 		}});
 	}
     }
@@ -317,7 +322,7 @@ class ClientSessionHandler {
 	    ClientSessionHandler session = (ClientSessionHandler) obj;
 	    return
 		areEqualIdentities(identity, session.identity) &&
-		sessionId.equals(session.sessionId);
+		compactId.equals(session.compactId);
 	}
 	return false;
     }
@@ -339,12 +344,12 @@ class ClientSessionHandler {
     
     /** {@inheritDoc} */
     public int hashCode() {
-	return sessionId.hashCode();
+	return compactId.hashCode();
     }
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + sessionId;
+	return getClass().getName() + "[" + identity + "]@" + compactId;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -486,7 +491,7 @@ class ClientSessionHandler {
 			}
 		    }
 		    
-		    serviceListener.receivedMessage(clientSession, buffer);
+		    serviceListener.receivedMessage(sessionImpl, buffer);
 		    
 		} else {
 		    if (logger.isLoggable(Level.SEVERE)) {
@@ -531,7 +536,7 @@ class ClientSessionHandler {
 			    sessionService.txnProxy,
 			    sessionService.nonDurableTaskScheduler,
 			    authenticatedIdentity);
-		    clientSession.setIdentity(authenticatedIdentity);
+		    sessionImpl.setIdentity(authenticatedIdentity);
 		    identity = authenticatedIdentity;
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
@@ -663,9 +668,7 @@ class ClientSessionHandler {
 		managedObj = new ClientSessionListenerWrapper(listener);
 	    }
 	    
-	    listenerKey =
-		ClientSessionHandler.class.getName() + "." +
-		Integer.toHexString(random.nextInt());
+	    listenerKey = sessionService.getListenerKey(idBytes);
 	    dataService.setServiceBinding(listenerKey, managedObj);
 	}
 
@@ -745,11 +748,12 @@ class ClientSessionHandler {
 		"LoginTask.run invoking AppListener.loggedIn session:{0}",
 		identity);
 
+	    sessionImpl.putSession(dataService);
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
-
+	    
 	    try {
-		returnedListener = appListener.loggedIn(clientSession);
+		returnedListener = appListener.loggedIn(sessionImpl);
 	    } catch (RuntimeException e) {
 		ex = e;
 	    }
@@ -763,16 +767,16 @@ class ClientSessionHandler {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
-			3 + sessionId.getExternalFormByteCount() +
+			3 + compactId.getExternalFormByteCount() +
 			reconnectionKey.getExternalFormByteCount());
 		ack.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		    putBytes(sessionId.getExternalForm()).
+		    putBytes(compactId.getExternalForm()).
 		    putBytes(reconnectionKey.getExternalForm());
 		
 		sessionService.sendProtocolMessageFirst(
-		    clientSession, ack.getBuffer(), Delivery.RELIABLE);
+		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE);
 
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(new AbstractKernelRunnable() {
@@ -805,8 +809,8 @@ class ClientSessionHandler {
 		    throw ex;
 		}
 		sessionService.sendProtocolMessageFirst(
-		    clientSession, getLoginNackMessage(), Delivery.RELIABLE);
-		sessionService.disconnect(clientSession);
+		    sessionImpl, getLoginNackMessage(), Delivery.RELIABLE);
+		sessionService.disconnect(sessionImpl);
 	    }
 	}
     }

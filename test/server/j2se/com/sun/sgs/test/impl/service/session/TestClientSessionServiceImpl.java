@@ -100,7 +100,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"throw RuntimeException";
     
     private static final String LISTENER_PREFIX =
-	"com.sun.sgs.impl.service.session.ClientSessionImpl";
+	ClientSessionServiceImpl.LISTENER_PREFIX;
     
     private static Object disconnectedCallbackLock = new Object();
     

@@ -17,10 +17,12 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionHandler.
     ClientSessionListenerWrapper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -38,6 +40,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -68,7 +71,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
     /** The prefix for ClientSessionListeners bound in the data store. */
     public static final String LISTENER_PREFIX =
-	ClientSessionImpl.class.getName();
+	"com.sun.sgs.impl.service.session.listener";
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -79,12 +82,27 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	new LoggerWrapper(Logger.getLogger(
 	    "com.sun.sgs.impl.service.session.service"));
 
+    /** The prefix for properties. */
+    private static final String PROPERTY_PREFIX =
+	"com.sun.sgs.impl.service.session";
+    
     /** The name of the IdGenerator. */
     private static final String ID_GENERATOR_NAME =
-	CLASSNAME + ".generator";
+	PROPERTY_PREFIX + ".id.generator";
 
+    /** The name of the ID block size property. */
+    private static final String ID_BLOCK_SIZE_PROPERTY =
+	PROPERTY_PREFIX + ".id.block.size";
+	
     /** The default block size for the IdGenerator. */
-    private static final int ID_GENERATOR_BLOCK_SIZE = 256;
+    private static final int DEFAULT_ID_BLOCK_SIZE = 256;
+    
+    /** The name of the server port property. */
+    private static final String SERVER_PORT_PROPERTY =
+	PROPERTY_PREFIX + ".server.port";
+	
+    /** The default server port. */
+    private static final int DEFAULT_SERVER_PORT = 0;
     
     /** The transaction proxy for this class. */
     static TransactionProxy txnProxy;
@@ -96,8 +114,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The application name. */
     private final String appName;
 
-    /** The port number for accepting connections. */
-    private final int port;
+    /** The port for accepting connections. */
+    private final int appPort;
 
     /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
@@ -146,8 +164,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The IdGenerator. */
     private final IdGenerator idGenerator;
 
-    /** The client session server. */
-    private ClientSessionServer sessionServer;
+    /** The exporter for the ClientSessionServer. */
+    private final Exporter<ClientSessionServer> exporter;
+
+    /** The ClientSessionServer remote interface implementation. */
+    private final SessionServerImpl serverImpl;
+	
+    /** The proxy for the ClientSessionServer. */
+    private final ClientSessionServer serverProxy;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -165,19 +189,19 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				    TransactionProxy txnProxy)
 	throws Exception
     {
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(
-	        Level.CONFIG,
-		"Creating ClientSessionServiceImpl properties:{0}",
-		properties);
-	}
+	logger.log(
+	    Level.CONFIG,
+	    "Creating ClientSessionServiceImpl properties:{0}",
+	    properties);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	
 	try {
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
 	    } else if (txnProxy == null) {
 		throw new NullPointerException("null txnProxy");
 	    }
-	    appName = properties.getProperty(StandardProperties.APP_NAME);
+	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
 		    "The " + StandardProperties.APP_NAME +
@@ -185,27 +209,43 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 
 	    String portString =
-            properties.getProperty(StandardProperties.APP_PORT);
+		wrappedProps.getProperty(StandardProperties.APP_PORT);
 	    if (portString == null) {
 		throw new IllegalArgumentException(
 		    "The " + StandardProperties.APP_PORT +
 		    " property must be specified");
 	    }
-	    port = Integer.parseInt(portString);
+	    appPort = Integer.parseInt(portString);
 	    // TBD: do we want to restrict ports to > 1024?
-	    if (port < 0) {
+	    if (appPort < 0) {
 		throw new IllegalArgumentException(
-		    "Port number can't be negative: " + port);
+		    "The " + StandardProperties.APP_PORT +
+		    " property can't be negative: " + appPort);
 	    }
 
-	    PropertiesWrapper wrappedProperties =
-		new PropertiesWrapper(properties);
-	    idBlockSize =
-		wrappedProperties.getIntProperty(
- 		    CLASSNAME + ".id.block.size", ID_GENERATOR_BLOCK_SIZE);
-	    if (idBlockSize < IdGenerator.MIN_BLOCK_SIZE) {
-		throw new IllegalArgumentException(
-		    "idBlockSize must be > " + IdGenerator.MIN_BLOCK_SIZE);
+	    idBlockSize = wrappedProps.getIntProperty(
+		ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
+		IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
+
+	    int serverPort = wrappedProps.getIntProperty(
+		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
+	    serverImpl = new SessionServerImpl();
+	    exporter =
+		new Exporter<ClientSessionServer>(ClientSessionServer.class);
+	    try {
+		int port = exporter.export(serverImpl, serverPort);
+		serverProxy = exporter.getProxy();
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(
+			Level.CONFIG, "export successful. port:{0,number,#}",
+			port);
+		}
+	    } catch (Exception e) {
+		try {
+		    exporter.unexport();
+		} catch (RuntimeException re) {
+		}
+		throw e;
 	    }
 
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -241,7 +281,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				taskScheduler);
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
-		    new InetSocketAddress(port), TransportType.RELIABLE);
+		    new InetSocketAddress(appPort), TransportType.RELIABLE);
 	    acceptor = endpoint.createAcceptor();
 	    try {
 		acceptor.listen(acceptorListener);
@@ -291,12 +331,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
 
     /**
-     * Returns the client session server
+     * Returns the proxy for the client session server
      *
-     * @return	the client session server
+     * @return	the proxy for the client session server
      */
     ClientSessionServer getServerProxy() {
-	return sessionServer;
+	return serverProxy;
     }
 
     /**
@@ -320,7 +360,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    acceptor.shutdown();
 	    logger.log(Level.FINEST, "acceptor shutdown");
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
+	    logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
+	    // swallow exception
+	}
+
+	try {
+	    exporter.unexport();
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
 	}
 
@@ -347,15 +394,22 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     public void registerProtocolMessageListener(
 	byte serviceId, ProtocolMessageListener listener)
     {
+	if (listener == null) {
+	    throw new NullPointerException("null listener");
+	}
 	serviceListeners.put(serviceId, listener);
     }
 
     /** {@inheritDoc} */
     public ClientSession getClientSession(byte[] sessionId) {
-	// FIXME: this works only for a single node...
-	ClientSessionHandler handler =
-	    handlers.get(new ClientSessionId(sessionId));
-	return (handler != null) ? handler.getClientSession() : null;
+	if (sessionId == null) {
+	    throw new NullPointerException("null sessionId");
+	}
+	ClientSessionHandler handler = getHandler(sessionId);
+	return
+	    (handler != null) ?
+	    handler.getClientSession() :
+	    ClientSessionImpl.getSession(dataService, sessionId);
     }
 
     /** {@inheritDoc} */
@@ -392,12 +446,37 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     public void sendProtocolMessageNonTransactional(
 	ClientSession session, byte[] message, Delivery delivery)
     {
-	// FIXME: this only works on a single node...
-	ClientSessionHandler handler = handlers.get(session.getSessionId());
+	ClientSessionId sessionId = session.getSessionId();
+	ClientSessionHandler handler = handlers.get(sessionId);
+	/*
+	 * If a local handler exists, forward message to local handler
+	 * to send to client session, otherwise obtain remote server
+	 * for client session and forward message for delivery.
+	 */
 	if (handler != null) {
 	    handler.sendProtocolMessage(message, delivery);
 	} else {
-	    logger.log(Level.WARNING, "session {0} doesn't exist", session);
+	    ClientSessionImpl sessionImpl = getClientSessionImpl(session);
+	    if (! sessionImpl.isConnected()) {
+		logger.log(
+		    Level.FINE,
+		    "Discarding messages for disconnected session:{0}",
+		    sessionImpl);
+		return;
+	    }
+	    try {
+		boolean connected = sessionImpl.getClientSessionServer().
+		    sendProtocolMessage(sessionId.getBytes(), message,
+					delivery);
+		if (! connected) {
+		    sessionImpl.setDisconnected();
+		}
+	    } catch (IOException e) {
+		logger.logThrow(
+		    Level.FINE, e, "Sending message to session:{0} throws");
+		// TBD: set the session as disconnected?
+		// sessionImpl.setDisconnected();
+	    }
 	}
     }
 
@@ -440,7 +519,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	public void disconnected() {
 	    logger.log(
 	        Level.SEVERE,
-		"The acceptor has become disconnected from port: {0}", port);
+		"The acceptor has become disconnected from port: {0}", appPort);
 	    // TBD: take other actions, such as restarting acceptor?
 	}
     }
@@ -644,7 +723,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private class Updates {
 
 	/** The client session. */
-	private final ClientSessionImpl session;
+	private final ClientSessionImpl sessionImpl;
 	
 	/** List of protocol messages to send on commit. */
 	List<byte[]> messages = new ArrayList<byte[]>();
@@ -652,25 +731,61 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	/** If true, disconnect after sending messages. */
 	boolean disconnect = false;
 
-	Updates(ClientSessionImpl session) {
-	    this.session = session;
+	Updates(ClientSessionImpl sessionImpl) {
+	    this.sessionImpl = sessionImpl;
 	}
 
 	private void flush() {
-	    ClientSessionHandler handler =
-		handlers.get(session.getSessionId());
-	    if (handler == null) {
-		logger.log(Level.WARNING,
-			   "discarding updates, session:{0} disconnected",
-			   session);
-		return;
-	    }
-	    // FIXME: this only works for a single node...
-	    for (byte[] message : messages) {
-		handler.sendProtocolMessage(message, Delivery.RELIABLE);
-	    }
-	    if (disconnect) {
-		handler.handleDisconnect(false);
+
+	    ClientSessionId sessionId = sessionImpl.getSessionId();
+	    ClientSessionHandler handler = handlers.get(sessionId);
+	    /*
+	     * If a local handler exists, forward messages to local handler
+	     * to send to client session and disconnect session if requested;
+	     * otherwise obtain remote server for client session and forward
+	     * messages for delivery as well as disconnect request.
+	     */
+	    if (handler != null) {
+		for (byte[] message : messages) {
+		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
+		}
+		if (disconnect) {
+		    handler.handleDisconnect(false);
+		}
+
+	    } else {
+		if (! sessionImpl.isConnected()) {
+		    logger.log(
+			Level.FINE,
+			"Discarding messages for disconnected session:{0}",
+			sessionImpl);
+		    return;
+		}
+
+		int size = messages.size();
+		byte[][] messageData = new byte[size][];
+		Delivery[] deliveryData = new Delivery[size];
+		int i = 0;
+		for (byte[] message : messages) {
+		    messageData[i] = message;
+		    deliveryData[i] = Delivery.RELIABLE;
+		    i++;
+		}
+		
+		try {
+		    boolean connected = sessionImpl.getClientSessionServer().
+			sendProtocolMessages(sessionId.getBytes(), messageData,
+					     deliveryData, disconnect);
+		    if (! connected) {
+			sessionImpl.setDisconnected();
+		    }
+		} catch (IOException e) {
+		    logger.logThrow(
+		    	Level.FINE, e,
+			"Sending messages to session:{0} throws");
+		    // TBD: set the session as disconnected?
+		    // sessionImpl.setDisconnected();
+		}
 	    }
 	}
     }
@@ -743,8 +858,122 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	}
     }
+
+    /* -- Implement ClientSessionServer -- */
+
+    /**
+     * Implements the {@code ClientSessionServer} that receives
+     * requests from {@code ClientSessionService}s on other nodes to
+     * forward messages to or disconnect local client sessions.
+     */
+    private class SessionServerImpl implements ClientSessionServer {
+
+	/** {@inheritDoc} */
+	public boolean isConnected(byte[] sessionId) {
+	    ClientSessionHandler handler = getHandler(sessionId);
+	    return handler != null && handler.isConnected();
+	}
+
+	/** {@inheritDoc} */
+	public boolean sendProtocolMessage(
+	    byte[] sessionId, byte[] message, Delivery delivery)
+	{
+	    ClientSessionId id = new ClientSessionId(sessionId);
+	    ClientSessionHandler handler = handlers.get(id);
+	    if (handler != null) {
+		if (handler.isConnected()) {
+		    handler.sendProtocolMessage(message, delivery);
+		    return true;
+		} else {
+		    logger.log (
+		    	Level.FINER,
+			"Unable to send message to disconnected session:{0}",
+			id);
+		}
+	    } else {
+		logger.log(
+		    Level.FINER,
+		    "Unable to send message to unknown session:{0}", id);
+	    }
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public boolean sendProtocolMessages(byte[] sessionId,
+					    byte[][] messages,
+					    Delivery[] delivery,
+					    boolean disconnect)
+	{
+	    ClientSessionId id = new ClientSessionId(sessionId);
+	    ClientSessionHandler handler = handlers.get(id);
+	    if (handler == null || ! handler.isConnected()) {
+		logger.log (
+		    Level.FINE,
+		    "Unable to send message to unknown or " +
+		    "disconnected session:{0}", id);
+		return false;
+	    }
+
+	    if (messages.length != delivery.length) {
+		throw new IllegalArgumentException(
+		    "length of messages and delivery arrays must match");
+	    }
+
+	    for (int i = 0; i < messages.length; i++) {
+		handler.sendProtocolMessage(messages[i], delivery[i]);
+	    }
+	    if (disconnect) {
+		handler.handleDisconnect(false);
+	    }
+	    return true;
+	}
+
+	/** {@inheritDoc} */
+	public boolean disconnect(byte[] sessionId) {
+	    ClientSessionId id = new ClientSessionId(sessionId);
+	    ClientSessionHandler handler = handlers.get(id);
+	    if (handler != null) {
+		if (handler.isConnected()) {
+		    handler.handleDisconnect(false);
+		    return true;
+		} else {
+		    logger.log (
+		    	Level.FINE, "Session:{0} already disconnected", id);
+		}
+	    } else {
+		logger.log(
+		    Level.FINE, "Unable to disconnect unknown session:{0}", id);
+	    }
+	    return false;
+	}
+    }
     
     /* -- Other methods -- */
+
+    ClientSessionImpl getLocalClientSession(byte[] idBytes) {
+	ClientSessionHandler handler = getHandler(idBytes);
+	return (handler != null) ? handler.getClientSession() : null;
+    }
+
+    /**
+     * Returns the key to access from the data service the {@code
+     * ClientSessionListener} instance for the specified session {@code
+     * idBytes}.
+     *
+     * @param	idBytes a session ID
+     * @return	a key for acessing the {@code ClientSessionListener}
+     */
+    static String getListenerKey(byte[] idBytes) {
+	return LISTENER_PREFIX + "." + HexDumper.toHexString(idBytes);
+    }
+    
+    /**
+     * Returns the client session handler for the specified session
+     * {@code idBytes}.
+     */
+    private ClientSessionHandler getHandler(byte[] idBytes) {
+	return handlers.get(new ClientSessionId(idBytes));
+    }
 
     /**
      * Returns the {@code ClientSessionImpl} corresponding to the
