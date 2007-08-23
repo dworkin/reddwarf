@@ -976,6 +976,29 @@
     </javac>
   </target>
   
+  <!-- Builds the germwar code -->
+  <target name="germwar-classes" depends="build"
+          description="Builds the germwar code">
+    <mkdir dir="${build.dir}/germwar/classes"/>
+    <depend srcdir="benchmark"
+            destdir="${build.dir}/germwar/classes"
+	    cache="${build.dir}/germwar/classes"
+	    closure="true"/>
+    <javac destdir="${build.dir}/germwar/classes"
+	   debug="on"
+	   nowarn="on">
+      <src>
+        <dirset dir="benchmark" includes="src"/>
+      </src>
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+  
   <!-- Runs the example ChatApp (server) -->
   <target name="example-chat-app" depends="example-classes"
           description="Runs the example ChatApp (server)">
@@ -1066,7 +1089,8 @@
       <jvmarg line="-XX:+AggressiveOpts"/>
       <jvmarg line="-XX:+MaxFDLimit"/>
       <jvmarg line="-XX:NewSize=512m"/>
-      <jvmarg line="-Xmx2g"/>
+      <jvmarg line="-Xmx750m"/>
+      <jvmarg line="-XX:+PrintClassHistogram"/>
       <!--jvmarg line="-XX:+PrintCompilation"/-->
       <sysproperty key="com.sun.sgs.config.file"
 		   file="benchmark/System.properties"/>
@@ -1107,6 +1131,27 @@
     </java>
   </target>
   
+  <!-- Runs the benchmark channel-monitor client -->
+  <target name="benchmark-channel-monitor" depends="benchmark-classes"
+	  description="Runs the benchmark channel-monitor client">
+    <java classname="com.sun.sgs.benchmark.client.ChannelMonitor"
+	  fork="true">
+      <arg line="${cmdargs}" />
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="com.sun.sgs.config.file"
+                   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <sysproperty key="BenchmarkClient.host"
+                   value="dstar2" />
+      <sysproperty key="BenchmarkClient.port"
+                   value="6168" />
+    </java>
+  </target>
+  
   <!-- Runs the benchmark stresstest client -->
   <target name="benchmark-client-stresstest" depends="benchmark-classes"
 	  description="Runs the benchmark client">
@@ -1130,6 +1175,80 @@
                    value="dstar2" />
       <sysproperty key="BenchmarkClient.port"
                    value="6168" />
+    </java>
+  </target>
+  
+  <!-- Runs the germwar suite (server) -->
+  <target name="germwar" depends="germwar-classes"
+	  description="run a set of example germwar applications">
+    <delete dir="/tmp/sgs-germwar"/>
+    <mkdir dir="/tmp/sgs-germwar"/>
+    <chmod perm="a+w">
+      <fileset dir="/tmp/sgs-germwar"/>
+    </chmod>
+    <mkdir dir="/tmp/sgs-germwar/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel" fork="true">
+      <jvmarg line="-server"/>
+      <jvmarg line="-XX:+UseParallelGC"/>
+      <jvmarg line="-XX:+HeapDumpOnOutOfMemoryError"/>
+      <jvmarg line="-XX:+UseFastAccessorMethods"/>
+      <jvmarg line="-XX:+AggressiveOpts"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
+      <sysproperty key="com.sun.sgs.config.file"
+		   file="benchmark/System.properties"/>
+      <sysproperty key="java.library.path" 
+		   file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+		   value="true"/>
+      <classpath>
+        <pathelement location="${build.dir}/germwar/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="benchmark/GermWar.properties"/>
+    </java>
+  </target>
+  
+  <!-- Runs the germwar client -->
+  <target name="germwar-client" depends="germwar-classes"
+	  description="Runs the germwar client">
+    <java classname="com.sun.sgs.germwar.client.GermWarClient"
+	  fork="true">
+      <arg line="${cmdargs}" />
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/germwar/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <sysproperty key="GermWarClient.host"
+                   value="localhost" />
+      <sysproperty key="GermWarClient.port"
+                   value="6169" />
+    </java>
+  </target>
+  
+  <!-- Runs the germwar AI client -->
+  <target name="germwar-ai-client" depends="germwar-classes"
+	  description="Runs the germwar AI client">
+    <java classname="com.sun.sgs.germwar.client.AIController"
+	  fork="true">
+      <arg line="${cmdargs}" />
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/germwar/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <sysproperty key="GermWarClient.host"
+                   value="localhost" />
+      <sysproperty key="GermWarClient.port"
+                   value="6169" />
     </java>
   </target>
   
