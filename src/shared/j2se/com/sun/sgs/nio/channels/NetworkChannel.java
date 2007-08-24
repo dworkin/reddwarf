@@ -25,8 +25,6 @@ public interface NetworkChannel extends Channel {
      * @throws AlreadyBoundException if the socket is already bound
      * @throws UnsupportedAddressTypeException if the type of the given
      *         address is not supported
-     * @throws SecurityException if a security manager has been installed
-     *         and its checkListen method denies the operation
      * @throws ClosedChannelException if the channel is closed
      * @throws IOException if some other I/O error occurs
      */
@@ -52,11 +50,9 @@ public interface NetworkChannel extends Channel {
      * @param name the name of the socket option
      * @param value the value of the socket option
      * @return this channel
-     * @throws UnsupportedSocketOptionException if the socket option is not
-     *         supported by this channel
-     * @throws IllegalArgumentException if the value of the socket option is
-     *         not of the correct type or not a valid value for the socket
-     *         option
+     * @throws IllegalArgumentException If the socket option is not
+     *         supported by this channel, or the value is not a valid value
+     *         for this socket option
      * @throws ClosedChannelException if this channel is closed
      * @throws IOException if an I/O error occurs
      * @see SocketOption
@@ -69,7 +65,7 @@ public interface NetworkChannel extends Channel {
      * 
      * @param name the name of the socket option
      * @return the value of the socket option
-     * @throws UnsupportedSocketOptionException if the socket option is not
+     * @throws IllegalArgumentException if the socket option is not
      *         supported by this channel
      * @throws ClosedChannelException if this channel is closed
      * @throws IOException if an I/O error occurs

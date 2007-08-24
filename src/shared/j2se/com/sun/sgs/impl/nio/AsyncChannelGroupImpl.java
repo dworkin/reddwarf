@@ -8,10 +8,7 @@ import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Iterator;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -36,15 +33,12 @@ class AsyncChannelGroupImpl
     static final int STOP       = 2;
     static final int TERMINATED = 3;
 
-    private final BlockingQueue<Callable<?>> workQueue =
-        new LinkedBlockingQueue<Callable<?>>();
     private final ReentrantLock mainLock = new ReentrantLock();
     private final Condition termination = mainLock.newCondition();
 
     private final Condition noTasksWaiting = mainLock.newCondition();
     volatile int numTasksWaiting = 0;
 
-    static final int MAX_TASKS_PER_WORK_LOOP = 1;
     static final int MAX_DISPATCHES_PER_WORK_LOOP = 1;
 
     AsyncChannelGroupImpl(DefaultAsynchronousChannelProvider provider,
@@ -126,8 +120,13 @@ class AsyncChannelGroupImpl
         }
     }
 
-    private static AsyncChannelHandler getHandler(SelectionKey key) {
+    AsyncChannelHandler getHandler(SelectionKey key) {
+        assert key.selector() == selector;
         return (AsyncChannelHandler) key.attachment();
+    }
+
+    SelectionKey getKey(AsyncChannelHandler handler) {
+        return handler.getSelectableChannel().keyFor(selector);
     }
 
     /**
@@ -159,7 +158,7 @@ class AsyncChannelGroupImpl
         shutdown();
     }
 
-    void register(final AsyncChannelHandler handler) throws IOException {
+    void register(AsyncChannelHandler handler) throws IOException {
         checkShutdown();
         incrementSelectorTasks();
         try {
@@ -170,36 +169,27 @@ class AsyncChannelGroupImpl
         }
     }
 
-    interface OpFuture {
-        AsyncChannelHandler getAsyncHandler();
-        int getInterestOps();
-    }
-
-    private SelectionKey keyFor(OpFuture opFuture) {
-        return opFuture.getAsyncHandler().getSelectableChannel().keyFor(selector);
-    }
-
-    void addOps(OpFuture opFuture) {
+    void addOps(AsyncChannelHandler handler, int ops) {
         incrementSelectorTasks();
         try {
-            SelectionKey key = keyFor(opFuture);
-            key.interestOps(key.interestOps() | opFuture.getInterestOps());
+            SelectionKey key = getKey(handler);
+            key.interestOps(key.interestOps() | ops);
         } finally {
             decrementSelectorTasks();
         }
     }
 
-    void cancelOps(OpFuture opFuture) {
+    void cancelOps(AsyncChannelHandler handler, int ops) {
         incrementSelectorTasks();
         try {
-            SelectionKey key = keyFor(opFuture);
-            key.interestOps(key.interestOps() & (~ opFuture.getInterestOps()));
+            SelectionKey key = getKey(handler);
+            key.interestOps(key.interestOps() & (~ ops));
         } finally {
             decrementSelectorTasks();
         }
     }
 
-    void incrementSelectorTasks() {
+    private void incrementSelectorTasks() {
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
@@ -211,7 +201,7 @@ class AsyncChannelGroupImpl
         }
     }
 
-    void decrementSelectorTasks() {
+    private void decrementSelectorTasks() {
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
@@ -268,6 +258,8 @@ class AsyncChannelGroupImpl
         }
 
         private void checkShutdown() {
+            if (runState == RUNNING)
+                return;
 
             for (SelectionKey key : selector.keys()) {
                 try {
@@ -277,6 +269,7 @@ class AsyncChannelGroupImpl
 
             // selector.close();
         }
+
         private void dispatchEvents() {
             // Handle events
             Iterator<SelectionKey> selectedKeyIter =
