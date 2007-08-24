@@ -11,7 +11,6 @@ import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -82,8 +81,8 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * This map marks itself for update as necessary.  Developers
- * <i>should not call {@code markForUpdate} or {@code getForUpdate} on
+ * This map marks itself for update as necessary.  <i>Developers
+ * should not call {@code markForUpdate} or {@code getForUpdate} on
  * this map ever</i>.  Doing so will eliminate all the concurrency
  * benefits of this class.
  *
@@ -131,13 +130,6 @@ public class DistributedHashMap<K,V>
     // object level locking becomes used), this should be adjusted to
     // minimize page-level contention from writes the leaf nodes
     private static final int DEFAULT_SPLIT_THRESHOLD = 98;
-
-    /**
-     * The merge threshold used when none is specified in the
-     * constructor.
-     */
-    private static final int DEFAULT_MERGE_THRESHOLD = 
-	DEFAULT_SPLIT_THRESHOLD / 16;
 
     /**
      * The default size of the leaf directory when none is specified
@@ -214,14 +206,6 @@ public class DistributedHashMap<K,V>
     private int splitThreshold;
 
     /**
-     * The minimum number of {@code PrefixEntry} entries in this table
-     * before it will attempt to merge itself with its sibling.
-     *
-     * @see #merge()
-     */
-    private int mergeThreshold;
-
-    /**
      * The capacity of the {@code PrefixEntry} table.
      */
     private final int leafCapacity;
@@ -248,7 +232,7 @@ public class DistributedHashMap<K,V>
      * calculated based on the {@code directorySize} provided in the
      * constructor.
      *
-     * @see #addLeavesToDirectory()
+     * @see #addLeavesToDirectory(int,ManagedReference,ManagedReference)
      */
     private final int dirBits;
     
@@ -274,8 +258,6 @@ public class DistributedHashMap<K,V>
      *         <li> {@code depth} is out of the range of valid prefix lengths
      *	       <li> {@code minConcurrency} is non-positive
      *	       <li> {@code splitThreshold} is non-positive
-     *	       <li> {@code mergeThreshold} is greater than or equal to
-     *	            {@code splitThreshold}
      *         <li> {@code directorySize} is less than two </ul>
      */
     // NOTE: this constructor is currently left package private but
@@ -284,7 +266,7 @@ public class DistributedHashMap<K,V>
     // exposed as a public parameter.  directorySize should also not
     // be directly explosed.
     DistributedHashMap(int depth, int minConcurrency, int splitThreshold,
-		       int mergeThreshold, int directorySize) {
+		       int directorySize) {
 	if (depth < 0 || depth > MAX_DEPTH) {
 	    throw new IllegalArgumentException("Illegal tree depth: " + 
 					       depth);	    
@@ -296,10 +278,6 @@ public class DistributedHashMap<K,V>
 	if (splitThreshold <= 0) {
 	    throw new IllegalArgumentException("Illegal split threshold: " + 
 					      splitThreshold);	    
-	}
-	if (mergeThreshold >= splitThreshold) {
-	    throw new IllegalArgumentException("Illegal merge threshold: " + 
-					       mergeThreshold);	    
 	}
 	if (directorySize < 2) {
 	    throw new IllegalArgumentException("Illegal directory size: " + 
@@ -327,7 +305,6 @@ public class DistributedHashMap<K,V>
 	dirBits = tmp;
 
 	this.splitThreshold = splitThreshold;
-	this.mergeThreshold = mergeThreshold;
 
 	// Only the root note should ensure depth, otherwise this call
 	// causes the children to be created in depth-first fashion,
@@ -348,7 +325,7 @@ public class DistributedHashMap<K,V>
      */
     public DistributedHashMap(int minConcurrency) {
 	this(0, minConcurrency, DEFAULT_SPLIT_THRESHOLD, 
-	     DEFAULT_MERGE_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
+	     DEFAULT_DIRECTORY_SIZE);
     }
 
 
@@ -358,8 +335,7 @@ public class DistributedHashMap<K,V>
      */
     public DistributedHashMap() {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
-	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD, 
-	     DEFAULT_DIRECTORY_SIZE);
+	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
     }
 
     /**
@@ -373,8 +349,7 @@ public class DistributedHashMap<K,V>
      */
     public DistributedHashMap(Map<? extends K, ? extends V> m) {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
-	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_MERGE_THRESHOLD,
-	     DEFAULT_DIRECTORY_SIZE);
+	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
 	if (m == null)
 	    throw new NullPointerException("The provided map is null");
 	putAll(m);
@@ -418,7 +393,6 @@ public class DistributedHashMap<K,V>
 		leaves[i] = new DistributedHashMap(depth + leafDepthOffset,
 						   minConcurrency,
 						   splitThreshold,
-						   mergeThreshold,
 						   1 << dirBits);
 		leaves[i].parent = thisRef;
 	    }
@@ -450,10 +424,6 @@ public class DistributedHashMap<K,V>
 		if (++i % entriesPerLeaf == 0)
 		    j++;
 	    }
-
-	    StringBuffer s = new StringBuffer();
-	    for (ManagedReference r : leafDirectory)
-		s.append(r.getId().longValue()).append(" ");	    
 	    
 	    // if the maximum depth of any leaf node under this is
 	    // still smaller than the minimum depth, call ensure depth
@@ -564,10 +534,10 @@ public class DistributedHashMap<K,V>
 
 	DistributedHashMap<K,V> leftChild = 
 	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
-					mergeThreshold, 1 << dirBits);
+					1 << dirBits);
 	DistributedHashMap<K,V> rightChild = 
 	    new DistributedHashMap<K,V>(depth+1, minConcurrency, splitThreshold,
-					mergeThreshold, 1 << dirBits);
+					1 << dirBits);
 
 	// for the collapse, we to determine what prefix will lead to
 	// this node.  Grabbing this from one of our nodes will suffice.
@@ -916,9 +886,9 @@ public class DistributedHashMap<K,V>
      
      /**
      * Returns the size of the tree.  Note that this implementation
-     * runs in {@code O(n + n*log(n))} time, where {@code n} is the
-     * number of nodes in the tree (<i>not</i> the number of elements).
-     * Developers should
+     * runs in {@code O(n + n*log(n))} time.  Developers should be
+     * cautious of calling this method on large maps, as the execution
+     * time grows significantly.
      *
      * @return the size of the tree
      */
@@ -1340,7 +1310,6 @@ public class DistributedHashMap<K,V>
 	}
 
     }
-
 
     /**
      * An abstract base class for implementing iteration over entries

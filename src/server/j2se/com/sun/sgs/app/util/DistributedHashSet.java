@@ -54,7 +54,7 @@ import com.sun.sgs.app.ManagedReference;
  * @see Object#hashCode()
  * @see Set
  * @see java.util.HashSet
- * @see PrefixHashMap
+ * @see DistributedHashMap
  * @see Serializable
  * @see ManagedObject
  */

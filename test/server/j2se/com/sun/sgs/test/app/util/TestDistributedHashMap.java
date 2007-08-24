@@ -224,12 +224,12 @@ public class TestDistributedHashMap extends TestCase {
 	txn.commit();
     }
     
-    @Test public void testFourArgConstructor() throws Exception {
+    @Test public void testMuiltParameterConstructor() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, 5);
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 5);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
@@ -244,7 +244,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, 4);
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
@@ -255,14 +255,14 @@ public class TestDistributedHashMap extends TestCase {
     }
 
 
-    @Test public void testFourArgConstructorSplitThesholdException() 
+    @Test public void testConstructorSplitThesholdException() 
 	throws Exception {
 
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 0, 4, 5);
+		new TestableDistributedHashMap<Integer,Integer>(1, 0, 5);
 	}
 	catch(IllegalArgumentException iae) { 	    
 	    txn.commit();
@@ -272,31 +272,14 @@ public class TestDistributedHashMap extends TestCase {
 	assertTrue(false);
     }
 
-    @Test public void testFourArgConstructorMergeThrehsoldException() 
+    @Test public void testConstructorInvalidTableSize() 
 	throws Exception {
 
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 32, 5);
-	}
-	catch(IllegalArgumentException iae) { 	    
-	    txn.commit();
-	    return;
-	}
-	txn.commit();
-	assertTrue(false);
-    }
-
-    @Test public void testFourArgConstructorInvalidTableSize() 
-	throws Exception {
-
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	try {
-	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4, -1);
+		new TestableDistributedHashMap<Integer,Integer>(1, 32, -1);
 	}
 	catch(IllegalArgumentException iae) { 	    
 	    txn.commit();
@@ -585,7 +568,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 2);
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -613,7 +596,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, -1, 4);
+	    new TestableDistributedHashMap<Integer,Integer>(1, 8, 4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -686,7 +669,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,2);
+	    new TestableDistributedHashMap<Integer,Integer>(1,32, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -735,7 +718,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1,32,-1,4);
+	    new TestableDistributedHashMap<Integer,Integer>(1,32,4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];

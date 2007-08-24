@@ -22,8 +22,6 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
      *        operations to support
      * @param splitThreshold the number of entries at a leaf node that
      *        will cause the leaf to split
-     * @param mergeTheshold the numer of entries at a leaf node that
-     *        will cause the leaf to attempt merging with its sibling
      * @param directorySize the maximum number of entries in the
      *        directory.  This is equivalent to the maximum number of
      *        leaves under this node when all children have been added
@@ -33,12 +31,10 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
      *         <li> {@code depth} is out of the range of valid prefix lengths
      *	       <li> {@code minConcurrency} is non-positive
      *	       <li> {@code splitThreshold} is non-positive
-     *	       <li> {@code mergeThreshold} is greater than or equal to
-     *	            {@code splitThreshold} </ul>
      */
     public TestableDistributedHashMap(int minConcurrency, int splitThreshold, 
-				      int mergeThreshold, int directorySize) {
-	super(0, minConcurrency, splitThreshold, mergeThreshold, directorySize);
+				      int directorySize) {
+	super(0, minConcurrency, splitThreshold, directorySize);
     }
 
     /** {@inheritDoc} */

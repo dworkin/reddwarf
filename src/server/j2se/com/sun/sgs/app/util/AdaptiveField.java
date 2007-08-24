@@ -32,11 +32,10 @@ import com.sun.sgs.app.ObjectNotFoundException;
  * field's value to no longer be deserialized when the containing
  * {@code ManagedObject} is deserialized.
  *
- *
  * @version 1.0
  * 
- * @see ManagedReference
- * @see ManagedObject
+ * @see com.sun.sgs.app.ManagedReference
+ * @see com.sun.sgs.app.ManagedObject
  */
 public final class AdaptiveField<T> implements java.io.Serializable {
 
@@ -110,12 +109,12 @@ public final class AdaptiveField<T> implements java.io.Serializable {
     /**
      * Returns the value of the field.  Note that if the field is
      * stored locally and changes, the caller should call {@link
-     * DataManager#markForUpdate(ManagedObject} on the {@code
-     * ManagedObject} that contains this field since its state has
-     * been changed.  The values of fields that are not local are
-     * cached after the initial call to the {@code DataManager}, so
-     * subsequent calls to {@code get()} will act as if they are
-     * local.
+     * com.sun.sgs.app.DataManager#markForUpdate(ManagedObject)} on
+     * the {@code ManagedObject} that contains this field since its
+     * state has been changed.  The values of fields that are not
+     * local are cached after the initial call to the {@code
+     * DataManager}, so subsequent calls to {@code get()} will act as
+     * if they are local.
      *
      * @return the value of the field
      */
@@ -135,9 +134,9 @@ public final class AdaptiveField<T> implements java.io.Serializable {
      * Returns the value of the field and if remotely stored, marks
      * the value for update.  Note that if the field is stored locally
      * and changes, the caller should call {@link
-     * DataManager#markForUpdate(ManagedObject} on the {@code
-     * ManagedObject} that contains this field since its state has
-     * been changed.
+     * com.sun.sgs.app.DataManager#markForUpdate(ManagedObject)} on
+     * the {@code ManagedObject} that contains this field since its
+     * state has been changed.
      *
      * @return the value of the field
      */
