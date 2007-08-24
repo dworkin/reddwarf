@@ -55,7 +55,7 @@ final class AsyncServerSocketChannelImpl
         group.register(this);
     }
 
-    private void checkClosed() {
+    private void checkClosedAsync() {
         if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
     }
@@ -63,21 +63,18 @@ final class AsyncServerSocketChannelImpl
     /**
      * {@inheritDoc}
      */
+    public boolean isOpen() {
+        return channel.isOpen();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public <A> IoFuture<AsynchronousSocketChannel, A> accept(
-        A attachment,
-        CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
+    public void close() throws IOException
     {
-        checkClosed();
-        if (! acceptPending.compareAndSet(false, true)) {
-            throw new AcceptPendingException();
-        }
-        //AcceptFuture<A> future = new AcceptFuture<A>(attachment, handler);
-       // group.updateInterestOps(channel, SelectionKey.OP_ACCEPT, 0);
-        //IoFuture<AsynchronousSocketChannel, A> foo =
-        //    new AbstractIoFuture<AsynchronousSocketChannel, A>(group, attachment, handler);
         // TODO
-        return null;
+        channel.close();
     }
 
     /**
@@ -98,25 +95,6 @@ final class AsyncServerSocketChannelImpl
 
         socket.bind(local, backlog);
         return this;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isAcceptPending()
-    {
-        return acceptPending.get();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void close() throws IOException
-    {
-        // TODO
-
     }
 
     /**
@@ -186,8 +164,30 @@ final class AsyncServerSocketChannelImpl
     /**
      * {@inheritDoc}
      */
-    public boolean isOpen() {
-        return channel.isOpen();
+    @Override
+    public boolean isAcceptPending()
+    {
+        return acceptPending.get();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <A> IoFuture<AsynchronousSocketChannel, A> accept(
+        A attachment,
+        CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
+    {
+        checkClosedAsync();
+        if (! acceptPending.compareAndSet(false, true)) {
+            throw new AcceptPendingException();
+        }
+        //AcceptFuture<A> future = new AcceptFuture<A>(attachment, handler);
+       // group.updateInterestOps(channel, SelectionKey.OP_ACCEPT, 0);
+        //IoFuture<AsynchronousSocketChannel, A> foo =
+        //    new AbstractIoFuture<AsynchronousSocketChannel, A>(group, attachment, handler);
+        // TODO
+        return null;
     }
 
     /**

@@ -15,7 +15,9 @@ import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -242,10 +244,15 @@ class AsyncSocketChannelImpl
         CompletionHandler<Void, ? super A> handler)
     {
         checkClosedAsync();
-        // TODO
-        return null;
+        return OpFutureBase.create(new ConnectRunner(), attachment, handler);
     }
-
+    
+    final class ConnectRunner implements Runnable {
+        public void run() {
+            // TODO
+        }
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -255,7 +262,6 @@ class AsyncSocketChannelImpl
         CompletionHandler<Integer, ? super A> handler)
     {
         checkClosedAsync();
-        // TODO
         return null;
     }
 

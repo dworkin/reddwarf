@@ -37,7 +37,7 @@ class AsyncChannelGroupImpl
     private final Condition termination = mainLock.newCondition();
 
     private final Condition noTasksWaiting = mainLock.newCondition();
-    volatile int numTasksWaiting = 0;
+    int numTasksWaiting = 0;
 
     static final int MAX_DISPATCHES_PER_WORK_LOOP = 1;
 
