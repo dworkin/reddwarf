@@ -14,7 +14,7 @@ public class InvalidMoveException extends Exception {
     /** The bacterium on which the move was attempted. */
     private final Bacterium bacterium;
 
-    /** The source and destination of the original move request. */
+    /** The source and destination of the original move attempt. */
     private final Location src, dest;
     private final Coordinate srcCoord, destCoord;
 
@@ -69,36 +69,36 @@ public class InvalidMoveException extends Exception {
     }
 
     /**
-     * Returns the destination {@link Bacterium} that was the target of the
-     * original move request.
+     * Returns the {@link Bacterium} that was the target of the original move
+     * attempt.
      */
     public Bacterium getBacterium() {
         return bacterium;
     }
 
     /**
-     * Returns the destination {@link Location} of the original move request.
+     * Returns the destination {@link Location} of the original move attempt.
      */
     public Location getDest() {
         return dest;
     }
 
     /**
-     * Returns the destination {@link Coordinate} of the original move request.
+     * Returns the destination {@link Coordinate} of the original move attempt.
      */
     public Coordinate getDestCoord() {
         return destCoord;
     }
 
     /**
-     * Returns the source {@link Location} of the original move request.
+     * Returns the source {@link Location} of the original move attempt.
      */
     public Location getSrc() {
         return src;
     }
 
     /**
-     * Returns the source {@link Coordinate} of the original move request.
+     * Returns the source {@link Coordinate} of the original move attempt.
      */
     public Coordinate getSrcCoord() {
         return srcCoord;

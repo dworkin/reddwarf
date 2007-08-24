@@ -20,6 +20,7 @@ import com.sun.sgs.germwar.server.Player;
 import com.sun.sgs.germwar.shared.Bacterium;
 import com.sun.sgs.germwar.shared.Coordinate;
 import com.sun.sgs.germwar.shared.InvalidMoveException;
+import com.sun.sgs.germwar.shared.InvalidSplitException;
 import com.sun.sgs.germwar.shared.Location;
 import com.sun.sgs.germwar.shared.impl.BacteriumImpl;
 
@@ -222,6 +223,16 @@ public class PlayerManager {
         /**
          * {@inheritDoc}
          */
+        public Bacterium createBacterium(Coordinate coord, float initialHealth) {
+            DataManager dm = AppContext.getDataManager();
+            BacteriumImpl bact = new BacteriumRecord(id, coord, initialHealth);
+            getBacteriaMap().put(bact.getId(), dm.createReference(bact));
+            return bact;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
         public Bacterium getBacterium(int id) {
             ManagedReference ref = getBacteriaMap().get(id);
             if (ref == null) return null;
@@ -247,14 +258,19 @@ public class PlayerManager {
             /** Create their first bacterium in a random location. */
             World world = WorldManager.getWorld();
             Coordinate coord;
+            Location loc;
 
             do {
                 int x = (int)Math.floor(Math.random()*world.getXDimension());
                 int y = (int)Math.floor(Math.random()*world.getYDimension());
                 coord = new Coordinate(x, y);
-            } while (world.getLocation(coord).isOccupied());
+                loc = world.getLocation(coord);
+            } while (loc.isOccupied());
 
-            createBacterium(coord);
+            Bacterium bact = createBacterium(coord);
+
+            /** Write this new bacterium into its location in the world. */
+            loc.setOccupant(bact);
         }
 
         /**
@@ -321,55 +337,27 @@ public class PlayerManager {
         /**
          * Creates a new Bacterium in the data store and returns a {@code
          * BacteriumRecord} representing it.
-         *
-         * @throws IllegalArgumentException if the location at {@code startPos}
-         *         is currently occupied
          */
         public BacteriumRecord(long playerId, Coordinate startPos) {
-            super(getNextId(playerId).get(), playerId, startPos,
+            super(getNextId(playerId), playerId, startPos,
                 TurnManager.getCurrentTurn());
-
-            Location loc = WorldManager.getWorld().getLocation(startPos);
-
-            if (loc.isOccupied()) {
-                throw new IllegalArgumentException("Cannot create bacterium" +
-                    " at " + startPos + "; loc is currently occupied by " +
-                    loc.getOccupant());
-            }
-
-            loc.setOccupant(this);
-            getNextId(playerId).increment();
         }
 
         /**
          * Creates a new Bacterium in the data store and returns a {@code
          * BacteriumRecord} representing it.
-         *
-         * @throws IllegalArgumentException if the location at {@code startPos}
-         *         is currently occupied
          */
         public BacteriumRecord(long playerId, Coordinate startPos,
             float initialHealth)
         {
-            super(getNextId(playerId).get(), playerId, startPos,
+            super(getNextId(playerId), playerId, startPos,
                 TurnManager.getCurrentTurn(), initialHealth);
-
-            Location loc = WorldManager.getWorld().getLocation(startPos);
-
-            if (loc.isOccupied()) {
-                throw new IllegalArgumentException("Cannot create bacterium" +
-                    " at " + startPos + "; loc is currently occupied by " +
-                    loc.getOccupant());
-            }
-
-            loc.setOccupant(this);
-            getNextId(playerId).increment();
         }
 
         /**
          * Returns the next bacterium ID to use for a given player.
          */
-        private static ManagedInteger getNextId(long playerId) {
+        private static int getNextId(long playerId) {
             DataManager dm = AppContext.getDataManager();
             String binding = ID_BINDING_PREFIX + playerId;
             ManagedInteger nextBacteriumId;
@@ -382,7 +370,9 @@ public class PlayerManager {
                 dm.setBinding(binding, nextBacteriumId);
             }
 
-            return nextBacteriumId;
+            int val = nextBacteriumId.get();
+            nextBacteriumId.increment();
+            return val;
         }
 
         /**
@@ -392,7 +382,8 @@ public class PlayerManager {
         protected Bacterium createSpawn(long playerId, Coordinate pos,
             float initialHealth)
         {
-            return new BacteriumRecord(playerId, pos, initialHealth);
+            return PlayerManager.getPlayer(playerId).createBacterium(pos,
+                initialHealth);
         }
 
         /**
@@ -409,9 +400,13 @@ public class PlayerManager {
          * {@inheritDoc}
          */
         @Override
-        public Bacterium splitUpdate(Coordinate spawnPos) {
+        public Bacterium doSplit(Coordinate spawnPos)
+            throws InvalidSplitException
+        {
+            /** Call super.doSplit first in case it throws an exception. */
+            Bacterium ret = super.doSplit(spawnPos);
             AppContext.getDataManager().markForUpdate(this);
-            return super.splitUpdate(spawnPos);
+            return ret;
         }
 
         /**

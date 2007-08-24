@@ -5,8 +5,12 @@
 package com.sun.sgs.germwar.client;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -73,10 +77,21 @@ public class AIController extends NullGui implements GameLogic {
      * Iterates all bacteria and decides on something for them to do.
      */
     private void executeAI() {
-        for (Bacterium bact : userBacteria.values()) {
-            Coordinate coord = bact.getCoordinate();
+        Set<Bacterium> remaining = new HashSet<Bacterium>(userBacteria.values());
+        Iterator<Bacterium> iter = remaining.iterator();
 
-            for (int m=0; m < bact.getCurrentMovementPoints(); m++) {
+        while (remaining.size() > 0) {
+            boolean moved = false;
+
+            while (iter.hasNext()) {
+                Bacterium bact = iter.next();
+
+                if (bact.getCurrentMovementPoints() == 0) {
+                    iter.remove();
+                    break;
+                }
+
+                Coordinate coord = bact.getCoordinate();
                 float bestFood = 0;
                 Location bestFoodLoc = null;
 
@@ -108,6 +123,26 @@ public class AIController extends NullGui implements GameLogic {
                     logger.log(Level.FINE, bact + ": " + ime);
                     break;  /** Give up on this bacterium for this turn. */
                 }
+
+                /**
+                 * There can always be synchronization problems with the server, but to
+                 * try to mitigate them, we pause slightly between moves to give the
+                 * server a chance to respond with any updates.
+                 */
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignore) { }
+
+                moved = true;
+            }
+
+            if (!moved) {
+                /**
+                 * Nobody could move; probably not worth trying again
+                 * (technically, they could be blocked on another player which will
+                 * move later this turn, but we ignore this case).
+                 */
+                return;
             }
         }
     }

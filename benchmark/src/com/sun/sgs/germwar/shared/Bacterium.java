@@ -33,10 +33,21 @@ public interface Bacterium extends ManagedObject {
      * internal state.
      *
      * @param newPos the bacterium's new position after the move
-     * @throws InvalidMoveException if the movement request is not possible to
-     *         fulfill under the bacterium's current state
+     * @throws InvalidMoveException if the movement attempt fails
      */
     void doMove(Coordinate newPos) throws InvalidMoveException;
+
+    /**
+     * Updates a bacterium's internal state to reflect that a split has
+     * occurred, returning a new, spawned bacterium.  Does not cause any changes
+     * to the world itself (such as placing the spawned bacterium in the world).
+     *
+     * @param spawnPos the position where the newly spawned bacterium should be
+     *        placed
+     * @return the newly spawned bacterium
+     * @throws InvalidSplitException if the split attempt fails
+     */
+    Bacterium doSplit(Coordinate spawnPos) throws InvalidSplitException;
 
     /** Returns the coordinate of the entity's current position. */
     Coordinate getCoordinate();
@@ -67,14 +78,6 @@ public interface Bacterium extends ManagedObject {
      * player (i.e. "owned" by the server).
      */
     long getPlayerId();
-
-    /**
-     * Called to update a bacterium after it has performed a 'split' action.
-     * @param spawnPos the position where the newly spawned bacterium should be
-     *        placed
-     * @return the newly spawned bacterium
-     */
-    Bacterium splitUpdate(Coordinate spawnPos);
 
     /**
      * Updates the current conditions of this bacterium if {@code turnNo} is

@@ -36,6 +36,7 @@ import com.sun.sgs.germwar.shared.Bacterium;
 import com.sun.sgs.germwar.shared.Coordinate;
 import com.sun.sgs.germwar.shared.GermWarConstants;
 import com.sun.sgs.germwar.shared.InvalidMoveException;
+import com.sun.sgs.germwar.shared.InvalidSplitException;
 import com.sun.sgs.germwar.shared.Location;
 import com.sun.sgs.germwar.shared.message.AckResponse;
 import com.sun.sgs.germwar.shared.message.AppMessage;
@@ -194,6 +195,60 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
         }
     }
 
+    /**
+     * If {@code bact} has enough health (semi-arbitrary threshold), try to
+     * split it.  Fails, returning {@code null} if {@code bact} does not have
+     * enough health, 
+     */
+    private Location tryToSplit(Bacterium bact) {
+        /** Note: semi-arbitrary threshold here. */
+        if (bact.getHealth() < 300) return null;
+
+        /** Fat enough... find a place to spawn to. */
+        World world = WorldManager.getWorld();
+        Coordinate parentCoord = bact.getCoordinate();
+        Coordinate spawnCoord = null;
+        Location spawnLoc = null;
+        Bacterium spawn;
+        int randStart = (int)(4*Math.random());
+
+        for (int i=0; i < 4; i++) {
+            int index = (randStart + i) % 4;
+
+            if (index == 0) spawnCoord = parentCoord.offsetBy(-1, 0);
+            if (index == 1) spawnCoord = parentCoord.offsetBy(1, 0);
+            if (index == 2) spawnCoord = parentCoord.offsetBy(0, -1);
+            if (index == 3) spawnCoord = parentCoord.offsetBy(0, 1);
+
+            if (world.validCoordinate(spawnCoord))
+                spawnLoc = world.getLocation(spawnCoord);
+            else
+                spawnLoc = null;
+
+            if ((spawnLoc != null) && (!spawnLoc.isOccupied())) {
+                /** Found a free space, try to split into it. */
+                try {
+                    spawn = bact.doSplit(spawnCoord);
+                } catch (InvalidSplitException ise) {
+                    logger.log(Level.WARNING, "Failed split attempt: " +
+                        ise.paramString() + ", " + ise.getMessage());
+                    return null;
+                }
+
+                /** Split succeeded. */
+                spawnLoc.setOccupant(spawn);
+
+                logger.log(Level.FINE, "Successful split attempt by " +
+                    bact + " to " + spawnLoc);
+
+                return spawnLoc;
+            }
+        }
+
+        /** Couldn't find a free location to spawn to. */
+        return null;
+    }
+
     // Implement ClientSessionListener
 
     /**
@@ -250,13 +305,21 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             MoveRequest moveRequest = (MoveRequest)appMsg;
             World world = WorldManager.getWorld();
 
+            /**
+             * TODO - if bacteria are moved back to being java references on
+             * locations, then this logic can be changed to avoid a call to
+             * player.getBacterium(); instead, we can just look at the occupant
+             * of moveRequest.getSource() and confirm that its the bacterium
+             * named (by player-id and bact-id).
+             */
+
             Player player = PlayerManager.getPlayer(playerId);
             Bacterium bact = player.getBacterium(moveRequest.getBacteriumId());
             Location src = world.getLocation(moveRequest.getSource());
             Coordinate srcCoord = src.getCoordinate();
             Location dest = world.getLocation(moveRequest.getDestination());
             Coordinate destCoord = dest.getCoordinate();
-            
+
             try {
                 /** Confirm that the bacterium is located at the source. */
                 if (!bact.getCoordinate().equals(srcCoord))
@@ -281,32 +344,42 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
                  */
                 bact.doMove(destCoord);
             } catch (InvalidMoveException ime) {
-                logger.log(Level.WARNING, "Move by " + formattedName +
-                    " failed: " + ime.getMessage() + ".  params=" +
-                    ime.paramString());
+                logger.log(Level.WARNING, "Failed move attempt by " +
+                    formattedName + ": " + ime.paramString() + ", " +
+                    ime.getMessage());
                 return;
             }
-
-            // todo - turn timer check?
 
             /** Move must have succeeded; update Locations as well. */
             dest.setOccupant(bact);
             src.setOccupant(null);
 
-            /** And finally, reward bacterium with the food it ate. */
+            /** Feed the bacterium all the food in this location. */
             bact.addHealth(dest.emptyFood());
 
+            logger.log(Level.FINE, "Successful move attempt by " + bact +
+                " from " + src + " to " + dest);
+
+            /** Check if the bacterium is ready and able to split. */
+            Location spawnLoc = tryToSplit(bact);
+
             /**
-             * Send updates for the locations involved in the move to any
-             * clients near them.
+             * Send updates for the locations involved in the move (and split,
+             * if one happened) to any clients near them.
              */
             sendRegionUpdate(src);
             sendRegionUpdate(dest);
+
+            if ((spawnLoc != null) &&
+                (spawnLoc.getCoordinate().equals(src.getCoordinate()) == false))
+                sendRegionUpdate(spawnLoc);
 
             /**
              * Send updates for all of the locations that just "came into view"
              * for the moving bacterium.
              */
+            // TODO - prune locs that happen to be near some other bacterium of
+            // this player?
             for (Coordinate newLocCoord :
                      getHorizonCoordinates(srcCoord, destCoord))
             {

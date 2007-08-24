@@ -10,6 +10,7 @@ import com.sun.sgs.germwar.shared.Bacterium;
 import com.sun.sgs.germwar.shared.Coordinate;
 import com.sun.sgs.germwar.shared.GermWarConstants;
 import com.sun.sgs.germwar.shared.InvalidMoveException;
+import com.sun.sgs.germwar.shared.InvalidSplitException;
 
 /**
  * Represents a single bacterium.
@@ -172,6 +173,31 @@ public class BacteriumImpl implements Bacterium, Serializable {
     /**
      * {@inheritDoc}
      */
+    public Bacterium doSplit(Coordinate spawnPos) throws InvalidSplitException {
+        int dist = position.diff(spawnPos).manhattanLength();
+
+        if (dist > 1)
+            throw new InvalidSplitException(this, spawnPos,
+                "Distance to spawn position is too great (" + dist + ").");
+
+        if (health < (Bacterium.SPLIT_HEALTH_COST + 2))
+            throw new InvalidSplitException(this, spawnPos,
+                "Not enough health (" + health + ") to split; " +
+                (Bacterium.SPLIT_HEALTH_COST + 2) + " required.");
+
+        /** else, split is ok. */
+
+        /* First deduct the cost of splitting, then divide health in 2. */
+        health -= Bacterium.SPLIT_HEALTH_COST;
+        float spawnHealth = health / 2;
+        health -= spawnHealth;
+
+        return createSpawn(playerId, spawnPos, spawnHealth);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public Coordinate getCoordinate() {
         return position;
     }
@@ -216,18 +242,6 @@ public class BacteriumImpl implements Bacterium, Serializable {
      */
     public long getPlayerId() {
         return playerId;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Bacterium splitUpdate(Coordinate spawnPos) {
-        /** First deduct the cost of splitting, then divide health in 2. */
-        health -= Bacterium.SPLIT_HEALTH_COST;
-        float spawnHealth = health / 2;
-        health -= spawnHealth;
-
-        return createSpawn(playerId, spawnPos, spawnHealth);
     }
 
     /**

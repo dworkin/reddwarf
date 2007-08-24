@@ -21,10 +21,20 @@ public interface Player extends Iterable<Bacterium> {
      * Creates a new bacterium, adds it to this player's collection, and returns
      * it.
      *
-     * @param coord coordinate of the the starting {@link Location} for the
+     * @param coord coordinate of the starting {@link Location} for the
      *        {@link Bacterium}, which must be empty
      */
     Bacterium createBacterium(Coordinate coord);
+
+    /**
+     * Creates a new bacterium with a specified initial health value, adds it to
+     * this player's collection, and returns it.
+     *
+     * @param coord coordinate of the starting {@link Location} for the
+     *        {@link Bacterium}, which must be empty
+     * @param initialHealth starting health value for the new Bacterium
+     */
+    Bacterium createBacterium(Coordinate coord, float initialHealth);
 
     /**
      * Returns the specified bacterium from this player's collection, or

@@ -182,13 +182,16 @@ public class MainFrame extends JFrame implements GameGui {
             Coordinate coord = mainMapPanel.getSelected();
             int targetId = -1;
 
+            if (userBacteria.size() == 0) return;
+
             if (coord != null) {
                 Bacterium selected =
                     getBacteriumFromLoc(gameLogic.getLocation(coord));
 
                 if (selected != null) {
+                    /** Need to add userBacteria.size() to make mod positive. */
                     int index = userBacteriaIds.indexOf(selected.getId()) +
-                        (forward ? 1 : -1);
+                        (forward ? 1 : -1) + userBacteria.size();
 
                     index = index % userBacteria.size();  /** wrap */
                     targetId = userBacteriaIds.get(index);
@@ -201,6 +204,7 @@ public class MainFrame extends JFrame implements GameGui {
             Bacterium target = userBacteria.get(targetId);
             mainMapPanel.setSelected(target.getCoordinate());
             mainMapPanel.setFocus(target.getCoordinate());
+            infoArea.display(gameLogic.getLocation(target.getCoordinate()));
         }
     }
 

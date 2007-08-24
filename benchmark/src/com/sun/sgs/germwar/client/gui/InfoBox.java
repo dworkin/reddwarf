@@ -64,11 +64,10 @@ public class InfoBox extends JLabel {
             }
 
             String infoStr = "<html><u>Location Info</><br><br>" +
-                "Food: " + decFormatter.format(loc.getFood()) +
-                "<br>" +
+                "Coordinate: " + loc.getCoordinate() + "<br>" +
+                "Food: " + decFormatter.format(loc.getFood()) + "<br>" +
                 "Food Growth Rate: " +
-                decFormatter.format(loc.getFoodGrowthRate()) +
-                "<br>" +
+                decFormatter.format(loc.getFoodGrowthRate()) + "<br>" +
                 "Occupied? " + occupantDesc + "</html>";
 
             setText(infoStr);
