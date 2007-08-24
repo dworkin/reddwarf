@@ -6,10 +6,13 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.channels.spi.SelectorProvider;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.util.Collections;
 import java.util.List;
+
+import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
 /**
  * Utility methods for channels and streams.
@@ -53,7 +56,7 @@ public final class Channels {
      * @param ch the channel to which bytes will be written
      * @return a new output stream
      */
-    public static OutputStream newOutputStream(final AsynchronousByteChannel ch)
+    public static OutputStream newOutputStream(AsynchronousByteChannel ch)
     {
         // TODO
         throw new UnsupportedOperationException();
@@ -99,7 +102,10 @@ public final class Channels {
         return java.nio.channels.Channels.newOutputStream(ch);
     }
  
-    public static Reader newReader(ReadableByteChannel ch, CharsetDecoder dec, int minBufferCap) {
+    public static Reader newReader(ReadableByteChannel ch,
+                                   CharsetDecoder dec,
+                                   int minBufferCap)
+    {
         return java.nio.channels.Channels.newReader(ch, dec, minBufferCap);
     }
 
@@ -107,7 +113,9 @@ public final class Channels {
         return java.nio.channels.Channels.newReader(ch, csName);
     }
  
-    public static Writer newWriter(WritableByteChannel ch, CharsetEncoder enc, int minBufferCap) {
+    public static Writer newWriter(WritableByteChannel ch,
+                                   CharsetEncoder enc,
+                                   int minBufferCap) {
         return java.nio.channels.Channels.newWriter(ch, enc, minBufferCap);
     }
 
