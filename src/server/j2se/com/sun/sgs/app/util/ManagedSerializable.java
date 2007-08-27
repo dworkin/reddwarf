@@ -1,9 +1,14 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 
 import java.io.Serializable;
+
 
 /**
  * A utility class for wrapping {@code Serializable} objects with
