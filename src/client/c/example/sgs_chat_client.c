@@ -345,6 +345,7 @@ static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
  */
 static void disconnected_cb(sgs_connection *conn) {
     printf(" - Callback -   Disconnected.\n");
+    g_session = NULL;
 }
 
 /*
