@@ -68,7 +68,7 @@
 #define SGS_MSG_INIT_LEN 7
 
 /* The version number */
-#define SGS_MSG_VERSION 1
+#define SGS_MSG_VERSION 2
 
 typedef enum sgs_service_id {
     /* Application service ID */
