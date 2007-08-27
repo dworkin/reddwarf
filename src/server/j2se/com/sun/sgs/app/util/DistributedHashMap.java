@@ -6,6 +6,8 @@ package com.sun.sgs.app.util;
 
 import java.io.Serializable;
 
+import java.math.BigInteger;
+
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -27,18 +29,11 @@ import com.sun.sgs.app.ManagedReference;
  * automatically manages the mapping storage within the datstore, and
  * supports concurrent writes.  This class is intended as a drop-in
  * replacement for the {@link java.util.HashMap} class as needed.
- * Developers are encouraged to use this class when the size of a
- * {@link java.util.HashMap} causes sufficient contention due to
- * serialization overhead.
- *
- * <p>
- *
- * As the number of mappings increases, the mappings are distributed
- * through multiple objects in the datastore, thereby mitigating the
- * cost of serializing the map.  Furthermore, map operations have been
- * implemented to minimize the locality of change.  As the map grows
- * in size, mutable operations change only a small number of managed
- * objects, thereby increasing the concurrency for multiple writes.
+ * This class is designed to mark itself for update as necessary; no
+ * additional calls to the {@code DataManager} are necessary when
+ * using the map.  Beware that developers should <i>not</i> call
+ * {@code markForUpdate} or {@code getForUpdate} on this map, as this
+ * will eliminate all the concurrency benefits of this class.
  *
  * <p>
  *
@@ -52,39 +47,38 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * The {@code DistributedHashMap} is implemented as a prefix tree of hash
- * maps, which provides {@code O(log(n))} performance for the
- * following operations: {@code get}, {@code put}, {@code remove},
- * {@code containsKey}, where {@code n} is the number of leaves in the
- * tree (<i>not</i> the number of elements).  Note that unlike most
- * collections, the {@code size} operation is <u>not</u> a constant
- * time operation.  Because of the concurrent nature of the map,
- * determining the size requires accessing all of the leaf nodes in
- * the tree, which takes {@code O(n + log(n))}, where {@code n} is the
- * number of leaves.  The {@code isEmpty} operation, however, is still
- * {@code O(1)}.
+ * This class provides {@code Serializable} views from the {@link
+ * #entrySet()}, {@link keySet()} and {@link #values()} methods.
+ * These views are concurrent and may be shared among different view.
+ * Furthermore, the {@code Iterator} objects returned by these methods
+ * also implement {@code Serializable} and are concurrent as well.
+ * These iterators do <i>not</i> throw {@link
+ * ConcurrentModificationException}.  An Iterator reflect the current
+ * state of the map at the time of its creation or if persisted, its
+ * deserialization.
+ *
+ * <p>
+ *
+ * Note that unlike most collections, the {@code size} operation is
+ * <u>not</u> a constant time operation.  Because of the asynchronous
+ * nature of the map, determining the size requires accessing all of
+ * the entries in the tree.  The {@code isEmpty} operation, however,
+ * is still {@code O(1)}.
  *
  * <p>
  *
  * An instance of {@code DistributedHashMap} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
- * minimum number of write operations to support in parallel.  As the
- * map grows, the number of supported parallel operations will also
- * grow beyond the specified minimum, but this factor ensures that it
- * will never drop below the provided number.  Setting this value too
+ * minimum number of write operations to support in parallel.  This
+ * parameter acts as a hint to the map on how to perform resizing.  As
+ * the map grows, the number of supported parallel operations will
+ * also grow beyond the specified minimum; specifying a minimum
+ * concurrency ensures that the map will resize correctly.  Since the
+ * distribution of objects in the map is essentially random, the
+ * actual concurrency will vary.  Setting the minimum concurrency too
  * high will waste space and time, while setting it too low will cause
  * conflicts until the map grows sufficiently to support more
- * concurrent operations.  Furthermore, the efficacy of the
- * concurrency depends on the distribution of hash values; keys with
- * poor hashing will minimize the actual number of possible concurrent
- * writes, regardless of the {@code minConcurrency} value.
- *
- * <p>
- *
- * This map marks itself for update as necessary.  <i>Developers
- * should not call {@code markForUpdate} or {@code getForUpdate} on
- * this map ever</i>.  Doing so will eliminate all the concurrency
- * benefits of this class.
+ * concurrent operations.
  *
  * <p>
  *
@@ -93,14 +87,9 @@ import com.sun.sgs.app.ManagedReference;
  * no guarantees on the order of elements when iterating over the key
  * set, values or entry set.
  * 
- * <p>
- *
- * The iterator for this implemenation will never throw a {@link
- * java.util.ConcurrentModificationException}, unlike many of the
- * other {@code Map} implementations.
  *
  * @since 0.9.4
- * @version 1.5
+ * @version 1.6
  *
  * @see Object#hashCode()
  * @see Map
@@ -1308,131 +1297,301 @@ public class DistributedHashMap<K,V>
 	    AppContext.getDataManager().markForUpdate(this);
 	    this.value = value;
 	}
-
     }
 
     /**
-     * An abstract base class for implementing iteration over entries
-     * while subclasses define which data from the entry should be
-     * return by {@code next()}.
+     * A concurrent, perstistable {@code Iterator} implementation for
+     * the {@code DistributeHashMap}.  This implemenation provides the
+     * following guarantees: <ul><li>if no modifications occur, all
+     * elements will eventually be returned by {@link
+     * ConcurrentIterator#next()}. <li>if any modifications occur, an
+     * element will be returned at most once from {@code next()}, with
+     * no guarantee to the number of elements returned.    
      */
-    private abstract class AbstractEntryIterator<E> 
-	implements Iterator<E> {
+    abstract static class ConcurrentIterator<E>
+	implements Iterator<E>, Serializable {	
+
+	private static final long serialVersionUID = 0x1L;
+
+	/**
+	 * A reference to the root node of the backing trie.  This is
+	 * necessary for looking up the leaf between transactions.
+	 */
+	private final ManagedReference rootRef;
 	
 	/**
-	 * The next element to return
+	 * A cache of all the hash codes for the current leaf node.
+	 * The cache is numerically sorted so that we can identify
+	 * what hash code would be located the right-most leaf should
+	 * one or more splits occur between transactions.  If a split
+	 * occurs, this cache is invalid and will be reloaded by
+	 * {@link #cacheLeaf(DistributedHashMap)}
 	 */
-	PrefixEntry<K,V> next;
+	private int[] hashCache;
 
 	/**
-	 * The table index for the next element to return
+	 * The current index into the cache of hash codes.
 	 */
-	int index; 
+	private int cur;
 
 	/**
-	 * The current table in which the {@code next} reference is
-	 * contained.
+	 * The ID of the current leaf that is being accessed.  This is
+	 * stored between transactions so that in {@code next()} can
+	 * tell when loading the leaf again whether a split has
+	 * occured and therefore we need to invalidate our cache and
+	 * reload the next round of entries.
 	 */
-	DistributedHashMap<K,V> curTable;
+	private BigInteger curLeafId;
+	
+	/**
+	 * The current leaf that is being accessed.  This is assigned
+	 * in {@link #cacheLeaf(DistirbutedHashMap}} and is valid for
+	 * only the current transaction.
+	 */
+	private transient DistributedHashMap curLeaf;
 
 	/**
-	 * Constructs the prefix table iterator.
+	 * The next leaf node in the backing trie.  This is assigned
+	 * from {@link #loadNextLeaf()} if a non-empty leaf can be
+	 * found.
+	 */
+	private transient DistributedHashMap nextLeaf;
+
+	/**
+	 * Constructs a new {@code ConcurrentIterator}.
 	 *
-	 * @param start the left-most leaf in the prefix tree
+	 * @param root the root node of the {@code DistributedHashMap}
+	 *        trie.
 	 */
-	AbstractEntryIterator(DistributedHashMap<K,V> start) {
+	public ConcurrentIterator(DistributedHashMap root) {
 
-	    curTable = start;
-	    index = 0;
-	    next = null;
-
-	    // load in the first table that has an element
-	    while (curTable.size == 0 && curTable.rightLeaf != null) 
-		curTable = curTable.rightLeaf.get(DistributedHashMap.class);
-		
-	    // advance to find the first Entry
-	    for (index = 0; index < curTable.table.length &&
-		     (next = curTable.table[index]) == null; ++index) 
-		;
+	    // keep a reference to the root so we can look up leaves
+	    rootRef = AppContext.getDataManager().createReference(root);
+	    
+	    // cache the initial contents of the left-most leaf
+	    DistributedHashMap leftLeaf = root.leftMost();
+	    cacheLeaf(leftLeaf);
 	}
+
+	/**
+	 * Caches the hash codes for all the entries of the leaf in
+	 * {@code hashCache} and assigns {@code curLeafId} and {@code
+	 * curLeaf} based on the provided leaf.
+	 *
+	 * @param leaf the leaf that should be cached
+	 */
+	private void cacheLeaf(DistributedHashMap leaf) {
+	    hashCache = new int[leaf.size];
+	    int i = 0;
+	    for (PrefixEntry e : leaf.table) {
+		if (e != null) {
+		    hashCache[i++] = e.hash;
+		    for (; (e = e.next) != null; hashCache[i++] = e.hash)
+			; // cache any chained entries
+		}
+	    }
+	    
+	    cur = 0;
+
+	    // we need this sorted so we can use the last element in
+	    // it as a reference for the next leaf in case this node
+	    // is split between next() calls
+	    Arrays.sort(hashCache);
+	    curLeaf = leaf;
+	    curLeafId = 
+		AppContext.getDataManager().createReference(curLeaf).getId();
+	}
+
+	/**
+	 * Ensures that the {@code ConcurrentIterator#hashCache} is up
+	 * to date and that all the hash codes contained within are
+	 * valid for the current leaf.  Calling this method will set
+	 * {@ConcurrentIterator#curLeaf} if was not previously set.
+	 */
+	private void ensureCacheCoherence() {
+	    
+	    // curLeaf is only initialized when the cache is coherent
+	    // so we can immedately returned in this case
+	    if (curLeaf != null) 
+		return;
+
+	    int curHash;
+
+	    if (hashCache.length == 0) {
+		// if the cache has zero length, then the iterator
+		// was initialized based on an empty map,
+		// therefore we should start trying to cache from
+		// the left most leaf
+		curLeaf = rootRef.get(DistributedHashMap.class).
+		    leftMost();
+
+		cacheLeaf(curLeaf);
+	    }
+	    else {
+		// NOTE: we have to use the last element in the array
+		// to look up our current leaf.  Otherwise, if the
+		// leaf split (possibly multiple times) the current
+		// leaf might point to any of the left children.  We
+		// need it to point to the left most to ensure that
+		// the iterator does not repeat any elements during
+		// iteration.		    
+		curLeaf = rootRef.get(DistributedHashMap.class).
+		    lookup(hashCache[hashCache.length-1]);
+
+		// save the current hash that we are on
+		curHash = hashCache[cur];
+		
+		// recache based on the new leaf
+		cacheLeaf(curLeaf);
+
+		// search for the old hash code so we can start from
+		// where we left off, or the next highest value in
+		// case the entry with the previous hash code was
+		// stored in a left child
+		cur = Math.max(0, Arrays.binarySearch(hashCache, curHash));
+
+	    }
+	}
+    
 
 	/**
 	 * {@inheritDoc}
 	 */
-	public final boolean hasNext() {
-	    return next != null;
+	public boolean hasNext() {
+
+	    // check that the cache is up to date
+	    ensureCacheCoherence();
+
+	    if (cur < hashCache.length)
+		return true;
+	    else {
+		// start loading leaves until either no more can be
+		// found or we find a non-empty one
+		return loadNextLeaf();		
+	    }
 	}
 
 	/**
-	 * Returns the next {@code PrefixEntry} found in this map.
+	 * Searches the leaves for the next non-empty leaf and assigns
+	 * it to {@code nextLeaf}, returning {@code true} if a
+	 * non-empty leaf was found.
 	 *
-	 * @throws NoSuchElementException if no next entry exists
+	 * @return {@code true} if a non-empty leaf was found and
+	 *         assigned to {@code nextLeaf}
 	 */
-	final PrefixEntry<K,V> nextEntry() {
-	    PrefixEntry<K,V> e = next;
-	    next = next.next;
+	private boolean loadNextLeaf() {
+	    DistributedHashMap curLeaf = 
+		rootRef.get(DistributedHashMap.class).
+		    lookup(hashCache[hashCache.length-1]);
+	    
+	    DistributedHashMap nextLeaf = curLeaf;
 
-	    if (e == null) 
-		throw new NoSuchElementException();
+	    while (nextLeaf.rightLeaf != null &&
+		   (nextLeaf = 
+		    nextLeaf.rightLeaf.get(DistributedHashMap.class)).size == 0)
+		;
+	    
+	    // check that we were able to find another leaf other than
+	    // this leaf and that its size is non-zero
+	    if ((curLeaf.rightLeaf != null && 
+		 curLeaf.rightLeaf.equals(nextLeaf.rightLeaf)) ||
+		 curLeaf.rightLeaf == nextLeaf.rightLeaf ||
+		nextLeaf.size == 0)
+		return false;
+	    else {
+		this.nextLeaf = nextLeaf;
+		return true;
+	    }
+	}
 
-	    if (next == null) {
-		// start at the next index into the current table and
-		// search for another element;
-		for(index++; index < curTable.table.length && 
-			(next = curTable.table[index]) == null; index++) 
-		    ;		
+	/**
+	 * Returns the next entry in the {@code DistributedHashMap}.
+	 * Note that due to the concurrent nature of this iterator,
+	 * this method may skip elements that have been added after
+	 * the iterator was constructed.  Likewise, it may return new
+	 * elements that have been added.  This implementation is
+	 * guaranteed never to return an element more than once.
+	 *
+	 * <p>
+	 *
+	 * This method will never throw a {@link
+	 * ConcurrentModificatinException}.
+	 *
+	 * @return the next entry in the {@code DistributedHashMap}
+	 *
+	 * @throws NoSuchElementException if no further entries exist
+	 */
+	public Entry nextEntry() {
 
-		// if still null, we must be at the end of the table,
-		// so begin loading in the next table, until another
-		// element is found
-		if (next == null) {
-		    
-  		    while (curTable.rightLeaf != null) {
-  			curTable = 
-			    curTable.rightLeaf.get(DistributedHashMap.class);
-			
-  			if (curTable.size == 0) 
- 			    continue;
-	
-			// iterate to the next element
-			for (index = 0; index < curTable.table.length &&
-				 (next = curTable.table[index]) == null; 
-			     ++index) 
-			    ;		   		    		    
- 			break;
- 		    }
+	    ensureCacheCoherence();
+
+	    if (cur == hashCache.length) {
+		if (nextLeaf == null && !loadNextLeaf())
+		    throw new NoSuchElementException();
+		else {
+		    // cache the contents of the next leaf, which was
+		    // assigned during a call to loadNextLeaf()
+		    cacheLeaf(nextLeaf);
+		    nextLeaf = null;
 		}
 	    }
 
-	    return e;
+	    int curHash = hashCache[cur++];    
+	    PrefixEntry e = curLeaf.table[DistributedHashMap.
+					  indexFor(curHash, 
+						   curLeaf.table.length)];
+
+	    // check all the chained entries for the one with the
+	    // correct hash code
+	    for (; e != null && e.hash != curHash; e = e.next)
+		;
+	    
+	    if (e == null)
+		// somewhere there was an error and we have a hash
+		// code that does not exist in the current table
+		throw new Error("AAAAH");
+	    else
+		return e;
 	}
-	
+
 	/**
 	 * This operation is not supported.
 	 *
 	 * @throws UnsupportedOperationException if called
 	 */
 	public void remove() {
-	    // REMINDER: we probably could support this.
 	    throw new UnsupportedOperationException();
 	}
-		
+
+	/**
+	 * {@inheritDoc}
+	 */
+	private void readObject(java.io.ObjectInputStream s) 
+	    throws java.io.IOException, ClassNotFoundException {
+	    
+	    s.defaultReadObject();
+	    curLeaf = null;
+	    nextLeaf = null;
+	}  
+
+
     }
 
     /**
      * An iterator over the entry set
      */
-    private final class EntryIterator
-	extends AbstractEntryIterator<Map.Entry<K,V>> {
+    private static class EntryIterator<K,V> 
+	extends ConcurrentIterator<Entry<K,V>> {
 	
+	private static final long serialVersionUID = 0x2L;
+
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param leftModeLeaf the left mode leaf node in the prefix
-	 *        tree
+	 * @param root the root node of the backing trie.
 	 */
-	EntryIterator(DistributedHashMap<K,V> leftMostLeaf) {
-	    super(leftMostLeaf);
+	EntryIterator(DistributedHashMap<K,V> root) {
+	    super(root);
 	}
 
 	/**
@@ -1446,23 +1605,24 @@ public class DistributedHashMap<K,V>
     /**
      * An iterator over the keys in the map
      */
-    private final class KeyIterator extends AbstractEntryIterator<K> {
+    private static final class KeyIterator<K,V> extends ConcurrentIterator<K> {
+
+	private static final long serialVersionUID = 0x1L;
 
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param leftModeLeaf the left mode leaf node in the prefix
-	 *        tree
+	 * @param root the root node of the backing trie.
 	 */
-	KeyIterator(DistributedHashMap<K,V> leftMostLeaf) {
-	    super(leftMostLeaf);
+	KeyIterator(DistributedHashMap<K,V> root) {
+	    super(root);
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public K next() {
-	    return nextEntry().getKey();
+	    return ((Entry<K,V>)nextEntry()).getKey();
 	}
     }
 
@@ -1470,67 +1630,95 @@ public class DistributedHashMap<K,V>
     /**
      * An iterator over the values in the tree
      */
-    private final class ValueIterator extends AbstractEntryIterator<V> {
+    private static final class ValueIterator<K,V> 
+	extends ConcurrentIterator<V> 
+	implements Serializable {
+
+	public static final long serialVersionUID = 0x1L;
 
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param leftModeLeaf the left mode leaf node in the prefix
-	 *        tree
+	 * @param root the root node of the backing trie.
 	 */
-	ValueIterator(DistributedHashMap<K,V> leftMostLeaf) {
-	    super(leftMostLeaf);
+	ValueIterator(DistributedHashMap<K,V> root) {
+	    super(root);
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public V next() {
-	    return nextEntry().getValue();
+	    return ((Entry<K,V>)nextEntry()).getValue();
 	}
     }
 
     /**
-     * Returns a {@code Set} of all the mappings contained in this
-     * map.  The returned {@code Set} is back by the map, so changes
-     * to the map will be reflected by this view.  Note that the time
-     * complexity of the operations on this set will be the same as
-     * those on the map itself.  
+     * Returns a concurrent, {@code Serializable} {@code Set} of all
+     * the mappings contained in this map.  The returned {@code Set}
+     * is back by the map, so changes to the map will be reflected by
+     * this view.  Note that the time complexity of the operations on
+     * this set will be the same as those on the map itself.
+     *
+     * <p>
+     *
+     * The iterator returned by this set also implements {@code
+     * Serializable}.
      *
      * @return the set of all mappings contained in this map
      */
     public Set<Entry<K,V>> entrySet() {
-	return new EntrySet(this);
+	return new EntrySet<K,V>(this);
     }
 
     /**
      * An internal-view {@code Set} implementation for viewing all the
      * entries in this map.  
      */
-    private final class EntrySet extends AbstractSet<Entry<K,V>> {
+    private static final class EntrySet<K,V>
+	extends AbstractSet<Entry<K,V>>
+	implements Serializable {
+
+	private static final long serialVersionUID = 0x1L;
+	
+	/**
+	 * A reference to the root node of the prefix tree
+	 */
+	private final ManagedReference rootRef;
 
 	/**
-	 * the root node of the prefix tree
+	 * A cached version of the root node for faster accessing
 	 */
-	private final DistributedHashMap<K,V> root;
+	private transient DistributedHashMap<K,V> root;
+	
 
 	EntrySet(DistributedHashMap<K,V> root) {
 	    this.root = root;
+	    rootRef = AppContext.getDataManager().createReference(root);
 	}
-	    
+	 
+	private void checkCache() {
+	    if (root == null) 
+		root = rootRef.get(DistributedHashMap.class);
+	}
+   
 	public Iterator<Entry<K,V>> iterator() {
-	    return new EntryIterator(root.leftMost());
+	    checkCache();
+	    return new EntryIterator<K,V>(root);
 	}
 
 	public boolean isEmpty() {
+	    checkCache();	    
 	    return root.isEmpty();
 	}
 
 	public int size() {
+	    checkCache();	    
 	    return root.size();
 	}
 
 	public boolean contains(Object o) {
+	    checkCache();
 	    if (!(o instanceof Map.Entry)) 
 		return false;
 	    Map.Entry<K,V> e = (Map.Entry<K,V>)o;
@@ -1539,107 +1727,159 @@ public class DistributedHashMap<K,V>
 	}
 
 	public void clear() {
+	    checkCache();
 	    root.clear();
 	}
 	
     }
 
     /**
-     * Returns a {@code Set} of all the keys contained in this
-     * map.  The returned {@code Set} is back by the map, so changes
-     * to the map will be reflected by this view.  Note that the time
-     * complexity of the operations on this set will be the same as
-     * those on the map itself.  
+     * Returns a concurrent, {@code Serializable} {@code Set} of all
+     * the keys contained in this map.  The returned {@code Set} is
+     * back by the map, so changes to the map will be reflected by
+     * this view.  Note that the time complexity of the operations on
+     * this set will be the same as those on the map itself.
+     *
+     * <p>
+     *
+     * The iterator returned by this set also implements {@code
+     * Serializable}.
      *
      * @return the set of all keys contained in this map
      */
     public Set<K> keySet() {
-	return new KeySet(this);
+	return new KeySet<K,V>(this);
     }
 
     /** 
      * An internal collections view class for viewing the keys in the
      * map
      */
-    private final class KeySet extends AbstractSet<K> {
+    private static final class KeySet<K,V> 
+	extends AbstractSet<K>
+	implements Serializable {
+
+	private static final long serialVersionUID = 0x1L;
 	  
 	/**
-	 * the root node of the prefix tree
+	 * A reference to the root node of the prefix tree
 	 */
-	private final DistributedHashMap<K,V> root;
+	private final ManagedReference rootRef;
+
+	/**
+	 * A cached version of the root node for faster accessing
+	 */
+	private transient DistributedHashMap<K,V> root;
 
 	KeySet(DistributedHashMap<K,V> root) {
 	    this.root = root;
+	     rootRef = AppContext.getDataManager().createReference(root);
 	}
 	    
+	private void checkCache() {
+	    if (root == null) 
+		root = rootRef.get(DistributedHashMap.class);
+	}
+
 	public Iterator<K> iterator() {
-	    return new KeyIterator(root.leftMost());
+	    checkCache();
+	    return new KeyIterator<K,V>(root);
 	}
 
 	public boolean isEmpty() {
+	    checkCache();
 	    return root.isEmpty();
 	}
 
 	public int size() {
+	    checkCache();
 	    return root.size();
 	}
 
 	public boolean contains(Object o) {
+	    checkCache();
 	    return root.containsKey(o);
 	}
 
 	public void clear() {
+	    checkCache();
 	    root.clear();
 	}
 	
-    }
+    }    
 	
     /**
-     * Returns a {@code Collection} of all the keys contained in this
-     * map.  The returned {@code Collection} is back by the map, so
-     * changes to the map will be reflected by this view.  Note that
-     * the time complexity of the operations on this set will be the
-     * same as those on the map itself.
+     * Returns a concurrent, {@code Serializable} {@code Collection}
+     * of all the keys contained in this map.  The returned {@code
+     * Collection} is back by the map, so changes to the map will be
+     * reflected by this view.  Note that the time complexity of the
+     * operations on this set will be the same as those on the map
+     * itself.
+     *
+     * <p>
+     *
+     * The iterator returned by this set also implements {@code
+     * Serializable}.
      *
      * @return the collection of all values contained in this map
      */
 
     public Collection<V> values() {
-	return new Values(this);
+	return new Values<K,V>(this);
     }
    
     /**
      * An internal collections-view of all the values contained in
      * this map
      */
-    private final class Values extends AbstractCollection<V> {
+    private static final class Values<K,V> 
+	extends AbstractCollection<V>
+	implements Serializable {
+
+	private static final long serialVersionUID = 0x1L;
+	  
+	/**
+	 * A reference to the root node of the prefix tree
+	 */
+	private final ManagedReference rootRef;
 
 	/**
-	 * the root node of the prefix tree
+	 * A cached version of the root node for faster accessing
 	 */
-	private final DistributedHashMap<K,V> root;
+	private transient DistributedHashMap<K,V> root;
 
 	public Values(DistributedHashMap<K,V> root) {
 	    this.root = root;
+	     rootRef = AppContext.getDataManager().createReference(root);
+	}
+
+	private void checkCache() {
+	    if (root == null) 
+		root = rootRef.get(DistributedHashMap.class);
 	}
 
 	public Iterator<V> iterator() {
-	    return new ValueIterator(root.leftMost());
+	    checkCache();
+	    return new ValueIterator<K,V>(root);
 	}
 
 	public boolean isEmpty() {
+	    checkCache();
 	    return root.isEmpty();
 	}
 
 	public int size() {
+	    checkCache();
 	    return root.size();
 	}
 
 	public boolean contains(Object o) {
-	    return containsValue(o);
+	    checkCache();
+	    return root.containsValue(o);
 	}
 
 	public void clear() {
+	    checkCache();
 	    root.clear();
 	}
     }

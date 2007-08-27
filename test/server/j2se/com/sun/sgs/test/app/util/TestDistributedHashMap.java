@@ -3,6 +3,7 @@ package com.sun.sgs.test.app.util;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.app.util.DistributedHashMap;
 import com.sun.sgs.app.util.TestableDistributedHashMap;
@@ -25,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1518,6 +1520,384 @@ public class TestDistributedHashMap extends TestCase {
     }
 
 
+    /*
+     * Tests on ManagedObject vs. Serializable object keys
+     *
+     * These tests should expose any bugs in the
+     * DistributedHashMap.PrefixEntry class, especially in the
+     * setValue() method.  These should also expose any bugs in the
+     * KeyValuePair class
+     */
+    @Test public void testOnManagedObjectKeys() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Bar,Foo> test = 
+	    new TestableDistributedHashMap<Bar,Foo>();
+	Map<Bar,Foo> control = new HashMap<Bar,Foo>();
+
+	for (int i = 0; i < 64; ++i) {
+	    
+	    test.put(new Bar(i), new Foo(i));
+	    control.put(new Bar(i), new Foo(i));
+	    assertEquals(control, test);
+	}	
+
+	
+        txn.commit();
+    }
+
+    @Test public void testOnManagedObjectValues() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Foo,Bar> test = 
+	    new TestableDistributedHashMap<Foo,Bar>();
+	Map<Foo,Bar> control = new HashMap<Foo,Bar>();
+
+	for (int i = 0; i < 64; ++i) {
+	    
+	    test.put(new Foo(i), new Bar(i));
+	    control.put(new Foo(i), new Bar(i));
+	    assertEquals(control, test);
+	}	
+
+	
+        txn.commit();
+    }
+
+    @Test public void testOnManagedObjectKeysAndValues() throws Exception {
+        txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Bar,Bar> test = 
+	    new TestableDistributedHashMap<Bar,Bar>();
+	Map<Bar,Bar> control = new HashMap<Bar,Bar>();
+
+	for (int i = 0; i < 64; ++i) {
+	    
+	    test.put(new Bar(i), new Bar(i));
+	    control.put(new Bar(i), new Bar(i));
+	    assertEquals(control, test);
+	}	
+
+	
+        txn.commit();
+    }
+
+
+    @Test public void testSerializableKeysReplacedWithManagedObjects() 
+	throws Exception {
+        
+	txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Foo,Foo> test = 
+	    new TestableDistributedHashMap<Foo,Foo>();
+	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
+
+	for (int i = 0; i < 64; ++i) {	    
+	    test.put(new Foo(i), new Foo(i));
+	    control.put(new Foo(i), new Foo(i));
+	    assertEquals(control, test);
+	}	
+
+	for (int i = 0; i < 64; ++i) {	    
+	    test.put(new Bar(i), new Foo(i));
+	    control.put(new Bar(i), new Foo(i));
+	    assertEquals(control, test);
+	}	
+	
+        txn.commit();
+    }
+
+    @Test public void testSerializableValuesReplacedWithManagedObjects() 
+	throws Exception {
+        
+	txn = createTransaction();
+        DataManager dataManager = AppContext.getDataManager();
+	Map<Foo,Foo> test = 
+	    new TestableDistributedHashMap<Foo,Foo>();
+	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
+
+	for (int i = 0; i < 64; ++i) {	    
+	    test.put(new Foo(i), new Foo(i));
+	    control.put(new Foo(i), new Foo(i));
+	    assertEquals(control, test);
+	}	
+
+	for (int i = 0; i < 64; ++i) {	    
+	    test.put(new Foo(i), new Bar(i));
+	    control.put(new Foo(i), new Bar(i));
+	    assertEquals(control, test);
+	}	
+	
+        txn.commit();
+    }
+
+
+
+
+    /*
+     * Concurrent Iterator tests
+     *
+     * These tests should expose any problems when the
+     * DistributedHashMap.ConcurrentIterator class is serialized and
+     * modifications are made to the map before it is deserialized.
+     * This should simulate the conditions between transactions where
+     * the map might be modified
+     */
+     
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIterator() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	for (Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator(); 
+	     it.hasNext();) {
+
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+	assertEquals(entrySet.size(), entries);
+
+	txn.commit();
+    }
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorSerailization() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
+	for (int i = 0; i < a.length / 2; ++i) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+
+	while(it.hasNext()) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(entrySet.size(), entries);
+
+	txn.commit();
+    }
+
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorWithRemovals() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	// then remove half of the entries
+	for (int i = 0; i < a.length; i += 2) {
+	    test.remove(a[i]);
+	    control.remove(a[i]);
+	}
+
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	       
+	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+
+	// ensure that the deserialized iterator reads the remaining
+	// elements
+	while(it.hasNext()) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(entrySet.size(), entries);
+
+	txn.commit();
+    }
+
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorWithAdditions() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	// immediately get the iterator while the map size is zero
+	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	       
+	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+
+	// ensure that the deserialized iterator reads the all the new
+	// elements
+	while(it.hasNext()) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(entrySet.size(), entries);
+
+	txn.commit();
+    }
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorWithReplacements() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Integer,Integer> test = 
+	    new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
+	for (int i = 0; i < a.length / 2; ++i) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(a.length / 2, entries);
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	// now repalce all th elements in the map
+	test.clear();
+	control.clear();
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(j, j);
+	    control.put(j, j);
+	    a[i] = j;
+	}
+
+	// reserialize the iterator
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+
+	while(it.hasNext()) {
+	    Map.Entry<Integer,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	// due to the random nature of the entries, we can't check
+	// that it read in another half other elements.  However this
+	// should still check that no execptions were thrown.
+
+	txn.commit();
+    }
+
+
 
     /**
      * Utility routines.
@@ -1554,7 +1934,7 @@ public class TestDistributedHashMap extends TestCase {
 	
 	return true;
     }
-
+    
     private DummyTransaction createTransaction() {
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
@@ -1596,6 +1976,42 @@ public class TestDistributedHashMap extends TestCase {
 		throw new RuntimeException("couldn't remove: " + dir);
 	}
     }
+
+    /*
+     * Test classes
+     */
+
+    static class Foo implements Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	public int i;
+
+	public Foo(int i) {
+	    this.i = i;
+	}
+
+	public int hashCode() {
+	    return i;
+	}
+
+	public boolean equals(Object o) {
+	    return (o instanceof Foo) 
+		? ((Foo)o).i == i
+		: false;
+	}
+    }
+
+    static class Bar extends Foo implements ManagedObject {
+
+	private static final long serialVersionUID = 1L;
+	
+	public Bar(int i) {
+	    super(i);
+	}
+	
+    }
+    
 
      /**
       * Adapter to let JUnit4 tests run in a JUnit3 execution environment.

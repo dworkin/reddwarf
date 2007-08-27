@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.app.util;
 
 import java.io.Serializable;
@@ -11,45 +15,60 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
+
 /**
  * A concurrent, scalable {@code Set} implementation backed by a
  * {@link DistributedHashMap}.  This class is intended as a drop-in
- * replacement for {@code java.util.HashSet}.
+ * replacement for {@code java.util.HashSet}.  This class is designed
+ * to mark itself for update as necessary; no additional calls to the
+ * {@code DataManager} are necessary when using the map.  Beware that
+ * developers should <i>not</i> call {@code markForUpdate} or {@code
+ * getForUpdate} on an instance, as this will eliminate all the
+ * concurrency benefits of this class.
  *
  * <p>
  *
  * This class offers constant time operations for {@code add}, {@code
  * remove}, {@code contains}, and {@code isEmpty}.  Unlike {@code
  * HashSet}, the {@code size} and {@code clear} operations are not
- * constant time; these two operations take {@code n log(n)} in this
- * implementation.  Like {@code HashSet}, this class permits the
+ * constant time; these two operations reqiuire a travesal of all the
+ * elements in the set.  Like {@code HashSet}, this class permits the
  * {@code null} element.
  *
  * <p>
  *
  * This implementation supports the contract that all elements must be
  * {@link Serializable}.  If a developer provides a {@code
- * Serializable} element that is <i>not</i> a {@code ManagedObject},
+ * Serializable} element that is <i>not</i> a {@link ManagedObject},
  * this implementation will take responsibility for the lifetime of
  * that object in the datastore.  The developer will be responsible
- * for the lifetime of all {@link ManagedObject} stored in this set.
+ * for the lifetime of all {@code ManagedObject} elements stored in
+ * this set.
+ *
+ * <p>
+ *
+ * The {@code Iterator} returned by this class implements {@code
+ * Serializable} and may be used concurrently.  Due to the
+ * asynchronous nature of this class, the iterator reflects the
+ * current state of the set at the time of its creation, or if
+ * persisted, its deserialization.
  *
  * <p>
  *
  * An instance of {@code DistributedHashSet} offers one parameters for
  * performance tuning: {@code minConcurrency}, which specifies the
- * minimum number of write operations to support in parallel.  As the
- * set grows, the number of supported parallel operations will also
- * grow beyond the specified minimum, but this factor ensures that it
- * will never drop below the provided number.  Setting this value too
+ * minimum number of write operations to support in parallel.  This
+ * parameter acts as a hint to the map on how to perform resizing.  As
+ * the map grows, the number of supported parallel operations will
+ * also grow beyond the specified minimum; specifying a minimum
+ * concurrency ensures that the map will resize correctly.  Since the
+ * distribution of objects in the map is essentially random, the
+ * actual concurrency will vary.  Setting the minimum concurrency too
  * high will waste space and time, while setting it too low will cause
- * conflicts until the set grows sufficiently to support more
- * concurrent operations.  Furthermore, the efficacy of the
- * concurrency depends on the distribution of hash values; elements
- * with poor hashing will minimize the actual number of possible
- * concurrent writes, regardless of the {@code minConcurrency} value.
+ * conflicts until the map grows sufficiently to support more
+ * concurrent operations.
  *
- * @version 1.0
+ * @version 1.1
  *
  * @see Object#hashCode()
  * @see Set
@@ -148,7 +167,8 @@ public class DistributedHashSet<E>
     }
 
     /**
-     * Returns an iterator over the elements in this set
+     * Returns a concurrent, {@code Serializable} {@code Iterator}
+     * over the elements in this set.
      *
      * @return an iterator over the elements in this set
      */
@@ -180,10 +200,18 @@ public class DistributedHashSet<E>
 
     /**
      * An internal marker class for storing as the value in the
-     * backing map.
+     * backing map.  All marker objects are equivalent.
      */
     private static class Marker implements Serializable { 
 	private static final long serialVersionUID = 3;
+	
+	public int hashCode() {
+	    return 0;
+	}
+
+	public boolean equals(Object o) {
+	    return o instanceof Marker;
+	}
     }
     
 }
