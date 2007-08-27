@@ -14,9 +14,6 @@ import java.nio.ByteBuffer;
  *<b>NOT Thread-Safe!</b>
  */
 public class Protocol {
-    /** Re-usable buffer (for write() only). */
-    private static ByteBuffer writeBuf = ByteBuffer.allocate(1024);
-
     /**
      * Not instantiable.
      */
@@ -74,13 +71,13 @@ public class Protocol {
      * Creates a byte array from an {@link AppMessage}.
      */
     public static byte[] write(AppMessage msg) {
-        writeBuf.clear();
-        writeBuf.put(msg.getOpCode().getKey());
-        msg.write(writeBuf);
-        writeBuf.flip();
+        ByteBuffer buf = ByteBuffer.allocate(1024);
+        buf.put(msg.getOpCode().getKey());
+        msg.write(buf);
+        buf.flip();
         
-        byte ba[] = new byte[writeBuf.limit()];
-        writeBuf.get(ba);
+        byte ba[] = new byte[buf.limit()];
+        buf.get(ba);
         return ba;
     }
 }
