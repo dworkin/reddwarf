@@ -212,9 +212,14 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
  */
 int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
     if (force) {
-        sgs_connection_impl_disconnect(connection);
+        conn_closed(connection);
     }
     else {
+        if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
+            errno = ENOTCONN;
+            return -1;
+        }
+
         connection->expecting_disconnect = 1;
         sgs_session_impl_logout(connection->session);
     }
@@ -230,8 +235,7 @@ sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
     
     connection = (sgs_connection_impl*)malloc(sizeof(struct sgs_connection_impl));
     if (connection == NULL) return NULL;
-    
-    connection->socket_fd = -1;
+
     connection->expecting_disconnect = 0;
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
     connection->ctx = ctx;
@@ -269,8 +273,8 @@ void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
         POLLIN | POLLOUT | POLLERR);
     
     close(connection->socket_fd);
-    connection->socket_fd = -1;
     connection->expecting_disconnect = 0;
+    connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
 }
 
 
@@ -309,14 +313,13 @@ static void conn_closed(sgs_connection_impl *connection) {
     if (connection->expecting_disconnect) {
         /** Expected close of connection... */
         sgs_connection_impl_disconnect(connection);
-        connection->expecting_disconnect = 0;
     } else {
         /** Unexpected close of connection... */
         sgs_connection_impl_disconnect(connection);
-    
-        if (connection->ctx->disconnected_cb != NULL)
-            connection->ctx->disconnected_cb(connection);
     }
+
+    if (connection->ctx->disconnected_cb != NULL)
+        connection->ctx->disconnected_cb(connection);
 }
 
 /*
