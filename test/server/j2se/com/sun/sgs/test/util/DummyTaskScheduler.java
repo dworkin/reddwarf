@@ -185,6 +185,26 @@ public class DummyTaskScheduler implements TaskScheduler {
             throw new TaskRejectedException("could not schedule task");
         return new RecurringTaskHandleImpl(task, startTime, period);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+        throws Exception
+    {
+        while (true) {
+            try {
+                task.run();
+                return;
+            } catch (Exception e) {
+                if (! retry)
+                    throw e;
+                if ((! (e instanceof ExceptionRetryStatus)) ||
+                    (! ((ExceptionRetryStatus)e).shouldRetry()))
+                    throw e;
+            }
+        }
+    }
     
     /**
      * A private implementation of <code>TaskReservation</code> that

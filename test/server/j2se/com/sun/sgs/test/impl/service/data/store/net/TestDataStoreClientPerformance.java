@@ -6,7 +6,6 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
 
 /** Test the performance of the DataStoreClient class. */
@@ -22,16 +21,9 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
     private static final int serverPort =
 	Integer.getInteger("test.server.port", 44530);
     
-    /** The name of the DataStoreClient class. */
-    private static final String DataStoreClientClassName =
-	DataStoreClient.class.getName();
-
-    /** The name of the DataStoreServerImpl class. */
-    private static final String DataStoreServerImplClassName =
-	DataStoreServerImpl.class.getName();
-
-    /** The server. */
-    DataStoreServerImpl server;
+    /** The name of the DataStoreClient package. */
+    private static final String DataStoreNetPackage =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** Creates an instance. */
     public TestDataStoreClientPerformance(String name) {
@@ -39,38 +31,21 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	count = Integer.getInteger("test.count", 20);
     }
 
-    /** Shutdown the server. */
-    protected void tearDown() throws Exception {
-	super.tearDown();
-	try {
-	    if (server != null) {
-		server.shutdown();
-	    }
-	} catch (RuntimeException e) {
-	    if (passed) {
-		throw e;
-	    } else {
-		e.printStackTrace();
-	    }
-	}
-    }
-
     /**
      * Create a DataStoreClient, set any default properties, and start the
      * server, if needed.
      */
+    @Override
     protected DataStore getDataStore() throws Exception {
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
-	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
-	    server = serverImpl;
 	    host = "localhost";
-	    port = serverImpl.getPort();
+	    port = 0;
+	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
 	}
-	props.setProperty(DataStoreClientClassName + ".server.host", host);
-	props.setProperty(DataStoreClientClassName + ".server.port",
+	props.setProperty(DataStoreNetPackage + ".server.host", host);
+	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	return new DataStoreClient(props);
     }

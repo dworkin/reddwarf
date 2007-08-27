@@ -42,11 +42,6 @@ class AppKernelAppContext extends AbstractKernelAppContext {
      * @param applicationName the name of the application represented by
      *                        this context
      * @param managerComponents the managers available in this context
-     *
-     * @throws MissingResourceException if the <code>ChannelManager</code>,
-     *                                  <code>DataManager</code>, or
-     *                                  <code>TaskManager</code> is missing
-     *                                  from the provided components
      */
     AppKernelAppContext (String applicationName,
                          ComponentRegistry managerComponents) {
@@ -54,16 +49,42 @@ class AppKernelAppContext extends AbstractKernelAppContext {
 
         this.managerComponents = managerComponents;
 
-        // pre-fetch the three standard managers
-        channelManager = managerComponents.getComponent(ChannelManager.class);
-        dataManager = managerComponents.getComponent(DataManager.class);
-        taskManager = managerComponents.getComponent(TaskManager.class);
+        // pre-fetch the three standard managers...if any of them isn't
+        // present then we're running without an application and with a
+        // sub-set of services, so just that manager to null
+
+        ChannelManager cm;
+        try {
+            cm = managerComponents.getComponent(ChannelManager.class);
+        } catch (MissingResourceException mre) {
+            cm = null;
+        }
+        channelManager = cm;
+
+        DataManager dm;
+        try {
+            dm = managerComponents.getComponent(DataManager.class);
+        } catch (MissingResourceException mre) {
+            dm = null;
+        }
+        dataManager = dm;
+        
+        TaskManager tm;
+        try {
+            tm = managerComponents.getComponent(TaskManager.class);
+        } catch (MissingResourceException mre) {
+            tm = null;
+        }
+        taskManager = tm;
     }
 
     /**
      * {@inheritDoc}
      */
     ChannelManager getChannelManager() {
+        if (channelManager == null)
+            throw new ManagerNotFoundException("this application is running " +
+                                               "without a ChannelManager");
         return channelManager;
     }
 
@@ -71,6 +92,9 @@ class AppKernelAppContext extends AbstractKernelAppContext {
      * {@inheritDoc}
      */
     DataManager getDataManager() {
+        if (dataManager == null)
+            throw new ManagerNotFoundException("this application is running " +
+                                               "without a DataManager");
         return dataManager;
     }
 
@@ -78,6 +102,9 @@ class AppKernelAppContext extends AbstractKernelAppContext {
      * {@inheritDoc}
      */
     TaskManager getTaskManager() {
+        if (taskManager == null)
+            throw new ManagerNotFoundException("this application is running " +
+                                               "without a TaskManager");
         return taskManager;
     }
 
