@@ -1,4 +1,4 @@
-Project Darkstar Client Software Development Kit
+Project Darkstar Client SDK, Binary Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,16 +7,15 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Client Software Development Kit contains everything
-you need to develop and run game clients that communicate with each
-other and with game servers implemented with the Project Darkstar
-Server.  The Project Darkstar Server is available as a separate
+The binary distribution of the Project Darkstar Client SDK contains
+everything you need to develop and run game clients that communicate
+with each other and with game servers implemented with the Project
+Darkstar Server.  The Project Darkstar Server is available as a separate
 download.
 
 CONTENTS
 
-The Software Development Kit (SDK) contains the following
-subdirectories:
+This distribution contains the following subdirectories:
 
 - doc
   Documentation for the client API
@@ -29,7 +28,7 @@ subdirectories:
 
 SUPPORTED PLATFORMS
 
-The SDK has been tested on the following operating systems and
+This distribution has been tested on the following operating systems and
 processors:
 
 - Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
@@ -38,7 +37,8 @@ processors:
 - Redhat Linux EL4 on 32-bit processors
 - Mac OS X 10.4 on PowerPC and Intel processors
 
-The SDK requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
+This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
+greater.
 
 It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
@@ -54,7 +54,8 @@ classpath:
 
 KNOWN ISSUES
 
-This version of the SDK has the following limitations:
+This version of the Project Darkstar Client SDK has the following
+limitations:
 
 - It only includes a J2SE client implementation.  Developers can use the
   documentation of the network protocol to develop other
