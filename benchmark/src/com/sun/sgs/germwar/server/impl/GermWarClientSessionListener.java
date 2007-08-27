@@ -113,7 +113,20 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
          * long.
          */
         TaskManager tm = AppContext.getTaskManager();
-        tm.scheduleTask(new PlayerUpdateTask(playerId));
+        tm.scheduleTask(new PlayerUpdateTask(playerId, newPlayer));
+    }
+
+    /**
+     * Returns the coordinates of locations that are adjacent (not including
+     * diagonals) to the location at position {@code center}.
+     */
+    private static Set<Coordinate> getAdjacentCoordinates(Coordinate center) {
+        Set<Coordinate> coords = new HashSet<Coordinate>();
+        coords.add(center.offsetBy(-1, 0));
+        coords.add(center.offsetBy(1, 0));
+        coords.add(center.offsetBy(0, -1));
+        coords.add(center.offsetBy(0, 1));
+        return coords;
     }
 
     /**
@@ -121,7 +134,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
      * it moves from {@code src} to {@code dest}; that is, the locations that
      * are not visible from {@code src}, but are visible from {@code dest}.
      */
-    private Set<Coordinate> getHorizonCoordinates(Coordinate src,
+    private static Set<Coordinate> getHorizonCoordinates(Coordinate src,
         Coordinate dest)
     {
         Set<Coordinate> destRegion = getVisibleRegion(dest);
@@ -130,10 +143,28 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
     }
 
     /**
+     * Returns the coordinates of locations that are adjacent or diagonal to the
+     * location at position {@code center}.
+     */
+    private static Set<Coordinate> getSurroundingCoordinates(Coordinate center) {
+        Set<Coordinate> coords = new HashSet<Coordinate>();
+
+        for (int i=-1; i <= 1; i++) {
+            for (int j=-1; j <= 1; j++) {
+                if ((i != 0) || (j != 0)) {
+                    coords.add(center.offsetBy(i, j));
+                }
+            }
+        }
+
+        return coords;
+    }
+
+    /**
      * Returns the {@link Coordinate}s that would be within visible range of a
      * bacterium at {@code center}.
      */
-    private Set<Coordinate> getVisibleRegion(Coordinate center) {
+    private static Set<Coordinate> getVisibleRegion(Coordinate center) {
         Set<Coordinate> coords = new HashSet<Coordinate>();
 
         World world = WorldManager.getWorld();
@@ -155,16 +186,18 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
      * Sends an update message with the current state of {@code loc} to all
      * players with a bacterium within {@code NOTIF_RANGE} of {@code loc}.
      */
-    private void sendRegionUpdate(Location loc) {
+    private static void sendRegionUpdate(Location loc) {
         sendRegionUpdate(loc, 0);
     }
 
     /**
      * Sends an update message with the current state of {@code loc} to {code
-     * playerId}, or to all players with a bacterium within {@code NOTIF_RANGE} of
-     * {@code loc} if {@code playerId} is 0.
+     * playerId} if that player has any bacteria within {@code NOTIF_RANGE} of
+     * {@code loc}.  If {@code playerId} is 0, then an update message is sent to
+     * each player that has a bacterium within {@code NOTIF_RANGE} of {@code
+     * loc}.
      */
-    private void sendRegionUpdate(Location loc, long playerId) {
+    private static void sendRegionUpdate(Location loc, long playerId) {
         World world = WorldManager.getWorld();
         Set<Long> notifPlayers = new HashSet<Long>();
 
@@ -185,7 +218,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
      * Sends an update message with the current state of {@code loc} to the
      * specified player, if they are logged in currently.
      */
-    private void sendUpdate(Location loc, long playerId) {
+    private static void sendUpdate(Location loc, long playerId) {
         Player player = PlayerManager.getPlayer(playerId);
         ClientSession playerSession =
             ClientSessionManager.get(player.getUsername());
@@ -197,56 +230,38 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
 
     /**
      * If {@code bact} has enough health (semi-arbitrary threshold), try to
-     * split it.  Fails, returning {@code null} if {@code bact} does not have
-     * enough health, 
+     * split it into location {@code loc}.  Returns whether split occurred.
      */
-    private Location tryToSplit(Bacterium bact) {
+    private boolean tryToSplit(Bacterium bact, Location loc) {
         /** Note: semi-arbitrary threshold here. */
-        if (bact.getHealth() < 300) return null;
+        if (bact.getHealth() < 300) return false;
 
         /** Fat enough... find a place to spawn to. */
-        World world = WorldManager.getWorld();
-        Coordinate parentCoord = bact.getCoordinate();
-        Coordinate spawnCoord = null;
-        Location spawnLoc = null;
-        Bacterium spawn;
-        int randStart = (int)(4*Math.random());
 
-        for (int i=0; i < 4; i++) {
-            int index = (randStart + i) % 4;
-
-            if (index == 0) spawnCoord = parentCoord.offsetBy(-1, 0);
-            if (index == 1) spawnCoord = parentCoord.offsetBy(1, 0);
-            if (index == 2) spawnCoord = parentCoord.offsetBy(0, -1);
-            if (index == 3) spawnCoord = parentCoord.offsetBy(0, 1);
-
-            if (world.validCoordinate(spawnCoord))
-                spawnLoc = world.getLocation(spawnCoord);
-            else
-                spawnLoc = null;
-
-            if ((spawnLoc != null) && (!spawnLoc.isOccupied())) {
-                /** Found a free space, try to split into it. */
-                try {
-                    spawn = bact.doSplit(spawnCoord);
-                } catch (InvalidSplitException ise) {
-                    logger.log(Level.WARNING, "Failed split attempt: " +
-                        ise.paramString() + ", " + ise.getMessage());
-                    return null;
-                }
-
-                /** Split succeeded. */
-                spawnLoc.setOccupant(spawn);
-
-                logger.log(Level.FINE, "Successful split attempt by " +
-                    bact + " to " + spawnLoc);
-
-                return spawnLoc;
-            }
+        if (loc.isOccupied()) {
+            /** Cannot split into an occupied location. */
+            logger.log(Level.WARNING, "Attempt to split " + bact + " into " +
+                loc + ", which is occupied by " + loc.getOccupant());
+            return false;
         }
 
-        /** Couldn't find a free location to spawn to. */
-        return null;
+        Bacterium spawn;
+
+        try {
+            spawn = bact.doSplit(loc.getCoordinate());
+        } catch (InvalidSplitException ise) {
+            logger.log(Level.WARNING, "Failed to split " + bact + " into " +
+                loc + ": " + ise.getMessage());
+            return false;
+        }
+
+        /** Split succeeded. */
+        loc.setOccupant(spawn);
+
+        logger.log(Level.FINE, "Successful split attempt by " +
+            bact + " into " + loc);
+
+        return true;
     }
 
     // Implement ClientSessionListener
@@ -314,11 +329,18 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
              */
 
             Player player = PlayerManager.getPlayer(playerId);
-            Bacterium bact = player.getBacterium(moveRequest.getBacteriumId());
+            int bactId = moveRequest.getBacteriumId();
+            Bacterium bact = player.getBacterium(bactId);
             Location src = world.getLocation(moveRequest.getSource());
             Coordinate srcCoord = src.getCoordinate();
             Location dest = world.getLocation(moveRequest.getDestination());
             Coordinate destCoord = dest.getCoordinate();
+
+            if (bact == null) {
+                logger.log(Level.WARNING, "MoveRequest received from player " +
+                    player + " for non-existant bacterium #" + bactId);
+                return;
+            }
 
             try {
                 /** Confirm that the bacterium is located at the source. */
@@ -354,25 +376,67 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             dest.setOccupant(bact);
             src.setOccupant(null);
 
-            /** Feed the bacterium all the food in this location. */
-            bact.addHealth(dest.emptyFood());
-
             logger.log(Level.FINE, "Successful move attempt by " + bact +
                 " from " + src + " to " + dest);
 
+            /**
+             * Inflict "damage" on any bacteria of opposing players that
+             * surround the square that was moved into, but do not surround the
+             * square that was moved from (i.e. you only get hurt when someone
+             * first moves next to you, not as they continue to move around in
+             * squares that surround you).  This should take place before the
+             * moving bacteria "eats" the food in the location that it is moving
+             * into.
+             */
+            Set<Coordinate> srcNeighbors = getSurroundingCoordinates(srcCoord);
+
+            for (Coordinate neighbor : getSurroundingCoordinates(destCoord)) {
+                if (!world.validCoordinate(neighbor)) continue;
+
+                if (srcNeighbors.contains(neighbor)) continue;
+
+                Location loc = world.getLocation(neighbor);
+                if (!loc.isOccupied()) continue;
+
+                Bacterium occ = loc.getOccupant();
+                long occPlayerId = occ.getPlayerId();
+                if (occPlayerId == playerId) continue;
+
+                logger.log(Level.FINE, bact + " is attacking " + occ);
+
+                boolean modified = occ.doFight(bact);
+
+                /** Is bacterium dead now? */
+                if (occ.getHealth() <= 0) {
+                    /** Remove it from the world and from its player. */
+                    loc.setOccupant(null);
+                    PlayerManager.getPlayer(occPlayerId).removeBacterium(occ);
+                    logger.log(Level.FINE, occ + " has been killed.");
+
+                    /**
+                     * Have to explicitly notify the owner of the now-dead
+                     * bacterium; since its not there any more, the player may
+                     * not be selected in sendRegionUpdate below.
+                     */
+                    sendUpdate(loc, occPlayerId);
+                }
+
+                /** Notify all neighbors of defender's new state. */
+                if (modified) sendRegionUpdate(loc);
+            }
+
             /** Check if the bacterium is ready and able to split. */
-            Location spawnLoc = tryToSplit(bact);
+            tryToSplit(bact, src);
+
+            /** Feed the bacterium all the food in this location. */
+            bact.addHealth(dest.emptyFood());
 
             /**
-             * Send updates for the locations involved in the move (and split,
-             * if one happened) to any clients near them.
+             * Send updates for the locations involved in the move to any
+             * clients near them.
              */
             sendRegionUpdate(src);
             sendRegionUpdate(dest);
-
-            if ((spawnLoc != null) &&
-                (spawnLoc.getCoordinate().equals(src.getCoordinate()) == false))
-                sendRegionUpdate(spawnLoc);
 
             /**
              * Send updates for all of the locations that just "came into view"
@@ -409,15 +473,37 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
         private long playerId;
 
         /**
+         * Whether this player's bacteria updates should be sent to neighboring
+         * players too (as opposed to just this player).
+         */
+        private boolean sendToNeighbors;
+
+        /**
+         * The {@link World} - should only be accessed from within {@code run()}
+         * or methods called from run.
+         */
+        private transient World world;
+
+        /**
          * Creates a new {@code PlayerUpdateTask} for the specified player.
          */
         public PlayerUpdateTask(long playerId) {
+            this(playerId, false);
+        }
+
+        /**
+         * Creates a new {@code PlayerUpdateTask} for the specified player, with
+         * the option to send updates to neighboring players as well.
+         */
+        public PlayerUpdateTask(long playerId, boolean sendToNeighbors) {
             this.playerId = playerId;
+            this.sendToNeighbors = sendToNeighbors;
         }
 
         // implement Task
 
         public void run() throws Exception {
+            world = WorldManager.getWorld();
             Player player = PlayerManager.getPlayer(playerId);
             ClientSession playerSession =
                 ClientSessionManager.get(player.getUsername());
@@ -428,6 +514,11 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             /** Iterate all bacteria of player... */
             for (Bacterium bact : PlayerManager.getPlayer(playerId)) {
                 locations.addAll(getRegion(bact.getCoordinate()));
+
+                if (sendToNeighbors) {
+                    sendRegionUpdate(world.getLocation(bact.getCoordinate()),
+                        playerId);
+                }
             }
 
             for (Location loc : locations) {
@@ -442,8 +533,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
          */
         private Collection<Location> getRegion(Coordinate coord) {
             Collection<Location> locs = new LinkedList<Location>();
-            World world = WorldManager.getWorld();
-
+            
             int minX = Math.max(0, coord.getX() - NOTIF_RANGE);
             int minY = Math.max(0, coord.getY() - NOTIF_RANGE);
             int maxX = Math.min(world.getXDimension() - 1, coord.getX() + NOTIF_RANGE);

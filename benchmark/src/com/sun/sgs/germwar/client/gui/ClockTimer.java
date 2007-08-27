@@ -43,6 +43,15 @@ public class ClockTimer extends JLabel {
     }
 
     /**
+     * Stops the timer (if running) and resets the displayed time to "00:00.0".
+     */
+    public void clear() {
+        stop();
+        setText("00:00.0");
+        setForeground(Color.BLACK);
+    }
+
+    /**
      * Stops the timer (if running) and starts it to count down from {@code
      * time} seconds.  When the timer expires, an {@link ActionEvent} will be
      * sent to any registered listeners.

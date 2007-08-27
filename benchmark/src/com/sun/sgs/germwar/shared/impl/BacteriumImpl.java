@@ -22,6 +22,9 @@ public class BacteriumImpl implements Bacterium, Serializable {
     /** Currently, all bacteria always have 1 movement point per turn. */
     public static final int MAX_MOVEMENT_POINTS = 1;
 
+    /** Bonus health that attacking bacteria get. */
+    public static final float ATTACK_BONUS = 50;
+
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
@@ -131,12 +134,8 @@ public class BacteriumImpl implements Bacterium, Serializable {
      */
     @Override
     public String toString() {
-        StringBuffer sb = new StringBuffer();
-        sb.append("BacteriaImpl [id=").append(id);
-        sb.append(", playerId=").append(playerId);
-        sb.append(", health=").append(health);
-        sb.append(", pos=").append(position).append("]");
-        return sb.toString();
+        return "BacteriaImpl [id=" + id + ", playerId=" + playerId +
+            ", health=" + health + ", pos=" + position + "]";
     }
 
     // implement Bacterium
@@ -146,6 +145,19 @@ public class BacteriumImpl implements Bacterium, Serializable {
      */
     public void addHealth(float mod) {
         health += mod;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean doFight(Bacterium attacker) {
+        /**
+         * If attacker is bigger (after adding in a bonus to the attacker),
+         * damage = difference in health.  Else, no damaged.
+         */
+        float diff = ((attacker.getHealth() + ATTACK_BONUS) - health);
+        if (diff > 0) health -= diff;
+        return (diff > 0);
     }
 
     /**

@@ -5,6 +5,7 @@
 package com.sun.sgs.germwar.server;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,6 +18,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
@@ -103,8 +105,11 @@ public class GermWarApp implements Serializable, AppListener {
             cm.createChannel(GermWarConstants.GLOBAL_CHANNEL_NAME, null,
                 Delivery.RELIABLE);
 
-        /** Start the turn task (note that returned handle is thrown away). */
+        /** Schedule a rarely-running task to print player stats. */
         TaskManager tm = AppContext.getTaskManager();
+        tm.schedulePeriodicTask(new ParentStatsTask(), 60*1000, 60*1000);
+
+        /** Start the turn task (note that returned handle is thrown away). */
         tm.schedulePeriodicTask(new TurnTask(), GermWarConstants.TURN_DURATION,
             GermWarConstants.TURN_DURATION);
 
@@ -150,6 +155,72 @@ public class GermWarApp implements Serializable, AppListener {
                 AppContext.getChannelManager().getChannel(GermWarConstants.GLOBAL_CHANNEL_NAME);
 
             globalChannel.send(Protocol.write(new TurnUpdate(turn)));
+        }
+    }
+
+    /**
+     * Inner class: ParentStatsTask
+     */
+    private static class ParentStatsTask
+        implements ManagedObject, Serializable, Task
+    {
+        /** The version of the serialized form of this class. */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Creates a new {@code ParentStatsTask}.
+         */
+        public ParentStatsTask() {
+            // empty
+        }
+
+        // implement Task
+
+        /**
+         * We spawn new tasks for each individual player's stats because if we
+         * tried to do them all in one task it would probably be way too long.
+         */
+        public void run() throws Exception {
+            TaskManager tm = AppContext.getTaskManager();
+            Iterator<ManagedReference> iter = PlayerManager.refIterator();
+
+            while (iter.hasNext()) {
+                tm.scheduleTask(new StatsTask(iter.next()));
+            }
+        }
+    }
+
+    /**
+     * Inner class: StatsTask
+     */
+    private static class StatsTask implements ManagedObject, Serializable, Task {
+        /** A ManagedReference to the player on which to report stats. */
+        private ManagedReference playerRef;
+
+        /** The version of the serialized form of this class. */
+        private static final long serialVersionUID = 1L;
+
+        /**
+         * Creates a new {@code StatsTask}.
+         */
+        public StatsTask(ManagedReference playerRef) {
+            this.playerRef = playerRef;
+        }
+
+        // implement Task
+
+        public void run() throws Exception {
+            Player player = playerRef.get(Player.class);
+            ClientSession playerSession =
+                ClientSessionManager.get(player.getUsername());
+
+            StringBuffer sb = new StringBuffer();
+            sb.append(System.currentTimeMillis()).append("\tPlayer #");
+            sb.append(player.getId()).append(", ").append(player.getUsername());
+            sb.append("\tlogged in? ");
+            sb.append(playerSession == null ? "n" : "y");
+            sb.append("\tcount: ").append(player.bacteriaCount());
+            logger.log(Level.INFO, sb.toString());
         }
     }
 }

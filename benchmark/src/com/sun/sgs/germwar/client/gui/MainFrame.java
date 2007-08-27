@@ -178,10 +178,10 @@ public class MainFrame extends JFrame implements GameGui {
      * @param forward iterates forward if {@code true}, backwards if {@code false}
      */
     private void iterateBacteria(boolean forward) {
-        synchronized (userBacteriaLock) {
-            Coordinate coord = mainMapPanel.getSelected();
-            int targetId = -1;
+        Coordinate coord = mainMapPanel.getSelected();
+        int targetId = -1;
 
+        synchronized (userBacteriaLock) {
             if (userBacteria.size() == 0) return;
 
             if (coord != null) {
@@ -202,9 +202,40 @@ public class MainFrame extends JFrame implements GameGui {
             if (targetId == -1) targetId = userBacteriaIds.get(0);
 
             Bacterium target = userBacteria.get(targetId);
-            mainMapPanel.setSelected(target.getCoordinate());
-            mainMapPanel.setFocus(target.getCoordinate());
-            infoArea.display(gameLogic.getLocation(target.getCoordinate()));
+            coord = target.getCoordinate();
+
+            /** Check that bacterium actually exists where we think it does. */
+            Location loc = gameLogic.getLocation(coord);
+            Bacterium occ = loc.getOccupant();
+
+            if ((occ != null) && (target.equals(occ))) {
+                /** Ok - checks out. */
+                mainMapPanel.setSelected(coord);
+                mainMapPanel.setFocus(coord);
+                infoArea.display(loc);
+            } else {
+                /**
+                 * Error - this bacterium thinks that its at a location where it
+                 * isn't.  We assume that this is because this bacterium has
+                 * died (and thus we recieved a location update - with no
+                 * occupant - for its location).  Note that this isn't very
+                 * robust - an explicit "bacterium has died" message from the
+                 * server would be better.
+                 */
+                userBacteria.remove(targetId);
+
+                /**
+                * Have to explicitly make this an Integer because remove(int)
+                * and remove(Object) are different methods on List interface.
+                */
+                userBacteriaIds.remove(new Integer(targetId));
+
+                newChatMessage(null, "Bacterium #" + targetId + " at " + coord +
+                    " appears to have died...");
+
+                /** Recurse until we find a valid (alive) bacterium. */
+                iterateBacteria(forward);
+            }
         }
     }
 
@@ -324,7 +355,6 @@ public class MainFrame extends JFrame implements GameGui {
                 }
             }
         }
-        // todo - some way to remove bacteria?  (if the game ever has this)
         
         mainMapPanel.update(loc);
         infoArea.updateIf(loc);
@@ -378,6 +408,7 @@ public class MainFrame extends JFrame implements GameGui {
         infoArea.setEnabled(loggedIn);
         mainMapPanel.setEnabled(loggedIn);
         miniMapPanel.setEnabled(loggedIn);
+        turnTimer.clear();
 
         /** Special command for controls panel. */
         controlsPanel.setLoginState(loggedIn);

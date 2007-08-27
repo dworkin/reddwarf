@@ -162,6 +162,30 @@ public class PlayerManager {
     }
 
     /**
+     * Returns an iterator over ManagedReferences to all players.  This should
+     * only be used over iterator() when the players will not be accessed
+     * immediately but instead will be passed to another task in some way.
+     */
+    public static Iterator<ManagedReference> refIterator() {
+        return new Iterator<ManagedReference>() {
+            private Iterator<ManagedReference> refIter =
+                getUserMap().values().iterator();
+
+            public boolean hasNext() {
+                return refIter.hasNext();
+            }
+
+            public ManagedReference next() {
+                return refIter.next();
+            }
+
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    /**
      * Inner class: PlayerImpl
      * <p>
      * A simple implementation of {@link Player}.
@@ -180,6 +204,12 @@ public class PlayerManager {
         private ManagedReference bacteriaMapRef;
 
         /**
+         * Count of all bacteria belonging to this player (more efficient to
+         * maintain this ourselves than to call size() on the bacteriaMapRef).
+         */
+        private int bacteriaCount;
+
+        /**
          * Creates a new {@code PlayerImpl}.
          */
         public PlayerImpl(long id, String username) {
@@ -188,8 +218,9 @@ public class PlayerManager {
             
             PrefixHashMap<Integer,ManagedReference> map =
                 new PrefixHashMap<Integer,ManagedReference>();
-            
+
             bacteriaMapRef = AppContext.getDataManager().createReference(map);
+            bacteriaCount = 0;
         }
 
         /**
@@ -201,13 +232,22 @@ public class PlayerManager {
             return (Map<Integer,ManagedReference>)bacteriaMapRef.get(Map.class);
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public String toString() {
+            return "PlayerImpl [id=" + id + ", username=" + username +
+                ", bacteria=" + bacteriaCount() + "]";
+        }
+
         // implement Player
 
         /**
          * {@inheritDoc}
          */
         public int bacteriaCount() {
-            return getBacteriaMap().size();
+            return bacteriaCount;
         }
 
         /**
@@ -217,6 +257,7 @@ public class PlayerManager {
             DataManager dm = AppContext.getDataManager();
             BacteriumImpl bact = new BacteriumRecord(id, coord);
             getBacteriaMap().put(bact.getId(), dm.createReference(bact));
+            bacteriaCount++;
             return bact;
         }
 
@@ -227,6 +268,7 @@ public class PlayerManager {
             DataManager dm = AppContext.getDataManager();
             BacteriumImpl bact = new BacteriumRecord(id, coord, initialHealth);
             getBacteriaMap().put(bact.getId(), dm.createReference(bact));
+            bacteriaCount++;
             return bact;
         }
 
@@ -303,10 +345,11 @@ public class PlayerManager {
          */
         public void removeBacterium(Bacterium bact) {
             Map<Integer,ManagedReference> map = getBacteriaMap();
-            long key = bact.getId();
+            int key = bact.getId();
 
             if (map.containsKey(key)) {
                 map.remove(key);
+                bacteriaCount--;
             } else {
                 throw new IllegalArgumentException("Cannot remove bacterium " +
                     bact + ", not found for player: " + this);
@@ -352,6 +395,28 @@ public class PlayerManager {
         {
             super(getNextId(playerId), playerId, startPos,
                 TurnManager.getCurrentTurn(), initialHealth);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void addHealth(float mod) {
+            if (mod != 0) AppContext.getDataManager().markForUpdate(this);
+            super.addHealth(mod);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean doFight(Bacterium attacker) {
+            if (super.doFight(attacker)) {
+                AppContext.getDataManager().markForUpdate(this);
+                return true;
+            } else {
+                return false;
+            }
         }
 
         /**
