@@ -594,7 +594,7 @@ class ClientSessionHandler {
 	    final Identity authenticatedIdentity;
 	    try {
 		authenticatedIdentity = authenticate(name, password);
-	    } catch (LoginException e) {
+	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.FINEST, e,
 		    "login authentication failed for name:{0}", name);

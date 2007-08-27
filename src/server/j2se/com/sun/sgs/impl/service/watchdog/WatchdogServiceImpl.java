@@ -239,7 +239,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		serverImpl = null;
 		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
 		serverPort = wrappedProps.getIntProperty(
-		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    }
 
 	    int clientPort = wrappedProps.getIntProperty(
