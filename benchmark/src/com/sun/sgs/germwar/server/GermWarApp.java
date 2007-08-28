@@ -187,9 +187,17 @@ public class GermWarApp implements Serializable, AppListener {
             logger.log(Level.INFO, System.currentTimeMillis() +
                 "\tStarting StatsTask.  players=" + PlayerManager.playerCount());
 
+            /**
+             * Under high load, these tasks can be pretty hard to schedule (lots
+             * of contention on task table, I assume), so this is commented out
+             * for now:
+             */
+
+            /*
             while (iter.hasNext()) {
                 tm.scheduleTask(new StatsTask(iter.next()));
             }
+            */
         }
     }
 
