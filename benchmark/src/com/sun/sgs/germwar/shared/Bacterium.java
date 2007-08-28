@@ -14,9 +14,6 @@ import com.sun.sgs.germwar.shared.Location;
  * Represents a single bacterium.
  */
 public interface Bacterium extends ManagedObject {
-    /** The health cost inflicted when someone moves next to you. */
-    public static final float FIGHT_HEALTH_COST = 50f;
-
     /** The health cost to performing a move. */
     public static final float MOVE_HEALTH_COST = 5f;
 
@@ -24,7 +21,7 @@ public interface Bacterium extends ManagedObject {
     public static final float SPLIT_HEALTH_COST = 100f;
 
     /** The health cost incurred every turn no matter what you do. */
-    public static final float TURN_HEALTH_COST = 1f;
+    public static final float TURN_HEALTH_COST = 0f;
 
     /** Adds {@code mod} amount to this {@code Bacterium's} health level. */
     void addHealth(float mod);
