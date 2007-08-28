@@ -120,8 +120,9 @@ class ServiceConfigRunner implements Runnable {
 
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
+        ComponentRegistryImpl managers = new ComponentRegistryImpl();
         AppKernelAppContext ctx = 
-                new AppKernelAppContext(appName, services, services);
+                new AppKernelAppContext(appName, services, managers);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -153,7 +154,6 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // register any profiling managers and fill in the manager registry
-        ComponentRegistryImpl managers = new ComponentRegistryImpl();
         for (Object manager : managerSet) {
             if (profileRegistrar != null) {
                 if (manager instanceof ProfileProducer)

@@ -13,6 +13,7 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import javax.swing.ListModel;
+import javax.swing.SwingUtilities;
 
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
@@ -124,11 +125,16 @@ class GameList implements ListModel, LobbyListener
         // listeners about only the items that changed. If this game started
         // hosting many dungeons, then it would be more important, but given
         // the current scale of the game the current mechanism is easier.
-        ListDataEvent event =
+        final ListDataEvent event =
             new ListDataEvent(this, ListDataEvent.CONTENTS_CHANGED,
                               0, data.size() - 1);
-        for (ListDataListener listener : listeners)
+        
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                for (ListDataListener listener : listeners)
             listener.contentsChanged(event);
+            }
+        });
     }
 
     /**
