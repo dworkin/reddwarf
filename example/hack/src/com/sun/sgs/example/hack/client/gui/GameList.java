@@ -132,7 +132,7 @@ class GameList implements ListModel, LobbyListener
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 for (ListDataListener listener : listeners)
-            listener.contentsChanged(event);
+                    listener.contentsChanged(event);
             }
         });
     }
