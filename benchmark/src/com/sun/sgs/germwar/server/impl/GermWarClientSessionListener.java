@@ -250,7 +250,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
         try {
             spawn = bact.doSplit(loc.getCoordinate());
         } catch (InvalidSplitException ise) {
-            logger.log(Level.WARNING, "Failed to split " + bact + " into " +
+            logger.log(Level.FINE, "Failed to split " + bact + " into " +
                 loc + ": " + ise.getMessage());
             return false;
         }
@@ -258,7 +258,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
         /** Split succeeded. */
         loc.setOccupant(spawn);
 
-        logger.log(Level.FINE, "Successful split attempt by " +
+        logger.log(Level.FINER, "Successful split attempt by " +
             bact + " into " + loc);
 
         return true;
@@ -300,7 +300,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             String msg = chatRequest.getMessage();
             int msgId = chatRequest.getId();
             
-            logger.log(Level.FINER, "Received chat request #" + msgId +
+            logger.log(Level.FINEST, "Received chat request #" + msgId +
                 " from " + formattedName + " to " + recipient + ": \"" +
                 msg + "\"");
 
@@ -337,7 +337,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             Coordinate destCoord = dest.getCoordinate();
 
             if (bact == null) {
-                logger.log(Level.WARNING, "MoveRequest received from player " +
+                logger.log(Level.INFO, "MoveRequest received from player " +
                     player + " for non-existant bacterium #" + bactId);
                 return;
             }
@@ -366,7 +366,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
                  */
                 bact.doMove(destCoord);
             } catch (InvalidMoveException ime) {
-                logger.log(Level.WARNING, "Failed move attempt by " +
+                logger.log(Level.FINE, "Failed move attempt by " +
                     formattedName + ": " + ime.paramString() + ", " +
                     ime.getMessage());
                 return;
@@ -376,7 +376,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             dest.setOccupant(bact);
             src.setOccupant(null);
 
-            logger.log(Level.FINE, "Successful move attempt by " + bact +
+            logger.log(Level.FINER, "Successful move attempt by " + bact +
                 " from " + src + " to " + dest);
 
             /**
@@ -402,7 +402,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
                 long occPlayerId = occ.getPlayerId();
                 if (occPlayerId == playerId) continue;
 
-                logger.log(Level.FINE, bact + " is attacking " + occ);
+                logger.log(Level.FINER, bact + " is attacking " + occ);
 
                 boolean modified = occ.doFight(bact);
 
@@ -449,11 +449,7 @@ public class GermWarClientSessionListener implements ClientSessionListener, Seri
             {
                 sendUpdate(world.getLocation(newLocCoord), playerId);
             }
-
-            logger.log(Level.FINE, formattedName + " successfully moved " +
-                bact + " from " + src + " to " + dest);
-        }
-        else {
+        } else {
             logger.log(Level.SEVERE,
                 String.format("Received unsupported message from %s: %s",
                     formattedName, appMsg.getClass().getName()));

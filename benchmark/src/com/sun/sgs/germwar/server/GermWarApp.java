@@ -128,7 +128,7 @@ public class GermWarApp implements Serializable, AppListener {
     public ClientSessionListener loggedIn(ClientSession session) {
         /** Add this user to the ClientSessionManager. */
         ClientSessionManager.add(session.getName(), session);
-        logger.log(Level.INFO, "ClientSession joined: {0}", session);
+        logger.log(Level.FINE, "ClientSession joined: {0}", session);
         return new GermWarClientSessionListener(session);
     }
 
