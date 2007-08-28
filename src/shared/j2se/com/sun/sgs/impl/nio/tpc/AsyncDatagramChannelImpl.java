@@ -11,23 +11,33 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.NotYetConnectedException;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.MembershipKey;
+import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
+import com.sun.sgs.nio.channels.WritePendingException;
 
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
@@ -48,7 +58,10 @@ class AsyncDatagramChannelImpl
 
     final AsyncChannelGroupImpl channelGroup;
     final DatagramChannel channel;
-    private final Object closeLock = new Object();
+
+    private final AtomicBoolean connectPending = new AtomicBoolean();
+    private final AtomicBoolean readPending    = new AtomicBoolean();
+    private final AtomicBoolean writePending   = new AtomicBoolean();
 
     protected AsyncDatagramChannelImpl(
             ThreadedAsyncChannelProvider provider,
@@ -57,14 +70,23 @@ class AsyncDatagramChannelImpl
     {
         super(provider);
         this.channelGroup = group;
-        channel = DatagramChannel.open();
-        channel.configureBlocking(false);
-        // TODO group.register(this);
+        channel = provider.getSelectorProvider().openDatagramChannel();
+        group.register(this);
     }
 
     private void checkClosedAsync() {
         if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
+    }
+
+    private void checkConnected() {
+        if (! channel.isConnected())
+            throw new NotYetConnectedException();
+    }
+
+    private void awaitSelectableOp(long timeout, int ops) throws IOException {
+        ((ThreadedAsyncChannelProvider) provider())
+                .awaitSelectableOp(channel, timeout, ops);
     }
 
     /**
@@ -78,14 +100,8 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public void close() throws IOException
-    {
-        synchronized (closeLock) {
-            if (! channel.isOpen())
-                return;
-            channel.close();
-            // TODO kill in-progress read, write, and/or connect ourselves
-        }
+    public void close() throws IOException {
+        channel.close();
     }
 
     /**
@@ -253,19 +269,37 @@ class AsyncDatagramChannelImpl
     @Override
     public SocketAddress getConnectedAddress() throws IOException
     {
-        // TODO
-        return null;
+        return channel.socket().getRemoteSocketAddress();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Void, A> connect(SocketAddress remote, A attachment,
-        CompletionHandler<Void, ? super A> handler)
+    public <A> IoFuture<Void, A> connect(
+            final SocketAddress remote,
+            A attachment,
+            CompletionHandler<Void, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+        if (channel.isConnected())
+            throw new AlreadyConnectedException();
+
+        if (! connectPending.compareAndSet(false, true))
+            throw new ConnectionPendingException();
+
+        AsyncIoTask<Void, A> task = AsyncIoTask.create(
+                new Callable<Void>() {
+                    public Void call() throws IOException {
+                        channel.connect(remote);
+                        return null;
+                    }},
+                attachment,
+                handler,
+                connectPending
+            );
+        channelGroup.execute(task);
+        return task;
     }
 
     /**
@@ -275,75 +309,185 @@ class AsyncDatagramChannelImpl
     public <A> IoFuture<Void, A> disconnect(A attachment,
         CompletionHandler<Void, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+
+        AsyncIoTask<Void, A> task = AsyncIoTask.create(
+                new Callable<Void>() {
+                    public Void call() throws IOException {
+                        channel.disconnect();
+                        return null;
+                    }},
+                attachment,
+                handler,
+                null
+            );
+        channelGroup.execute(task);
+        return task;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public boolean isReadPending()
-    {
-        // TODO
-        return false;
+    public boolean isReadPending() {
+        return readPending.get();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public boolean isWritePending()
-    {
-        // TODO
-        return false;
+    public boolean isWritePending() {
+        return writePending.get();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<SocketAddress, A> receive(ByteBuffer dst,
-        long timeout, TimeUnit unit, A attachment,
-        CompletionHandler<SocketAddress, ? super A> handler)
+    public <A> IoFuture<SocketAddress, A> receive(
+            final ByteBuffer dst,
+            long timeout,
+            TimeUnit unit,
+            A attachment,
+            CompletionHandler<SocketAddress, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+        if (timeout < 0)
+            throw new IllegalArgumentException("timeout can't be negative");
+
+        if (! readPending.compareAndSet(false, true))
+            throw new ReadPendingException();
+
+        final int timeoutMillis = (int) unit.toMillis(timeout);
+
+        Callable<SocketAddress> callable = new Callable<SocketAddress>() {
+            public SocketAddress call() throws IOException {
+                if (channel.socket().getSoTimeout() != timeoutMillis)
+                    channel.socket().setSoTimeout(timeoutMillis);
+                try {
+                    return channel.receive(dst);
+                } catch (SocketTimeoutException e) {
+                    throw new AbortedByTimeoutException();
+                }
+            }
+        };
+
+        AsyncIoTask<SocketAddress, A> task =
+            AsyncIoTask.create(callable, attachment, handler, readPending);
+
+        channelGroup.execute(task);
+        return task;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Integer, A> send(ByteBuffer src,
-        SocketAddress target, long timeout, TimeUnit unit, A attachment,
-        CompletionHandler<Integer, ? super A> handler)
+    public <A> IoFuture<Integer, A> send(
+            final ByteBuffer src,
+            final SocketAddress target,
+            long timeout, 
+            TimeUnit unit, 
+            A attachment,
+            CompletionHandler<Integer, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+        checkConnected();
+        if (timeout < 0)
+            throw new IllegalArgumentException("timeout can't be negative");
+
+        if (! writePending.compareAndSet(false, true))
+            throw new WritePendingException();
+
+        final long timeoutMillis = unit.toMillis(timeout);
+
+        Callable<Integer> callable = new Callable<Integer>() {
+            public Integer call() throws IOException {
+                awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
+                return channel.send(src, target);
+            }
+        };
+
+        AsyncIoTask<Integer, A> task =
+            AsyncIoTask.create(callable, attachment, handler, writePending);
+
+        channelGroup.execute(task);
+        return task;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Integer, A> read(ByteBuffer dst, long timeout,
-        TimeUnit unit, A attachment,
-        CompletionHandler<Integer, ? super A> handler)
+    public <A> IoFuture<Integer, A> read(
+            final ByteBuffer dst,
+            long timeout,
+            TimeUnit unit,
+            A attachment,
+            CompletionHandler<Integer, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+        checkConnected();
+        if (timeout < 0)
+            throw new IllegalArgumentException("timeout can't be negative");
+
+        if (! readPending.compareAndSet(false, true))
+            throw new ReadPendingException();
+
+        final int timeoutMillis = (int) unit.toMillis(timeout);
+
+        Callable<Integer> callable = new Callable<Integer>() {
+            public Integer call() throws IOException {
+                if (channel.socket().getSoTimeout() != timeoutMillis)
+                    channel.socket().setSoTimeout(timeoutMillis);
+                try {
+                    return channel.read(dst);
+                } catch (SocketTimeoutException e) {
+                    throw new AbortedByTimeoutException();
+                }
+            }
+        };
+
+        AsyncIoTask<Integer, A> task =
+            AsyncIoTask.create(callable, attachment, handler, readPending);
+
+        channelGroup.execute(task);
+        return task;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Integer, A> write(ByteBuffer src, long timeout,
-        TimeUnit unit, A attachment,
-        CompletionHandler<Integer, ? super A> handler)
+    public <A> IoFuture<Integer, A> write(
+            final ByteBuffer src, 
+            long timeout,
+            TimeUnit unit, 
+            A attachment,
+          CompletionHandler<Integer, ? super A> handler)
     {
-        // TODO
-        return null;
+        checkClosedAsync();
+        checkConnected();
+        if (timeout < 0)
+            throw new IllegalArgumentException("timeout can't be negative");
+
+        if (! writePending.compareAndSet(false, true))
+            throw new WritePendingException();
+
+        final long timeoutMillis = unit.toMillis(timeout);
+
+        Callable<Integer> callable = new Callable<Integer>() {
+            public Integer call() throws IOException {
+                awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
+                return channel.write(src);
+            }
+        };
+
+        AsyncIoTask<Integer, A> task =
+            AsyncIoTask.create(callable, attachment, handler, writePending);
+
+        channelGroup.execute(task);
+        return task;
     }
 }

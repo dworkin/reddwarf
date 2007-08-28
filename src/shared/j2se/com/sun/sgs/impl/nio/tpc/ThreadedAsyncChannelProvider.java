@@ -5,10 +5,14 @@
 package com.sun.sgs.impl.nio.tpc;
 
 import java.io.IOException;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.Selector;
+import java.nio.channels.spi.SelectorProvider;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.concurrent.ExecutorService;
 
+import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
@@ -16,14 +20,16 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 public class ThreadedAsyncChannelProvider
     extends AsynchronousChannelProvider
 {
+    private final SelectorProvider selectorProvider;
     private AsyncChannelGroupImpl defaultGroupInstance = null;
 
     public static ThreadedAsyncChannelProvider create() {
-        return new ThreadedAsyncChannelProvider();
+        return new ThreadedAsyncChannelProvider(SelectorProvider.provider());
     }
 
-    protected ThreadedAsyncChannelProvider() {
+    protected ThreadedAsyncChannelProvider(SelectorProvider selProvider) {
         super();
+        selectorProvider = selProvider;
     }
 
     private static ThreadPoolFactory getThreadPoolFactory() {
@@ -69,6 +75,23 @@ public class ThreadedAsyncChannelProvider
         return ((AsyncChannelGroupImpl) group).checkShutdown();
     }
 
+    void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
+        throws IOException
+    {
+        
+        if (timeout == 0)
+            return;
+
+        Selector sel = getSelectorProvider().openSelector();
+        channel.register(sel, ops);
+        if (sel.select(timeout) == 0)
+            throw new AbortedByTimeoutException();
+    }
+
+    SelectorProvider getSelectorProvider() {
+        return selectorProvider;
+    }
+    
     /**
      * {@inheritDoc}
      */

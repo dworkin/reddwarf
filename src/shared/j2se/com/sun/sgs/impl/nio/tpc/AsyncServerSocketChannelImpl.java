@@ -14,6 +14,7 @@ import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.sgs.nio.channels.AcceptPendingException;
@@ -40,18 +41,16 @@ final class AsyncServerSocketChannelImpl
     final AsyncChannelGroupImpl channelGroup;
     final ServerSocketChannel channel;
 
-    final AtomicBoolean acceptPending = new AtomicBoolean(false);
+    private final AtomicBoolean acceptPending = new AtomicBoolean();
 
-    AsyncServerSocketChannelImpl(
-            ThreadedAsyncChannelProvider provider,
-            AsyncChannelGroupImpl group)
-    throws IOException
+    AsyncServerSocketChannelImpl(ThreadedAsyncChannelProvider provider,
+                                 AsyncChannelGroupImpl group)
+        throws IOException
     {
         super(provider);
         this.channelGroup = group;
-        channel = ServerSocketChannel.open();
-        channel.configureBlocking(false);
-        //group.register(this);
+        channel = provider.getSelectorProvider().openServerSocketChannel();
+        group.register(this);
     }
 
     private void checkClosedAsync() {
@@ -70,9 +69,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public void close() throws IOException
-    {
-        // TODO
+    public void close() throws IOException {
         channel.close();
     }
 
@@ -164,8 +161,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public boolean isAcceptPending()
-    {
+    public boolean isAcceptPending() {
         return acceptPending.get();
     }
 
@@ -174,18 +170,27 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public <A> IoFuture<AsynchronousSocketChannel, A> accept(
-        A attachment,
-        CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
+            A attachment,
+            CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
         checkClosedAsync();
-        if (! acceptPending.compareAndSet(false, true)) {
+
+        if (! acceptPending.compareAndSet(false, true))
             throw new AcceptPendingException();
-        }
-        //AcceptFuture<A> future = new AcceptFuture<A>(attachment, handler);
-       // group.updateInterestOps(channel, SelectionKey.OP_ACCEPT, 0);
-        //IoFuture<AsynchronousSocketChannel, A> foo =
-        //    new AbstractIoFuture<AsynchronousSocketChannel, A>(group, attachment, handler);
-        // TODO
-        return null;
+
+        AsyncIoTask<AsynchronousSocketChannel, A> task = AsyncIoTask.create(
+                new Callable<AsynchronousSocketChannel>() {
+                    public AsynchronousSocketChannel call() throws IOException {
+                        return new AsyncSocketChannelImpl(
+                            (ThreadedAsyncChannelProvider) provider(),
+                            channelGroup,
+                            channel.accept());
+                    }},
+                attachment,
+                handler,
+                acceptPending
+            );
+        channelGroup.execute(task);
+        return task;
     }
 }

@@ -5,8 +5,8 @@
 package com.sun.sgs.impl.nio.tpc;
 
 import java.io.IOException;
-import java.nio.channels.Channel;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -16,13 +16,9 @@ import com.sun.sgs.nio.channels.AsynchronousChannel;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
-/*
- * For the moment, this borrows a lot of code and structure from
- * ThreadPoolExecutor; however, this is expected to change.
- */
-
 class AsyncChannelGroupImpl
     extends AsynchronousChannelGroup
+    implements Executor
 {
     final ExecutorService executor;
 
@@ -65,9 +61,9 @@ class AsyncChannelGroupImpl
             // TODO error? ignore?
         }
     }
-    
-    ExecutorService getExecutor() {
-        return executor;
+
+    public void execute(Runnable task) {
+        executor.execute(task);
     }
 
     /**
@@ -154,11 +150,13 @@ class AsyncChannelGroupImpl
     }
 
     /**
-     * Invokes <tt>shutdown</tt> when this channel group is no longer
+     * Invokes {@code shutdown} when this channel group is no longer
      * referenced.
      */
     @Override
-    protected void finalize()  {
+    protected void finalize() {
+        // TODO is this actually useful? -JM
         shutdown();
     }
+
 }
