@@ -186,6 +186,20 @@ public class PlayerManager {
     }
 
     /**
+     * Returns the current number of players (this includes players with no
+     * bacteria left because they have all died).
+     */
+    public static long playerCount() {
+        try {
+            ManagedLong nextBacteriumId = AppContext.getDataManager()
+                .getBinding(MASTER_ID_BINDING, ManagedLong.class);
+            return nextBacteriumId.get() - 1;
+        } catch (NameNotBoundException nnbe) {
+            return 0;
+        }
+    }
+
+    /**
      * Inner class: PlayerImpl
      * <p>
      * A simple implementation of {@link Player}.

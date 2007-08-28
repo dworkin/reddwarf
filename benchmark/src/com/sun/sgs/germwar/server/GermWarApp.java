@@ -184,6 +184,9 @@ public class GermWarApp implements Serializable, AppListener {
             TaskManager tm = AppContext.getTaskManager();
             Iterator<ManagedReference> iter = PlayerManager.refIterator();
 
+            logger.log(Level.INFO, System.currentTimeMillis() +
+                "\tStarting StatsTask.  players=" + PlayerManager.playerCount());
+
             while (iter.hasNext()) {
                 tm.scheduleTask(new StatsTask(iter.next()));
             }
