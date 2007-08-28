@@ -4,6 +4,11 @@
 
 package com.sun.sgs.germwar.client;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -54,7 +59,8 @@ public class AIController extends NullGui implements GameLogic {
      * still appears empty to the client).  When the server gets this message,
      * the move request fails because the destination is not empty.
      */
-    private Set<Coordinate> movedLocs = new HashSet<Coordinate>();
+    private Set<Coordinate> movedLocs =
+        Collections.synchronizedSet(new HashSet<Coordinate>());
 
     /** Handles the AI actions. */
     private ActionThread actionThread = new ActionThread();
@@ -98,38 +104,55 @@ public class AIController extends NullGui implements GameLogic {
      * @param args the commandline arguments (not used)
      */
     public static void main(String[] args) {
-        int count = 1;
-        boolean showGui = false;
+        if ((args.length > 0) && (args[0].equals("-g"))) {
+            /** Just make 1 client, and show a gui. */
+            makeClient("AI-gui", true);
+        } else {
+            int total = 0;
+            BufferedReader reader = new BufferedReader(new
+                InputStreamReader(System.in));
 
-        if (args.length > 0) {
-            try {
-                count = Integer.valueOf(args[0]);
-            } catch (NumberFormatException nfe) {
-                System.err.println("Usage: com.sun.sgs.germwar.client." +
-                    "AIController [bot-count] [-g]  (-g shows GUI)");
-                return;
-            }
+            do {
+                int count;
+                /** Have to include a newline because Ant sucks. */
+                System.out.println("Number of clients to create: ");
+                try {
+                    String s = reader.readLine();
+                    if (s == null) return;
+                    count = Integer.valueOf(s);
+                } catch (IOException ioe) {
+                    System.err.println(ioe);
+                    continue;
+                } catch (NumberFormatException nfe) {
+                    System.err.println(nfe);
+                    continue;
+                }
 
-            showGui = (args.length >= 2) && (args[1].equals("-g"));
+                for (int i=0; i < count; i++) {
+                    ++total;
+                    makeClient("AI-" + total, false);
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ignore) { }
+                }
+
+                System.out.println("Total clients so far: " + total);
+            } while (true);
         }
+    }
 
-        Random rand = new Random();
+    /** Helper method for main. */
+    private static void makeClient(String username, boolean showGui) {
+        GermWarClient gameClient = new GermWarClient();
+        AIController controller = new AIController(gameClient,
+            username, "pwd");
 
-        for (int i=0; i < count; i++) {
-            GermWarClient gameClient = new GermWarClient();
-            AIController controller = new AIController(gameClient,
-                "AI:" + rand.nextInt(), "pwd");
+        gameClient.setGui(controller);
+        if (showGui) controller.setGui(new MainFrame(controller));
 
-            gameClient.setGui(controller);
-            if (showGui) controller.setGui(new MainFrame(controller));
-
-            controller.setVisible(true);
-            controller.login();
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ignore) { }
-        }
+        controller.setVisible(true);
+        controller.login();
     }
 
     /**
@@ -138,15 +161,13 @@ public class AIController extends NullGui implements GameLogic {
     @Override
     public void mapUpdate(Location loc) {
         Bacterium bact = getBacteriumFromLoc(loc);
-
+        
         if (bact != null) {
             synchronized (userBacteria) {
                 userBacteria.put(bact.getId(), bact);
             }
         }
-
-        // todo - some way to remove bacteria?  (if the game ever has this)
-
+        
         gui.mapUpdate(loc);
     }
 
@@ -164,12 +185,11 @@ public class AIController extends NullGui implements GameLogic {
     @Override
     public void newTurn() {
         gui.newTurn();
-        actionThread.poke();
 
         /** Clear list of locations moved to. */
-        synchronized (movedLocs) {
-            movedLocs.clear();
-        }
+        movedLocs.clear();
+
+        actionThread.poke();
     }
 
     /**
@@ -324,10 +344,13 @@ public class AIController extends NullGui implements GameLogic {
 
                 /** Iterate bacteria, looking for one that can move. */
                 synchronized (userBacteria) {
-                    for (Bacterium bact : userBacteria.values()) {
+                    Iterator<Bacterium> iter = userBacteria.values().iterator();
+
+                    while (iter.hasNext()) {
                         /** Good to recheck this every iteration. */
                         if (!enabled) break;
 
+                        Bacterium bact = iter.next();
                         if (bact.getCurrentMovementPoints() == 0) continue;
 
                         Coordinate coord = bact.getCoordinate();
@@ -346,28 +369,26 @@ public class AIController extends NullGui implements GameLogic {
                              * Error - bacterium is out of sync with the world
                              * state; assume its dead.
                              */
-                            userBacteria.remove(bact.getId());
+                            iter.remove();
                             continue;
                         }
 
-                        synchronized (movedLocs) {
-                            for (int i=0; i < 4; i++) {
-                                Coordinate dest = null;
+                        for (int i=0; i < 4; i++) {
+                            Coordinate dest = null;
 
-                                if (i == 0) dest = coord.offsetBy(-1, 0);
-                                if (i == 1) dest = coord.offsetBy(1, 0);
-                                if (i == 2) dest = coord.offsetBy(0, -1);
-                                if (i == 3) dest = coord.offsetBy(0, 1);
+                            if (i == 0) dest = coord.offsetBy(-1, 0);
+                            if (i == 1) dest = coord.offsetBy(1, 0);
+                            if (i == 2) dest = coord.offsetBy(0, -1);
+                            if (i == 3) dest = coord.offsetBy(0, 1);
 
-                                if (movedLocs.contains(dest)) continue;
+                            if (movedLocs.contains(dest)) continue;
 
-                                Location loc = gameLogic.getLocation(dest);
+                            Location loc = gameLogic.getLocation(dest);
 
-                                if ((loc != null) && (!loc.isOccupied()) &&
-                                    (loc.getFood() > bestFood)) {
-                                    bestFood = loc.getFood();
-                                    bestFoodLoc = loc;
-                                }
+                            if ((loc != null) && (!loc.isOccupied()) &&
+                                (loc.getFood() > bestFood)) {
+                                bestFood = loc.getFood();
+                                bestFoodLoc = loc;
                             }
                         }
 
@@ -381,9 +402,7 @@ public class AIController extends NullGui implements GameLogic {
                             continue;
                         }
 
-                        synchronized (movedLocs) {
-                            movedLocs.add(bestFoodLoc.getCoordinate());
-                        }
+                        movedLocs.add(bestFoodLoc.getCoordinate().copy());
                     }
                 }
 
