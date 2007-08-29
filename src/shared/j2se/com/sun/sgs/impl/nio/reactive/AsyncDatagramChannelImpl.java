@@ -2,57 +2,62 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio;
+package com.sun.sgs.impl.nio.reactive;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
-import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
+import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ShutdownType;
+import com.sun.sgs.nio.channels.MembershipKey;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
-class AsyncSocketChannelImpl
-    extends AsynchronousSocketChannel
-    implements AsyncChannelHandler
+class AsyncDatagramChannelImpl
+    extends AsynchronousDatagramChannel
 {
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
             StandardSocketOption.SO_SNDBUF,
             StandardSocketOption.SO_RCVBUF,
-            StandardSocketOption.SO_KEEPALIVE,
             StandardSocketOption.SO_REUSEADDR,
-            StandardSocketOption.TCP_NODELAY);
+            StandardSocketOption.SO_BROADCAST,
+            StandardSocketOption.IP_TOS,
+            StandardSocketOption.IP_MULTICAST_IF,
+            StandardSocketOption.IP_MULTICAST_TTL,
+            StandardSocketOption.IP_MULTICAST_LOOP);
         socketOptions = Collections.unmodifiableSet(es);
     }
 
     final AsyncChannelGroupImpl channelGroup;
-    final SocketChannel channel;
+    final DatagramChannel channel;
     private final Object closeLock = new Object();
 
-    AsyncSocketChannelImpl(DefaultAsynchronousChannelProvider provider,
-        AsyncChannelGroupImpl group) throws IOException
+    protected AsyncDatagramChannelImpl(
+            ReactiveAsyncChannelProvider provider,
+            AsyncChannelGroupImpl group)
+        throws IOException
     {
         super(provider);
         this.channelGroup = group;
-        channel = SocketChannel.open();
+        channel = DatagramChannel.open();
         channel.configureBlocking(false);
         // TODO group.register(this);
     }
@@ -87,10 +92,10 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncSocketChannelImpl bind(SocketAddress local)
+    public AsynchronousDatagramChannel bind(SocketAddress local)
         throws IOException
     {
-        final Socket socket = channel.socket();
+        final DatagramSocket socket = channel.socket();
         if (socket.isClosed())
             throw new ClosedChannelException();
         if (socket.isBound())
@@ -113,7 +118,7 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncSocketChannelImpl setOption(SocketOption name, Object value)
+    public AsyncDatagramChannelImpl setOption(SocketOption name, Object value)
         throws IOException
     {
         if (! (name instanceof StandardSocketOption))
@@ -132,17 +137,36 @@ class AsyncSocketChannelImpl
             channel.socket().setReceiveBufferSize(((Integer)value).intValue());
             break;
 
-        case SO_KEEPALIVE:
-            channel.socket().setKeepAlive(((Boolean)value).booleanValue());
-            break;
-
         case SO_REUSEADDR:
             channel.socket().setReuseAddress(((Boolean)value).booleanValue());
             break;
 
-        case TCP_NODELAY:
-            channel.socket().setTcpNoDelay(((Boolean)value).booleanValue());
+        case SO_BROADCAST:
+            channel.socket().setBroadcast(((Boolean)value).booleanValue());
             break;
+
+        case IP_TOS:
+            channel.socket().setTrafficClass(((Integer)value).intValue());
+            break;
+
+        case IP_MULTICAST_IF: {
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            msocket.setNetworkInterface((NetworkInterface)value);
+            break;
+        }
+
+        case IP_MULTICAST_TTL: {
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            msocket.setTimeToLive(((Integer)value).intValue());
+            break;
+        }
+
+        case IP_MULTICAST_LOOP: {
+            // TODO should we reverse the value of this IP_MULTICAST_LOOP?
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            msocket.setLoopbackMode(((Boolean)value).booleanValue());
+            break;
+        }
 
         default:
             throw new IllegalArgumentException("Unsupported option " + name);
@@ -165,14 +189,30 @@ class AsyncSocketChannelImpl
         case SO_RCVBUF:
             return channel.socket().getReceiveBufferSize();
 
-        case SO_KEEPALIVE:
-            return channel.socket().getKeepAlive();
-
         case SO_REUSEADDR:
             return channel.socket().getReuseAddress();
 
-        case TCP_NODELAY:
-            return channel.socket().getTcpNoDelay();
+        case SO_BROADCAST:
+            return channel.socket().getBroadcast();
+
+        case IP_TOS:
+            return channel.socket().getTrafficClass();
+
+        case IP_MULTICAST_IF: {
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            return msocket.getNetworkInterface();
+        }
+
+        case IP_MULTICAST_TTL: {
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            return msocket.getTimeToLive();
+        }
+
+        case IP_MULTICAST_LOOP: {
+            // TODO should we reverse the value of this IP_MULTICAST_LOOP?
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            return msocket.getLoopbackMode();
+        }
 
         default:
             break;
@@ -190,30 +230,53 @@ class AsyncSocketChannelImpl
     /**
      * {@inheritDoc}
      */
-    @Override
-    public AsyncSocketChannelImpl shutdown(ShutdownType how)
+    public MembershipKey join(InetAddress group, NetworkInterface interf)
         throws IOException
     {
         // TODO
-        return this;
+        throw new UnsupportedOperationException();
     }
 
     /**
      * {@inheritDoc}
      */
-    @Override
-    public SocketAddress getConnectedAddress() throws IOException {
-        return channel.socket().getRemoteSocketAddress();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean isConnectionPending()
+    public MembershipKey join(InetAddress group, NetworkInterface interf,
+        InetAddress source) throws IOException
     {
         // TODO
-        return false;
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SocketAddress getConnectedAddress() throws IOException
+    {
+        // TODO
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <A> IoFuture<Void, A> connect(SocketAddress remote, A attachment,
+        CompletionHandler<Void, ? super A> handler)
+    {
+        // TODO
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <A> IoFuture<Void, A> disconnect(A attachment,
+        CompletionHandler<Void, ? super A> handler)
+    {
+        // TODO
+        return null;
     }
 
     /**
@@ -240,19 +303,26 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Void, A> connect(SocketAddress remote, A attachment,
-        CompletionHandler<Void, ? super A> handler)
+    public <A> IoFuture<SocketAddress, A> receive(ByteBuffer dst,
+        long timeout, TimeUnit unit, A attachment,
+        CompletionHandler<SocketAddress, ? super A> handler)
     {
-        checkClosedAsync();
-        return OpFutureBase.create(new ConnectRunner(), attachment, handler);
+        // TODO
+        return null;
     }
-    
-    final class ConnectRunner implements Runnable {
-        public void run() {
-            // TODO
-        }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <A> IoFuture<Integer, A> send(ByteBuffer src,
+        SocketAddress target, long timeout, TimeUnit unit, A attachment,
+        CompletionHandler<Integer, ? super A> handler)
+    {
+        // TODO
+        return null;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -261,19 +331,6 @@ class AsyncSocketChannelImpl
         TimeUnit unit, A attachment,
         CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
-        return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public <A> IoFuture<Long, A> read(ByteBuffer[] dsts, int offset,
-        int length, long timeout, TimeUnit unit, A attachment,
-        CompletionHandler<Long, ? super A> handler)
-    {
-        checkClosedAsync();
         // TODO
         return null;
     }
@@ -286,35 +343,7 @@ class AsyncSocketChannelImpl
         TimeUnit unit, A attachment,
         CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
         // TODO
         return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public <A> IoFuture<Long, A> write(ByteBuffer[] srcs, int offset,
-        int length, long timeout, TimeUnit unit, A attachment,
-        CompletionHandler<Long, ? super A> handler)
-    {
-        checkClosedAsync();
-        // TODO
-        return null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void channelSelected(int ops) throws IOException {
-        // TODO
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public SocketChannel getSelectableChannel() {
-        return channel;
     }
 }

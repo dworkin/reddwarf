@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio;
+package com.sun.sgs.impl.nio.reactive;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -44,7 +44,7 @@ final class AsyncServerSocketChannelImpl
     final AtomicBoolean acceptPending = new AtomicBoolean(false);
 
     AsyncServerSocketChannelImpl(
-            DefaultAsynchronousChannelProvider provider,
+            ReactiveAsyncChannelProvider provider,
             AsyncChannelGroupImpl group)
     throws IOException
     {

@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio;
+package com.sun.sgs.impl.nio.reactive;
 
 import java.io.IOException;
 import java.security.AccessController;
@@ -13,16 +13,16 @@ import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
-public class DefaultAsynchronousChannelProvider
+public class ReactiveAsyncChannelProvider
     extends AsynchronousChannelProvider
 {
     private AsyncChannelGroupImpl defaultGroupInstance = null;
 
-    public static DefaultAsynchronousChannelProvider create() {
-        return new DefaultAsynchronousChannelProvider();
+    public static ReactiveAsyncChannelProvider create() {
+        return new ReactiveAsyncChannelProvider();
     }
 
-    protected DefaultAsynchronousChannelProvider() {
+    protected ReactiveAsyncChannelProvider() {
         super();
     }
 

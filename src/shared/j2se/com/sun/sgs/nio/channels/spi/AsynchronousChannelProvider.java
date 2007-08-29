@@ -101,15 +101,16 @@ public abstract class AsynchronousChannelProvider {
                 return provider;
             return AccessController.doPrivileged(
                 new PrivilegedAction<AsynchronousChannelProvider>() {
-                        public AsynchronousChannelProvider run() {
-                            if (loadProviderFromProperty())
-                                return provider;
-//                            if (loadProviderAsService())
-//                                return provider;
-                            provider = com.sun.sgs.impl.nio.DefaultAsynchronousChannelProvider.create();
+                    public AsynchronousChannelProvider run() {
+                        if (loadProviderFromProperty())
                             return provider;
-                        }
-                    });
+// TODO service loading requires JDK 6 or higher
+//                        if (loadProviderAsService())
+//                            return provider;
+                        provider = com.sun.sgs.impl.nio.threaded.ThreadedAsyncChannelProvider.create();
+                        return provider;
+                    }
+                });
         }
     }
 

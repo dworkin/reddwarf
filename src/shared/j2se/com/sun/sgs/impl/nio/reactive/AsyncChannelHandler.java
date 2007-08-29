@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio;
+package com.sun.sgs.impl.nio.reactive;
 
 import java.io.Closeable;
 import java.io.IOException;

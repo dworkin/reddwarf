@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio;
+package com.sun.sgs.impl.nio.reactive;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
@@ -41,7 +41,7 @@ class AsyncChannelGroupImpl
 
     static final int MAX_DISPATCHES_PER_WORK_LOOP = 1;
 
-    AsyncChannelGroupImpl(DefaultAsynchronousChannelProvider provider,
+    AsyncChannelGroupImpl(ReactiveAsyncChannelProvider provider,
                           ExecutorService executor) 
         throws IOException
     {
