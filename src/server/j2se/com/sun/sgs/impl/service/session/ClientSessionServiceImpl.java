@@ -143,7 +143,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    NonDurableTaskScheduler nonDurableTaskScheduler;
+    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;

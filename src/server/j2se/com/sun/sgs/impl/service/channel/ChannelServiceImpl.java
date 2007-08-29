@@ -120,7 +120,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    NonDurableTaskScheduler nonDurableTaskScheduler;
+    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
