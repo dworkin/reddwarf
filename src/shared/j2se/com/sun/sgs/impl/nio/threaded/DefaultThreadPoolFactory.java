@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio.tpc;
+package com.sun.sgs.impl.nio.threaded;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
