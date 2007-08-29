@@ -1199,7 +1199,7 @@
       <sysproperty key="java.library.path" 
 		   file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
-		   file="${test.logging}"/>
+		   file="benchmark/germwar.logging"/>
       <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
 		   value="true"/>
       <classpath>
@@ -1218,7 +1218,7 @@
       <arg line="${cmdargs}" />
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.util.logging.config.file"
-		   file="${test.logging}"/>
+		   file="benchmark/germwar.logging"/>
       <classpath>
         <pathelement location="${build.dir}/classes/client"/>
         <pathelement location="${build.dir}/germwar/classes"/>
