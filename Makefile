@@ -11,6 +11,9 @@ else
   LINKFLAGS =
 endif
 
+# Version number
+VERSION=0.9.3
+
 # directories to look in / put things
 BINDIR  = bin
 DISTDIR = dist
@@ -18,7 +21,7 @@ ODIR    = obj
 SRCDIR  = src/client/c
 
 # the base name (sans suffix) of the distribution file to create ("make tar") or ("make zip")
-DISTFILE = sgs_c_api
+DISTFILE = sgs_c_api_$(VERSION)
 
 HEADERS = $(wildcard $(SRCDIR)/*.h) $(wildcard $(SRCDIR)/impl/*.h)
 SRCS = $(notdir $(wildcard $(SRCDIR)/*.c)) $(addprefix impl/, $(notdir $(wildcard $(SRCDIR)/impl/*.c)))
