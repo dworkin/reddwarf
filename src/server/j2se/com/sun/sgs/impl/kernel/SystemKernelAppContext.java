@@ -112,18 +112,6 @@ final class SystemKernelAppContext extends AbstractKernelAppContext
      * @throws IllegalStateException always, since there are no services
      *                               available in the system context
      */
-    void setServices(ComponentRegistry serviceComponents) {
-        logger.log(Level.SEVERE, "Trying to set the services for the " +
-                   "system context");
-        throw new IllegalStateException("System context has no services");
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @throws IllegalStateException always, since there are no services
-     *                               available in the system context
-     */
     <T extends Service> T getService(Class<T> type) {
         logger.log(Level.SEVERE, "Trying to resolve a service from " +
                    "within the system context");
