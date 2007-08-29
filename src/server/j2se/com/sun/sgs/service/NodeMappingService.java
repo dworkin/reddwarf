@@ -68,10 +68,13 @@ public interface NodeMappingService extends Service {
         
     /**
      * Assigns the identity to a node and adds the assignment to the map.   
-     * If the identity has no node assignment, a node is selected for it; 
-     * otherwise, no action is performed.   Additionally (and atomically),
-     * notes that the service considers the identity to be active, as
-     * though {@link #setStatus setStatus(service, identity, true)} had
+     * If the identity has no node assignment, or the current assignment
+     * is not to a live node, a node is selected for it; otherwise, no action 
+     * is performed.   
+     * <p>
+     * Additionally (and atomically), notes that the service considers the 
+     * identity to be active, as though 
+     * {@link #setStatus setStatus(service, identity, true)} had
      * been called on the assigned node.
      * <p>
      * <b> TBD:  Perhaps this atomic setService doesn't help.  It seems as
