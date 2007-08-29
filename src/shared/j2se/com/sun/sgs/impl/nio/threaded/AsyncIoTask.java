@@ -10,12 +10,11 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 
-abstract class AsyncIoTask<R, A>
+class AsyncIoTask<R, A>
     implements RunnableFuture<R>, IoFuture<R, A>
 {
     private final InnerTask<?> innerTask;
@@ -24,32 +23,24 @@ abstract class AsyncIoTask<R, A>
     static <R, A> AsyncIoTask<R, A>
         create(final Callable<R> callable,
                A attachment,
-               CompletionHandler<R, ? super A> handler,
-               final AtomicBoolean pending)
+               CompletionHandler<R, ? super A> handler)
     {
-        return new AsyncIoTask<R, A>(attachment, handler) {
-            @Override
-            protected R performWork() throws Exception
-            {
-                return callable.call();
-            }
-            @Override
-            protected void done() {
-                if (pending != null)
-                    pending.set(false);
-            }
-        };
+        return new AsyncIoTask<R, A>(callable, attachment, handler);
     }
 
-    AsyncIoTask(A attachment, CompletionHandler<R, ? super A> handler) {
+    AsyncIoTask(Callable<R> callable,
+                A attachment,
+                CompletionHandler<R, ? super A> handler) {
         this.attachment = attachment;
-        innerTask = createInnerTask(attachment, handler);
+        innerTask = createInnerTask(callable, attachment, handler);
     }
 
-    private <X> InnerTask<X>
-        createInnerTask(X attachment, CompletionHandler<R, X> handler)
+    private <X> InnerTask<X> createInnerTask(
+            Callable<R> callable,
+            X attachment, 
+            CompletionHandler<R, X> handler)
     {
-        return new InnerTask<X>(attachment, handler);
+        return new InnerTask<X>(callable, attachment, handler);
     }
 
     final class InnerTask<X>
@@ -59,22 +50,18 @@ abstract class AsyncIoTask<R, A>
         private X innerAttachment;
         private CompletionHandler<R, X> handler;
 
-        InnerTask(X attachment, CompletionHandler<R, X> handler) {
-            super(new Callable<R>() {
-                public R call() throws Exception {
-                    return performWork();
-                }});
+        InnerTask(Callable<R> callable,
+                  X attachment,
+                  CompletionHandler<R, X> handler)
+        {
+            super(callable);
             this.innerAttachment = attachment;
             this.handler = handler;
         }
 
         @Override
         protected void done() {
-            try {
-                AsyncIoTask.this.done();
-            } finally {
-                handler.completed(this);
-            }
+            handler.completed(this);
         }
 
         public X attach(X ob) {
@@ -106,13 +93,6 @@ abstract class AsyncIoTask<R, A>
         }
     }
 
-    protected abstract R performWork() throws Exception;
-
-    /**
-     * @see FutureTask#done
-     */
-    protected void done() { }
-
     public A attach(A ob) {
         return attachment = ob;
     }
@@ -121,11 +101,11 @@ abstract class AsyncIoTask<R, A>
         return attachment;
     }
 
+    // Delegate to InnerTask
+
     public R getNow() throws ExecutionException {
         return innerTask.getNow();
     }
-
-    // Delegate to FutureTask
 
     public boolean cancel(boolean mayInterruptIfRunning) {
         return innerTask.cancel(mayInterruptIfRunning);

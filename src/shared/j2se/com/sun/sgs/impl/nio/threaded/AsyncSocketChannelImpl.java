@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
@@ -22,9 +21,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
@@ -50,12 +47,12 @@ final class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl channelGroup;
+    final AsyncChannelGroupImpl group;
     final SocketChannel channel;
 
-    private final AtomicBoolean connectPending = new AtomicBoolean();
-    private final AtomicBoolean readPending    = new AtomicBoolean();
-    private final AtomicBoolean writePending   = new AtomicBoolean();
+    private final AsyncIoTaskFactory connectTask;
+    private final AsyncIoTaskFactory readTask;
+    private final AsyncIoTaskFactory writeTask;
 
     // For unconnected channels
     AsyncSocketChannelImpl(ThreadedAsyncChannelProvider provider,
@@ -73,9 +70,22 @@ final class AsyncSocketChannelImpl
                            SocketChannel channel)
     {
         super(provider);
-        this.channelGroup = group;
+        this.group = group;
         this.channel = channel;
+        connectTask = new AsyncIoTaskFactory(group) {
+            @Override protected void alreadyPendingPolicy() {
+                throw new ConnectionPendingException();
+            }};
+        readTask = new AsyncIoTaskFactory(group) {
+            @Override protected void alreadyPendingPolicy() {
+                throw new ReadPendingException();
+            }};
+        writeTask = new AsyncIoTaskFactory(group) {
+            @Override protected void alreadyPendingPolicy() {
+                throw new WritePendingException();
+            }};
         group.register(this);
+
     }
 
     private void checkClosedAsync() {
@@ -104,8 +114,7 @@ final class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public void close() throws IOException
-    {
+    public void close() throws IOException {
         channel.close();
     }
 
@@ -248,27 +257,24 @@ final class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public boolean isConnectionPending()
-    {
-        return connectPending.get();
+    public boolean isConnectionPending() {
+        return connectTask.isPending();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public boolean isReadPending()
-    {
-        return readPending.get();
+    public boolean isReadPending() {
+        return readTask.isPending();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public boolean isWritePending()
-    {
-        return writePending.get();
+    public boolean isWritePending() {
+        return writeTask.isPending();
     }
 
     /**
@@ -284,21 +290,11 @@ final class AsyncSocketChannelImpl
         if (channel.isConnected())
             throw new AlreadyConnectedException();
 
-        if (! connectPending.compareAndSet(false, true))
-            throw new ConnectionPendingException();
-
-        AsyncIoTask<Void, A> task = AsyncIoTask.create(
-                new Callable<Void>() {
-                    public Void call() throws IOException {
-                        channel.connect(remote);
-                        return null;
-                    }},
-                attachment,
-                handler,
-                connectPending
-            );
-        channelGroup.execute(task);
-        return task;
+        return connectTask.submit(attachment, handler, new Callable<Void>() {
+            public Void call() throws IOException {
+                channel.connect(remote);
+                return null;
+            }});
     }
 
     /**
@@ -317,12 +313,10 @@ final class AsyncSocketChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        if (! readPending.compareAndSet(false, true))
-            throw new ReadPendingException();
-
         final int timeoutMillis = (int) unit.toMillis(timeout);
 
-        Callable<Integer> callable = new Callable<Integer>() {
+/*
+        return readTask.submit(attachment, handler, new Callable<Integer>() {
             public Integer call() throws IOException {
                 if (channel.socket().getSoTimeout() != timeoutMillis)
                     channel.socket().setSoTimeout(timeoutMillis);
@@ -331,14 +325,14 @@ final class AsyncSocketChannelImpl
                 } catch (SocketTimeoutException e) {
                     throw new AbortedByTimeoutException();
                 }
-            }
-        };
+            }});
+*/
 
-        AsyncIoTask<Integer, A> task =
-            AsyncIoTask.create(callable, attachment, handler, readPending);
-
-        channelGroup.execute(task);
-        return task;
+        return readTask.submit(attachment, handler, new Callable<Integer>() {
+            public Integer call() throws IOException {
+                awaitSelectableOp(timeoutMillis, SelectionKey.OP_READ);
+                return channel.read(dst);
+            }});
     }
 
     /**
@@ -363,12 +357,10 @@ final class AsyncSocketChannelImpl
         if ((length < 0) || (length > (dsts.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        if (! readPending.compareAndSet(false, true))
-            throw new ReadPendingException();
-
         final int timeoutMillis = (int) unit.toMillis(timeout);
 
-        Callable<Long> callable = new Callable<Long>() {
+/*
+        return readTask.submit(attachment, handler, new Callable<Long>() {
             public Long call() throws IOException {
                 if (channel.socket().getSoTimeout() != timeoutMillis)
                     channel.socket().setSoTimeout(timeoutMillis);
@@ -377,14 +369,14 @@ final class AsyncSocketChannelImpl
                 } catch (SocketTimeoutException e) {
                     throw new AbortedByTimeoutException();
                 }
-            }
-        };
+            }});
+*/
 
-        AsyncIoTask<Long, A> task =
-            AsyncIoTask.create(callable, attachment, handler, readPending);
-
-        channelGroup.execute(task);
-        return task;
+        return readTask.submit(attachment, handler, new Callable<Long>() {
+            public Long call() throws IOException {
+                awaitSelectableOp(timeoutMillis, SelectionKey.OP_READ);
+                return channel.read(dsts, offset, length);
+            }});
     }
 
     /**
@@ -403,23 +395,13 @@ final class AsyncSocketChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        if (! writePending.compareAndSet(false, true))
-            throw new WritePendingException();
-
         final long timeoutMillis = unit.toMillis(timeout);
 
-        Callable<Integer> callable = new Callable<Integer>() {
+        return writeTask.submit(attachment, handler, new Callable<Integer>() {
             public Integer call() throws IOException {
                 awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
                 return channel.write(src);
-            }
-        };
-
-        AsyncIoTask<Integer, A> task =
-            AsyncIoTask.create(callable, attachment, handler, writePending);
-
-        channelGroup.execute(task);
-        return task;
+            }});
     }
 
     /**
@@ -444,22 +426,12 @@ final class AsyncSocketChannelImpl
         if ((length < 0) || (length > (srcs.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        if (! writePending.compareAndSet(false, true))
-            throw new WritePendingException();
-
         final long timeoutMillis = unit.toMillis(timeout);
 
-        Callable<Long> callable = new Callable<Long>() {
+        return writeTask.submit(attachment, handler, new Callable<Long>() {
             public Long call() throws IOException {
                 awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
                 return channel.write(srcs, offset, length);
-            }
-        };
-
-        AsyncIoTask<Long, A> task =
-            AsyncIoTask.create(callable, attachment, handler, writePending);
-
-        channelGroup.execute(task);
-        return task;
+            }});
     }
 }

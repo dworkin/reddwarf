@@ -5,8 +5,8 @@
 package com.sun.sgs.impl.nio.threaded;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -14,11 +14,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.sun.sgs.nio.channels.AsynchronousChannel;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
+import com.sun.sgs.nio.channels.CompletionHandler;
+import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 class AsyncChannelGroupImpl
     extends AsynchronousChannelGroup
-    implements Executor
 {
     final ExecutorService executor;
 
@@ -62,8 +63,63 @@ class AsyncChannelGroupImpl
         }
     }
 
-    public void execute(Runnable task) {
-        executor.execute(task);
+    <R, A> IoFuture<R, A> submit(Callable<R> callable,
+                                 A attachment,
+                                 CompletionHandler<R, ? super A> handler)
+    {
+        AsyncIoTask<R, A> task =
+            AsyncIoTask.create(callable, attachment, wrapHandler(handler));
+        incrementTaskCount();
+        boolean success = false;
+        try {
+            executor.execute(task);
+            success = true;
+            return task;
+        } finally {
+            if (! success)
+                decrementTaskCount();
+        }
+    }
+
+    volatile int pendingTasks;
+
+    private void incrementTaskCount() {
+        try {
+            mainLock.lock();
+            pendingTasks++;
+        } finally {
+            mainLock.unlock();
+        }
+    }
+    private void decrementTaskCount() {
+        try {
+            mainLock.lock();
+            pendingTasks--;
+            if ((runState != RUNNING) && (0 == pendingTasks))
+                termination.notifyAll();
+        } finally {
+            mainLock.unlock();
+        }
+    }
+
+
+    private <R, A> InnerHandler<R, A> wrapHandler(
+            CompletionHandler<R, A> handler)
+    {
+        return new InnerHandler<R, A>(handler);
+    }
+
+    final class InnerHandler<R, A> implements CompletionHandler<R, A> {
+        private final CompletionHandler<R, A> handler;
+
+        InnerHandler(CompletionHandler<R, A> handler) {
+            this.handler = handler;
+        }
+
+        public void completed(IoFuture<R, A> result) {
+            decrementTaskCount();
+            handler.completed(result);
+        }
     }
 
     /**
@@ -93,8 +149,7 @@ class AsyncChannelGroupImpl
      * {@inheritDoc}
      */
     @Override
-    public boolean isShutdown()
-    {
+    public boolean isShutdown() {
         return runState != RUNNING;
     }
 
@@ -102,8 +157,7 @@ class AsyncChannelGroupImpl
      * {@inheritDoc}
      */
     @Override
-    public boolean isTerminated()
-    {
+    public boolean isTerminated() {
         return runState == TERMINATED;
     }
 
@@ -111,8 +165,7 @@ class AsyncChannelGroupImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncChannelGroupImpl shutdown()
-    {
+    public AsyncChannelGroupImpl shutdown() {
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {

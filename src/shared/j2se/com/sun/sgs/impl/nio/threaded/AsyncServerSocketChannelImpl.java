@@ -15,7 +15,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
@@ -38,18 +37,22 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl channelGroup;
+    final AsyncChannelGroupImpl group;
     final ServerSocketChannel channel;
 
-    private final AtomicBoolean acceptPending = new AtomicBoolean();
+    private final AsyncIoTaskFactory acceptTask;
 
     AsyncServerSocketChannelImpl(ThreadedAsyncChannelProvider provider,
                                  AsyncChannelGroupImpl group)
         throws IOException
     {
         super(provider);
-        this.channelGroup = group;
+        this.group = group;
         channel = provider.getSelectorProvider().openServerSocketChannel();
+        acceptTask = new AsyncIoTaskFactory(group) {
+            @Override protected void alreadyPendingPolicy() {
+                throw new AcceptPendingException();
+            }};
         group.register(this);
     }
 
@@ -71,6 +74,7 @@ final class AsyncServerSocketChannelImpl
     @Override
     public void close() throws IOException {
         channel.close();
+        group.unregister(this);
     }
 
     /**
@@ -162,7 +166,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return acceptPending.get();
+        return acceptTask.isPending();
     }
 
     /**
@@ -175,22 +179,14 @@ final class AsyncServerSocketChannelImpl
     {
         checkClosedAsync();
 
-        if (! acceptPending.compareAndSet(false, true))
-            throw new AcceptPendingException();
-
-        AsyncIoTask<AsynchronousSocketChannel, A> task = AsyncIoTask.create(
-                new Callable<AsynchronousSocketChannel>() {
-                    public AsynchronousSocketChannel call() throws IOException {
-                        return new AsyncSocketChannelImpl(
-                            (ThreadedAsyncChannelProvider) provider(),
-                            channelGroup,
-                            channel.accept());
-                    }},
-                attachment,
-                handler,
-                acceptPending
-            );
-        channelGroup.execute(task);
-        return task;
+        return acceptTask.submit(attachment, handler,
+            new Callable<AsynchronousSocketChannel>() {
+                public AsynchronousSocketChannel call() throws IOException {
+                    return new AsyncSocketChannelImpl(
+                        (ThreadedAsyncChannelProvider) provider(),
+                        group,
+                        channel.accept());
+                }});
     }
+
 }
