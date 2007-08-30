@@ -1,0 +1,15 @@
+This distribution contains the following subdirectories:
+
+- sgs-@VERSION@
+  Project Darkstar Server
+
+- bdb-@BDB.VERSION@
+  Berkeley DB
+
+- mina-@MINA.VERSION@
+  Apache MINA
+
+- slf4j-@SLF4J.VERSION@
+  Simple Logging Facade for Java (SLF4J)
+
+See the README file in the sgs-@VERSION@ subdirectory for instructions.

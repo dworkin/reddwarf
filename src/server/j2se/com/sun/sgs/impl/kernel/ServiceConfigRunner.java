@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
@@ -120,8 +135,9 @@ class ServiceConfigRunner implements Runnable {
 
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
-        AppKernelAppContext ctx = new AppKernelAppContext(appName, services);
-        ctx.setServices(services);
+        ComponentRegistryImpl managers = new ComponentRegistryImpl();
+        AppKernelAppContext ctx = 
+                new AppKernelAppContext(appName, services, managers);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -153,7 +169,6 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // register any profiling managers and fill in the manager registry
-        ComponentRegistryImpl managers = new ComponentRegistryImpl();
         for (Object manager : managerSet) {
             if (profileRegistrar != null) {
                 if (manager instanceof ProfileProducer)
@@ -164,8 +179,7 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // with the managers created, setup the final context and owner
-        ctx = new AppKernelAppContext(appName, managers);
-        ctx.setServices(services);
+        ctx = new AppKernelAppContext(appName, services, managers);
         owner = new TaskOwnerImpl(id, ctx);
         ThreadState.setCurrentOwner(owner);
 

@@ -1,4 +1,4 @@
-Project Darkstar Server Source Distribution
+Project Darkstar Server, Source Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,18 +7,14 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Server Source Distribution contains the source code
-for developing game servers that run as applications in the Project
-Darkstar Server environment.  Information about building client
+The source distribution of the Project Darkstar Server contains the
+source code for developing game servers that run as applications in the
+Project Darkstar Server environment.  Information about building client
 applications is available as a separate download.
 
-In addition to the documents, APIs and examples, this kit contains the
-source code for a complete single-system version of the Project Darkstar
-Server.  The APIs in this version are the same as those that will be
-included in the full-scale, multi-node version of the system, which will
-be released in the future. The current system allows development of
-games that run on a single server. The server system will make use of
-the multi-threading capabilities of that server when they are available.
+In addition to the documents, APIs and examples, this distribution
+contains the source code for a complete single-system version of the
+Project Darkstar Server.
 
 CONTENTS
 
@@ -62,17 +58,17 @@ lib subdirectory:
 
 - Apache MINA, version 1.1:
 
-  http://mina.apache.org/downloads.html
+  http://mina.apache.org/
 
 - Simple Logging Facade for Java (SLF4J), version 1.4:
 
-  http://www.slf4j.org/download.html
+  http://www.slf4j.org/
 
 The binaries for Berkeley DB are also needed:
 
 - Berkeley DB, version 4.5.22:
 
-  http://www.oracle.com/technology/software/products/berkeley-db/db/index.html
+  http://www.oracle.com/database/berkeley-db/db/index.html
 
 These binaries need to be installed in a directory that you specify as
 the value of the bdb.lib.dir property when using Ant.
@@ -82,7 +78,7 @@ subdirectory in order to run the tests:
 
 - JUnit version 4.1 (or better)
 
-  http://junit.org/index.htm
+  http://junit.org/
 
 
 KNOWN ISSUES
