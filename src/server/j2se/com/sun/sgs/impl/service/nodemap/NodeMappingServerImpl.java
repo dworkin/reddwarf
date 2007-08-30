@@ -410,7 +410,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     return;
                 } else {
                     // The node is dead.  We need to map to a new node.
-                    node = watchdogService.getNode(checkTask.getNodeId());
+                    node = checkTask.getNode();
                 }
             } catch (NameNotBoundException nnbe) {
                 // Do nothing.  We expect this exception if the id isn't in
@@ -451,7 +451,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         /** return value, was node alive? */
         boolean isAlive = false;
         /** return value, node assignment */
-        private long nodeId;
+        private Node node;
         CheckTask(Identity id, String serviceName) {
             idkey = NodeMapUtil.getIdentityKey(id);
             this.serviceName = serviceName;
@@ -460,11 +460,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         public void run() {
             IdentityMO idmo = 
                 dataService.getServiceBinding(idkey, IdentityMO.class);
-            nodeId = idmo.getNodeId();
+            long nodeId = idmo.getNodeId();
             
             isAlive = watchdogService.getNode(nodeId).isAlive();
             if (!isAlive) {
                 // Caller can get result from getNodeId()
+                node = watchdogService.getNode(nodeId);
                 return;
             }
             // The identity already has an assignment but we still 
@@ -478,7 +479,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         }
         
         public boolean isAssignedToLiveNode()   { return isAlive; }
-        public long getNodeId()                 { return nodeId;  }
+        public Node getNode()                   { return node;    }
     }
 
     /** {@inheritDoc} */
