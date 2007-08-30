@@ -51,6 +51,8 @@ public abstract class AsynchronousChannelProvider {
                 new RuntimePermission("asynchronousChannelProvider"));
     }
 
+    // Loading code based on SelectorProvider implementation in Sun JDK
+    
     private static boolean loadProviderFromProperty() {
         String cn = System.getProperty(
             "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");

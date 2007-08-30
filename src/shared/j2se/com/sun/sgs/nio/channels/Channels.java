@@ -13,7 +13,8 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -35,6 +36,7 @@ public final class Channels {
 
     private Channels() { }              // No instantiation
 
+    // Based on code in java.nio.channels.Channels
     private static void writeAll(AsynchronousByteChannel ch, ByteBuffer bb)
         throws IOException
     {
@@ -55,12 +57,14 @@ public final class Channels {
         throws IOException
     {
         Throwable t = e.getCause();
-        if (t instanceof IOException)
+        if (t instanceof IOException) {
             throw (IOException) t;
-        else if (t instanceof RuntimeException)
+        } else if (t instanceof RuntimeException) {
             throw (RuntimeException) t;
-        else
+        } else {
+            // TODO is there something more appropriate to throw? -JM
             throw new IOError(t);
+        }
     }
 
     /**
@@ -76,6 +80,8 @@ public final class Channels {
      */
     public static InputStream newInputStream(final AsynchronousByteChannel ch)
     {
+        // Based on code in java.nio.channels.Channels
+
         return new InputStream() {
 
             private ByteBuffer bb = null;
@@ -141,6 +147,8 @@ public final class Channels {
     {
         return new OutputStream() {
 
+            // Based on code in java.nio.channels.Channels
+
             private ByteBuffer bb = null;
             private byte[] bs = null;       // Invoker's previous array
             private byte[] b1 = null;
@@ -194,14 +202,27 @@ public final class Channels {
      * it implements the {@code ManagedChannelFactory} interface.
      * </ul>
      * The list of {@code ChannelPoolMXBeans} is returned in no
-     * particularorder, and the ordering may differ from one invocation to
+     * particular order, and the ordering may differ from one invocation to
      * the next. Whether the list is modifiable is implementation specific.
      *
      * @return a list of {@code ChannelPoolMXBean} objects
      */
     public static List<ChannelPoolMXBean> getChannelPoolMXBeans() {
-        // TODO
-        return Collections.emptyList();
+        List<ChannelPoolMXBean> result = new LinkedList<ChannelPoolMXBean>();
+
+        List<Object> providers = Arrays.asList(new Object[] {
+            SelectorProvider.provider(),
+            AsynchronousChannelProvider.provider()
+        });
+
+        for (Object provider : providers) {
+            if (provider instanceof ManagedChannelFactory) {
+                result.addAll(
+                    ((ManagedChannelFactory)provider).getChannelPoolMXBeans());
+            }
+        }
+
+        return result;
     }
 
     public static ReadableByteChannel newChannel(InputStream in) {
