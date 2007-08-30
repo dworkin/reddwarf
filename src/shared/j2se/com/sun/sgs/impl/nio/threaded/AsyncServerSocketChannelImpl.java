@@ -53,7 +53,6 @@ final class AsyncServerSocketChannelImpl
             @Override protected void alreadyPendingPolicy() {
                 throw new AcceptPendingException();
             }};
-        group.register(this);
     }
 
     private void checkClosedAsync() {
@@ -74,7 +73,6 @@ final class AsyncServerSocketChannelImpl
     @Override
     public void close() throws IOException {
         channel.close();
-        group.unregister(this);
     }
 
     /**

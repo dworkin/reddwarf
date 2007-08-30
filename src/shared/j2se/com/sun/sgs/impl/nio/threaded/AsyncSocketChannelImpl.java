@@ -47,7 +47,6 @@ final class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl group;
     final SocketChannel channel;
 
     private final AsyncIoTaskFactory connectTask;
@@ -70,7 +69,6 @@ final class AsyncSocketChannelImpl
                            SocketChannel channel)
     {
         super(provider);
-        this.group = group;
         this.channel = channel;
         connectTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
@@ -84,7 +82,6 @@ final class AsyncSocketChannelImpl
             @Override protected void alreadyPendingPolicy() {
                 throw new WritePendingException();
             }};
-        group.register(this);
 
     }
 

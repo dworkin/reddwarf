@@ -1,9 +1,13 @@
 package com.sun.sgs.nio.channels;
 
+import java.io.IOError;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.channels.spi.SelectorProvider;
@@ -11,6 +15,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
@@ -30,6 +35,34 @@ public final class Channels {
 
     private Channels() { }              // No instantiation
 
+    private static void writeAll(AsynchronousByteChannel ch, ByteBuffer bb)
+        throws IOException
+    {
+        try {
+            while (bb.hasRemaining()) {
+                ch.write(bb, null).get();
+            }
+        } catch (InterruptedException e) {
+            ch.close();
+            Thread.currentThread().interrupt();
+            throw new ClosedByInterruptException();
+        } catch (ExecutionException e) {
+            launderExecutionException(e);
+        }
+    }
+
+    private static int launderExecutionException(ExecutionException e)
+        throws IOException
+    {
+        Throwable t = e.getCause();
+        if (t instanceof IOException)
+            throw (IOException) t;
+        else if (t instanceof RuntimeException)
+            throw (RuntimeException) t;
+        else
+            throw new IOError(t);
+    }
+
     /**
      * Constructs a stream that reads bytes from the given channel.
      * <p>
@@ -41,9 +74,56 @@ public final class Channels {
      * @param ch the channel from which bytes will be read
      * @return a new input stream
      */
-    public static InputStream newInputStream(AsynchronousByteChannel ch) {
-        // TODO
-        throw new UnsupportedOperationException();
+    public static InputStream newInputStream(final AsynchronousByteChannel ch)
+    {
+        return new InputStream() {
+
+            private ByteBuffer bb = null;
+            private byte[] bs = null;       // Invoker's previous array
+            private byte[] b1 = null;
+
+            @Override
+            public synchronized int read() throws IOException {
+               if (b1 == null)
+                    b1 = new byte[1];
+               if (this.read(b1) == -1)
+                   return -1;
+               return b1[0];
+            }
+
+            @Override
+            public synchronized int read(byte[] bs, int off, int len)
+                throws IOException
+            {
+                if ((off < 0) || (off > bs.length) || (len < 0) ||
+                        ((off + len) > bs.length) || ((off + len) < 0)) {
+                    throw new IndexOutOfBoundsException();
+                } else if (len == 0) {
+                    return 0;
+                }
+                ByteBuffer bb = ((this.bs == bs)
+                                 ? this.bb
+                                 : ByteBuffer.wrap(bs));
+                bb.limit(Math.min(off + len, bb.capacity()));
+                bb.position(off);
+                this.bb = bb;
+                this.bs = bs;
+                try {
+                    return ch.read(bb, null).get();
+                } catch (InterruptedException e) {
+                    ch.close();
+                    Thread.currentThread().interrupt();
+                    throw new ClosedByInterruptException();
+                } catch (ExecutionException e) {
+                    return launderExecutionException(e);
+                }
+            }
+
+            @Override
+            public void close() throws IOException {
+                ch.close();
+            }
+        };
     }
 
     /**
@@ -56,10 +136,48 @@ public final class Channels {
      * @param ch the channel to which bytes will be written
      * @return a new output stream
      */
-    public static OutputStream newOutputStream(AsynchronousByteChannel ch)
+    public static OutputStream newOutputStream(
+                                    final AsynchronousByteChannel ch)
     {
-        // TODO
-        throw new UnsupportedOperationException();
+        return new OutputStream() {
+
+            private ByteBuffer bb = null;
+            private byte[] bs = null;       // Invoker's previous array
+            private byte[] b1 = null;
+
+            @Override
+            public synchronized void write(int b) throws IOException {
+               if (b1 == null)
+                    b1 = new byte[1];
+                b1[0] = (byte)b;
+                this.write(b1);
+            }
+
+            @Override
+            public synchronized void write(byte[] bs, int off, int len)
+                throws IOException
+            {
+                if ((off < 0) || (off > bs.length) || (len < 0) ||
+                    ((off + len) > bs.length) || ((off + len) < 0)) {
+                    throw new IndexOutOfBoundsException();
+                } else if (len == 0) {
+                    return;
+                }
+                ByteBuffer bb = ((this.bs == bs)
+                                 ? this.bb
+                                 : ByteBuffer.wrap(bs));
+                bb.limit(Math.min(off + len, bb.capacity()));
+                bb.position(off);
+                this.bb = bb;
+                this.bs = bs;
+                Channels.writeAll(ch, bb);
+            }
+
+            @Override
+            public void close() throws IOException {
+                ch.close();
+            }
+        };
     }
 
     /**

@@ -53,7 +53,6 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl group;
     final DatagramChannel channel;
 
     private final AsyncIoTaskFactory connectTask;
@@ -67,7 +66,6 @@ class AsyncDatagramChannelImpl
         throws IOException
     {
         super(provider);
-        this.group = group;
         channel = provider.getSelectorProvider().openDatagramChannel();
         connectTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
@@ -83,7 +81,6 @@ class AsyncDatagramChannelImpl
             }};
         // Allow multiple pending disconnect ops
         disconnectTask = new AsyncIoTaskFactory(group);
-        group.register(this);
     }
 
     private void checkClosedAsync() {

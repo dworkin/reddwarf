@@ -6,13 +6,12 @@ package com.sun.sgs.impl.nio.threaded;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.sun.sgs.nio.channels.AsynchronousChannel;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
@@ -32,8 +31,6 @@ class AsyncChannelGroupImpl
     private final ReentrantLock mainLock = new ReentrantLock();
     private final Condition termination = mainLock.newCondition();
 
-    private final ConcurrentHashMap<AsynchronousChannel, Boolean> channels;
-
     AsyncChannelGroupImpl(ThreadedAsyncChannelProvider provider,
                           ExecutorService executor) 
         throws IOException
@@ -42,25 +39,12 @@ class AsyncChannelGroupImpl
         if (executor == null)
             throw new NullPointerException("null ExecutorService");
         this.executor = executor;
-        channels = new ConcurrentHashMap<AsynchronousChannel, Boolean>();
     }
 
     AsyncChannelGroupImpl checkShutdown() {
         if (isShutdown())
             throw new ShutdownChannelGroupException();
         return this;
-    }
-
-    void register(AsynchronousChannel channel) {
-        if (channels.putIfAbsent(channel, true) != null) {
-            // TODO error
-        }
-    }
-
-    void unregister(AsynchronousChannel channel) {
-        if (channels.remove(channel) == null) {
-            // TODO error? ignore?
-        }
     }
 
     <R, A> IoFuture<R, A> submit(Callable<R> callable,
@@ -81,27 +65,21 @@ class AsyncChannelGroupImpl
         }
     }
 
-    volatile int pendingTasks;
+    final AtomicInteger pendingTasks = new AtomicInteger();
 
     private void incrementTaskCount() {
-        try {
-            mainLock.lock();
-            pendingTasks++;
-        } finally {
-            mainLock.unlock();
-        }
-    }
-    private void decrementTaskCount() {
-        try {
-            mainLock.lock();
-            pendingTasks--;
-            if ((runState != RUNNING) && (0 == pendingTasks))
-                termination.notifyAll();
-        } finally {
-            mainLock.unlock();
-        }
+        pendingTasks.incrementAndGet();
     }
 
+    private void decrementTaskCount() {
+        pendingTasks.decrementAndGet();
+    }
+
+    // MUST BE CALLED WITH mainLock HELD!
+    private void checkTermination() {
+        if ((runState != RUNNING) && (0 == pendingTasks.get()))
+            termination.signalAll();
+    }
 
     private <R, A> InnerHandler<R, A> wrapHandler(
             CompletionHandler<R, A> handler)
@@ -173,8 +151,7 @@ class AsyncChannelGroupImpl
             if (state < SHUTDOWN)
                 runState = SHUTDOWN;
 
-            // TODO wait for connections to empty
-            // TODO notify waiters
+            checkTermination();
             return this;
         } finally {
             mainLock.unlock();
@@ -195,7 +172,8 @@ class AsyncChannelGroupImpl
                 runState = STOP;
 
             // TODO close all connections
-            // TODO notify waiters
+
+            checkTermination();
             return this;
         } finally {
             mainLock.unlock();
