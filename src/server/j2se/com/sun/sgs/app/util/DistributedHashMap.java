@@ -13,6 +13,8 @@ import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -48,14 +50,14 @@ import com.sun.sgs.app.ManagedReference;
  * <p>
  *
  * This class provides {@code Serializable} views from the {@link
- * #entrySet()}, {@link keySet()} and {@link #values()} methods.
+ * #entrySet()}, {@link #keySet()} and {@link #values()} methods.
  * These views are concurrent and may be shared among different view.
  * Furthermore, the {@code Iterator} objects returned by these methods
  * also implement {@code Serializable} and are concurrent as well.
  * These iterators do <i>not</i> throw {@link
- * ConcurrentModificationException}.  An Iterator reflect the current
- * state of the map at the time of its creation or if persisted, its
- * deserialization.
+ * java.util.ConcurrentModificationException}.  An Iterator reflects
+ * the current state of the map at the time of its creation or if
+ * persisted, its deserialization.
  *
  * <p>
  *
@@ -170,7 +172,6 @@ public class DistributedHashMap<K,V>
      */
     private ManagedReference[] leafDirectory;
 
-
     /**
      * The fixed-size table for storing all Map entries.  This table
      * will be {@code null} if this instance is a directory node.
@@ -180,6 +181,14 @@ public class DistributedHashMap<K,V>
     //       as necessary
     private transient PrefixEntry[] table;    
     
+    /**
+     * The monotonic counter that reflects the number of times this
+     * instance has been modified.  The version number is used by the
+     * {@link ConcurrentIterator} to detect changes between
+     * transactions.
+     */
+    private int version;
+
     /**
      * The number of elements in this table.  Note that this is
      * <i>not</i> the total number of elements in the entire tree.
@@ -281,6 +290,7 @@ public class DistributedHashMap<K,V>
 	minDepth = tmp;
 
 	size = 0;
+	version = 0;
 	parent = null;
  	leftLeaf = null;
  	rightLeaf = null;
@@ -346,13 +356,17 @@ public class DistributedHashMap<K,V>
 
     /**
      * Ensures that this node has children of at least the provided
-     * minimum depth.
+     * minimum depth.  
      *
      * @param minDepth the minimum depth of the leaf nodes under this
      *        node
      *
      * @see #split()
      */
+    // NOTE: we still collapse the tree above the the minimum depth
+    //       just as split() does.  This does not affect the minimum
+    //       concurrency, as split() ensure that no write-locks will
+    //       ever propagate up to this collapsed portion of the tree.
     private void ensureDepth(int minDepth) {
 	
  	if (depth >= minDepth)
@@ -453,6 +467,8 @@ public class DistributedHashMap<K,V>
 	    table = new PrefixEntry[leafCapacity];
 	    size = 0;
 	}
+
+	version++;
     }
 
     /**
@@ -578,14 +594,29 @@ public class DistributedHashMap<K,V>
 	leftChild.rightLeaf = rightChildRef;
 	rightChild.leftLeaf = leftChildRef;
 	
-	// two cases:
-	// 1. this node is the start of a new directory entry
-	// 2. this node needs to be subsumed by the directory above it	    
+	// Decide what to do with this node:
+
+	// This node should form a new directory node in the following
+	// cases:
+	// 
+	// 1. If this node is the root (parent == null)
+	//
+	// 2. The parent's directory does not have enough bits to add
+	//    this node,
+	//
+	// 3. The minimum concurrency requires a minimum depth to the
+	//    tree.  This entails that all nodes below this be
+	//    distinct from the parent, so their updates never cause
+	//    write-lock contention.  If this node was a leaf node at
+	//    the minimum depth, it must become a new directory node
+	//    to avoid removing some concurrency by adding itself to
+	//    the parent.
+	//
 	if (parent == null ||
 	    depth % dirBits == 0 ||
-	    depth <= minDepth) {
-	    // this leaf node is now a directory
-	    
+	    depth == minDepth) {
+
+	    // this leaf node will become a directory node
 	    ManagedReference thisRef = dataManager.createReference(this);
 	    rightChild.parent = thisRef;			  
 	    leftChild.parent = thisRef;
@@ -601,6 +632,8 @@ public class DistributedHashMap<K,V>
 		leafDirectory[i | right] = rightChildRef;
 	    }
 	}
+	// In all other cases, this node can be added to its parent
+	// directory.
 	else {
 	    // notify the parent to remove this leaf by following
 	    // the provided prefix and then replace it with
@@ -677,6 +710,8 @@ public class DistributedHashMap<K,V>
 	DistributedHashMap<K,V> leaf = leafDirectory[index].get(DistributedHashMap.class);
 
 	DataManager dm = AppContext.getDataManager();
+
+	// remove the old leaf node
 	dm.removeObject(leaf);
 
 	// update the leaf node to point to this directory node as
@@ -777,7 +812,6 @@ public class DistributedHashMap<K,V>
 	// the HashMap.hash() function from JDK 1.6
 	h ^= (h >>> 20) ^ (h >>> 12);
 	return h ^ (h >>> 7) ^ (h >>> 4);
-
     }
 
     /**
@@ -794,6 +828,7 @@ public class DistributedHashMap<K,V>
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
+	leaf.version++;
 
 	int i = indexFor(hash, leaf.table.length);
 	for (PrefixEntry<K,V> e = leaf.table[i]; e != null; e = e.next) {
@@ -908,7 +943,7 @@ public class DistributedHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	DistributedHashMap<K,V> leaf = lookup(hash);
+	DistributedHashMap<K,V> leaf = lookup(hash);	
 	
 	int i = indexFor(hash, leaf.table.length);
 	PrefixEntry<K,V> e = leaf.table[i]; 
@@ -936,7 +971,8 @@ public class DistributedHashMap<K,V>
 		e.unmanage();
 
 		--leaf.size;
-		
+		leaf.version++;
+
 		// NOTE: this is where we would attempt a merge
 		// operation if we decide to later support one
 		return v;
@@ -1206,7 +1242,8 @@ public class DistributedHashMap<K,V>
 	 */
 	public final boolean equals(Object o) {
 	    if (!(o instanceof Map.Entry))
-		return false;
+		return false;	    
+
 	    Map.Entry e = (Map.Entry)o;
 	    Object k1 = getKey();
 	    Object k2 = e.getKey();
@@ -1223,7 +1260,8 @@ public class DistributedHashMap<K,V>
 	 * {@inheritDoc}
 	 */
 	public final int hashCode() {
-	    return (keyRef==null   ? 0 : keyRef.hashCode()) ^
+	    return 
+		((keyRef==null  ? 0 : keyRef.hashCode()) << 16) ^
 		(valueRef==null ? 0 : valueRef.hashCode());
 	}
 	
@@ -1320,16 +1358,6 @@ public class DistributedHashMap<K,V>
 	private final ManagedReference rootRef;
 	
 	/**
-	 * A cache of all the hash codes for the current leaf node.
-	 * The cache is numerically sorted so that we can identify
-	 * what hash code would be located the right-most leaf should
-	 * one or more splits occur between transactions.  If a split
-	 * occurs, this cache is invalid and will be reloaded by
-	 * {@link #cacheLeaf(DistributedHashMap)}
-	 */
-	private int[] hashCache;
-
-	/**
 	 * The current index into the cache of hash codes.
 	 */
 	private int cur;
@@ -1341,7 +1369,40 @@ public class DistributedHashMap<K,V>
 	 * occured and therefore we need to invalidate our cache and
 	 * reload the next round of entries.
 	 */
-	private BigInteger curLeafId;
+	private BigInteger cachedLeafId;
+
+	/**
+	 * The revision number of the leaf that is currently being
+	 * examined.  This is used to check whether a leaf has changed
+	 * if the map changes from when the last cache was made.
+	 */
+	private int cachedRevision;
+
+	/**
+	 * A cache of all the {@code PrefixEntries} in the leaf that
+	 * is currently being examined.  The entries are sorted such
+	 * that the hash code that would end on the right-most leaf is
+	 * stored at the end of the array.  All entries with equal
+	 * hash codes should be together in a single block because of
+	 * this.  If a split occurs, this cache is invalid and will be
+	 * reloaded by {@link #cacheLeaf(DistributedHashMap)}
+	 */
+	private PrefixEntry[] leafCache ;
+
+	/**
+	 * The hash code of the entry that was last returned
+	 */
+	private int lastHash;	
+
+	/**
+	 * The set of all elements with the same hash code as the
+	 * current element, which have previously been returned
+	 * through {@code next()}.  This set will remain small in the
+	 * common case.  For poorly hashed keys, this set is necessary
+	 * to distinguish previously returned entries if changes are
+	 * made to the map between deserializations of the iterator.
+	 */
+	private transient Set<PrefixEntry> alreadySeen;
 	
 	/**
 	 * The current leaf that is being accessed.  This is assigned
@@ -1368,6 +1429,11 @@ public class DistributedHashMap<K,V>
 	    // keep a reference to the root so we can look up leaves
 	    rootRef = AppContext.getDataManager().createReference(root);
 	    
+	    // NOTE: try to minimize the serialization cost of this
+	    // map by keeping it small.
+	    alreadySeen = new HashSet<PrefixEntry>(2,2f);
+	    lastHash = -1;
+
 	    // cache the initial contents of the left-most leaf
 	    DistributedHashMap leftLeaf = root.leftMost();
 	    cacheLeaf(leftLeaf);
@@ -1375,18 +1441,19 @@ public class DistributedHashMap<K,V>
 
 	/**
 	 * Caches the hash codes for all the entries of the leaf in
-	 * {@code hashCache} and assigns {@code curLeafId} and {@code
-	 * curLeaf} based on the provided leaf.
+	 * {@code hashCache} and assigns {@code cachedLeafId} and
+	 * {@code curLeaf} based on the provided leaf.
 	 *
 	 * @param leaf the leaf that should be cached
 	 */
 	private void cacheLeaf(DistributedHashMap leaf) {
-	    hashCache = new int[leaf.size];
+
+	    leafCache = new PrefixEntry[leaf.size];
 	    int i = 0;
 	    for (PrefixEntry e : leaf.table) {
 		if (e != null) {
-		    hashCache[i++] = e.hash;
-		    for (; (e = e.next) != null; hashCache[i++] = e.hash)
+		    leafCache[i++] = e;
+		    for (; (e = e.next) != null; leafCache[i++] = e)
 			; // cache any chained entries
 		}
 	    }
@@ -1396,10 +1463,11 @@ public class DistributedHashMap<K,V>
 	    // we need this sorted so we can use the last element in
 	    // it as a reference for the next leaf in case this node
 	    // is split between next() calls
-	    Arrays.sort(hashCache);
+	    Arrays.sort(leafCache, HashComparator.INSTANCE);
 	    curLeaf = leaf;
-	    curLeafId = 
+	    cachedLeafId = 
 		AppContext.getDataManager().createReference(curLeaf).getId();
+	    cachedRevision = curLeaf.version;
 	}
 
 	/**
@@ -1411,13 +1479,12 @@ public class DistributedHashMap<K,V>
 	private void ensureCacheCoherence() {
 	    
 	    // curLeaf is only initialized when the cache is coherent
-	    // so we can immedately returned in this case
+	    // or when a leaf has already been manually loaded so we
+	    // can immedately returned in this case
 	    if (curLeaf != null) 
 		return;
 
-	    int curHash;
-
-	    if (hashCache.length == 0) {
+	    if (leafCache.length == 0) {
 		// if the cache has zero length, then the iterator
 		// was initialized based on an empty map,
 		// therefore we should start trying to cache from
@@ -1436,10 +1503,28 @@ public class DistributedHashMap<K,V>
 		// the iterator does not repeat any elements during
 		// iteration.		    
 		curLeaf = rootRef.get(DistributedHashMap.class).
-		    lookup(hashCache[hashCache.length-1]);
+		    lookup(leafCache[leafCache.length-1].hash);
 
-		// save the current hash that we are on
-		curHash = hashCache[cur];
+		// after looking up the new leaf check if this is the
+		// leaf that was previously cached.  Also check that
+		// it hasn't been modified since we last cached it
+		if (AppContext.getDataManager().createReference(curLeaf).
+		    getId().equals(cachedLeafId) &&
+		    curLeaf.version == cachedRevision)
+		    // cache still valid
+		    return;
+
+		// otherwise, we had either a different or modified
+		// leaf so we need to recache it
+
+		// mark whether whether the next call should load a
+		// new leaf
+		boolean atEnd = leafCache.length == cur;
+
+		// save the current hash that we are on so we can
+		// restore cur after caching.  Or if were at the end,
+		// save the last hash we saw
+		int curHash = leafCache[(atEnd) ? cur - 1 : cur].hash;
 		
 		// recache based on the new leaf
 		cacheLeaf(curLeaf);
@@ -1448,8 +1533,29 @@ public class DistributedHashMap<K,V>
 		// where we left off, or the next highest value in
 		// case the entry with the previous hash code was
 		// stored in a left child
-		cur = Math.max(0, Arrays.binarySearch(hashCache, curHash));
 
+		// use a binary search to locate where the hash code
+		// would have been placed
+		int low = 0;
+		int high = leafCache.length - 1;
+
+		while (low <= high) {
+		    int mid = (low + high) >>> 1;
+		    int midHash = leafCache[mid].hash;
+		    
+		    if (midHash < curHash)
+			low = mid + 1;
+		    else if (midHash > curHash)
+			high = mid - 1;
+		    else {
+			cur = (atEnd) ? mid + 1 : mid;
+			return;
+		    } 
+		}
+
+		// low is now where the entry would have been
+		// inserted
+		cur = (atEnd) ? low + 1 : low; 
 	    }
 	}
     
@@ -1462,13 +1568,25 @@ public class DistributedHashMap<K,V>
 	    // check that the cache is up to date
 	    ensureCacheCoherence();
 
-	    if (cur < hashCache.length)
+	    // check for the edge case of multiple entries with the
+	    // same hash codes.  Advance the cur pointer while
+	    // checking to avoid having to perform these checks
+	    // needlessly later
+	    for (; cur < leafCache.length && 
+		     alreadySeen.contains(leafCache[cur]); cur++)
+		;
+	    
+	    // cur should now point to an entry we haven't seen or
+	    // it should be equal to the length of the cache if we
+	    // have seen everything in the list		
+	    if (cur < leafCache.length)
 		return true;
-	    else {
-		// start loading leaves until either no more can be
-		// found or we find a non-empty one
-		return loadNextLeaf();		
-	    }
+	    
+	    
+	    // start loading leaves until either no more can be
+	    // found or we find a non-empty one
+	    return loadNextLeaf();		
+	    
 	}
 
 	/**
@@ -1482,7 +1600,7 @@ public class DistributedHashMap<K,V>
 	private boolean loadNextLeaf() {
 	    DistributedHashMap curLeaf = 
 		rootRef.get(DistributedHashMap.class).
-		    lookup(hashCache[hashCache.length-1]);
+		    lookup(leafCache[leafCache.length-1].hash);
 	    
 	    DistributedHashMap nextLeaf = curLeaf;
 
@@ -1525,7 +1643,7 @@ public class DistributedHashMap<K,V>
 
 	    ensureCacheCoherence();
 
-	    if (cur == hashCache.length) {
+	    if (cur >= leafCache.length) {
 		if (nextLeaf == null && !loadNextLeaf())
 		    throw new NoSuchElementException();
 		else {
@@ -1535,23 +1653,48 @@ public class DistributedHashMap<K,V>
 		    nextLeaf = null;
 		}
 	    }
-
-	    int curHash = hashCache[cur++];    
-	    PrefixEntry e = curLeaf.table[DistributedHashMap.
-					  indexFor(curHash, 
-						   curLeaf.table.length)];
-
-	    // check all the chained entries for the one with the
-	    // correct hash code
-	    for (; e != null && e.hash != curHash; e = e.next)
-		;
 	    
-	    if (e == null)
-		// somewhere there was an error and we have a hash
-		// code that does not exist in the current table
-		throw new Error("AAAAH");
-	    else
-		return e;
+	    PrefixEntry e = leafCache[cur++];
+
+	    // check that we don't return an element that we have
+	    // already seen.
+	    if (e.hash == lastHash) {
+		
+		// hasNext() should have done this loop for us if it
+		// was called, but in case it wasn't called, loop
+		// through the cache until we find an entry we haven't
+		// seen
+		while (alreadySeen.contains(e) && cur < leafCache.length)
+		    e = leafCache[cur++];
+
+		// This is a very rare case where we've performed
+		// multiple next() calls in a row with no hasNext()
+		// between, and where the last keys in the leafCache
+		// all have the same hash code, but we've seen them
+		// all before - which could only happen due to
+		// additions and removals of the same key, which
+		// causes a recaching of the leaf that resets cur back
+		// to the start of that hash code
+		if (cur == leafCache.length && alreadySeen.contains(e)) {
+		    
+		    // in this case, we rely on a recursive call to
+		    // nextEntry() to do the appropriate actions for
+		    // loading the next leaf and setting all the other
+		    // state.  There should be at most one recursive
+		    // call in the stack when doing this, as this call
+		    // will load a new leaf, which it guaranteed to
+		    // have a different hash code, or it will throw a
+		    // NoSuchElementException
+		    return nextEntry();
+		}
+	    }
+	    else {
+		alreadySeen.clear();
+	    }
+	    
+	    alreadySeen.add(e);
+	    lastHash = e.hash;
+	    return e;	    
 	}
 
 	/**
@@ -1564,17 +1707,120 @@ public class DistributedHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Saves the state of the {@code Iterator} to the stream.
+	 *
+	 * @serialData The size of the {@code alreadySeen} set is
+	 *             written (int) followed by each of the {@code
+	 *             PrefixEntry} elements in the set in no
+	 *             particular order
+	 */
+	private void writeObject(java.io.ObjectOutputStream s)
+	    throws java.io.IOException {
+	    s.defaultWriteObject();
+	    
+	    // manually save the state of the alreadySeen set.  This
+	    // is what HashSet does under the hood, so it should not
+	    // impact performance.  See the lengthy comment below for
+	    // why we do this.
+	    s.writeInt(alreadySeen.size());
+	    for (PrefixEntry e : alreadySeen)
+		s.writeObject(e);
+	}
+
+
+	/**
+	 * Reconstitutes the {@code Iterator} from the stream and
+	 * checks for elements in the cached {@code alreadySeen} set
+	 * that may have been removed from the backing map, and
+	 * removes them from the cache.
 	 */
 	private void readObject(java.io.ObjectInputStream s) 
 	    throws java.io.IOException, ClassNotFoundException {
 	    
 	    s.defaultReadObject();
+	    int size = s.readInt();
+	    alreadySeen = new HashSet<PrefixEntry>(size);
+
+	    // This case happens if during the intermittent
+	    // transactions, some number of already seen elements with
+	    // the same hashcode as what the one that we are currently
+	    // iterating on have been removed and therefore the
+	    // PrefixEntry.equals() method will throw this exception
+	    // when trying to locate its key and value.  In this case,
+	    // our cached-previously-seen entires are invalid.  This
+	    // only happens when we hold on to an entry in the
+	    // alreadySeen set, where the entry was removed out from
+	    // under us.  We therefore manually serialize the
+	    // contents of the set.
+	    //
+	    // We do not add extra state to the PrefixEntry to
+	    // actively avoid this, as this would require adding extra
+	    // serialization overhead for every entry to prevent this
+	    // exception, which only happens in an extremely rare
+	    // case.
+	    //
+	    // Instead we keep iterating over the cache disregarding
+	    // any errors until we have had read the entire set.  If
+	    // no error occurs, this is roughly as fast as if we had
+	    // had the extra state, since this is the default way that
+	    // HashSet serializes its entries as well.  However, the
+	    // error condition is such a rare case that the tradeoff
+	    // for keeping the common case simple (i.e. no extra
+	    // state) is worth the extra cost here.
+	    for (int i = 0; i < size; ++i) {
+		try {
+		    PrefixEntry e = (PrefixEntry)(s.readObject());
+		    // the next line triggers exception if entry was
+		    // removed from the backing map 
+		    e.getKey(); 
+		    alreadySeen.add(e);
+		}
+		catch (com.sun.sgs.app.ObjectNotFoundException onfe) {
+		    // ignore this error and move past the entry
+		}
+	    }
+
+	    // initialize the other transient fields to null
 	    curLeaf = null;
 	    nextLeaf = null;
 	}  
 
+	/**
+	 * A comparator for sorting {@code PrefixEntry} entries
+	 * according to how their hash codes would be distirbuted in
+	 * the trie.  When sorting an array, the largest value after
+	 * sorting will be the right-most entry of the array in the
+	 * trie, while the lowest value will be the left-most.
+	 */
+	private static class HashComparator implements Comparator<PrefixEntry> {
+	    
+	    /**
+	     * Singleton instance since this class is immutable.
+	     */
+	    static final HashComparator INSTANCE = new HashComparator();
 
+	    public int compare(PrefixEntry t1, PrefixEntry t2) {
+		int i = t1.hash;
+		int j = t2.hash;
+		// if both have the same sign, the do a numeric
+		// comparison, sort so that positive values come
+		// before negative values.
+		//
+		// NOTE: the numeric comparison works because the
+		// integers are stored as 2's compelment, so a hash of
+		// -1 in binary is all 1's, which is the right-most
+		// entry in the trie, so it should be at the
+		// right-most in the array.
+		return ((i & 0x80000000) == (j & 0x80000000)) 
+		    ? i - j
+		    : -i;
+	    }
+
+	    public boolean equals(Object o) {
+		return o instanceof HashComparator;
+	    }
+
+	}
     }
 
     /**

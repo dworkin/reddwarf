@@ -212,6 +212,5 @@ public class DistributedHashSet<E>
 	public boolean equals(Object o) {
 	    return o instanceof Marker;
 	}
-    }
-    
+    }   
 }

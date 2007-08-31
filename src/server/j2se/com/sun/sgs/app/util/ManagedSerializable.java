@@ -11,7 +11,7 @@ import java.io.Serializable;
 
 
 /**
- * A utility class for wrapping {@code Serializable} objects with
+ * A utility class for wrapping {@code Serializable} objects within a
  * {@code ManagedObject} instance.  This class is primarily intended
  * to allow class that do not implement {@code ManagedObject} to be
  * persistently stored and accessed through a {@code
@@ -67,7 +67,7 @@ import java.io.Serializable;
  *     // a reference of type ManagedSerializable&lt;Collection&lt;Item&gt;&gt;
  *     ManagedReference inventoryRef;
  *
- *     // a reference of type ManagedSerializable&lt;MapArea&lt;
+ *     // a reference of type ManagedSerializable&lt;MapArea&gt;
  *     ManagedReference currentLocationRef;
  *     
  *     public MyPlayerObj(...) { 
@@ -121,12 +121,38 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
     }
 
     /**
+     * Returns {@code true} if {@code o} is a {@code
+     * ManagedSerializable} and the objects contained within are both
+     * equal.
+     *
+     * @return {@code true} if {@code o} is a {@code
+     *         ManagedSerializable} and the objects contained within
+     *         are both equal.
+     */
+    public boolean equals(Object o) {
+	if (o instanceof ManagedSerializable) {
+	    ManagedSerializable m = (ManagedSerializable)o;
+	    return (object == null) 
+		? object == m.object
+		: object.equals(m.object);
+	}
+	return false;
+    }
+
+    /**
      * Returns the object wrapped by this instance.
      *
      * @return the object
      */
     public T get() {
 	return object;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+	return (object == null) ? 0 : object.hashCode();
     }
 
     /**

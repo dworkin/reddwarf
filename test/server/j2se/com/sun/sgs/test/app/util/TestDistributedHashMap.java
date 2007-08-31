@@ -1684,7 +1684,7 @@ public class TestDistributedHashMap extends TestCase {
 	    new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
-	int[] a = new int[128];
+	int[] a = new int[256];
 	
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
@@ -1735,7 +1735,7 @@ public class TestDistributedHashMap extends TestCase {
 	    new TestableDistributedHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
-	int[] a = new int[128];
+	int[] a = new int[1024];
 	
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
@@ -1772,6 +1772,7 @@ public class TestDistributedHashMap extends TestCase {
 	// elements
 	while(it.hasNext()) {
 	    Map.Entry<Integer,Integer> e = it.next();
+	    e.getKey();
 	    assertTrue(entrySet.contains(e));
 	    entries++;
 	}
@@ -1899,6 +1900,245 @@ public class TestDistributedHashMap extends TestCase {
 
 
 
+
+    /*
+     * Tests on concurrent iterator edge cases
+     */
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorSerailizationEqualHashCodes() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+
+	TestableDistributedHashMap<Equals,Integer> test = 
+	    new TestableDistributedHashMap<Equals,Integer>(16);
+	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
+	
+	int[] a = new int[256];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(new Equals(j), j);
+	    control.put(new Equals(j), j);
+	    a[i] = j;
+	}
+	
+	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
+	for (int i = 0; i < a.length / 2; ++i) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    assertTrue(control.remove(e.getKey()) != null);
+	}
+
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+
+	while(it.hasNext()) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    assertTrue(control.remove(e.getKey()) != null);
+	}
+
+	assertEquals(0, control.size());
+
+	txn.commit();
+    }
+
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes() throws Exception {
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Equals,Integer> test = 
+	    new TestableDistributedHashMap<Equals,Integer>(16);
+	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(new Equals(j), j);
+	    control.put(new Equals(j), j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	// then remove half of the entries
+	for (int i = 0; i < a.length; i += 2) {
+	    test.remove(a[i]);
+	    control.remove(a[i]);
+	}
+
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	       
+	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+
+	// ensure that the deserialized iterator reads the remaining
+	// elements
+	while(it.hasNext()) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(entrySet.size(), entries);
+
+	txn.commit();
+    }
+
+    @SuppressWarnings({"unchecked"})
+    @Test public void testConcurrentIteratorWithAdditionsEqualHashCodes()
+	throws Exception {
+
+	txn = createTransaction();
+	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Equals,Integer> test = 
+	    new TestableDistributedHashMap<Equals,Integer>(16);
+	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
+
+	// immediately get the iterator while the map size is zero
+	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(new Equals(j), j);
+	    control.put(new Equals(j), j);
+	    a[i] = j;
+	}
+	
+	//Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	       
+	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+
+	// ensure that the deserialized iterator reads the all the new
+	// elements
+	while(it.hasNext()) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    control.remove(e.getKey());
+	}
+
+	assertEquals(0, control.size());
+
+	txn.commit();
+    }
+
+     @SuppressWarnings({"unchecked"})
+     @Test public void testConcurrentIteratorWithReplacementsOnEqualHashCodes() 
+	 throws Exception {
+
+ 	txn = createTransaction();
+ 	DataManager dataManager = AppContext.getDataManager();
+	TestableDistributedHashMap<Equals,Integer> test = 
+	    new TestableDistributedHashMap<Equals,Integer>(16);
+	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
+
+	int[] a = new int[128];
+	
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(new Equals(j), j);
+	    control.put(new Equals(j), j);
+	    a[i] = j;
+	}
+	
+	Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
+	int entries = 0;
+
+	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
+	for (int i = 0; i < a.length / 2; ++i) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	assertEquals(a.length / 2, entries);
+
+	// serialize the iterator
+ 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 	ObjectOutputStream oos = new ObjectOutputStream(baos);
+ 	oos.writeObject(it);
+	
+	// now repalce all th elements in the map
+	test.clear();
+	control.clear();	
+
+	for (int i = 0; i < a.length; ++i) {
+	    int j = RANDOM.nextInt();
+	    test.put(new Equals(j), j);
+	    control.put(new Equals(j), j);
+	    a[i] = j;
+	}
+
+	assertEquals(control.size(), test.size());
+
+	// reserialize the iterator
+ 	byte[] serializedForm = baos.toByteArray();
+
+ 	ByteArrayInputStream bais = 
+ 	    new ByteArrayInputStream(serializedForm);
+ 	ObjectInputStream ois = new ObjectInputStream(bais);
+	
+	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+
+	while(it.hasNext()) {
+	    Map.Entry<Equals,Integer> e = it.next();
+	    assertTrue(entrySet.contains(e));
+	    entries++;
+	}
+
+	// due to the random nature of the entries, we can't check
+	// that it read in another half other elements.  However this
+	// should still check that no execptions were thrown.
+
+	txn.commit();
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
     /**
      * Utility routines.
      */
@@ -2012,6 +2252,27 @@ public class TestDistributedHashMap extends TestCase {
 	
     }
     
+
+    static class Equals implements Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	int i;
+
+	public Equals(int i) {
+	    this.i = i;
+	}
+
+	public boolean equals(Object o) {
+	    return (o instanceof Equals)
+		? ((Equals)o).i == i : false;
+	}
+
+	public int hashCode() {
+	    return 0;
+	}
+	
+    }
 
      /**
       * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
