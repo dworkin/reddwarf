@@ -70,6 +70,7 @@ class MasterTaskConsumer implements Runnable {
      */
     public void run() {
         logger.log(Level.FINE, "Starting a Master Task Consumer");
+        ThreadState.setAsSchedulerThread(true);
 
         try {
             while (true) {
@@ -91,6 +92,7 @@ class MasterTaskConsumer implements Runnable {
             logger.logThrow(Level.SEVERE, e, "Consumer thread fatal error");
         } finally {
             masterScheduler.notifyThreadLeaving();
+            ThreadState.setAsSchedulerThread(false);
         }
     }
 
