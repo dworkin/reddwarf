@@ -33,8 +33,10 @@ import java.util.Collection;
  * in <code>TransactionRunner</code>. To make a task persist, you
  * should use the <code>DataService</code>.
  * <p>
- * Note that while <code>TaskScheduler</code> is not aware of transactions,
- * it does handle re-trying tasks based on <code>Exception</code>s thrown
+ * Note that while <code>TaskScheduler</code> is not aware of transactions
+ * (with the exception of <code>runTransactionalTask</code>), it does
+ * handle re-trying tasks submitted via the <code>reserveTask</code> and
+ * <code>scheduleTask</code> methods based on <code>Exception</code>s thrown
  * from the given <code>KernelRunnable</code>. If the <code>Exception</code>
  * thrown implements <code>ExceptionRetryStatus</code> then the
  * <code>TaskScheduler</code> will consult the <code>shouldRetry</code>
@@ -42,6 +44,14 @@ import java.util.Collection;
  * scheduler implementation to decide if tasks are re-tried immediately,
  * or re-scheduled in some manner (for instance, scheduled at a higher
  * priority or put on the front of the queue).
+ * <p>
+ * The <code>runTask</code> and <code>runTransactionalTask</code> methods
+ * also support re-trying tasks in certain cases based on the rules described
+ * above. Refer to the method documentation for detail on how re-try
+ * decisions are made. Note that in the specific case of
+ * <code>runTransactionalTask</code> a scheduled task can effectively
+ * create a nested task, in which case re-try is skipped for the nested
+ * task to be handled for the calling task.
  * <p>
  * The <code>scheduleTask</code> methods will make a best effort to schedule
  * the task provided, but based on the policy of the scheduler, this may not
