@@ -305,6 +305,88 @@ public class TestMasterTaskSchedulerImpl {
     }
 
     /**
+     * Test runTransactionalTask.
+     */
+
+    @Test public void runNewTransaction() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        scheduler.runTransactionalTask(new TestRunner(new Runnable() {
+                public void run() {
+                    proxy.getCurrentTransaction();
+                }
+            }), testOwner);
+    }
+
+    @Test public void runNewTransactionExistingTask() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(new TestRunner(new Runnable() {
+                                    public void run() {
+                                        proxy.getCurrentTransaction();
+                                    }
+                                }), testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.runTask(runner, testOwner, false);
+    }
+
+    @Test public void runNewTransactionScheduledTask() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(1);
+        final RunCountTestRunner countRunner = new RunCountTestRunner(1);
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(countRunner, testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.scheduleTask(runner, testOwner);
+        Thread.sleep(500L);
+        assertEquals(0, countRunner.getRunCount());
+    }
+
+    @Test public void runExistingTransaction() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(new TestRunner(new Runnable() {
+                                    public void run() {
+                                        proxy.getCurrentTransaction();
+                                    }
+                                }), testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.runTask(new TransactionRunner(runner), testOwner, false);
+    }
+
+    @Test (expected=IllegalStateException.class)
+        public void runTransactionNested() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {}
+            });
+        scheduler.runTransactionalTask(new TransactionRunner(runner),
+                                       testOwner);
+    }
+
+    /**
      * Utility methods.
      */
 

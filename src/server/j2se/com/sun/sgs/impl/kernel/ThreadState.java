@@ -155,4 +155,14 @@ final class ThreadState {
         currentTransaction.set(null);
     }
 
+    /**
+     * Returns whether there is a currently active transaction.
+     *
+     * @return <code>true</code> if there is currently an active transaction,
+     *         <code>false</code> otherwise
+     */
+    static boolean isCurrentTransaction() {
+        return (currentTransaction.get() != null);
+    }
+
 }

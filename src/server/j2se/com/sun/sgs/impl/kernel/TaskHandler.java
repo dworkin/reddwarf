@@ -118,13 +118,40 @@ public final class TaskHandler {
     }
 
     /**
+     * Runs the given task in a transactional state. If no transaction is
+     * currently active then one is created, attempting to commit on
+     * completion of the task. If a transaction is already active then the
+     * task is run in the context of the active transaction, but is not
+     * committed when this method returns.
+     * <p>
+     * Note that this method is typically only called from the context of
+     * a task run through the scheduler. If you need to run a transactional
+     * task from an independent thread, you should use{@code runTask}
+     * on {@code TaskScheduler} and provide a {@code TransactionRunner},
+     * or simply use the scheduler's {@code runTransactionalTask} method.
+     *
+     * @param task the <code>KernelRunnable</code> to run transactionally
+     *
+     * @throws Exception if there is any failure in running the task
+     */
+    public static void runTransactionally(KernelRunnable task)
+        throws Exception
+    {
+        if (ThreadState.isCurrentTransaction())
+            task.run();
+        else
+            runTransactionalTask(task);
+    }
+
+    /**
      * Runs the given task in a transactional state, committing the
      * transaction on completion of the task.
      * <p>
      * Note that this method is typically only called from the context of
-     * a thread created by the system. If you need to run a transactional
-     * task from an independent thread, you should use {@code runTask}
-     * on {@code TaskScheduler} and provide a {@code TransactionRunner}.
+     * a task run through the scheduler. If you need to run a transactional
+     * task from an independent thread, you should use{@code runTask}
+     * on {@code TaskScheduler} and provide a {@code TransactionRunner},
+     * or simply use the scheduler's {@code runTransactionalTask} method.
      *
      * @param task the <code>KernelRunnable</code> to run transactionally
      *
@@ -134,6 +161,7 @@ public final class TaskHandler {
     public static void runTransactionalTask(KernelRunnable task)
         throws Exception
     {
+        // FIXME: should this assert that we're in a scheduler thread?
 	runTransactionalTask(task, false);
     }
 
