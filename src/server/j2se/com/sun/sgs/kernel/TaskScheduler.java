@@ -33,8 +33,10 @@ import java.util.Collection;
  * in <code>TransactionRunner</code>. To make a task persist, you
  * should use the <code>DataService</code>.
  * <p>
- * Note that while <code>TaskScheduler</code> is not aware of transactions,
- * it does handle re-trying tasks based on <code>Exception</code>s thrown
+ * Note that while <code>TaskScheduler</code> is not aware of transactions
+ * (with the exception of <code>runTransactionalTask</code>), it does
+ * handle re-trying tasks submitted via the <code>reserveTask</code> and
+ * <code>scheduleTask</code> methods based on <code>Exception</code>s thrown
  * from the given <code>KernelRunnable</code>. If the <code>Exception</code>
  * thrown implements <code>ExceptionRetryStatus</code> then the
  * <code>TaskScheduler</code> will consult the <code>shouldRetry</code>
@@ -42,6 +44,14 @@ import java.util.Collection;
  * scheduler implementation to decide if tasks are re-tried immediately,
  * or re-scheduled in some manner (for instance, scheduled at a higher
  * priority or put on the front of the queue).
+ * <p>
+ * The <code>runTask</code> and <code>runTransactionalTask</code> methods
+ * also support re-trying tasks in certain cases based on the rules described
+ * above. Refer to the method documentation for detail on how re-try
+ * decisions are made. Note that in the specific case of
+ * <code>runTransactionalTask</code> a scheduled task can effectively
+ * create a nested task, in which case re-try is skipped for the nested
+ * task to be handled for the calling task.
  * <p>
  * The <code>scheduleTask</code> methods will make a best effort to schedule
  * the task provided, but based on the policy of the scheduler, this may not
@@ -196,7 +206,8 @@ public interface TaskScheduler
      * the caller will block until the task completes or fails permanently.
      * <p>
      * Note that a task run through this method may not in turn call
-     * {@code runTask}. Doing so will cause an {@code IllegalStateException}
+     * {@code runTask}, nor may a task scheduled through this scheduler call
+     * this method. Doing so will cause an {@code IllegalStateException}
      * to be thrown.
      *
      * @param task the {@code KernelRunnable} to execute
@@ -207,10 +218,49 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if the given task is not accepted
      * @throws IllegalStateException if {@code runTask} is being invoked by
-     *                               a task that was run via {@code runTask}
+     *                               a task that was run through this scheduler
      * @throws Exception if the task fails and is not re-tried
      */
     public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+        throws Exception;
+
+    /**
+     * Runs the task synchronously and in a transactional context, returning
+     * when the task has completed or throwing an exception if the task
+     * fails. The provided {@code KernelRunnable} should not be an instance
+     * of or invoke an instance of {@code TransactionRunner}. This will cause
+     * an {@code IllegalStateException} to be thrown since transactions
+     * cannot be nested.
+     * <p>
+     * Unlike {@code runTask}, this method may be called from any thread
+     * of control regardless of its current context. Specifically, this may
+     * be called directly by a task run through this scheduler, a thread
+     * independent of this scheduler, even by an already active transaction.
+     * Note that in the latter case, rather than creating a transactional
+     * context, the existing transaction will be used, meaning that this
+     * method will return without committing the transactional task.
+     * <p>
+     * Note that when this method is called from the context of a task that
+     * was started through this scheduler, then there is already an
+     * associated owner. In this case, the provided {@code TaskOwner} will
+     * be ignored and the owner will remain unchanged.
+     * <p>
+     * Note also that when this method is called from the context of a
+     * task that was started through this scheduler, then re-try handling
+     * is already being applied to the calling task. This means that the
+     * provided {@code KernelRunnable} will only be re-tried if this
+     * method is called from the context of a thread that isn't running
+     * a task executed through this scheduler.
+     *
+     * @param task the {@code KernelRunnable} to execute transactionally
+     * @param owner the requested entity on who's behalf this task may be run
+     *
+     * @throws TaskRejectedException if the given task is not accepted
+     * @throws IllegalStateException if the task is or invokes an instance
+     *                               of {@code TransactionRunner}
+     * @throws Exception if the task fails and is not re-tried
+     */
+    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
         throws Exception;
 
 }
