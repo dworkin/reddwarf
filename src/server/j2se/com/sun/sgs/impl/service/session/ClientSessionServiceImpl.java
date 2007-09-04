@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.session;
@@ -37,7 +52,7 @@ import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import java.io.IOException;
+import com.sun.sgs.service.TransactionRunner;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -122,31 +137,28 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final Object flushContextsLock = new Object();
 
     /** The Acceptor for listening for new connections. */
-    private Acceptor<SocketAddress> acceptor;
-
-    /** Synchronize on this object before accessing the registry. */
-    private final Object lock = new Object();
+    private final Acceptor<SocketAddress> acceptor;
 
     /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    NonDurableTaskScheduler nonDurableTaskScheduler;
+    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
-    private TransactionContextFactory<Context> contextFactory;
+    private final TransactionContextFactory<Context> contextFactory;
     
     /** The data service. */
-    DataService dataService;
+    final DataService dataService;
 
     /** The identity manager. */
-    IdentityManager identityManager;
+    final IdentityManager identityManager;
 
     /** The ID block size for the IdGenerator. */
-    private int idBlockSize;
+    private final int idBlockSize;
     
     /** The IdGenerator. */
-    private IdGenerator idGenerator;
+    private final IdGenerator idGenerator;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -156,9 +168,13 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      *
      * @param properties service properties
      * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
+     * @throws Exception if a problem occurs when creating the service
      */
-    public ClientSessionServiceImpl(
-	Properties properties, ComponentRegistry systemRegistry)
+    public ClientSessionServiceImpl(Properties properties,
+				    ComponentRegistry systemRegistry,
+				    TransactionProxy txnProxy)
+	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
@@ -169,6 +185,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	try {
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
+	    } else if (txnProxy == null) {
+		throw new NullPointerException("null txnProxy");
 	    }
 	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
@@ -206,7 +224,42 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		systemRegistry.getComponent(IdentityManager.class);
 	    flushContextsThread.start();
 
-	} catch (RuntimeException e) {
+	    synchronized (ClientSessionServiceImpl.class) {
+		if (ClientSessionServiceImpl.txnProxy == null) {
+		    ClientSessionServiceImpl.txnProxy = txnProxy;
+		} else {
+		    assert ClientSessionServiceImpl.txnProxy == txnProxy;
+		}
+	    }
+	    contextFactory = new ContextFactory(txnProxy);
+	    dataService = txnProxy.getService(DataService.class);
+
+	    idGenerator =
+		new IdGenerator(ID_GENERATOR_NAME,
+				idBlockSize,
+				txnProxy,
+				taskScheduler);
+	    ServerSocketEndpoint endpoint =
+		new ServerSocketEndpoint(
+		    new InetSocketAddress(port), TransportType.RELIABLE);
+	    acceptor = endpoint.createAcceptor();
+	    try {
+		acceptor.listen(acceptorListener);
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(
+			Level.CONFIG, "listen successful. port:{0,number,#}",
+			getListenPort());
+		}
+	    } catch (Exception e) {
+		try {
+		    acceptor.shutdown();
+		} catch (RuntimeException re) {
+		}
+		throw e;
+	    }
+	    // TBD: listen for UNRELIABLE connections as well?
+
+	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e,
@@ -224,69 +277,21 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /** {@inheritDoc} */
-    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "Configuring ClientSessionServiceImpl");
-	}
-	try {
-	    if (registry == null) {
-		throw new NullPointerException("null registry");
-	    } else if (proxy == null) {
-		throw new NullPointerException("null transaction proxy");
-	    }
-	    
-	    synchronized (ClientSessionServiceImpl.class) {
-		if (ClientSessionServiceImpl.txnProxy == null) {
-		    ClientSessionServiceImpl.txnProxy = proxy;
-		} else {
-		    assert ClientSessionServiceImpl.txnProxy == proxy;
-		}
-	    }
-	    
-	    synchronized (lock) {
-		if (this.acceptor != null) {
-		    throw new IllegalStateException("Already configured");
-		}
-		(new ConfigureServiceContextFactory(txnProxy)).
-		    joinTransaction();
-		contextFactory = new ContextFactory(txnProxy);
-		dataService = registry.getComponent(DataService.class);
-		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(
-			taskScheduler, proxy.getCurrentOwner(),
-			registry.getComponent(TaskService.class));
-		notifyDisconnectedSessions();
-		idGenerator =
-		    new IdGenerator(ID_GENERATOR_NAME,
-				    idBlockSize,
-				    txnProxy,
-				    nonDurableTaskScheduler);
-		ServerSocketEndpoint endpoint =
-		    new ServerSocketEndpoint(
-		        new InetSocketAddress(port), TransportType.RELIABLE);
-		try {
-                    acceptor = endpoint.createAcceptor();
-		    acceptor.listen(acceptorListener);
-		    if (logger.isLoggable(Level.CONFIG)) {
-			logger.log(
-			    Level.CONFIG,
-			    "configure: listen successful. port:{0,number,#}",
-                            getListenPort());
-		    }
-		} catch (IOException e) {
-		    throw new RuntimeException(e);
-		}
-		// TBD: listen for UNRELIABLE connections as well?
-	    }
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to configure ClientSessionServiceImpl");
-	    }
-	    throw e;
-	}
+    public void ready() throws Exception { 
+        // Update with the application owner
+        nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+        
+        taskScheduler.runTask(
+		new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    notifyDisconnectedSessions();
+			}
+		    }),
+		txnProxy.getCurrentOwner(), true);
     }
 
     /**
@@ -295,13 +300,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * @return the port this service is listening on
      */
     public int getListenPort() {
-	synchronized (lock) {
-	    if (acceptor == null) {
-		throw new IllegalArgumentException("not configured");
-	    }
-	    return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
-		getPort();
-	}
+	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
+	    getPort();
     }
 
     /**
@@ -322,10 +322,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
 
 	try {
-	    if (acceptor != null) {
-		acceptor.shutdown();
-		logger.log(Level.FINEST, "acceptor shutdown");
-	    }
+	    acceptor.shutdown();
+	    logger.log(Level.FINEST, "acceptor shutdown");
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
 	    // swallow exception
@@ -372,9 +370,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    byte[] nextId;
 	    try {
 		nextId = idGenerator.nextBytes();
-	    } catch (InterruptedException e) {
-		// This shouldn't happen; noone should be interrupting
-		// this thread.
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Failed to obtain client session ID, throws");
 		return null;
 	    }
 	    ClientSessionImpl session =
@@ -392,74 +391,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
     }
 
-    /* -- Implement transaction participant/context for 'configure' -- */
-
-    private class ConfigureServiceContextFactory
-	extends TransactionContextFactory
-		<ConfigureServiceTransactionContext>
-    {
-	ConfigureServiceContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
-	}
-	
-	/** {@inheritDoc} */
-	public ConfigureServiceTransactionContext
-	    createContext(Transaction txn)
-	{
-	    return new ConfigureServiceTransactionContext(txn);
-	}
-    }
-
-    private final class ConfigureServiceTransactionContext
-	extends TransactionContext
-    {
-	/**
-	 * Constructs a context with the specified transaction.
-	 */
-        private ConfigureServiceTransactionContext(Transaction txn) {
-	    super(txn);
-	}
-	
-	/**
-	 * {@inheritDoc}
-	 *
-	 * Performs cleanup in the case that the transaction invoking
-	 * the service's {@code configure} method aborts.
-	 */
-	public void abort(boolean retryable) {
-	    synchronized (lock) {
-		try {
-		    if (acceptor != null) {
-			acceptor.shutdown();
-		    }
-		} catch (Exception e) {
-		    // ignore exception shutting down acceptor
-		    logger.logThrow(
-			Level.FINEST, e, " exception shutting down acceptor");
-		} finally {
-		    acceptor = null;
-		}
-		
-		for (ClientSessionImpl session : sessions.values()) {
-		    try {
-			session.shutdown();
-		    } catch (Exception e) {
-			// ignore exception shutting down session
-			logger.logThrow(
-			    Level.FINEST, e,
-			    " exception shutting down session");
-		    }
-		}
-		sessions.clear();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void commit() {
-	    isCommitted = true;
-        }
-    }
-	
     /* -- Implement TransactionContextFactory -- */
 
     private class ContextFactory extends TransactionContextFactory<Context> {
@@ -757,7 +688,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * throwing TransactionNotActiveException if there is no current
      * transaction, and throwing IllegalStateException if there is a
      * problem with the state of the transaction or if this service
-     * has not been configured with a transaction proxy.
+     * has not been initialized with a transaction proxy.
      */
     Context checkContext() {
 	return contextFactory.joinTransaction();
@@ -772,7 +703,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     public synchronized static ClientSessionService getInstance() {
 	if (txnProxy == null) {
-	    throw new IllegalStateException("Service not configured");
+	    throw new IllegalStateException("Service not initialized");
 	} else {
 	    return txnProxy.getService(ClientSessionService.class);
 	}

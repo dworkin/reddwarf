@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.task;
@@ -93,32 +108,33 @@ public class TestTaskServiceImpl extends TestCase {
         // create the task and data services used by most of the tests
         // NOTE: this should probably be done on demand for those tests
         // that actually need services
-        deleteDirectory(DB_DIRECTORY);
-        dataService = createDataService(DB_DIRECTORY);
-        taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-        
-        // configure the main service instances that will be used throughout
+        // register the main service instances that will be used throughout
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
-        txn = createTransaction(10000);
-        dataService.configure(serviceRegistry, txnProxy);
+        deleteDirectory(DB_DIRECTORY);
+        dataService = createDataService(DB_DIRECTORY);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        taskService.configure(serviceRegistry, txnProxy);
+        taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
         serviceRegistry.setComponent(TaskManager.class, taskService);
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
         
+	// services ready
+	dataService.ready();
+	taskService.ready();
+
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
+        txn = createTransaction(10000);
         dataService.setBinding("counter", new Counter());
-            
-        txn.commit();
+	txn.commit();
     }
 
     protected void tearDown() {
@@ -145,29 +161,64 @@ public class TestTaskServiceImpl extends TestCase {
      * Constructor tests.
      */
 
-    public void testConstructorNullArgs() {
+    public void testConstructorNullArgs() throws Exception {
         try {
-            new TaskServiceImpl(null, systemRegistry);
+            new TaskServiceImpl(null, systemRegistry, txnProxy);
             fail("Expected NullPointerException");
         } catch (NullPointerException e) {
             System.err.println(e);
         }
         try {
-            new TaskServiceImpl(new Properties(), null);
+            new TaskServiceImpl(new Properties(), null, txnProxy);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            System.err.println(e);
+        }
+        try {
+            new TaskServiceImpl(new Properties(), systemRegistry, null);
             fail("Expected NullPointerException");
         } catch (NullPointerException e) {
             System.err.println(e);
         }
     }
 
-    public void testConstructorNoScheduler() {
+    public void testConstructorNoScheduler() throws Exception {
         try {
             new TaskServiceImpl(new Properties(),
-                                new DummyComponentRegistry());
+                                new DummyComponentRegistry(),
+				new DummyTransactionProxy());
             fail("Expected MissingResourceException");
         } catch (MissingResourceException e) {
             System.err.println(e);
         }
+    }
+
+    public void testConstructorNoDataService() throws Exception {
+        DummyComponentRegistry registry = new DummyComponentRegistry();
+        registry.setComponent(
+	    TaskScheduler.class, new DummyTaskScheduler(appContext, false));
+        try {
+            new TaskServiceImpl(
+		new Properties(), registry, new DummyTransactionProxy());
+            fail("Expected MissingResourceException");
+        } catch (MissingResourceException e) {
+            System.err.println(e);
+        }
+    }
+
+    public void testConstructorPendingSingleTasks() throws Exception {
+        //clearPendingTasksInStore();
+        // FIXME: implement this once service shutdown is available
+    }
+
+    public void testConstructorPendingRecurringTasks() throws Exception {
+        //clearPendingTasksInStore();
+        // FIXME: implement this once service shutdown is available
+    }
+
+    public void testConstructorPendingAnyTasks() throws Exception {
+        //clearPendingTasksInStore();
+        // FIXME: implement this once service shutdown is available
     }
 
     /**
@@ -176,96 +227,6 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testGetName() {
         assertNotNull(taskService.getName());
-    }
-
-    /**
-     * Configuration tests.
-     */
-
-    public void testConfigureNullArgs() {
-        TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
-        try {
-            service.configure(null, txnProxy);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
-        txn = createTransaction();
-        try {
-            service.configure(serviceRegistry, null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
-    }
-
-    public void testConfigureNoTxn() {
-        TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), systemRegistry);
-        try {
-            service.configure(serviceRegistry, txnProxy);
-            fail("Expected TransactionNotActiveException");
-        } catch (TransactionNotActiveException e) {
-            System.err.println(e);
-        }
-    }
-
-    public void testConfigureAgain() {
-        txn = createTransaction();
-        try {
-            taskService.configure(serviceRegistry, txnProxy);
-            fail("Expected IllegalStateException");
-        } catch (IllegalStateException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
-    }
-
-    public void testConfigureAborted() throws Exception {
-        TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
-        service.configure(serviceRegistry, txnProxy);
-        txn.abort(null);
-        txn = createTransaction();
-        try {
-            service.configure(serviceRegistry, txnProxy);
-            txn.commit();
-        } catch (Exception e) {
-            fail("Did not expect Exception");
-        }
-    }
-
-    public void testConfigureNoDataService() {
-        TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
-        try {
-            service.configure(new DummyComponentRegistry(), txnProxy);
-            fail("Expected MissingResourceException");
-        } catch (MissingResourceException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
-    }
-
-    public void testConfigurePendingSingleTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
-    }
-
-    public void testConfigurePendingRecurringTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
-    }
-
-    public void testConfigurePendingAnyTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
     }
 
     /**
@@ -407,15 +368,14 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    public void testScheduleRejected() {
+    public void testScheduleRejected() throws Exception {
         DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
         DummyComponentRegistry registry = new DummyComponentRegistry();
         registry.setComponent(TaskScheduler.class, rejSched);
         TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), registry);
+            new TaskServiceImpl(new Properties(), registry, txnProxy);
         registry = new DummyComponentRegistry();
         txn = createTransaction();
-        service.configure(serviceRegistry, txnProxy);
         Task task = new ManagedTask();
         try {
             service.scheduleTask(task);
@@ -804,7 +764,7 @@ public class TestTaskServiceImpl extends TestCase {
                                "DataStoreImpl.directory", directory);
         properties.setProperty(StandardProperties.APP_NAME,
                                "TestTaskServiceImpl");
-        return new DataServiceImpl(properties, systemRegistry);
+        return new DataServiceImpl(properties, systemRegistry, txnProxy);
     }
 
     private void deleteDirectory(String directory) {

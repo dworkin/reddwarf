@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.data;
@@ -22,6 +37,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -126,9 +142,6 @@ public class TestDataServiceImpl extends TestCase {
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
-	    createTransaction(10000);
-	    service.configure(componentRegistry, txnProxy);
-	    txn.commit();
 	    componentRegistry.setComponent(DataManager.class, service);
 	}
 	componentRegistry.registerAppContext();
@@ -173,13 +186,19 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConstructorNullArgs() throws Exception {
 	try {
-	    createDataServiceImpl(null, componentRegistry);
+	    createDataServiceImpl(null, componentRegistry, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
 	try {
-	    createDataServiceImpl(props, null);
+	    createDataServiceImpl(props, null, txnProxy);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    createDataServiceImpl(props, componentRegistry, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -189,7 +208,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
 	props.remove(StandardProperties.APP_NAME);
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -200,7 +219,7 @@ public class TestDataServiceImpl extends TestCase {
 	props.setProperty(
 	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -214,6 +233,8 @@ public class TestDataServiceImpl extends TestCase {
      * @throws Exception if an unexpected exception occurs
      */
     public void testConstructorNoDirectory() throws Exception {
+	txn.commit();
+	txn = null;
         String rootDir = createDirectory();
         File dataDir = new File(rootDir, "dsdb");
         if (!dataDir.mkdir()) {
@@ -222,14 +243,14 @@ public class TestDataServiceImpl extends TestCase {
 	props.remove(DataStoreImplClassName + ".directory");
 	props.setProperty(StandardProperties.APP_ROOT, rootDir);
 	DataServiceImpl testSvc =
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
         testSvc.shutdown();
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {
 	props.remove(DataStoreImplClassName + ".directory");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -240,7 +261,7 @@ public class TestDataServiceImpl extends TestCase {
 	props.setProperty(
 	    DataServiceImplClassName + ".data.store.class", "AnUnknownClass");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -252,7 +273,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    Object.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -264,7 +285,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreNoConstructor.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -278,7 +299,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreAbstract.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -296,7 +317,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreConstructorFails.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected DataStoreConstructorException");
 	} catch (DataStoreConstructorException e) {
 	    System.err.println(e);
@@ -319,64 +340,6 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testGetName() {
 	assertNotNull(service.getName());
-    }
-
-    /* -- Test configure -- */
-
-    public void testConfigureNullArgs() throws Exception {
-	txn.commit();
-	txn = null;
-	service.shutdown();
-	service = getDataServiceImpl();
-	try {
-	    service.configure(null, txnProxy);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-	try {
-	    service.configure(componentRegistry, null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureNoTxn() throws Exception {
-	txn.commit();
-	txn = null;
-	service = getDataServiceImpl();
-	try {
-	    service.configure(componentRegistry, txnProxy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureAgain() throws Exception {
-	try {
-	    service.configure(componentRegistry, txnProxy);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureAborted() throws Exception {
-	txn.commit();
-	service = getDataServiceImpl();
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
-	txn.abort(null);
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
-	txn.commit();
-	txn = null;
-	service = null;
     }
 
     /* -- Test getBinding and getServiceBinding -- */
@@ -558,12 +521,6 @@ public class TestDataServiceImpl extends TestCase {
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	}
     };
-    public void testGetBindingUninitialized() throws Exception {
-	testUninitialized(getBinding);
-    }
-    public void testGetServiceBindingUninitialized() throws Exception {
-	testUninitialized(getServiceBinding);
-    }
     public void testGetBindingAborting() throws Exception {
 	testAborting(getBinding);
     }
@@ -753,12 +710,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action setServiceBinding = new Action() {
 	void run() { service.setServiceBinding("dummy", dummy); }
     };
-    public void testSetBindingUninitialized() throws Exception {
-	testUninitialized(setBinding);
-    }
-    public void testSetServiceBindingUninitialized() throws Exception {
-	testUninitialized(setServiceBinding);
-    }
     public void testSetBindingAborting() throws Exception {
 	testAborting(setBinding);
     }
@@ -1006,12 +957,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action removeServiceBinding = new Action() {
 	void run() { service.removeServiceBinding("dummy"); }
     };
-    public void testRemoveBindingUninitialized() throws Exception {
-	testUninitialized(removeBinding);
-    }
-    public void testRemoveServiceBindingUninitialized() throws Exception {
-	testUninitialized(removeServiceBinding);
-    }
     public void testRemoveBindingAborting() throws Exception {
 	testAborting(removeBinding);
     }
@@ -1191,12 +1136,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action nextServiceBoundName = new Action() {
 	void run() { service.nextServiceBoundName(null); }
     };
-    public void testNextBoundNameUninitialized() throws Exception {
-	testUninitialized(nextBoundName);
-    }
-    public void testNextServiceBoundNameUninitialized() throws Exception {
-	testUninitialized(nextServiceBoundName);
-    }
     public void testNextBoundNameAborting() throws Exception {
 	testAborting(nextBoundName);
     }
@@ -1376,9 +1315,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action removeObject = new Action() {
 	void run() { service.removeObject(dummy); }
     };
-    public void testRemoveObjectUninitialized() throws Exception {
-	testUninitialized(removeObject);
-    }
     public void testRemoveObjectAborting() throws Exception {
 	testAborting(removeObject);
     }
@@ -1473,9 +1409,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action markForUpdate = new Action() {
 	void run() { service.markForUpdate(dummy); }
     };
-    public void testMarkForUpdateUninitialized() throws Exception {
-	testUninitialized(markForUpdate);
-    }
     public void testMarkForUpdateAborting() throws Exception {
 	testAborting(markForUpdate);
     }
@@ -1579,9 +1512,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action createReference = new Action() {
 	void run() { service.createReference(dummy); }
     };
-    public void testCreateReferenceUninitialized() throws Exception {
-	testUninitialized(createReference);
-    }
     public void testCreateReferenceAborting() throws Exception {
 	testAborting(createReference);
     }
@@ -1699,9 +1629,6 @@ public class TestDataServiceImpl extends TestCase {
 	void setUp() { id = service.createReference(dummy).getId(); }
 	void run() { service.createReferenceForId(id); }
     };
-    public void testCreateReferenceForIdUninitialized() throws Exception {
-	testUninitialized(createReferenceForId);
-    }
     public void testCreateReferenceForIdAborting() throws Exception {
 	testAborting(createReferenceForId);
     }
@@ -2165,10 +2092,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	service.shutdown();
 	service = getDataServiceImpl();
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
-	txn.commit();
 	createTransaction();
 	assertEquals(
 	    dummy, service.getBinding("dummy", DummyManagedObject.class));
@@ -2622,7 +2546,9 @@ public class TestDataServiceImpl extends TestCase {
      * properties and component registry.
      */
     protected DataServiceImpl createDataServiceImpl(
-	Properties props, ComponentRegistry componentRegistry)
+	Properties props,
+	ComponentRegistry componentRegistry,
+	TransactionProxy txnProxy)
 	throws Exception
     {
 	File dir = new File(dbDirectory);
@@ -2632,7 +2558,7 @@ public class TestDataServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /**
@@ -2640,7 +2566,7 @@ public class TestDataServiceImpl extends TestCase {
      * registry.
      */
     private DataServiceImpl getDataServiceImpl() throws Exception {
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /** Returns the default properties to use for creating data services. */
@@ -2764,21 +2690,6 @@ public class TestDataServiceImpl extends TestCase {
     abstract class Action {
 	void setUp() { };
 	abstract void run();
-    }
-
-    /** Tests running the action with an uninitialized service. */
-    void testUninitialized(Action action) throws Exception {
-	action.setUp();
-	txn.commit();
-	createTransaction();
-	service = getDataServiceImpl();
-	try {
-	    action.run();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-	service = null;
     }
 
     /** Tests running the action while aborting. */

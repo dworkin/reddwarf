@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.example.hack.client.gui;
@@ -13,6 +28,7 @@ import java.util.Collection;
 import java.util.HashSet;
 
 import javax.swing.ListModel;
+import javax.swing.SwingUtilities;
 
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
@@ -124,11 +140,16 @@ class GameList implements ListModel, LobbyListener
         // listeners about only the items that changed. If this game started
         // hosting many dungeons, then it would be more important, but given
         // the current scale of the game the current mechanism is easier.
-        ListDataEvent event =
+        final ListDataEvent event =
             new ListDataEvent(this, ListDataEvent.CONTENTS_CHANGED,
                               0, data.size() - 1);
-        for (ListDataListener listener : listeners)
-            listener.contentsChanged(event);
+        
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                for (ListDataListener listener : listeners)
+                    listener.contentsChanged(event);
+            }
+        });
     }
 
     /**

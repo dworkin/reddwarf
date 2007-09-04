@@ -74,6 +74,12 @@
        the server binary distribution -->
   <property name="bdb.je.jar" location="lib/je-3.2.23.jar"/>
 
+  <!-- Versions of referenced software, for creating subdirectories in
+       the server binary distribution -->
+  <property name="bdb.version" value="4.5.20"/>
+  <property name="mina.version" value="1.1"/>
+  <property name="slf4j.version" value="1.4.0"/>
+
   <!-- Shared code class path -->
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
@@ -205,10 +211,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
-        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
-        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
-        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
+        Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -317,11 +320,12 @@
 	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client-src"/>
+    <copy file="etc/THIRDPARTYLICENSE-non-gpl.txt"
+	  tofile="${build.dir}/sgs-client-src/THIRDPARTYLICENSE.txt"/>
     <copy file="etc/README-client-source"
 	  tofile="${build.dir}/sgs-client-src/README">
-      <filterset>
-	<filter token="VERSION" value="${project.version}"/>
-      </filterset>
+      <filterset refid="versions"/>
     </copy>
     <apply executable="${ruby}" logError="true">
       <arg file="etc/update_copyrights"/>
@@ -329,7 +333,9 @@
       <fileset dir="${build.dir}/sgs-client-src" includes="**/*.java"/>
     </apply>
     <delete>
-      <fileset dir="${build.dir}/sgs-client-src" includes="**/*~"/>
+      <fileset dir="${build.dir}/sgs-client-src"
+	       defaultexcludes="no"
+	       includes="**/*~"/>
     </delete>
     <zip destfile="${build.dir}/sgs-client-src-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-client-src"
@@ -365,12 +371,12 @@
 	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs-client"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client"/>
+    <copy file="etc/THIRDPARTYLICENSE-non-gpl.txt"
+	  tofile="${build.dir}/sgs-client/THIRDPARTYLICENSE.txt"/>
     <copy file="etc/README-client-binary"
 	  tofile="${build.dir}/sgs-client/README">
-      <filterset>
-	<filter token="VERSION" value="${project.version}"/>
-      </filterset>
+      <filterset refid="versions"/>
     </copy>
     <zip destfile="${build.dir}/sgs-client-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-client"
@@ -406,10 +412,13 @@
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
+    <copy file="etc/NOTICE-server-gpl"
+	  tofile="${build.dir}/sgs-src/NOTICE-gpl"/>
+    <copy file="etc/THIRDPARTYLICENSE-non-gpl.txt"
+	  tofile="${build.dir}/sgs-src/THIRDPARTYLICENSE.txt"/>
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
-      <filterset>
-	<filter token="VERSION" value="${project.version}"/>
-      </filterset>
+      <filterset refid="versions"/>
     </copy>
     <mkdir dir="${build.dir}/sgs-src/lib"/>
     <zip destfile="${build.dir}/sgs-src-${project.version}.zip">
@@ -431,28 +440,50 @@
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
-    <copy file="etc/THIRDPARTYLICENSE" todir="${build.dir}/sgs"/>
+    <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs"/>
+    <copy file="etc/NOTICE-server-gpl" tofile="${build.dir}/sgs/NOTICE-gpl"/>
     <copy file="etc/README-server-binary" tofile="${build.dir}/sgs/README">
-      <filterset>
-	<filter token="VERSION" value="${project.version}"/>
-      </filterset>
+      <filterset refid="versions"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
-    <copy todir="${build.dir}/sgs/lib">
-      <fileset file="${build.dir}/lib/sgs.jar"/>
-      <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
-    </copy>
+    <copy file="${build.dir}/lib/sgs.jar" todir="${build.dir}/sgs/lib"/>
+    <mkdir dir="${build.dir}/sgs/lib/bdb"/>
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"/>
     </copy>
+    <copy todir="${build.dir}/mina">
+      <fileset dir="lib" includes="mina-*.jar"/>
+    </copy>
+    <copy file="etc/LICENSE-mina" tofile="${build.dir}/mina/LICENSE"/>
+    <copy file="etc/NOTICE-mina" tofile="${build.dir}/mina/NOTICE"/>
+    <copy todir="${build.dir}/slf4j">
+      <fileset dir="lib" includes="slf4j-*.jar"/>
+    </copy>
+    <copy file="etc/LICENSE-slf4j" tofile="${build.dir}/slf4j/LICENSE"/>
+    <copy file="etc/README-server-binary-toplevel"
+	  tofile="${build.dir}/README">
+      <filterset refid="versions"/>
+    </copy>
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
+      <fileset file="${build.dir}/README"/>
       <zipfileset dir="${build.dir}/sgs" includes="**"
-		  excludes="sgs.sh, lib/bdb/win32-x86/*"
+		  excludes="sgs.sh"
 		  prefix="sgs-${project.version}"/>
       <zipfileset dir="${build.dir}/sgs"
-		  includes="sgs.sh, lib/bdb/win32-x86/*"
+		  includes="sgs.sh"
 		  filemode="755"
 		  prefix="sgs-${project.version}"/>
+      <zipfileset dir="${build.dir}/bdb" includes="**"
+		  excludes="win32-x86/*"
+		  prefix="bdb-${bdb.version}"/>
+      <zipfileset dir="${build.dir}/bdb"
+		  includes="win32-x86/*"
+		  filemode="755"
+		  prefix="bdb-${bdb.version}"/>
+      <zipfileset dir="${build.dir}/mina" includes="**"
+		  prefix="mina-${mina.version}"/>
+      <zipfileset dir="${build.dir}/slf4j" includes="**"
+		  prefix="slf4j-${slf4j.version}"/>
     </zip>
   </target>
 
@@ -466,39 +497,40 @@
 	  description="Builds files for distributing Berkeley DB">
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
-    <copy todir="${build.dir}/sgs/lib/bdb"
+    <copy file="etc/LICENSE-bdb" tofile="${build.dir}/bdb/LICENSE"/>
+    <copy todir="${build.dir}/bdb"
 	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
-    <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
+    <copy todir="${build.dir}/bdb/macosx-ppc">
       <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/macosx-x86">
+    <copy todir="${build.dir}/bdb/macosx-x86">
       <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
+    <copy todir="${build.dir}/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
+    <copy todir="${build.dir}/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86">
+    <copy todir="${build.dir}/bdb/linux-x86">
       <fileset dir="${bdb.builds.dir}/linux-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86_64">
+    <copy todir="${build.dir}/bdb/linux-x86_64">
       <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
+    <copy todir="${build.dir}/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
@@ -566,6 +598,12 @@
     <property name="project.version"
 	      value="${project.release}${release.suffix}-r${project.revision}"/>
     <echo message="${project.version}"/>
+    <filterset id="versions">
+      <filter token="VERSION" value="${project.version}"/>
+      <filter token="BDB.VERSION" value="${bdb.version}"/>
+      <filter token="MINA.VERSION" value="${mina.version}"/>
+      <filter token="SLF4J.VERSION" value="${slf4j.version}"/>
+    </filterset>
   </target>
 
   <!-- Checks Java coding style -->
