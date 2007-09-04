@@ -892,7 +892,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             
             // Look up each identity on the failed node and move it
             String nodekey = NodeMapUtil.getPartialNodeKey(nodeId);
-            GetIdOnNodeTask task = new GetIdOnNodeTask(dataService, nodekey);
+            GetIdOnNodeTask task = 
+                    new GetIdOnNodeTask(dataService, nodekey, logger);
             
             boolean done = false;
             while (!done) {
@@ -928,6 +929,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     }
                 
                 } catch (Exception ex) {
+                    done = true;
                     logger.logThrow(Level.WARNING, ex, 
                         "Failed to move identity {0} from failed node {1}", 
                         task.getId(), node);
@@ -950,17 +952,27 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
         private final DataService dataService;
         private final String nodekey;
+        private final LoggerWrapper logger;
         
-        GetIdOnNodeTask(DataService dataService, String nodekey) {
+        GetIdOnNodeTask(DataService dataService, 
+                        String nodekey, LoggerWrapper logger) 
+        {
             this.dataService = dataService;
             this.nodekey = nodekey;
+            this.logger = logger;
         }
         
         public void run() {
-            String key = dataService.nextServiceBoundName(nodekey);
-            done = (key == null || !key.contains(nodekey));
-            if (!done) {
-                idmo = dataService.getServiceBinding(key, IdentityMO.class);
+            try {
+                String key = dataService.nextServiceBoundName(nodekey);
+                done = (key == null || !key.contains(nodekey));
+                if (!done) {
+                    idmo = dataService.getServiceBinding(key, IdentityMO.class);
+                }
+            } catch (Exception e) {
+                done = true;
+                logger.logThrow(Level.WARNING, e, 
+                        "Failed to get key or binding for {0}", nodekey);
             }
         }
         

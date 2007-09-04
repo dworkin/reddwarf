@@ -392,7 +392,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertEquals(3, found.size());
         long nodeId1 = 
                 (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
-        System.out.println("node id is " + nodeId + " and node id 1 is " + nodeId1);
         assertFalse(nodeId == nodeId1);
     }
      
@@ -428,7 +427,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         nodeMappingServer.canRemove(id);
         
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
 
         verifyMapCorrect(id);
         found = getFoundKeys(id);
@@ -441,7 +440,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         nodeMappingServer.assignNode(NodeMappingServerImpl.class, id);
         // We can't remove this, as the status is still set.
         nodeMappingServer.canRemove(id);
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
 
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);

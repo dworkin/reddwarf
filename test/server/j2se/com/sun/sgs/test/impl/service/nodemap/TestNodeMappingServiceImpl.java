@@ -696,7 +696,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone
         createTransaction();
         try {
@@ -743,7 +743,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         service.setStatus(NodeMappingService.class, id, false);
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone
         createTransaction();
         try {
@@ -770,7 +770,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         nodeMappingService.setStatus(NodeMappingService.class, id, true);
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Error if we cannot find the identity!
         createTransaction();
         try {
@@ -925,7 +925,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone... this is a hole in the
         // implementation, currently.  It won't be removed.
         createTransaction();
