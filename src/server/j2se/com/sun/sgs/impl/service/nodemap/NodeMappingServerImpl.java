@@ -507,6 +507,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * during our waiting time, marking the identity as active, during the
      * waiting time.  If it is still appropriate to remove the identity,
      * all traces of it are removed from the data store.
+     * <p>
+     * NOTE: this thread is still not correct in the face of interrupts:
+     * the logging code is known to swallow the interrupted exception
+     * sometimes.  InterruptedException clears the interrupt status,
+     * so checking isInterrupted() doesn't tell us if the thread has 
+     * <b>ever</b> been interrupted.
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
