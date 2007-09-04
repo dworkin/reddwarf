@@ -28,7 +28,11 @@ import com.sun.sgs.auth.Identity;
  * Invocations of the {@code NodeMappingListener} methods are made outside
  * of a transaction, but modifications to the map will have been performed
  * inside a transaction.
- * 
+ * <p>
+ * The implementations for the methods of this interface should be
+ * idempotent because they may be invoked multiple times if the implementation
+ * throws an exception which implements {@link ExceptionRetryStatus} and 
+ * {@code shouldRetry} returns {@code true}.
  * 
  * @see NodeMappingService#addNodeMappingListener(NodeMappingListener)
  */

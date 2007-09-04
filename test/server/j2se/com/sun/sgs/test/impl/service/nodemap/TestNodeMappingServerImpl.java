@@ -353,10 +353,46 @@ public class TestNodeMappingServerImpl extends TestCase {
         Identity id = new DummyIdentity();
         nodeMappingServer.assignNode(DataService.class, id);
         verifyMapCorrect(id);
+        long nodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
         nodeMappingServer.assignNode(DataService.class, id);
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);
         assertEquals(3, found.size());
+        long nodeId1 = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        assertEquals(nodeId, nodeId1);
+    }
+     
+    public void testAssignNodeTwiceFailed() throws Exception {
+        commitTransaction();
+        
+        Class NodeImplClass = 
+                Class.forName("com.sun.sgs.impl.service.watchdog.NodeImpl");
+        Method setFailedMethod = NodeImplClass.getDeclaredMethod(
+                "setFailed",
+                new Class[] {DataService.class});
+        setFailedMethod.setAccessible(true);
+        
+        Identity id = new DummyIdentity();
+        nodeMappingServer.assignNode(DataService.class, id);
+        verifyMapCorrect(id);
+        long nodeId = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        
+        // Mark the node as failed
+        createTransaction();
+        Node node = watchdogService.getNode(nodeId);
+        setFailedMethod.invoke(node, dataService);
+        commitTransaction();
+        
+        nodeMappingServer.assignNode(DataService.class, id);
+        verifyMapCorrect(id);
+        Set<String> found = getFoundKeys(id);
+        assertEquals(3, found.size());
+        long nodeId1 = 
+                (Long) getNodeForIdentityMethod.invoke(nodeMappingServer, id);
+        assertFalse(nodeId == nodeId1);
     }
      
      public void testAssignNodeTwiceDifferentService() throws Exception {
@@ -391,7 +427,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         nodeMappingServer.canRemove(id);
         
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
 
         verifyMapCorrect(id);
         found = getFoundKeys(id);
@@ -404,7 +440,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         nodeMappingServer.assignNode(NodeMappingServerImpl.class, id);
         // We can't remove this, as the status is still set.
         nodeMappingServer.canRemove(id);
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
 
         verifyMapCorrect(id);
         Set<String> found = getFoundKeys(id);

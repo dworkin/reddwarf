@@ -34,7 +34,8 @@ interface NodeMappingServer extends Remote {
      * Assigns the identity to a node and indicates that the service class
      * believes this identity is active.
      * If the id has already been assigned to a node, simply
-     * return that assignment.
+     * return that assignment.  If the id is assigned to a node that's not 
+     * alive, reassign it.
      *
      * @param service the class of the calling service
      * @param id the identity to assign
