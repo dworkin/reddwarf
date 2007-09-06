@@ -52,7 +52,7 @@
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.assertions" value="-enableassertions"/>
+  <property name="test.assertions" value="-ea:com.sun.sgs..."/>
   <property name="test.jvm.args" value="${test.assertions}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>

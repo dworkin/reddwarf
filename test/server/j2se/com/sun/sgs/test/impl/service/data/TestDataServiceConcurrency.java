@@ -220,12 +220,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	}
 	/* Warm up */
 	if (repeat != 1) {
-	    System.err.println("Warmup:");
 	    runOperations(1);
 	}
 	/* Test */
 	for (int t = threads; t <= maxThreads; t++) {
-	    System.err.println("Threads: " + t);
 	    for (int r = 0; r < repeat; r++) {
 		runOperations(t);
 	    }
@@ -262,9 +260,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	long ms = stop - start;
 	double s = (stop - start) / 1000.0d;
 	System.err.println(
-	    "Time: " + ms + " ms\n" +
-	    "Aborts: " + aborts + "\n" +
-	    "Ops per second: " + Math.round((threads * operations) / s));
+	    "Threads: " + threads + ", " +
+	    "time: " + ms + " ms, " +
+	    "aborts: " + aborts + ", " +
+	    "ops/sec: " + Math.round((threads * operations) / s));
     }
 
     /**
@@ -303,8 +302,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	    try {
 		createTxn();
 		for (int i = 0; i < operations; i++) {
-		    if (i % 1000 == 0) {
-			System.err.println(this + ": Operation " + i);
+		    if (i % 1000 == 0 && logger.isLoggable(Level.FINE)) {
+			logger.log(Level.FINE, "Operation {0}", i);
 		    }
 		    while (true) {
 			try {
