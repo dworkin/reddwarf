@@ -456,7 +456,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
 	try {
-	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+            taskScheduler.runTransactionalTask(task, taskOwner);
 	} catch (Exception e) {
 	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
 	    throw e;

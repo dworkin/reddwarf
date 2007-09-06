@@ -21,6 +21,7 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -37,7 +38,7 @@ public class DummyTransactionProxy implements TransactionProxy {
 	new ThreadLocal<DummyTransaction>();
 
     /** The task owner. */
-    private final TaskOwner taskOwner = new DummyTaskOwner();
+    private final DummyTaskOwner taskOwner = new DummyTaskOwner();
 
     /** Mapping from type to service. */
     private final Map<Class<? extends Service>, Service> services =
@@ -109,5 +110,9 @@ public class DummyTransactionProxy implements TransactionProxy {
 	    throw new NullPointerException("Arguments must not be null");
 	}
 	services.put(type, service);
+    }
+    
+    public void setContext(KernelAppContext ctx) {
+        taskOwner.setContext(ctx);
     }
 }

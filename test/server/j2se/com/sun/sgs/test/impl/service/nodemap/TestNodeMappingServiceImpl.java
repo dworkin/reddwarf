@@ -180,6 +180,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         nodemap = new HashMap<Long, NodeMappingService>();
         nodeListenerMap = new HashMap<Long, TestListener>();
         
+        MinimalTestKernel.useMasterScheduler(serviceProps);
 	appContext[0] = MinimalTestKernel.createContext();
 	systemRegistry[0] = MinimalTestKernel.getSystemRegistry(appContext[0]);
 	serviceRegistry[0] = MinimalTestKernel.getServiceRegistry(appContext[0]);

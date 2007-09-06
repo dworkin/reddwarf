@@ -19,6 +19,7 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 
 /**
