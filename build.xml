@@ -50,6 +50,13 @@
   <property name="apidoc.client.zip"
             location="${build.dir}/sgs-client-apidoc.zip"/>
 
+  <!-- Versions of referenced software, for creating subdirectories in
+       the server binary distribution -->
+  <property name="bdb.version" value="4.5.20"/>
+  <property name="bdbje.version" value="3.2.23"/>
+  <property name="mina.version" value="1.1"/>
+  <property name="slf4j.version" value="1.4.0"/>
+
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
   <property name="test.assertions" value="-ea:com.sun.sgs..."/>
@@ -57,7 +64,7 @@
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
-  <!-- Set test.use.bdbje to tru to test with BDB Java Edition -->
+  <!-- Set test.use.bdbje to true to test with BDB Java Edition -->
   <condition
      property="test.bdb.env"
      value="com.sun.sgs.impl.service.data.store.db.bdbje.BdbJeEnvironment"
@@ -72,13 +79,7 @@
   <!-- The caller should set the bdb.builds.dir property to a directory
        containing builds of Berkeley DB for all platforms if building
        the server binary distribution -->
-  <property name="bdb.je.jar" location="lib/je-3.2.23.jar"/>
-
-  <!-- Versions of referenced software, for creating subdirectories in
-       the server binary distribution -->
-  <property name="bdb.version" value="4.5.20"/>
-  <property name="mina.version" value="1.1"/>
-  <property name="slf4j.version" value="1.4.0"/>
+  <property name="bdb.je.jar" location="lib/je-${bdbje.version}.jar"/>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
@@ -428,6 +429,8 @@
   </target>
 
   <!-- Creates server binary distribution -->
+  <!-- FIXME: Make packaging and licensing changes for BDB JE
+       -tjb@sun.com (09/06/2007) -->
   <target name="dist-server-binary"
 	  depends="-dist-server-binary-clean, dist-server-binary-tutorial,
 		   dist-server-binary-bdb, jar-server, javadoc-api-server,
