@@ -20,6 +20,7 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.app.ExceptionRetryStatus;
 
 /**
  * A listener that can be registered with the {@link NodeMappingService}

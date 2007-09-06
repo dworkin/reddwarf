@@ -724,7 +724,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {   
-        taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);      
+        taskScheduler.runTransactionalTask(task, taskOwner);
     }
     
     /**
