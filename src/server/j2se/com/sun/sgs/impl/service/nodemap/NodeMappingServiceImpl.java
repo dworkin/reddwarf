@@ -922,8 +922,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
      *  Run the given task synchronously, and transactionally.
      * @param task the task
      */
-    private void runTransactionally(KernelRunnable task) throws Exception {
-        taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+    private void runTransactionally(KernelRunnable task) throws Exception {     
+        taskScheduler.runTransactionalTask(task, taskOwner);
     }
             
     /* -- Implement transaction participant/context for 'getNode' -- */

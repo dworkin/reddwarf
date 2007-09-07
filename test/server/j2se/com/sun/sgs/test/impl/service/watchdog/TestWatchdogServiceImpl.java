@@ -110,6 +110,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
 	createDirectory(DB_DIRECTORY);
+        MinimalTestKernel.useMasterScheduler(serviceProps);
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);

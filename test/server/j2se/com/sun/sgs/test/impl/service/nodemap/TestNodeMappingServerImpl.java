@@ -166,6 +166,7 @@ public class TestNodeMappingServerImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
         
+        MinimalTestKernel.useMasterScheduler(serviceProps);
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext); 
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);

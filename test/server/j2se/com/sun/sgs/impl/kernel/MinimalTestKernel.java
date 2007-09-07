@@ -108,6 +108,8 @@ public final class MinimalTestKernel
 
         contextMap.put(context, new ContextState(systemRegistry,
                                                  serviceRegistry));
+        
+        proxy.setContext(context);
         return context;
     }
 
