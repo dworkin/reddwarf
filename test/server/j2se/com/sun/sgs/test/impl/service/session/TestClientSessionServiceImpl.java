@@ -298,7 +298,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		UtilMisc.createProperties(StandardProperties.APP_NAME,
-				 "TestClientSessionServiceImpl");
+					  "TestClientSessionServiceImpl");
 	    new ClientSessionServiceImpl(
 		props, new DummyComponentRegistry(),
 		new DummyTransactionProxy());

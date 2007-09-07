@@ -35,6 +35,7 @@ import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.UtilMisc;
 
 import java.io.File;
 import java.util.HashMap;
@@ -67,7 +68,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private static long RENEW_INTERVAL = 500;
 
     /** Properties for the watchdog server and data service. */
-    private static Properties serviceProps = createProperties(
+    private static Properties serviceProps = UtilMisc.createProperties(
 	StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	WatchdogServerPropertyPrefix + ".start", "true",
 	WatchdogServerPropertyPrefix + ".port", Integer.toString(WATCHDOG_PORT),
@@ -75,7 +76,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    Long.toString(RENEW_INTERVAL));
 
     /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
+    private static Properties dbProps = UtilMisc.createProperties(
 	DataStoreImplClassName + ".directory",
 	DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestWatchdogServiceImpl");
@@ -211,7 +212,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testConstructorNoAppName() throws Exception {
-	Properties properties = createProperties(
+	Properties properties = UtilMisc.createProperties(
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(WATCHDOG_PORT));
 	try {
@@ -223,7 +224,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
     
     public void testConstructorZeroPort() throws Exception {
-	Properties properties = createProperties(
+	Properties properties = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
 	try {
@@ -235,7 +236,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testConstructorPortTooLarge() throws Exception {
-	Properties properties = createProperties(
+	Properties properties = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
@@ -249,7 +250,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorStartServerRenewIntervalTooSmall()
 	throws Exception
     {
-	Properties properties = createProperties(
+	Properties properties = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
@@ -265,7 +266,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorStartServerRenewIntervalTooLarge()
 	throws Exception
     {
-	Properties properties = createProperties(
+	Properties properties = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
@@ -286,7 +287,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    fail("Expected id 1, got " + id);
 	}
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -323,7 +324,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	commitTransaction();
 
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -378,7 +379,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
 
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -430,7 +431,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testGetNodes() throws Exception {
 	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	try {
@@ -492,7 +493,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testGetNode() throws Exception {
 	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	try {
@@ -583,7 +584,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testAddNodeListenerNodeStarted() throws Exception {
 	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	DummyNodeListener listener = new DummyNodeListener();
@@ -621,7 +622,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testAddNodeListenerNodeFailed() throws Exception {
 	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	DummyNodeListener listener = new DummyNodeListener();
@@ -674,7 +675,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Map<WatchdogServiceImpl, DummyNodeListener> watchdogMap =
 	    new HashMap<WatchdogServiceImpl, DummyNodeListener>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
+	Properties props = UtilMisc.createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
@@ -715,18 +716,6 @@ public class TestWatchdogServiceImpl extends TestCase {
     
     /* -- other methods -- */
     
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
 	File dir = new File(directory);

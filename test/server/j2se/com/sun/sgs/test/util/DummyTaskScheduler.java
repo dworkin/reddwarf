@@ -107,7 +107,6 @@ public class DummyTaskScheduler implements TaskScheduler {
      * stop running.
      */
     public void shutdown() {
-	System.err.println("DummyTaskScheduler.shutdown");
         for (Thread thread : threads)
             thread.interrupt();
         timer.cancel();

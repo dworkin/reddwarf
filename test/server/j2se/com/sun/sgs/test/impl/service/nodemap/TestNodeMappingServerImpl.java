@@ -25,6 +25,7 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.UtilMisc;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -142,7 +143,7 @@ public class TestNodeMappingServerImpl extends TestCase {
           NodeMappingServerImpl.class.getDeclaredField("watchdogNodeListener");
         watchdogNodeListenerField.setAccessible(true);
         
-        serviceProps = createProperties(
+        serviceProps = UtilMisc.createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             WatchdogServerPropertyPrefix + ".start", "true",
@@ -283,7 +284,7 @@ public class TestNodeMappingServerImpl extends TestCase {
 
     public void testConstructorRequestedPort() throws Exception {
         final int PORT = 5556;
-        Properties properties = createProperties(
+        Properties properties = UtilMisc.createProperties(
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
             serverPortPropertyName, Integer.toString(PORT));
@@ -301,7 +302,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     }
    
     public void testNegPort() throws Exception {
-        Properties properties = createProperties(
+        Properties properties = UtilMisc.createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
             serverPortPropertyName, Integer.toString(-1));
         NodeMappingServerImpl nodemap = null;
@@ -319,7 +320,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     }
     
     public void testBigPort() throws Exception {
-        Properties properties = createProperties(
+        Properties properties = UtilMisc.createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
             serverPortPropertyName, Integer.toString(65536));
         NodeMappingServerImpl nodemap = null;
@@ -583,18 +584,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertTrue(firstNodeId != secondNodeId);
     }
      
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-        Properties props = new Properties();
-        if (args.length % 2 != 0) {
-            throw new RuntimeException("Odd number of arguments");
-        }
-        for (int i = 0; i < args.length; i += 2) {
-            props.setProperty(args[i], args[i + 1]);
-        }
-        return props;
-    }
-
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
         File dir = new File(directory);

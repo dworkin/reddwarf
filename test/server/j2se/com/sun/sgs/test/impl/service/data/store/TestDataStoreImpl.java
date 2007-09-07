@@ -1042,9 +1042,9 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(null, store.nextBoundName(txn, "name-1"));
 	assertEquals(null, store.nextBoundName(txn, "name-2"));
 	assertEquals(null, store.nextBoundName(txn, "name-1"));
-	assertEquals("name-1", store.nextBoundName(txn, "name-00"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
 	assertEquals("name-1", store.nextBoundName(txn, null));
-	assertEquals("name-1", store.nextBoundName(txn, "name-00"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
 	store.setBinding(txn, "name-2", id);
 	txn.commit();
 	txn = new DummyTransaction();

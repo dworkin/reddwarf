@@ -255,7 +255,6 @@ public class TestChannelServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
         MinimalTestKernel.destroyContext(appContext);
-	//serviceRegistry.clearComponents();
     }
 
     /* -- Test constructor -- */
