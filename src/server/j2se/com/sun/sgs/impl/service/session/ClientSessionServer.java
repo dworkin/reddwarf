@@ -63,6 +63,8 @@ public interface ClientSessionServer extends Remote {
      * @param	messages an array of protocol messages, each contained
      *		in a byte array
      * @param	delivery an array of delivery requirements
+     * @param	disconnect if {@code true} the session should be
+     *		disconnected after sending the protocol messages
      * @return	{@code true} if the client session with the specified
      * 		{@code sessionId} is connected to this server, otherwise
      *		{@code false}

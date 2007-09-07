@@ -5,7 +5,6 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
@@ -14,7 +13,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -25,14 +23,10 @@ import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.ProtocolMessageListener;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.security.SecureRandom;
 import java.util.Random;
@@ -106,14 +100,16 @@ class ClientSessionHandler {
     /** The identity for this session. */
     private volatile Identity identity;
 
-    /** The lock for accessing the connection state and sending messages. */
+    /** The lock for accessing the following fields:
+     * {@code state}, {@code disconnectHandled}, and {@code shutdown}.
+     */
     private final Object lock = new Object();
     
-    /** The connection state. */
+    /** The connection state, accessed. */
     private State state = State.CONNECTING;
 
     /** The client session listener for this client session.*/
-    private SessionListener listener;
+    private volatile SessionListener sessionListener;
 
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
@@ -138,6 +134,12 @@ class ClientSessionHandler {
 	this.idBytes = compactId.getId();
 	this.sessionImpl = new ClientSessionImpl(compactId);
 	this.reconnectionKey = compactId; // not used yet
+
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "creating ClientSessionHandler: id:{0}, nodeId:{1}",
+		       compactId, sessionService.getLocalNodeId());
+	}
     }
 
     /* -- Instance methods -- */
@@ -250,7 +252,7 @@ class ClientSessionHandler {
 
 	sessionService.disconnected(sessionImpl);
 	
-	if (identity != null) {
+	if (identity != null && sessionListener != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
 	    // may happen out of order with respect to the
 	    // 'notifyLoggedIn' callback.  Also, this notification may
@@ -285,11 +287,11 @@ class ClientSessionHandler {
 	    }
 	}
 
-	if (listener != null) {
+	if (sessionListener != null) {
 	    scheduleTask(new AbstractKernelRunnable() {
 		public void run() throws IOException {
-		    listener.get().disconnected(graceful);
-		    listener.remove();
+		    sessionListener.get().disconnected(graceful);
+		    sessionListener.remove();
 		    sessionImpl.removeSession(dataService, idBytes);
 		}});
 	}
@@ -551,7 +553,7 @@ class ClientSessionHandler {
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
-			    listener.get().receivedMessage(clientMessage);
+			    sessionListener.get().receivedMessage(clientMessage);
 			}
 		    }});
 		break;
@@ -590,7 +592,10 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST, 
 		"handling login request for name:{0}", name);
-	    
+
+	    /*
+	     * Authenticate identity.
+	     */
 	    final Identity authenticatedIdentity;
 	    try {
 		authenticatedIdentity = authenticate(name, password);
@@ -604,6 +609,9 @@ class ClientSessionHandler {
 
 	    Node node;
 	    try {
+		/*
+		 * Get node assignment.
+		 */
 		sessionService.nodeMapService.assignNode(
 		    ClientSessionHandler.class, authenticatedIdentity);
 		GetNodeTask getNodeTask =
@@ -611,16 +619,23 @@ class ClientSessionHandler {
 		sessionService.runTransactionalTask(
 		    getNodeTask, authenticatedIdentity);
 		node = getNodeTask.getNode();
-		
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+			       name, node);
+		}
+
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "exception contacting node map service for name:{0}", name);
+		    "getting node assignment for identity:{0} throws", name);
 		sendLoginFailureAndDisconnect();
 		return;
 	    }
 
 	    if (node.getId() == sessionService.getLocalNodeId()) {
+		/*
+		 * Handle login request locally.
+		 */
 		taskQueue =
 		    new NonDurableTaskQueue(
 			sessionService.txnProxy,
@@ -631,6 +646,16 @@ class ClientSessionHandler {
 		scheduleTask(new LoginTask());
 		
 	    } else {
+		/*
+		 * Redirect login to assigned (non-local) node.
+		 */
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"redirecting login for identity:{0} " +
+			"from nodeId:{1} to node:{2}",
+			name, sessionService.getLocalNodeId(), node);
+		}
 		final byte[] loginRedirectMessage =
 		    getLoginRedirectMessage(node.getHostName());
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
@@ -639,9 +664,38 @@ class ClientSessionHandler {
 			    loginRedirectMessage, Delivery.RELIABLE);
 			handleDisconnect(false);
 		    }});
+
+		try {
+		    /*
+		     * Set identity's status for this class to 'false'.
+		     *
+		     * TBD: Should this handler wait before invoking
+		     * 'setStatus' to ensure that the node assignment
+		     * for the identity remains in the node map so the
+		     * assingment doesn't change before the login
+		     * redirect can be handled by the client? -- ann (8/29/07)
+		     */
+		    sessionService.nodeMapService.setStatus(
+			ClientSessionHandler.class, authenticatedIdentity,
+			false);
+		    
+		} catch (Exception e) {
+		    // TBD: Is it OK to assume that node map service
+		    // will handle retries of 'setStatus' if they fail, or
+		    // does this handler need to retry 'setStatus' until
+		    // it succeeds? -- ann (8/29/07)
+		    logger.logThrow(
+		       Level.WARNING, e,
+		       "setting status for identity:{0} throws", name);
+
+		}
 	    }
 	}
 
+	/**
+	 * Sends the LOGIN_FAILURE protocol message to the client and
+	 * disconnects the client session.
+	 */
 	private void sendLoginFailureAndDisconnect() {
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
@@ -825,8 +879,7 @@ class ClientSessionHandler {
 		    StandardProperties.APP_LISTENER, AppListener.class);
 	    logger.log(
 		Level.FINEST,
-		"LoginTask.run invoking AppListener.loggedIn session:{0}",
-		identity);
+		"invoking AppListener.loggedIn session:{0}", identity);
 
 	    sessionImpl.putSession(dataService);
 	    ClientSessionListener returnedListener = null;
@@ -841,10 +894,12 @@ class ClientSessionHandler {
 	    if (returnedListener instanceof Serializable) {
 		logger.log(
 		    Level.FINEST,
-		    "LoginTask.run AppListener.loggedIn returned {0}",
-		    returnedListener);
+		    "AppListener.loggedIn returned {0}", returnedListener);
 
-		listener = new SessionListener(returnedListener);
+		// TBD: This listener should be removed if the transaction
+		// aborts; i.e., the listener should only be set if the
+		// transaction commits.  -- ann (8/29/07)
+		sessionListener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
 			3 + compactId.getExternalFormByteCount() +
@@ -859,25 +914,25 @@ class ClientSessionHandler {
 		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE);
 
 		final Identity thisIdentity = identity;
-		sessionService.scheduleTaskOnCommit(new AbstractKernelRunnable() {
-		    public void run() {
-			logger.log(
-			    Level.FINE,
-			    "calling notifyLoggedIn on identity:{0}",
-			    thisIdentity);
-			// notify that this identity logged in,
-			// whether or not this session is connected at
-			// the time of notification.
-			thisIdentity.notifyLoggedIn();
-		    }});
+		sessionService.scheduleTaskOnCommit(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    logger.log(
+			        Level.FINE,
+				"calling notifyLoggedIn on identity:{0}",
+				thisIdentity);
+			    // notify that this identity logged in,
+			    // whether or not this session is connected at
+			    // the time of notification.
+			    thisIdentity.notifyLoggedIn();
+			}});
 		
 	    } else {
 		if (ex == null) {
 		    logger.log(
 		        Level.WARNING,
-			"LoginTask.run AppListener.loggedIn returned " +
-			"non-serializable listener {0}",
-			returnedListener);
+			"AppListener.loggedIn returned non-serializable " +
+			"ClientSessionListener:{0}", returnedListener);
 		} else if (!(ex instanceof ExceptionRetryStatus) ||
 			   ((ExceptionRetryStatus) ex).shouldRetry() == false) {
 		    logger.logThrow(

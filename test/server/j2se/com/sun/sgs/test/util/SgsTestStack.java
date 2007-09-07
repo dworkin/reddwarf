@@ -48,7 +48,7 @@ public class SgsTestStack {
     private final String dbDirectory;
 
     /** Kernel/transaction-related test components. */
-    private static DummyTransactionProxy txnProxy =
+    private DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
@@ -73,7 +73,7 @@ public class SgsTestStack {
      * serviceProps} for all services.  If {@code serverStack} is
      * null, then the appropriate properties for starting the watchdog
      * server and nodemap server are set to "true".  To set up
-     * services, call the {@link #setup setup} method.  If additional
+     * services, call the {@link #setUp setUp} method.  If additional
      * service properties need to be set before the services are
      * created, the properties can be added to {@code serviceProps}.
      *
@@ -197,7 +197,7 @@ public class SgsTestStack {
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	// TBD: does this need to be done?
-	serviceRegistry.registerAppContext();
+	//serviceRegistry.registerAppContext();
 	
 	// services ready
 	dataService.ready();
@@ -389,7 +389,7 @@ public class SgsTestStack {
     }
 
     /**
-     * Returns the port for the node mapping server.
+     * Returns the bound port for the node mapping server.
      */
     private static int getNodeMapServerPort(
 	NodeMappingServiceImpl nodmapService)

@@ -21,7 +21,7 @@ public interface ClientSessionService extends ClientSessionManager, Service {
      * <p>When a client session receives a protocol message with the
      * specified service ID, the specified listener's {@link
      * ProtocolMessageListener#receivedMessage receivedMessage} method is
-     * invoked with the {@link SgsClientSession client session} and
+     * invoked with the {@link ClientSession client session} and
      * the complete protocol message.
      *
      * <p>The reserved service IDs are 0-127.  The current ones in use are:

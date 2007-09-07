@@ -67,10 +67,9 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * compactId} and {@code identity}.
+     * compactId}.
      *
      * @param	compactId a session ID
-     * @param	identity an identity
      */
     ClientSessionImpl(CompactId compactId) {
 	if (compactId == null) {

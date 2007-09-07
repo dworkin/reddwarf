@@ -73,9 +73,11 @@ import java.util.logging.Logger;
  */
 public class ClientSessionServiceImpl implements ClientSessionService {
 
+    /** The package name. */
+    public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
+    
     /** The prefix for ClientSessionListeners bound in the data store. */
-    public static final String LISTENER_PREFIX =
-	"com.sun.sgs.impl.service.session.listener";
+    public static final String LISTENER_PREFIX = PKG_NAME + ".listener";
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -83,27 +85,22 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(
-	    "com.sun.sgs.impl.service.session.service"));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
-    /** The prefix for properties. */
-    private static final String PROPERTY_PREFIX =
-	"com.sun.sgs.impl.service.session";
-    
     /** The name of the IdGenerator. */
     private static final String ID_GENERATOR_NAME =
-	PROPERTY_PREFIX + ".id.generator";
+	PKG_NAME + ".id.generator";
 
     /** The name of the ID block size property. */
     private static final String ID_BLOCK_SIZE_PROPERTY =
-	PROPERTY_PREFIX + ".id.block.size";
+	PKG_NAME + ".id.block.size";
 	
     /** The default block size for the IdGenerator. */
     private static final int DEFAULT_ID_BLOCK_SIZE = 256;
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
-	PROPERTY_PREFIX + ".server.port";
+	PKG_NAME + ".server.port";
 	
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
@@ -164,6 +161,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The data service. */
     final DataService dataService;
+
+    /** The watchdog service. */
+    final WatchdogService watchdogService;
 
     /** The node mapping service. */
     final NodeMappingService nodeMapService;
@@ -275,8 +275,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	    contextFactory = new ContextFactory(txnProxy);
 	    dataService = txnProxy.getService(DataService.class);
+	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    taskOwner = txnProxy.getCurrentOwner();
+	    // TBD: the taskOwner has the incorrect context in it, so
+	    // it should be retrieved from the transaction proxy in
+	    // NDTS.  The NDTS constructor should be updated to take
+	    // a transaction proxy and obtain the task owner from it
+	    // when necessary.
 	    nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
 		    taskScheduler, taskOwner,
@@ -334,7 +340,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() {
+	// TBD: the AcceptorListener.newConnection method needs to
+	// reject connections until ready is invoked.  Need to
+	// implement interlock for this.  -- ann (8/29/07)
+
+    }
 
     /**
      * Returns the port this service is listening on for incoming
@@ -402,6 +413,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** {@inheritDoc} */
     public ClientSession getClientSession(String user) {
+	checkLocalNodeAlive();
 	throw new AssertionError("not implemented");
     }
 
@@ -422,6 +434,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	if (sessionId == null) {
 	    throw new NullPointerException("null sessionId");
 	}
+	checkLocalNodeAlive();
 	ClientSessionHandler handler = getHandler(sessionId);
 	return
 	    (handler != null) ?
@@ -435,6 +448,18 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     {
 	checkContext().addMessage(
 	    getClientSessionImpl(session), message, delivery);
+    }
+
+    /**
+     * Checks if the local node is considered alive, and throws an
+     * {@code IllegalStateException} if the node is no loger alive.
+     * This method should be called within a transaction.
+     */
+    private void checkLocalNodeAlive() {
+	if (! watchdogService.isLocalNodeAlive()) {
+	    throw new IllegalStateException(
+		"local node is not considered alive");
+	}
     }
 
     /**
@@ -1028,6 +1053,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * has not been initialized with a transaction proxy.
      */
     Context checkContext() {
+	checkLocalNodeAlive();
 	return contextFactory.joinTransaction();
     }
 
@@ -1106,6 +1132,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
+	// TBD: the taskOwner default has the incorrect context.  It
+	// should be initialized in the ready method, or be fixed such
+	// that it is updated with the correct context.
 	TaskOwner owner =
 	    (ownerIdentity == null) ?
 	    taskOwner :

@@ -207,10 +207,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
     
-    public void testConstructorZeroPort() throws Exception {
+    public void testConstructorNegativePort() throws Exception {
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");

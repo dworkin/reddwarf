@@ -42,10 +42,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import junit.framework.TestCase;
 
 public class TestClientSessionServiceImpl extends TestCase {
+
+    private static final String APP_NAME = "TestClientSessionServiceImpl";
+    
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
     private static final int WAIT_TIME = 5000;
@@ -60,27 +65,32 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String LISTENER_PREFIX =
 	ClientSessionServiceImpl.LISTENER_PREFIX;
     
-    private static Object disconnectedCallbackLock = new Object();
-
-    private SgsTestStack stack;
+    /** The SGS server stack. */
+    private SgsTestStack serverStack;
+    
+    /** The shared data service. */
     private DataServiceImpl dataService;
 
     /** True if test passes. */
     private boolean passed;
 
+    /** The test clients, keyed by user name. */
+    private static Map<String, DummyClient> dummyClients;
+
     /** Constructs a test instance. */
     public TestClientSessionServiceImpl(String name) throws Exception {
 	super(name);
-	stack = new SgsTestStack("TestClientSessionServiceImpl", null);
+	serverStack = new SgsTestStack(APP_NAME, null);
     }
 
     /** Creates and configures the session service. */
     protected void setUp() throws Exception {
         passed = false;
         System.err.println("Testcase: " + getName());
-	stack.setUp(true);
-	dataService = stack.getDataService();
-	stack.createTransaction();
+	dummyClients = new HashMap<String, DummyClient>();
+	serverStack.setUp(true);
+	dataService = serverStack.getDataService();
+	serverStack.createTransaction();
     }
 
     /** Sets passed if the test passes. */
@@ -96,7 +106,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
-	stack.tearDown(clean);
+	serverStack.tearDown(clean);
     }
 
     /* -- Test constructor -- */
@@ -169,9 +179,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     /* -- Test connecting, logging in, logging out with server -- */
 
     public void testConnection() throws Exception {
-	DummyClient client = new DummyClient();
+	DummyClient client = new DummyClient("foo");
 	try {
-	    client.connect(stack.getAppPort());
+	    client.connect(serverStack.getAppPort());
 	} catch (Exception e) {
 	    System.err.println("Exception: " + e);
 	    Throwable t = e.getCause();
@@ -186,11 +196,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginSuccess() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
-	String name = "success";
+	DummyClient client = new DummyClient("success");
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "password");
+	    client.connect(serverStack.getAppPort());
+	    client.login("password");
 	} finally {
             client.disconnect(false);
 	}
@@ -198,12 +207,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
 	String name = "success";
+	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "password");
-	    if (stack.getIdentityManager().getNotifyLoggedIn(name)) {
+	    client.connect(serverStack.getAppPort());
+	    client.login("password");
+	    if (serverStack.getIdentityManager().getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
@@ -218,15 +227,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	throws Exception
     {
 	registerAppListener();
-	DummyClient client = new DummyClient();
+	DummyClient client = new DummyClient(NON_SERIALIZABLE);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(NON_SERIALIZABLE, "password");
+	    client.connect(serverStack.getAppPort());
+	    client.login("password");
 	    fail("expected login failure");
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (stack.getIdentityManager().
+		if (serverStack.getIdentityManager().
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -245,15 +254,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	throws Exception
     {
 	registerAppListener();
-	DummyClient client = new DummyClient();
+	DummyClient client = new DummyClient(RETURN_NULL);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(RETURN_NULL, "bar");
+	    client.connect(serverStack.getAppPort());
+	    client.login("bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (stack.getIdentityManager().
+		if (serverStack.getIdentityManager().
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -272,15 +281,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	throws Exception
     {
 	registerAppListener();
-	DummyClient client = new DummyClient();
+	DummyClient client = new DummyClient(THROW_RUNTIME_EXCEPTION);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(THROW_RUNTIME_EXCEPTION, "bar");
+	    client.connect(serverStack.getAppPort());
+	    client.login("bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (stack.getIdentityManager().
+		if (serverStack.getIdentityManager().
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -297,30 +306,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
-	String name = "logout";
+	DummyClient client = new DummyClient("logout");
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "test");
+	    client.connect(serverStack.getAppPort());
+	    client.login("test");
 	    client.logout();
-	    synchronized (disconnectedCallbackLock) {
-		DummyClientSessionListener sessionListener =
-		    getClientSessionListener(name);
-		if (sessionListener == null ||
-		    !sessionListener.receivedDisconnectedCallback)
-		{
-		    disconnectedCallbackLock.wait(WAIT_TIME);
-		    sessionListener = getClientSessionListener(name);
-		}
-		if (sessionListener == null) {
-		    fail ("sessionListener is null!");
-		} else if (!sessionListener.receivedDisconnectedCallback) {
-		    fail("disconnected callback not invoked");
-		} else if (!sessionListener.graceful) {
-		    fail("disconnection was not graceful");
-		}
-		System.err.println("Logout successful");
-	    }
+	    client.checkDisconnected(true);
 	} catch (InterruptedException e) {
 	    e.printStackTrace();
 	    fail("testLogout interrupted");
@@ -331,19 +322,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
 	String name = "logout";
+	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "password");
+	    client.connect(serverStack.getAppPort());
+	    client.login("password");
 	    client.logout();
-	    if (stack.getIdentityManager().getNotifyLoggedIn(name)) {
+	    if (serverStack.getIdentityManager().getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
-	    if (stack.getIdentityManager().getNotifyLoggedOut(name)) {
+	    if (serverStack.getIdentityManager().getNotifyLoggedOut(name)) {
 		System.err.println(
 		    "notifyLoggedOut invoked for identity: " + name);
 	    } else {
@@ -357,11 +348,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
 	String name = "testRemoveListener";
+	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "password");
+	    client.connect(serverStack.getAppPort());
+	    client.login("password");
 
 	    Set<String> listenerKeys = getClientSessionListenerKeys();
 	    System.err.println("Listener keys: " + listenerKeys);
@@ -373,29 +364,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
             // Simulate "crash"
             tearDown(false);
-            stack.setUp(false);
-	    dataService = stack.getDataService();
+            serverStack.setUp(false);
+	    dataService = serverStack.getDataService();
 	    
-	    DummyClientSessionListener sessionListener =
-		getClientSessionListener(name);
-	    if (sessionListener == null) {
-		fail("listener is null!");
-	    } else {
-		synchronized (disconnectedCallbackLock) {
-
-		    if (!sessionListener.receivedDisconnectedCallback) {
-			disconnectedCallbackLock.wait(WAIT_TIME);
-			sessionListener = getClientSessionListener(name);
-		    }
-
-		    if (!sessionListener.receivedDisconnectedCallback) {
-			fail("disconnected callback not invoked");
-		    } else if (sessionListener.graceful) {
-			fail("disconnection was graceful!");
-		    }
-		    System.err.println("disconnect notification successful");
-		}
-	    }
+	    client.checkDisconnected(false);
 
 	    if (!getClientSessionListenerKeys().isEmpty()) {
 		fail("listener key not removed!");
@@ -406,7 +378,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private Set<String> getClientSessionListenerKeys() throws Exception {
-	stack.createTransaction();
+	serverStack.createTransaction();
 	Set<String> listenerKeys = new HashSet<String>();
 	String key = LISTENER_PREFIX;
 	for (;;) {
@@ -419,30 +391,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    listenerKeys.add(key);
 	}
-	stack.commitTransaction();
+	serverStack.commitTransaction();
 	return listenerKeys;
-    }
-
-    private DummyClientSessionListener getClientSessionListener(String name)
-	throws Exception
-    {
-	stack.createTransaction();
-	DummyClientSessionListener sessionListener =
-	    getAppListener().getClientSessionListener(name);
-	stack.commitTransaction();
-	return sessionListener;
     }
 
     /* -- test ClientSession -- */
 
     public void testClientSessionIsConnected() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
-	String name = "clientname";
+	DummyClient client = new DummyClient("clientname");
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "dummypassword");
-	    stack.createTransaction();
+	    client.connect(serverStack.getAppPort());
+	    client.login("dummypassword");
+	    serverStack.createTransaction();
 	    DummyAppListener appListener = getAppListener();
 	    Set<ClientSession> sessions = appListener.getSessions();
 	    if (sessions.isEmpty()) {
@@ -451,7 +412,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.isConnected() == true) {
 		    System.err.println("session is connected");
-		    stack.commitTransaction();
+		    serverStack.commitTransaction();
 		    return;
 		} else {
 		    fail("Expected connected session: " + session);
@@ -465,12 +426,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     public void testClientSessionGetName() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
 	String name = "clientname";
+	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "dummypassword");
-	    stack.createTransaction();
+	    client.connect(serverStack.getAppPort());
+	    client.login("dummypassword");
+	    serverStack.createTransaction();
 	    DummyAppListener appListener = getAppListener();
 	    Set<ClientSession> sessions = appListener.getSessions();
 	    if (sessions.isEmpty()) {
@@ -479,7 +440,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getName().equals(name)) {
 		    System.err.println("names match");
-		    stack.commitTransaction();
+		    serverStack.commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session name: " + name +
@@ -494,12 +455,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testClientSessionGetSessionId() throws Exception {
 	registerAppListener();
-	DummyClient client = new DummyClient();
-	String name = "clientname";
+	DummyClient client = new DummyClient("clientname");
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "dummypassword");
-	    stack.createTransaction();
+	    client.connect(serverStack.getAppPort());
+	    client.login("dummypassword");
+	    serverStack.createTransaction();
 	    DummyAppListener appListener = getAppListener();
 	    Set<ClientSession> sessions = appListener.getSessions();
 	    if (sessions.isEmpty()) {
@@ -508,7 +468,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
-		    stack.commitTransaction();
+		    serverStack.commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session id: " + client.getSessionId() +
@@ -539,55 +499,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	sendMessagesAndCheck(
 	    5, 4, new MaybeRetryException("non-retryable", false));
     }
-    
-    private static final Object receivedAllMessagesLock = new Object();
-    private static RuntimeException throwException = null;
-    private static int totalExpectedMessages;
-    
+
     private void sendMessagesAndCheck(
 	int numMessages, int expectedMessages, RuntimeException exception)
 	throws Exception
     {
-	synchronized (receivedAllMessagesLock) {
-	    totalExpectedMessages = expectedMessages;
-	    throwException = exception;
-	}
 	registerAppListener();
-	DummyClient client = new DummyClient();
-	String name = "client";
+	String name = "clientname";
+	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(stack.getAppPort());
-	    client.login(name, "dummypassword");
-	    for (int i = 0; i < numMessages; i++) {
-		MessageBuffer buf = new MessageBuffer(4);
-		buf.putInt(i);
-		client.sendMessage(buf.getBuffer());
-	    }
-	    
-	    DummyClientSessionListener sessionListener =
-		getClientSessionListener(name);
-	    synchronized (receivedAllMessagesLock) {
-		if (sessionListener.messages.size() != totalExpectedMessages) {
-		    try {
-			receivedAllMessagesLock.wait(WAIT_TIME);
-		    } catch (InterruptedException e) {
-		    }
-		}
-	    }
-	    sessionListener = getClientSessionListener(name);
-	    synchronized (receivedAllMessagesLock) {
-		int receivedMessages = sessionListener.messages.size();
-		if (receivedMessages != totalExpectedMessages) {
-		    fail("expected " + totalExpectedMessages + ", received " +
-			 receivedMessages);
-		}
-	    }
-		
+	    client.connect(serverStack.getAppPort());
+	    client.login("dummypassword");
+	    client.sendMessages(numMessages, expectedMessages, exception);
 	} finally {
 	    client.disconnect(false);
 	}
     }
-    
 
     /* -- other methods -- */
 
@@ -608,21 +535,23 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private void registerAppListener() throws Exception {
 	
-	stack.createTransaction();
+	// TODO: this needs to be retried if it fails.
+	serverStack.createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
 	    StandardProperties.APP_LISTENER, appListener);
-	stack.commitTransaction();
+	serverStack.commitTransaction();
     }
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
 	    StandardProperties.APP_LISTENER, AppListener.class);
     }
+    
     /**
      * Dummy client code for testing purposes.
      */
-    private static class DummyClient {
+    private class DummyClient {
 
 	private String name;
 	private String password;
@@ -631,6 +560,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private Connection connection;
 	private boolean connected = false;
 	private final Object lock = new Object();
+	private final Object disconnectedCallbackLock = new Object();
+	private final Object receivedAllMessagesLock = new Object();
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
 	private boolean logoutAck = false;
@@ -643,7 +574,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private CompactId reconnectionKey;
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
-	DummyClient() {
+	volatile boolean receivedDisconnectedCallback = false;
+	volatile boolean graceful = false;
+	
+	volatile RuntimeException throwException;
+	volatile int expectedMessages;
+	Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
+	
+
+	DummyClient(String name) {
+	    this.name = name;
+	    dummyClients.put(name, this);
 	}
 
 	ClientSessionId getSessionId() {
@@ -705,14 +646,17 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
 	}
 
-	void login(String name, String password) {
+	/**
+	 * Returns {@code true} if login was successful, and returns
+	 * {@code false} if login was redirected.
+	 */
+	boolean login(String password) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(
 			"DummyClient.login not connected");
 		}
 	    }
-	    this.name = name;
 	    this.password = password;
 
 	    MessageBuffer buf =
@@ -738,6 +682,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 			throw new RuntimeException(
 			    "DummyClient.login timed out");
 		    }
+		    if (loginRedirect == true) {
+			return false;
+		    }
 		    if (!loginSuccess) {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
@@ -746,6 +693,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			"DummyClient.login timed out", e);
 		}
 	    }
+	    return true;
 	}
 
 	/**
@@ -788,6 +736,31 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
+	void sendMessages(int numMessages, int expectedMessages, RuntimeException re) {
+	    this.expectedMessages = expectedMessages;
+	    this.throwException = re;
+	    
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		sendMessage(buf.getBuffer());
+	    }
+	    
+	    synchronized (receivedAllMessagesLock) {
+		if (messages.size() != expectedMessages) {
+		    try {
+			receivedAllMessagesLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		    int receivedMessages = messages.size();
+		    if (receivedMessages != expectedMessages) {
+			fail("expected " + expectedMessages + ", received " +
+			     receivedMessages);
+		    }
+		}
+	    }
+	}
+
 	void logout() {
             synchronized (lock) {
                 if (connected == false) {
@@ -795,8 +768,8 @@ public class TestClientSessionServiceImpl extends TestCase {
                 }
                 MessageBuffer buf = new MessageBuffer(3);
                 buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		    putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -821,6 +794,21 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
 	}
 
+	void checkDisconnected(boolean graceful) throws Exception {
+	    synchronized (disconnectedCallbackLock) {
+		if (!receivedDisconnectedCallback) {
+		    disconnectedCallbackLock.wait(WAIT_TIME);
+		}
+	    }
+	    if (!receivedDisconnectedCallback) {
+		fail("disconnected callback not invoked");
+	    } else if (this.graceful != graceful) {
+		fail("graceful was: " + this.graceful +
+		     ", expected: " + graceful);
+	    }
+	    System.err.println("disconnect successful");
+	}
+	
 	private class Listener implements ConnectionListener {
 
 	    List<byte[]> messageList = new ArrayList<byte[]>();
@@ -995,20 +983,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private Set<ClientSession> getSessions() {
 	    return sessions.keySet();
 	}
-
-	DummyClientSessionListener getClientSessionListener(String name) {
-
-	    for (Map.Entry<ClientSession,ManagedReference> entry :
-		     sessions.entrySet()) {
-
-		ClientSession session = entry.getKey();
-		ManagedReference listenerRef = entry.getValue();
-		if (session.getName().equals(name)) {
-		    return listenerRef.get(DummyClientSessionListener.class);
-		}
-	    }
-	    return null;
-	}
     }
 
     private static class NonSerializableClientSessionListener
@@ -1028,9 +1002,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
-	boolean receivedDisconnectedCallback = false;
-	boolean graceful = false;
-	List<byte[]> messages = new ArrayList<byte[]>();
 	private int seq = -1;
 	
 	private transient final ClientSession session;
@@ -1045,10 +1016,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
 	    AppContext.getDataManager().markForUpdate(this);
-	    synchronized (disconnectedCallbackLock) {
-		receivedDisconnectedCallback = true;
-		this.graceful = graceful;
-		disconnectedCallbackLock.notifyAll();
+	    DummyClient client = dummyClients.get(name);
+	    client.receivedDisconnectedCallback = true;
+	    client.graceful = graceful;
+	    synchronized (client.disconnectedCallbackLock) {
+		client.disconnectedCallbackLock.notifyAll();
 	    }
 	}
 
@@ -1056,25 +1028,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void receivedMessage(byte[] message) {
 	    MessageBuffer buf = new MessageBuffer(message);
 	    int num = buf.getInt();
+	    DummyClient client = dummyClients.get(name);
 	    System.err.println("receivedMessage: " + num + 
-			       "\nthrowException: " + throwException);
+			       "\nthrowException: " + client.throwException);
 	    if (num <= seq) {
 		throw new RuntimeException(
 		    "expected message greater than " + seq + ", got " + num);
 	    }
 	    AppContext.getDataManager().markForUpdate(this);
-	    messages.add(message);
+	    client.messages.add(message);
 	    seq = num;
-	    synchronized (receivedAllMessagesLock) {
-		if (throwException != null) {
-		    RuntimeException e = throwException;
-		    throwException = null;
-		    throw e;
-		}
+	    if (client.throwException != null) {
+		RuntimeException re = client.throwException;
+		client.throwException = null;
+		throw re;
 	    }
-	    if (messages.size() == totalExpectedMessages) {
-		synchronized (receivedAllMessagesLock) {
-		    receivedAllMessagesLock.notifyAll();
+	    if (client.messages.size() == client.expectedMessages) {
+		synchronized (client.receivedAllMessagesLock) {
+		    client.receivedAllMessagesLock.notifyAll();
 		}
 	    }
 	}
