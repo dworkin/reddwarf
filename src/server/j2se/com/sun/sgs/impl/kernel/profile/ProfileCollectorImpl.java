@@ -14,6 +14,8 @@ import com.sun.sgs.kernel.ProfileSample;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 
+import java.beans.PropertyChangeEvent;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -93,23 +95,40 @@ public class ProfileCollectorImpl implements ProfileCollector {
     /** {@inheritDoc} */
     public void addListener(ProfileOperationListener listener) {
         listeners.add(listener);
-        listener.notifyThreadCount(schedulerThreadCount);
-	for (ProfileOperationImpl p : ops.values()) 
-	    listener.notifyNewOp(p);
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    null, schedulerThreadCount);
+
+        listener.propertyChange(event);
+	for (ProfileOperationImpl p : ops.values()) {
+	    event = new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",
+					    null, p);
+	    listener.propertyChange(event);
+	}
     }
 
     /** {@inheritDoc} */
     public void notifyThreadAdded() {
         schedulerThreadCount++;
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    schedulerThreadCount - 1, 
+				    schedulerThreadCount);
+
         for (ProfileOperationListener listener : listeners)
-            listener.notifyThreadCount(schedulerThreadCount);
+            listener.propertyChange(event);
     }
 
     /** {@inheritDoc} */
     public void notifyThreadRemoved() {
         schedulerThreadCount--;
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    schedulerThreadCount + 1, 
+				    schedulerThreadCount);
+
         for (ProfileOperationListener listener : listeners)
-            listener.notifyThreadCount(schedulerThreadCount);
+            listener.propertyChange(event);
     }
 
     /** {@inheritDoc} */
@@ -175,21 +194,27 @@ public class ProfileCollectorImpl implements ProfileCollector {
      * @param producerName the name of the <code>ProfileProducer</code>
      *                     registering this operation
      *
-     * @return a new <code>ProfileOperation</code> that will report back
-     *         to this collector.
-     *
-     * @throws IllegalStateException if no more operations can be registered
+     * @return the canonical <code>ProfileOperation</code> that will
+     *         report back to this collector.
      */
     ProfileOperation registerOperation(String opName, String producerName) {
 	String name = producerName + "::" + opName;
-	int opId = opIdCounter.getAndIncrement();
-	ProfileOperationImpl op = new ProfileOperationImpl(opName, opId);
-	ProfileOperationImpl prev = ops.putIfAbsent(name,op);
-	if (prev != null)
-	    op = prev;
+	
+	
+	ProfileOperationImpl op = ops.get(name);//ops.putIfAbsent(name,op);
+
+	if (op == null) {
+	    int opId = opIdCounter.getAndIncrement();
+	    op = new ProfileOperationImpl(opName, opId);
+	    ops.putIfAbsent(name, op);
+	    op = ops.get(name);
+	}
+
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",null, op);
 
         for (ProfileOperationListener listener : listeners)
-            listener.notifyNewOp(op);
+            listener.propertyChange(event);
         return op;
     }
 
@@ -204,12 +229,15 @@ public class ProfileCollectorImpl implements ProfileCollector {
             this.opName = opName;
             this.opId = opId;
         }
+
         public String getOperationName() {
             return opName;
         }
+
         public int getId() {
             return opId;
         }
+
         public String toString() {
             return opName;
         }

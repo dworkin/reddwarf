@@ -23,10 +23,8 @@ public interface ProfileConsumer {
      * Registers the named operation with this consumer, such that the
      * operation can be reported as part of a task's profile. Note
      * that registering the same name multiple times on the same
-     * consumer may not produce the same instance of
-     * <code>ProfileOperation</code>.  That is, two registrations of
-     * the same name may still result in operations that are reported
-     * distinctly.
+     * consumer will produce the same canonical instance of
+     * <code>ProfileOperation</code>.  
      *
      * @param name the name of the operation
      *

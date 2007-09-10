@@ -15,6 +15,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.io.IOException;
 
 import java.util.Properties;
@@ -113,15 +115,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfileOperation op) {
-        // for now, this is ignored
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        this.threadCount = schedulerThreadCount;
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.threadcount"))
+	    this.threadCount = ((Integer)event.getNewValue()).intValue();
     }
 
     /**

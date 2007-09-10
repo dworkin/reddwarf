@@ -39,6 +39,7 @@ import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.kernel.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -298,7 +299,8 @@ public class DataStoreImpl
     private ProfileCounter readObjectsCounter = null;
     private ProfileCounter writtenBytesCounter = null;
     private ProfileCounter writtenObjectsCounter = null;
-
+    private ProfileSample readBytesSample = null;
+    private ProfileSample writtenBytesSample = null;
     /**
      * Records information about all active transactions.
      *
@@ -903,8 +905,10 @@ public class DataStoreImpl
 	}
 	byte[] result = value.getData();
 	if (readBytesCounter != null) {
-	    if (result != null)
+	    if (result != null) {
 		readBytesCounter.incrementCount(result.length);
+		readBytesSample.addSample(result.length);
+	    }
 	    readObjectsCounter.incrementCount();
 	}
 	/* Berkeley DB returns null if the data is empty. */
@@ -936,6 +940,7 @@ public class DataStoreImpl
 	    if (writtenBytesCounter != null) {
 		writtenBytesCounter.incrementCount(data.length);
 		writtenObjectsCounter.incrementCount();
+		writtenBytesSample.addSample(data.length);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -994,6 +999,7 @@ public class DataStoreImpl
 		if (writtenBytesCounter != null) {
 		    writtenBytesCounter.incrementCount(data.length);
 		    writtenObjectsCounter.incrementCount();
+		    writtenBytesSample.addSample(data.length);
 		}
 	    }
 	    txnInfo.modified = true;
@@ -1546,6 +1552,11 @@ public class DataStoreImpl
 	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
 	writtenObjectsCounter =
 	    consumer.registerCounter("writtenObjects", true);
+	readBytesSample = consumer.registerSampleSource("readBytes", true,
+							Integer.MAX_VALUE);
+	writtenBytesSample = consumer.registerSampleSource("writtenBytes", true,
+							   Integer.MAX_VALUE);
+
     }
 
     /* -- Other public methods -- */

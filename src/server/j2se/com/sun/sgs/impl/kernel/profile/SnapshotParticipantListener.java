@@ -16,6 +16,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.io.IOException;
 
 import java.text.DecimalFormat;
@@ -109,15 +111,8 @@ public class SnapshotParticipantListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfileOperation op) {
-
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-
+    public void propertyChange(PropertyChangeEvent event) {
+	// unused
     }
 
     /**

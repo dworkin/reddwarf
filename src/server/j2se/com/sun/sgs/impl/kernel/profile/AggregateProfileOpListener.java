@@ -15,6 +15,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.io.IOException;
 
 import java.util.HashMap;
@@ -121,16 +123,14 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     }
 
     /** {@inheritDoc} */
-    public void notifyNewOp(ProfileOperation op) {
-        int id = op.getId();
-        if (id > maxOp)
-            maxOp = id;
-        registeredOps.put(id,op);
-    }
-
-    /** {@inheritDoc} */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        // for now, this is ignored
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.newop")) {          
+	    ProfileOperation op = (ProfileOperation)(event.getNewValue());
+	    int id = op.getId();
+	    if (id > maxOp)
+		maxOp = id;
+	    registeredOps.put(id,op);
+	}
     }
 
     /** {@inheritDoc}*/

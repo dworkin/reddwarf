@@ -14,6 +14,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -99,16 +101,18 @@ public class OperationLoggingProfileOpListener
     }
 
     /** {@inheritDoc} */
-    public void notifyNewOp(ProfileOperation op) {
-        int id = op.getId();
-        if (id > maxOp)
-            maxOp = id;
-	registeredOps.put(id,op);
-    }
-
-    /** {@inheritDoc} */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        threadCount = schedulerThreadCount;
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.newop")) {          
+	    ProfileOperation op = (ProfileOperation)(event.getNewValue());
+	    int id = op.getId();
+	    if (id > maxOp)
+		maxOp = id;
+	    registeredOps.put(id,op);
+	}
+	else if (event.getPropertyName().
+		 equals("com.sun.sgs.profile.threadcount")) {
+	    threadCount = ((Integer)(event.getNewValue())).intValue();
+	}
     }
 
     /** {@inheritDoc} */

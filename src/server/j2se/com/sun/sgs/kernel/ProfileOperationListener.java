@@ -4,6 +4,7 @@
 
 package com.sun.sgs.kernel;
 
+import java.beans.PropertyChangeEvent;
 
 /**
  * This interface is used to listen for profiling data as reported by
@@ -35,25 +36,15 @@ package com.sun.sgs.kernel;
 public interface ProfileOperationListener {
 
     /**
-     * Notifies this listener of a registered operation that may be reported
-     * as part of the data provided to <code>report</code>. If a listener
-     * is created after an operation has already been registered, then the
-     * listener will be notified of that operation before any tasks are
-     * reported.
+     * Notifies this listener of a new change in the system
+     * properties.  This method is called for any property that
+     * changes.
      *
-     * @param op a registered <code>ProfileOperation</code>
+     * @param event A <code>PropertyChangeEvent</code> object
+     *        describing the name of the property, its old and new
+     *        values and the source of the change.
      */
-    public void notifyNewOp(ProfileOperation op);
-
-    /**
-     * Notifies the listener of the number of threads being used by the
-     * scheduler to run tasks. This is typically called when the count
-     * changes, or when a listener is first created.
-     *
-     * @param schedulerThreadCount the number of consumer threads being
-     *                             used by the scheduler
-     */
-    public void notifyThreadCount(int schedulerThreadCount);
+    public void propertyChange(PropertyChangeEvent event);
 
     /**
      * Reports a completed task that has been run through the scheduler. The

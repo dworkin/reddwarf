@@ -23,6 +23,8 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.lang.reflect.Constructor;
 
 import java.util.Collection;
@@ -204,15 +206,8 @@ public class MasterTaskScheduler
     /**
      * {@inheritDoc}
      */
-    public void notifyThreadCount(int count) {
-        // ignored, since we are the cause of this message
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyNewOp(ProfileOperation op) {
-        // see comment in notifyThreadLeaving
+    public void propertyChange(PropertyChangeEvent event) {
+	// ignored but see comment in notifyThreadLeaving
     }
 
     /**

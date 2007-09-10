@@ -15,6 +15,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.beans.PropertyChangeEvent;
+
 import java.io.IOException;
 
 import java.util.HashMap;
@@ -97,17 +99,9 @@ public class RunTimeHistogramListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfileOperation op) {
+    public void propertyChange(PropertyChangeEvent event) {
 	// unused
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-	// unused
-    }
-
 
     /**
      * Aggregates the task execution times for sucessful tasks and
