@@ -67,7 +67,6 @@ class AsyncChannelGroupImpl
         throws InterruptedException
     {
         long nanos = unit.toNanos(timeout);
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             for (;;) {
@@ -106,7 +105,6 @@ class AsyncChannelGroupImpl
     @Override
     public AsyncChannelGroupImpl shutdown()
     {
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             int state = runState;
@@ -135,7 +133,6 @@ class AsyncChannelGroupImpl
     @Override
     public AsyncChannelGroupImpl shutdownNow() throws IOException
     {
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             int state = runState;
@@ -190,7 +187,6 @@ class AsyncChannelGroupImpl
     }
 
     private void incrementSelectorTasks() {
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             if (++numTasksWaiting == 1) {
@@ -202,7 +198,6 @@ class AsyncChannelGroupImpl
     }
 
     private void decrementSelectorTasks() {
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             if (--numTasksWaiting == 0) {
@@ -214,7 +209,6 @@ class AsyncChannelGroupImpl
     }
 
     void awaitSelectorTasks() throws InterruptedException {
-        final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
             for (;;) {

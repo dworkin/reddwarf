@@ -84,17 +84,17 @@ public final class Channels {
 
         return new InputStream() {
 
-            private ByteBuffer bb = null;
-            private byte[] bs = null;       // Invoker's previous array
-            private byte[] b1 = null;
+            private ByteBuffer buf = null;
+            private byte[] prevBytes = null;       // Invoker's previous array
+            private byte[] oneByte = null;
 
             @Override
             public synchronized int read() throws IOException {
-               if (b1 == null)
-                    b1 = new byte[1];
-               if (this.read(b1) == -1)
+               if (oneByte == null)
+                    oneByte = new byte[1];
+               if (this.read(oneByte) == -1)
                    return -1;
-               return b1[0];
+               return oneByte[0];
             }
 
             @Override
@@ -107,13 +107,13 @@ public final class Channels {
                 } else if (len == 0) {
                     return 0;
                 }
-                ByteBuffer bb = ((this.bs == bs)
-                                 ? this.bb
+                ByteBuffer bb = ((this.prevBytes == bs)
+                                 ? this.buf
                                  : ByteBuffer.wrap(bs));
                 bb.limit(Math.min(off + len, bb.capacity()));
                 bb.position(off);
-                this.bb = bb;
-                this.bs = bs;
+                this.buf = bb;
+                this.prevBytes = bs;
                 try {
                     return ch.read(bb, null).get();
                 } catch (InterruptedException e) {
@@ -149,8 +149,8 @@ public final class Channels {
 
             // Based on code in java.nio.channels.Channels
 
-            private ByteBuffer bb = null;
-            private byte[] bs = null;       // Invoker's previous array
+            private ByteBuffer buf = null;
+            private byte[] prevBytes = null;       // Invoker's previous array
             private byte[] b1 = null;
 
             @Override
@@ -171,13 +171,13 @@ public final class Channels {
                 } else if (len == 0) {
                     return;
                 }
-                ByteBuffer bb = ((this.bs == bs)
-                                 ? this.bb
+                ByteBuffer bb = ((this.prevBytes == bs)
+                                 ? this.buf
                                  : ByteBuffer.wrap(bs));
                 bb.limit(Math.min(off + len, bb.capacity()));
                 bb.position(off);
-                this.bb = bb;
-                this.bs = bs;
+                this.buf = bb;
+                this.prevBytes = bs;
                 Channels.writeAll(ch, bb);
             }
 

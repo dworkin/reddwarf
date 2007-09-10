@@ -68,17 +68,18 @@ public class ThreadedAsyncChannelProvider
         if (group == null) {
             return defaultGroup();
         }
-        if (! this.equals(group.provider())) {
+
+        if (group.provider() != this) {
             throw new IllegalArgumentException(
                 "AsynchronousChannelGroup not created by this provider");
         }
-        return ((AsyncChannelGroupImpl) group).checkShutdown();
+
+        return (AsyncChannelGroupImpl) group;
     }
 
     void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
         throws IOException
     {
-        
         if (timeout == 0)
             return;
 
@@ -91,14 +92,14 @@ public class ThreadedAsyncChannelProvider
     SelectorProvider getSelectorProvider() {
         return selectorProvider;
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
-    public AsyncChannelGroupImpl openAsynchronousChannelGroup(
-                                                    ExecutorService executor)
-        throws IOException
+    public AsyncChannelGroupImpl
+        openAsynchronousChannelGroup(ExecutorService executor)
+            throws IOException
     {
         return new AsyncChannelGroupImpl(this, executor);
     }
@@ -107,9 +108,9 @@ public class ThreadedAsyncChannelProvider
      * {@inheritDoc}
      */
     @Override
-    public AsyncDatagramChannelImpl openAsynchronousDatagramChannel(
-                                                AsynchronousChannelGroup group)
-        throws IOException
+    public AsyncDatagramChannelImpl
+        openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
+            throws IOException
     {
         return new AsyncDatagramChannelImpl(this, checkGroup(group));
     }
@@ -118,9 +119,9 @@ public class ThreadedAsyncChannelProvider
      * {@inheritDoc}
      */
     @Override
-    public AsyncServerSocketChannelImpl openAsynchronousServerSocketChannel(
-                                                AsynchronousChannelGroup group)
-        throws IOException
+    public AsyncServerSocketChannelImpl
+        openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
+            throws IOException
     {
         return new AsyncServerSocketChannelImpl(this, checkGroup(group));
     }
@@ -129,9 +130,9 @@ public class ThreadedAsyncChannelProvider
      * {@inheritDoc}
      */
     @Override
-    public AsyncSocketChannelImpl openAsynchronousSocketChannel(
-                                                AsynchronousChannelGroup group)
-        throws IOException
+    public AsyncSocketChannelImpl
+        openAsynchronousSocketChannel(AsynchronousChannelGroup group)
+            throws IOException
     {
         return new AsyncSocketChannelImpl(this, checkGroup(group));
     }

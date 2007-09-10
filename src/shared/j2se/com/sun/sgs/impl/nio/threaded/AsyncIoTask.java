@@ -37,10 +37,10 @@ class AsyncIoTask<R, A>
 
     private <X> InnerTask<X> createInnerTask(
             Callable<R> callable,
-            X attachment, 
+            X innerAttachment, 
             CompletionHandler<R, X> handler)
     {
-        return new InnerTask<X>(callable, attachment, handler);
+        return new InnerTask<X>(callable, innerAttachment, handler);
     }
 
     final class InnerTask<X>
@@ -55,13 +55,14 @@ class AsyncIoTask<R, A>
                   CompletionHandler<R, X> handler)
         {
             super(callable);
-            this.innerAttachment = attachment;
+            innerAttachment = (handler == null) ? null : attachment;
             this.handler = handler;
         }
 
         @Override
         protected void done() {
-            handler.completed(this);
+            if (handler != null)
+                handler.completed(this);
         }
 
         public X attach(X ob) {

@@ -264,6 +264,7 @@ class AsyncDatagramChannelImpl
     public <A> IoFuture<Void, A> connect(SocketAddress remote, A attachment,
         CompletionHandler<Void, ? super A> handler)
     {
+        checkClosedAsync();
         // TODO
         return null;
     }
@@ -307,6 +308,7 @@ class AsyncDatagramChannelImpl
         long timeout, TimeUnit unit, A attachment,
         CompletionHandler<SocketAddress, ? super A> handler)
     {
+        checkClosedAsync();
         // TODO
         return null;
     }
@@ -319,6 +321,7 @@ class AsyncDatagramChannelImpl
         SocketAddress target, long timeout, TimeUnit unit, A attachment,
         CompletionHandler<Integer, ? super A> handler)
     {
+        checkClosedAsync();
         // TODO
         return null;
     }
@@ -331,6 +334,7 @@ class AsyncDatagramChannelImpl
         TimeUnit unit, A attachment,
         CompletionHandler<Integer, ? super A> handler)
     {
+        checkClosedAsync();
         // TODO
         return null;
     }
@@ -343,6 +347,7 @@ class AsyncDatagramChannelImpl
         TimeUnit unit, A attachment,
         CompletionHandler<Integer, ? super A> handler)
     {
+        checkClosedAsync();
         // TODO
         return null;
     }

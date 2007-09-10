@@ -23,6 +23,7 @@ import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
@@ -53,6 +54,11 @@ final class AsyncServerSocketChannelImpl
             @Override protected void alreadyPendingPolicy() {
                 throw new AcceptPendingException();
             }};
+        try {
+            group.addChannel(this);
+        } catch (ShutdownChannelGroupException e) {
+            channel.close();
+        }
     }
 
     private void checkClosedAsync() {
@@ -73,6 +79,7 @@ final class AsyncServerSocketChannelImpl
     @Override
     public void close() throws IOException {
         channel.close();
+        group.channelClosed(this);
     }
 
     /**

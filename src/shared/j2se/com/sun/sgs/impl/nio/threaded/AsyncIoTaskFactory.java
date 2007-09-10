@@ -64,7 +64,8 @@ class AsyncIoTaskFactory {
 
         public void completed(IoFuture<R, A> result) {
             pending.set(false);
-            handler.completed(result);
+            if (handler != null)
+                handler.completed(result);
         }
     }
 }
