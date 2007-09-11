@@ -225,7 +225,6 @@ public class PropertiesWrapper {
      * @throws	IllegalArgumentException if the property is found and a problem
      *		occurs creating the instance, or if the constructor throws a
      *		checked exception
-     * @throws	RuntimeException if it is thrown by the constructor
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)

@@ -429,8 +429,6 @@
   </target>
 
   <!-- Creates server binary distribution -->
-  <!-- FIXME: Make packaging and licensing changes for BDB JE
-       -tjb@sun.com (09/06/2007) -->
   <target name="dist-server-binary"
 	  depends="-dist-server-binary-clean, dist-server-binary-tutorial,
 		   dist-server-binary-bdb, jar-server, javadoc-api-server,
@@ -672,7 +670,7 @@
   <target name="findbugs-client" depends="build-client, -findbugs.init"
 	  description="Checks for bugs in the client">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/client/j2se"/>
       <class location="${build.dir}/classes/client"/>
       <auxClasspath>
@@ -685,7 +683,7 @@
   <target name="findbugs-server" depends="build-server, -findbugs.init"
 	  description="Checks for bugs in the server">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/server/j2se"/>
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
@@ -700,7 +698,7 @@
   <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
 	  description="Checks for bugs in shared code">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/shared/j2se"/>
       <class location="${build.dir}/classes/shared"/>
       <auxClasspath>

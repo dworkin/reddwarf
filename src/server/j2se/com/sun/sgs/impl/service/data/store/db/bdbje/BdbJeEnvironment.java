@@ -43,7 +43,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.Enumeration;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -89,7 +88,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * loss but introduces a significant reduction in performance. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.db.bdbje.flush.to.disk
+ *	com.sun.sgs.impl.service.data.store.db.bdbje.stats
  *	</b></code> <br>
  *	<i>Default:</i> <code>-1</code>
  *
@@ -100,11 +99,12 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  *
  * </dl> <p>
  *
- * It also supports any initialization properties supported by the {@link
- * Environment} class that start with the {@code je.} prefix. <p>
+ * The constructor also supports any initialization properties supported by the
+ * Berkeley DB {@link Environment} class that start with the {@code je.}
+ * prefix. <p>
  *
  * Unless overridden, this implementation provides the following non-default
- * settings for initialization properties:
+ * settings for Berkeley DB initialization properties:
  *
  * <dl style="margin-left: 1em">
  *
@@ -131,6 +131,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  *	application restart and recovery
  * <li> {@link Level#WARNING WARNING} - Berkeley DB exceptions
  * <li> {@link Level#INFO INFO} - Berkeley DB statistics
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties
  * </ul>
  */
 public class BdbJeEnvironment implements DbEnvironment {
@@ -174,10 +175,10 @@ public class BdbJeEnvironment implements DbEnvironment {
     private final XAEnvironment env;
 
     /** The stats task or null. */
-    private StatsRunnable statsTask;
+    private StatsRunnable statsTask = null;
 
     /** Used to cancel the stats task, if non-null. */
-    private TaskHandle statsTaskHandle;
+    private TaskHandle statsTaskHandle = null;
 
     /** A Berkeley DB exception listener that uses logging. */
     private static class LoggingExceptionListener
@@ -247,12 +248,9 @@ public class BdbJeEnvironment implements DbEnvironment {
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
 	config.setTxnWriteNoSync(!flushToDisk);
-	for (Enumeration<?> names = properties.propertyNames();
-	     names.hasMoreElements(); )
-	{
-	    Object name = names.nextElement();
-	    if (name instanceof String) {
-		String property = (String) name;
+	for (Object key : properties.keySet()) {
+	    if (key instanceof String) {
+		String property = (String) key;
 		if (property.startsWith("je.")) {
 		    config.setConfigParam(
 			property, properties.getProperty(property));
@@ -274,7 +272,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 		statsTask, stats);
 	}
     }
-	
+
     /**
      * Returns the correct exception for a Berkeley DB DatabaseException, or
      * XAException, thrown during an operation.  Throws an Error if recovery is
@@ -286,43 +284,37 @@ public class BdbJeEnvironment implements DbEnvironment {
     {
 	if (convertTxnExceptions && e instanceof LockNotGrantedException) {
 	    return new TransactionTimeoutException(
-		"Transaction timed out: " + e, e);
+		"Transaction timed out: " + e.getMessage(), e);
 	} else if (convertTxnExceptions && e instanceof DeadlockException) {
 	    return new TransactionConflictException(
-		"Transaction conflict: " + e, e);
+		"Transaction conflict: " + e.getMessage(), e);
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
 	     * order to reopen the Berkeley DB databases, because it's hard to
 	     * know when they are no longer in use.  It's OK to catch this
-	     * Error and create a new DataStoreImpl instance, but this instance
+	     * Error and create a new environment instance, but this instance
 	     * is dead.  -tjb@sun.com (10/19/2006)
 	     */
 	    Error error = new Error(
-		"Database requires recovery -- need to restart the server " +
-		"or create a new instance of DataStoreImpl: " + e.getMessage(),
-		e);
+		"Database requires recovery -- need to restart: " + e, e);
 	    logger.logThrow(Level.SEVERE, error, "Database requires recovery");
 	    throw error;
 	} else if (e instanceof XAException) {
 	    int errorCode = ((XAException) e).errorCode;
 	    if (errorCode == XA_RBTIMEOUT) {
 		throw new TransactionTimeoutException(
-		    "Transaction timed out: " + e, e);
+		    "Transaction timed out: " + e.getMessage(), e);
 	    } else if (errorCode == XA_RBDEADLOCK) {
 		throw new TransactionConflictException(
-		    "Transaction conflict: " + e, e);
+		    "Transaction conflict: " + e.getMessage(), e);
 	    } else if (errorCode >= XA_RBBASE && errorCode <= XA_RBEND) {
 		throw new TransactionAbortedException(
-		    "Transaction aborted: " + e, e);
-	    } else {
-		throw new DbDatabaseException(
-		    "Unexpected database exception: " + e, e);
+		    "Transaction aborted: " + e.getMessage(), e);
 	    }
-	} else {
-	    throw new DbDatabaseException(
-		"Unexpected database exception: " + e, e);
 	}
+	throw new DbDatabaseException(
+	    "Unexpected database exception: " + e, e);
     }
 
     /* -- Implement DbEnvironment -- */

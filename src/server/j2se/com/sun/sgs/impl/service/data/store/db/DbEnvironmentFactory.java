@@ -36,19 +36,19 @@ public final class DbEnvironmentFactory {
 
     /**
      * Returns the environment for interacting with the database implementation
-     * for files stored in the specified directory, and configured with the
-     * specified properties and scheduler.  The value of the {@code
-     * com.sun.sgs.impl.service.data.store.db.environment.class} property, if
-     * present, should be the fully qualified name of a non-abstract class that
-     * implements {@link DbEnvironment}, and that has a public constructor with
-     * three parameters: a {@link String}, which specifies the directory
-     * containing database files, {@link Properties}, which specifies
-     * configuration options, and a {@link Scheduler}, which the implementation
-     * can use to run asynchronous, periodic tasks.  If the property is
-     * present, the results of calling the constructor with the arguments
-     * passed to this method will be returned.  Otherwise, an instance of
-     * {@link BdbDbEnvironment}, constructed with the arguments, will be
-     * returned.
+     * for files stored in the specified directory, which must exist, and
+     * configured with the specified properties and scheduler.  The value of
+     * the {@code com.sun.sgs.impl.service.data.store.db.environment.class}
+     * property, if present, should be the fully qualified name of a
+     * non-abstract class that implements {@link DbEnvironment}, and that has a
+     * public constructor with three parameters: a {@link String}, which
+     * specifies the directory containing database files, {@link Properties},
+     * which specifies configuration options, and a {@link Scheduler}, which
+     * the implementation can use to run asynchronous, periodic tasks.  If the
+     * property is present, the results of calling the constructor with the
+     * arguments passed to this method will be returned.  Otherwise, an
+     * instance of {@link BdbDbEnvironment}, constructed with the arguments,
+     * will be returned.
      *
      * @param	directory the directory containing database files
      * @param	properties the properties to configure the implementation

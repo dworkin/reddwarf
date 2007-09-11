@@ -392,9 +392,8 @@ public class DataStoreImpl
 		cursor = names.openCursor(dbTxn);
 	    }
 	    if (name == null) {
-		boolean found = cursor.findFirst();
-		lastCursorKey = found ?
-		    DataEncoding.decodeString(cursor.getKey()) : null;
+		lastCursorKey = cursor.findFirst()
+		    ? DataEncoding.decodeString(cursor.getKey()) : null;
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
@@ -402,17 +401,15 @@ public class DataStoreImpl
 		     * The name specified was not the last key returned, so
 		     * search for the specified name
 		     */
-		    boolean found =
-			cursor.findNext(DataEncoding.encodeString(name));
-		    lastCursorKey = found ?
-			DataEncoding.decodeString(cursor.getKey()) : null;
+		    lastCursorKey =
+			cursor.findNext(DataEncoding.encodeString(name))
+			? DataEncoding.decodeString(cursor.getKey()) : null;
 		    /* Record if we found an exact match */
 		    matchesLast = name.equals(lastCursorKey);
 		}
 		if (matchesLast) {
 		    /* The last key was an exact match, so find the next one */
-		    boolean found = cursor.findNext();
-		    lastCursorKey = found
+		    lastCursorKey = cursor.findNext()
 			? DataEncoding.decodeString(cursor.getKey()) : null;
 		}
 	    }
@@ -969,8 +966,7 @@ public class DataStoreImpl
 		} else {
 		    DbCursor cursor = classesDb.openCursor(dbTxn);
 		    try {
-			boolean found = cursor.findLast();
-			result = found
+			result = cursor.findLast()
 			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
 			byte[] idKey = getKeyFromClassId(result);
 			boolean success =
@@ -1023,12 +1019,12 @@ public class DataStoreImpl
 		throw new IllegalArgumentException(
 		    "The classId argument must greater than 0");
 	    }
+	    byte[] key = getKeyFromClassId(classId);
 	    byte[] result;
 	    boolean done = false;
 	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
 	    try {
-		result =
-		    classesDb.get(dbTxn, getKeyFromClassId(classId), false);
+		result = classesDb.get(dbTxn, key, false);
 		done = true;
 		dbTxn.commit();
 	    } finally {
@@ -1396,29 +1392,26 @@ public class DataStoreImpl
     private RuntimeException convertException(
 	Transaction txn, Level level, RuntimeException e, String operation)
     {
-	RuntimeException re;
 	if (e instanceof TransactionTimeoutException) {
 	    /* Include the operation in the message */
-	    re = new TransactionTimeoutException(
+	    e = new TransactionTimeoutException(
 		operation + " failed: " + e.getMessage(), e);
 	} else if (e instanceof TransactionConflictException) {
-	    re = new TransactionConflictException(
+	    e = new TransactionConflictException(
 		operation + " failed: " + e.getMessage(), e);
 	} else if (e instanceof DbDatabaseException) {
-	    re = new DataStoreException(
+	    e = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
-	} else {
-	    re = (RuntimeException) e;
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was
 	 * aborted, then make sure to abort the transaction now.
 	 */
-	if (re instanceof TransactionAbortedException && txn != null) {
-	    txn.abort(re);
+	if (e instanceof TransactionAbortedException && txn != null) {
+	    txn.abort(e);
 	}
-	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
-	return re;
+	logger.logThrow(Level.FINEST, e, "{0} throws", operation);
+	return e;
     }
 
     /** Returns the current transaction count. */

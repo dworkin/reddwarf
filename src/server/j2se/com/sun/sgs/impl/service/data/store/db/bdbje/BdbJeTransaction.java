@@ -41,7 +41,7 @@ class BdbJeTransaction implements DbTransaction {
      */
     private static final class SimpleXid implements Xid {
 	/** The global transaction ID. */
-	private byte[] gid;
+	private final byte[] gid;
 
 	/** Creates an instance with the specified global transaction ID. */
 	SimpleXid(byte[] gid) {

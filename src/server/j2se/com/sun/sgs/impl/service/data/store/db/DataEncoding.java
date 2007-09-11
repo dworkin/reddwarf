@@ -216,6 +216,8 @@ public final class DataEncoding {
      *
      * @param	string the string to encode
      * @return	the encoded byte array
+     * @throws	IllegalArgumentException if the UTF-8 encoding of the string
+     *		contains more than {@code 65535} characters
      */
     public static byte[] encodeString(String string) {
 	ByteArrayOutputStream baos =
@@ -247,7 +249,8 @@ public final class DataEncoding {
      * @param	bytes the byte array to decode
      * @return	the decoded string
      * @throws	IllegalArgumentException if the format of the bytes is not
-     *		valid UTF-8 data
+     *		valid UTF-8 data, if it is not null terminated, or if it
+     *		represents more than {@code 65535} bytes
      */
     public static String decodeString(byte[] bytes) {
 	int length;
@@ -259,7 +262,7 @@ public final class DataEncoding {
 	if (length >= bytes.length) {
 	    throw new IllegalArgumentException(
 		"Problem decoding string: Null termination not found");
-	} else if (length > Short.MAX_VALUE) {
+	} else if (length > 65535) {
 	    throw new IllegalArgumentException(
 		"Problem decoding string: Length is too large: " + length);
 	}

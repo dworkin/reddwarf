@@ -172,7 +172,7 @@ public class TestDataEncoding extends TestCase {
 
     public void testDecodeIntSubseq() {
 	try {
-	    DataEncoding.decodeInt(null);
+	    DataEncoding.decodeInt(null, 0);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	}
@@ -253,9 +253,23 @@ public class TestDataEncoding extends TestCase {
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	}
-	char[] chars = new char[(1<<16) + 1];
+	char[] chars = new char[(1<<16) - 1];
 	Arrays.fill(chars, 'a');
+	byte[] bytes = new byte[1<<16];
+	Arrays.fill(bytes, (byte) 'a');
+	bytes[bytes.length - 1] = 0;
+	verifyEncodeString(new String(chars), bytes);
+	chars[0] = '\u1234';
 	String longString = new String(chars);
+	try {
+	    DataEncoding.encodeString(longString);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	chars = new char[1<<16];
+	Arrays.fill(chars, 'a');
+	longString = new String(chars);
 	try {
 	    DataEncoding.encodeString(longString);
 	    fail("Expected IllegalArgumentException");
@@ -268,13 +282,17 @@ public class TestDataEncoding extends TestCase {
 	    "Some weird stuff: \u0123\u1234\u3456",
 	    b('S'), b('o'), b('m'), b('e'), b(' '), b('w'), b('e'), b('i'),
 	    b('r'), b('d'), b(' '), b('s'), b('t'), b('u'), b('f'), b('f'),
-	    b(':'), b(' '), b(0xc4), b(0xa3), b(0xe1), b(0x88), b(0xb4),
-	    b(0xe3), b(0x91), b(0x96), zero);
+	    b(':'), b(' '), 
+	    b(0xc4), b(0xa3),		/* \u0123 */
+	    b(0xe1), b(0x88), b(0xb4),	/* \u1234 */
+	    b(0xe3), b(0x91), b(0x96),  /* \u3456 */
+	    zero);
 	verifyEncodeString("\u0000", b(0xc0), b(0x80), zero);
     }
 
     private static void verifyEncodeString(String string, byte... b) {
 	byte[] bytes = DataEncoding.encodeString(string);
+	assertEquals(b.length, bytes.length);
 	assertEquals(Arrays.toString(b), Arrays.toString(bytes));
 	String decoded = DataEncoding.decodeString(bytes);
 	assertEquals(string, decoded);
@@ -316,7 +334,7 @@ public class TestDataEncoding extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	bytes = new byte[Short.MAX_VALUE + 2];
+	bytes = new byte[(1<<16) + 1];
 	Arrays.fill(bytes, (byte) 'a');
 	bytes[bytes.length - 1] = 0;
 	try {

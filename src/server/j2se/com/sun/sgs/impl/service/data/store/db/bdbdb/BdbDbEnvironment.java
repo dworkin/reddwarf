@@ -77,6 +77,7 @@ import java.util.logging.Logger;
  * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
  *	application restart and recovery
  * <li> {@link Level#WARNING WARNING} - Berkeley DB errors
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties
  * <li> {@link Level#FINE FINE} - Berkeley DB messages
  * </ul>
  */
@@ -240,7 +241,7 @@ public class BdbDbEnvironment implements DbEnvironment {
 	checkpointTaskHandle = scheduler.scheduleRecurringTask(
 	    checkpointTask, checkpointInterval);
     }
-	
+
     /**
      * Returns the correct exception for a Berkeley DB DatabaseException thrown
      * during an operation.  Throws an Error if recovery is needed.  Only
@@ -266,13 +267,11 @@ public class BdbDbEnvironment implements DbEnvironment {
 	     * It is tricky to clean up the data structures in this instance in
 	     * order to reopen the Berkeley DB databases, because it's hard to
 	     * know when they are no longer in use.  It's OK to catch this
-	     * Error and create a new DataStoreImpl instance, but this instance
+	     * Error and create a new environment instance, but this instance
 	     * is dead.  -tjb@sun.com (10/19/2006)
 	     */
 	    Error error = new Error(
-		"Database requires recovery -- need to restart the server " +
-		"or create a new instance of DataStoreImpl: " + e.getMessage(),
-		e);
+		"Database requires recovery -- need to restart: " + e, e);
 	    logger.logThrow(Level.SEVERE, error, "Database requires recovery");
 	    throw error;
 	} else {
