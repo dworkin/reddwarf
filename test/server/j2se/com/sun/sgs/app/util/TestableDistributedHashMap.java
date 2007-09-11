@@ -37,17 +37,37 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
 	super(0, minConcurrency, splitThreshold, directorySize);
     }
 
-    /** {@inheritDoc} */
+
+    /** 
+     * Constructs an empty {@code TestableDistributedHashMap} with the
+     * default minimum concurrency.
+     */
     public TestableDistributedHashMap() {
 	super();
     }
 
-    /** {@inheritDoc} */
+
+    /** 
+     * Constructs an empty {@code TestableDistributedHashMap} with the
+     * specified minimum concurrency.
+     *
+     * @param minConcurrency the minimum number of concurrent write
+     *        operations supported
+     *
+     * @throws IllegalArgumentException if minConcurrency is non positive
+     */
     public TestableDistributedHashMap(int minConcurrency) {
 	super(minConcurrency);
     }
 
-    /** {@inheritDoc}*/
+
+    /**
+     * Constructs a new {@code TestableDistributedHashMap} with the
+     * same mappings as the specified {@code Map}, and the default
+     * minimum concurrency (32).
+     *
+     * @param m the mappings to include
+     */
     public TestableDistributedHashMap(Map<? extends K, ? extends V> m) {
 	super(m);
     }
@@ -61,9 +81,9 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
     public int getMinTreeDepth() {	
  	DistributedHashMap<K,V> cur = leftMost();
 	int minDepth = cur.depth;
-  	while(cur.rightLeaf != null) {
+  	while(cur.rightLeafRef != null) {
 	    minDepth = Math.min(minDepth, 
-				(cur = cur.rightLeaf.
+				(cur = cur.rightLeafRef.
 				 get(DistributedHashMap.class)).depth);
 	}
 	return minDepth+1;
@@ -78,9 +98,9 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
     public int getMaxTreeDepth() {	
  	DistributedHashMap<K,V> cur = leftMost();
 	int maxDepth = cur.depth;
-  	while(cur.rightLeaf != null) {
+  	while(cur.rightLeafRef != null) {
 	    maxDepth = Math.max(maxDepth, 
-				(cur = cur.rightLeaf.
+				(cur = cur.rightLeafRef.
 				 get(DistributedHashMap.class)).depth);
 	}
 	return maxDepth+1;
@@ -95,9 +115,9 @@ public class TestableDistributedHashMap<K,V> extends DistributedHashMap<K,V> {
  	DistributedHashMap<K,V> cur = leftMost();
 	int maxDepth = cur.depth;
 	double leaves = 1;
-  	while(cur.rightLeaf != null) {
+  	while(cur.rightLeafRef != null) {
 	    maxDepth = Math.max(maxDepth, 
-				(cur = cur.rightLeaf.
+				(cur = cur.rightLeafRef.
 				 get(DistributedHashMap.class)).depth);
 	    leaves++;
 	}

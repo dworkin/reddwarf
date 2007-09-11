@@ -27,37 +27,73 @@ import com.sun.sgs.app.ManagedReference;
 
 
 /**
- * A concurrent, distributed {@code Map} implementation that
- * automatically manages the mapping storage within the datstore, and
- * supports concurrent writes.  This class is intended as a drop-in
- * replacement for the {@link java.util.HashMap} class as needed.
- * This class is designed to mark itself for update as necessary; no
- * additional calls to the {@code DataManager} are necessary when
- * using the map.  Beware that developers should <i>not</i> call
- * {@code markForUpdate} or {@code getForUpdate} on this map, as this
- * will eliminate all the concurrency benefits of this class.
+ * A concurrent, distributed implementation of {@code Map}.  The
+ * internal structure of the map is separated into distributed pieces,
+ * which reduces the amount of data any one operation needs to access.
+ * The distributed structure increases the concurrency and allows for
+ * parallel write operations to successfully complete.
+ * 
+ * <p>
+ *
+ * Developers may use this class as a drop-in replacement for the
+ * {@link java.util.HashMap} class for use in a {@link ManagedObject}.
+ * A {@code HashMap} will typically perform better than this class
+ * when the number of mappings is small and the objects being stored
+ * are small, and when minimal concurrency is required.  As the size
+ * of the serialized {@code HashMap} increases, this class will
+ * perform significantly better.  Developers are encouraged to profile
+ * the size of their map to determine which implementation will
+ * perform better.  Note that {@code HashMap} has no implicit
+ * concurrency, so this class may perform in situations where multiple
+ * tasks need to modify the set concurrently, even if the total number
+ * of mappings is small.  Also note that this class should be used
+ * instead of other {@code Map} implementations to store {@code
+ * ManagedObject} instances.
  *
  * <p>
  *
- * This implementation supports the contract that all keys and values
- * must be {@link Serializable}.  If a developer provides a {@code
- * Serializable} key or value that is <i>not</i> a {@code
- * ManagedObject}, this implementation will take responsibility for
- * the lifetime of that object in the datastore.  The developer will
- * be responsible for the lifetime of all {@link ManagedObject} stored
- * in this map.
+ * This class marks itself for update as necessary; no additional
+ * calls to the {@link DataManager} are necessary when modifying the
+ * map.  Developers do not need to call {@code markForUpdate} or
+ * {@code getForUpdate} on this map, as this will eliminate all the
+ * concurrency benefits of this class.  However, calling {@code
+ * getForUpdate} or {@code markForUpdate} can be used if a operation
+ * needs to prevent all access to the map.
+ *
+ * <p>
+ *
+ * This implementation requires that all keys and values must be
+ * {@link Serializable}.  If a key or value is an instance of {@code
+ * Serializable} but does not implement {@code ManagedObject}, this
+ * class will persist the object as necessary; when such an object is
+ * removed from the map, it is also removed from the {@code
+ * DataManager}.  If a key or value is an instance of {@code
+ * ManagedObject}, the developer will be responsible for removing
+ * these objects from the {@code DataManager} when done with them.
+ * Developers should not remove these object from the {@code
+ * DataManger} prior to removing them from the map.
  *
  * <p>
  *
  * This class provides {@code Serializable} views from the {@link
  * #entrySet()}, {@link #keySet()} and {@link #values()} methods.
- * These views are concurrent and may be shared among different view.
- * Furthermore, the {@code Iterator} objects returned by these methods
- * also implement {@code Serializable} and are concurrent as well.
- * These iterators do <i>not</i> throw {@link
- * java.util.ConcurrentModificationException}.  An Iterator reflects
- * the current state of the map at the time of its creation or if
- * persisted, its deserialization.
+ * These views may be shared and persisted by multiple {@code
+ * ManagedObject} instances.
+ *
+ * <a name="iterator">
+ * The {@code Iterator} for each view also implements {@code
+ * Serializable}.  An single iterator may be saved by a different
+ * {@code ManagedObject} instances, which create a distinct copy of
+ * the original iterator.  A copy starts its iteration from where the
+ * state of the original was at the time of the copy.  However a copy
+ * maintains a separate, independent state from the original will
+ * therefore not reflect any changes to the original iterator.  These
+ * iterators do not throw {@link
+ * java.util.ConcurrentModificationException}.  These iterators are
+ * stable with respect to the concurrent changes to the associated
+ * collection; an iterator will not the same object twice after a
+ * change is made.  An iterator may ignore additions and removals to
+ * the associated collection that occur before the iteration site.
  *
  * <p>
  *
@@ -74,13 +110,18 @@ import com.sun.sgs.app.ManagedReference;
  * minimum number of write operations to support in parallel.  This
  * parameter acts as a hint to the map on how to perform resizing.  As
  * the map grows, the number of supported parallel operations will
- * also grow beyond the specified minimum; specifying a minimum
- * concurrency ensures that the map will resize correctly.  Since the
- * distribution of objects in the map is essentially random, the
- * actual concurrency will vary.  Setting the minimum concurrency too
- * high will waste space and time, while setting it too low will cause
- * conflicts until the map grows sufficiently to support more
- * concurrent operations.
+ * also grow beyond the specified minimum.  Setting the minimum
+ * concurrency too high will waste space and time, while setting it
+ * too low will cause conflicts until the map grows sufficiently to
+ * support more concurrent operations.
+ *
+ * <p>
+ *
+ * Since the expected distribution of objects in the map is
+ * essentially random, the actual concurrency will vary.  Developers
+ * are stronly encouraged to use hash codes that provide a normal
+ * distribution; a large number of collisions will likely reduce the
+ * performance.
  *
  * <p>
  *
@@ -89,33 +130,22 @@ import com.sun.sgs.app.ManagedReference;
  * no guarantees on the order of elements when iterating over the key
  * set, values or entry set.
  * 
- *
- * @since 0.9.4
- * @version 1.6
- *
  * @see Object#hashCode()
  * @see Map
  * @see Serializable
  * @see ManagedObject
  */
-@SuppressWarnings({"unchecked"})
 public class DistributedHashMap<K,V> 
     extends AbstractMap<K,V>
-    implements Map<K,V>, Serializable, ManagedObject {
-
+    implements Serializable, ManagedObject {
+    
     private static final long serialVersionUID = 0x1337L;
-
-    /**
-     * The default number of parallel write operations used when none
-     * is specified in the constructor.
-     */
-    private static final int DEFAULT_MINIMUM_CONCURRENCY = 1;    
-
+    
     /**
      * The split threshold used when none is specified in the
      * constructor.
      */
-    // NOTE: through emprical testing, it has been shown that 96
+    // NOTE: through emprical testing, it has been shown that 98
     // elements is the maximum number of PrefixEntries that will fit
     // onto a 4K page.  As the datastore page size changes (or if
     // object level locking becomes used), this should be adjusted to
@@ -127,6 +157,14 @@ public class DistributedHashMap<K,V>
      * in the constructor.
      */
     private static final int DEFAULT_DIRECTORY_SIZE = 32;
+
+    /**
+     * The default number of parallel write operations used when none
+     * is specified in the constructor.
+     */
+    private static final int DEFAULT_MINIMUM_CONCURRENCY =
+	DEFAULT_DIRECTORY_SIZE;    
+
     
     /**
      * The default number of {@code PrefixEntry} entries per
@@ -146,7 +184,7 @@ public class DistributedHashMap<K,V>
      * The parent node directly above this.  For the root node, this
      * should always be null.
      */
-    private ManagedReference parent;
+    private ManagedReference parentRef;
 
     // NOTE: the leftLeaf and rightLeaf references for a doubly-linked
     //       list for the leaf nodes of the tree, which allows us to
@@ -157,20 +195,21 @@ public class DistributedHashMap<K,V>
      * The leaf table immediately to the left of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    ManagedReference leftLeaf;
+    ManagedReference leftLeafRef;
 
     /**
      * The leaf table immediately to the right of this table, or {@code
      * null} if this table is an intermediate node in tree.
      */
-    ManagedReference rightLeaf;
+    ManagedReference rightLeafRef;
 
     /**
      * The lookup directory for deciding which leaf node to access
      * based on a provided prefix.  If this instance is a leaf node,
-     * the directory will be {@code null}
+     * the directory will be {@code null}.  Note that this directory
+     * contains both leaf nodes as well as other directory nodes.
      */
-    private ManagedReference[] leafDirectory;
+    private ManagedReference[] nodeDirectory;
 
     /**
      * The fixed-size table for storing all Map entries.  This table
@@ -245,8 +284,6 @@ public class DistributedHashMap<K,V>
      *        operations to support
      * @param splitThreshold the number of entries at a leaf node that
      *        will cause the leaf to split
-     * @param mergeTheshold the numer of entries at a leaf node that
-     *        will cause the leaf to attempt merging with its sibling
      * @param directorySize the maximum number of entries in the
      *        directory.  This is equivalent to the maximum number of
      *        leaves under this node when all children have been added
@@ -291,13 +328,13 @@ public class DistributedHashMap<K,V>
 
 	size = 0;
 	version = 0;
-	parent = null;
- 	leftLeaf = null;
- 	rightLeaf = null;
+	parentRef = null;
+ 	leftLeafRef = null;
+ 	rightLeafRef = null;
 
 	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
-	leafDirectory = null;
+	nodeDirectory = null;
 
 	for (tmp = 1; (1 << tmp) < directorySize; tmp++)
 	    ;
@@ -330,7 +367,7 @@ public class DistributedHashMap<K,V>
 
     /** 
      * Constructs an empty {@code DistributedHashMap} with the default
-     * minimum concurrency (1).
+     * minimum concurrency (32).
      */
     public DistributedHashMap() {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
@@ -340,11 +377,9 @@ public class DistributedHashMap<K,V>
     /**
      * Constructs a new {@code DistributedHashMap} with the same mappings
      * as the specified {@code Map}, and the default 
-     * minimum concurrency (1).
+     * minimum concurrency (32).
      *
      * @param m the mappings to include
-     *
-     * @throws NullPointerException if the provided map is null
      */
     public DistributedHashMap(Map<? extends K, ? extends V> m) {
 	this(0, DEFAULT_MINIMUM_CONCURRENCY, 
@@ -377,7 +412,7 @@ public class DistributedHashMap<K,V>
 	    // is much more efficient
 
 	    table = null; // this node is no longer a leaf
-	    leafDirectory = 
+	    nodeDirectory = 
 		new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
 	    
 	    // decide how many leaves to make based on the required
@@ -397,33 +432,33 @@ public class DistributedHashMap<K,V>
 						   minConcurrency,
 						   splitThreshold,
 						   1 << dirBits);
-		leaves[i].parent = thisRef;
+		leaves[i].parentRef = thisRef;
 	    }
 	    
-	    // link them together
+	    // for the linked list for the leaves
 	    for (int i = 1; i < numLeaves-1; ++i) {
-		leaves[i].leftLeaf = dm.createReference(leaves[i-1]);
-		leaves[i].rightLeaf = dm.createReference(leaves[i+1]);
+		leaves[i].leftLeafRef = dm.createReference(leaves[i-1]);
+		leaves[i].rightLeafRef = dm.createReference(leaves[i+1]);
 	    }
 
 	    // edge updating - Note that since there are guaranteed to
 	    // be at least two leaves, these absolute offset calls are safe
-	    leaves[0].leftLeaf = leftLeaf;
-	    leaves[0].rightLeaf = dm.createReference(leaves[1]);
-	    leaves[numLeaves-1].leftLeaf = 
+	    leaves[0].leftLeafRef = leftLeafRef;
+	    leaves[0].rightLeafRef = dm.createReference(leaves[1]);
+	    leaves[numLeaves-1].leftLeafRef = 
 		dm.createReference(leaves[numLeaves-2]);
-	    leaves[numLeaves-1].rightLeaf = rightLeaf;
+	    leaves[numLeaves-1].rightLeafRef = rightLeafRef;
 
 	    // since this node is now a directory, invalidate its
 	    // leaf-list references
-	    leftLeaf = null;
-	    rightLeaf = null;
+	    leftLeafRef = null;
+	    rightLeafRef = null;
    
-	    int entriesPerLeaf = leafDirectory.length / leaves.length;
+	    int entriesPerLeaf = nodeDirectory.length / leaves.length;
 
 	    // lastly, fill the directory with the references
-	    for (int i = 0, j = 0; i < leafDirectory.length; ) {
-		leafDirectory[i] = dm.createReference(leaves[j]);
+	    for (int i = 0, j = 0; i < nodeDirectory.length; ) {
+		nodeDirectory[i] = dm.createReference(leaves[j]);
 		if (++i % entriesPerLeaf == 0)
 		    j++;
 	    }
@@ -432,16 +467,17 @@ public class DistributedHashMap<K,V>
 	    // still smaller than the minimum depth, call ensure depth
 	    // on the directory nodes under this
 	    if (depth + leafDepthOffset < minDepth) {
-		for (ManagedReference dirNode : leafDirectory) 
+		for (ManagedReference dirNode : nodeDirectory) 
 		    dirNode.get(DistributedHashMap.class).ensureDepth(minDepth);
 	    }
  	}
     }
-
+    
     /**
      * Clears the map of all entries in {@code O(n log(n))} time.
-     * When clearing, all values managed by this map will be removed
-     * from the persistence mechanism.
+     * When clearing, all non-{@code ManagedObject} key and values
+     * persisted by this map will be removed from the {@code
+     * DataManager}
      */
     public void clear() {
 	
@@ -454,7 +490,7 @@ public class DistributedHashMap<K,V>
 	    DataManager dm = AppContext.getDataManager();
 	    ManagedReference leafRef = null;
 	    DistributedHashMap leaf = null; 
-	    for (ManagedReference r : leafDirectory) {
+	    for (ManagedReference r : nodeDirectory) {
 		if (leafRef == r) 
 		    continue;
 		(leaf = ((leafRef = r).get(DistributedHashMap.class))).clear();
@@ -463,7 +499,7 @@ public class DistributedHashMap<K,V>
 	}
 	
 	if (depth == 0) { // special case for root node;
-	    leafDirectory = null;
+	    nodeDirectory = null;
 	    table = new PrefixEntry[leafCapacity];
 	    size = 0;
 	}
@@ -477,7 +513,7 @@ public class DistributedHashMap<K,V>
     public boolean containsKey(Object key) {
 	return getEntry(key) != null;
     }
-
+    
     /**
      * Returns the {@code PrefixEntry} associated with this key.
      *
@@ -486,6 +522,7 @@ public class DistributedHashMap<K,V>
      * @return the entry associated with the key or {@code null} if no
      *         such entry exists
      */ 
+    @SuppressWarnings({"unchecked"})
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
@@ -504,9 +541,9 @@ public class DistributedHashMap<K,V>
     /**
      * {@inheritDoc}
      *
-     * Note that the execution time of this method grows substatially
+     * Note that the execution time of this method grows substantially
      * as the map size increases due to the cost of accessing the data
-     * store.
+     * manager.
      */
     public boolean containsValue(Object value) {
 	for (V v : values()) {
@@ -527,6 +564,7 @@ public class DistributedHashMap<K,V>
      * @see #addEntry(PrefixEntry, int)
      * @see #collapse(int, int)
      */
+    @SuppressWarnings({"unchecked"})
     private void split() {
 	    
 	if (table == null) { // can't split an intermediate node!
@@ -574,25 +612,25 @@ public class DistributedHashMap<K,V>
 	ManagedReference rightChildRef = 
 	    dataManager.createReference(rightChild);
 	    
-	if (leftLeaf != null) {
-	    DistributedHashMap leftLeaf_ = 
-		leftLeaf.get(DistributedHashMap.class);
-	    leftLeaf_.rightLeaf = leftChildRef;
-	    leftChild.leftLeaf = leftLeaf;
-	    leftLeaf = null;
+	if (leftLeafRef != null) {
+	    DistributedHashMap leftLeaf = 
+		leftLeafRef.get(DistributedHashMap.class);
+	    leftLeaf.rightLeafRef = leftChildRef;
+	    leftChild.leftLeafRef = leftLeafRef;
+	    leftLeafRef = null;
 	}
 	
-	if (rightLeaf != null) {
-	    DistributedHashMap rightLeaf_ = 
-		rightLeaf.get(DistributedHashMap.class);
-	    rightLeaf_.leftLeaf = rightChildRef;
-	    rightChild.rightLeaf = rightLeaf;
-	    rightLeaf = null;
+	if (rightLeafRef != null) {
+	    DistributedHashMap rightLeaf = 
+		rightLeafRef.get(DistributedHashMap.class);
+	    rightLeaf.leftLeafRef = rightChildRef;
+	    rightChild.rightLeafRef = rightLeafRef;
+	    rightLeafRef = null;
 	}
 
 	// update the family links
-	leftChild.rightLeaf = rightChildRef;
-	rightChild.leftLeaf = leftChildRef;
+	leftChild.rightLeafRef = rightChildRef;
+	rightChild.leftLeafRef = leftChildRef;
 	
 	// Decide what to do with this node:
 
@@ -612,24 +650,24 @@ public class DistributedHashMap<K,V>
 	//    to avoid removing some concurrency by adding itself to
 	//    the parent.
 	//
-	if (parent == null ||
+	if (parentRef == null ||
 	    depth % dirBits == 0 ||
 	    depth == minDepth) {
 
 	    // this leaf node will become a directory node
 	    ManagedReference thisRef = dataManager.createReference(this);
-	    rightChild.parent = thisRef;			  
-	    leftChild.parent = thisRef;
+	    rightChild.parentRef = thisRef;			  
+	    leftChild.parentRef = thisRef;
 	    
 	    table = null;
-	    leafDirectory = 
+	    nodeDirectory = 
 		new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
 
-	    int right = leafDirectory.length / 2;
+	    int right = nodeDirectory.length / 2;
 
 	    for (int i = 0; i < right; ++i) {
-		leafDirectory[i] = leftChildRef;
-		leafDirectory[i | right] = rightChildRef;
+		nodeDirectory[i] = leftChildRef;
+		nodeDirectory[i | right] = rightChildRef;
 	    }
 	}
 	// In all other cases, this node can be added to its parent
@@ -638,7 +676,7 @@ public class DistributedHashMap<K,V>
 	    // notify the parent to remove this leaf by following
 	    // the provided prefix and then replace it with
 	    // references to the right and left children
-	    parent.get(DistributedHashMap.class).
+	    parentRef.get(DistributedHashMap.class).
 		addLeavesToDirectory(prefix, rightChildRef, leftChildRef);
 	}	        
     }
@@ -674,6 +712,7 @@ public class DistributedHashMap<K,V>
      *
      * @return the leaf node that is associated with the prefix
      */
+    @SuppressWarnings({"unchecked"})
     private DistributedHashMap<K,V> directoryLookup(int prefix) {
 	
 	// first, identify the number of bits in the prefix that will
@@ -681,7 +720,7 @@ public class DistributedHashMap<K,V>
 	// significant bits down from the prefix and use those as an
 	// index into the directory.
 	int index = (prefix >>> (32 - Math.min(dirBits, MAX_DEPTH - depth)));
-	return leafDirectory[index].get(DistributedHashMap.class);	
+	return nodeDirectory[index].get(DistributedHashMap.class);	
     }		       
 
     /**
@@ -697,17 +736,19 @@ public class DistributedHashMap<K,V>
      * @param leftChildRef the left child of the node that will be
      *        replaced
      */
+    @SuppressWarnings({"unchecked"})
     private void addLeavesToDirectory(int prefix, 
 				      ManagedReference rightChildRef,
 				      ManagedReference leftChildRef) {		
 	prefix <<= this.depth;
-
+	
 	int maxBits = Math.min(dirBits, MAX_DEPTH - depth);
 	int index = prefix >>> (32 - maxBits);
 
 	// the leaf is under this node, so just look it up using the
 	// directory
-	DistributedHashMap<K,V> leaf = leafDirectory[index].get(DistributedHashMap.class);
+	DistributedHashMap<K,V> leaf = 
+	    nodeDirectory[index].get(DistributedHashMap.class);
 
 	DataManager dm = AppContext.getDataManager();
 
@@ -717,8 +758,8 @@ public class DistributedHashMap<K,V>
 	// update the leaf node to point to this directory node as
 	// their parent
 	ManagedReference thisRef = dm.createReference(this);
-	rightChildRef.get(DistributedHashMap.class).parent = thisRef;
-	leftChildRef.get(DistributedHashMap.class).parent = thisRef;
+	rightChildRef.get(DistributedHashMap.class).parentRef = thisRef;
+	leftChildRef.get(DistributedHashMap.class).parentRef = thisRef;
 	
 	// how many bits in the prefix are significant for looking up
 	// the child
@@ -739,8 +780,8 @@ public class DistributedHashMap<K,V>
 	
 	// update all the directory entires for the prefix
 	for (int i = left; i < right; ++i) {
-	    leafDirectory[i] = leftChildRef;
-	    leafDirectory[i | off] = rightChildRef;
+	    nodeDirectory[i] = leftChildRef;
+	    nodeDirectory[i | off] = rightChildRef;
 	}
 
 	dm.markForUpdate(this);			
@@ -758,6 +799,7 @@ public class DistributedHashMap<K,V>
      * @return the value mapped to the provided key or {@code null} if
      *         no such mapping exists
      */
+    @SuppressWarnings({"unchecked"})
     public V get(Object key) {
 
  	int hash = (key == null) ? 0x0 : hash(key.hashCode());
@@ -823,6 +865,7 @@ public class DistributedHashMap<K,V>
      * @param value the value to be mapped to the key
      * @return the previous value mapped to the provided key, if any
      */
+    @SuppressWarnings({"unchecked"})
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
@@ -871,6 +914,7 @@ public class DistributedHashMap<K,V>
      * @param the index in the table at which the mapping should be
      *        stored.
      */
+    @SuppressWarnings({"unchecked"})
     private void addEntry(int hash, K key, V value, int index) {
 	PrefixEntry<K,V> prev = table[index];
 	int c = 0; PrefixEntry<K,V> t;
@@ -892,12 +936,33 @@ public class DistributedHashMap<K,V>
      *        leaf
      * @param index the index where the new entry should be put
      */
+     @SuppressWarnings({"unchecked"})
     private void addEntry(PrefixEntry e, int index) {
  	PrefixEntry<K,V> prev = table[index];
 	e.next = prev;
 	table[index] = e;
  	size++;
+     }
+     
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+	return AppContext.getDataManager().
+	    createReference(this).getId().intValue();
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+	if (o instanceof DistributedHashMap) {
+	    DataManager dm = AppContext.getDataManager();
+	    return dm.createReference(this).
+		equals(dm.createReference((DistributedHashMap)o));
+	}
+	return super.equals(o);
+    }  
     
     /**
      * Returns whether this map has no mappings.  
@@ -907,31 +972,32 @@ public class DistributedHashMap<K,V>
     public boolean isEmpty() {
 	return (table != null && size == 0) || (minDepth > 0 && size() == 0);
     }
-     
-     /**
+    
+    /**
      * Returns the size of the tree.  Note that this implementation
-     * runs in {@code O(n + n*log(n))} time.  Developers should be
+     * runs in {@code O(n*log(n))} time.  Developers should be
      * cautious of calling this method on large maps, as the execution
      * time grows significantly.
      *
      * @return the size of the tree
      */
+    @SuppressWarnings({"unchecked"})
     public int size() {
 	// root is leaf node, short-circuit case
-  	if (table != null)
- 	    return size;
-
- 	int totalSize = 0;
- 	DistributedHashMap<K,V> cur = leftMost();
-  	totalSize += cur.size;
-  	while(cur.rightLeaf != null) {
-	    totalSize += 
-		(cur = cur.rightLeaf.get(DistributedHashMap.class)).size;
+	if (table != null)
+	    return size;
+	
+	int totalSize = 0;
+	DistributedHashMap<K,V> cur = leftMost();
+	totalSize += cur.size;
+	while(cur.rightLeafRef != null) {
+	     totalSize += 
+		 (cur = cur.rightLeafRef.get(DistributedHashMap.class)).size;
 	}
 	
-  	return totalSize;
+	return totalSize;
     }
-
+     
     /**
      * Removes the mapping for the specified key from this map if present.
      *
@@ -941,6 +1007,7 @@ public class DistributedHashMap<K,V>
      *         (A <tt>null</tt> return can also indicate that the map
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
+    @SuppressWarnings({"unchecked"})
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);	
@@ -1132,6 +1199,7 @@ public class DistributedHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+	@SuppressWarnings({"unchecked"})
 	public final K getKey() {
  	    if (isKeyValueCombined)
  		return (K)(keyValuePairRef.get(KeyValuePair.class).getKey());
@@ -1153,6 +1221,7 @@ public class DistributedHashMap<K,V>
 	 */
 	// NOTE: this method will automatically unwrap all value that
 	//       the map is responsible for managing
+	@SuppressWarnings({"unchecked"})
 	public final V getValue() {
  	    if (isKeyValueCombined)
  		return (V)(keyValuePairRef.get(KeyValuePair.class).getValue());
@@ -1167,11 +1236,12 @@ public class DistributedHashMap<K,V>
 	 * Replaces the previous value of this entry with the provided
 	 * value.  If {@code newValue} is not of type {@code
 	 * ManagedObject}, the value is wrapped by a {@code
-	 * ManagerWrapper} and stored in the data store.
+	 * ManagerWrapper} and stored in the data manager.
 	 *
 	 * @param newValue the value to be stored
 	 * @return the previous value of this entry
 	 */
+	@SuppressWarnings({"unchecked"})
 	public final V setValue(V newValue) {
 	    V oldValue;
 	    ManagedSerializable<V> wrapper = null;
@@ -1275,12 +1345,13 @@ public class DistributedHashMap<K,V>
 
 	/**
 	 * Removes any {@code Serializable} managed by this entry from
-	 * the datastore.  This should only be called from {@link
+	 * the data manager.  This should only be called from {@link
 	 * DistributedHashMap#clear()} and {@link
-	 * DistributedHashMap#remove(Object)} under the condition that this
-	 * entry's map-managed object will never be reference again by
-	 * the map.
+	 * DistributedHashMap#remove(Object)} under the condition that
+	 * this entry's map-managed object will never be reference
+	 * again by the map.
 	 */
+	@SuppressWarnings({"unchecked"})
 	final void unmanage() {
 	    if (isKeyValueCombined) {
 		AppContext.getDataManager().
@@ -1432,7 +1503,7 @@ public class DistributedHashMap<K,V>
 	    // NOTE: try to minimize the serialization cost of this
 	    // map by keeping it small.
 	    alreadySeen = new HashSet<PrefixEntry>(2,2f);
-	    lastHash = -1;
+	    lastHash = 0; // 0 is the left-most hash
 
 	    // cache the initial contents of the left-most leaf
 	    DistributedHashMap leftLeaf = root.leftMost();
@@ -1582,7 +1653,6 @@ public class DistributedHashMap<K,V>
 	    if (cur < leafCache.length)
 		return true;
 	    
-	    
 	    // start loading leaves until either no more can be
 	    // found or we find a non-empty one
 	    return loadNextLeaf();		
@@ -1598,22 +1668,28 @@ public class DistributedHashMap<K,V>
 	 *         assigned to {@code nextLeaf}
 	 */
 	private boolean loadNextLeaf() {
-	    DistributedHashMap curLeaf = 
+	    // when looking up the current leaf, use the last hash
+	    // code seen if the current leaf is now empty.  Otherwise
+	    // use the right-most hash code in the sorted array to
+	    // decide what leaf we're on.
+	    DistributedHashMap 	curLeaf = 
 		rootRef.get(DistributedHashMap.class).
-		    lookup(leafCache[leafCache.length-1].hash);
+		lookup((leafCache.length == 0) 
+		       ? lastHash 
+		       : leafCache[leafCache.length-1].hash);
 	    
 	    DistributedHashMap nextLeaf = curLeaf;
 
-	    while (nextLeaf.rightLeaf != null &&
+	    while (nextLeaf.rightLeafRef != null &&
 		   (nextLeaf = 
-		    nextLeaf.rightLeaf.get(DistributedHashMap.class)).size == 0)
+		    nextLeaf.rightLeafRef.get(DistributedHashMap.class)).size == 0)
 		;
 	    
 	    // check that we were able to find another leaf other than
 	    // this leaf and that its size is non-zero
-	    if ((curLeaf.rightLeaf != null && 
-		 curLeaf.rightLeaf.equals(nextLeaf.rightLeaf)) ||
-		 curLeaf.rightLeaf == nextLeaf.rightLeaf ||
+	    if ((curLeaf.rightLeafRef != null && 
+		 curLeaf.rightLeafRef.equals(nextLeaf.rightLeafRef)) ||
+		 curLeaf.rightLeafRef == nextLeaf.rightLeafRef ||
 		nextLeaf.size == 0)
 		return false;
 	    else {
@@ -1633,7 +1709,7 @@ public class DistributedHashMap<K,V>
 	 * <p>
 	 *
 	 * This method will never throw a {@link
-	 * ConcurrentModificatinException}.
+	 * java.util.ConcurrentModificatinException}.
 	 *
 	 * @return the next entry in the {@code DistributedHashMap}
 	 *
@@ -1843,6 +1919,7 @@ public class DistributedHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+	@SuppressWarnings({"unchecked"})
 	public Map.Entry<K,V> next() {
 	    return nextEntry();
 	}
@@ -1867,6 +1944,7 @@ public class DistributedHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+	@SuppressWarnings({"unchecked"})
 	public K next() {
 	    return ((Entry<K,V>)nextEntry()).getKey();
 	}
@@ -1894,6 +1972,7 @@ public class DistributedHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+	@SuppressWarnings({"unchecked"})
 	public V next() {
 	    return ((Entry<K,V>)nextEntry()).getValue();
 	}
@@ -1902,14 +1981,15 @@ public class DistributedHashMap<K,V>
     /**
      * Returns a concurrent, {@code Serializable} {@code Set} of all
      * the mappings contained in this map.  The returned {@code Set}
-     * is back by the map, so changes to the map will be reflected by
-     * this view.  Note that the time complexity of the operations on
-     * this set will be the same as those on the map itself.
+     * is backed by the map, so changes to the map will be reflected
+     * by this view.  Note that the time complexity of the operations
+     * on this set will be the same as those on the map itself.
      *
      * <p>
      *
      * The iterator returned by this set also implements {@code
-     * Serializable}.
+     * Serializable}.  See the <a href="#iterator">javadoc</a> for
+     * details.
      *
      * @return the set of all mappings contained in this map
      */
@@ -1942,7 +2022,8 @@ public class DistributedHashMap<K,V>
 	    this.root = root;
 	    rootRef = AppContext.getDataManager().createReference(root);
 	}
-	 
+	
+	@SuppressWarnings({"unchecked"})
 	private void checkCache() {
 	    if (root == null) 
 		root = rootRef.get(DistributedHashMap.class);
@@ -1963,6 +2044,7 @@ public class DistributedHashMap<K,V>
 	    return root.size();
 	}
 
+	@SuppressWarnings({"unchecked"})
 	public boolean contains(Object o) {
 	    checkCache();
 	    if (!(o instanceof Map.Entry)) 
@@ -1982,14 +2064,15 @@ public class DistributedHashMap<K,V>
     /**
      * Returns a concurrent, {@code Serializable} {@code Set} of all
      * the keys contained in this map.  The returned {@code Set} is
-     * back by the map, so changes to the map will be reflected by
+     * backed by the map, so changes to the map will be reflected by
      * this view.  Note that the time complexity of the operations on
      * this set will be the same as those on the map itself.
      *
      * <p>
      *
      * The iterator returned by this set also implements {@code
-     * Serializable}.
+     * Serializable}.  See the <a href="#iterator">javadoc</a> for
+     * details.
      *
      * @return the set of all keys contained in this map
      */
@@ -2022,6 +2105,7 @@ public class DistributedHashMap<K,V>
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
 	    
+	@SuppressWarnings({"unchecked"})
 	private void checkCache() {
 	    if (root == null) 
 		root = rootRef.get(DistributedHashMap.class);
@@ -2057,7 +2141,7 @@ public class DistributedHashMap<K,V>
     /**
      * Returns a concurrent, {@code Serializable} {@code Collection}
      * of all the keys contained in this map.  The returned {@code
-     * Collection} is back by the map, so changes to the map will be
+     * Collection} is backed by the map, so changes to the map will be
      * reflected by this view.  Note that the time complexity of the
      * operations on this set will be the same as those on the map
      * itself.
@@ -2065,7 +2149,8 @@ public class DistributedHashMap<K,V>
      * <p>
      *
      * The iterator returned by this set also implements {@code
-     * Serializable}.
+     * Serializable}.  See the <a href="#iterator">javadoc</a> for
+     * details.
      *
      * @return the collection of all values contained in this map
      */
@@ -2099,6 +2184,7 @@ public class DistributedHashMap<K,V>
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
 
+	@SuppressWarnings({"unchecked"})
 	private void checkCache() {
 	    if (root == null) 
 		root = rootRef.get(DistributedHashMap.class);
@@ -2169,6 +2255,7 @@ public class DistributedHashMap<K,V>
      * Reconstructs the {@code DistributedHashMap} from the provided
      * stream.
      */
+    @SuppressWarnings({"unchecked"})
     private void readObject(java.io.ObjectInputStream s) 
 	throws java.io.IOException, ClassNotFoundException {
 	

@@ -20,10 +20,10 @@ import java.io.Serializable;
  * <p>
  *
  * The serialization costs for a class largely depend on the size of
- * the field that it references.  The {@code ManagedReference} class
+ * the objects that it references.  The {@code ManagedReference} class
  * allows developers the ability to create breaks in the serialization
- * graphs where not all of the fields are deserized when a class is
- * deserialzied.  The {@code ManagedSerializable} class is intended to
+ * graphs where not all of the fields are deserialized when a class is
+ * deserialized.  The {@code ManagedSerializable} class is intended to
  * be used for wrapping large serializable objects, such as
  * collections, in order to break the serialization graph, thereby
  * reducing the number of bytes read and written.  Note that wrapping
@@ -52,7 +52,7 @@ import java.io.Serializable;
  *
  *     ...
  *
- *     public findNearbyPlayers() {
+ *     public void findNearbyPlayers() {
  *         for (Player p : currentLocation.getPlayers()) 
  *             ....
  *     }
@@ -80,22 +80,22 @@ import java.io.Serializable;
  *
  *     ...
  *
- *     public findNearbyPlayers() {
- *         ManagedSerializable&lt;MapArea&gt; mapAreaWrapper = 
- *             mapAreaRef.get(ManagerSerializable.class);
- *         MapArea currentLocation = mapAreaWrapper.get();
+ *     public void findNearbyPlayers() {
+ *         ManagedSerializable&lt;MapArea&gt; curLocWrapper = 
+ *             currentLocationRef.get(ManagerSerializable.class);
+ *         MapArea currentLocation = curLocWrapper.get();
  *
  *         for (Player p : currentLocation.getPlayers()) 
- *             ....
+ *             ...
  *     }
  * }
  * </pre>
  *     
  * Application developers are still responsible for removing a {@code
- * ManagedSerializable} instance from the {@code DataManager}.  Any
- * changes to state of the object that is wrapped require that
- * developer notify the {@code DataManager} that this instance should
- * be marked for update.
+ * ManagedSerializable} instance from the {@code DataManager}.
+ * Developers are strongly encouraged to notify the {@code
+ * DataManager} that this instance should be marked for update when
+ * any changed occur to the value contained by this instance. 
  *
  * @see com.sun.sgs.app.ManagedReference
  * @see com.sun.sgs.app.DataManager
@@ -111,11 +111,22 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
     private T object;
     
     /**
-     * Constructs a managed wrapper around this object
+     * Constructs a managed wrapper around this object.  {@code
+     * ManagedObject} instances are not permitted as this class is
+     * already an instance of {@code ManagedObject} and may therefor
+     * not have a Java reference to another instance of {@code
+     * ManagedObject}.
      *
      * @param object the object to be stored in the datastore
+     *
+     * @throws IllegalArgumentException if {@code object} is an
+     *         instance of {@code ManagedObject}
      */
     public ManagedSerializable(T object) {
+	if (object instanceof ManagedObject) 
+	    throw new IllegalArgumentException("cannot create a " +
+					       "ManagerSerializable for a " +
+					       "ManagedObject");      
 	this.object = object;
 	AppContext.getDataManager().markForUpdate(this);
     }
@@ -161,8 +172,15 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
      *
      * @param object the new object to replace the previously wrapped
      *        object
+     *
+     * @throws IllegalArgumentException if {@code object} is an
+     *         instance of {@code ManagedObject}
      */
     public void set(T object) {
+	if (object instanceof ManagedObject) 
+	    throw new IllegalArgumentException("cannot set the value of a " +
+					       "ManagerSerializable to be a " +
+					       "ManagedObject");      
 	this.object = object;
 	AppContext.getDataManager().markForUpdate(this);
     }

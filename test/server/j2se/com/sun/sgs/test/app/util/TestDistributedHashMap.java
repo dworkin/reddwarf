@@ -138,8 +138,8 @@ public class TestDistributedHashMap extends TestCase {
 	DataManager dataManager = AppContext.getDataManager();
 	TestableDistributedHashMap<Integer,Integer> test = 
 	    new TestableDistributedHashMap<Integer,Integer>();
-	assertEquals(1, test.getMaxTreeDepth());
-	assertEquals(1, test.getMinTreeDepth());
+	assertEquals(6, test.getMaxTreeDepth());
+	assertEquals(6, test.getMinTreeDepth());
 	txn.commit();
     }
 
@@ -509,6 +509,8 @@ public class TestDistributedHashMap extends TestCase {
 	    control.put(j, i);
 	}
 
+	assertEquals(control, test);
+
 	for (int i = 0; i < 12; i += 2) {
 	    test.remove(a[i]);
 	    control.remove(a[i]);
@@ -522,12 +524,12 @@ public class TestDistributedHashMap extends TestCase {
 	    test.get(a[i]);
 	}
 
+	assertEquals(control, test);
 
 	for (Integer k : control.keySet()) {
 	    assertTrue(test.containsKey(k));
 	    assertTrue(test.containsValue(control.get(k)));		       
 	}
-
 
 	for (Integer k : test.keySet()) {
 	    assertTrue(control.containsKey(k));
