@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.app.util;
@@ -27,11 +42,11 @@ import com.sun.sgs.app.ManagedReference;
 
 
 /**
- * A concurrent, distributed implementation of {@code Map}.  The
- * internal structure of the map is separated into distributed pieces,
- * which reduces the amount of data any one operation needs to access.
- * The distributed structure increases the concurrency and allows for
- * parallel write operations to successfully complete.
+ * A concurrent, distributed implementation of {@code java.util.Map}.
+ * The internal structure of the map is separated into distributed
+ * pieces, which reduces the amount of data any one operation needs to
+ * access.  The distributed structure increases the concurrency and
+ * allows for parallel write operations to successfully complete.
  * 
  * <p>
  *
@@ -80,7 +95,9 @@ import com.sun.sgs.app.ManagedReference;
  * These views may be shared and persisted by multiple {@code
  * ManagedObject} instances.
  *
- * <a name="iterator">
+ * <p>
+ *
+ * <a name="iterator"></a>
  * The {@code Iterator} for each view also implements {@code
  * Serializable}.  An single iterator may be saved by a different
  * {@code ManagedObject} instances, which create a distinct copy of
@@ -131,7 +148,7 @@ import com.sun.sgs.app.ManagedReference;
  * set, values or entry set.
  * 
  * @see Object#hashCode()
- * @see Map
+ * @see java.util.Map
  * @see Serializable
  * @see ManagedObject
  */
@@ -164,7 +181,6 @@ public class DistributedHashMap<K,V>
      */
     private static final int DEFAULT_MINIMUM_CONCURRENCY =
 	DEFAULT_DIRECTORY_SIZE;    
-
     
     /**
      * The default number of {@code PrefixEntry} entries per
@@ -363,7 +379,6 @@ public class DistributedHashMap<K,V>
 	this(0, minConcurrency, DEFAULT_SPLIT_THRESHOLD, 
 	     DEFAULT_DIRECTORY_SIZE);
     }
-
 
     /** 
      * Constructs an empty {@code DistributedHashMap} with the default
@@ -1209,6 +1224,21 @@ public class DistributedHashMap<K,V>
 		       (keyRef.get(ManagedSerializable.class))).get()
 		    : (K)(keyRef.get(Object.class));
 	}
+
+	/**
+	 * Returns the {@code ManagedReference} for the key used in
+	 * this entry.  These references are not guaranteed to stay
+	 * valid across transactions and should therefore not be used
+	 * except for comparisons.
+	 *
+	 * @return the {@code ManagedReference} for the key
+	 *
+	 * @see ConcurrentIterator
+	 */
+	ManagedReference getKeyRef() {
+	    return (isKeyValueCombined) ? keyValuePairRef : keyRef;
+	}
+	
     
 	/**
 	 * Returns the value stored by this entry.  If the mapping has
@@ -1466,14 +1496,25 @@ public class DistributedHashMap<K,V>
 	private int lastHash;	
 
 	/**
-	 * The set of all elements with the same hash code as the
-	 * current element, which have previously been returned
-	 * through {@code next()}.  This set will remain small in the
-	 * common case.  For poorly hashed keys, this set is necessary
-	 * to distinguish previously returned entries if changes are
-	 * made to the map between deserializations of the iterator.
+	 * The set of {@code ManagedReference}s for the keys of
+	 * entries that have already been seen that also have the same
+	 * hash code as the current entry.  These entries have
+	 * previously been returned through {@code nextEntry()}.  When
+	 * keys have evenly distributed hash codes, this set will
+	 * generally have only a single element in it.  In the event
+	 * of a collision, this set is necessary to distinguish
+	 * previously returned entries if changes are made to the map
+	 * between deserializations of the iterator.  
+	 *
+	 * <p>
+	 *
+	 * The references contained in this set should <i>never</i>
+	 * have {@link ManagedReference#get(Class)} called on them;
+	 * instead, they should only be used to test for equality.
+	 *
+	 * @see PrefixEntry#getKeyRef()
 	 */
-	private transient Set<PrefixEntry> alreadySeen;
+	private Set<ManagedReference> alreadySeen;
 	
 	/**
 	 * The current leaf that is being accessed.  This is assigned
@@ -1502,7 +1543,7 @@ public class DistributedHashMap<K,V>
 	    
 	    // NOTE: try to minimize the serialization cost of this
 	    // map by keeping it small.
-	    alreadySeen = new HashSet<PrefixEntry>(2,2f);
+	    alreadySeen = new HashSet<ManagedReference>(2,2f);
 	    lastHash = 0; // 0 is the left-most hash
 
 	    // cache the initial contents of the left-most leaf
@@ -1630,7 +1671,6 @@ public class DistributedHashMap<K,V>
 	    }
 	}
     
-
 	/**
 	 * {@inheritDoc}
 	 */
@@ -1644,7 +1684,7 @@ public class DistributedHashMap<K,V>
 	    // checking to avoid having to perform these checks
 	    // needlessly later
 	    for (; cur < leafCache.length && 
-		     alreadySeen.contains(leafCache[cur]); cur++)
+		     alreadySeen.contains(leafCache[cur].getKeyRef()); cur++)
 		;
 	    
 	    // cur should now point to an entry we haven't seen or
@@ -1655,8 +1695,7 @@ public class DistributedHashMap<K,V>
 	    
 	    // start loading leaves until either no more can be
 	    // found or we find a non-empty one
-	    return loadNextLeaf();		
-	    
+	    return loadNextLeaf();			    
 	}
 
 	/**
@@ -1740,7 +1779,8 @@ public class DistributedHashMap<K,V>
 		// was called, but in case it wasn't called, loop
 		// through the cache until we find an entry we haven't
 		// seen
-		while (alreadySeen.contains(e) && cur < leafCache.length)
+		while (alreadySeen.contains(e.getKeyRef()) && 
+		       cur < leafCache.length)
 		    e = leafCache[cur++];
 
 		// This is a very rare case where we've performed
@@ -1751,7 +1791,8 @@ public class DistributedHashMap<K,V>
 		// additions and removals of the same key, which
 		// causes a recaching of the leaf that resets cur back
 		// to the start of that hash code
-		if (cur == leafCache.length && alreadySeen.contains(e)) {
+		if (cur == leafCache.length && 
+		    alreadySeen.contains(e.getKeyRef())) {
 		    
 		    // in this case, we rely on a recursive call to
 		    // nextEntry() to do the appropriate actions for
@@ -1768,7 +1809,7 @@ public class DistributedHashMap<K,V>
 		alreadySeen.clear();
 	    }
 	    
-	    alreadySeen.add(e);
+	    alreadySeen.add(e.getKeyRef());
 	    lastHash = e.hash;
 	    return e;	    
 	}
@@ -1783,80 +1824,21 @@ public class DistributedHashMap<K,V>
 	}
 
 	/**
-	 * Saves the state of the {@code Iterator} to the stream.
-	 *
-	 * @serialData The size of the {@code alreadySeen} set is
-	 *             written (int) followed by each of the {@code
-	 *             PrefixEntry} elements in the set in no
-	 *             particular order
+	 * Saves the state of the {@code Iterator} to the stream.	 
 	 */
 	private void writeObject(java.io.ObjectOutputStream s)
 	    throws java.io.IOException {
 	    s.defaultWriteObject();
-	    
-	    // manually save the state of the alreadySeen set.  This
-	    // is what HashSet does under the hood, so it should not
-	    // impact performance.  See the lengthy comment below for
-	    // why we do this.
-	    s.writeInt(alreadySeen.size());
-	    for (PrefixEntry e : alreadySeen)
-		s.writeObject(e);
 	}
 
-
 	/**
-	 * Reconstitutes the {@code Iterator} from the stream and
-	 * checks for elements in the cached {@code alreadySeen} set
-	 * that may have been removed from the backing map, and
-	 * removes them from the cache.
+	 * Reconstitutes the {@code Iterator} from the stream.
 	 */
 	private void readObject(java.io.ObjectInputStream s) 
-	    throws java.io.IOException, ClassNotFoundException {
-	    
+	    throws java.io.IOException, ClassNotFoundException {	    
 	    s.defaultReadObject();
-	    int size = s.readInt();
-	    alreadySeen = new HashSet<PrefixEntry>(size);
 
-	    // This case happens if during the intermittent
-	    // transactions, some number of already seen elements with
-	    // the same hashcode as what the one that we are currently
-	    // iterating on have been removed and therefore the
-	    // PrefixEntry.equals() method will throw this exception
-	    // when trying to locate its key and value.  In this case,
-	    // our cached-previously-seen entires are invalid.  This
-	    // only happens when we hold on to an entry in the
-	    // alreadySeen set, where the entry was removed out from
-	    // under us.  We therefore manually serialize the
-	    // contents of the set.
-	    //
-	    // We do not add extra state to the PrefixEntry to
-	    // actively avoid this, as this would require adding extra
-	    // serialization overhead for every entry to prevent this
-	    // exception, which only happens in an extremely rare
-	    // case.
-	    //
-	    // Instead we keep iterating over the cache disregarding
-	    // any errors until we have had read the entire set.  If
-	    // no error occurs, this is roughly as fast as if we had
-	    // had the extra state, since this is the default way that
-	    // HashSet serializes its entries as well.  However, the
-	    // error condition is such a rare case that the tradeoff
-	    // for keeping the common case simple (i.e. no extra
-	    // state) is worth the extra cost here.
-	    for (int i = 0; i < size; ++i) {
-		try {
-		    PrefixEntry e = (PrefixEntry)(s.readObject());
-		    // the next line triggers exception if entry was
-		    // removed from the backing map 
-		    e.getKey(); 
-		    alreadySeen.add(e);
-		}
-		catch (com.sun.sgs.app.ObjectNotFoundException onfe) {
-		    // ignore this error and move past the entry
-		}
-	    }
-
-	    // initialize the other transient fields to null
+	    // initialize the transient fields to null
 	    curLeaf = null;
 	    nextLeaf = null;
 	}  
@@ -1878,9 +1860,10 @@ public class DistributedHashMap<K,V>
 	    public int compare(PrefixEntry t1, PrefixEntry t2) {
 		int i = t1.hash;
 		int j = t2.hash;
-		// if both have the same sign, the do a numeric
-		// comparison, sort so that positive values come
-		// before negative values.
+		// if both hash codes have the same sign, the do a
+		// numeric comparison, otherwise return the opposite
+		// sign of the first, which ensures that negative
+		// values are greater than positive values.
 		//
 		// NOTE: the numeric comparison works because the
 		// integers are stored as 2's compelment, so a hash of
@@ -1895,7 +1878,6 @@ public class DistributedHashMap<K,V>
 	    public boolean equals(Object o) {
 		return o instanceof HashComparator;
 	    }
-
 	}
     }
 
@@ -2057,8 +2039,7 @@ public class DistributedHashMap<K,V>
 	public void clear() {
 	    checkCache();
 	    root.clear();
-	}
-	
+	}	
     }
 
     /**
@@ -2134,8 +2115,7 @@ public class DistributedHashMap<K,V>
 	public void clear() {
 	    checkCache();
 	    root.clear();
-	}
-	
+	}	
     }    
 	
     /**

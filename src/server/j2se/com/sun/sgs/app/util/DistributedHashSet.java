@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.app.util;
@@ -9,7 +24,6 @@ import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Set;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
@@ -76,14 +90,15 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * <a name="iterator"> The {@code Iterator} for this class implements
- * {@code Serializable}.  An single iterator may be saved by a
- * different {@code ManagedObject} instances, which create a distinct
- * copy of the original iterator.  A copy starts its iteration from
- * where the state of the original was at the time of the copy.
- * However each copy maintains a separate, independent state from the
- * original will therefore not reflect any changes to the original
- * iterator.  These iterators do not throw {@link
+ * <a name="iterator"></a>
+ * The {@code Iterator} for this class implements {@code
+ * Serializable}.  An single iterator may be saved by a different
+ * {@code ManagedObject} instances, which create a distinct copy of
+ * the original iterator.  A copy starts its iteration from where the
+ * state of the original was at the time of the copy.  However each
+ * copy maintains a separate, independent state from the original will
+ * therefore not reflect any changes to the original iterator.  These
+ * iterators do not throw {@link
  * java.util.ConcurrentModificationException}.  The iterator for this
  * class is stable with respect to the concurrent changes to the
  * associated collection; an iterator will not the same object twice
@@ -113,7 +128,7 @@ import com.sun.sgs.app.ManagedReference;
  * performance.
  *
  * @see Object#hashCode()
- * @see Set
+ * @see java.util.Set
  * @see java.util.HashSet
  * @see DistributedHashMap
  * @see Serializable
@@ -221,6 +236,8 @@ public class DistributedHashSet<E>
      * Returns {@code true} if this set contains the specified
      * element.
      *
+     * @param o the element whose presence in the set is to be tested
+     *
      * @return {@code true} if this set contains the specified
      *         element.
      */
@@ -250,6 +267,9 @@ public class DistributedHashSet<E>
     /**
      * Removes the specified element from this set if it was present.
      *
+     * @param o the element that should be removed from the set, if
+     *          present
+     *
      * @return {@code true} if the element was initially present in
      *         this set
      */
@@ -262,7 +282,7 @@ public class DistributedHashSet<E>
      * {@code HashMap}, this is <i>not</i> a constant time operation.
      * Determining the size of a set takes {@code n log(n)}.
      *
-     * @return the number of elements in thus set
+     * @return the number of elements in this set
      */
     public int size() {
 	return map.get(DistributedHashMap.class).size();
