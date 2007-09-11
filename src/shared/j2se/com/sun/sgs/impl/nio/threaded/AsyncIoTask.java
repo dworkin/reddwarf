@@ -17,7 +17,7 @@ import com.sun.sgs.nio.channels.IoFuture;
 class AsyncIoTask<R, A>
     implements RunnableFuture<R>, IoFuture<R, A>
 {
-    private final InnerTask<?> innerTask;
+    private final InnerTask<R, ?> innerTask;
     private A attachment;
 
     static <R, A> AsyncIoTask<R, A>
@@ -35,15 +35,15 @@ class AsyncIoTask<R, A>
         innerTask = createInnerTask(callable, attachment, handler);
     }
 
-    private <X> InnerTask<X> createInnerTask(
+    private static <R, X> InnerTask<R, X> createInnerTask(
             Callable<R> callable,
             X innerAttachment, 
             CompletionHandler<R, X> handler)
     {
-        return new InnerTask<X>(callable, innerAttachment, handler);
+        return new InnerTask<R, X>(callable, innerAttachment, handler);
     }
 
-    final class InnerTask<X>
+    static final class InnerTask<R, X>
         extends FutureTask<R>
         implements IoFuture<R, X>
     {

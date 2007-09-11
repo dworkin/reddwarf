@@ -28,7 +28,6 @@ public class ThreadedAsyncChannelProvider
     }
 
     protected ThreadedAsyncChannelProvider(SelectorProvider selProvider) {
-        super();
         selectorProvider = selProvider;
     }
 
@@ -136,5 +135,4 @@ public class ThreadedAsyncChannelProvider
     {
         return new AsyncSocketChannelImpl(this, checkGroup(group));
     }
-
 }

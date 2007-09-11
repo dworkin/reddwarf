@@ -32,6 +32,7 @@ import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.MembershipKey;
 import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 import com.sun.sgs.nio.channels.WritePendingException;
@@ -53,6 +54,7 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    final AsyncChannelGroupImpl group;
     final DatagramChannel channel;
 
     private final AsyncIoTaskFactory connectTask;
@@ -66,6 +68,7 @@ class AsyncDatagramChannelImpl
         throws IOException
     {
         super(provider);
+        this.group = group;
         channel = provider.getSelectorProvider().openDatagramChannel();
         connectTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
@@ -81,6 +84,12 @@ class AsyncDatagramChannelImpl
             }};
         // Allow multiple pending disconnect ops
         disconnectTask = new AsyncIoTaskFactory(group);
+
+        try {
+            group.addChannel(this);
+        } catch (ShutdownChannelGroupException e) {
+            channel.close();
+        }
     }
 
     private void checkClosedAsync() {
@@ -110,7 +119,11 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channel.close();
+        try {
+            channel.close();
+        } finally {
+            group.channelClosed(this);
+        }
     }
 
     /**

@@ -21,14 +21,14 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 class AsyncChannelGroupImpl
     extends AsynchronousChannelGroup
 {
+    /* Based on the Sun JDK ThreadPoolExecutor implementation. */
+
     /**
      * The executor service for this group's tasks.
      */
     final ExecutorService executor;
 
     /**
-     * Based on the Sun JDK ThreadPoolExecutor implementation.
-     * <p>
      * runState provides the main lifecyle control, taking on values:
      *
      *   RUNNING:  Accept new tasks and process queued tasks
@@ -80,12 +80,6 @@ class AsyncChannelGroupImpl
     private volatile int groupSize = 0;
 
     /**
-     * Current channel count, updated only while holding mainLock but
-     * volatile to allow concurrent readability even during updates.
-     */
-    private volatile int pendingTaskCount = 0;
-
-    /**
      * Creates a new AsyncChannelGroupImpl with the given provider and
      * executor service.
      *
@@ -101,18 +95,11 @@ class AsyncChannelGroupImpl
         this.executor = executor;
     }
 
-    /**
-     * Throws ShutdownChannelGroupException if this group isShutdown().
-     */
-    private void checkShutdown() {
-        if (isShutdown())
-            throw new ShutdownChannelGroupException();
-    }
-
     void addChannel(AsynchronousChannel channel) {
         mainLock.lock();
         try {
-            checkShutdown();
+            if (isShutdown())
+                throw new ShutdownChannelGroupException();
             channels.add(channel);
             ++groupSize;
         } finally {
@@ -124,8 +111,8 @@ class AsyncChannelGroupImpl
         mainLock.lock();
         try {
             channels.remove(channel);
-            if (--groupSize == 0)
-                tryTerminate();
+            --groupSize;
+            tryTerminate();
         } finally {
             mainLock.unlock();
         }
@@ -134,11 +121,8 @@ class AsyncChannelGroupImpl
     /* Termination support. */
 
     private void tryTerminate() {
-        if (pendingTaskCount == 0) {
+        if (groupSize == 0) {
             int state = runState;
-            if (state < STOP && groupSize > 0) {
-                return;
-            }
             if (state == STOP || state == SHUTDOWN) {
                 runState = TERMINATED;
                 termination.signalAll();
@@ -164,63 +148,11 @@ class AsyncChannelGroupImpl
                                  A attachment,
                                  CompletionHandler<R, ? super A> handler)
     {
-        mainLock.lock();
-        try {
-            ++pendingTaskCount;
-        } finally {
-            mainLock.unlock();
-        }
-        boolean success = false;
-        try {
-            AsyncIoTask<R, A> task =
-                AsyncIoTask.create(callable, attachment, wrapHandler(handler));
+        AsyncIoTask<R, A> task =
+            AsyncIoTask.create(callable, attachment, handler);
 
-            executor.execute(task);
-            success = true;
-            return task;
-        } finally {
-            if (! success)
-                taskDone();
-        }
-    }
-
-    void taskDone() {
-        mainLock.lock();
-        try {
-            if (--pendingTaskCount == 0)
-                tryTerminate();
-        } finally {
-            mainLock.unlock();
-        }
-    }
-
-    private <R, A> InnerHandler<R, A> wrapHandler(
-            CompletionHandler<R, A> handler)
-    {
-        return new InnerHandler<R, A>(handler);
-    }
-
-    final class InnerHandler<R, A> implements CompletionHandler<R, A>
-    {
-        private final CompletionHandler<R, A> handler;
-
-        InnerHandler(CompletionHandler<R, A> handler) {
-            this.handler = handler;
-        }
-        
-        public void completed(final IoFuture<R, A> result) {
-            try {
-                if (handler != null) {
-                    executor.execute(new Runnable() {
-                        public void run() {
-                            handler.completed(result);
-                        }
-                    });
-                }
-            } finally {
-                taskDone();
-            }
-        }
+        executor.execute(task);
+        return task;
     }
 
     /**

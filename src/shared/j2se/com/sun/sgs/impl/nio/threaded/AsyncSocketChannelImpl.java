@@ -28,6 +28,7 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.ShutdownType;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
@@ -47,6 +48,7 @@ final class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    final AsyncChannelGroupImpl group;
     final SocketChannel channel;
 
     private final AsyncIoTaskFactory connectTask;
@@ -67,8 +69,10 @@ final class AsyncSocketChannelImpl
     AsyncSocketChannelImpl(ThreadedAsyncChannelProvider provider,
                            AsyncChannelGroupImpl group,
                            SocketChannel channel)
+        throws IOException
     {
         super(provider);
+        this.group = group;
         this.channel = channel;
         connectTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
@@ -83,6 +87,11 @@ final class AsyncSocketChannelImpl
                 throw new WritePendingException();
             }};
 
+        try {
+            group.addChannel(this);
+        } catch (ShutdownChannelGroupException e) {
+            channel.close();
+        }
     }
 
     private void checkClosedAsync() {
@@ -112,7 +121,11 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channel.close();
+        try {
+            channel.close();
+        } finally {
+            group.channelClosed(this);
+        }
     }
 
     /**

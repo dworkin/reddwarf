@@ -78,8 +78,11 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channel.close();
-        group.channelClosed(this);
+        try {
+            channel.close();
+        } finally {
+            group.channelClosed(this);
+        }
     }
 
     /**
