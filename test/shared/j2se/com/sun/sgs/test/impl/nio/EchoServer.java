@@ -137,7 +137,7 @@ public class EchoServer {
                 channel.write(buf, buf, this);
             } catch (ExecutionException e) {
                 log.throwing("ChannelHandler", "readCompleted", e);
-                // ignore
+                disconnected(channel);
             }
         }
 
@@ -158,16 +158,23 @@ public class EchoServer {
                 }
             } catch (ExecutionException e) {
                 log.throwing("ChannelHandler", "writeCompleted", e);
-                // ignore
+                disconnected(channel);
             }
         }
     }
 
     public void disconnected(AsynchronousSocketChannel channel) {
         log.log(Level.FINE, "Disconnected {0}", channel);
+
+        try {
+            channel.close();
+        } catch (IOException ignore) { }
         
         if (numConnections.decrementAndGet() == 0) {
             log.info("Shutting down group");
+            try {
+                acceptor.close();
+            } catch (IOException ignore) { }
             group.shutdown();
         }
     }

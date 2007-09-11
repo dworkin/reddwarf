@@ -5,6 +5,12 @@
 package com.sun.sgs.impl.nio.threaded;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.sgs.nio.channels.CompletionHandler;
@@ -12,11 +18,11 @@ import com.sun.sgs.nio.channels.IoFuture;
 
 class AsyncIoTaskFactory {
 
-    final AsyncChannelGroupImpl group;
+    private final Executor executor;
     final AtomicBoolean pending = new AtomicBoolean();
 
-    public AsyncIoTaskFactory(AsyncChannelGroupImpl group) {
-        this.group = group;
+    public AsyncIoTaskFactory(Executor executor) {
+        this.executor = executor;
     }
 
     /**
@@ -39,33 +45,112 @@ class AsyncIoTaskFactory {
 
         boolean success = false;
         try {
-            IoFuture<R, A> future =
-                group.submit(callable, attachment, wrapHandler(handler));
+            FutureTask<R> task = new AsyncIoTask<R>(callable, attachment, handler);
+            executor.execute(task);
             success = true;
-            return future;
+            return new IoFutureBase<R, A>(task, attachment);
         } finally {
             if (! success)
                 pending.set(false);
         }
     }
 
-    private <R, A> InnerHandler<R, A> wrapHandler(
-            CompletionHandler<R, A> handler)
-    {
-        return new InnerHandler<R, A>(handler);
+    static class IoFutureBase<R, A> implements IoFuture<R, A> {
+        private final Future<R> future;
+        private A attachment;
+
+        IoFutureBase(Future<R> future, A attachment) {
+            this.future = future;
+            this.attachment = attachment;
+        }
+
+        public A attach(A ob) {
+            return attachment = ob;
+        }
+
+        public A attachment() {
+            return attachment;
+        }
+
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return future.cancel(mayInterruptIfRunning);
+        }
+
+        public R getNow() throws ExecutionException {
+            if (! isDone())
+                throw new IllegalStateException("not done");
+
+            boolean interrupted = false;
+            try {
+                while (true) {
+                    try {
+                        return get();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                        // fall through and retry
+                    }
+                }
+            } finally {
+                if (interrupted)
+                    Thread.currentThread().interrupt();
+            }
+        }
+
+        public R get() throws InterruptedException, ExecutionException {
+            return future.get();
+        }
+
+        public R get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            return future.get(timeout, unit);
+        }
+
+        public boolean isCancelled() {
+            return future.isCancelled();
+        }
+
+        public boolean isDone() {
+            return future.isDone();
+        }
     }
 
-    final class InnerHandler<R, A> implements CompletionHandler<R, A> {
+    final class AsyncIoTask<R> extends FutureTask<R> {
+        private final Runnable doneRunner;
+
+        <A> AsyncIoTask(Callable<R> callable, A attachment,
+            CompletionHandler<R, ? super A> handler) {
+            super(callable);
+            doneRunner = (handler == null) ? null : getDoneRunner(this, attachment, handler);
+        }
+        
+        @Override
+        protected void done() {
+            if (doneRunner != null)
+                doneRunner.run();
+        }
+    }
+    
+    <R, A> DoneRunner<R, A> getDoneRunner(
+            Future<R> future,
+            A attachment,
+            CompletionHandler<R, A> handler)
+    {
+        return new DoneRunner<R, A>(future, attachment, handler);
+    }
+
+    final class DoneRunner<R, A>
+        extends IoFutureBase<R, A>
+        implements Runnable
+    {
         private final CompletionHandler<R, A> handler;
 
-        InnerHandler(CompletionHandler<R, A> handler) {
+        DoneRunner(Future<R> future, A attachment, CompletionHandler<R, A> handler) {
+            super(future, attachment);
             this.handler = handler;
         }
 
-        public void completed(IoFuture<R, A> result) {
+        public void run() {
             pending.set(false);
-            if (handler != null)
-                handler.completed(result);
+            handler.completed(this);
         }
     }
 }

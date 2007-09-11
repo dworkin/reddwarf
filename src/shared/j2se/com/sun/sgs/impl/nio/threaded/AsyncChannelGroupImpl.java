@@ -6,7 +6,7 @@ package com.sun.sgs.impl.nio.threaded;
 
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -14,12 +14,11 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.sun.sgs.nio.channels.AsynchronousChannel;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 class AsyncChannelGroupImpl
     extends AsynchronousChannelGroup
+    implements Executor
 {
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
 
@@ -130,29 +129,8 @@ class AsyncChannelGroupImpl
         }
     }
 
-    /**
-     * Submits the callable to the thread pool for asynchronous execution,
-     * returning an IoFuture of the appropriate type initialized with the
-     * given attachment.  If handler is not null, it is invoked upon the
-     * completion of the callable's execution with a distinct (completed)
-     * IoFuture initialized with the provided attachment.
-     *
-     * @param <R> the result type
-     * @param <A> the attachment type
-     * @param callable the operation to perform asynchronously
-     * @param attachment the attachment, or null
-     * @param handler the completion handler, or null
-     * @return an IoFuture
-     */
-    <R, A> IoFuture<R, A> submit(Callable<R> callable,
-                                 A attachment,
-                                 CompletionHandler<R, ? super A> handler)
-    {
-        AsyncIoTask<R, A> task =
-            AsyncIoTask.create(callable, attachment, handler);
-
-        executor.execute(task);
-        return task;
+    public void execute(Runnable command) {
+        executor.execute(command);
     }
 
     /**
