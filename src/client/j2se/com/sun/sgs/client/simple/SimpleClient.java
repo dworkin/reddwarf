@@ -1,5 +1,33 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright (c) 2007, Sun Microsystems, Inc.
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided with the
+ *       distribution.
+ *     * Neither the name of Sun Microsystems, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.sun.sgs.client.simple;
@@ -10,6 +38,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -516,7 +545,7 @@ public class SimpleClient implements ServerSession {
                 CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel = channels.get(channelId);
                 if (channel == null) {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Ignore message on channel {0}: not a member",
                         channelId);
                     return;
@@ -546,7 +575,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -557,7 +586,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
 
@@ -568,7 +597,7 @@ public class SimpleClient implements ServerSession {
             RuntimeException re =
                 new UnsupportedOperationException(
                         "Not supported by SimpleClient");
-            logger.logThrow(Level.FINE, re, re.getMessage());
+            logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
         }
     }
@@ -586,6 +615,8 @@ public class SimpleClient implements ServerSession {
          * or null if the client is no longer a member of this channel.
          */
         private volatile ClientChannelListener listener = null;
+
+        private final AtomicBoolean isJoined = new AtomicBoolean(false);
 
         SimpleClientChannel(String name, CompactId id) {
             this.channelName = name;
@@ -629,25 +660,43 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            assert (listener == null);
+            if (! isJoined.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                    "Already joined to channel " + channelName);
+            }
 
-            listener = clientListener.joinedChannel(this);
+            assert listener == null;
 
-            if (listener == null) {
-                throw new NullPointerException(
-                    "The returned ClientChannelListener must not be null");
+            try {
+                listener = clientListener.joinedChannel(this);
+
+                if (listener == null) {
+                    throw new NullPointerException(
+                        "The returned ClientChannelListener must not be null");
+                }
+            } catch (RuntimeException ex) {
+                isJoined.set(false);
+                throw ex;
             }
         }
 
         void left() {
-            assert (listener != null);
+            if (! isJoined.compareAndSet(true, false)) {
+                throw new IllegalStateException(
+                    "Cannot leave unjoined channel " + channelName);
+            }
 
-            listener.leftChannel(this);
-            listener = null;
+            final ClientChannelListener l = this.listener;
+            this.listener = null;
+
+            l.leftChannel(this);
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            assert (listener != null);
+            if (!  isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot receive on unjoined channel " + channelName);
+            }
 
             listener.receivedMessage(this, sid, message);
         }
@@ -655,13 +704,9 @@ public class SimpleClient implements ServerSession {
         void sendInternal(Set<SessionId> recipients, byte[] message)
             throws IOException
         {
-            if (listener == null) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot send on channel {0}: not a member",
-                        channelName);
-                }
-                return;
+            if (! isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot send on unjoined channel " + channelName);
             }
             int totalSessionLength = 0;
             if (recipients != null) {
@@ -671,7 +716,7 @@ public class SimpleClient implements ServerSession {
 			    getExternalFormByteCount();
                 }
             }
-            
+
             MessageBuffer msg =
                 new MessageBuffer(3 +
 		    channelId.getExternalFormByteCount() +
@@ -688,8 +733,8 @@ public class SimpleClient implements ServerSession {
             } else {
                 msg.putShort(recipients.size());
                 for (SessionId recipientId : recipients) {
-                    msg.putBytes(((SimpleSessionId) recipientId).getCompactId().
-				 getExternalForm());
+                    msg.putBytes(((SimpleSessionId) recipientId).
+                        getCompactId().getExternalForm());
                 }
             }
             msg.putByteArray(message);

@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.kernel.schedule;
@@ -287,6 +302,88 @@ public class TestMasterTaskSchedulerImpl {
                 }
             });
         scheduler.runTask(new TransactionRunner(runner), testOwner, false);
+    }
+
+    /**
+     * Test runTransactionalTask.
+     */
+
+    @Test public void runNewTransaction() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        scheduler.runTransactionalTask(new TestRunner(new Runnable() {
+                public void run() {
+                    proxy.getCurrentTransaction();
+                }
+            }), testOwner);
+    }
+
+    @Test public void runNewTransactionExistingTask() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(new TestRunner(new Runnable() {
+                                    public void run() {
+                                        proxy.getCurrentTransaction();
+                                    }
+                                }), testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.runTask(runner, testOwner, false);
+    }
+
+    @Test public void runNewTransactionScheduledTask() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(1);
+        final RunCountTestRunner countRunner = new RunCountTestRunner(1);
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(countRunner, testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.scheduleTask(runner, testOwner);
+        Thread.sleep(500L);
+        assertEquals(0, countRunner.getRunCount());
+    }
+
+    @Test public void runExistingTransaction() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(0);
+        final TransactionProxy proxy = MinimalTestKernel.getTransactionProxy();
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {
+                    try {
+                        scheduler.
+                            runTransactionalTask(new TestRunner(new Runnable() {
+                                    public void run() {
+                                        proxy.getCurrentTransaction();
+                                    }
+                                }), testOwner);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        scheduler.runTask(new TransactionRunner(runner), testOwner, false);
+    }
+
+    @Test (expected=IllegalStateException.class)
+        public void runTransactionNested() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler(0);
+        TestRunner runner = new TestRunner(new Runnable() {
+                public void run() {}
+            });
+        scheduler.runTransactionalTask(new TransactionRunner(runner),
+                                       testOwner);
     }
 
     /**

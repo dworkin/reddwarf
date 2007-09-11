@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.kernel;
@@ -57,7 +72,9 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    "com.sun.sgs.app.name", "SimpleApp",
 	    "com.sun.sgs.app.port", String.valueOf(getPort()),
-	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath());
+	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
+	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
+	    "com.sun.sgs.impl.service.watchdog.server.start", "true");
 	/* Create logging properties to log at WARNING or higher */
 	logging = createProperties(
 	    ".level", "WARNING",
