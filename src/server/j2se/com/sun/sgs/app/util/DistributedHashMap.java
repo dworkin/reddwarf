@@ -242,7 +242,7 @@ public class DistributedHashMap<K,V>
      * {@link ConcurrentIterator} to detect changes between
      * transactions.
      */
-    private int version;
+    private int modifications;
 
     /**
      * The number of elements in this table.  Note that this is
@@ -343,7 +343,7 @@ public class DistributedHashMap<K,V>
 	minDepth = tmp;
 
 	size = 0;
-	version = 0;
+	modifications = 0;
 	parentRef = null;
  	leftLeafRef = null;
  	rightLeafRef = null;
@@ -519,7 +519,7 @@ public class DistributedHashMap<K,V>
 	    size = 0;
 	}
 
-	version++;
+	modifications++;
     }
 
     /**
@@ -886,7 +886,7 @@ public class DistributedHashMap<K,V>
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
-	leaf.version++;
+	leaf.modifications++;
 
 	int i = indexFor(hash, leaf.table.length);
 	for (PrefixEntry<K,V> e = leaf.table[i]; e != null; e = e.next) {
@@ -1053,7 +1053,7 @@ public class DistributedHashMap<K,V>
 		e.unmanage();
 
 		--leaf.size;
-		leaf.version++;
+		leaf.modifications++;
 
 		// NOTE: this is where we would attempt a merge
 		// operation if we decide to later support one
@@ -1579,7 +1579,7 @@ public class DistributedHashMap<K,V>
 	    curLeaf = leaf;
 	    cachedLeafId = 
 		AppContext.getDataManager().createReference(curLeaf).getId();
-	    cachedRevision = curLeaf.version;
+	    cachedRevision = curLeaf.modifications;
 	}
 
 	/**
@@ -1622,7 +1622,7 @@ public class DistributedHashMap<K,V>
 		// it hasn't been modified since we last cached it
 		if (AppContext.getDataManager().createReference(curLeaf).
 		    getId().equals(cachedLeafId) &&
-		    curLeaf.version == cachedRevision)
+		    curLeaf.modifications == cachedRevision)
 		    // cache still valid
 		    return;
 

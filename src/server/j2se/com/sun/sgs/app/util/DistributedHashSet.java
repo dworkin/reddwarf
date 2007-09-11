@@ -134,7 +134,6 @@ import com.sun.sgs.app.ManagedReference;
  * @see Serializable
  * @see ManagedObject
  */
-@SuppressWarnings({"unchecked"})
 public class DistributedHashSet<E>
     extends AbstractSet<E>
     implements Serializable, ManagedObject {
@@ -199,6 +198,7 @@ public class DistributedHashSet<E>
      * @return {@code true} if the set did not already contain the
      *         specified element
      */
+    @SuppressWarnings({"unchecked"})
     public boolean add(E e) {
 	return map.get(DistributedHashMap.class).put(e, PRESENT) == null;
     }
@@ -260,6 +260,7 @@ public class DistributedHashSet<E>
      *
      * @return an iterator over the elements in this set
      */
+    @SuppressWarnings({"unchecked"})
     public Iterator<E> iterator() {
 	return map.get(DistributedHashMap.class).keySet().iterator();
     }   
