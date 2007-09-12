@@ -13,8 +13,10 @@ public interface RecoveryService extends Service {
     /**
      * Returns the node that is designated as the backup for the node
      * with the specified {@code nodeId}, or {@code null} if no backup
-     * is designated (i.e., if there is only a single node in the
-     * system).  This method must be called within a transaction.
+     * is currently designated.  This method must be called within a
+     * transaction.
+     *
+     * <p>Note: this method should be moved to the Node interface.
      *
      * @param	nodeId a node ID
      * @return	a backup node, or {@code null}

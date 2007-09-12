@@ -652,13 +652,11 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 				statusChangedNodes.add(recoveringNode);
 			    }
 			}
-			// TBD: check to see if backup has failed and reassign?
-			// Is it possible to miss?
 		    }
 		}
 
-		// TBD: may want to send out reminder notifications to
-		// nodes that haven't recovered yet.
+		// TBD: should reminders notifications be sent to
+		// nodes that haven't recovered yet?
 
 		/*
 		 * Notify thread to send out node status change notifications.
@@ -727,8 +725,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 * map of "alive" nodes.  For now, the choice is the first
 	 * node encountered (returned arbitrarily from iterating
 	 * through the "alive" nodes).  Before this method is invoked,
-	 * the specified {@code node} should not be present in the
-	 * "alive" nodes map.
+	 * the specified {@code node} as well as other currently
+	 * detected failed nodes should not be present in the "alive"
+	 * nodes map.
 	 */
 	private NodeImpl chooseBackup(NodeImpl node) {
 	    long nodeId = node.getId();

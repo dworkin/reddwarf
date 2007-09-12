@@ -16,18 +16,24 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import junit.framework.TestCase;
 
@@ -547,7 +553,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-	createTransaction();
 	try {
 	    watchdog.addNodeListener(new DummyNodeListener());
 	    fail("Expected IllegalStateException");
@@ -695,6 +700,262 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    for (WatchdogServiceImpl watchdog : watchdogMap.keySet()) {
 		watchdog.shutdown();
 	    }
+	}
+    }
+
+    /* -- test addRecoveryListener -- */
+    
+    public void testAddRecoveryListenerServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	watchdog.shutdown();
+	try {
+	    watchdog.addRecoveryListener(new DummyRecoveryListener());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testAddRecoveryListenerNullListener() throws Exception {
+	try {
+	    watchdogService.addRecoveryListener(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRecovery() throws Exception {
+	List<WatchdogServiceImpl> watchdogs =
+	    new ArrayList<WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+
+	int totalWatchdogs = 5;
+	int numWatchdogsToShutdown = 3;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+		watchdog.addRecoveryListener(listener);
+		watchdog.ready();
+		watchdogs.add(watchdog);
+	    }
+
+	    // shut down a few watchdog services
+	    for (int i = 0; i < numWatchdogsToShutdown; i++) {
+		WatchdogServiceImpl watchdog = watchdogs.get(i);
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+		watchdogs.remove(watchdog);
+	    }
+
+	    // pause for watchdog server to detect failure and
+	    // send notifications
+	    Thread.sleep(3 * RENEW_INTERVAL);
+	    if (listener.nodes.size() != shutdownIds.size()) {
+		fail("Expected 3 recover requests, received: " +
+		     listener.nodes.size());
+	    }
+
+	    createTransaction();
+	    System.err.println("Get shutdown nodes (should be marked failed)");
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node == null) {
+		    fail("Node removed before recovery complete: " + id);
+		}
+		if (node.isAlive()) {
+		    fail("Node not marked as failed: " + id);
+		}
+	    }
+	    commitTransaction();
+
+	    for (RecoveryCompleteFuture future : listener.nodes.values()) {
+		future.done();
+	    }
+	    
+	    createTransaction();
+	    System.err.println("Get shutdown nodes (should be removed)...");
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node != null) {
+		    fail("Expected node to be removed: " + node);
+		}
+	    }
+
+	    System.err.println("Get live nodes...");
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		Node node = watchdogService.getNode(watchdog.getLocalNodeId());
+		System.err.println("node: " + node);
+		if (node == null || !node.isAlive()) {
+		    fail("Expected alive node");
+		}
+	    }
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testRecoveryWithBackupFailureDuringRecovery() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+
+	int totalWatchdogs = 8;
+	int numWatchdogsToShutdown = 3;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+		watchdog.addRecoveryListener(listener);
+		watchdog.ready();
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down a few watchdog services
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		if (numWatchdogsToShutdown == 0) {
+		    break;
+		}
+		numWatchdogsToShutdown--;
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+		watchdogs.remove(id);
+	    }
+
+	    // pause for watchdog server to detect failure and
+	    // send notifications
+	    Thread.sleep(3 * RENEW_INTERVAL);
+	    if (listener.nodes.size() != shutdownIds.size()) {
+		fail("Expected 3 recover requests, received: " +
+		     listener.nodes.size());
+	    }
+
+	    System.err.println("Get shutdown nodes (should be marked failed)");
+	    List<Node> backups = new ArrayList<Node>();
+	    createTransaction();
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node == null) {
+		    fail("Node removed before recovery complete: " + id);
+		}
+		if (node.isAlive()) {
+		    fail("Node not marked as failed: " + id);
+		}
+		Node backup = watchdogService.getBackup(id);
+		if (backup == null) {
+		    fail("backup not assigned for failed node: " + id);
+		} else {
+		    backups.add(backup);
+		}
+	    }
+	    commitTransaction();
+
+	    // shutdown backups
+	    for (Node backup : backups) {
+		long backupId = backup.getId();
+		WatchdogServiceImpl watchdog = watchdogs.get(backupId);
+		if (watchdog != null) {
+		    System.err.println("shutting down backup: " + backupId);
+		    shutdownIds.add(backupId);
+		    watchdog.shutdown();
+		    watchdogs.remove(backupId);
+		}
+	    }
+
+	    Thread.sleep(3 * RENEW_INTERVAL);
+	    if (listener.nodes.size() != shutdownIds.size()) {
+		fail("Expected 3 recover requests, received: " +
+		     listener.nodes.size());
+	    }
+	    
+	    for (RecoveryCompleteFuture future : listener.nodes.values()) {
+		future.done();
+	    }
+	    
+	    createTransaction();
+	    System.err.println("Get shutdown nodes (should be removed)...");
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node != null) {
+		    fail("Expected node to be removed: " + node);
+		}
+	    }
+
+	    System.err.println("Get live nodes...");
+	    for (long id : watchdogs.keySet()) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "): " + node);
+		if (node == null || !node.isAlive()) {
+		    fail("Expected alive node");
+		}
+	    }
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+    
+    private static class DummyRecoveryListener implements RecoveryListener {
+
+	private final Map<Node, RecoveryCompleteFuture> nodes =
+	    Collections.synchronizedMap(
+		new HashMap<Node, RecoveryCompleteFuture>());
+
+	DummyRecoveryListener() {}
+
+	public void recover(Node node, RecoveryCompleteFuture future) {
+	    if (node == null) {
+		System.err.println("DummyRecoveryListener.recover: null node");
+		return;
+	    } else if (future == null) {
+		System.err.println(
+		    "DummyRecoveryListener.recover: null future");
+		return;
+	    }
+	    
+	    if (nodes.get(node) == null) {
+		System.err.println(
+		    "DummyRecoveryListener.recover: adding node: " + node);
+	    } else {
+		System.err.println(
+		    "DummyRecoveryListener.recover: REPLACING node: " + node);
+	    }
+	    nodes.put(node, future);
+	}
+
+	void recoverDone(Node node) {
+	    nodes.get(node).done();
 	}
     }
     

@@ -297,6 +297,8 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 	    dataService = txnProxy.getService(DataService.class);
 	    taskOwner = txnProxy.getCurrentOwner();
 
+	    // TBD: should the watchdog service that starts the
+	    // watchdog server register itself as a node?
 	    long[] values = serverProxy.registerNode(clientHost, clientProxy);
 	    if (values == null || values.length < 2) {
 		setFailedThenNotify(false);
@@ -414,7 +416,11 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {
-	throw new AssertionError("not yet implemented");
+	NodeImpl node = (NodeImpl) getNode(nodeId);
+	return
+	    (node != null && node.hasBackup()) ?
+	    getNode(node.getBackupId()) :
+	    null;
     }
 
     /** {@inheritDoc} */
@@ -572,10 +578,12 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			if (node.isAlive()) {
-			    nodeListener.nodeStarted(node);
-			} else {
-			    nodeListener.nodeFailed(node);
+			if (isLocalNodeAliveNonTransactional()) {
+			    if (node.isAlive()) {
+				nodeListener.nodeStarted(node);
+			    } else {
+				nodeListener.nodeFailed(node);
+			    }
 			}
 		    }
 		}, taskOwner);
@@ -604,8 +612,16 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			if (isLocalNodeAlive()) {
-			    recoveryListener.recover(node, future);
+			try {
+			    if (isLocalNodeAliveNonTransactional()) {
+				recoveryListener.recover(node, future);
+			    }
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying recovery listener on node:{0} " +
+				"with node:{1}, future:{2} throws",
+				localNodeId, node, future);
 			}
 		    }
 		}, taskOwner);
@@ -684,7 +700,9 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 		// from table of recovery futures
 		if (recoveryFutures.remove(node) != null) {
 		    try {
-			serverProxy.recoveredNode(node.getId(), localNodeId);
+			if (isLocalNodeAliveNonTransactional()) {
+			    serverProxy.recoveredNode(node.getId(), localNodeId);
+			}
 		    } catch (Exception e) {
 			logger.logThrow(
 			    Level.WARNING, e,
