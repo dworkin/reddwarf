@@ -48,7 +48,7 @@ final class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl group;
+    final AsyncChannelGroupImpl channelGroup;
     final SocketChannel channel;
 
     private final AsyncIoTaskFactory connectTask;
@@ -72,7 +72,7 @@ final class AsyncSocketChannelImpl
         throws IOException
     {
         super(provider);
-        this.group = group;
+        channelGroup = group;
         this.channel = channel;
         connectTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
@@ -88,7 +88,7 @@ final class AsyncSocketChannelImpl
             }};
 
         try {
-            group.addChannel(this);
+            channelGroup.addChannel(this);
         } catch (ShutdownChannelGroupException e) {
             channel.close();
         }
@@ -124,7 +124,7 @@ final class AsyncSocketChannelImpl
         try {
             channel.close();
         } finally {
-            group.channelClosed(this);
+            channelGroup.channelClosed(this);
         }
     }
 
