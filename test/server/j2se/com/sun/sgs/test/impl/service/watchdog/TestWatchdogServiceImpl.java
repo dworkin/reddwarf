@@ -762,8 +762,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // send notifications
 	    Thread.sleep(3 * RENEW_INTERVAL);
 	    if (listener.nodes.size() != shutdownIds.size()) {
-		fail("Expected 3 recover requests, received: " +
-		     listener.nodes.size());
+		fail("Expected " + shutdownIds.size() + " recover requests, " +
+		     "received: " + listener.nodes.size());
 	    }
 
 	    createTransaction();
@@ -851,8 +851,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // send notifications
 	    Thread.sleep(3 * RENEW_INTERVAL);
 	    if (listener.nodes.size() != shutdownIds.size()) {
-		fail("Expected 3 recover requests, received: " +
-		     listener.nodes.size());
+		fail("Expected " + shutdownIds.size() + " recover requests, " +
+		     "received: " + listener.nodes.size());
 	    }
 
 	    System.err.println("Get shutdown nodes (should be marked failed)");
@@ -891,8 +891,113 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    Thread.sleep(3 * RENEW_INTERVAL);
 	    if (listener.nodes.size() != shutdownIds.size()) {
-		fail("Expected 3 recover requests, received: " +
-		     listener.nodes.size());
+		fail("Expected " + shutdownIds.size() + " recover requests, " +
+		     "received: " + listener.nodes.size());
+	    }
+	    
+	    for (RecoveryCompleteFuture future : listener.nodes.values()) {
+		future.done();
+	    }
+	    
+	    createTransaction();
+	    System.err.println("Get shutdown nodes (should be removed)...");
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node != null) {
+		    fail("Expected node to be removed: " + node);
+		}
+	    }
+
+	    System.err.println("Get live nodes...");
+	    for (long id : watchdogs.keySet()) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "): " + node);
+		if (node == null || !node.isAlive()) {
+		    fail("Expected alive node");
+		}
+	    }
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+    
+    public void testRecoveryWithDelayedBackupAssignment() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+
+	int totalWatchdogs = 5;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog =
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+		watchdog.addRecoveryListener(listener);
+		watchdog.ready();
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down all watchdog services.
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+	    }
+
+	    watchdogs.clear();
+
+	    // pause for watchdog server to detect failure and
+	    // reassign backups.
+	    Thread.sleep(3 * RENEW_INTERVAL);
+	    if (listener.nodes.size() != shutdownIds.size()) {
+		fail("Expected " + shutdownIds.size() + " recover requests, " +
+		     "received: " + listener.nodes.size());
+	    }
+
+	    System.err.println("Get shutdown nodes (should be marked failed)");
+	    createTransaction();
+	    for (long id : shutdownIds) {
+		Node node = watchdogService.getNode(id);
+		System.err.println("node (" + id + "):" +
+				   (node == null ? "(removed)" : node));
+		if (node == null) {
+		    fail("Node removed before recovery complete: " + id);
+		}
+		if (node.isAlive()) {
+		    fail("Node not marked as failed: " + id);
+		}
+		Node backup = watchdogService.getBackup(id);
+		if (backup != null) {
+		    fail("failed node (" + id + ") assigned backup: " +
+			 backup);
+		}
+	    }
+	    commitTransaction();
+
+	    WatchdogServiceImpl watchdog = 
+		new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	    watchdog.addRecoveryListener(listener);
+	    watchdog.ready();
+	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+
+	    // pause for watchdog server to reassign new node as
+	    // backup to exising nodes.
+	    
+	    Thread.sleep(3 * RENEW_INTERVAL);
+	    if (listener.nodes.size() != shutdownIds.size()) {
+		fail("Expected " + shutdownIds.size() + " recover requests, " +
+		     "received: " + listener.nodes.size());
 	    }
 	    
 	    for (RecoveryCompleteFuture future : listener.nodes.values()) {
