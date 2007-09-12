@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.kernel;
@@ -39,6 +54,33 @@ public interface ProfileOperationListener {
      * Notifies this listener of a new change in the system
      * properties.  This method is called for any property that
      * changes.
+     *
+     * <p>
+     *
+     * The current list of supported property names is as follows:
+     *
+     * <table border="0" style="font-size:80%" cellpadding="20%">
+     * <tr>
+     *   <td><b>name</b></td>
+     *   <td><b>description</b></td>
+     *   <td><b>new value</b></td>
+     *   <td><b>old value</b></td>
+     * </tr>
+     * <tr>
+     *   <td><code>com.sun.sgs.profile.newop</code></td>
+     *   <td>a new operation is registered with the system.</td>
+     *   <td>the new operation : 
+     *          {@link com.sun.sgs.kernel.ProfileOperation}</td>
+     *   <td> <code>null</code></td>
+     * </tr>
+     * <tr>
+     *   <td><code>com.sun.sgs.profile.threadcount</code></td>
+     *   <td>the number of threads in the system has changed.</td>
+     *   <td>the current number of threads : <code>Integer</code></td>
+     *   <td>the previous number of threads : <code>Integer</code></td>
+     * </tr>
+     *
+     * </table>
      *
      * @param event A <code>PropertyChangeEvent</code> object
      *        describing the name of the property, its old and new

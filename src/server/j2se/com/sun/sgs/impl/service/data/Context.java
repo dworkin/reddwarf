@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data;
@@ -10,8 +25,6 @@ import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
-import java.util.LinkedList;
-import java.util.List;
 
 /** Stores information for a specific transaction. */
 final class Context extends TransactionContext {
@@ -59,12 +72,6 @@ final class Context extends TransactionContext {
      * part of the ManagedReferenceImpl class.
      */
     final ReferenceTable refs = new ReferenceTable();
-
-    /**
-     * A list of operations to run after abort, or null if there are no abort
-     * actions.
-     */
-    private List<Runnable> abortActions = null;
 
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
@@ -258,11 +265,6 @@ final class Context extends TransactionContext {
 	if (storeParticipant != null) {
 	    storeParticipant.abort(txn);
 	}
-	if (abortActions != null) {
-	    for (Runnable action : abortActions) {
-		action.run();
-	    }
-	}
     }
 
     /* -- Other methods -- */
@@ -282,16 +284,5 @@ final class Context extends TransactionContext {
     /** Checks that the service is running or shutting down. */
     void checkState() {
 	service.checkState();
-    }
-
-    /**
-     * Adds an action to be performed on abort, to roll back transient state
-     * changes.
-     */
-    void addAbortAction(Runnable action) {
-	if (abortActions == null) {
-	    abortActions = new LinkedList<Runnable>();
-	}
-	abortActions.add(action);
     }
 }

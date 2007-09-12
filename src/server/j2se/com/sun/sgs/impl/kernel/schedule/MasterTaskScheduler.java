@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel.schedule;
@@ -22,6 +37,7 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.TransactionRunner;
 
 import java.beans.PropertyChangeEvent;
 
@@ -51,14 +67,6 @@ public class MasterTaskScheduler
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(MasterTaskScheduler.
                                            class.getName()));
-
-    // thread-local to track direct-run tasks
-    private static ThreadLocal<Boolean> runningDirectTask =
-        new ThreadLocal<Boolean>() {
-            protected Boolean initialValue() {
-                return Boolean.FALSE;
-            }
-        };
 
     // the scheduler used for this system
     private final SystemScheduler systemScheduler;
@@ -329,10 +337,10 @@ public class MasterTaskScheduler
         throws Exception
     {
         // check that we're not already running a direct task
-        if (runningDirectTask.get())
-            throw new IllegalStateException("Cannot invoke runTask from " +
-                                            "a task started via runTask");
-        runningDirectTask.set(true);
+        if (ThreadState.isSchedulerThread())
+            throw new IllegalStateException("Cannot invoke runTask from a " +
+                                            "task run through this scheduler");
+        ThreadState.setAsSchedulerThread(true);
 
         // NOTE: since there isn't much fairness being guarenteed by the
         // system yet, this method simply runs the task directly. When
@@ -346,8 +354,23 @@ public class MasterTaskScheduler
                                   System.currentTimeMillis());
             taskExecutor.runTask(directTask, retry, true);
         } finally {
-            runningDirectTask.set(false);
+            ThreadState.setAsSchedulerThread(false);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+        throws Exception
+    {
+        // if we're not in the context of a scheduler thread, then we can
+        // safely start the context of a new task, otherwise this should
+        // just be run in place
+        if (! ThreadState.isSchedulerThread())
+            runTask(new TransactionRunner(task), owner, true);
+        else
+            TaskHandler.runTransactionally(task);
     }
 
     /**

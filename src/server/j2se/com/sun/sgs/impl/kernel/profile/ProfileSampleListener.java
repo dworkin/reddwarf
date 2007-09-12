@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel.profile;
@@ -29,9 +44,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A text-output listener that displays the distribution for all
- * {@link ProfileSample}s updated during a fixed-size window of tasks
- * as well as the lifetime of the program.  This class uses a {@link
- * PowerOfTwoHistogram} to display the distribution for each sample
+ * {@link com.sun.sgs.kernel.ProfileSample}s updated during a
+ * fixed-size window of tasks as well as the lifetime of the program.
+ * This class uses a {@link PowerOfTwoHistogram} to display the
+ * distribution for each sample
  *
  * Note that this class uses a fixed number of tasks between outputs,
  * rather than a period of time.  The number of tasks can be
@@ -41,7 +57,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class is {@code 5000}.
  *
  * @see ProfileProperties
- * @see ProfileSample
+ * @see com.sun.sgs.kernel.ProfileSample
  */
 public class ProfileSampleListener implements ProfileOperationListener {
 

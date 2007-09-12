@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
@@ -77,18 +92,6 @@ abstract class AbstractKernelAppContext implements KernelAppContext {
      *                                  the requested type
      */
     abstract <T> T getManager(Class<T> type);
-
-    /**
-     * Sets the <code>Service</code>s available in this context. This is done
-     * as part of application startup. This method may only be called once
-     * for the lifetime of a given context.
-     *
-     * @param serviceComponents the <code>Service</code>s used in this context
-     *
-     * @throws IllegalStateException if the <code>Service</code>s have already
-     *                               been set
-     */
-    abstract void setServices(ComponentRegistry serviceComponents);
 
     /**
      * Returns a <code>Service</code> based on the given type. If the type is

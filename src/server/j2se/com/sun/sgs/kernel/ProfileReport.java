@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.kernel;
@@ -167,7 +182,7 @@ public interface ProfileReport {
      * Returns any exception that occurred during the execution of
      * this report's task, or <code>null</code> if no exception
      * occurred.  This exception will always be <code>null</code> if
-     * {@link #wasSuccessful()} returns <code>true</code>.
+     * {@link #wasTaskSuccessful()} returns <code>true</code>.
      * 
      * @return the exception that occurred or <code>null</code> if
      *         none occurred.

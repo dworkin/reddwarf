@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel.profile;
@@ -125,7 +140,7 @@ class ProfileReportImpl implements ProfileReport {
      * this sample hasn't had a value reported yet for this task, then
      * a new list is made and the the provided value is added to it.
      *
-     * @param counter the name of the sample
+     * @param sampleName the name of the sample
      * @param value the latest value for the sample
      */
     void addLocalSample(String sampleName, long value) {
@@ -150,7 +165,7 @@ class ProfileReportImpl implements ProfileReport {
      * this sample hasn't had a value reported yet for this task, then
      * a new list is made and the the provided value is added to it.
      *
-     * @param counter the name of the sample
+     * @param sampleName the name of the sample
      * @param samples the list of all samples for this name
      */
     void registerAggregateSamples(String sampleName, 

@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel.profile;
@@ -130,6 +145,8 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
 	    if (id > maxOp)
 		maxOp = id;
 	    registeredOps.put(id,op);
+	    sOpCounts.put(id, 0L);
+	    fOpCounts.put(id, 0L);
 	}
     }
 
@@ -237,14 +254,19 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                 "  AvgOpCountOnFailure=" + avgFailedOps + "\n";
 
             reportStr += "OpCounts:\n";
-	    int j;
-            for (int i = 1; i <= maxOp + 1; i++) {
-                reportStr += "   " + registeredOps.get(i-1) + "=" +
-                    (j = sOpCounts.get(i-1).intValue()) + "/" + 
-		    (j + fOpCounts.get(i-1).intValue());
-                if (((i % 3) == 0) || (i == (maxOp + 1)))
+	    int j, k = 0;
+            //for (int i = 1; i < maxOp + 1; i++) {
+	    for (Integer i : registeredOps.keySet()) {
+		//System.out.println("registeredOps: " + registeredOps);
+		//System.out.printf("registeredOps.get(%s) = %s\n",i, registeredOps.get(i));
+                reportStr += "   " + registeredOps.get(i) + "=" +
+                    (j = sOpCounts.get(i).intValue()) + "/" + 
+		    (j + fOpCounts.get(i).intValue());
+                //if (((i.intValue % 3) == 0) || (i.intValue() == (maxOp)))
+		if (++k % 3 == 0)
                     reportStr += "\n";
             }
+	    reportStr += "\n";
 
 	    if (! aggregateCounters.isEmpty()) {
 		reportStr += "AggregateCounters (total):\n";

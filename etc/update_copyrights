@@ -6,6 +6,14 @@
 # You can update all the Java files by doing:
 #
 #   find .. -name '*.java' -exec update_copyrights COPYRIGHT-FILE {} \;
+#
+# Here is the procedure for applying the appropriate headers:
+#
+#   cd ..
+#   find . -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-server {} \;
+#   find src/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
+#   find test/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
+#   find example/tutorial/src/com/sun/sgs/tutorial/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
 
 COPYRIGHT_FILE = ARGV.shift
 
