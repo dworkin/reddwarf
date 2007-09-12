@@ -474,6 +474,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
 	try {
 	    try {
+		// TBD: should the node be removed if the current
+		// backup ID for the node with the given node ID
+		// is not the given backup ID?
 		runTransactionally(new AbstractKernelRunnable() {
 		    public void run() {
 			NodeImpl.removeNode(dataService,  nodeId);

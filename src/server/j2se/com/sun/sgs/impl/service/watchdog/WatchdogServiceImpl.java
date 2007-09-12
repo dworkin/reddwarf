@@ -331,7 +331,10 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
     }
     
     /** {@inheritDoc} */
-    public void ready() { 
+    public void ready() {
+	// TBD: the client shouldn't accept incoming calls until this
+	// service is ready which would give all RecoveryListeners a
+	// chance to register.
         if (serverImpl != null) {
             serverImpl.ready();
         }

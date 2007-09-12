@@ -960,10 +960,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // pause for watchdog server to detect failure and
 	    // reassign backups.
 	    Thread.sleep(3 * RENEW_INTERVAL);
-	    if (listener.nodes.size() != shutdownIds.size()) {
-		fail("Expected " + shutdownIds.size() + " recover requests, " +
-		     "received: " + listener.nodes.size());
-	    }
 
 	    System.err.println("Get shutdown nodes (should be marked failed)");
 	    createTransaction();
@@ -985,11 +981,14 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	    commitTransaction();
 
+	    // Create new node to be (belatedly) assigned as backup
+	    // for failed nodes.
 	    WatchdogServiceImpl watchdog = 
 		new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	    watchdog.addRecoveryListener(listener);
 	    watchdog.ready();
 	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    System.err.println("Created node (" + watchdog.getLocalNodeId() + ")");
 
 	    // pause for watchdog server to reassign new node as
 	    // backup to exising nodes.
