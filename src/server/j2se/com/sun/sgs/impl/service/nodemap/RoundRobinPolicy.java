@@ -47,12 +47,13 @@ import java.util.logging.Logger;
  *	</b></code><br>
  *	<i>Default:</i> {@code 0}
  *
- * <dd style="padding-top: .5em">How often an identity mapping should be
+ * <dd style="padding-top: .5em">This property is for simple testing purposes, 
+ *      and specifies how often an identity mapping should be
  *      arbitrarily moved.  If this value is positive, an identity will
  *      be selected from a live node and moved to a different live node every
  *      {@code movecount} calls to {@link #chooseNode}.  If this value is
  *      negative or {@code 0}, no arbitrary movement will take place.  
- *      Specifying a postive value for {@code movecount} is a testing aid. <p>
+ *      Specifying a positive value for {@code movecount} is a testing aid. <p>
  * 
  *
  * </dl> <p>
@@ -156,17 +157,20 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                         try {
                             long newnode =
                                 server.mapToNewNode(idToMove, null, node);
+                            
                             // mapToNewNode will call this method again. We
                             // want to make sure to reset where the next id
                             // will be assigned to, to keep things somewhat
                             // predictable.  
-                            // Also, if we're unlucky enough to pick a random
-                            // node that will be the next one assigned to, 
-                            // *every* next node will be the next one assigned
-                            // to because this is a round robin policy.  We
-                            // really want to keep one element (node to move
-                            // from or node to move to) constant in this loop.
+                            // Also, if the node we choose to move an identity
+                            // from happens to be the next node this policy will
+                            // choose to assign to, we'll never pick a new node
+                            // for assignment in this loop (each iteration will
+                            // select the next index in liveNodes to move an 
+                            // identity from and make the next assignment to).
+                            
                             nextNode.getAndDecrement();
+                            
                             logger.log(Level.FINEST, "Move Identity attempt: "
                                     + "chose {0} for id {1} on old node {2}",
                                     newnode, idToMove, node);
@@ -214,7 +218,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
             this.logger = logger;
         }
         
-        public void run() {
+        public void run() throws Exception {
             try {
                 String key = dataService.nextServiceBoundName(nodekey);
                 boolean done = (key == null || !key.contains(nodekey));
@@ -223,9 +227,9 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 }
                 node = watchdogService.getNode(nodeId);
             } catch (Exception e) {
-                e.printStackTrace();
                 logger.logThrow(Level.WARNING, e, 
                         "Failed to get key or binding for {0}", nodekey);
+                throw e;
             }
         }
         
