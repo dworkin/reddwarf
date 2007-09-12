@@ -2,13 +2,14 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio.threaded;
+package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
+    implements AsyncChannelInternals
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -38,18 +40,17 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncChannelGroupImpl channelGroup;
+    final AbstractAsyncChannelGroup channelGroup;
     final ServerSocketChannel channel;
 
     private final AsyncIoTaskFactory acceptTask;
 
-    AsyncServerSocketChannelImpl(ThreadedAsyncChannelProvider provider,
-                                 AsyncChannelGroupImpl group)
+    AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
-        super(provider);
+        super(group.provider());
         channelGroup = group;
-        channel = provider.getSelectorProvider().openServerSocketChannel();
+        channel = group.getSelectorProvider().openServerSocketChannel();
         acceptTask = new AsyncIoTaskFactory(group) {
             @Override protected void alreadyPendingPolicy() {
                 throw new AcceptPendingException();
@@ -59,6 +60,10 @@ final class AsyncServerSocketChannelImpl
         } catch (ShutdownChannelGroupException e) {
             channel.close();
         }
+    }
+
+    public SelectableChannel getSelectableChannel() {
+        return channel;
     }
 
     private void checkClosedAsync() {
@@ -191,7 +196,6 @@ final class AsyncServerSocketChannelImpl
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     return new AsyncSocketChannelImpl(
-                        (ThreadedAsyncChannelProvider) provider(),
                         channelGroup,
                         channel.accept());
                 }});

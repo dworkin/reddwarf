@@ -2,11 +2,10 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio.threaded;
+package com.sun.sgs.impl.nio;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -18,11 +17,11 @@ import com.sun.sgs.nio.channels.IoFuture;
 
 class AsyncIoTaskFactory {
 
-    private final Executor executor;
+    private final AbstractAsyncChannelGroup channelGroup;
     final AtomicBoolean pending = new AtomicBoolean();
 
-    public AsyncIoTaskFactory(Executor executor) {
-        this.executor = executor;
+    public AsyncIoTaskFactory(AbstractAsyncChannelGroup group) {
+        this.channelGroup = group;
     }
 
     /**
@@ -46,7 +45,8 @@ class AsyncIoTaskFactory {
         boolean success = false;
         try {
             FutureTask<R> task = new AsyncIoTask<R>(callable, attachment, handler);
-            executor.execute(task);
+            // FIXME
+            //channelGroup.execute(task);
             success = true;
             return new IoFutureBase<R, A>(task, attachment);
         } finally {

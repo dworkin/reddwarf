@@ -109,7 +109,7 @@ public abstract class AsynchronousChannelProvider {
 // TODO service loading requires JDK 6 or higher
 //                        if (loadProviderAsService())
 //                            return provider;
-                        provider = com.sun.sgs.impl.nio.threaded.ThreadedAsyncChannelProvider.create();
+                        provider = com.sun.sgs.impl.nio.AsyncProviderImpl.create();
                         return provider;
                     }
                 });

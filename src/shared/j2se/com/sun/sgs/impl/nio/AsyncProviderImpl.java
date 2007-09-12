@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio.threaded;
+package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
 import java.nio.channels.SelectableChannel;
@@ -17,17 +17,17 @@ import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
-public class ThreadedAsyncChannelProvider
+public class AsyncProviderImpl
     extends AsynchronousChannelProvider
 {
     private final SelectorProvider selectorProvider;
-    private AsyncChannelGroupImpl defaultGroupInstance = null;
+    private AbstractAsyncChannelGroup defaultGroupInstance = null;
 
-    public static ThreadedAsyncChannelProvider create() {
-        return new ThreadedAsyncChannelProvider(SelectorProvider.provider());
+    public static AsyncProviderImpl create() {
+        return new AsyncProviderImpl(SelectorProvider.provider());
     }
 
-    protected ThreadedAsyncChannelProvider(SelectorProvider selProvider) {
+    protected AsyncProviderImpl(SelectorProvider selProvider) {
         selectorProvider = selProvider;
     }
 
@@ -49,7 +49,7 @@ public class ThreadedAsyncChannelProvider
             });
     }
 
-    private AsyncChannelGroupImpl defaultGroup() throws IOException {
+    private AbstractAsyncChannelGroup defaultGroup() throws IOException {
         synchronized (this) {
             if (defaultGroupInstance == null) {
                 ThreadPoolFactory tpf = getThreadPoolFactory();
@@ -61,7 +61,7 @@ public class ThreadedAsyncChannelProvider
         return defaultGroupInstance;
     }
 
-    private AsyncChannelGroupImpl checkGroup(AsynchronousChannelGroup group)
+    private AbstractAsyncChannelGroup checkGroup(AsynchronousChannelGroup group)
         throws IOException
     {
         if (group == null) {
@@ -73,7 +73,7 @@ public class ThreadedAsyncChannelProvider
                 "AsynchronousChannelGroup not created by this provider");
         }
 
-        return (AsyncChannelGroupImpl) group;
+        return (TPCChannelGroup) group;
     }
 
     void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
@@ -96,11 +96,11 @@ public class ThreadedAsyncChannelProvider
      * {@inheritDoc}
      */
     @Override
-    public AsyncChannelGroupImpl
+    public TPCChannelGroup
         openAsynchronousChannelGroup(ExecutorService executor)
             throws IOException
     {
-        return new AsyncChannelGroupImpl(this, executor);
+        return new TPCChannelGroup(this, executor);
     }
 
     /**
@@ -111,7 +111,7 @@ public class ThreadedAsyncChannelProvider
         openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return new AsyncDatagramChannelImpl(this, checkGroup(group));
+        return new AsyncDatagramChannelImpl(checkGroup(group));
     }
 
     /**
@@ -122,7 +122,7 @@ public class ThreadedAsyncChannelProvider
         openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return new AsyncServerSocketChannelImpl(this, checkGroup(group));
+        return new AsyncServerSocketChannelImpl(checkGroup(group));
     }
 
     /**
@@ -133,6 +133,6 @@ public class ThreadedAsyncChannelProvider
         openAsynchronousSocketChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return new AsyncSocketChannelImpl(this, checkGroup(group));
+        return new AsyncSocketChannelImpl(checkGroup(group));
     }
 }

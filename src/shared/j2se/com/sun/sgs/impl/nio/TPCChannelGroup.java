@@ -2,30 +2,26 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.nio.threaded;
+package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
+import java.nio.channels.SelectableChannel;
 import java.util.HashSet;
-import java.util.concurrent.Executor;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.sun.sgs.nio.channels.AsynchronousChannel;
-import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
+import com.sun.sgs.nio.channels.CompletionHandler;
+import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
-class AsyncChannelGroupImpl
-    extends AsynchronousChannelGroup
-    implements Executor
+class TPCChannelGroup
+    extends AbstractAsyncChannelGroup
 {
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
-
-    /**
-     * The executor service for this group's tasks.
-     */
-    final ExecutorService executor;
 
     /**
      * runState provides the main lifecyle control, taking on values:
@@ -69,8 +65,8 @@ class AsyncChannelGroupImpl
      * Set containing all channels in group. Accessed only when
      * holding mainLock.
      */
-    private final HashSet<AsynchronousChannel> channels =
-        new HashSet<AsynchronousChannel>();
+    private final HashSet<AsyncChannelInternals> channels =
+        new HashSet<AsyncChannelInternals>();
 
     /**
      * Current channel count, updated only while holding mainLock but
@@ -85,16 +81,12 @@ class AsyncChannelGroupImpl
      * @param provider the provider
      * @param executor the executor
      */
-    AsyncChannelGroupImpl(ThreadedAsyncChannelProvider provider,
-                          ExecutorService executor)
-    {
-        super(provider);
-        if (executor == null)
-            throw new NullPointerException("null ExecutorService");
-        this.executor = executor;
+    TPCChannelGroup(AsyncProviderImpl provider, ExecutorService executor) {
+        super(provider, executor);
     }
 
-    void addChannel(AsynchronousChannel channel) {
+    @Override
+    void addChannel(AsyncChannelInternals channel) {
         mainLock.lock();
         try {
             if (isShutdown())
@@ -106,7 +98,8 @@ class AsyncChannelGroupImpl
         }
     }
 
-    void channelClosed(AsynchronousChannel channel) {
+    @Override
+    void channelClosed(AsyncChannelInternals channel) {
         mainLock.lock();
         try {
             channels.remove(channel);
@@ -115,6 +108,20 @@ class AsyncChannelGroupImpl
         } finally {
             mainLock.unlock();
         }
+    }
+
+    @Override
+    <R> Future<R> submit(SelectableChannel channel,
+           int op,
+           Callable<R> command,
+           long timeout,
+           TimeUnit unit)
+    {
+        if (timeout == 0) {
+            
+        }
+        // TODO
+        return null;
     }
 
     /* Termination support. */
@@ -127,10 +134,6 @@ class AsyncChannelGroupImpl
                 termination.signalAll();
             }
         }
-    }
-
-    public void execute(Runnable command) {
-        executor.execute(command);
     }
 
     /**
@@ -175,7 +178,7 @@ class AsyncChannelGroupImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncChannelGroupImpl shutdown() {
+    public TPCChannelGroup shutdown() {
         mainLock.lock();
         try {
             int state = runState;
@@ -193,7 +196,7 @@ class AsyncChannelGroupImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncChannelGroupImpl shutdownNow() throws IOException
+    public TPCChannelGroup shutdownNow() throws IOException
     {
         mainLock.lock();
         try {
@@ -201,7 +204,7 @@ class AsyncChannelGroupImpl
             if (state < STOP)
                 runState = STOP;
 
-            for (AsynchronousChannel channel : channels)
+            for (AsyncChannelInternals channel : channels)
                 closeChannelNow(channel);
 
             tryTerminate();
@@ -211,7 +214,7 @@ class AsyncChannelGroupImpl
         }
     }
 
-    private void closeChannelNow(AsynchronousChannel channel) {
+    private void closeChannelNow(AsyncChannelInternals channel) {
         try {
             channel.close();
         } catch (IOException ignore) { }
