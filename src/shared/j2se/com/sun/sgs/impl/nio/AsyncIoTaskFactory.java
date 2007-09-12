@@ -45,8 +45,7 @@ class AsyncIoTaskFactory {
         boolean success = false;
         try {
             FutureTask<R> task = new AsyncIoTask<R>(callable, attachment, handler);
-            // FIXME
-            //channelGroup.execute(task);
+            channelGroup.executor().execute(task);
             success = true;
             return new IoFutureBase<R, A>(task, attachment);
         } finally {
