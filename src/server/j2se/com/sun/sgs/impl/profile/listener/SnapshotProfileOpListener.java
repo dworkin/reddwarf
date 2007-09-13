@@ -63,6 +63,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
+ *
+ * @see AggregateTaskListener
  */
 public class SnapshotProfileOpListener implements ProfileListener {
 

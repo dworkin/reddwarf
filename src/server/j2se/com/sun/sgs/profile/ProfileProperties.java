@@ -33,7 +33,7 @@ public interface ProfileProperties {
      * integer.
      */
     public static final String WINDOW_SIZE =
-	"com.sun.sgs.kernel.profile.listener.window.size";
+	"com.sun.sgs.profile.listener.window.size";
 
 
 }

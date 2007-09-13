@@ -46,8 +46,19 @@ import java.util.Properties;
 
 
 /**
- * A listener for reporting task-summary information to the network on
- * port {@code 43009}.
+ * This implementation of <code>ProfileOperationListener</code> aggregates
+ * task data over the lifetime of the system, and reports at fixed
+ * intervals. By default the time interval is 10 seconds.
+ * <p>
+ * This listener reports its findings on a server socket. Any number of
+ * users may connect to that socket to watch the reports. The default
+ * port used is 43009.
+ * <p>
+ * The <code>com.sun.sgs.impl.profile.listener.AggregateTaskListener.</code>
+ * root is used for all properties in this class. The <code>reportPort</code>
+ * key is used to specify an alternate port on which to report profiling
+ * data. The <code>reportPeriod</code> key is used to specify the length of
+ * time, in milliseconds, between reports.
  *
  * @see SnapshotTaskListener
  */
@@ -137,7 +148,7 @@ public class AggregateTaskListener implements ProfileListener {
                     detail.opCount +=
                         profileReport.getReportedOperations().size();
                     detail.retries += profileReport.getRetryCount();
-                     for (ProfileOperation op :
+		    for (ProfileOperation op :
                               profileReport.getReportedOperations()) {
 			 Long l = null;
 			 detail.ops.put(op, ((l = detail.ops.get(op)) == null)

@@ -46,10 +46,20 @@ import java.util.Properties;
 
 
 /**
- * A listener for reporting task-summary information to the network on
- * port {@code 43010}.
- *
- * @see SnapshotTaskListener
+ * This implementation of <code>ProfileOperationListener</code> takes
+ * snapshots at fixed intervals. It provides a very simple view of what
+ * tasks have run over the last interval. By default the time
+ * interval is 5 seconds.
+ * <p>
+ * This listener reports its findings on a server socket. Any number of
+ * users may connect to that socket to watch the reports. The default
+ * port used is 43010.
+ * <p>
+ * The <code>com.sun.sgs.impl.profile.listener.SnapshotTaskListener.</code>
+ * root is used for all properties in this class. The <code>reportPort</code>
+ * key is used to specify an alternate port on which to report profiling
+ * data. The <code>reportPeriod</code> key is used to specify the length of
+ * time, in milliseconds, between reports.
  */
 public class SnapshotTaskListener implements ProfileListener {
 

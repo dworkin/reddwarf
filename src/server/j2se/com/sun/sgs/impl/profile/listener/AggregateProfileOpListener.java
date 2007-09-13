@@ -55,7 +55,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * users may connect to that socket to watch the reports. The default
  * port used is 43005.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener.</code>
+ * The <code>com.sun.sgs.impl.profile.listener.AggregateProfileOpListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of

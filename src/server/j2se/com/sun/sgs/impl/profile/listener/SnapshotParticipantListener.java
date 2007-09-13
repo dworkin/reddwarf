@@ -55,7 +55,7 @@ import java.util.Properties;
  * users may connect to that socket to watch the reports. The default
  * port used is 43012.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener</code>
+ * The <code>com.sun.sgs.impl.profile.listener.SnapshotParticipantListener</code>
  * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>report.period</code> key is used to specify the length of
