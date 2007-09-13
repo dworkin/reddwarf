@@ -65,7 +65,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @see ProfileProperties
  */
-public class RunTimeHistogramListener implements ProfileListener {
+public class RuntimeHistogramListener implements ProfileListener {
 
     /**
      * The window of tasks that are aggregated before the next text
@@ -95,7 +95,7 @@ public class RunTimeHistogramListener implements ProfileListener {
     private final Histogram lifetimeHistogram;
 
     /**
-     * Creates an instance of {@code RunTimeHistogramListener}.
+     * Creates an instance of {@code RuntimeHistogramListener}.
      *
      * @param properties the {@code Properties} for this listener
      * @param owner the {@code TaskOwner} to use for all tasks run by
@@ -106,7 +106,7 @@ public class RunTimeHistogramListener implements ProfileListener {
      *        run any long-lived tasks
      *
      */
-    public RunTimeHistogramListener(Properties properties, TaskOwner owner,
+    public RuntimeHistogramListener(Properties properties, TaskOwner owner,
 				    TaskScheduler taskScheduler,
 				    ResourceCoordinator resourceCoord) {
   	taskCount = 0;

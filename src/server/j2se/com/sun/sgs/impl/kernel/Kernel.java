@@ -105,9 +105,7 @@ class Kernel {
         "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:" +
-        "com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener:" +
-        "com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener";
+        "com.sun.sgs.impl.profile.listener.AggregateProfileOpListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
