@@ -17,8 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
 
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -42,7 +44,7 @@ public interface ProfileCollector {
      *
      * @param listener the <code>ProfileOperationListener</code> to add
      */
-    public void addListener(ProfileOperationListener listener);
+    public void addListener(ProfileListener listener);
 
     /**
      * Notifies the collector that a thread has been added to the scheduler.

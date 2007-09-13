@@ -17,17 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileCollector;
-import com.sun.sgs.kernel.ProfileCounter;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileParticipantDetail;
-import com.sun.sgs.kernel.ProfileSample;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
+
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCounter;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.ProfileSample;
 
 import java.beans.PropertyChangeEvent;
 
@@ -68,7 +69,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     private volatile int schedulerThreadCount;
 
     // the set of registered listeners
-    private ArrayList<ProfileOperationListener> listeners;
+    private ArrayList<ProfileListener> listeners;
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
@@ -92,7 +93,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
         schedulerThreadCount = 0;
 	ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
-        listeners = new ArrayList<ProfileOperationListener>();
+        listeners = new ArrayList<ProfileListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
 	opIdCounter = new AtomicInteger(0);
 
@@ -107,7 +108,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void addListener(ProfileOperationListener listener) {
+    public void addListener(ProfileListener listener) {
         listeners.add(listener);
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
@@ -129,7 +130,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount - 1, 
 				    schedulerThreadCount);
 
-        for (ProfileOperationListener listener : listeners)
+        for (ProfileListener listener : listeners)
             listener.propertyChange(event);
     }
 
@@ -141,7 +142,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount + 1, 
 				    schedulerThreadCount);
 
-        for (ProfileOperationListener listener : listeners)
+        for (ProfileListener listener : listeners)
             listener.propertyChange(event);
     }
 
@@ -225,7 +226,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",null, op);
 
-        for (ProfileOperationListener listener : listeners)
+        for (ProfileListener listener : listeners)
             listener.propertyChange(event);
         return op;
     }
@@ -544,7 +545,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
                         Collections.
                         unmodifiableSet(profileReport.participants);
 
-                    for (ProfileOperationListener listener : listeners)
+                    for (ProfileListener listener : listeners)
                         listener.report(profileReport);
                 }
             } catch (InterruptedException ie) {}

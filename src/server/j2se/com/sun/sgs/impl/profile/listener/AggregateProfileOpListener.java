@@ -17,18 +17,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
+
+import com.sun.sgs.impl.profile.util.NetworkReporter;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
@@ -58,7 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
-public class AggregateProfileOpListener implements ProfileOperationListener {
+public class AggregateProfileOpListener implements ProfileListener {
 
     private int maxOp = 0;
     private Map<Integer,ProfileOperation> registeredOps = new HashMap<Integer,ProfileOperation>();

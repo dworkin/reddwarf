@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
 
 import java.beans.PropertyChangeEvent;
 
@@ -33,7 +33,7 @@ import java.beans.PropertyChangeEvent;
  * <p>
  *
  * In order to create listeners with all of the facilities that they need,
- * all implementations of <code>ProfileOperationListener</code> must
+ * all implementations of <code>ProfileListener</code> must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
  * <code>com.sun.sgs.kernel.TaskScheduler</code>,
@@ -48,7 +48,7 @@ import java.beans.PropertyChangeEvent;
  *
  * @see ProfileReport
  */
-public interface ProfileOperationListener {
+public interface ProfileListener {
 
     /**
      * Notifies this listener of a new change in the system

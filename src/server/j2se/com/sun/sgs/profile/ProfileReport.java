@@ -17,7 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
+
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.List;
 import java.util.Map;

@@ -23,10 +23,10 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollectorImpl;
-import com.sun.sgs.impl.kernel.profile.ProfileRegistrarImpl;
-
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
+
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -34,11 +34,12 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
 
-import com.sun.sgs.kernel.ProfileCollector;
-import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileListener;
 
 import com.sun.sgs.service.Service;
 
@@ -66,10 +67,10 @@ import java.util.logging.Logger;
  * be given the value "on". If no profile listeners are specified, then the
  * default <code>AggregateProfileOpListener</code> and
  * <code>SnapshotProfileOpListener</code> are enabled. To specify that a
- * different set of <code>ProfileOperationListener</code>s should be used,
+ * different set of <code>ProfileListener</code>s should be used,
  * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
  * property must be specified with a colon-separated list of fully-qualified
- * classes, each of which implements <code>ProfileOperationListener</code>.
+ * classes, each of which implements <code>ProfileListener</code>.
  */
 class Kernel {
 
@@ -230,22 +231,22 @@ class Kernel {
                     listenerConstructor.newInstance(systemProperties,
                                                     owner, taskScheduler,
                                                     resourceCoordinator);
-                ProfileOperationListener listener =
-                    (ProfileOperationListener)obj;
+                ProfileListener listener =
+                    (ProfileListener)obj;
                 profileCollector.addListener(listener);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                    "ProfileOperationListener {0} ... " +
+                                    "ProfileListener {0} ... " +
                                     "it will not be available for profiling",
                                     listenerClassName);
             }
         }
 
         // finally, register the scheduler as a listener too
-        if (taskScheduler instanceof ProfileOperationListener)
+        if (taskScheduler instanceof ProfileListener)
             profileCollector.
-                addListener((ProfileOperationListener)taskScheduler);
+                addListener((ProfileListener)taskScheduler);
     }
 
     /**

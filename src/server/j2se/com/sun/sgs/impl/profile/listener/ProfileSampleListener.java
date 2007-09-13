@@ -17,18 +17,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.impl.profile.util.Histogram;
+import com.sun.sgs.impl.profile.util.LinearHistogram;
+import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileProperties;
+import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
@@ -59,7 +65,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @see ProfileProperties
  * @see com.sun.sgs.kernel.ProfileSample
  */
-public class ProfileSampleListener implements ProfileOperationListener {
+public class ProfileSampleListener implements ProfileListener {
 
     /**
      * The window of tasks that are aggregated before the next text

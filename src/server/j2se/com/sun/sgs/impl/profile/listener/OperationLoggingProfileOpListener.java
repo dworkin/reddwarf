@@ -17,17 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
@@ -55,9 +56,7 @@ import java.util.logging.Logger;
  * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
  * </code> property may be used to set the interval between reports.
  */
-public class OperationLoggingProfileOpListener
-    implements ProfileOperationListener
-{
+public class OperationLoggingProfileOpListener implements ProfileListener {
 
     // the name of the class
     private static final String CLASSNAME =

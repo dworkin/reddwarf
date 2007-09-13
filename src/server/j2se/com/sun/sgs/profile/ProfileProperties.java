@@ -18,7 +18,7 @@
  */
 
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.profile;
 
 /**
  * A collection of common properties used by {@link

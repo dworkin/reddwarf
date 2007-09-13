@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile;
 
-import com.sun.sgs.kernel.ProfileConsumer;
-import com.sun.sgs.kernel.ProfileCounter;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileSample;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileCounter;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileSample;
 
 
 /**
