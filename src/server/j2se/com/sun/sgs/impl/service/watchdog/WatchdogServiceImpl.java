@@ -481,7 +481,7 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 		     * server again before the renew interval expires.
 		     */
 		    logger.logThrow(
-			Level.WARNING, e,
+			Level.INFO, e,
 			"renewing with watchdog server throws");
 		    nextRenewInterval =
 			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
