@@ -14,11 +14,8 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.NotYetConnectedException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -32,15 +29,14 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.MembershipKey;
-import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
-import com.sun.sgs.nio.channels.WritePendingException;
+
+import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
 
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
-    implements AsyncChannelInternals
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -59,41 +55,12 @@ class AsyncDatagramChannelImpl
     final AbstractAsyncChannelGroup channelGroup;
     final DatagramChannel channel;
 
-    private final AsyncIoTaskFactory connectTask;
-    private final AsyncIoTaskFactory disconnectTask;
-    private final AsyncIoTaskFactory readTask;
-    private final AsyncIoTaskFactory writeTask;
-
     protected AsyncDatagramChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
         super(group.provider());
         channelGroup = group;
-        channel = group.getSelectorProvider().openDatagramChannel();
-        connectTask = new AsyncIoTaskFactory(group) {
-            @Override protected void alreadyPendingPolicy() {
-                throw new ConnectionPendingException();
-            }};
-        readTask = new AsyncIoTaskFactory(group) {
-            @Override protected void alreadyPendingPolicy() {
-                throw new ReadPendingException();
-            }};
-        writeTask = new AsyncIoTaskFactory(group) {
-            @Override protected void alreadyPendingPolicy() {
-                throw new WritePendingException();
-            }};
-        // Allow multiple pending disconnect ops
-        disconnectTask = new AsyncIoTaskFactory(group);
-
-        try {
-            channelGroup.addChannel(this);
-        } catch (ShutdownChannelGroupException e) {
-            channel.close();
-        }
-    }
-
-    public SelectableChannel getSelectableChannel() {
-        return channel;
+        channel = group.openDatagramChannel();
     }
 
     private void checkClosedAsync() {
@@ -104,11 +71,6 @@ class AsyncDatagramChannelImpl
     private void checkConnected() {
         if (! channel.isConnected())
             throw new NotYetConnectedException();
-    }
-
-    private void awaitSelectableOp(long timeout, int ops) throws IOException {
-        ((AsyncProviderImpl) provider())
-                .awaitSelectableOp(channel, timeout, ops);
     }
 
     /**
@@ -123,11 +85,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public void close() throws IOException {
-        try {
-            channel.close();
-        } finally {
-            channelGroup.channelClosed(this);
-        }
+        channelGroup.closeChannel(channel);
     }
 
     /**
@@ -311,7 +269,9 @@ class AsyncDatagramChannelImpl
         if (channel.isConnected())
             throw new AlreadyConnectedException();
 
-        return connectTask.submit(attachment, handler, new Callable<Void>() {
+        // TODO ensure that only one of these is pending at a time
+
+        return channelGroup.submit(attachment, handler, new Callable<Void>() {
             public Void call() throws IOException {
                 channel.connect(remote);
                 return null;
@@ -327,7 +287,7 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
 
-        return disconnectTask.submit(attachment, handler, new Callable<Void>() {
+        return channelGroup.submit(attachment, handler, new Callable<Void>() {
             public Void call() throws IOException {
                 channel.disconnect();
                 return null;
@@ -339,7 +299,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return readTask.isPending();
+        return channelGroup.isOperationPending(channel, OP_READ);
     }
 
     /**
@@ -347,7 +307,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return writeTask.isPending();
+        return channelGroup.isOperationPending(channel, OP_WRITE);
     }
 
     /**
@@ -365,26 +325,10 @@ class AsyncDatagramChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        final int timeoutMillis = (int) unit.toMillis(timeout);
-
-/*
-        return readTask.submit(attachment, handler,
+        return channelGroup.submit(
+            channel, OP_READ, attachment, handler, timeout, unit,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    if (channel.socket().getSoTimeout() != timeoutMillis)
-                        channel.socket().setSoTimeout(timeoutMillis);
-                    try {
-                        return channel.receive(dst);
-                    } catch (SocketTimeoutException e) {
-                        throw new AbortedByTimeoutException();
-                    }
-            }});
-*/
-
-        return readTask.submit(attachment, handler,
-            new Callable<SocketAddress>() {
-                public SocketAddress call() throws IOException {
-                    awaitSelectableOp(timeoutMillis, SelectionKey.OP_READ);
                     return channel.receive(dst);
             }});
     }
@@ -406,13 +350,12 @@ class AsyncDatagramChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        final long timeoutMillis = unit.toMillis(timeout);
-
-        return writeTask.submit(attachment, handler, new Callable<Integer>() {
-            public Integer call() throws IOException {
-                awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
-                return channel.send(src, target);
-            }});
+        return channelGroup.submit(
+            channel, OP_WRITE, attachment, handler, timeout, unit,
+            new Callable<Integer>() {
+                public Integer call() throws IOException {
+                    return channel.send(src, target);
+                }});
     }
 
     /**
@@ -431,26 +374,12 @@ class AsyncDatagramChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        final int timeoutMillis = (int) unit.toMillis(timeout);
-
-/*
-        return readTask.submit(attachment, handler, new Callable<Integer>() {
-            public Integer call() throws IOException {
-                if (channel.socket().getSoTimeout() != timeoutMillis)
-                    channel.socket().setSoTimeout(timeoutMillis);
-                try {
+        return channelGroup.submit(
+            channel, OP_READ, attachment, handler, timeout, unit,
+            new Callable<Integer>() {
+                public Integer call() throws IOException {
                     return channel.read(dst);
-                } catch (SocketTimeoutException e) {
-                    throw new AbortedByTimeoutException();
-                }
-            }});
-*/
-
-        return readTask.submit(attachment, handler, new Callable<Integer>() {
-            public Integer call() throws IOException {
-                awaitSelectableOp(timeoutMillis, SelectionKey.OP_READ);
-                return channel.read(dst);
-            }});
+                }});
     }
 
     /**
@@ -469,12 +398,11 @@ class AsyncDatagramChannelImpl
         if (timeout < 0)
             throw new IllegalArgumentException("timeout can't be negative");
 
-        final long timeoutMillis = unit.toMillis(timeout);
-
-        return writeTask.submit(attachment, handler, new Callable<Integer>() {
-            public Integer call() throws IOException {
-                awaitSelectableOp(timeoutMillis, SelectionKey.OP_WRITE);
-                return channel.write(src);
-            }});
+        return channelGroup.submit(
+            channel, OP_WRITE, attachment, handler, timeout, unit,
+            new Callable<Integer>() {
+                public Integer call() throws IOException {
+                    return channel.write(src);
+                }});
     }
 }

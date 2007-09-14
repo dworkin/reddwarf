@@ -9,7 +9,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
@@ -17,20 +16,19 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
+import static java.nio.channels.SelectionKey.OP_ACCEPT;
+
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
-    implements AsyncChannelInternals
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -43,27 +41,12 @@ final class AsyncServerSocketChannelImpl
     final AbstractAsyncChannelGroup channelGroup;
     final ServerSocketChannel channel;
 
-    private final AsyncIoTaskFactory acceptTask;
-
     AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
         super(group.provider());
         channelGroup = group;
-        channel = group.getSelectorProvider().openServerSocketChannel();
-        acceptTask = new AsyncIoTaskFactory(group) {
-            @Override protected void alreadyPendingPolicy() {
-                throw new AcceptPendingException();
-            }};
-        try {
-            channelGroup.addChannel(this);
-        } catch (ShutdownChannelGroupException e) {
-            channel.close();
-        }
-    }
-
-    public SelectableChannel getSelectableChannel() {
-        return channel;
+        channel = group.openServerSocketChannel();
     }
 
     private void checkClosedAsync() {
@@ -83,11 +66,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        try {
-            channel.close();
-        } finally {
-            channelGroup.channelClosed(this);
-        }
+        channelGroup.closeChannel(channel);
     }
 
     /**
@@ -179,7 +158,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return acceptTask.isPending();
+        return channelGroup.isOperationPending(channel, OP_ACCEPT);
     }
 
     /**
@@ -192,13 +171,12 @@ final class AsyncServerSocketChannelImpl
     {
         checkClosedAsync();
 
-        return acceptTask.submit(attachment, handler,
+        return channelGroup.submit(channel, OP_ACCEPT, attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     return new AsyncSocketChannelImpl(
                         channelGroup,
-                        channel.accept());
+                        channelGroup.acceptChannel(channel));
                 }});
     }
-
 }
