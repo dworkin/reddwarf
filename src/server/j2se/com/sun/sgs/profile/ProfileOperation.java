@@ -17,23 +17,36 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
 
 
 /**
- * A registration interface where <code>ProfileProducers</code>s register
- * and get <code>ProfileConsumer</code>s used to consume profiling data.
+ * This interface represents a single operation that can be reported as
+ * happening during the life of a task running through the scheduler.
  */
-public interface ProfileRegistrar {
+public interface ProfileOperation {
 
     /**
-     * Registers the given <code>ProfileProducer</code>.
+     * Returns the name of this operation.
      *
-     * @param producer the <code>ProfileProducer</code> being registered
-     *
-     * @return a <code>ProfileConsumer</code> that will consume profiling
-     *         data from the provided <code>ProfileProducer</code>
+     * @return the name
      */
-    public ProfileConsumer registerProfileProducer(ProfileProducer producer);
+    public String getOperationName();
+
+    /**
+     * Returns the identifier for this operation.
+     *
+     * @return the identifier
+     */
+    public int getId();
+
+    /**
+     * Tells this operation to report that it is happening. This may be
+     * called any number of times during a single task.
+     *
+     * @throws IllegalStateException if this is called outside the scope
+     *                               of a task run through the scheduler
+     */
+    public void report();
 
 }

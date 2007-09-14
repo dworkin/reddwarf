@@ -17,19 +17,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.impl.profile.util.NetworkReporter;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileParticipantDetail;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.ProfileReport;
+
+import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
@@ -41,7 +46,7 @@ import java.util.Properties;
 
 
 /**
- * This implementation of <code>ProfileOperationListener</code> takes
+ * This implementation of <code>ProfileListener</code> takes
  * snapshots at fixed intervals. It provides a very simple view of
  * transactional participants that were active over the last interval. By
  * default the time interval is 5 seconds.
@@ -50,13 +55,14 @@ import java.util.Properties;
  * users may connect to that socket to watch the reports. The default
  * port used is 43012.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener</code>
+ * The
+ * <code>com.sun.sgs.impl.profile.listener.SnapshotParticipantListener</code>
  * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>report.period</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
-public class SnapshotParticipantListener implements ProfileOperationListener {
+public class SnapshotParticipantListener implements ProfileListener {
 
     // the reporter used to publish data
     private NetworkReporter networkReporter;
@@ -124,15 +130,8 @@ public class SnapshotParticipantListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfileOperation op) {
-
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-
+    public void propertyChange(PropertyChangeEvent event) {
+	// unused
     }
 
     /**

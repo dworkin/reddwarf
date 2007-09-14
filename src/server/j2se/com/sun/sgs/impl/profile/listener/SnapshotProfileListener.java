@@ -17,18 +17,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.impl.profile.util.NetworkReporter;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
+
+import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
@@ -38,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /**
- * This implementation of <code>ProfileOperationListener</code> takes
+ * This implementation of <code>ProfileListener</code> takes
  * snapshots at fixed intervals. It provides a very simple view of what
  * the system has done over the last interval. By default the time
  * interval is 10 seconds.
@@ -53,13 +58,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * users may connect to that socket to watch the reports. The default
  * port used is 43007.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener.</code>
+ * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
+ *
+ * @see AggregateTaskListener
  */
-public class SnapshotProfileOpListener implements ProfileOperationListener {
+public class SnapshotProfileListener implements ProfileListener {
 
     // the number of successful tasks and the total number of tasks
     private volatile long successCount = 0;
@@ -83,7 +90,7 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
 
     // the base name for properties
     private static final String PROP_BASE =
-        SnapshotProfileOpListener.class.getName();
+        SnapshotProfileListener.class.getName();
 
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
@@ -92,7 +99,7 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     private static final long DEFAULT_PERIOD = 10000;
 
     /**
-     * Creates an instance of <code>SnapshotProfileOpListener</code>.
+     * Creates an instance of <code>SnapshotProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
      * @param owner the <code>TaskOwner</code> to use for all tasks run by
@@ -104,9 +111,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
      *
      * @throws IOException if the server socket cannot be created
      */
-    public SnapshotProfileOpListener(Properties properties, TaskOwner owner,
-                                     TaskScheduler taskScheduler,
-                                     ResourceCoordinator resourceCoord)
+    public SnapshotProfileListener(Properties properties, TaskOwner owner,
+                                   TaskScheduler taskScheduler,
+                                   ResourceCoordinator resourceCoord)
         throws IOException
     {
         flag = new AtomicBoolean(false);
@@ -128,15 +135,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfileOperation op) {
-        // for now, this is ignored
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        this.threadCount = schedulerThreadCount;
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.threadcount"))
+	    this.threadCount = ((Integer)event.getNewValue()).intValue();
     }
 
     /**

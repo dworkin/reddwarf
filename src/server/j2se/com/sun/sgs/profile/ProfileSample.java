@@ -17,28 +17,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
 
 
 /**
- * Interface that represents a counter used in profiling tasks run through
- * the scheduler. All counters have a name associated with them, and start
- * at zero. Counters can only be incremented. Counters are either aggregate,
- * where all increments are aggregated over the lifetime of the system, or
- * task-local, in which each counter is effectively first set to zero for each
- * task where that counter is modified.
+ * A profile sample is a list of data points that are accumulated
+ * during the lifetime of a task.  A profile sample may be for either
+ * a single task or span multiple tasks.  A profile sample allows for
+ * different aggregations on data at a later time.
+ *
+ * @see ProfileCounter
+ * @see ProfileOperation
  */
-public interface ProfileCounter {
+public interface ProfileSample {
 
     /**
-     * Returns the name of this counter.
+     * Returns the name of this list of samples.
      *
      * @return the counter's name
      */
-    public String getCounterName();
+    public String getSampleName();
 
     /**
-     * Returns whether this is a task-local counter.
+     * Returns whether this is a task-local list of samples.
      *
      * @return <code>true</code> if this counter is task-local,
      *         <code>false</code> if this counter is aggregated
@@ -46,15 +47,10 @@ public interface ProfileCounter {
     public boolean isTaskLocal();
 
     /**
-     * Increments the counter by <code>1</code>.
-     */
-    public void incrementCount();
-
-    /**
-     * Increments the counter by the given value.
+     * Adds a new sample to the end of the current list of samples.
      *
      * @param value the amount to increment the counter
      */
-    public void incrementCount(long value);
-
+    public void addSample(long value);
+    
 }
