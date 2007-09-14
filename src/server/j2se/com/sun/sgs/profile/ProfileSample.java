@@ -21,32 +21,36 @@ package com.sun.sgs.profile;
 
 
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * A profile sample is a list of data points that are accumulated
+ * during the lifetime of a task.  A profile sample may be for either
+ * a single task or span multiple tasks.  A profile sample allows for
+ * different aggregations on data at a later time.
+ *
+ * @see ProfileCounter
+ * @see ProfileOperation
  */
-public interface ProfileOperation {
+public interface ProfileSample {
 
     /**
-     * Returns the name of this operation.
+     * Returns the name of this list of samples.
      *
-     * @return the name
+     * @return the counter's name
      */
-    public String getOperationName();
+    public String getSampleName();
 
     /**
-     * Returns the identifier for this operation.
+     * Returns whether this is a task-local list of samples.
      *
-     * @return the identifier
+     * @return <code>true</code> if this counter is task-local,
+     *         <code>false</code> if this counter is aggregated
      */
-    public int getId();
+    public boolean isTaskLocal();
 
     /**
-     * Tells this operation to report that it is happening. This may be
-     * called any number of times during a single task.
+     * Adds a new sample to the end of the current list of samples.
      *
-     * @throws IllegalStateException if this is called outside the scope
-     *                               of a task run through the scheduler
+     * @param value the amount to increment the counter
      */
-    public void report();
-
+    public void addSample(long value);
+    
 }

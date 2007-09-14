@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-import com.sun.sgs.kernel.ProfileConsumer;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
