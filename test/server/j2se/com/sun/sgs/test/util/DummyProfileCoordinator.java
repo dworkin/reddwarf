@@ -21,12 +21,14 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
-import com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener;
-import com.sun.sgs.impl.kernel.profile.ProfileCollectorImpl;
-import com.sun.sgs.impl.kernel.profile.ProfileRegistrarImpl;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
+
+import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileProducer;
+
+import com.sun.sgs.profile.ProfileProducer;
 
 import java.util.Properties;
 
@@ -100,8 +102,12 @@ public class DummyProfileCoordinator {
     /** Signals that the current thread's task is done */
     public static void endTask(boolean committed) {
         synchronized (lockObject) {
-            if (instance != null)
-                instance.collector.finishTask(1, committed);
+            if (instance != null) {
+                if (committed)
+                    instance.collector.finishTask(1);
+                else
+                    instance.collector.finishTask(1, new Exception(""));
+            }
         }
     }
 
