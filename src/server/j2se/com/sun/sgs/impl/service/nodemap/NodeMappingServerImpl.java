@@ -35,7 +35,6 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -84,7 +83,8 @@ import java.util.logging.Logger;
  *      The name of the class that implements {@link
  *	NodeAssignPolicy}, used for the node assignment policy. The class 
  *      should be public, not abstract, and should provide a public constructor
- *      with a {@link Properties} parameter. <p>
+ *      with {@link Properties} and {@link NodeMappingServerImpl} parameters. 
+ *      <p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.remove.expire.time
@@ -163,10 +163,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final TaskOwner taskOwner;
     
     /** The data service. */
-    private final DataService dataService;
+    final DataService dataService;
     
     /** The watchdog service. */
-    private final WatchdogService watchdogService;
+    final WatchdogService watchdogService;
     
     /** The policy for assigning new nodes.  This will likely morph into
      *  the load balancing policy, as well. */
@@ -260,11 +260,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         String policyClassName = wrappedProps.getProperty(
 		ASSIGN_POLICY_CLASS_PROPERTY);	    
         if (policyClassName == null) {
-            assignPolicy = new RoundRobinPolicy(properties);
+            assignPolicy = new RoundRobinPolicy(properties, this);
         } else {
             assignPolicy = wrappedProps.getClassInstanceProperty(
                 ASSIGN_POLICY_CLASS_PROPERTY, NodeAssignPolicy.class,
-                new Class[] { Properties.class }, properties);
+                new Class[] { Properties.class, NodeMappingServerImpl.class }, 
+                properties, this);
         }
         
         // Restore any old data from the data service.
@@ -723,7 +724,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      *  if the exception is of type <@code ExceptionRetryStatus>.
      * @param task the task
      */
-    private void runTransactionally(KernelRunnable task) throws Exception {   
+    void runTransactionally(KernelRunnable task) throws Exception {   
         taskScheduler.runTransactionalTask(task, taskOwner);
     }
     
@@ -736,12 +737,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      *
      * @param id the identity to map to a new node
      * @param serviceName the name of the requesting service's class, or null
-     * @param oldNode the last node the identity was mapped to, or null if there
+     * @param old the last node the identity was mapped to, or null if there
      *        was no prior mapping
      *
      * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    private long mapToNewNode(Identity id, String serviceName, Node old) 
+    long mapToNewNode(Identity id, String serviceName, Node old) 
         throws NoNodesAvailableException
     {
         assert(id != null);
