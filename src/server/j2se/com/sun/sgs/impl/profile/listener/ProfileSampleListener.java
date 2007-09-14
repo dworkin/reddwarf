@@ -63,7 +63,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class is {@code 5000}.
  *
  * @see ProfileProperties
- * @see com.sun.sgs.kernel.ProfileSample
+ * @see com.sun.sgs.profile.ProfileSample
  */
 public class ProfileSampleListener implements ProfileListener {
 

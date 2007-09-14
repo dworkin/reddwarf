@@ -70,7 +70,7 @@ public interface ProfileListener {
      *   <td><code>com.sun.sgs.profile.newop</code></td>
      *   <td>a new operation is registered with the system.</td>
      *   <td>the new operation : 
-     *          {@link com.sun.sgs.kernel.ProfileOperation}</td>
+     *          {@link com.sun.sgs.profile.ProfileOperation}</td>
      *   <td> <code>null</code></td>
      * </tr>
      * <tr>
