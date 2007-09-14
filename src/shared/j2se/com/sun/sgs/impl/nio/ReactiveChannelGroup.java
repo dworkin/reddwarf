@@ -9,9 +9,17 @@ import java.io.IOException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -20,7 +28,7 @@ import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
-class TPCChannelGroup
+class ReactiveChannelGroup
     extends AbstractAsyncChannelGroup
 {
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
@@ -63,18 +71,28 @@ class TPCChannelGroup
      */
     private final Condition termination = mainLock.newCondition();
 
-    /**
-     * Set containing all channels in group. Accessed only when
-     * holding mainLock.
-     */
-    private final HashSet<AsyncOp<? extends SelectableChannel>> channels =
-        new HashSet<AsyncOp<? extends SelectableChannel>>();
+    abstract class DelayedRunnable implements Runnable, Delayed {
+        final long timeout;
+        final TimeUnit unit;
 
-    /**
-     * Current channel count, updated only while holding mainLock but
-     * volatile to allow concurrent readability even during updates.
-     */
-    private volatile int groupSize = 0;
+        DelayedRunnable(long timeout, TimeUnit unit) {
+            this.timeout = timeout;
+            this.unit = unit;
+        }
+
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(timeout, unit);
+        }
+
+        public int compareTo(Delayed o) {
+            final long other = o.getDelay(unit);
+            return (timeout<other ? -1 : (timeout==other ? 0 : 1));
+        }
+    }
+
+    final Selector selector;
+    final DelayQueue<DelayedRunnable> timeouts =
+        new DelayQueue<DelayedRunnable>();
 
     /**
      * Creates a new AsyncChannelGroupImpl with the given provider and
@@ -83,8 +101,11 @@ class TPCChannelGroup
      * @param provider the provider
      * @param executor the executor
      */
-    TPCChannelGroup(AsyncProviderImpl provider, ExecutorService executor) {
+    ReactiveChannelGroup(AsyncProviderImpl provider, ExecutorService executor)
+        throws IOException
+    {
         super(provider, executor);
+        selector = selectorProvider().openSelector();
     }
 
     @Override
@@ -96,42 +117,33 @@ class TPCChannelGroup
             if (isShutdown()) {
                 forceClose(channel);
                 throw new ShutdownChannelGroupException();
-            }
-            AsyncOp<T> op = new TPCAsyncOp<T>(channel);
-            channels.add(op);
-            ++groupSize;
-            return op;
+           }
+           return new ReactiveAsyncOp<T>(channel);
         } finally {
             mainLock.unlock();
         }
+        
     }
 
     <T extends SelectableChannel> void channelClosed(AsyncOp<T> ops) {
         mainLock.lock();
         try {
-            channels.remove(ops);
-            --groupSize;
             tryTerminate();
         } finally {
             mainLock.unlock();
         }
     }
 
-    class TPCAsyncOp<T extends SelectableChannel> extends AsyncOp<T> {
+    class ReactiveAsyncOp<T extends SelectableChannel> extends AsyncOp<T> {
 
-        private final T channel;
-        private volatile int pendingOps;
+        private final SelectionKey key;
+        private RunnableFuture<?> acceptTask;
+        private RunnableFuture<?> connectTask;
+        private RunnableFuture<?> readTask;
+        private RunnableFuture<?> writeTask;
 
-        TPCAsyncOp(T channel) {
-            this.channel = channel;
-        }
-
-        T channel() {
-            return channel;
-        }
-
-        TPCChannelGroup group() {
-            return TPCChannelGroup.this;
+        ReactiveAsyncOp(T channel) throws IOException {
+            key = channel.register(selector, 0, this);
         }
 
         public void close() throws IOException {
@@ -142,20 +154,32 @@ class TPCChannelGroup
             }
         }
 
+        @SuppressWarnings("unchecked")
+        T channel() {
+            // Safe to cast because a T was used to create the key
+            return (T) key.channel();
+        }
+
+        ReactiveChannelGroup group() {
+            return ReactiveChannelGroup.this;
+        }
+
         boolean isPending(int op) {
-            return (pendingOps & op) != 0;
+            return (key.interestOps() & op) != 0;
         }
 
         void setOp(int op) {
             synchronized (this) {
                 checkPending(op);
-                pendingOps |= op;
+                key.interestOps(key.interestOps() | op);
+                selector.wakeup();
             }
         }
 
         void clearOp(int op) {
             synchronized (this) {
-                pendingOps &= ~op;
+                key.interestOps(key.interestOps() & ~op);
+                selector.wakeup();
             }
         }
 
@@ -167,28 +191,60 @@ class TPCChannelGroup
                TimeUnit unit, 
                Callable<R> callable)
         {
-            // TODO
+            if (timeout > 0) {
+                timeouts.add(new DelayedRunnable(timeout, unit) {
+                    public void run() {
+                        // set timeout exception on future
+                    }
+                });
+            }
             return null;
         }
     }
 
-    void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
-        throws IOException
-    {
-        if (timeout == 0)
-            return;
-/*
-        Selector sel = getSelectorProvider().openSelector();
-        channel.register(sel, ops);
-        if (sel.select(timeout) == 0)
-            throw new AbortedByTimeoutException();
-*/
+    int doSelect() throws IOException {
+        return selector.select(getSelectorTimeout());
+    }
+
+    int getSelectorTimeout() {
+        final Delayed t = timeouts.peek();
+        return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
+    }
+
+    public void run() {
+        try {
+            int rc = doSelect();
+            
+            if (! selector.isOpen()) {
+                // TODO
+                return;
+            }
+
+            List<DelayedRunnable> expired = new ArrayList<DelayedRunnable>();
+            timeouts.drainTo(expired);
+
+            for (Runnable r : expired)
+                r.run();
+
+            Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
+
+            while (keys.hasNext()) {
+                SelectionKey key = keys.next();
+                int readyOps = key.readyOps();
+                ReactiveAsyncOp<? extends SelectableChannel> op = getOp(key);
+                keys.remove();
+                op.ready(readyOps);
+            }
+            
+        } catch (Exception e) {
+            // TODO
+        }
     }
 
     /* Termination support. */
 
     private void tryTerminate() {
-        if (groupSize == 0) {
+        if (selector.keys().isEmpty()) {
             int state = runState;
             if (state == STOP || state == SHUTDOWN) {
                 runState = TERMINATED;
@@ -239,7 +295,7 @@ class TPCChannelGroup
      * {@inheritDoc}
      */
     @Override
-    public TPCChannelGroup shutdown() {
+    public ReactiveChannelGroup shutdown() {
         mainLock.lock();
         try {
             int state = runState;
@@ -253,11 +309,15 @@ class TPCChannelGroup
         }
     }
 
+    ReactiveAsyncOp<? extends SelectableChannel> getOp(SelectionKey key) {
+        return (ReactiveAsyncOp<? extends SelectableChannel>) key.attachment();
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
-    public TPCChannelGroup shutdownNow() throws IOException
+    public ReactiveChannelGroup shutdownNow() throws IOException
     {
         mainLock.lock();
         try {
@@ -265,8 +325,10 @@ class TPCChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (AsyncOp<?> op : channels)
-                forceClose(op);
+            Set<SelectionKey> keys = selector.keys();
+            selector.close();
+            for (SelectionKey key : keys)
+                forceClose(getOp(key));
 
             tryTerminate();
             return this;

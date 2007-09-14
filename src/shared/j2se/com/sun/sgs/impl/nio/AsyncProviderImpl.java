@@ -5,14 +5,11 @@
 package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
-import java.nio.channels.SelectableChannel;
-import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.concurrent.ExecutorService;
 
-import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
@@ -28,6 +25,8 @@ public class AsyncProviderImpl
     }
 
     protected AsyncProviderImpl(SelectorProvider selProvider) {
+        if (selProvider == null)
+            throw new NullPointerException("null SelectorProvider");
         selectorProvider = selProvider;
     }
 
@@ -73,22 +72,10 @@ public class AsyncProviderImpl
                 "AsynchronousChannelGroup not created by this provider");
         }
 
-        return (TPCChannelGroup) group;
+        return (AbstractAsyncChannelGroup) group;
     }
 
-    void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
-        throws IOException
-    {
-        if (timeout == 0)
-            return;
-
-        Selector sel = getSelectorProvider().openSelector();
-        channel.register(sel, ops);
-        if (sel.select(timeout) == 0)
-            throw new AbortedByTimeoutException();
-    }
-
-    SelectorProvider getSelectorProvider() {
+    SelectorProvider selectorProvider() {
         return selectorProvider;
     }
 
@@ -96,9 +83,9 @@ public class AsyncProviderImpl
      * {@inheritDoc}
      */
     @Override
-    public TPCChannelGroup
-        openAsynchronousChannelGroup(ExecutorService executor)
-            throws IOException
+    public AbstractAsyncChannelGroup
+    openAsynchronousChannelGroup(ExecutorService executor)
+        throws IOException
     {
         return new TPCChannelGroup(this, executor);
     }
@@ -108,10 +95,12 @@ public class AsyncProviderImpl
      */
     @Override
     public AsyncDatagramChannelImpl
-        openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
-            throws IOException
+    openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
+        throws IOException
     {
-        return new AsyncDatagramChannelImpl(checkGroup(group));
+        return new AsyncDatagramChannelImpl(
+            checkGroup(group).registerChannel(
+                selectorProvider.openDatagramChannel()));
     }
 
     /**
@@ -119,10 +108,12 @@ public class AsyncProviderImpl
      */
     @Override
     public AsyncServerSocketChannelImpl
-        openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
-            throws IOException
+    openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
+        throws IOException
     {
-        return new AsyncServerSocketChannelImpl(checkGroup(group));
+        return new AsyncServerSocketChannelImpl(
+            checkGroup(group).registerChannel(
+                selectorProvider.openServerSocketChannel()));
     }
 
     /**
@@ -133,6 +124,8 @@ public class AsyncProviderImpl
         openAsynchronousSocketChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return new AsyncSocketChannelImpl(checkGroup(group));
+        return new AsyncSocketChannelImpl(
+            checkGroup(group).registerChannel(
+                selectorProvider.openSocketChannel()));
     }
 }

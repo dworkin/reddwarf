@@ -13,7 +13,7 @@ import com.sun.sgs.nio.channels.IoFuture;
 
 public class AttachedFuture<R, A> implements IoFuture<R, A> {
     private final Future<R> future;
-    private A attachment;
+    private volatile A attachment;
 
     public static <R, A> AttachedFuture<R, A>
     wrap(Future<R> future, A attachment) {
@@ -26,7 +26,9 @@ public class AttachedFuture<R, A> implements IoFuture<R, A> {
     }
 
     public A attach(A ob) {
-        return attachment = ob;
+        A previous = attachment;
+        attachment = ob;
+        return previous;
     }
 
     public A attachment() {

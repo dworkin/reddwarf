@@ -52,24 +52,23 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AbstractAsyncChannelGroup channelGroup;
-    final DatagramChannel channel;
+    final AsyncOp<DatagramChannel> ops;
 
-    protected AsyncDatagramChannelImpl(AbstractAsyncChannelGroup group)
+
+    AsyncDatagramChannelImpl(AsyncOp<DatagramChannel> ops)
         throws IOException
     {
-        super(group.provider());
-        channelGroup = group;
-        channel = group.openDatagramChannel();
+        super(ops.group().provider());
+        this.ops = ops;
     }
 
     private void checkClosedAsync() {
-        if (! channel.isOpen())
+        if (! ops.isOpen())
             throw new ClosedAsynchronousChannelException();
     }
 
     private void checkConnected() {
-        if (! channel.isConnected())
+        if (! ops.channel().isConnected())
             throw new NotYetConnectedException();
     }
 
@@ -77,7 +76,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return channel.isOpen();
+        return ops.isOpen();
     }
 
     /**
@@ -85,7 +84,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channelGroup.closeChannel(channel);
+        ops.close();
     }
 
     /**
@@ -95,7 +94,7 @@ class AsyncDatagramChannelImpl
     public AsynchronousDatagramChannel bind(SocketAddress local)
         throws IOException
     {
-        final DatagramSocket socket = channel.socket();
+        final DatagramSocket socket = ops.channel().socket();
         if (socket.isClosed())
             throw new ClosedChannelException();
         if (socket.isBound())
@@ -111,7 +110,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return channel.socket().getLocalSocketAddress();
+        return ops.channel().socket().getLocalSocketAddress();
     }
 
     /**
@@ -128,42 +127,42 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
+        final DatagramSocket socket = ops.channel().socket();
         switch (stdOpt) {
         case SO_SNDBUF:
-            channel.socket().setSendBufferSize(((Integer)value).intValue());
+            socket.setSendBufferSize(((Integer)value).intValue());
             break;
 
         case SO_RCVBUF:
-            channel.socket().setReceiveBufferSize(((Integer)value).intValue());
+            socket.setReceiveBufferSize(((Integer)value).intValue());
             break;
 
         case SO_REUSEADDR:
-            channel.socket().setReuseAddress(((Boolean)value).booleanValue());
+            socket.setReuseAddress(((Boolean)value).booleanValue());
             break;
 
         case SO_BROADCAST:
-            channel.socket().setBroadcast(((Boolean)value).booleanValue());
+            socket.setBroadcast(((Boolean)value).booleanValue());
             break;
 
         case IP_TOS:
-            channel.socket().setTrafficClass(((Integer)value).intValue());
+            socket.setTrafficClass(((Integer)value).intValue());
             break;
 
         case IP_MULTICAST_IF: {
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             msocket.setNetworkInterface((NetworkInterface)value);
             break;
         }
 
         case IP_MULTICAST_TTL: {
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             msocket.setTimeToLive(((Integer)value).intValue());
             break;
         }
 
         case IP_MULTICAST_LOOP: {
-            // TODO should we reverse the value of this IP_MULTICAST_LOOP?
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             msocket.setLoopbackMode(((Boolean)value).booleanValue());
             break;
         }
@@ -182,35 +181,36 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
+        final DatagramSocket socket = ops.channel().socket();
         switch (stdOpt) {
         case SO_SNDBUF:
-            return channel.socket().getSendBufferSize();
+            return socket.getSendBufferSize();
 
         case SO_RCVBUF:
-            return channel.socket().getReceiveBufferSize();
+            return socket.getReceiveBufferSize();
 
         case SO_REUSEADDR:
-            return channel.socket().getReuseAddress();
+            return socket.getReuseAddress();
 
         case SO_BROADCAST:
-            return channel.socket().getBroadcast();
+            return socket.getBroadcast();
 
         case IP_TOS:
-            return channel.socket().getTrafficClass();
+            return socket.getTrafficClass();
 
         case IP_MULTICAST_IF: {
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             return msocket.getNetworkInterface();
         }
 
         case IP_MULTICAST_TTL: {
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             return msocket.getTimeToLive();
         }
 
         case IP_MULTICAST_LOOP: {
             // TODO should we reverse the value of this IP_MULTICAST_LOOP?
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) socket;
             return msocket.getLoopbackMode();
         }
 
@@ -253,7 +253,7 @@ class AsyncDatagramChannelImpl
     @Override
     public SocketAddress getConnectedAddress() throws IOException
     {
-        return channel.socket().getRemoteSocketAddress();
+        return ops.channel().socket().getRemoteSocketAddress();
     }
 
     /**
@@ -266,16 +266,17 @@ class AsyncDatagramChannelImpl
             CompletionHandler<Void, ? super A> handler)
     {
         checkClosedAsync();
-        if (channel.isConnected())
+        if (ops.channel().isConnected())
             throw new AlreadyConnectedException();
 
         // TODO ensure that only one of these is pending at a time
 
-        return channelGroup.submit(attachment, handler, new Callable<Void>() {
-            public Void call() throws IOException {
-                channel.connect(remote);
-                return null;
-            }});
+        return ops.submit(0, attachment, handler, 0, TimeUnit.MILLISECONDS,
+            new Callable<Void>() {
+                public Void call() throws IOException {
+                    ops.channel().connect(remote);
+                    return null;
+                }});
     }
 
     /**
@@ -287,11 +288,12 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
 
-        return channelGroup.submit(attachment, handler, new Callable<Void>() {
-            public Void call() throws IOException {
-                channel.disconnect();
-                return null;
-            }});
+        return ops.submit(0, attachment, handler, 0, TimeUnit.MILLISECONDS,
+            new Callable<Void>() {
+                public Void call() throws IOException {
+                    ops.channel().disconnect();
+                    return null;
+                }});
     }
 
     /**
@@ -299,7 +301,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return channelGroup.isOperationPending(channel, OP_READ);
+        return ops.isPending(OP_READ);
     }
 
     /**
@@ -307,7 +309,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return channelGroup.isOperationPending(channel, OP_WRITE);
+        return ops.isPending(OP_WRITE);
     }
 
     /**
@@ -322,14 +324,12 @@ class AsyncDatagramChannelImpl
             CompletionHandler<SocketAddress, ? super A> handler)
     {
         checkClosedAsync();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
 
-        return channelGroup.submit(
-            channel, OP_READ, attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_READ, attachment, handler, timeout, unit,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    return channel.receive(dst);
+                    return ops.channel().receive(dst);
             }});
     }
 
@@ -347,14 +347,12 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
 
-        return channelGroup.submit(
-            channel, OP_WRITE, attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.send(src, target);
+                    return ops.channel().send(src, target);
                 }});
     }
 
@@ -371,14 +369,12 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
 
-        return channelGroup.submit(
-            channel, OP_READ, attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.read(dst);
+                    return ops.channel().read(dst);
                 }});
     }
 
@@ -395,14 +391,12 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
 
-        return channelGroup.submit(
-            channel, OP_WRITE, attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.write(src);
+                    return ops.channel().write(src);
                 }});
     }
 }

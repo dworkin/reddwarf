@@ -16,6 +16,8 @@ public abstract class AsynchronousChannelGroup {
      * @param provider the asynchronous channel provider for this group
      */
     protected AsynchronousChannelGroup(AsynchronousChannelProvider provider) {
+        if (provider == null)
+            throw new NullPointerException("null provider");
         this.provider = provider;
     }
 

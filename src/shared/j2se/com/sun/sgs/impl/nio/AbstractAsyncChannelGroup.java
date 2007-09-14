@@ -1,18 +1,12 @@
 package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
-import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 abstract class AbstractAsyncChannelGroup
@@ -41,65 +35,21 @@ abstract class AbstractAsyncChannelGroup
             throw new ShutdownChannelGroupException();
     }
 
-    protected SelectorProvider getSelectorProvider() {
-        checkShutdown();
-        return ((AsyncProviderImpl) provider()).getSelectorProvider();
+    protected SelectorProvider selectorProvider() {
+        return ((AsyncProviderImpl) provider()).selectorProvider();
     }
 
-    SocketChannel acceptChannel(ServerSocketChannel channel)
-        throws IOException
-    {
-        checkShutdown();
-        return channel.accept();
+    abstract void
+    registerChannel(AsyncChannelImpl channel) throws IOException;
+
+    void
+    submit(AsyncChannelImpl channel, int op) {
+        submit(channel, op, 0, TimeUnit.MILLISECONDS);
     }
 
-    DatagramChannel openDatagramChannel() throws IOException {
-        checkShutdown();
-        return getSelectorProvider().openDatagramChannel();
-    }
-
-    ServerSocketChannel openServerSocketChannel() throws IOException {
-        checkShutdown();
-        return getSelectorProvider().openServerSocketChannel();
-    }
-
-    SocketChannel openSocketChannel() throws IOException {
-        checkShutdown();
-        return getSelectorProvider().openSocketChannel();
-    }
-
-    void closeChannel(SelectableChannel channel) throws IOException {
-        channel.close();
-    }
-
-    abstract boolean
-    isOperationPending(SelectableChannel channel, int op);
-
-    <R, A> IoFuture<R, A>
-    submit(A attachment,
-           CompletionHandler<R, ? super A> handler,
-           Callable<R> callable)
-    {
-        return submit(null, 0, attachment, handler, callable);
-    }
-
-    <R, A> IoFuture<R, A>
-    submit(SelectableChannel channel,
+    abstract void
+    submit(AsyncChannelImpl channel,
            int op,
-           A attachment,
-           CompletionHandler<R, ? super A> handler,
-           Callable<R> callable)
-    {
-        return submit(channel, op, attachment, handler, 0, null, callable);
-    }
-
-    abstract <R, A> IoFuture<R, A>
-    submit(SelectableChannel channel,
-           int op,
-           A attachment,
-           CompletionHandler<R, ? super A> handler,
            long timeout,
-           TimeUnit unit,
-           Callable<R> callable);
-
+           TimeUnit unit);
 }

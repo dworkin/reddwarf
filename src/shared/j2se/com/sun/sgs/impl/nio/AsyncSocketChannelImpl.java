@@ -11,6 +11,7 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
@@ -18,13 +19,18 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.ShutdownType;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
@@ -35,6 +41,7 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 
 final class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
+    implements AsyncChannelImpl
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -47,24 +54,36 @@ final class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AbstractAsyncChannelGroup channelGroup;
+    final AbstractAsyncChannelGroup group;
     final SocketChannel channel;
 
-    // For unconnected channels
+    final Object stateLock = new Object();
+
+    volatile FutureTask<?> connectTask;
+    volatile FutureTask<?> readTask;
+    volatile FutureTask<?> writeTask;
+
     AsyncSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
-        this(group, group.openSocketChannel());
+        this(group, group.selectorProvider().openSocketChannel());
     }
 
-    // For channels accepted via AsynchronousServerSocketChannel
-    AsyncSocketChannelImpl(AbstractAsyncChannelGroup group,
-                           SocketChannel channel)
+    AsyncSocketChannelImpl(AbstractAsyncChannelGroup group, SocketChannel channel)
         throws IOException
     {
         super(group.provider());
-        channelGroup = group;
+        this.group = group;
         this.channel = channel;
+        try {
+            group.registerChannel(this);
+        } catch (ShutdownChannelGroupException e) {
+            channel.close();
+        }
+    }
+
+    public SocketChannel channel() {
+        return channel;
     }
 
     private void checkClosedAsync() {
@@ -89,7 +108,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channelGroup.closeChannel(channel);
+        channel.close();
     }
 
     /**
@@ -132,25 +151,26 @@ final class AsyncSocketChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
+        final Socket socket = channel.socket();
         switch (stdOpt) {
         case SO_SNDBUF:
-            channel.socket().setSendBufferSize(((Integer)value).intValue());
+            socket.setSendBufferSize(((Integer)value).intValue());
             break;
 
         case SO_RCVBUF:
-            channel.socket().setReceiveBufferSize(((Integer)value).intValue());
+            socket.setReceiveBufferSize(((Integer)value).intValue());
             break;
 
         case SO_KEEPALIVE:
-            channel.socket().setKeepAlive(((Boolean)value).booleanValue());
+            socket.setKeepAlive(((Boolean)value).booleanValue());
             break;
 
         case SO_REUSEADDR:
-            channel.socket().setReuseAddress(((Boolean)value).booleanValue());
+            socket.setReuseAddress(((Boolean)value).booleanValue());
             break;
 
         case TCP_NODELAY:
-            channel.socket().setTcpNoDelay(((Boolean)value).booleanValue());
+            socket.setTcpNoDelay(((Boolean)value).booleanValue());
             break;
 
         default:
@@ -167,21 +187,22 @@ final class AsyncSocketChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
+        final Socket socket = channel.socket();
         switch (stdOpt) {
         case SO_SNDBUF:
-            return channel.socket().getSendBufferSize();
+            return socket.getSendBufferSize();
 
         case SO_RCVBUF:
-            return channel.socket().getReceiveBufferSize();
+            return socket.getReceiveBufferSize();
 
         case SO_KEEPALIVE:
-            return channel.socket().getKeepAlive();
+            return socket.getKeepAlive();
 
         case SO_REUSEADDR:
-            return channel.socket().getReuseAddress();
+            return socket.getReuseAddress();
 
         case TCP_NODELAY:
-            return channel.socket().getTcpNoDelay();
+            return socket.getTcpNoDelay();
 
         default:
             break;
@@ -232,7 +253,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isConnectionPending() {
-        return channelGroup.isOperationPending(channel, OP_CONNECT);
+        return connectTask != null;
     }
 
     /**
@@ -240,7 +261,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return channelGroup.isOperationPending(channel, OP_READ);
+        return readTask != null;
     }
 
     /**
@@ -248,7 +269,29 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return channelGroup.isOperationPending(channel, OP_WRITE);
+        return writeTask != null;
+    }
+
+    static <R, A> void
+    runCompletion(CompletionHandler<R, A> handler,
+                  A attachment,
+                  Future<R> future)
+    {
+        if (handler == null)
+            return;
+        handler.completed(AttachedFuture.wrap(future, attachment));
+    }
+
+    void selected(int ops) {
+        if ((ops & OP_CONNECT) != 0 && connectTask != null) {
+            connectTask.run();
+        }
+        if ((ops & OP_READ) != 0 && readTask != null) {
+            readTask.run();
+        }
+        if ((ops & OP_WRITE) != 0 && writeTask != null) {
+            writeTask.run();
+        }
     }
 
     /**
@@ -257,20 +300,38 @@ final class AsyncSocketChannelImpl
     @Override
     public <A> IoFuture<Void, A> connect(
         final SocketAddress remote,
-        A attachment,
-        CompletionHandler<Void, ? super A> handler)
+        final A attachment,
+        final CompletionHandler<Void, ? super A> handler)
     {
-        checkClosedAsync();
-        if (channel.isConnected())
-            throw new AlreadyConnectedException();
 
-        return channelGroup.submit(
-            channel, OP_CONNECT, attachment, handler,
+        FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
                 public Void call() throws IOException {
                     channel.connect(remote);
                     return null;
-                }});
+               }})
+            {
+                @Override
+                protected void done()
+                {
+                    connectTask = null;
+                    runCompletion(handler, attachment, this);
+                }
+            };
+
+        synchronized (stateLock) {
+            checkClosedAsync();
+            if (channel.isConnected())
+                throw new AlreadyConnectedException();
+            if (isConnectionPending())
+                throw new ConnectionPendingException();
+
+             connectTask = task;
+        }
+
+        group.submit(this, OP_CONNECT);
+
+        return AttachedFuture.wrap(task, attachment);
     }
 
     /**
@@ -287,14 +348,10 @@ final class AsyncSocketChannelImpl
         checkClosedAsync();
         checkConnected();
 
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
-
-        return channelGroup.submit(
-            channel, OP_READ, attachment, handler, timeout, unit,
+        return ops.submit(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.read(dst);
+                    return ops.channel().read(dst);
                 }});
     }
 
@@ -313,19 +370,17 @@ final class AsyncSocketChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
         if ((offset < 0) || (offset >= dsts.length))
             throw new IllegalArgumentException("offset out of range");
         if ((length < 0) || (length > (dsts.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        return channelGroup.submit(
-            channel, OP_READ, attachment, handler, timeout, unit,
-                new Callable<Long>() {
-                    public Long call() throws IOException {
-                        return channel.read(dsts, offset, length);
-                    }});
+        return ops.submit(
+            OP_READ, attachment, handler, timeout, unit,
+            new Callable<Long>() {
+                public Long call() throws IOException {
+                    return ops.channel().read(dsts, offset, length);
+                }});
     }
 
     /**
@@ -341,14 +396,12 @@ final class AsyncSocketChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
 
-        return channelGroup.submit(channel, OP_WRITE,
-            attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.write(src);
+                    return ops.channel().write(src);
                 }});
     }
 
@@ -367,18 +420,16 @@ final class AsyncSocketChannelImpl
     {
         checkClosedAsync();
         checkConnected();
-        if (timeout < 0)
-            throw new IllegalArgumentException("timeout can't be negative");
         if ((offset < 0) || (offset >= srcs.length))
             throw new IllegalArgumentException("offset out of range");
         if ((length < 0) || (length > (srcs.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        return channelGroup.submit(channel, OP_WRITE,
-            attachment, handler, timeout, unit,
+        return ops.submit(
+            OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return channel.write(srcs, offset, length);
+                    return ops.channel().write(srcs, offset, length);
                 }});
     }
 }
