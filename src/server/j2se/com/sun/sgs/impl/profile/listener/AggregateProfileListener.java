@@ -56,13 +56,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * port used is 43005.
  * <p>
  * The
- * <code>com.sun.sgs.impl.profile.listener.AggregateProfileOpListener.</code>
+ * <code>com.sun.sgs.impl.profile.listener.AggregateProfileListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
-public class AggregateProfileOpListener implements ProfileListener {
+public class AggregateProfileListener implements ProfileListener {
 
     private int maxOp = 0;
     private Map<Integer,ProfileOperation> registeredOps =
@@ -99,7 +99,7 @@ public class AggregateProfileOpListener implements ProfileListener {
 
     // the base name for properties
     private static final String PROP_BASE =
-        AggregateProfileOpListener.class.getName();
+        AggregateProfileListener.class.getName();
 
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
@@ -108,7 +108,7 @@ public class AggregateProfileOpListener implements ProfileListener {
     private static final long DEFAULT_PERIOD = 5000;
 
     /**
-     * Creates an instance of <code>SnapshotProfileOpListener</code>.
+     * Creates an instance of <code>AggregateProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
      * @param owner the <code>TaskOwner</code> to use for all tasks run by
@@ -120,9 +120,9 @@ public class AggregateProfileOpListener implements ProfileListener {
      *
      * @throws IOException if the server socket cannot be created
      */
-    public AggregateProfileOpListener(Properties properties, TaskOwner owner,
-                                      TaskScheduler taskScheduler,
-                                      ResourceCoordinator resourceCoord)
+    public AggregateProfileListener(Properties properties, TaskOwner owner,
+                                    TaskScheduler taskScheduler,
+                                    ResourceCoordinator resourceCoord)
         throws IOException
     {
 	aggregateCounters = new ConcurrentHashMap<String,Long>();

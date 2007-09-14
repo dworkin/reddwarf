@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * users may connect to that socket to watch the reports. The default
  * port used is 43007.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener.</code>
+ * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
@@ -66,7 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @see AggregateTaskListener
  */
-public class SnapshotProfileOpListener implements ProfileListener {
+public class SnapshotProfileListener implements ProfileListener {
 
     // the number of successful tasks and the total number of tasks
     private volatile long successCount = 0;
@@ -90,7 +90,7 @@ public class SnapshotProfileOpListener implements ProfileListener {
 
     // the base name for properties
     private static final String PROP_BASE =
-        SnapshotProfileOpListener.class.getName();
+        SnapshotProfileListener.class.getName();
 
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
@@ -99,7 +99,7 @@ public class SnapshotProfileOpListener implements ProfileListener {
     private static final long DEFAULT_PERIOD = 10000;
 
     /**
-     * Creates an instance of <code>SnapshotProfileOpListener</code>.
+     * Creates an instance of <code>SnapshotProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
      * @param owner the <code>TaskOwner</code> to use for all tasks run by
@@ -111,9 +111,9 @@ public class SnapshotProfileOpListener implements ProfileListener {
      *
      * @throws IOException if the server socket cannot be created
      */
-    public SnapshotProfileOpListener(Properties properties, TaskOwner owner,
-                                     TaskScheduler taskScheduler,
-                                     ResourceCoordinator resourceCoord)
+    public SnapshotProfileListener(Properties properties, TaskOwner owner,
+                                   TaskScheduler taskScheduler,
+                                   ResourceCoordinator resourceCoord)
         throws IOException
     {
         flag = new AtomicBoolean(false);

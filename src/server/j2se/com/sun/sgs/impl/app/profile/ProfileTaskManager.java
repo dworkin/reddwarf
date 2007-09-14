@@ -23,10 +23,10 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
-import com.sun.sgs.kernel.ProfileConsumer;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /**
