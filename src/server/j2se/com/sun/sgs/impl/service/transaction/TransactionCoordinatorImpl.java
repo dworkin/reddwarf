@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
