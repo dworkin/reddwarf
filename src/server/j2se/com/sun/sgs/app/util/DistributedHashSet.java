@@ -77,14 +77,14 @@ import com.sun.sgs.app.ManagedReference;
  * ManagedObject}, the developer will be responsible for removing
  * these objects from the {@code DataManager} when done with them.
  * Developers should not remove these object from the {@code
- * DataManger} prior to removing them from the set.
+ * DataManager} prior to removing them from the set.
  *
  * <p>
  *
  * This class offers constant time operations for {@code add}, {@code
  * remove}, {@code contains}, and {@code isEmpty}.  Unlike {@code
  * HashSet}, the {@code size} and {@code clear} operations are not
- * constant time; these two operations reqiuire a traversal of all the
+ * constant time; these two operations require a traversal of all the
  * elements in the set.  Like {@code HashSet}, this class permits the
  * {@code null} element.
  *
@@ -105,14 +105,19 @@ import com.sun.sgs.app.ManagedReference;
  * after a change is made.  An iterator may ignore additions and
  * removals to the associated collection that occur before the
  * iteration site.  This set provides no guarantees on the order of
- * elements when iterating.
+ * elements when iterating.  
  *
  * <p>
  *
- * An instance of {@code DistributedHashSet} offers one parameters for
+ * The {@code Iterator} for this set implements all optional
+ * operations.
+ *
+ * <p>
+ *
+ * An instance of {@code DistributedHashSet} offers one parameter for
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  This
- * parameter acts as a hint to the backing qmap on how to perform
+ * parameter acts as a hint to the backing map on how to perform
  * resizing.  As the set grows, the number of supported parallel
  * operations will also grow beyond the specified minimum.  Setting
  * the minimum concurrency too high will waste space and time, while
@@ -123,9 +128,11 @@ import com.sun.sgs.app.ManagedReference;
  *
  * Since the expected distribution of objects in the set is
  * essentially random, the actual concurrency will vary.  Developers
- * are stronly encouraged to use hash codes that provide a normal
+ * are strongly encouraged to use hash codes that provide a normal
  * distribution; a large number of collisions will likely reduce the
  * performance.
+ *
+ * @param <E> the type of elements maintained by this set
  *
  * @see Object#hashCode()
  * @see java.util.Set
@@ -175,7 +182,7 @@ public class DistributedHashSet<E>
      */
     public DistributedHashSet(int minConcurrency) {
 	map = AppContext.getDataManager().
-	    createReference(new DistributedHashMap<E,Marker>(minConcurrency));	
+	    createReference(new DistributedHashMap<E,Marker>(minConcurrency));
     }
 
     /**
@@ -215,19 +222,14 @@ public class DistributedHashSet<E>
     /**
      * {@inheritDoc}
      */
-    public int hashCode() {
-	return AppContext.getDataManager().
-	    createReference(this).getId().intValue();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public boolean equals(Object o) {
+	/// perform quick to check to see if o is really an instance
+	/// of this set
 	if (o instanceof DistributedHashSet) {
 	    DataManager dm = AppContext.getDataManager();
-	    return dm.createReference(this).
-		equals(dm.createReference((DistributedHashSet)o));
+	    if (dm.createReference(this).
+		equals(dm.createReference((DistributedHashSet)o)))
+		return true;
 	}
 	return super.equals(o);
     }
