@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.transaction;
 
-import com.sun.sgs.kernel.ProfileParticipantDetail;
+import com.sun.sgs.profile.ProfileParticipantDetail;
 
 
 /**
