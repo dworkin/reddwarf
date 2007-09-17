@@ -1799,7 +1799,10 @@ public class DataStoreImpl
 	 * If we're throwing an exception saying that the transaction was
 	 * aborted, then make sure to abort the transaction now.
 	 */
-	if (re instanceof TransactionAbortedException && txn != null) {
+	if (re instanceof TransactionAbortedException &&
+	    txn != null &&
+	    !txn.isAborted())
+	{
 	    txn.abort(re);
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);

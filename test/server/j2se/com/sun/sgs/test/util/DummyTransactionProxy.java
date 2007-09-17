@@ -49,25 +49,13 @@ public class DummyTransactionProxy implements TransactionProxy {
 
     /* -- Implement TransactionProxy -- */
 
-    /**
-     * Note that this implementation also aborts the transaction if it has
-     * timed out.  This behavior roughly simulates the way that tasks
-     * automatically abort timed out transactions, even though it is not the
-     * transaction proxy that is responsible for this behavior in the product.
-     * -tjb@sun.com (06/14/2007)
-     */
     public Transaction getCurrentTransaction() {
 	Transaction txn = threadTxn.get();
 	if (txn == null) {
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
-	try {
-	    txn.checkTimeout();
-	} catch (TransactionTimeoutException e) {
-	    txn.abort(e);
-	    throw e;
-	}
+	txn.checkTimeout();
 	return txn;
     }
 
