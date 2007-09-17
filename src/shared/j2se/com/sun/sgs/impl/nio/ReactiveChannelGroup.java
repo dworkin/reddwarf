@@ -4,6 +4,11 @@
 
 package com.sun.sgs.impl.nio;
 
+import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static java.nio.channels.SelectionKey.OP_CONNECT;
+import static java.nio.channels.SelectionKey.OP_READ;
+import static java.nio.channels.SelectionKey.OP_WRITE;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.ConnectionPendingException;
@@ -19,6 +24,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -109,25 +116,87 @@ class ReactiveChannelGroup
     }
 
     @Override
-    <T extends SelectableChannel> AsyncOp<T> registerChannel(T channel)
-    throws IOException
-    {
+    void registerChannel(SelectableChannel channel) throws IOException {
         mainLock.lock();
         try {
             if (isShutdown()) {
-                forceClose(channel);
+                try {
+                    channel.close();
+                } catch (IOException ignore) { }
                 throw new ShutdownChannelGroupException();
-           }
-           return new ReactiveAsyncOp<T>(channel);
+            }
+            channel.register(selector, 0, new KeyDispatcher(channel));
         } finally {
             mainLock.unlock();
         }
-        
     }
 
-    <T extends SelectableChannel> void channelClosed(AsyncOp<T> ops) {
+    final class KeyDispatcher {
+        private final SelectableChannel channel;
+
+        private volatile FutureTask<?> acceptFuture = null;
+        private volatile FutureTask<?> connectFuture = null;
+        private volatile FutureTask<?> readFuture = null;
+        private volatile FutureTask<?> writeFuture = null;
+
+        KeyDispatcher(SelectableChannel channel) {
+            this.channel = channel;
+        }
+
+        void close() throws IOException {
+            if (acceptFuture != null) {
+                acceptFuture.cancel(true);
+                acceptFuture = null;
+            }
+            if (connectFuture != null) {
+                connectFuture.cancel(true);
+                connectFuture = null;
+            }
+            if (readFuture != null) {
+                readFuture.cancel(true);
+                readFuture = null;
+            }
+            if (writeFuture != null) {
+                writeFuture.cancel(true);
+                writeFuture = null;
+            }
+            channel.close();
+        }
+
+        void selected(SelectionKey key) throws IOException {
+            if (key.isAcceptable() && acceptFuture != null) {
+                acceptFuture.run();
+                acceptFuture = null;
+            }
+            if (key.isConnectable() && connectFuture != null) {
+                connectFuture.run();
+                connectFuture = null;
+            }
+            if (key.isReadable() && readFuture != null) {
+                readFuture.run();
+                readFuture = null;
+            }
+            if (key.isWritable() && writeFuture != null) {
+                writeFuture.run();
+                writeFuture = null;
+            }
+        }
+    }
+
+    KeyDispatcher getDispatcher(SelectableChannel channel) {
+        return getDispatcher(channel.keyFor(selector));
+    }
+
+    KeyDispatcher getDispatcher(SelectionKey key) {
+        return (KeyDispatcher) key.attachment();
+    }
+
+    void closeChannel(SelectableChannel channel) {
         mainLock.lock();
         try {
+            try {
+                getDispatcher(channel).close();
+            } catch (IOException ignore) { }
             tryTerminate();
         } finally {
             mainLock.unlock();
@@ -351,5 +420,18 @@ class ReactiveChannelGroup
     protected void finalize() {
         // TODO is this actually useful? -JM
         shutdown();
+    }
+
+
+    void selected(int ops) {
+        if ((ops & OP_CONNECT) != 0 && connectTask != null) {
+            connectTask.run();
+        }
+        if ((ops & OP_READ) != 0 && readTask != null) {
+            readTask.run();
+        }
+        if ((ops & OP_WRITE) != 0 && writeTask != null) {
+            writeTask.run();
+        }
     }
 }

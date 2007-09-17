@@ -98,9 +98,7 @@ public class AsyncProviderImpl
     openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
         throws IOException
     {
-        return new AsyncDatagramChannelImpl(
-            checkGroup(group).registerChannel(
-                selectorProvider.openDatagramChannel()));
+        return checkGroup(group).openAsynchronousDatagramChannel();
     }
 
     /**
@@ -111,9 +109,7 @@ public class AsyncProviderImpl
     openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
         throws IOException
     {
-        return new AsyncServerSocketChannelImpl(
-            checkGroup(group).registerChannel(
-                selectorProvider.openServerSocketChannel()));
+        return checkGroup(group).openAsynchronousServerSocketChannel();
     }
 
     /**
@@ -124,8 +120,6 @@ public class AsyncProviderImpl
         openAsynchronousSocketChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return new AsyncSocketChannelImpl(
-            checkGroup(group).registerChannel(
-                selectorProvider.openSocketChannel()));
+        return checkGroup(group).openAsynchronousSocketChannel();
     }
 }

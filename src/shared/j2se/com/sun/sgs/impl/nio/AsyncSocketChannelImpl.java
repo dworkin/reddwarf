@@ -57,7 +57,7 @@ final class AsyncSocketChannelImpl
     final AbstractAsyncChannelGroup group;
     final SocketChannel channel;
 
-    final Object stateLock = new Object();
+    final Object mainLock = new Object();
 
     volatile FutureTask<?> connectTask;
     volatile FutureTask<?> readTask;
@@ -75,11 +75,7 @@ final class AsyncSocketChannelImpl
         super(group.provider());
         this.group = group;
         this.channel = channel;
-        try {
-            group.registerChannel(this);
-        } catch (ShutdownChannelGroupException e) {
-            channel.close();
-        }
+        group.registerChannel(channel);
     }
 
     public SocketChannel channel() {
@@ -108,7 +104,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        channel.close();
+        group.closeChannel(channel);
     }
 
     /**
@@ -272,28 +268,6 @@ final class AsyncSocketChannelImpl
         return writeTask != null;
     }
 
-    static <R, A> void
-    runCompletion(CompletionHandler<R, A> handler,
-                  A attachment,
-                  Future<R> future)
-    {
-        if (handler == null)
-            return;
-        handler.completed(AttachedFuture.wrap(future, attachment));
-    }
-
-    void selected(int ops) {
-        if ((ops & OP_CONNECT) != 0 && connectTask != null) {
-            connectTask.run();
-        }
-        if ((ops & OP_READ) != 0 && readTask != null) {
-            readTask.run();
-        }
-        if ((ops & OP_WRITE) != 0 && writeTask != null) {
-            writeTask.run();
-        }
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -319,7 +293,7 @@ final class AsyncSocketChannelImpl
                 }
             };
 
-        synchronized (stateLock) {
+        synchronized (mainLock) {
             checkClosedAsync();
             if (channel.isConnected())
                 throw new AlreadyConnectedException();
