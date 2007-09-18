@@ -24,13 +24,16 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -108,11 +111,11 @@ class ReactiveChannelGroup
         executor().execute(this);
     }
 
-    ConcurrentLinkedQueue<SelectableChannel> registrations =
-        new ConcurrentLinkedQueue<SelectableChannel>();
+    BlockingQueue<Runnable> tasks =
+        new LinkedBlockingQueue<Runnable>();
 
     @Override
-    void registerChannel(SelectableChannel channel) throws IOException {
+    void registerChannel(final SelectableChannel channel) throws IOException {
         mainLock.lock();
         try {
             if (isShutdown()) {
@@ -122,8 +125,28 @@ class ReactiveChannelGroup
                 throw new ShutdownChannelGroupException();
             }
             channel.configureBlocking(false);
-            registrations.add(channel);
+            FutureTask<Void> task = new FutureTask<Void>(
+                new Callable<Void>() {
+                    public Void call() throws IOException {
+                        channel.register(selector, 0, new KeyDispatcher(channel));
+                        return null;
+                    }
+                });
+            tasks.add(task);
             selector.wakeup();
+            try {
+                task.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException(e);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof IOException)
+                    throw (IOException) cause;
+                if (cause instanceof RuntimeException)
+                    throw (RuntimeException) cause;
+                throw new RuntimeException(cause);
+            }
         } finally {
             mainLock.unlock();
         }
@@ -310,13 +333,11 @@ class ReactiveChannelGroup
                 getDispatcher(op.getChannel()).setException(op.getOp(),
                     new AbortedByTimeoutException());
             }
-            
-            while (true) {
-                SelectableChannel channel = registrations.poll();
-                if (channel == null)
-                    break;
-                channel.register(selector, 0, new KeyDispatcher(channel));
-            }
+
+            List<Runnable> ts = new ArrayList<Runnable>();
+            tasks.drainTo(ts);
+            for (Runnable r : ts)
+                r.run();
 
             executor().execute(this);
             

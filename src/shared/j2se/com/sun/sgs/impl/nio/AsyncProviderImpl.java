@@ -88,7 +88,7 @@ public class AsyncProviderImpl
     openAsynchronousChannelGroup(ExecutorService executor)
         throws IOException
     {
-        return new TPCChannelGroup(this, executor);
+        return new ReactiveChannelGroup(this, executor);
     }
 
     /**
