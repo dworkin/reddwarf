@@ -16,7 +16,8 @@ public interface RecoveryService extends Service {
      * is currently designated.  This method must be called within a
      * transaction.
      *
-     * <p>Note: this method should be moved to the Node interface.
+     * <p>Note: this method should probably be moved to the Node
+     * interface.
      *
      * @param	nodeId a node ID
      * @return	a backup node, or {@code null}

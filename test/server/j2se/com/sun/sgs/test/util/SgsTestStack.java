@@ -197,7 +197,7 @@ public class SgsTestStack {
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	// TBD: does this need to be done?
-	//serviceRegistry.registerAppContext();
+	serviceRegistry.registerAppContext();
 	
 	// services ready
 	dataService.ready();
@@ -240,14 +240,12 @@ public class SgsTestStack {
 	    watchdogService.shutdown();
 	    watchdogService = null;
 	}
-        if (dataService != null) {
+        if (clean) {
             dataService.shutdown();
             dataService = null;
-        }
-        if (clean) {
             deleteDirectory(dbDirectory);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        //MinimalTestKernel.destroyContext(appContext);
     }
 
     /**

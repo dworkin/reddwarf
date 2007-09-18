@@ -415,7 +415,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		notifyClientsLock.notifyAll();
 	    }
 
-	    logger.log(Level.FINEST, "node:{0} registered", node);
+	    logger.log(Level.INFO, "node:{0} registered", node);
 	    return new long[]{nodeId, renewInterval};
 	    
 	} finally {
@@ -815,7 +815,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    changedNodes.add(iter.next());
 		    iter.remove();
 		}
-		
+
 		notifyClients(aliveNodes.values(), changedNodes);
 	    }
 	}
@@ -841,17 +841,23 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 
 	int i = 0;
 	for (NodeImpl changedNode : changedNodes) {
+	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
 	    status[i] = changedNode.isAlive();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
 	}
-	
+
 	// Notify clients of status changes.
 	for (NodeImpl notifyNode : notifyNodes) {
 	    WatchdogClient client = notifyNode.getWatchdogClient();
 	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"notifying client:{0} of status change", notifyNode);
+		}
 		client.nodeStatusChanges(ids, hosts, status, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in

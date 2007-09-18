@@ -581,7 +581,9 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			if (isLocalNodeAliveNonTransactional()) {
+			if (! shuttingDown() &&
+			    isLocalNodeAliveNonTransactional()) 
+			{
 			    if (node.isAlive()) {
 				nodeListener.nodeStarted(node);
 			    } else {
@@ -600,6 +602,10 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
      * @param	node a node	
      */
     private void notifyRecoveryListeners(final Node node) {
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
+		       localNodeId, node.getId());
+	}
 	Queue<RecoveryCompleteFuture> futureQueue =
 	    new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
 	if (recoveryFutures.putIfAbsent(node, futureQueue) != null) {
@@ -616,7 +622,9 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 		new AbstractKernelRunnable() {
 		    public void run() {
 			try {
-			    if (isLocalNodeAliveNonTransactional()) {
+			    if (! shuttingDown() &&
+				isLocalNodeAliveNonTransactional())
+			    {
 				recoveryListener.recover(node, future);
 			    }
 			} catch (Exception e) {

@@ -33,10 +33,11 @@ class NodeImpl
     private static final long INVALID_ID = -1L;
 
     /** The name of this class. */
-    static final String CLASSNAME = NodeImpl.class.getName();
+    private static final String PKG_NAME =
+	"com.sun.sgs.impl.service.watchdog";
 
     /** The prefix for NodeImpl state. */
-    private static final String NODE_PREFIX = CLASSNAME;
+    private static final String NODE_PREFIX = PKG_NAME + ".node";
 
     /** The node id. */
     private final long id;
@@ -168,7 +169,8 @@ class NodeImpl
     /** {@inheritDoc} */
     public String toString() {
 	return getClass().getName() + "[" + id + "," +
-	    (isAlive() ? "alive" : "failed") + "]@" + host;
+	    (isAlive() ? "alive" : "failed") + ",backup:" +
+	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;
     }
 
     /* -- package access methods -- */

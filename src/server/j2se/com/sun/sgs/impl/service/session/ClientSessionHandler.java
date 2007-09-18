@@ -35,8 +35,8 @@ import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
 
 /**
- * Handles sending/receiving bytes messages to/from a client session
- * and disconnecting a client session.
+ * Handles sending/receiving messages to/from a client session and
+ * disconnecting a client session.
  */
 class ClientSessionHandler {
 
@@ -107,9 +107,6 @@ class ClientSessionHandler {
     
     /** The connection state, accessed. */
     private State state = State.CONNECTING;
-
-    /** The client session listener for this client session.*/
-    private volatile SessionListener sessionListener;
 
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
@@ -252,7 +249,7 @@ class ClientSessionHandler {
 
 	sessionService.disconnected(sessionImpl);
 	
-	if (identity != null && sessionListener != null) {
+	if (identity != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
 	    // may happen out of order with respect to the
 	    // 'notifyLoggedIn' callback.  Also, this notification may
@@ -287,14 +284,15 @@ class ClientSessionHandler {
 	    }
 	}
 
-	if (sessionListener != null) {
-	    scheduleTask(new AbstractKernelRunnable() {
-		public void run() throws IOException {
-		    sessionListener.get().disconnected(graceful);
-		    sessionListener.remove();
-		    sessionImpl.removeSession(dataService, idBytes);
-		}});
-	}
+	scheduleTask(new AbstractKernelRunnable() {
+	    public void run() throws IOException {
+		ClientSessionImpl sessionImpl =
+		    ClientSessionImpl.getSession(dataService, idBytes);
+		if (sessionImpl != null) {
+		    sessionImpl.
+			notifyListenerAndRemoveSession(dataService, graceful);
+		}
+	    }});
     }
 
     /**
@@ -553,7 +551,8 @@ class ClientSessionHandler {
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
-			    sessionListener.get().receivedMessage(clientMessage);
+			    sessionImpl.getClientSessionListener(dataService).
+				receivedMessage(clientMessage);
 			}
 		    }});
 		break;
@@ -632,7 +631,8 @@ class ClientSessionHandler {
 		return;
 	    }
 
-	    if (node.getId() == sessionService.getLocalNodeId()) {
+	    long assignedNodeId = node.getId();
+	    if (assignedNodeId == sessionService.getLocalNodeId()) {
 		/*
 		 * Handle login request locally.
 		 */
@@ -641,7 +641,8 @@ class ClientSessionHandler {
 			sessionService.txnProxy,
 			sessionService.nonDurableTaskScheduler,
 			authenticatedIdentity);
-		sessionImpl.setIdentity(authenticatedIdentity);
+		sessionImpl.setIdentityAndNodeId(
+		    authenticatedIdentity, assignedNodeId);
 		identity = authenticatedIdentity;
 		scheduleTask(new LoginTask());
 		
@@ -755,76 +756,6 @@ class ClientSessionHandler {
     }
 
     /**
-     * Wrapper for persisting a {@code ClientSessionListener} that is
-     * either a {@code ManagedObject} or {@code Serializable}.
-     */
-    private class SessionListener {
-
-	private final String listenerKey;
-
-	private final boolean isManaged;
-
-	@SuppressWarnings("hiding")
-	SessionListener(ClientSessionListener listener) {
-	    assert listener != null && listener instanceof Serializable;
-	    
-	    ManagedObject managedObj;
-	    if (listener instanceof ManagedObject) {
-		isManaged = true;
-		managedObj = (ManagedObject) listener;
-		
-	    } else {
-		// listener is simply Serializable
-		isManaged = false;
-		managedObj = new ClientSessionListenerWrapper(listener);
-	    }
-	    
-	    listenerKey = sessionService.getListenerKey(idBytes);
-	    dataService.setServiceBinding(listenerKey, managedObj);
-	}
-
-	ClientSessionListener get() {
-	    ManagedObject obj = 
-		    dataService.getServiceBinding(
-			listenerKey, ManagedObject.class);
-	    return
-		(isManaged) ?
-		((ClientSessionListener) obj) :
-		((ClientSessionListenerWrapper) obj).get();
-	}
-
-	void remove() {
-	    if (!isManaged) {
-		ClientSessionListenerWrapper wrapper =
-		    dataService.getServiceBinding(
-			listenerKey, ClientSessionListenerWrapper.class);
-		dataService.removeObject(wrapper);
-	    }
-	    dataService.removeServiceBinding(listenerKey);
-	}
-    }
-
-    /**
-     * A {@code ManagedObject} wrapper for a {@code ClientSessionListener}.
-     */
-    static class ClientSessionListenerWrapper
-	implements ManagedObject, Serializable
-    {
-	private final static long serialVersionUID = 1L;
-	
-	private ClientSessionListener listener;
-
-	ClientSessionListenerWrapper(ClientSessionListener listener) {
-	    assert listener != null && listener instanceof Serializable;
-	    this.listener = listener;
-	}
-
-	ClientSessionListener get() {
-	    return listener;
-	}
-    }
-
-    /**
      * This is a transactional task to obtain the node assignment for
      * a given identity.
      */
@@ -896,10 +827,8 @@ class ClientSessionHandler {
 		    Level.FINEST,
 		    "AppListener.loggedIn returned {0}", returnedListener);
 
-		// TBD: This listener should be removed if the transaction
-		// aborts; i.e., the listener should only be set if the
-		// transaction commits.  -- ann (8/29/07)
-		sessionListener = new SessionListener(returnedListener);
+		sessionImpl.putClientSessionListener(
+		    dataService, returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
 			3 + compactId.getExternalFormByteCount() +

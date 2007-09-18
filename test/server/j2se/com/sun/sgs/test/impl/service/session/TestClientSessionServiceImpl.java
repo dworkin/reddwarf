@@ -61,10 +61,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final String THROW_RUNTIME_EXCEPTION =
 	"throw RuntimeException";
+
+    private static final String SESSION_PREFIX =
+	"com.sun.sgs.impl.service.session.proxy";
+
+    private static final String SESSION_NODE_PREFIX =
+	"com.sun.sgs.impl.service.session.node";
     
     private static final String LISTENER_PREFIX =
-	ClientSessionServiceImpl.LISTENER_PREFIX;
-    
+	"com.sun.sgs.impl.service.session.listener";
+
+    private static final String NODE_PREFIX =
+	"com.sun.sgs.impl.service.watchdog.node";
+
     /** The SGS server stack. */
     private SgsTestStack serverStack;
     
@@ -126,7 +135,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", "TestClientSessionServiceImpl",
+		    "com.sun.sgs.app.name", APP_NAME,
 		    "com.sun.sgs.app.port", "0");
 	    new ClientSessionServiceImpl(props, null,
 					 new DummyTransactionProxy());
@@ -140,7 +149,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", "TestClientSessionServiceImpl",
+		    "com.sun.sgs.app.name", APP_NAME,
 		    "com.sun.sgs.app.port", "0");
 	    new ClientSessionServiceImpl(props,
 					 new DummyComponentRegistry(), null);
@@ -165,7 +174,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", "TestClientSessionServiceImpl");
+		    "com.sun.sgs.app.name", APP_NAME);
 	    new ClientSessionServiceImpl(
 		props, new DummyComponentRegistry(),
 		new DummyTransactionProxy());
@@ -350,11 +359,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	String name = "testRemoveListener";
 	DummyClient client = new DummyClient(name);
+	SgsTestStack stack1 = null;
 	try {
+	    List<String> nodeKeys = getServiceBindingKeys(NODE_PREFIX);
+	    System.err.println("Node keys: " + nodeKeys);
+	    if (nodeKeys.isEmpty()) {
+		fail("no node keys");
+	    } else if (nodeKeys.size() > 1) {
+		fail("more than one node key");
+	    }
+	    
 	    client.connect(serverStack.getAppPort());
 	    client.login("password");
 
-	    Set<String> listenerKeys = getClientSessionListenerKeys();
+	    List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
 	    System.err.println("Listener keys: " + listenerKeys);
 	    if (listenerKeys.isEmpty()) {
 		fail("no listener keys");
@@ -362,37 +380,83 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("more than one listener key");
 	    }
 	    
+	    List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
+	    System.err.println("Session keys: " + sessionKeys);
+	    if (sessionKeys.isEmpty()) {
+		fail("no session keys");
+	    } else if (sessionKeys.size() > 1) {
+		fail("more than one session key");
+	    }
+	    
+	    List<String> sessionNodeKeys =
+		getServiceBindingKeys(SESSION_NODE_PREFIX);
+	    System.err.println("Session node keys: " + sessionNodeKeys);
+	    if (sessionNodeKeys.isEmpty()) {
+		fail("no session node keys");
+	    } else if (sessionNodeKeys.size() > 1) {
+		fail("more than one session node key");
+	    }
+
             // Simulate "crash"
             tearDown(false);
+	    String failedNodeKey = nodeKeys.get(0);
             serverStack.setUp(false);
 	    dataService = serverStack.getDataService();
-	    
+	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
+		fail("Failed node key prematurely removed: " + failedNodeKey);
+	    }
+	    stack1 = new SgsTestStack(APP_NAME, serverStack);
+	    stack1.setUp(false);
 	    client.checkDisconnected(false);
 
-	    if (!getClientSessionListenerKeys().isEmpty()) {
+	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
+	    if (! listenerKeys.isEmpty()) {
+		System.err.println("Listener key not removed: " + listenerKeys);
 		fail("listener key not removed!");
 	    }
+	    sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
+	    if (! sessionKeys.isEmpty()) {
+		System.err.println("Session keys not removed: " + sessionKeys);
+		fail("session keys not removed!");
+	    }
+	    
+	    sessionNodeKeys = getServiceBindingKeys(SESSION_NODE_PREFIX);
+	    if (! sessionNodeKeys.isEmpty()) {
+		System.err.println("Session keys not removed: " + sessionNodeKeys);
+		fail("session node keys not removed!");
+	    }
+	    // Wait to make sure that node key is cleaned up.
+	    Thread.sleep(WAIT_TIME);
+	    nodeKeys = getServiceBindingKeys(NODE_PREFIX);
+	    System.err.println("Node keys: " + nodeKeys);
+	    if (nodeKeys.contains(failedNodeKey)) {
+		fail("failed node key not removed: " + failedNodeKey);
+	    }
+	    
 	} finally {
 	    client.disconnect(false);
+	    if (stack1 != null) {
+		stack1.tearDown(false);
+	    }
 	}
     }
 
-    private Set<String> getClientSessionListenerKeys() throws Exception {
+    private List<String> getServiceBindingKeys(String prefix) throws Exception {
 	serverStack.createTransaction();
-	Set<String> listenerKeys = new HashSet<String>();
-	String key = LISTENER_PREFIX;
+	List<String> keys = new ArrayList<String>();
+	String key = prefix;
 	for (;;) {
 	    key = dataService.nextServiceBoundName(key);
 	    if (key == null ||
 		! key.regionMatches(
-		      0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length()))
+		      0, prefix, 0, prefix.length()))
 	    {
 		break;
 	    }
-	    listenerKeys.add(key);
+	    keys.add(key);
 	}
 	serverStack.commitTransaction();
-	return listenerKeys;
+	return keys;
     }
 
     /* -- test ClientSession -- */

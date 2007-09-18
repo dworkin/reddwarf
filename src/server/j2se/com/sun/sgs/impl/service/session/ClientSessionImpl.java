@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
+import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
@@ -33,27 +34,35 @@ public class ClientSessionImpl
 {
 
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-    /** The logger name and prefix for session keys. */
-    private static final String SESSION_PREFIX =
-	"com.sun.sgs.impl.service.session.proxy";
+    /** The logger name and prefix for session keys and session node keys. */
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
+
+    /** The prefix to add before a client session ID in a session key. */
+    private static final String SESSION_PREFIX = "proxy";
+
+    /** The prefix to add before a client session listener in a listener key. */
+    private static final String LISTENER_PREFIX = "listener";
+
+    /** The prefix to add before a node ID in session and session node keys. */
+    private static final String NODE_PREFIX = "node";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(SESSION_PREFIX));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
     /** The session ID. */
-    private final CompactId compactId;
+    private transient CompactId compactId;
 
     /** The session ID bytes. */
     private final byte[] idBytes;
 
     /** The identity for this session. */
     private volatile Identity identity;
-    
-    /** The local client session service. */
-    private final ClientSessionServiceImpl sessionService;
+
+    /** The node ID for this session. */
+    private volatile long nodeId;
 
     /** The client session server (possibly remote) for this client session. */
     private final ClientSessionServer sessionServer;
@@ -77,8 +86,7 @@ public class ClientSessionImpl
 	}
 	this.compactId = compactId;
 	this.idBytes = compactId.getId();
-	this.sessionService = ClientSessionServiceImpl.getInstance();
-	this.sessionServer = sessionService.getServerProxy();
+	this.sessionServer = getClientSessionService().getServerProxy();
     }
 
     /**
@@ -87,18 +95,18 @@ public class ClientSessionImpl
      */
     private ClientSessionImpl(CompactId compactId,
 			      Identity identity,
-			      ClientSessionServiceImpl sessionService,
+			      long nodeId,
 			      ClientSessionServer sessionServer,
 			      boolean connected)
     {
 	this.compactId = compactId;
 	this.idBytes = compactId.getId();
 	this.identity = identity;
-	this.sessionService = sessionService;
+	this.nodeId = nodeId;
 	this.sessionServer = sessionServer;
 	this.connected = connected;
     }
-
+    
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
@@ -144,7 +152,9 @@ public class ClientSessionImpl
 		putLong(sequenceNumber.getAndIncrement()).
 		putShort(message.length).
 		putBytes(message);
-	    sessionService.sendProtocolMessage(
+	    // FIXME: The protocol message should be assembled at the
+	    // session server and the sequence number should be assigned there.
+	    getClientSessionService().sendProtocolMessage(
 		this, buf.getBuffer(), Delivery.RELIABLE);
 
 	} catch (RuntimeException e) {
@@ -159,7 +169,7 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public void disconnect() {
 	if (isConnected()) {
-	    sessionService.disconnect(this);
+	    getClientSessionService().disconnect(this);
 	}
 	logger.log(Level.FINEST, "disconnect returns");
     }
@@ -207,7 +217,9 @@ public class ClientSessionImpl
     /* -- Serialization methods -- */
 
     private Object writeReplace() {
-	return new External(idBytes, identity, sessionServer, connected);
+	return
+	    new External(
+		idBytes, identity, nodeId, sessionServer, connected);
     }
 
     /**
@@ -219,16 +231,19 @@ public class ClientSessionImpl
 
 	private final byte[] idBytes;
         private final Identity identity;
+	private final long nodeId;
 	private final ClientSessionServer sessionServer;
 	private final boolean connected;
 
 	External(byte[] idBytes,
 		 Identity identity,
+		 long nodeId,
 		 ClientSessionServer sessionServer,
 		 boolean connected)
 	{
 	    this.idBytes = idBytes;
             this.identity = identity;
+	    this.nodeId = nodeId;
 	    this.sessionServer = sessionServer;
 	    this.connected = connected;
 	}
@@ -244,15 +259,12 @@ public class ClientSessionImpl
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-	    ClientSessionServiceImpl sessionService =
-		ClientSessionServiceImpl.getInstance();
 	    ClientSessionImpl sessionImpl =
-		sessionService.getLocalClientSession(idBytes);
+		getClientSessionService().getLocalClientSession(idBytes);
 	    if (sessionImpl == null) {
 		CompactId compactId = new CompactId(idBytes);
 		sessionImpl = new ClientSessionImpl(
-		    compactId, identity, sessionService,
-		    sessionServer, connected);
+		    compactId, identity, nodeId, sessionServer, connected);
 	    }
 	    return sessionImpl;
 	}
@@ -261,15 +273,25 @@ public class ClientSessionImpl
     /* -- Other methods -- */
 
     /**
-     * Stores this instance in the specified {@code dataService}.
+     * Stores the state associated with this instance in the specified
+     * {@code dataService} with the following bindings:<p>
+     *
+     * <pre>
+     * com.sun.sgs.impl.service.session.proxy.<idBytes>
+     * com.sun.sgs.impl.service.session.node.<nodeId>.proxy.<idBytes>
+     *</pre>
      * This method should only be called within a transaction.
      *
      * @param	dataService a data service
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
+     * @throws TransactionException if there is a problem with the
+     * 		current transaction
      */
     void putSession(DataService dataService) {
+	if (identity == null) {
+	    throw new IllegalStateException("session's identity is not set");
+	}
 	dataService.setServiceBinding(getSessionKey(idBytes), this);
+	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
     }
 
     /**
@@ -286,7 +308,7 @@ public class ClientSessionImpl
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    static ClientSession getSession(DataService dataService, byte[] idBytes) {
+    static ClientSessionImpl getSession(DataService dataService, byte[] idBytes) {
 	String key = getSessionKey(idBytes);
 	ClientSessionImpl sessionImpl = null;
 	try {
@@ -298,10 +320,12 @@ public class ClientSessionImpl
     }
     
     /**
-     * Removes the {@code ClientSessionImpl} with the specified
-     * session {@code idBytes} and its binding from the specified
-     * {@code dataService}.  If the binding has already been removed
-     * from the {@code dataService} this method takes no action.  This
+     * Invokes the {@code disconnected} callback on this session's
+     * {@code ClientSessionListener} (if present), removes the
+     * listener and its binding (if present), and then removes this
+     * session and its bindings from the specified {@code
+     * dataService}.  If the bindings have already been removed from
+     * the {@code dataService} this method takes no action.  This
      * method should only be called within a transaction.
      *
      * @param	dataService a data service
@@ -309,15 +333,60 @@ public class ClientSessionImpl
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    static void removeSession(DataService dataService, byte[] idBytes) {
-	String key = getSessionKey(idBytes);
-	ClientSessionImpl sessionImpl;
+    void notifyListenerAndRemoveSession(
+	DataService dataService, boolean graceful)
+    {
+	String sessionKey = getSessionKey(idBytes);
+	String sessionNodeKey = getSessionNodeKey(nodeId, idBytes);
+	String listenerKey = getListenerKey(idBytes);
+
+
+	/*
+	 * Get ClientSessionListener, and remove its binding and
+	 * wrapper if applicable.  The listener may not be bound
+	 * in the data service if the AppListener.loggedIn callback
+	 * either threw a non-retryable exception or returned a
+	 * null listener.
+	 *
+	 */
+	ClientSessionListener listener = null;
 	try {
-	    sessionImpl =
-		dataService.getServiceBinding(key, ClientSessionImpl.class);
-	    dataService.removeServiceBinding(key);
-	    dataService.removeObject(sessionImpl);
+	    ManagedObject obj =
+		dataService.getServiceBinding(listenerKey, ManagedObject.class);
+	    dataService.removeServiceBinding(listenerKey);
+ 	    if (obj instanceof ListenerWrapper) {
+		dataService.removeObject(obj);
+		listener = ((ListenerWrapper) obj).get();
+	    } else {
+		listener = (ClientSessionListener) obj;
+	    }
+	    // TBD: should the listener be removed too?
+	    
 	} catch (NameNotBoundException e) {
+	    logger.logThrow(
+		Level.FINE, e,
+		"removing ClientSessionListener for  session:{0} throws",
+		this);
+	}
+
+	/*
+	 * Invoke listener's disconnected callback.
+	 */
+	if (listener != null) {
+	    listener.disconnected(graceful);
+	}
+
+	/*
+	 * Remove this session's state and bindings.
+	 */
+	try {
+	    dataService.removeServiceBinding(sessionKey);
+	    dataService.removeServiceBinding(sessionNodeKey);
+	    dataService.removeObject(this);
+	} catch (NameNotBoundException e) {
+	    logger.logThrow(
+		Level.WARNING, e, "session binding already removed:{0}",
+		sessionKey);
 	}
     }
 
@@ -339,13 +408,16 @@ public class ClientSessionImpl
     }
 	    
     /**
-     * Sets the identity to the specified one.
+     * Sets the identity to the specified one.  This method should be
+     * called outside of a transaction to set the non-final fields of
+     * this instance before it is stored in the data service.
      */
-    void setIdentity(Identity identity) {
+    void setIdentityAndNodeId(Identity identity, long nodeId) {
 	if (identity == null) {
 	    throw new NullPointerException("null identity");
 	}
 	this.identity = identity;
+	this.nodeId = nodeId;
     }
 
     /**
@@ -364,6 +436,120 @@ public class ClientSessionImpl
      * @return	a key for acessing the {@code ClientSessionImpl} instance
      */
     private static String getSessionKey(byte[] idBytes) {
-	return SESSION_PREFIX + "." + HexDumper.toHexString(idBytes);
+	return
+	    PKG_NAME + "." +
+	    SESSION_PREFIX + "." + HexDumper.toHexString(idBytes);
+    }
+
+    /**
+     * Returns the key to access from the data service the {@code
+     * ClientSessionListener} instance for the specified session
+     * {@code idBytes}. If the {@code ClientSessionListener} does not
+     * implement {@code ManagedObject}, then the key will be bound to
+     * a {@code ListenerWrapper}.
+     *
+     * @param	idBytes a session ID
+     * @return	a key for acessing the {@code ClientSessionListener} instance
+     */
+    private static String getListenerKey(byte[] idBytes) {
+	return
+	    PKG_NAME + "." +
+	    LISTENER_PREFIX + "." + HexDumper.toHexString(idBytes);
+    }
+
+    /**
+     * Returns the key to access from the data service the {@code
+     * ClientSessionImpl} instance with the specified {@code nodeId} and
+     * session {@code idBytes}.
+     *
+     * @param	idBytes a session ID
+     * @return	a key for acessing the {@code ClientSessionImpl} instance
+     */
+    private static String getSessionNodeKey(long nodeId, byte[] idBytes) {
+	return
+	    getNodePrefix(nodeId) + "." +
+	    SESSION_PREFIX + "." + HexDumper.toHexString(idBytes);
+    }
+
+    /**
+     * Returns the prefix to access from the data service {@code
+     * ClientSessionImpl} instances with the the specified {@code nodeId}.
+     */
+    static String getNodePrefix(long nodeId) {
+	return
+	    PKG_NAME + "." +
+	    NODE_PREFIX + "." + nodeId;
+    }
+
+    /**
+     * Stores the specified client session listener in the specified
+     * {@code dataService} with following binding:
+     * <pre>
+     * com.sun.sgs.impl.service.session.listener.<idBytes>
+     * </pre>
+     * This method should only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @param	listener a client session listener
+     * @throws	TransactionException if there is a problem with the
+     * 		current transaction
+     */
+    void putClientSessionListener(
+	DataService dataService, ClientSessionListener listener)
+    {
+	ManagedObject managedObject =
+	    (listener instanceof ManagedObject) ?
+	    (ManagedObject) listener :
+	    new ListenerWrapper(listener);
+	String listenerKey = getListenerKey(idBytes);
+	dataService.setServiceBinding(listenerKey, managedObject);
+    }
+
+    /**
+     * Returns the client session listener, obtained from the
+     * specified {@code dataService}, for this session.  This method
+     * should only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @return	the client session listener for this session
+     * @throws	TransactionException if there is a problem with the
+     * 		current transaction
+     */
+    ClientSessionListener getClientSessionListener(DataService dataService) {
+	String listenerKey = getListenerKey(idBytes);
+	ManagedObject obj =
+	    dataService.getServiceBinding(
+		listenerKey, ManagedObject.class);
+	return
+	    (obj instanceof ListenerWrapper) ?
+	    ((ListenerWrapper) obj).get() :
+	    (ClientSessionListener) obj;
+    }
+
+    /**
+     * A {@code ManagedObject} wrapper for a {@code ClientSessionListener}.
+     */
+    private static class ListenerWrapper
+	implements ManagedObject, Serializable
+    {
+	private final static long serialVersionUID = 1L;
+	
+	private ClientSessionListener listener;
+
+	ListenerWrapper(ClientSessionListener listener) {
+	    assert listener != null && listener instanceof Serializable;
+	    this.listener = listener;
+	}
+
+	ClientSessionListener get() {
+	    return listener;
+	}
+    }
+
+    /**
+     * Returns the client session service instance.
+     */
+    private static ClientSessionServiceImpl getClientSessionService() {
+	return ClientSessionServiceImpl.getInstance();
     }
 }

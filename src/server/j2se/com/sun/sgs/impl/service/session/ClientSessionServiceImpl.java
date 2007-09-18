@@ -16,8 +16,6 @@ import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
-import com.sun.sgs.impl.service.session.ClientSessionHandler.
-    ClientSessionListenerWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -37,8 +35,12 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.ProtocolMessageListener;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
+import com.sun.sgs.service.RecoveryService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -76,9 +78,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The package name. */
     public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
     
-    /** The prefix for ClientSessionListeners bound in the data store. */
-    public static final String LISTENER_PREFIX = PKG_NAME + ".listener";
-
     /** The name of this class. */
     private static final String CLASSNAME =
 	ClientSessionServiceImpl.class.getName();
@@ -287,14 +286,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		new NonDurableTaskScheduler(
 		    taskScheduler, taskOwner,
 		    txnProxy.getService(TaskService.class));
-	    taskScheduler.runTask(
-		new TransactionRunner(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    notifyDisconnectedSessions();
-			}
-		    }),
-		taskOwner, true);
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
@@ -302,6 +293,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				taskScheduler);
 	    localNodeId = txnProxy.getService(WatchdogService.class).
 		getLocalNodeId();
+	    ((RecoveryService) watchdogService).
+		addRecoveryListener(new ClientSessionServiceRecoveryListener());
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
 		    new InetSocketAddress(appPort), TransportType.RELIABLE);
@@ -1013,18 +1006,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /**
-     * Returns the key to access from the data service the {@code
-     * ClientSessionListener} instance for the specified session {@code
-     * idBytes}.
-     *
-     * @param	idBytes a session ID
-     * @return	a key for acessing the {@code ClientSessionListener}
-     */
-    static String getListenerKey(byte[] idBytes) {
-	return LISTENER_PREFIX + "." + HexDumper.toHexString(idBytes);
-    }
-    
-    /**
      * Returns the client session handler for the specified session
      * {@code idBytes}.
      */
@@ -1150,6 +1131,35 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	return shuttingDown;
     }
 
+    private class ClientSessionServiceRecoveryListener
+	implements RecoveryListener
+    {
+	public void recover(final Node node, RecoveryCompleteFuture future) {
+	    try {
+		runTransactionally(new AbstractKernelRunnable() {
+		    public void run() {
+		        notifyDisconnectedSessions(node.getId());
+		    }});
+	    } catch (Exception e) {
+		logger.logThrow(
+ 		    Level.WARNING, e,
+		    "notifying disconnected sessions for node:{0} throws",
+		    node.getId());
+	    }
+	    future.done();
+	}
+	
+    }
+
+    private void runTransactionally(KernelRunnable task) throws Exception {
+	try {
+	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+	} catch (Exception e) {
+	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
+	    throw e;
+	}
+    }
+
     /**
      * For each {@code ClientSessionListener} bound in the data
      * service, schedules a transactional task that a) notifies the
@@ -1159,35 +1169,27 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * wrapped in a managed {@code ClientSessionListenerWrapper}, the
      * task removes the wrapper as well.
      */
-    private void notifyDisconnectedSessions() {
-	
+    private void notifyDisconnectedSessions(long nodeId) {
+	String nodePrefix = ClientSessionImpl.getNodePrefix(nodeId);
 	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
- 				dataService, LISTENER_PREFIX))
+ 				dataService, nodePrefix))
 	{
 	    logger.log(
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
 		key);
 
-	    final String listenerKey = key;		
+	    final String sessionKey = key;		
 		
 	    scheduleTaskOnCommit(
 		new AbstractKernelRunnable() {
 		    public void run() throws Exception {
-			ManagedObject obj = 
+			ClientSessionImpl sessionImpl = 
 			    dataService.getServiceBinding(
-				listenerKey, ManagedObject.class);
-			 boolean isWrapped =
-			     obj instanceof ClientSessionListenerWrapper;
-			 ClientSessionListener listener =
-			     isWrapped ?
-			     ((ClientSessionListenerWrapper) obj).get() :
-			     ((ClientSessionListener) obj);
-			listener.disconnected(false);
-			dataService.removeServiceBinding(listenerKey);
-			if (isWrapped) {
-			    dataService.removeObject(obj);
-			}
+				sessionKey, ClientSessionImpl.class);
+			sessionImpl.notifyListenerAndRemoveSession(
+			    dataService, false);
+
 		    }});
 	}
     }
