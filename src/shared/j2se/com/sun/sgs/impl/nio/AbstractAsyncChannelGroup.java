@@ -43,31 +43,6 @@ abstract class AbstractAsyncChannelGroup
             throw new ShutdownChannelGroupException();
     }
 
-    AsyncDatagramChannelImpl
-    openAsynchronousDatagramChannel()
-        throws IOException
-    {
-        // TODO
-        //return new AsyncDatagramChannelImpl(this);
-        return null;
-    }
-
-    AsyncServerSocketChannelImpl
-    openAsynchronousServerSocketChannel()
-        throws IOException
-    {
-        // TODO
-        //return new AsyncServerSocketChannelImpl(this);
-        return null;
-    }
-
-    AsyncSocketChannelImpl
-        openAsynchronousSocketChannel()
-            throws IOException
-    {
-        return new AsyncSocketChannelImpl(this);
-    }
-
     abstract void
     registerChannel(SelectableChannel channel) throws IOException;
 

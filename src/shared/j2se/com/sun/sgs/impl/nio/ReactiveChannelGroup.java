@@ -21,9 +21,11 @@ import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
@@ -106,6 +108,9 @@ class ReactiveChannelGroup
         executor().execute(this);
     }
 
+    ConcurrentLinkedQueue<SelectableChannel> registrations =
+        new ConcurrentLinkedQueue<SelectableChannel>();
+
     @Override
     void registerChannel(SelectableChannel channel) throws IOException {
         mainLock.lock();
@@ -116,7 +121,9 @@ class ReactiveChannelGroup
                 } catch (IOException ignore) { }
                 throw new ShutdownChannelGroupException();
             }
-            channel.register(selector, 0, new KeyDispatcher(channel));
+            channel.configureBlocking(false);
+            registrations.add(channel);
+            selector.wakeup();
         } finally {
             mainLock.unlock();
         }
@@ -302,6 +309,13 @@ class ReactiveChannelGroup
             for (AsyncOp<?> op : expired) {
                 getDispatcher(op.getChannel()).setException(op.getOp(),
                     new AbortedByTimeoutException());
+            }
+            
+            while (true) {
+                SelectableChannel channel = registrations.poll();
+                if (channel == null)
+                    break;
+                channel.register(selector, 0, new KeyDispatcher(channel));
             }
 
             executor().execute(this);

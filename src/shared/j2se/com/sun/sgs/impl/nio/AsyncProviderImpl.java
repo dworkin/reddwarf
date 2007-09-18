@@ -11,6 +11,7 @@ import java.security.PrivilegedAction;
 import java.util.concurrent.ExecutorService;
 
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
+import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
@@ -94,11 +95,13 @@ public class AsyncProviderImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncDatagramChannelImpl
+    public AsynchronousDatagramChannel
     openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
         throws IOException
     {
-        return checkGroup(group).openAsynchronousDatagramChannel();
+        // TODO
+        // return new AsyncDatagramChannelImpl(checkGroup(group));
+        return null;
     }
 
     /**
@@ -109,7 +112,7 @@ public class AsyncProviderImpl
     openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
         throws IOException
     {
-        return checkGroup(group).openAsynchronousServerSocketChannel();
+        return new AsyncServerSocketChannelImpl(checkGroup(group));
     }
 
     /**
@@ -120,6 +123,6 @@ public class AsyncProviderImpl
         openAsynchronousSocketChannel(AsynchronousChannelGroup group)
             throws IOException
     {
-        return checkGroup(group).openAsynchronousSocketChannel();
+        return new AsyncSocketChannelImpl(checkGroup(group));
     }
 }
