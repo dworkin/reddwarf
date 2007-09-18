@@ -262,6 +262,7 @@ final class AsyncSocketChannelImpl
         final CompletionHandler<Void, ? super A> handler)
     {
         AsyncOp<Void> op = AsyncOp.create(
+            group.executor(),
             channel,
             OP_CONNECT,
             attachment,

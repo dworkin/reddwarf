@@ -493,7 +493,7 @@ class ReactiveChannelGroup
     <R, A> IoFuture<R, A> submit(SelectableChannel channel, int op, long timeout, TimeUnit unit, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable)
     {
         AsyncOp<R> asyncOp =
-            AsyncOp.create(channel, op, timeout, unit,
+            AsyncOp.create(executor(), channel, op, timeout, unit,
                            attachment, handler, callable);
         execute(asyncOp);
         return AttachedFuture.wrap(asyncOp, attachment);
