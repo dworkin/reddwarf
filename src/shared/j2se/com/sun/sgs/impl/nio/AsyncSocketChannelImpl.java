@@ -9,9 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
@@ -19,18 +17,13 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.ShutdownType;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
@@ -57,12 +50,6 @@ final class AsyncSocketChannelImpl
     final AbstractAsyncChannelGroup group;
     final SocketChannel channel;
 
-    final Object mainLock = new Object();
-
-    volatile FutureTask<?> connectTask;
-    volatile FutureTask<?> readTask;
-    volatile FutureTask<?> writeTask;
-
     AsyncSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
@@ -82,12 +69,9 @@ final class AsyncSocketChannelImpl
         return channel;
     }
 
-    private void checkClosedAsync() {
+    private void checkConnected() {
         if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
-    }
-
-    private void checkConnected() {
         if (! channel.isConnected())
             throw new NotYetConnectedException();
     }
@@ -249,7 +233,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isConnectionPending() {
-        return connectTask != null;
+        return channel.isConnectionPending();
     }
 
     /**
@@ -257,7 +241,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return readTask != null;
+        return group.isOpPending(channel, OP_READ);
     }
 
     /**
@@ -265,7 +249,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return writeTask != null;
+        return group.isOpPending(channel, OP_WRITE);
     }
 
     /**
@@ -277,35 +261,33 @@ final class AsyncSocketChannelImpl
         final A attachment,
         final CompletionHandler<Void, ? super A> handler)
     {
-
-        FutureTask<Void> task = new FutureTask<Void>(
+        AsyncOp<Void> op = AsyncOp.create(
+            channel,
+            OP_CONNECT,
+            attachment,
+            handler,
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    channel.connect(remote);
+                    channel.finishConnect();
                     return null;
-               }})
-            {
-                @Override
-                protected void done()
-                {
-                    connectTask = null;
-                    runCompletion(handler, attachment, this);
-                }
-            };
+                }});
 
-        synchronized (mainLock) {
-            checkClosedAsync();
-            if (channel.isConnected())
-                throw new AlreadyConnectedException();
-            if (isConnectionPending())
-                throw new ConnectionPendingException();
-
-             connectTask = task;
+        try {
+            if (channel.connect(remote)) {
+                op.run();
+            } else {
+                group.execute(op);
+            }
+        } catch (ClosedChannelException e) {
+            ClosedAsynchronousChannelException ex =
+                new ClosedAsynchronousChannelException();
+            ex.initCause(e);
+            throw ex;
+        } catch (IOException e) {
+            op.setException(e);
         }
 
-        group.submit(this, OP_CONNECT);
-
-        return AttachedFuture.wrap(task, attachment);
+        return AttachedFuture.wrap(op, attachment);
     }
 
     /**
@@ -319,13 +301,13 @@ final class AsyncSocketChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
 
-        return ops.submit(OP_READ, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_READ, timeout, unit, attachment, handler,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return ops.channel().read(dst);
+                    return channel.read(dst);
                 }});
     }
 
@@ -342,18 +324,17 @@ final class AsyncSocketChannelImpl
             A attachment,
             CompletionHandler<Long, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
         if ((offset < 0) || (offset >= dsts.length))
             throw new IllegalArgumentException("offset out of range");
         if ((length < 0) || (length > (dsts.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        return ops.submit(
-            OP_READ, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_READ, timeout, unit, attachment, handler,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return ops.channel().read(dsts, offset, length);
+                    return channel.read(dsts, offset, length);
                 }});
     }
 
@@ -368,14 +349,13 @@ final class AsyncSocketChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
 
-        return ops.submit(
-            OP_WRITE, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_WRITE, timeout, unit, attachment, handler,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return ops.channel().write(src);
+                    return channel.write(src);
                 }});
     }
 
@@ -392,18 +372,17 @@ final class AsyncSocketChannelImpl
             A attachment,
            CompletionHandler<Long, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
         if ((offset < 0) || (offset >= srcs.length))
             throw new IllegalArgumentException("offset out of range");
         if ((length < 0) || (length > (srcs.length - offset)))
             throw new IllegalArgumentException("length out of range");
 
-        return ops.submit(
-            OP_WRITE, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_WRITE, timeout, unit, attachment, handler,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return ops.channel().write(srcs, offset, length);
+                    return channel.write(srcs, offset, length);
                 }});
     }
 }

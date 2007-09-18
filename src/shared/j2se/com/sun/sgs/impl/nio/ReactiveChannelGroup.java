@@ -11,6 +11,9 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.Channel;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -31,12 +34,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.sun.sgs.nio.channels.AbortedByTimeoutException;
+import com.sun.sgs.nio.channels.AcceptPendingException;
+import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
+import com.sun.sgs.nio.channels.WritePendingException;
 
 class ReactiveChannelGroup
     extends AbstractAsyncChannelGroup
+    implements Runnable
 {
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
 
@@ -78,28 +87,9 @@ class ReactiveChannelGroup
      */
     private final Condition termination = mainLock.newCondition();
 
-    abstract class DelayedRunnable implements Runnable, Delayed {
-        final long timeout;
-        final TimeUnit unit;
-
-        DelayedRunnable(long timeout, TimeUnit unit) {
-            this.timeout = timeout;
-            this.unit = unit;
-        }
-
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(timeout, unit);
-        }
-
-        public int compareTo(Delayed o) {
-            final long other = o.getDelay(unit);
-            return (timeout<other ? -1 : (timeout==other ? 0 : 1));
-        }
-    }
-
     final Selector selector;
-    final DelayQueue<DelayedRunnable> timeouts =
-        new DelayQueue<DelayedRunnable>();
+    final DelayQueue<AsyncOp<?>> timeouts =
+        new DelayQueue<AsyncOp<?>>();
 
     /**
      * Creates a new AsyncChannelGroupImpl with the given provider and
@@ -113,6 +103,7 @@ class ReactiveChannelGroup
     {
         super(provider, executor);
         selector = selectorProvider().openSelector();
+        executor().execute(this);
     }
 
     @Override
@@ -131,55 +122,124 @@ class ReactiveChannelGroup
         }
     }
 
-    final class KeyDispatcher {
+    final class KeyDispatcher implements Channel {
         private final SelectableChannel channel;
 
-        private volatile FutureTask<?> acceptFuture = null;
-        private volatile FutureTask<?> connectFuture = null;
-        private volatile FutureTask<?> readFuture = null;
-        private volatile FutureTask<?> writeFuture = null;
+        private volatile AsyncOp<?> acceptTask = null;
+        private volatile AsyncOp<?> connectTask = null;
+        private volatile AsyncOp<?> readTask = null;
+        private volatile AsyncOp<?> writeTask = null;
 
         KeyDispatcher(SelectableChannel channel) {
             this.channel = channel;
         }
-
-        void close() throws IOException {
-            if (acceptFuture != null) {
-                acceptFuture.cancel(true);
-                acceptFuture = null;
+        
+        synchronized void add(AsyncOp<?> op) {
+            SelectionKey key = channel.keyFor(selector);
+            switch (op.getOp()) {
+            case OP_ACCEPT:
+                if (acceptTask != null)
+                    throw new AcceptPendingException();
+                key.interestOps(key.interestOps() | OP_ACCEPT);
+                acceptTask = op;
+                break;
+            case OP_CONNECT:
+                if (connectTask != null)
+                    throw new ConnectionPendingException();
+                key.interestOps(key.interestOps() | OP_CONNECT);
+                connectTask = op;
+                break;
+            case OP_READ:
+                if (readTask != null)
+                    throw new ReadPendingException();
+                key.interestOps(key.interestOps() | OP_READ);
+                readTask = op;
+                break;
+            case OP_WRITE:
+                if (writeTask != null)
+                    throw new WritePendingException();
+                key.interestOps(key.interestOps() | OP_WRITE);
+                writeTask = op;
+                break;
             }
-            if (connectFuture != null) {
-                connectFuture.cancel(true);
-                connectFuture = null;
+        }
+        
+        synchronized void setException(int op, Throwable t) {
+            SelectionKey key = channel.keyFor(selector);
+            switch (op) {
+            case OP_ACCEPT:
+                if (acceptTask != null) {
+                    key.interestOps(key.interestOps() & (~ OP_ACCEPT));
+                    acceptTask.setException(t);
+                    acceptTask = null;
+                }
+                break;
+            case OP_CONNECT:
+                if (connectTask != null) {
+                    key.interestOps(key.interestOps() & (~ OP_CONNECT));
+                    connectTask.setException(t);
+                    connectTask = null;
+                }
+                break;
+            case OP_READ:
+                if (readTask != null) {
+                    key.interestOps(key.interestOps() & (~ OP_READ));
+                    readTask.setException(t);
+                    readTask = null;
+                }
+                break;
+            case OP_WRITE:
+                if (writeTask != null) {
+                    key.interestOps(key.interestOps() & (~ OP_WRITE));
+                    writeTask.setException(t);
+                    writeTask = null;
+                }
+                break;
             }
-            if (readFuture != null) {
-                readFuture.cancel(true);
-                readFuture = null;
-            }
-            if (writeFuture != null) {
-                writeFuture.cancel(true);
-                writeFuture = null;
-            }
-            channel.close();
         }
 
-        void selected(SelectionKey key) throws IOException {
-            if (key.isAcceptable() && acceptFuture != null) {
-                acceptFuture.run();
-                acceptFuture = null;
+        public synchronized void close() throws IOException {
+            channel.close();
+
+            if (acceptTask != null) {
+                acceptTask.setException(new AsynchronousCloseException());
+                acceptTask = null;
             }
-            if (key.isConnectable() && connectFuture != null) {
-                connectFuture.run();
-                connectFuture = null;
+            if (connectTask != null) {
+                connectTask.setException(new AsynchronousCloseException());
+                connectTask = null;
             }
-            if (key.isReadable() && readFuture != null) {
-                readFuture.run();
-                readFuture = null;
+            if (readTask != null) {
+                readTask.setException(new AsynchronousCloseException());
+                readTask = null;
             }
-            if (key.isWritable() && writeFuture != null) {
-                writeFuture.run();
-                writeFuture = null;
+            if (writeTask != null) {
+                writeTask.setException(new AsynchronousCloseException());
+                writeTask = null;
             }
+        }
+
+        synchronized void selected(int readyOps) throws IOException {
+            if ((readyOps & OP_ACCEPT) != 0 && acceptTask != null) {
+                acceptTask.run();
+                acceptTask = null;
+            }
+            if ((readyOps & OP_CONNECT) != 0 && connectTask != null) {
+                connectTask.run();
+                connectTask = null;
+            }
+            if ((readyOps & OP_READ) != 0 && readTask != null) {
+                readTask.run();
+                readTask = null;
+            }
+            if ((readyOps & OP_WRITE) != 0 && writeTask != null) {
+                writeTask.run();
+                writeTask = null;
+            }
+        }
+
+        public boolean isOpen() {
+            return channel.isOpen();
         }
     }
 
@@ -196,78 +256,11 @@ class ReactiveChannelGroup
         try {
             try {
                 getDispatcher(channel).close();
+                selector.wakeup();
             } catch (IOException ignore) { }
             tryTerminate();
         } finally {
             mainLock.unlock();
-        }
-    }
-
-    class ReactiveAsyncOp<T extends SelectableChannel> extends AsyncOp<T> {
-
-        private final SelectionKey key;
-        private RunnableFuture<?> acceptTask;
-        private RunnableFuture<?> connectTask;
-        private RunnableFuture<?> readTask;
-        private RunnableFuture<?> writeTask;
-
-        ReactiveAsyncOp(T channel) throws IOException {
-            key = channel.register(selector, 0, this);
-        }
-
-        public void close() throws IOException {
-            try {
-                super.close();
-            } finally {
-                channelClosed(this);
-            }
-        }
-
-        @SuppressWarnings("unchecked")
-        T channel() {
-            // Safe to cast because a T was used to create the key
-            return (T) key.channel();
-        }
-
-        ReactiveChannelGroup group() {
-            return ReactiveChannelGroup.this;
-        }
-
-        boolean isPending(int op) {
-            return (key.interestOps() & op) != 0;
-        }
-
-        void setOp(int op) {
-            synchronized (this) {
-                checkPending(op);
-                key.interestOps(key.interestOps() | op);
-                selector.wakeup();
-            }
-        }
-
-        void clearOp(int op) {
-            synchronized (this) {
-                key.interestOps(key.interestOps() & ~op);
-                selector.wakeup();
-            }
-        }
-
-        <R, A> IoFuture<R, A>
-        submit(int op,
-               A attachment,
-               CompletionHandler<R, ? super A> handler, 
-               long timeout, 
-               TimeUnit unit, 
-               Callable<R> callable)
-        {
-            if (timeout > 0) {
-                timeouts.add(new DelayedRunnable(timeout, unit) {
-                    public void run() {
-                        // set timeout exception on future
-                    }
-                });
-            }
-            return null;
         }
     }
 
@@ -289,24 +282,41 @@ class ReactiveChannelGroup
                 return;
             }
 
-            List<DelayedRunnable> expired = new ArrayList<DelayedRunnable>();
-            timeouts.drainTo(expired);
-
-            for (Runnable r : expired)
-                r.run();
-
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
 
             while (keys.hasNext()) {
                 SelectionKey key = keys.next();
-                int readyOps = key.readyOps();
-                ReactiveAsyncOp<? extends SelectableChannel> op = getOp(key);
                 keys.remove();
-                op.ready(readyOps);
+                int readyOps = key.readyOps();
+                key.interestOps(key.interestOps() & (~ readyOps));
+                try {
+                    getDispatcher(key).selected(readyOps);
+                } catch (IOException e) {
+                    // TODO
+                }
             }
+
+            List<AsyncOp<?>> expired = new ArrayList<AsyncOp<?>>();
+            timeouts.drainTo(expired);
+
+            for (AsyncOp<?> op : expired) {
+                getDispatcher(op.getChannel()).setException(op.getOp(),
+                    new AbortedByTimeoutException());
+            }
+
+            executor().execute(this);
             
         } catch (Exception e) {
             // TODO
+        }
+    }
+    
+    @Override
+    boolean isOpPending(SelectableChannel channel, int op) {
+        try {
+            return (channel.keyFor(selector).interestOps() & op) != 0;
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 
@@ -378,10 +388,6 @@ class ReactiveChannelGroup
         }
     }
 
-    ReactiveAsyncOp<? extends SelectableChannel> getOp(SelectionKey key) {
-        return (ReactiveAsyncOp<? extends SelectableChannel>) key.attachment();
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -397,7 +403,7 @@ class ReactiveChannelGroup
             Set<SelectionKey> keys = selector.keys();
             selector.close();
             for (SelectionKey key : keys)
-                forceClose(getOp(key));
+                forceClose(getDispatcher(key));
 
             tryTerminate();
             return this;
@@ -422,16 +428,39 @@ class ReactiveChannelGroup
         shutdown();
     }
 
+    @Override
+    void execute(AsyncOp<?> op) {
+        mainLock.lock();
+        try {
+            SelectableChannel channel = op.getChannel();
+            if (! channel.isOpen())
+                throw new ClosedAsynchronousChannelException();
+            long timeout = op.getDelay(TimeUnit.MILLISECONDS);
+            if (timeout < 0)
+                throw new IllegalArgumentException("Negative timeout");
+            if (timeout > 0)
+                timeouts.add(op);
+            getDispatcher(channel).add(op);
+            selector.wakeup();
+        } finally {
+            mainLock.unlock();
+        }
+    }
 
-    void selected(int ops) {
-        if ((ops & OP_CONNECT) != 0 && connectTask != null) {
-            connectTask.run();
-        }
-        if ((ops & OP_READ) != 0 && readTask != null) {
-            readTask.run();
-        }
-        if ((ops & OP_WRITE) != 0 && writeTask != null) {
-            writeTask.run();
-        }
+    @Override
+    <R, A> IoFuture<R, A> submit(SelectableChannel channel, int op, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable)
+    {
+        return submit(channel, op, 0, TimeUnit.MILLISECONDS,
+                      attachment, handler, callable);
+    }
+
+    @Override
+    <R, A> IoFuture<R, A> submit(SelectableChannel channel, int op, long timeout, TimeUnit unit, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable)
+    {
+        AsyncOp<R> asyncOp =
+            AsyncOp.create(channel, op, timeout, unit,
+                           attachment, handler, callable);
+        execute(asyncOp);
+        return AttachedFuture.wrap(asyncOp, attachment);
     }
 }

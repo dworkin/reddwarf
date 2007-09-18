@@ -27,6 +27,7 @@ import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
+import static java.nio.channels.SelectionKey.OP_READ;
 
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
@@ -39,17 +40,20 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncOp<ServerSocketChannel> ops;
+    final AbstractAsyncChannelGroup group;
+    final ServerSocketChannel channel;
 
-    AsyncServerSocketChannelImpl(AsyncOp<ServerSocketChannel> ops)
+    AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
-        super(ops.group().provider());
-        this.ops = ops;
+        super(group.provider());
+        this.group = group;
+        this.channel = group.selectorProvider().openServerSocketChannel();
+        group.registerChannel(channel);
     }
 
     private void checkClosedAsync() {
-        if (! ops.isOpen())
+        if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
     }
 
@@ -57,7 +61,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return ops.isOpen();
+        return channel.isOpen();
     }
 
     /**
@@ -65,7 +69,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        ops.close();
+        group.closeChannel(channel);
     }
 
     /**
@@ -76,7 +80,7 @@ final class AsyncServerSocketChannelImpl
                                              int backlog)
         throws IOException
     {
-        final ServerSocket socket = ops.channel().socket();
+        final ServerSocket socket = channel.socket();
         if (socket.isClosed())
             throw new ClosedChannelException();
         if (socket.isBound())
@@ -92,7 +96,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return ops.channel().socket().getLocalSocketAddress();
+        return channel.socket().getLocalSocketAddress();
     }
 
     /**
@@ -109,7 +113,7 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = ops.channel().socket();
+        final ServerSocket socket = channel.socket();
         switch (stdOpt) {
         case SO_RCVBUF:
             socket.setReceiveBufferSize(((Integer)value).intValue());
@@ -133,7 +137,7 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = ops.channel().socket();
+        final ServerSocket socket = channel.socket();
         switch (stdOpt) {
         case SO_RCVBUF:
             return socket.getReceiveBufferSize();
@@ -159,7 +163,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return ops.isPending(OP_ACCEPT);
+        return group.isOpPending(channel, OP_ACCEPT);
     }
 
     /**
@@ -170,15 +174,11 @@ final class AsyncServerSocketChannelImpl
             A attachment,
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
-        checkClosedAsync();
-
-        return ops.submit(
-            OP_ACCEPT, attachment, handler, 0, TimeUnit.MILLISECONDS,
+        return group.submit(
+            channel, OP_READ, attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
-                    return new AsyncSocketChannelImpl(
-                        ops.group().registerChannel(
-                            ops.channel().accept()));
+                    return new AsyncSocketChannelImpl(group, channel.accept());
                 }});
     }
 }
