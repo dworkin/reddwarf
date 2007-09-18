@@ -15,19 +15,16 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
-import static java.nio.channels.SelectionKey.OP_READ;
 
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
@@ -50,11 +47,6 @@ final class AsyncServerSocketChannelImpl
         this.group = group;
         this.channel = group.selectorProvider().openServerSocketChannel();
         group.registerChannel(channel);
-    }
-
-    private void checkClosedAsync() {
-        if (! channel.isOpen())
-            throw new ClosedAsynchronousChannelException();
     }
 
     /**
@@ -175,7 +167,7 @@ final class AsyncServerSocketChannelImpl
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
         return group.submit(
-            channel, OP_READ, attachment, handler,
+            channel, OP_ACCEPT, attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     return new AsyncSocketChannelImpl(group, channel.accept());
