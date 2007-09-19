@@ -7,8 +7,9 @@ package com.sun.sgs.test.impl.nio;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -42,8 +43,10 @@ public class EchoClient {
         Integer.valueOf(System.getProperty("messages", DEFAULT_NUM_MSGS));
 
     static final Logger log = Logger.getAnonymousLogger();
-    static CyclicBarrier barrier;
-    
+
+    static CountDownLatch startSignal;
+    static CountDownLatch doneSignal;
+
     private final AsynchronousChannelGroup group;
     AsynchronousSocketChannel channel;
 
@@ -58,7 +61,7 @@ public class EchoClient {
         this.group = group;
     }
 
-    public void start() throws Exception {
+    public void connect() throws Exception {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
@@ -71,6 +74,13 @@ public class EchoClient {
         }
         channel.connect(new InetSocketAddress(host, port), new ConnectHandler()).get();
     }
+ 
+    public void start() throws Exception {
+        WriteHandler wh = new WriteHandler();
+        ReadHandler rh = new ReadHandler();
+        wh.start();
+        rh.start();
+    }
 
     final class ConnectHandler
         implements CompletionHandler<Void, Object>
@@ -79,20 +89,7 @@ public class EchoClient {
             try {
                 log.log(Level.FINE, "Connected {0}", channel);
                 result.getNow();
-                WriteHandler wh = new WriteHandler();
-                ReadHandler rh = new ReadHandler();
-                try {
-                    barrier.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    log.warning("Barrier interrupted");
-                    return;
-                } catch (BrokenBarrierException e) {
-                    log.warning("Barrier broken");
-                    return;
-                }
-                wh.start();
-                rh.start();
+                startSignal.countDown();
             } catch (ExecutionException e) {
                 log.throwing("ConnectHandler", "completed", e);
                 // ignore
@@ -206,14 +203,7 @@ public class EchoClient {
         }
         totalBytesRead.addAndGet(bytesRead);
         totalBytesWritten.addAndGet(bytesWritten);
-        try {
-            barrier.await();
-        } catch (InterruptedException e) {
-            log.warning("Barrier interrupted");
-            Thread.currentThread().interrupt();
-        } catch (BrokenBarrierException e) {
-            log.warning("Barrier broken");
-        }
+        doneSignal.countDown();
     }
 
     /**
@@ -235,31 +225,12 @@ public class EchoClient {
         AsynchronousChannelGroup group =
             provider.openAsynchronousChannelGroup(executor);
 
-        barrier = new CyclicBarrier(NUM_CLIENTS + 1,
-            new Runnable() {
-                public void run() {
-                    if (startTime == 0) {
-                        log.info("Starting test");
-                        startTime = System.nanoTime();
-                        return;
-                    }
-                    long ops = NUM_CLIENTS * NUM_MSGS * 2;
-                    long elapsed = System.nanoTime() - startTime;
-                    log.log(Level.INFO, "Bytes read: {0}  written:{1}",
-                        new Object[] {
-                            totalBytesRead.get(),
-                            totalBytesWritten.get()
-                        });
-                    log.log(Level.INFO, "{0} ops in {1} seconds = {2} ops/sec",
-                        new Object[] {
-                            ops,
-                            TimeUnit.NANOSECONDS.toSeconds(elapsed),
-                            TimeUnit.SECONDS.toNanos(ops) / elapsed
-                        });
-                }
-            });
+        log.log(Level.INFO, "ChannelGroup is a {0}", group.getClass());
 
-        int numThreads = NUM_CLIENTS * 2;
+        startSignal = new CountDownLatch(NUM_CLIENTS);
+        doneSignal = new CountDownLatch(NUM_CLIENTS);
+
+        int numThreads = 1;
 
         log.log(Level.INFO,
             "Prestarting {0,number,integer} threads", numThreads);
@@ -270,13 +241,37 @@ public class EchoClient {
         log.log(Level.INFO,
             "Connecting {0,number,integer} clients", NUM_CLIENTS);
 
+        Set<EchoClient> clients = new HashSet<EchoClient>(NUM_CLIENTS);
+
         for (int i = 0; i < NUM_CLIENTS; ++i) {
             EchoClient client = new EchoClient(group);
-            client.start();
+            clients.add(client);
+            client.connect();
         }
 
-        barrier.await();
-        barrier.await();
+        startSignal.await();
+
+        log.info("Starting test");
+        startTime = System.nanoTime();
+
+        for (EchoClient client : clients)
+            client.start();
+
+        doneSignal.await();
+
+        long ops = NUM_CLIENTS * NUM_MSGS * 2;
+        long elapsed = System.nanoTime() - startTime;
+        log.log(Level.INFO, "Bytes read: {0}  written:{1}",
+            new Object[] {
+                totalBytesRead.get(),
+                totalBytesWritten.get()
+            });
+        log.log(Level.INFO, "{0} ops in {1} seconds = {2} ops/sec",
+            new Object[] {
+                ops,
+                TimeUnit.NANOSECONDS.toSeconds(elapsed),
+                TimeUnit.SECONDS.toNanos(ops) / elapsed
+            });
 
         group.shutdown();
         log.info("Awaiting group termination");        

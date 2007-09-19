@@ -12,29 +12,18 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.CancelledKeyException;
 import java.nio.channels.Channel;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -42,8 +31,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
@@ -113,11 +100,8 @@ class ReactiveChannelGroup
         executor().execute(this);
     }
 
-    BlockingQueue<Runnable> tasks =
-        new LinkedBlockingQueue<Runnable>();
-
     @Override
-    void registerChannel(final SelectableChannel channel) throws IOException {
+    void registerChannel(SelectableChannel channel) throws IOException {
         mainLock.lock();
         try {
             if (isShutdown()) {
@@ -127,32 +111,8 @@ class ReactiveChannelGroup
                 throw new ShutdownChannelGroupException();
             }
             channel.configureBlocking(false);
-            FutureTask<Void> task = new FutureTask<Void>(
-                new Callable<Void>() {
-                    public Void call() throws IOException {
-                        channel.register(selector, 0, new KeyDispatcher(channel));
-                        return null;
-                    }
-                });
-            if (! selecting) {
-                task.run();
-            } else {
-                tasks.add(task);
-                selector.wakeup();
-            }
-            try {
-                task.get();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(e);
-            } catch (ExecutionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof IOException)
-                    throw (IOException) cause;
-                if (cause instanceof RuntimeException)
-                    throw (RuntimeException) cause;
-                throw new RuntimeException(cause);
-            }
+            selector.wakeup();
+            channel.register(selector, 0, new KeyDispatcher(channel));
         } finally {
             mainLock.unlock();
         }
@@ -316,7 +276,12 @@ class ReactiveChannelGroup
 
     public void run() {
         try {
-            int rc = doSelect();
+            // Obtain and release the lock to allow other tasks to run
+            // after waking the selector.
+            mainLock.lock();
+            mainLock.unlock();
+
+            doSelect();
             
             if (! selector.isOpen()) {
                 // TODO
@@ -337,18 +302,15 @@ class ReactiveChannelGroup
                 }
             }
 
-            List<AsyncOp<?>> expired = new ArrayList<AsyncOp<?>>();
-            timeouts.drainTo(expired);
+            if (timeouts.peek() != null) {
+                List<AsyncOp<?>> expired = new ArrayList<AsyncOp<?>>();
+                timeouts.drainTo(expired);
 
-            for (AsyncOp<?> op : expired) {
-                getDispatcher(op.getChannel()).setException(op.getOp(),
-                    new AbortedByTimeoutException());
+                for (AsyncOp<?> op : expired) {
+                    getDispatcher(op.getChannel()).setException(op.getOp(),
+                        new AbortedByTimeoutException());
+                }
             }
-
-            List<Runnable> ts = new ArrayList<Runnable>();
-            tasks.drainTo(ts);
-            for (Runnable r : ts)
-                r.run();
 
             executor().execute(this);
             
@@ -464,16 +426,6 @@ class ReactiveChannelGroup
         } catch (IOException ignore) { }
     }
 
-    /**
-     * Invokes {@code shutdown} when this channel group is no longer
-     * referenced.
-     */
-    @Override
-    protected void finalize() {
-        // TODO is this actually useful? -JM
-        shutdown();
-    }
-
     @Override
     void execute(AsyncOp<?> op) {
         mainLock.lock();
@@ -481,6 +433,10 @@ class ReactiveChannelGroup
             SelectableChannel channel = op.getChannel();
             if (! channel.isOpen())
                 throw new ClosedAsynchronousChannelException();
+            if (op.getOp() == 0) {
+                executor().execute(op);
+                return;
+            }
             long timeout = op.getDelay(TimeUnit.MILLISECONDS);
             if (timeout < 0)
                 throw new IllegalArgumentException("Negative timeout");
@@ -491,22 +447,5 @@ class ReactiveChannelGroup
         } finally {
             mainLock.unlock();
         }
-    }
-
-    @Override
-    <R, A> IoFuture<R, A> submit(SelectableChannel channel, int op, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable)
-    {
-        return submit(channel, op, 0, TimeUnit.MILLISECONDS,
-                      attachment, handler, callable);
-    }
-
-    @Override
-    <R, A> IoFuture<R, A> submit(SelectableChannel channel, int op, long timeout, TimeUnit unit, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable)
-    {
-        AsyncOp<R> asyncOp =
-            AsyncOp.create(executor(), channel, op, timeout, unit,
-                           attachment, handler, callable);
-        execute(asyncOp);
-        return AttachedFuture.wrap(asyncOp, attachment);
     }
 }

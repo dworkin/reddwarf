@@ -53,21 +53,32 @@ abstract class AbstractAsyncChannelGroup
 
     abstract void execute(AsyncOp<?> op);
 
-    abstract <R, A> IoFuture<R, A>
+    <R, A> IoFuture<R, A>
     submit(SelectableChannel channel,
            int op,
            A attachment,
            CompletionHandler<R, ? super A> handler,
-           Callable<R> callable);
+           Callable<R> callable)
+    {
+        return submit(channel, op, 0, TimeUnit.MILLISECONDS,
+                      attachment, handler, callable);
+    }
 
-    abstract <R, A> IoFuture<R, A>
+    <R, A> IoFuture<R, A>
     submit(SelectableChannel channel,
            int op,
            long timeout,
            TimeUnit unit,
            A attachment,
            CompletionHandler<R, ? super A> handler,
-           Callable<R> callable);
+           Callable<R> callable)
+    {
+        AsyncOp<R> asyncOp =
+            AsyncOp.create(executor(), channel, op, timeout, unit,
+                           attachment, handler, callable);
+        execute(asyncOp);
+        return AttachedFuture.wrap(asyncOp, attachment);
+    }
 
     protected static <R, A> void
     runCompletion(CompletionHandler<R, A> handler,
@@ -77,5 +88,15 @@ abstract class AbstractAsyncChannelGroup
         if (handler == null)
             return;
         handler.completed(AttachedFuture.wrap(future, attachment));
+    }
+
+    /**
+     * Invokes {@code shutdown} when this channel group is no longer
+     * referenced.
+     */
+    @Override
+    protected void finalize() {
+        // TODO is this actually useful? -JM
+        shutdown();
     }
 }

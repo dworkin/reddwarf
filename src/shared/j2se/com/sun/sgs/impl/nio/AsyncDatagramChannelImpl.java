@@ -52,23 +52,24 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncOp<DatagramChannel> ops;
+    final AbstractAsyncChannelGroup group;
+    final DatagramChannel channel;
 
-
-    AsyncDatagramChannelImpl(AsyncOp<DatagramChannel> ops)
+    AsyncDatagramChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
-        super(ops.group().provider());
-        this.ops = ops;
+        super(group.provider());
+        this.group = group;
+        this.channel = group.selectorProvider().openDatagramChannel();
     }
 
     private void checkClosedAsync() {
-        if (! ops.isOpen())
+        if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
     }
 
     private void checkConnected() {
-        if (! ops.channel().isConnected())
+        if (! channel.isConnected())
             throw new NotYetConnectedException();
     }
 
@@ -76,7 +77,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return ops.isOpen();
+        return channel.isOpen();
     }
 
     /**
@@ -84,7 +85,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public void close() throws IOException {
-        ops.close();
+        group.closeChannel(channel);
     }
 
     /**
@@ -94,7 +95,7 @@ class AsyncDatagramChannelImpl
     public AsynchronousDatagramChannel bind(SocketAddress local)
         throws IOException
     {
-        final DatagramSocket socket = ops.channel().socket();
+        final DatagramSocket socket = channel.socket();
         if (socket.isClosed())
             throw new ClosedChannelException();
         if (socket.isBound())
@@ -110,7 +111,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return ops.channel().socket().getLocalSocketAddress();
+        return channel.socket().getLocalSocketAddress();
     }
 
     /**
@@ -127,7 +128,7 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = ops.channel().socket();
+        final DatagramSocket socket = channel.socket();
         switch (stdOpt) {
         case SO_SNDBUF:
             socket.setSendBufferSize(((Integer)value).intValue());
@@ -181,7 +182,7 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = ops.channel().socket();
+        final DatagramSocket socket = channel.socket();
         switch (stdOpt) {
         case SO_SNDBUF:
             return socket.getSendBufferSize();
@@ -253,7 +254,7 @@ class AsyncDatagramChannelImpl
     @Override
     public SocketAddress getConnectedAddress() throws IOException
     {
-        return ops.channel().socket().getRemoteSocketAddress();
+        return channel.socket().getRemoteSocketAddress();
     }
 
     /**
@@ -266,17 +267,26 @@ class AsyncDatagramChannelImpl
             CompletionHandler<Void, ? super A> handler)
     {
         checkClosedAsync();
-        if (ops.channel().isConnected())
+        if (channel.isConnected())
             throw new AlreadyConnectedException();
 
-        // TODO ensure that only one of these is pending at a time
+        // TODO ensure only one of these outstanding
 
-        return ops.submit(0, attachment, handler, 0, TimeUnit.MILLISECONDS,
+        AsyncOp<Void> op = AsyncOp.create(
+            group.executor(),
+            channel,
+            0,
+            attachment,
+            handler,
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    ops.channel().connect(remote);
+                    channel.connect(remote);
                     return null;
                 }});
+
+        group.execute(op);
+
+        return AttachedFuture.wrap(op, attachment);
     }
 
     /**
@@ -288,12 +298,21 @@ class AsyncDatagramChannelImpl
     {
         checkClosedAsync();
 
-        return ops.submit(0, attachment, handler, 0, TimeUnit.MILLISECONDS,
+        AsyncOp<Void> op = AsyncOp.create(
+            group.executor(),
+            channel,
+            0,
+            attachment,
+            handler,
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    ops.channel().disconnect();
+                    channel.disconnect();
                     return null;
                 }});
+
+        group.execute(op);
+
+        return AttachedFuture.wrap(op, attachment);
     }
 
     /**
@@ -301,7 +320,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return ops.isPending(OP_READ);
+        return group.isOpPending(channel, OP_READ);
     }
 
     /**
@@ -309,7 +328,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return ops.isPending(OP_WRITE);
+        return group.isOpPending(channel, OP_WRITE);
     }
 
     /**
@@ -323,14 +342,12 @@ class AsyncDatagramChannelImpl
             A attachment,
             CompletionHandler<SocketAddress, ? super A> handler)
     {
-        checkClosedAsync();
-
-        return ops.submit(
-            OP_READ, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_READ, timeout, unit, attachment, handler,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    return ops.channel().receive(dst);
-            }});
+                    return channel.receive(dst);
+                }});
     }
 
     /**
@@ -346,13 +363,12 @@ class AsyncDatagramChannelImpl
             CompletionHandler<Integer, ? super A> handler)
     {
         checkClosedAsync();
-        checkConnected();
 
-        return ops.submit(
-            OP_WRITE, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_WRITE, timeout, unit, attachment, handler,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return ops.channel().send(src, target);
+                    return channel.send(src, target);
                 }});
     }
 
@@ -367,14 +383,13 @@ class AsyncDatagramChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
 
-        return ops.submit(
-            OP_READ, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_READ, timeout, unit, attachment, handler,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return ops.channel().read(dst);
+                    return channel.read(dst);
                 }});
     }
 
@@ -389,14 +404,13 @@ class AsyncDatagramChannelImpl
             A attachment,
           CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
         checkConnected();
 
-        return ops.submit(
-            OP_WRITE, attachment, handler, timeout, unit,
+        return group.submit(
+            channel, OP_WRITE, timeout, unit, attachment, handler,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return ops.channel().write(src);
+                    return channel.write(src);
                 }});
     }
 }

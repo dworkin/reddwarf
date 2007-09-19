@@ -30,13 +30,13 @@ public class EchoServer {
     public static final String DEFAULT_PORT = "5150";
 
     public static final String DEFAULT_BUFFER_SIZE = "32";
-    public static final String DEFAULT_NUM_CLIENTS =  "4";
+    public static final String DEFAULT_NUM_THREADS =  "4";
     public static final String DEFAULT_BACKLOG     =  "0";
 
     private static final int BUFFER_SIZE =
         Integer.valueOf(System.getProperty("buffer_size", DEFAULT_BUFFER_SIZE));
-    private static final int NUM_CLIENTS =
-        Integer.valueOf(System.getProperty("clients", DEFAULT_NUM_CLIENTS));
+    private static final int NUM_THREADS =
+        Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -198,10 +198,12 @@ public class EchoServer {
         AsynchronousChannelGroup group =
             provider.openAsynchronousChannelGroup(executor);
 
-        log.log(Level.INFO,
-            "Prestarting {0,number,integer} threads", NUM_CLIENTS);
+        log.log(Level.INFO, "ChannelGroup is a {0}", group.getClass());
 
-        executor.setCorePoolSize(NUM_CLIENTS);
+        log.log(Level.INFO,
+            "Prestarting {0,number,integer} threads", NUM_THREADS);
+
+        executor.setCorePoolSize(NUM_THREADS);
         executor.prestartAllCoreThreads();
 
         log.info("Starting the server");

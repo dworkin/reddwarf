@@ -6,18 +6,15 @@ package com.sun.sgs.impl.nio;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.SelectionKey;
 import java.util.HashSet;
-import java.util.concurrent.Callable;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 class TPCChannelGroup
@@ -67,8 +64,8 @@ class TPCChannelGroup
      * Set containing all channels in group. Accessed only when
      * holding mainLock.
      */
-    private final HashSet<AsyncOp<? extends SelectableChannel>> channels =
-        new HashSet<AsyncOp<? extends SelectableChannel>>();
+    private final Set<SelectableChannel> channels =
+        new HashSet<SelectableChannel>();
 
     /**
      * Current channel count, updated only while holding mainLock but
@@ -88,8 +85,8 @@ class TPCChannelGroup
     }
 
     @Override
-    <T extends SelectableChannel> AsyncOp<T> registerChannel(T channel)
-    throws IOException
+    void registerChannel(SelectableChannel channel)
+        throws IOException
     {
         mainLock.lock();
         try {
@@ -97,78 +94,24 @@ class TPCChannelGroup
                 forceClose(channel);
                 throw new ShutdownChannelGroupException();
             }
-            AsyncOp<T> op = new TPCAsyncOp<T>(channel);
-            channels.add(op);
+            channels.add(channel);
             ++groupSize;
-            return op;
         } finally {
             mainLock.unlock();
         }
     }
 
-    <T extends SelectableChannel> void channelClosed(AsyncOp<T> ops) {
+    void closeChannel(SelectableChannel channel) {
         mainLock.lock();
         try {
-            channels.remove(ops);
+            try {
+                channel.close();
+            } catch (IOException ignore) { }
+            channels.remove(channel);
             --groupSize;
             tryTerminate();
         } finally {
             mainLock.unlock();
-        }
-    }
-
-    class TPCAsyncOp<T extends SelectableChannel> extends AsyncOp<T> {
-
-        private final T channel;
-        private volatile int pendingOps;
-
-        TPCAsyncOp(T channel) {
-            this.channel = channel;
-        }
-
-        T channel() {
-            return channel;
-        }
-
-        TPCChannelGroup group() {
-            return TPCChannelGroup.this;
-        }
-
-        public void close() throws IOException {
-            try {
-                super.close();
-            } finally {
-                channelClosed(this);
-            }
-        }
-
-        boolean isPending(int op) {
-            return (pendingOps & op) != 0;
-        }
-
-        void setOp(int op) {
-            synchronized (this) {
-                checkPending(op);
-                pendingOps |= op;
-            }
-        }
-
-        void clearOp(int op) {
-            synchronized (this) {
-                pendingOps &= ~op;
-            }
-        }
-
-        <R, A> IoFuture<R, A>
-        submit(int op,
-               A attachment,
-               CompletionHandler<R, ? super A> handler, 
-               long timeout, 
-               TimeUnit unit, 
-               Callable<R> callable)
-        {
-            // TODO
-            return null;
         }
     }
 
@@ -265,8 +208,8 @@ class TPCChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (AsyncOp<?> op : channels)
-                forceClose(op);
+            for (SelectableChannel channel : channels)
+                forceClose(channel);
 
             tryTerminate();
             return this;
@@ -281,13 +224,30 @@ class TPCChannelGroup
         } catch (IOException ignore) { }
     }
 
-    /**
-     * Invokes {@code shutdown} when this channel group is no longer
-     * referenced.
-     */
     @Override
-    protected void finalize() {
-        // TODO is this actually useful? -JM
-        shutdown();
+    void execute(AsyncOp<?> op)
+    {
+        SelectableChannel channel = op.getChannel();
+        if (! channel.isOpen())
+            throw new ClosedAsynchronousChannelException();
+        if (op.getOp() == 0) {
+            executor().execute(op);
+            return;
+        }
+        long timeout = op.getDelay(TimeUnit.MILLISECONDS);
+        if (timeout < 0)
+            throw new IllegalArgumentException("Negative timeout");
+        if (timeout > 0) {
+            // TODO
+            throw new UnsupportedOperationException("timeout not implemented");
+        }
+        executor().execute(op);
+    }
+
+    @Override
+    boolean isOpPending(SelectableChannel channel, int op)
+    {
+        // TODO
+        return false;
     }
 }
