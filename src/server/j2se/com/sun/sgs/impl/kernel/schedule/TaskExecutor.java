@@ -25,8 +25,9 @@ import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.TaskOwner;
+
+import com.sun.sgs.profile.ProfileCollector;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -104,12 +105,12 @@ class TaskExecutor {
                 taskHandler.runTaskAsOwner(task.getTask(), task.getOwner());
 
                 if (collector != null)
-                    collector.finishTask(tryCount, true);
+                    collector.finishTask(tryCount);
 
                 return;
             } catch (InterruptedException ie) {
                 if (collector != null)
-                    collector.finishTask(tryCount, false);
+                    collector.finishTask(tryCount, ie);
 
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, ie, "skipping a task " +
@@ -118,7 +119,7 @@ class TaskExecutor {
                 throw ie;
             } catch (Exception e) {
                 if (collector != null)
-                    collector.finishTask(tryCount, false);
+                    collector.finishTask(tryCount, e);
 
                 if (! retry) {
                     if (throwExceptions)

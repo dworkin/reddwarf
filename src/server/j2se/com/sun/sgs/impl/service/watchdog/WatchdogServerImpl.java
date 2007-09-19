@@ -32,7 +32,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;

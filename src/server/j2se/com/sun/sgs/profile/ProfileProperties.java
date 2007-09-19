@@ -17,36 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.profile;
 
 
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * A collection of common properties used by {@link
+ * com.sun.sgs.profile.ProfileListener} implementations.
  */
-public interface ProfileOperation {
+public interface ProfileProperties {
 
     /**
-     * Returns the name of this operation.
-     *
-     * @return the name
+     * The property for defining the number task to summarize for
+     * windowed {@code com.sun.sgs.profile.ProfileListener}
+     * implementations.  The value assigned to the property must be an
+     * integer.
      */
-    public String getOperationName();
-
-    /**
-     * Returns the identifier for this operation.
-     *
-     * @return the identifier
-     */
-    public int getId();
-
-    /**
-     * Tells this operation to report that it is happening. This may be
-     * called any number of times during a single task.
-     *
-     * @throws IllegalStateException if this is called outside the scope
-     *                               of a task run through the scheduler
-     */
-    public void report();
+    public static final String WINDOW_SIZE =
+	"com.sun.sgs.profile.listener.window.size";
 
 }
