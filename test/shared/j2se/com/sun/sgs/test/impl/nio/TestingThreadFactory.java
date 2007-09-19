@@ -29,7 +29,6 @@ final class TestingThreadFactory
     }
 
     public void uncaughtException(Thread t, Throwable e) {
-        log.log(Level.WARNING, "Uncaught exception in {0} : {1}",
-            new Object[] { t, e.getMessage() });
+        log.log(Level.WARNING, "Uncaught exception in " + t, e);
     }
 }
