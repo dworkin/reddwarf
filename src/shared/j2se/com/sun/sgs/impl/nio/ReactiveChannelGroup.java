@@ -217,20 +217,24 @@ class ReactiveChannelGroup
 
         synchronized void selected(int readyOps) throws IOException {
             if ((readyOps & OP_ACCEPT) != 0 && acceptTask != null) {
-                acceptTask.run();
+                Runnable r = acceptTask;
                 acceptTask = null;
+                executor().execute(r);
             }
             if ((readyOps & OP_CONNECT) != 0 && connectTask != null) {
-                connectTask.run();
+                Runnable r = connectTask;
                 connectTask = null;
+                executor().execute(r);
             }
             if ((readyOps & OP_READ) != 0 && readTask != null) {
-                readTask.run();
+                Runnable r = readTask;
                 readTask = null;
+                executor().execute(r);
             }
             if ((readyOps & OP_WRITE) != 0 && writeTask != null) {
-                writeTask.run();
+                Runnable r = writeTask;
                 writeTask = null;
+                executor().execute(r);
             }
         }
 

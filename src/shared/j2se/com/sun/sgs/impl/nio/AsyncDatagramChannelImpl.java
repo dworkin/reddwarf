@@ -273,7 +273,6 @@ class AsyncDatagramChannelImpl
         // TODO ensure only one of these outstanding
 
         AsyncOp<Void> op = AsyncOp.create(
-            group.executor(),
             channel,
             0,
             attachment,
@@ -299,7 +298,6 @@ class AsyncDatagramChannelImpl
         checkClosedAsync();
 
         AsyncOp<Void> op = AsyncOp.create(
-            group.executor(),
             channel,
             0,
             attachment,

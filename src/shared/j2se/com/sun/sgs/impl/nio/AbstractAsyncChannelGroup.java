@@ -74,7 +74,7 @@ abstract class AbstractAsyncChannelGroup
            Callable<R> callable)
     {
         AsyncOp<R> asyncOp =
-            AsyncOp.create(executor(), channel, op, timeout, unit,
+            AsyncOp.create(channel, op, timeout, unit,
                            attachment, handler, callable);
         execute(asyncOp);
         return AttachedFuture.wrap(asyncOp, attachment);

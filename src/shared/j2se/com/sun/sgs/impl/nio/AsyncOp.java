@@ -3,7 +3,6 @@ package com.sun.sgs.impl.nio;
 import java.nio.channels.SelectableChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Delayed;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -14,7 +13,6 @@ class AsyncOp<R>
     extends FutureTask<R>
     implements Delayed
 {
-    private final Executor executor;
     private final SelectableChannel channel;
     private final int op;
     private final long timeout;
@@ -22,20 +20,18 @@ class AsyncOp<R>
     private final Runnable completionRunner;
 
     static <R, A> AsyncOp<R>
-    create(Executor executor,
-           SelectableChannel channel,
+    create(SelectableChannel channel,
            int op,
            A attachment,
            CompletionHandler<R, A> handler,
            Callable<R> callable)
     {
-        return create(executor, channel, op, 0, TimeUnit.MILLISECONDS,
+        return create(channel, op, 0, TimeUnit.MILLISECONDS,
                       attachment, handler, callable);
     }
 
     static <R, A> AsyncOp<R>
-    create(Executor executor,
-           SelectableChannel channel,
+    create(SelectableChannel channel,
            int op,
            long timeout,
            TimeUnit unit,
@@ -44,11 +40,10 @@ class AsyncOp<R>
            Callable<R> callable)
     {
         return new AsyncOp<R>(
-            executor, channel, op, timeout, unit, attachment, handler, callable);
+            channel, op, timeout, unit, attachment, handler, callable);
     }
 
     protected <A> AsyncOp(
-            Executor executor,
             SelectableChannel channel,
             int op,
             long timeout,
@@ -58,7 +53,6 @@ class AsyncOp<R>
             Callable<R> callable)
     {
         super(callable);
-        this.executor = executor;
         this.channel = channel;
         this.op = op;
         this.timeout = timeout;
@@ -82,7 +76,7 @@ class AsyncOp<R>
     @Override
     protected void done() {
         if (completionRunner != null)
-            executor.execute(completionRunner);
+            completionRunner.run();
     }
 
     @Override
