@@ -41,6 +41,12 @@ import java.util.logging.Logger;
  * have not yet run to completion or been dropped. This class maintains all
  * of the meta-data associated with these pending tasks, and if needed, makes
  * sure that the {@code Task} itself is persisted.
+ * <p>
+ * FIXME: The identity is being kept here only because we need it given the
+ * current APIs. When notification of node joins is added, the Identity will
+ * be provided, and we will no longer need to have it in the pending data
+ * for this purpose. We need to figure out if it's still useful for other
+ * applications (e.g., handoff on cancelled periodic tasks).
  */
 class PendingTask implements ManagedObject, Serializable {
 
