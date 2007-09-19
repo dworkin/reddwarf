@@ -81,6 +81,8 @@ class ReactiveChannelGroup
     static final int SHUTDOWN   = 1;
     static final int STOP       = 2;
     static final int TERMINATED = 3;
+    
+    volatile boolean selecting = false;
 
     /**
      * Lock held on updates to runState and channel set.
@@ -132,8 +134,12 @@ class ReactiveChannelGroup
                         return null;
                     }
                 });
-            tasks.add(task);
-            selector.wakeup();
+            if (! selecting) {
+                task.run();
+            } else {
+                tasks.add(task);
+                selector.wakeup();
+            }
             try {
                 task.get();
             } catch (InterruptedException e) {
@@ -295,7 +301,12 @@ class ReactiveChannelGroup
     }
 
     int doSelect() throws IOException {
-        return selector.select(getSelectorTimeout());
+        selecting = true;
+        try {
+            return selector.select(getSelectorTimeout());
+        } finally {
+            selecting = false;
+        }
     }
 
     int getSelectorTimeout() {
