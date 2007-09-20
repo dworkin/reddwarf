@@ -33,6 +33,8 @@ public class EchoClient {
 
     public static final String DEFAULT_BUFFER_SIZE = "32";
     public static final String DEFAULT_NUM_CLIENTS =  "4";
+    public static final String DEFAULT_NUM_THREADS =  "1";
+    public static final String DEFAULT_MAX_THREADS =  String.valueOf(Integer.MAX_VALUE);
     public static final String DEFAULT_NUM_MSGS    =  "8";
 
     private static final int BUFFER_SIZE =
@@ -41,6 +43,10 @@ public class EchoClient {
         Integer.valueOf(System.getProperty("clients", DEFAULT_NUM_CLIENTS));
     private static final int NUM_MSGS =
         Integer.valueOf(System.getProperty("messages", DEFAULT_NUM_MSGS));
+    private static final int NUM_THREADS =
+        Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
+    private static final int MAX_THREADS =
+        Integer.valueOf(System.getProperty("maxthreads", DEFAULT_MAX_THREADS));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -216,8 +222,10 @@ public class EchoClient {
         ThreadFactory threadFactory =
             new TestingThreadFactory(log, Executors.defaultThreadFactory());
 
-        ThreadPoolExecutor executor =
-            (ThreadPoolExecutor) Executors.newCachedThreadPool(threadFactory);
+        ThreadPoolExecutor executor = (ThreadPoolExecutor)
+            (MAX_THREADS == Integer.MAX_VALUE
+                ? Executors.newCachedThreadPool(threadFactory)
+                : Executors.newFixedThreadPool(MAX_THREADS, threadFactory));
 
         AsynchronousChannelProvider provider =
             AsynchronousChannelProvider.provider();
@@ -230,12 +238,10 @@ public class EchoClient {
         startSignal = new CountDownLatch(NUM_CLIENTS);
         doneSignal = new CountDownLatch(NUM_CLIENTS);
 
-        int numThreads = 1;
-
         log.log(Level.INFO,
-            "Prestarting {0,number,integer} threads", numThreads);
+            "Prestarting {0,number,integer} threads", NUM_THREADS);
 
-        executor.setCorePoolSize(numThreads);
+        executor.setCorePoolSize(NUM_THREADS);
         executor.prestartAllCoreThreads();
 
         log.log(Level.INFO,

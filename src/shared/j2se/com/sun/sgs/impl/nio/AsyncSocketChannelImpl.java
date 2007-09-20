@@ -327,7 +327,7 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public <A> IoFuture<Void, A> connect(
-        final SocketAddress remote,
+        SocketAddress remote,
         A attachment,
         CompletionHandler<Void, ? super A> handler)
     {

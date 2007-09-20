@@ -220,11 +220,17 @@ class ReactiveChannelGroup
 
     public void run() {
         try {
+            int rc;
             // Obtain and release the guard to allow other tasks to run
             // after waking the selector.
-            synchronized (selectorLock) { /* empty */ }
+            synchronized (selectorLock) {
+                // FIXME experimenting with a selectNow to clear
+                // spurious wakeups
+                rc = selector.selectNow();
+            }
 
-            doSelect();
+            if (rc == 0)
+                doSelect();
 
             if (runState != RUNNING) {
                 mainLock.lock();
