@@ -72,7 +72,7 @@ public class EchoClient {
             log.throwing("EchoClient", "connect", e);
             throw e;
         }
-        channel.connect(new InetSocketAddress(host, port), new ConnectHandler());
+        channel.connect(new InetSocketAddress(host, port), new ConnectHandler()).get();
     }
  
     public void start() throws Exception {
@@ -246,7 +246,6 @@ public class EchoClient {
         for (int i = 0; i < NUM_CLIENTS; ++i) {
             EchoClient client = new EchoClient(group);
             clients.add(client);
-            System.err.println("Connecting client " + i);
             client.connect();
         }
 
