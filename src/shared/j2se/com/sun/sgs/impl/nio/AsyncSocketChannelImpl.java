@@ -346,7 +346,7 @@ final class AsyncSocketChannelImpl
 
         try {
             if (channel.connect(remote)) {
-                group.execute(task);
+                selected(OP_CONNECT);
             } else {
                 group.awaitReady(this, OP_CONNECT);
             }
