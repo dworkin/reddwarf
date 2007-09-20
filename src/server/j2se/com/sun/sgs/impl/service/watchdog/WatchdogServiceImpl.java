@@ -32,7 +32,6 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
-import com.sun.sgs.service.RecoveryService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -60,7 +59,7 @@ import java.util.logging.Logger;
  */
 
 /**
- * The {@link WatchdogService} and {@link RecoveryService} implementation. <p>
+ * The {@link WatchdogService} implementation. <p>
  *
  * The {@link #WatchdogServiceImpl constructor} supports the following
  * properties: <p>
@@ -123,7 +122,7 @@ import java.util.logging.Logger;
  *	{@code 65535}.<p>
  * </dl> <p>
  */
-public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
+public class WatchdogServiceImpl implements WatchdogService {
 
     /**  The name of this class. */
     private static final String CLASSNAME =
@@ -429,8 +428,6 @@ public class WatchdogServiceImpl implements WatchdogService, RecoveryService {
 	}
 	nodeListeners.putIfAbsent(listener, listener);
     }
-
-    /* -- Implement RecoveryService -- */
 
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {

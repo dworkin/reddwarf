@@ -55,7 +55,6 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
-import com.sun.sgs.service.RecoveryService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -298,8 +297,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				taskScheduler);
 	    localNodeId = txnProxy.getService(WatchdogService.class).
 		getLocalNodeId();
-	    ((RecoveryService) watchdogService).
-		addRecoveryListener(new ClientSessionServiceRecoveryListener());
+	    watchdogService.addRecoveryListener(
+		new ClientSessionServiceRecoveryListener());
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
 		    new InetSocketAddress(appPort), TransportType.RELIABLE);
@@ -1156,13 +1155,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 			    notifyDisconnectedSessions(node.getId());
 			}},
 		    taskOwner);
+		future.done();
 	    } catch (Exception e) {
 		logger.logThrow(
  		    Level.WARNING, e,
 		    "notifying disconnected sessions for node:{0} throws",
 		    node.getId());
+		// TBD: what should it do if it can't recover?
 	    }
-	    future.done();
 	}
 	
 	/**
@@ -1185,21 +1185,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 		final String sessionKey = key;		
 
-		/*
-		 * TBD: this either has to be a durable task, or
-		 * it needs to inform the "recover" method that it
-		 * is done, and when all notifications are done, then
-		 * the future can report done.
-		 */
-		scheduleTaskOnCommit(
-		    new AbstractKernelRunnable() {
-			public void run() throws Exception {
-			    ClientSessionImpl sessionImpl = 
-				dataService.getServiceBinding(
-				    sessionKey, ClientSessionImpl.class);
-			    sessionImpl.notifyListenerAndRemoveSession(
-			        dataService, false);
-			}});
+		// TBD: should each notification/removal happen as a
+		// separate task?
+		ClientSessionImpl sessionImpl = 
+		    dataService.getServiceBinding(
+			sessionKey, ClientSessionImpl.class);
+		sessionImpl.notifyListenerAndRemoveSession(dataService, false);
 	    }
 	}
     }
