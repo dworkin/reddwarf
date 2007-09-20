@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.UnsupportedAddressTypeException;
@@ -15,7 +16,9 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
+import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -28,6 +31,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
+    implements AsyncChannelImpl
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -40,13 +44,41 @@ final class AsyncServerSocketChannelImpl
     final AbstractAsyncChannelGroup group;
     final ServerSocketChannel channel;
 
+    volatile AsyncOp<?> acceptTask = null;
+
+    private static final AtomicReferenceFieldUpdater<AsyncServerSocketChannelImpl, AsyncOp>
+        acceptTaskUpdater = AtomicReferenceFieldUpdater.newUpdater(
+            AsyncServerSocketChannelImpl.class, AsyncOp.class, "acceptTask");
+
     AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
     {
         super(group.provider());
         this.group = group;
         this.channel = group.selectorProvider().openServerSocketChannel();
-        group.registerChannel(channel);
+        group.registerChannel(this);
+    }
+
+    public ServerSocketChannel channel() {
+        return channel;
+    }
+
+    public void selected(int ops) {
+        if (ops != OP_ACCEPT)
+            throw new IllegalStateException("Unexpected ops " + ops);
+
+        AsyncOp<?> task = acceptTaskUpdater.getAndSet(this, null);
+        if (task != null)
+            group.execute(task);
+    }
+
+    public void setException(int op, Throwable t) {
+        if (op != OP_ACCEPT)
+            throw new IllegalStateException("Unexpected op " + op);
+
+        AsyncOp<?> task = acceptTaskUpdater.getAndSet(this, null);
+        if (task != null)
+            group.setException(task, t);
     }
 
     /**
@@ -61,7 +93,12 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        group.closeChannel(channel);
+        try {
+            channel.close();
+        } finally {
+            setException(OP_ACCEPT, new AsynchronousCloseException());
+            group.unregisterChannel(this);
+        }
     }
 
     /**
@@ -155,7 +192,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return group.isOpPending(channel, OP_ACCEPT);
+        return acceptTask != null;
     }
 
     /**
@@ -166,11 +203,17 @@ final class AsyncServerSocketChannelImpl
             A attachment,
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
-        return group.submit(
-            channel, OP_ACCEPT, attachment, handler,
+        AsyncOp<AsynchronousSocketChannel> task =
+            AsyncOp.create(attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     return new AsyncSocketChannelImpl(group, channel.accept());
                 }});
+
+        if (! acceptTaskUpdater.compareAndSet(this, null, task))
+            throw new AcceptPendingException();
+
+        group.awaitReady(this, OP_ACCEPT);
+        return AttachedFuture.wrap(task, attachment);
     }
 }

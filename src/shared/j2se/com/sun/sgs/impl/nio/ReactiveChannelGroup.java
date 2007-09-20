@@ -11,8 +11,6 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.Channel;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -20,7 +18,6 @@ import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
@@ -30,7 +27,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AcceptPendingException;
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
@@ -68,8 +64,6 @@ class ReactiveChannelGroup
     static final int SHUTDOWN   = 1;
     static final int STOP       = 2;
     static final int TERMINATED = 3;
-    
-    volatile boolean selecting = false;
 
     /**
      * Lock held on updates to runState and channel set.
@@ -81,9 +75,58 @@ class ReactiveChannelGroup
      */
     private final Condition termination = mainLock.newCondition();
 
+    /**
+     * Selector guard.  May be locked *after* mainLock, but not before.
+     */
+    private final Object selectorLock = new Object();
+
     final Selector selector;
-    final DelayQueue<AsyncOp<?>> timeouts =
-        new DelayQueue<AsyncOp<?>>();
+    final DelayQueue<TimeoutHandler> timeouts =
+        new DelayQueue<TimeoutHandler>();
+
+    static class TimeoutHandler implements Delayed, Runnable {
+        private final AsyncChannelImpl asyncChannel;
+        private final int op;
+        private final long timeout;
+        private final TimeUnit timeoutUnit;
+
+        TimeoutHandler(AsyncChannelImpl ach,
+                       int op,
+                       long timeout,
+                       TimeUnit unit)
+        {
+            this.asyncChannel = ach;
+            this.op = op;
+            this.timeout = timeout;
+            timeoutUnit = unit;
+        }
+
+        public long getDelay(TimeUnit unit) {
+            return unit.convert(timeout, timeoutUnit);
+        }
+
+        public int compareTo(Delayed o) {
+            final long other = o.getDelay(timeoutUnit);
+            return (timeout<other ? -1 : (timeout==other ? 0 : 1));
+        }
+
+        public void run() {
+            asyncChannel.setException(op, new AbortedByTimeoutException());
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            TimeoutHandler other = (TimeoutHandler) obj;
+            return asyncChannel == other.asyncChannel && op == other.op;
+        }
+
+        @Override
+        public int hashCode() {
+            return asyncChannel.hashCode() ^ (1 << op);
+        }
+    }
 
     /**
      * Creates a new AsyncChannelGroupImpl with the given provider and
@@ -97,199 +140,113 @@ class ReactiveChannelGroup
     {
         super(provider, executor);
         selector = selectorProvider().openSelector();
-        executor().execute(this);
+        execute(this);
     }
 
     @Override
-    void registerChannel(SelectableChannel channel) throws IOException {
+    void registerChannel(AsyncChannelImpl ach) throws IOException {
         mainLock.lock();
         try {
+            final SelectableChannel ch = ach.channel();
             if (isShutdown()) {
                 try {
-                    channel.close();
+                    ch.close();
                 } catch (IOException ignore) { }
                 throw new ShutdownChannelGroupException();
             }
-            channel.configureBlocking(false);
-            selector.wakeup();
-            channel.register(selector, 0, new KeyDispatcher(channel));
-        } finally {
-            mainLock.unlock();
-        }
-    }
-
-    final class KeyDispatcher implements Channel {
-        private final SelectableChannel channel;
-
-        private volatile AsyncOp<?> acceptTask = null;
-        private volatile AsyncOp<?> connectTask = null;
-        private volatile AsyncOp<?> readTask = null;
-        private volatile AsyncOp<?> writeTask = null;
-
-        KeyDispatcher(SelectableChannel channel) {
-            this.channel = channel;
-        }
-        
-        synchronized void add(AsyncOp<?> op) {
-            SelectionKey key = channel.keyFor(selector);
-            switch (op.getOp()) {
-            case OP_ACCEPT:
-                if (acceptTask != null)
-                    throw new AcceptPendingException();
-                key.interestOps(key.interestOps() | OP_ACCEPT);
-                acceptTask = op;
-                break;
-            case OP_CONNECT:
-                if (connectTask != null)
-                    throw new ConnectionPendingException();
-                key.interestOps(key.interestOps() | OP_CONNECT);
-                connectTask = op;
-                break;
-            case OP_READ:
-                if (readTask != null)
-                    throw new ReadPendingException();
-                key.interestOps(key.interestOps() | OP_READ);
-                readTask = op;
-                break;
-            case OP_WRITE:
-                if (writeTask != null)
-                    throw new WritePendingException();
-                key.interestOps(key.interestOps() | OP_WRITE);
-                writeTask = op;
-                break;
-            }
-        }
-        
-        synchronized void setException(int op, Throwable t) {
-            SelectionKey key = channel.keyFor(selector);
-            switch (op) {
-            case OP_ACCEPT:
-                if (acceptTask != null) {
-                    key.interestOps(key.interestOps() & (~ OP_ACCEPT));
-                    acceptTask.setException(t);
-                    acceptTask = null;
-                }
-                break;
-            case OP_CONNECT:
-                if (connectTask != null) {
-                    key.interestOps(key.interestOps() & (~ OP_CONNECT));
-                    connectTask.setException(t);
-                    connectTask = null;
-                }
-                break;
-            case OP_READ:
-                if (readTask != null) {
-                    key.interestOps(key.interestOps() & (~ OP_READ));
-                    readTask.setException(t);
-                    readTask = null;
-                }
-                break;
-            case OP_WRITE:
-                if (writeTask != null) {
-                    key.interestOps(key.interestOps() & (~ OP_WRITE));
-                    writeTask.setException(t);
-                    writeTask = null;
-                }
-                break;
-            }
-        }
-
-        public synchronized void close() throws IOException {
-            channel.close();
-
-            if (acceptTask != null) {
-                acceptTask.setException(new AsynchronousCloseException());
-                acceptTask = null;
-            }
-            if (connectTask != null) {
-                connectTask.setException(new AsynchronousCloseException());
-                connectTask = null;
-            }
-            if (readTask != null) {
-                readTask.setException(new AsynchronousCloseException());
-                readTask = null;
-            }
-            if (writeTask != null) {
-                writeTask.setException(new AsynchronousCloseException());
-                writeTask = null;
-            }
-        }
-
-        synchronized void selected(int readyOps) throws IOException {
-            if ((readyOps & OP_ACCEPT) != 0 && acceptTask != null) {
-                Runnable r = acceptTask;
-                acceptTask = null;
-                executor().execute(r);
-            }
-            if ((readyOps & OP_CONNECT) != 0 && connectTask != null) {
-                Runnable r = connectTask;
-                connectTask = null;
-                executor().execute(r);
-            }
-            if ((readyOps & OP_READ) != 0 && readTask != null) {
-                Runnable r = readTask;
-                readTask = null;
-                executor().execute(r);
-            }
-            if ((readyOps & OP_WRITE) != 0 && writeTask != null) {
-                Runnable r = writeTask;
-                writeTask = null;
-                executor().execute(r);
-            }
-        }
-
-        public boolean isOpen() {
-            return channel.isOpen();
-        }
-    }
-
-    KeyDispatcher getDispatcher(SelectableChannel channel) {
-        return getDispatcher(channel.keyFor(selector));
-    }
-
-    KeyDispatcher getDispatcher(SelectionKey key) {
-        return (KeyDispatcher) key.attachment();
-    }
-
-    void closeChannel(SelectableChannel channel) {
-        mainLock.lock();
-        try {
-            try {
-                getDispatcher(channel).close();
+            ch.configureBlocking(false);
+            synchronized (selectorLock) {
                 selector.wakeup();
-            } catch (IOException ignore) { }
-            tryTerminate();
+                ch.register(selector, 0, ach);
+            }
         } finally {
             mainLock.unlock();
         }
     }
 
-    int doSelect() throws IOException {
-        selecting = true;
-        try {
-            return selector.select(getSelectorTimeout());
-        } finally {
-            selecting = false;
+    @Override
+    void unregisterChannel(AsyncChannelImpl ach) {
+        selector.wakeup();
+    }
+
+    @Override
+    void awaitReady(AsyncChannelImpl ach, int op) {
+        awaitReady(ach, op, 0, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    void awaitReady(AsyncChannelImpl ach, int op, long timeout, TimeUnit unit) {
+        if (timeout < 0)
+            throw new IllegalArgumentException("Negative timeout");
+        if (timeout > 0) {
+            // TODO
+            throw new UnsupportedOperationException("timeout not implemented");
+        }
+        synchronized (selectorLock) {
+            selector.wakeup();
+            SelectionKey key = ach.channel().keyFor(selector);
+            int interestOps = key.interestOps();
+            checkPending(interestOps, op);
+            key.interestOps(interestOps | op);
         }
     }
 
-    int getSelectorTimeout() {
+    private void checkPending(int interestOps, int op) {
+        if ((interestOps & op) == 0)
+            return;
+
+        switch (op) {
+        case OP_ACCEPT:
+            throw new AcceptPendingException();
+        case OP_CONNECT:
+            throw new ConnectionPendingException();
+        case OP_READ:
+            throw new ReadPendingException();
+        case OP_WRITE:
+            throw new WritePendingException();
+        default:
+            throw new IllegalStateException("Unexpected op " + op);
+        }
+    }
+
+    protected int doSelect() throws IOException {
+        return selector.select(getSelectorTimeout());
+    }
+
+    protected int getSelectorTimeout() {
         final Delayed t = timeouts.peek();
         return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
     }
 
     public void run() {
         try {
-            // Obtain and release the lock to allow other tasks to run
+            // Obtain and release the guard to allow other tasks to run
             // after waking the selector.
-            mainLock.lock();
-            mainLock.unlock();
+            synchronized (selectorLock) { /* empty */ }
 
             doSelect();
-            
-            if (! selector.isOpen()) {
-                // TODO
-                return;
+
+            if (runState != RUNNING) {
+                mainLock.lock();
+                try {
+                    if (runState == TERMINATED)
+                        return;
+
+                    selector.selectNow(); // clear cancelled keys
+                    if (selector.keys().isEmpty()) {
+                        int state = runState;
+                        if (state == STOP || state == SHUTDOWN) {
+                            runState = TERMINATED;
+                            try {
+                                selector.close();
+                            } catch (IOException ignore) { }
+                            termination.signalAll();
+                            return;
+                        }
+                    }
+                } finally {
+                    mainLock.unlock();
+                }
             }
 
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -299,50 +256,28 @@ class ReactiveChannelGroup
                 keys.remove();
                 int readyOps = key.readyOps();
                 key.interestOps(key.interestOps() & (~ readyOps));
-                try {
-                    getDispatcher(key).selected(readyOps);
-                } catch (IOException e) {
-                    // TODO
-                }
+                AsyncChannelImpl ach = (AsyncChannelImpl) key.attachment();
+                ach.selected(readyOps);
             }
 
             if (timeouts.peek() != null) {
-                List<AsyncOp<?>> expired = new ArrayList<AsyncOp<?>>();
-                timeouts.drainTo(expired);
+                List<TimeoutHandler> expiredHandlers = new ArrayList<TimeoutHandler>();
+                timeouts.drainTo(expiredHandlers);
 
-                for (AsyncOp<?> op : expired) {
-                    getDispatcher(op.getChannel()).setException(op.getOp(),
-                        new AbortedByTimeoutException());
-                }
+                for (TimeoutHandler expired : expiredHandlers)
+                    expired.run();
             }
 
-            executor().execute(this);
+            execute(this);
             
-        } catch (Exception e) {
+        } catch (Throwable t) {
             // TODO
-        }
-    }
-    
-    @Override
-    boolean isOpPending(SelectableChannel channel, int op) {
-        try {
-            return (channel.keyFor(selector).interestOps() & op) != 0;
-        } catch (RuntimeException e) {
-            return false;
+            t.printStackTrace();
+            execute(this);
         }
     }
 
     /* Termination support. */
-
-    private void tryTerminate() {
-        if (selector.keys().isEmpty()) {
-            int state = runState;
-            if (state == STOP || state == SHUTDOWN) {
-                runState = TERMINATED;
-                termination.signalAll();
-            }
-        }
-    }
 
     /**
      * {@inheritDoc}
@@ -393,7 +328,7 @@ class ReactiveChannelGroup
             if (state < SHUTDOWN)
                 runState = SHUTDOWN;
 
-            tryTerminate();
+            selector.wakeup();
             return this;
         } finally {
             mainLock.unlock();
@@ -412,12 +347,12 @@ class ReactiveChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            Set<SelectionKey> keys = selector.keys();
-            selector.close();
-            for (SelectionKey key : keys)
-                forceClose(getDispatcher(key));
+            synchronized (selectorLock) {
+                selector.wakeup();
+                for (SelectionKey key : selector.keys())
+                    forceClose((AsyncChannelImpl) key.attachment());
+            }
 
-            tryTerminate();
             return this;
         } finally {
             mainLock.unlock();
@@ -428,28 +363,5 @@ class ReactiveChannelGroup
         try {
             closeable.close();
         } catch (IOException ignore) { }
-    }
-
-    @Override
-    void execute(AsyncOp<?> op) {
-        mainLock.lock();
-        try {
-            SelectableChannel channel = op.getChannel();
-            if (! channel.isOpen())
-                throw new ClosedAsynchronousChannelException();
-            if (op.getOp() == 0) {
-                executor().execute(op);
-                return;
-            }
-            long timeout = op.getDelay(TimeUnit.MILLISECONDS);
-            if (timeout < 0)
-                throw new IllegalArgumentException("Negative timeout");
-            if (timeout > 0)
-                timeouts.add(op);
-            getDispatcher(channel).add(op);
-            selector.wakeup();
-        } finally {
-            mainLock.unlock();
-        }
     }
 }

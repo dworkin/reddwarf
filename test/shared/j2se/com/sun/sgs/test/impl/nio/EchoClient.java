@@ -69,10 +69,10 @@ public class EchoClient {
             channel = group.provider().openAsynchronousSocketChannel(group);
             channel.setOption(StandardSocketOption.TCP_NODELAY, Boolean.FALSE);
         } catch (IOException e) {
-            log.throwing("EchoClient", "start", e);
+            log.throwing("EchoClient", "connect", e);
             throw e;
         }
-        channel.connect(new InetSocketAddress(host, port), new ConnectHandler()).get();
+        channel.connect(new InetSocketAddress(host, port), new ConnectHandler());
     }
  
     public void start() throws Exception {
@@ -246,6 +246,7 @@ public class EchoClient {
         for (int i = 0; i < NUM_CLIENTS; ++i) {
             EchoClient client = new EchoClient(group);
             clients.add(client);
+            System.err.println("Connecting client " + i);
             client.connect();
         }
 

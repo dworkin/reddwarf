@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 class TPCChannelGroup
@@ -64,8 +63,8 @@ class TPCChannelGroup
      * Set containing all channels in group. Accessed only when
      * holding mainLock.
      */
-    private final Set<SelectableChannel> channels =
-        new HashSet<SelectableChannel>();
+    private final Set<AsyncChannelImpl> channels =
+        new HashSet<AsyncChannelImpl>();
 
     /**
      * Current channel count, updated only while holding mainLock but
@@ -83,36 +82,52 @@ class TPCChannelGroup
     TPCChannelGroup(AsyncProviderImpl provider, ExecutorService executor) {
         super(provider, executor);
     }
-
     @Override
-    void registerChannel(SelectableChannel channel)
-        throws IOException
-    {
+    void registerChannel(AsyncChannelImpl ach) throws IOException {
         mainLock.lock();
         try {
             if (isShutdown()) {
-                forceClose(channel);
+                forceClose(ach);
                 throw new ShutdownChannelGroupException();
             }
-            channels.add(channel);
+            channels.add(ach);
             ++groupSize;
         } finally {
             mainLock.unlock();
         }
     }
 
-    void closeChannel(SelectableChannel channel) {
+    @Override
+    void unregisterChannel(AsyncChannelImpl ach) {
         mainLock.lock();
         try {
-            try {
-                channel.close();
-            } catch (IOException ignore) { }
-            channels.remove(channel);
+            channels.remove(ach);
             --groupSize;
             tryTerminate();
         } finally {
             mainLock.unlock();
         }
+        
+    }
+
+    @Override
+    void awaitReady(AsyncChannelImpl ach, int op) {
+        awaitReady(ach, op, 0, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    void awaitReady(final AsyncChannelImpl ach,
+                    final int op,
+                    long timeout,
+                    TimeUnit unit)
+    {
+        if (timeout < 0)
+            throw new IllegalArgumentException("Negative timeout");
+        if (timeout > 0) {
+            // TODO
+            throw new UnsupportedOperationException("timeout not implemented");
+        }
+        ach.selected(op);
     }
 
     void awaitSelectableOp(SelectableChannel channel, long timeout, int ops)
@@ -208,7 +223,7 @@ class TPCChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (SelectableChannel channel : channels)
+            for (AsyncChannelImpl channel : channels)
                 forceClose(channel);
 
             tryTerminate();
@@ -222,32 +237,5 @@ class TPCChannelGroup
         try {
             closeable.close();
         } catch (IOException ignore) { }
-    }
-
-    @Override
-    void execute(AsyncOp<?> op)
-    {
-        SelectableChannel channel = op.getChannel();
-        if (! channel.isOpen())
-            throw new ClosedAsynchronousChannelException();
-        if (op.getOp() == 0) {
-            executor().execute(op);
-            return;
-        }
-        long timeout = op.getDelay(TimeUnit.MILLISECONDS);
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-        if (timeout > 0) {
-            // TODO
-            throw new UnsupportedOperationException("timeout not implemented");
-        }
-        executor().execute(op);
-    }
-
-    @Override
-    boolean isOpPending(SelectableChannel channel, int op)
-    {
-        // TODO
-        return false;
     }
 }
