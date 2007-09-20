@@ -26,10 +26,7 @@ import java.math.BigInteger;
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -205,7 +202,6 @@ public class DistributedHashMap<K,V>
      */
     // NOTE: this is limited by the number of bits in the prefix,
     //       which currently is implemented as a 32-bit int
-    /* XXX: Change to 32 - directory size?  -tjb@sun.com (09/20/2007) */
     private static final int MAX_DEPTH = 32;
     
     /**
@@ -891,7 +887,6 @@ public class DistributedHashMap<K,V>
      * @return the value mapped to the provided key or {@code null} if
      *         no such mapping exists
      */
-    @SuppressWarnings("unchecked")
     public V get(Object key) {
 	PrefixEntry<K,V> entry = getEntry(key);
 	return (entry == null) ? null : entry.getValue();
@@ -960,16 +955,17 @@ public class DistributedHashMap<K,V>
 	    }
 	}
 
-// 	// we found no key match, so add an entry
+ 	// we found no key match, so add an entry
 	if (newEntry == null) {
 	    newEntry = new PrefixEntry<K,V>(hash, key, value);
 	}
 	leaf.addEntryMaybeSplit(newEntry, prev);
+
 	return null;
     }
 
     /** Compares the arguments as unsigned values. */
-    boolean unsignedGreaterThan(int x, int y) {
+    static boolean unsignedGreaterThan(int x, int y) {
 	return (x ^ 0x80000000) > (y ^ 0x80000000);
     }
 
@@ -1530,215 +1526,6 @@ public class DistributedHashMap<K,V>
     }
 
     /**
-     * A concurrent, perstistable {@code Iterator} implementation for
-     * the {@code DistributeHashMap}.  This implemenation provides the
-     * following guarantees: <ul><li>if no modifications occur, all
-     * elements will eventually be returned by {@link
-     * ConcurrentIterator#next()}. <li>if any modifications occur, an
-     * element will be returned at most once from {@code next()}, with
-     * no guarantee to the number of elements returned.    
-     */
-//     abstract static class ConcurrentIterator<E>
-// 	implements Iterator<E>, Serializable {	
-
-// 	private static final long serialVersionUID = 0x1L;
-
-	
-// 	 * A reference to the root node of the table, used to look up the leaf
-// 	 * if the current leaf is split
-// 	private final ManagedReference rootRef;
-	
-	
-// 	 * A reference to the leaf containing the current position of the
-// 	 * iterator, or null if the iteration has not started
-// 	private ManagedReference currentLeafRef = null;
-
-	
-// 	 * The hash code of the entry at the current position of the iterator
-// 	private int currentHash = 0;
-
-	
-// 	 * A reference to the managed object for the key or entry at the
-// 	 * current position of the iterator, or null if the iteration has not
-// 	 * started.  Set to the same value as the currentLeafField if the
-// 	 * iteration has been completed
-// 	private ManagedReference currentKeyRef = null;
-
-// 	The leaf containing the next entry, or null if not computed. */
-// 	private transient DistributedHashMap nextLeaf = null;
-
-// 	/** The next entry, or null if no next entry or if not computed. */
-// 	private transient PrefixEntry nextEntry = null;
-
-// 	/**
-// 	 * The value of the modification count when the nextLeaf and
-// 	 * nextEntry fields were computed.
-// 	 */
-// 	private transient int nextLeafModifications = 0;
-
-// 	/**
-// 	 * Constructs a new {@code ConcurrentIterator}.
-// 	 *
-// 	 * @param root the root node of the {@code DistributedHashMap}
-// 	 */
-// 	public ConcurrentIterator(DistributedHashMap root) {
-// 	    rootRef = AppContext.getDataManager().createReference(root);
-// 	    checkNext();
-// 	}
-
-// 	/** Makes sure that the next entry is up to date. */
-// 	private void checkNext() {
-// 	    if (nextLeaf == null ||
-// 		nextLeafModifications != nextLeaf.modifications)
-// 	    {
-// 		getNext();
-// 	    }
-// 	}
-
-// 	/** Computes the next entry. */
-// 	private void getNext() {
-// 	    if (currentLeafRef == null) {
-// //		System.err.println("a");
-// 		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
-// 		nextEntry = firstEntry(nextLeaf);
-// 	    } else if (currentLeafRef != currentKeyRef) {
-// //		System.err.println("b");
-// 		//Thread.dumpStack();
-// 		try {
-// 		    nextLeaf = currentLeafRef.get(DistributedHashMap.class);
-// 		    if (nextLeaf.nodeDirectory != null) {
-// //			System.err.println("c");
-// 			/* The leaf was converted to a directory node */
-// 			nextLeaf =
-// 			    rootRef.get(DistributedHashMap.class).lookup(
-// 				currentHash);
-// 		    }
-// 		} catch (ObjectNotFoundException e) {
-// //		    System.err.println("d");
-// 		    /* The leaf was removed */
-// 		    nextLeaf = rootRef.get(DistributedHashMap.class).lookup(
-// 			currentHash);
-// 		}
-// 		nextEntry = nextEntry(
-// 		    nextLeaf, currentHash, currentKeyRef);
-// //		System.err.println(nextEntry);
-// 	    } else {
-// //		System.err.println("e");
-// 		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
-// 		nextEntry = null;
-// 	    }
-// 	    nextLeafModifications = nextLeaf.modifications;
-// 	}
-
-// 	/**
-// 	 * Returns the first entry starting with the specified leaf or null if
-// 	 * it is empty.
-// 	 */
-// 	private PrefixEntry firstEntry(DistributedHashMap leaf) {
-// 	    do {
-// 		for (int i = 0; i < leaf.table.length; i++) {
-// 		    PrefixEntry entry = nextLeaf.table[i];
-// 		    if (entry != null) {
-// 			return entry;
-// 		    }
-// 		}
-// 		leaf = leaf.rightLeafRef.get(DistributedHashMap.class);
-// 	    } while (leaf != null);
-// 	    return null;
-// 	}
-
-// 	/**
-// 	 * Returns the next entry on the leaf after the entry with the
-// 	 * specified hash and key, or null if there are no entries after that
-// 	 * position.
-// 	 */
-// 	private PrefixEntry nextEntry(DistributedHashMap leaf,
-// 				      int hash,
-// 				      ManagedReference keyRef)
-// 	{
-// 	    System.err.println("nextEntry hash:" + hash);
-// 	    BigInteger keyId = keyRef.getId();
-// 	    System.err.println("keyId:" + keyId);
-// 	    while (true) {
-// 		for (int i = 0; i < leaf.table.length; i++) {
-// 		    for (PrefixEntry entry = leaf.table[i];
-// 			 entry != null;
-// 			 entry = entry.next)
-// 		    {
-// 			System.err.println("entry:" + entry);
-// 			if (entry.hash == hash) {
-// 			    BigInteger entryKeyId = entry.keyRef().getId();
-// 			    if (entryKeyId.compareTo(keyId) > 0) {
-// 				System.err.println("found entryKeyId: " + entryKeyId);
-// 				return entry;
-// 			    }
-// 			}
-// 		    }
-// 		}
-// 		if (leaf.rightLeafRef == null) {
-// 		    return null;
-// 		}
-// 		DistributedHashMap newLeaf = leaf.rightLeafRef.get(DistributedHashMap.class);
-// 		System.err.println("leaf==newLeaf = " + (leaf==newLeaf));
-// 		leaf = newLeaf;
-// 		if (leaf == null) {
-// 		    return null;
-// 		}
-// 	    }
-// 	}
-
-// 	/**
-// 	 * {@inheritDoc}
-// 	 */
-// 	public boolean hasNext() {
-// 	    checkNext();
-// 	    return nextEntry != null;
-// 	}
-
-// 	/**
-// 	 * Returns the next entry in the {@code DistributedHashMap}.
-// 	 * Note that due to the concurrent nature of this iterator,
-// 	 * this method may skip elements that have been added after
-// 	 * the iterator was constructed.  Likewise, it may return new
-// 	 * elements that have been added.  This implementation is
-// 	 * guaranteed never to return an element more than once.
-// 	 *
-// 	 * <p>
-// 	 *
-// 	 * This method will never throw a {@link
-// 	 * java.util.ConcurrentModificatinException}.
-// 	 *
-// 	 * @return the next entry in the {@code DistributedHashMap}
-// 	 *
-// 	 * @throws NoSuchElementException if no further entries exist
-// 	 */
-// 	Entry nextEntry() {
-// 	    if (!hasNext()) {
-// 		throw new NoSuchElementException();
-// 	    }
-// 	    currentLeafRef =
-// 		AppContext.getDataManager().createReference(nextLeaf);
-// 	    currentHash = nextEntry.hash;
-// 	    currentKeyRef = nextEntry.keyRef();
-// 	    Entry result = nextEntry;
-// 	    getNext();
-// 	    if (nextEntry == null) {
-// 		currentKeyRef = currentLeafRef;
-// 	    }
-// 	    return result;
-// 	}
-
-// 	/**
-// 	 * This operation is not supported.
-// 	 *
-// 	 * @throws UnsupportedOperationException if called
-// 	 */
-// 	public void remove() {
-// 	    throw new UnsupportedOperationException();
-// 	}
-//     }
-
-    /**
      * A concurrent, persistable {@code Iterator} implementation for
      * the {@code DistributedHashMap}.  This implementation provides
      * the following guarantees: <ul><li>if no modifications occur,
@@ -1753,292 +1540,148 @@ public class DistributedHashMap<K,V>
 	private static final long serialVersionUID = 0x1L;
 
 	/**
-	 * A reference to the root node of the backing trie.  This is
-	 * necessary for looking up the leaf between transactions.
+	 * A reference to the root node of the table, used to look up the leaf
+	 * if the current leaf is split
 	 */
 	private final ManagedReference rootRef;
 	
 	/**
-	 * The current index into the {@code leafCache}.
+	 * A reference to the leaf containing the current position of the
+	 * iterator, or null if the iteration has not started.
 	 */
-	private int cur;
+	private ManagedReference currentLeafRef = null;
 
 	/**
-	 * The ID of the current leaf that is being accessed.  This is
-	 * stored between transactions so that in {@code next()} can
-	 * tell when loading the leaf again whether a split has
-	 * occurred and therefore we need to invalidate our cache and
-	 * reload the next round of entries.
+	 * The hash code of the entry at the current position of the iterator.
 	 */
-	private BigInteger cachedLeafId;
+	private int currentHash = 0;
 
 	/**
-	 * The revision number of the leaf that is currently being
-	 * examined.  This is used to check whether a leaf has changed
-	 * if the map changes from when the last cache was made.
+	 * A reference to the managed object for the key or entry at the
+	 * current position of the iterator, or null if the iteration has not
+	 * started.  Set to the same value as the currentLeafField if the
+	 * iteration has been completed.
 	 */
-	private int cachedModifications;
+	private ManagedReference currentKeyRef = null;
+
+	/** The leaf containing the next entry, or null if not computed. */
+	private transient DistributedHashMap nextLeaf = null;
+
+	/** The next entry, or null if no next entry or if not computed. */
+	private transient PrefixEntry nextEntry = null;
 
 	/**
-	 * A cache of all the {@code PrefixEntries} in the leaf that
-	 * is currently being examined.  The entries are sorted such
-	 * that the hash code that would end on the right-most leaf is
-	 * stored at the end of the array.  All entries with equal
-	 * hash codes should be together in a single block because of
-	 * this.  If a split occurs, this cache is invalid and will be
-	 * reloaded by {@link #cacheLeaf(DistributedHashMap)}
+	 * The value of the modification count when the nextLeaf and
+	 * nextEntry fields were computed.
 	 */
-	private PrefixEntry[] leafCache;
-
-	/**
-	 * The hash code of the entry that was last returned
-	 */
-	private int lastHash;	
-
-	/**
-	 * The {@code ManagedReference} to the key of the entry that
-	 * was last returned
-	 */
-	private ManagedReference lastKeyRef;
-
-	/**
-	 * The set of {@code ManagedReference}s for the keys of
-	 * entries that have already been seen that also have the same
-	 * hash code as the current entry.  These entries have
-	 * previously been returned through {@code nextEntry()}.  When
-	 * keys have evenly distributed hash codes, this set will
-	 * generally have only a single element in it.  In the event
-	 * of a collision, this set is necessary to distinguish
-	 * previously returned entries if changes are made to the map
-	 * between deserializations of the iterator.  
-	 *
-	 * <p>
-	 *
-	 * The references contained in this set should <i>never</i>
-	 * have {@link ManagedReference#get(Class)} called on them;
-	 * instead, they should only be used to test for equality.
-	 *
-	 * @see PrefixEntry#keyRef()
-	 */
-	private Set<ManagedReference> alreadySeen;
-	
-	/**
-	 * The current leaf that is being accessed.  This is assigned
-	 * in {@link #cacheLeaf(DistributedHashMap)} and is valid for
-	 * only the current transaction.
-	 */
-	private transient DistributedHashMap curLeaf;
-
-	/**
-	 * The next leaf node in the backing trie.  This is assigned
-	 * from {@link #loadNextLeaf()} if a non-empty leaf can be
-	 * found.
-	 */
-	private transient DistributedHashMap nextLeaf;
+	private transient int nextLeafModifications = 0;
 
 	/**
 	 * Constructs a new {@code ConcurrentIterator}.
 	 *
 	 * @param root the root node of the {@code DistributedHashMap}
-	 *        trie.
 	 */
 	public ConcurrentIterator(DistributedHashMap root) {
-
-	    // keep a reference to the root so we can look up leaves
 	    rootRef = AppContext.getDataManager().createReference(root);
-	    
-	    alreadySeen = new HashSet<ManagedReference>();
-	    lastHash = 0; // 0 is the left-most hash
+	    checkNext();
+	}
 
-	    // cache the initial contents of the left-most leaf
-	    DistributedHashMap leftLeaf = root.leftMost();
-	    cacheLeaf(leftLeaf);
+	/** Makes sure that the next entry is up to date. */
+	private void checkNext() {
+	    if (nextLeaf == null ||
+		nextLeafModifications != nextLeaf.modifications)
+	    {
+		getNext();
+	    }
+	}
+
+	/** Computes the next entry. */
+	private void getNext() {
+	    if (currentLeafRef == null) {
+		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
+		nextEntry = firstEntry(nextLeaf);
+	    } else if (currentLeafRef != currentKeyRef) {
+		try {
+		    nextLeaf = currentLeafRef.get(DistributedHashMap.class);
+		    if (nextLeaf.nodeDirectory != null) {
+			/* The leaf was converted to a directory node */
+			nextLeaf =
+			    rootRef.get(DistributedHashMap.class).lookup(
+				currentHash);
+		    }
+		} catch (ObjectNotFoundException e) {
+		    /* The leaf was removed */
+		    nextLeaf = rootRef.get(DistributedHashMap.class).lookup(
+			currentHash);
+		}
+		nextEntry = nextEntry(
+		    nextLeaf, currentHash, currentKeyRef);
+	    } else {
+		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
+		nextEntry = null;
+	    }
+	    nextLeafModifications = nextLeaf.modifications;
 	}
 
 	/**
-	 * Caches the hash codes for all the entries of the leaf in
-	 * {@code leafCache} and assigns {@code cachedLeafId} and
-	 * {@code curLeaf} based on the provided leaf.
-	 *
-	 * @param leaf the leaf that should be cached
+	 * Returns the first entry starting with the specified leaf or null if
+	 * it is empty.
 	 */
-	private void cacheLeaf(DistributedHashMap leaf) {
-
-	    leafCache = new PrefixEntry[leaf.size];
-	    int i = 0;
-	    for (PrefixEntry e : leaf.table) {
-		if (e != null) {
-		    leafCache[i++] = e;
-		    for (; (e = e.next) != null; leafCache[i++] = e)
-			; // cache any chained entries
+	private PrefixEntry firstEntry(DistributedHashMap leaf) {
+	    while (true) {
+		for (int i = 0; i < leaf.table.length; i++) {
+		    PrefixEntry entry = leaf.table[i];
+		    if (entry != null) {
+			return entry;
+		    }
 		}
+		if (leaf.rightLeafRef == null) {
+		    return null;
+		}
+		leaf = leaf.rightLeafRef.get(DistributedHashMap.class);
 	    }
-	    
-	    cur = 0;
-
-	    // we need this sorted so we can use the last element in
-	    // it as a reference for the next leaf in case this node
-	    // is split between next() calls
-	    Arrays.sort(leafCache, HashComparator.INSTANCE);
-	    curLeaf = leaf;
-	    cachedLeafId = 
-		AppContext.getDataManager().createReference(curLeaf).getId();
-	    cachedModifications = curLeaf.modifications;
 	}
 
 	/**
-	 * Ensures that the {@code ConcurrentIterator#hashCache} is up
-	 * to date and that all the hash codes contained within are
-	 * valid for the current leaf.  Calling this method will set
-	 * {@ConcurrentIterator#curLeaf} if was not previously set.
+	 * Returns the next entry on the leaf after the entry with the
+	 * specified hash and key, or null if there are no entries after that
+	 * position.
 	 */
-	private void ensureCacheCoherence() {
-	    
-	    // curLeaf is only initialized when the cache is coherent
-	    // or when a leaf has already been manually loaded so we
-	    // can immedately returned in this case
-	    if (curLeaf != null) 
-		return;
-
-	    if (leafCache.length == 0) {
-		// if the cache has zero length, then the iterator
-		// was initialized based on an empty map,
-		// therefore we should start trying to cache from
-		// the left most leaf
-		curLeaf = rootRef.get(DistributedHashMap.class).
-		    leftMost();
-
-		cacheLeaf(curLeaf);
-	    }
-	    else {
-		// NOTE: we have to use the last element in the array
-		// to look up our current leaf.  Otherwise, if the
-		// leaf split (possibly multiple times) the current
-		// leaf might point to any of the left children.  We
-		// need it to point to the left most to ensure that
-		// the iterator does not repeat any elements during
-		// iteration.		    
-		curLeaf = rootRef.get(DistributedHashMap.class).
-		    lookup(leafCache[leafCache.length-1].hash);
-
-		// after looking up the new leaf check if this is the
-		// leaf that was previously cached.  Also check that
-		// it hasn't been modified since we last cached it
-		if (AppContext.getDataManager().createReference(curLeaf).
-		    getId().equals(cachedLeafId) &&
-		    curLeaf.modifications == cachedModifications)
-		    // cache still valid
-		    return;
-
-		// otherwise, we had either a different or modified
-		// leaf so we need to recache it
-
-		// mark whether whether the next call should load a
-		// new leaf
-		boolean atEnd = leafCache.length == cur;
-
-		// save the current hash that we are on so we can
-		// restore cur after caching.  Or if were at the end,
-		// save the last hash we saw
-		int curHash = leafCache[(atEnd) ? cur - 1 : cur].hash;
-		
-		// recache based on the new leaf
-		cacheLeaf(curLeaf);
-
-		// search for the old hash code so we can start from
-		// where we left off, or the next highest value in
-		// case the entry with the previous hash code was
-		// stored in a left child
-
-		// use a binary search to locate where the hash code
-		// would have been placed
-		int low = 0;
-		int high = leafCache.length - 1;
-
-		while (low <= high) {
-		    int mid = (low + high) >>> 1;
-		    int midHash = leafCache[mid].hash;
-		    
-		    if (midHash < curHash)
-			low = mid + 1;
-		    else if (midHash > curHash)
-			high = mid - 1;
-		    else {
-			cur = (atEnd) ? mid + 1 : mid;
-			return;
-		    } 
+	private PrefixEntry nextEntry(DistributedHashMap leaf,
+				      int hash,
+				      ManagedReference keyRef)
+	{
+	    BigInteger keyId = keyRef.getId();
+	    while (true) {
+		for (int i = 0; i < leaf.table.length; i++) {
+		    for (PrefixEntry entry = leaf.table[i];
+			 entry != null;
+			 entry = entry.next)
+		    {
+			if (unsignedGreaterThan(hash, entry.hash)) {
+			    continue;
+			} else if (unsignedGreaterThan(entry.hash, hash)) {
+			    return entry;
+			}
+			BigInteger entryKeyId = entry.keyRef().getId();
+			if (entryKeyId.compareTo(keyId) > 0) {
+			    return entry;
+			}
+		    }
 		}
-
-		// low is now where the entry would have been
-		// inserted
-		cur = (atEnd) ? low + 1 : low; 
+		if (leaf.rightLeafRef == null) {
+		    return null;
+		}
+		leaf = leaf.rightLeafRef.get(DistributedHashMap.class);
 	    }
 	}
-    
+
 	/**
 	 * {@inheritDoc}
 	 */
 	public boolean hasNext() {
-
-	    // check that the cache is up to date
-	    ensureCacheCoherence();
-
-	    // check for the edge case of multiple entries with the
-	    // same hash codes.  Advance the cur pointer while
-	    // checking to avoid having to perform these checks
-	    // needlessly later
-	    for (; cur < leafCache.length && 
-		     alreadySeen.contains(leafCache[cur].keyRef()); cur++)
-		;
-	    
-	    // cur should now point to an entry we haven't seen or
-	    // it should be equal to the length of the cache if we
-	    // have seen everything in the list		
-	    if (cur < leafCache.length)
-		return true;
-	    
-	    // start loading leaves until either no more can be
-	    // found or we find a non-empty one
-	    return loadNextLeaf();			    
-	}
-
-	/**
-	 * Searches the leaves for the next non-empty leaf and assigns
-	 * it to {@code nextLeaf}, returning {@code true} if a
-	 * non-empty leaf was found.
-	 *
-	 * @return {@code true} if a non-empty leaf was found and
-	 *         assigned to {@code nextLeaf}
-	 */
-	private boolean loadNextLeaf() {
-	    // when looking up the current leaf, use the last hash
-	    // code seen if the current leaf is now empty.  Otherwise
-	    // use the right-most hash code in the sorted array to
-	    // decide what leaf we're on.
-	    DistributedHashMap 	curLeaf = 
-		rootRef.get(DistributedHashMap.class).
-		lookup((leafCache.length == 0) 
-		       ? lastHash 
-		       : leafCache[leafCache.length-1].hash);
-	    
-	    DistributedHashMap nextLeaf = curLeaf;
-
-	    while (nextLeaf.rightLeafRef != null &&
-		   (nextLeaf = 
-		    nextLeaf.rightLeafRef.get(DistributedHashMap.class)).size == 0)
-		;
-	    
-	    // check that we were able to find another leaf other than
-	    // this leaf and that its size is non-zero
-	    if ((curLeaf.rightLeafRef != null && 
-		 curLeaf.rightLeafRef.equals(nextLeaf.rightLeafRef)) ||
-		 curLeaf.rightLeafRef == nextLeaf.rightLeafRef ||
-		nextLeaf.size == 0)
-		return false;
-	    else {
-		this.nextLeaf = nextLeaf;
-		return true;
-	    }
+	    checkNext();
+	    return nextEntry != null;
 	}
 
 	/**
@@ -2058,174 +1701,29 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @throws NoSuchElementException if no further entries exist
 	 */
-	public Entry nextEntry() {
-
-	    ensureCacheCoherence();
-
-	    if (cur >= leafCache.length) {
-		if (nextLeaf == null && !loadNextLeaf())
-		    throw new NoSuchElementException();
-		else {
-		    // cache the contents of the next leaf, which was
-		    // assigned during a call to loadNextLeaf()
-		    cacheLeaf(nextLeaf);
-		    nextLeaf = null;
-		}
+	Entry nextEntry() {
+	    if (!hasNext()) {
+		throw new NoSuchElementException();
 	    }
-	    
-	    PrefixEntry e = leafCache[cur++];
-
-	    // check that we don't return an element that we have
-	    // already seen.
-	    if (e.hash == lastHash) {
-		
-		// hasNext() should have done this loop for us if it
-		// was called, but in case it wasn't called, loop
-		// through the cache until we find an entry we haven't
-		// seen
-		while (alreadySeen.contains(e.keyRef()) && 
-		       cur < leafCache.length)
-		    e = leafCache[cur++];
-
-		// This is a very rare case where we've performed
-		// multiple next() calls in a row with no hasNext()
-		// between, and where the last keys in the leafCache
-		// all have the same hash code, but we've seen them
-		// all before - which could only happen due to
-		// additions and removals of the same key, which
-		// causes a recaching of the leaf that resets cur back
-		// to the start of that hash code
-		if (cur == leafCache.length && 
-		    alreadySeen.contains(e.keyRef())) {
-		    
-		    // in this case, we rely on a recursive call to
-		    // nextEntry() to do the appropriate actions for
-		    // loading the next leaf and setting all the other
-		    // state.  There should be at most one recursive
-		    // call in the stack when doing this, as this call
-		    // will load a new leaf, which it guaranteed to
-		    // have a different hash code, or it will throw a
-		    // NoSuchElementException
-		    return nextEntry();
-		}
+	    currentLeafRef =
+		AppContext.getDataManager().createReference(nextLeaf);
+	    currentHash = nextEntry.hash;
+	    currentKeyRef = nextEntry.keyRef();
+	    Entry result = nextEntry;
+	    getNext();
+	    if (nextEntry == null) {
+		currentKeyRef = currentLeafRef;
 	    }
-	    else {
-		alreadySeen.clear();
-	    }
-	   
-	    ManagedReference ref = e.keyRef();
-	    alreadySeen.add(ref);
-	    lastHash = e.hash;
-	    lastKeyRef = ref;
-	    return e;	    
+	    return result;
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * This operation is not supported.
 	 *
-	 * @throws IllegalStateException if called before iteration
-	 *         begins.
+	 * @throws UnsupportedOperationException if called
 	 */
-	@SuppressWarnings("unchecked")
 	public void remove() {
-            if (lastKeyRef == null)
-                throw new IllegalStateException();
-	    
-	    // NOTE: we cannot call remove(key) in this situation
-	    // because we have to avoid having to call
-	    // ManagedReference.get() on the key itself.  If the key
-	    // had already been removed, this would cause an
-	    // exception.  Instead, we inline parts of the remove(key)
-	    // code and modify it to do comparisongs on the key
-	    // reference itself in order to test for equality.
-
-	    DistributedHashMap leaf = rootRef.get(DistributedHashMap.class).
-		lookup(lastHash);	
-	    
-	    int i = leaf.indexFor(lastHash);
-	    PrefixEntry e = leaf.table[i]; 
-	    PrefixEntry prev = e;
-
-	    while (e != null) {
-		PrefixEntry next = e.next;
-		Object k;		
-		if (e.hash == lastHash && e.keyRef().equals(lastKeyRef)) {
-		    // remove the value and reorder the chained keys
-		    if (e == prev)
-			leaf.table[i] = next;
-		    else			
-			prev.next = next;
-
-		    DataManager dm = AppContext.getDataManager();
-		    dm.markForUpdate(leaf);
-		    --leaf.size;
-		    leaf.modifications++;
-		    // remove any objects that this class was
-		    // responsible for persisting
-		    e.unmanage();
-		}
-		prev = e;
-		e = e.next;
-	    }
-
-	    lastKeyRef = null;
-	}
-
-	/**
-	 * Saves the state of the {@code Iterator} to the stream.	 
-	 */
-	private void writeObject(java.io.ObjectOutputStream s)
-	    throws java.io.IOException {
-	    s.defaultWriteObject();
-	}
-
-	/**
-	 * Reconstitutes the {@code Iterator} from the stream.
-	 */
-	private void readObject(java.io.ObjectInputStream s) 
-	    throws java.io.IOException, ClassNotFoundException {	    
-	    s.defaultReadObject();
-
-	    // initialize the transient fields to null
-	    curLeaf = null;
-	    nextLeaf = null;
-	}  
-
-	/**
-	 * A comparator for sorting {@code PrefixEntry} entries
-	 * according to how their hash codes would be distirbuted in
-	 * the trie.  When sorting an array, the largest value after
-	 * sorting will be the right-most entry of the array in the
-	 * trie, while the lowest value will be the left-most.
-	 */
-	private static class HashComparator implements Comparator<PrefixEntry> {
-	    
-	    /**
-	     * Singleton instance since this class is immutable.
-	     */
-	    static final HashComparator INSTANCE = new HashComparator();
-
-	    public int compare(PrefixEntry t1, PrefixEntry t2) {
-		int i = t1.hash;
-		int j = t2.hash;
-		// if both hash codes have the same sign, the do a
-		// numeric comparison, otherwise return the opposite
-		// sign of the first, which ensures that negative
-		// values are greater than positive values.
-		//
-		// NOTE: the numeric comparison works because the
-		// integers are stored as 2's compelment, so a hash of
-		// -1 in binary is all 1's, which is the right-most
-		// entry in the trie, so it should be at the
-		// right-most in the array.
-		return ((i & 0x80000000) == (j & 0x80000000)) 
-		    ? i - j
-		    : -i;
-	    }
-
-	    public boolean equals(Object o) {
-		return o instanceof HashComparator;
-	    }
+	    throw new UnsupportedOperationException();
 	}
     }
 
