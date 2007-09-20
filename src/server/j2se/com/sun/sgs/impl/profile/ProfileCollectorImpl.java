@@ -1,21 +1,45 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileCollector;
-import com.sun.sgs.kernel.ProfileCounter;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileParticipantDetail;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCounter;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.profile.ProfileSample;
+
+import java.beans.PropertyChangeEvent;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,22 +53,23 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class ProfileCollectorImpl implements ProfileCollector {
 
-    // the next free operation identifier to use
-    private AtomicInteger nextOpId;
+    private final AtomicInteger opIdCounter;
 
-    // the maximum number of operations we allow
-    // NOTE: this should become dynamic, but for now we will never
-    // hit this upper-bound
-    static final int MAX_OPS = 256;
+    private final ConcurrentHashMap<String,ProfileOperationImpl> ops;
 
-    // the set of already-allocated operations
-    private ProfileOperationImpl [] ops = new ProfileOperationImpl[MAX_OPS];
+    private final ConcurrentHashMap<String,ProfileSample> taskLocalSamples;
 
+    private final ConcurrentHashMap<String,ProfileSample> aggregateSamples;
+
+    private final ConcurrentHashMap<String,ProfileCounter> taskLocalCounters;
+
+    private final ConcurrentHashMap<String,ProfileCounter> aggregateCounters;
+    
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
 
     // the set of registered listeners
-    private ArrayList<ProfileOperationListener> listeners;
+    private ArrayList<ProfileListener> listeners;
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
@@ -65,46 +90,63 @@ public class ProfileCollectorImpl implements ProfileCollector {
      *                            to run collecting and reporting tasks
      */
     public ProfileCollectorImpl(ResourceCoordinator resourceCoordinator) {
-        nextOpId = new AtomicInteger(0);
+
         schedulerThreadCount = 0;
-        listeners = new ArrayList<ProfileOperationListener>();
+	ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
+        listeners = new ArrayList<ProfileListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
+	opIdCounter = new AtomicInteger(0);
+
+	aggregateSamples = new ConcurrentHashMap<String,ProfileSample>(); 
+	taskLocalSamples = new ConcurrentHashMap<String,ProfileSample>();
+
+	aggregateCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
+	taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
 
         // start a long-lived task to consume the other end of the queue
         resourceCoordinator.startTask(new CollectorRunnable(), null);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void addListener(ProfileOperationListener listener) {
+    /** {@inheritDoc} */
+    public void addListener(ProfileListener listener) {
         listeners.add(listener);
-        listener.notifyThreadCount(schedulerThreadCount);
-        for (int i = 0; i < nextOpId.get(); i++)
-            listener.notifyNewOp(ops[i]);
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    null, schedulerThreadCount);
+
+        listener.propertyChange(event);
+	for (ProfileOperationImpl p : ops.values()) {
+	    event = new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",
+					    null, p);
+	    listener.propertyChange(event);
+	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyThreadAdded() {
         schedulerThreadCount++;
-        for (ProfileOperationListener listener : listeners)
-            listener.notifyThreadCount(schedulerThreadCount);
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    schedulerThreadCount - 1, 
+				    schedulerThreadCount);
+
+        for (ProfileListener listener : listeners)
+            listener.propertyChange(event);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void notifyThreadRemoved() {
         schedulerThreadCount--;
-        for (ProfileOperationListener listener : listeners)
-            listener.notifyThreadCount(schedulerThreadCount);
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
+				    schedulerThreadCount + 1, 
+				    schedulerThreadCount);
+
+        for (ProfileListener listener : listeners)
+            listener.propertyChange(event);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void startTask(KernelRunnable task, TaskOwner owner,
                           long scheduledStartTime, int readyCount) {
         if (profileReports.get() != null)
@@ -115,9 +157,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
                                                  readyCount));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void noteTransactional() {
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
@@ -126,9 +166,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
         profileReport.transactional = true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void addParticipant(ProfileParticipantDetail participantDetail) {
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
@@ -140,10 +178,13 @@ public class ProfileCollectorImpl implements ProfileCollector {
         profileReport.participants.add(participantDetail);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void finishTask(int tryCount, boolean taskSucceeded) {
+    /** {@inheritDoc} */
+    public void finishTask(int tryCount) {
+	finishTask(tryCount, null);
+    }
+
+    /** {@inheritDoc} */
+    public void finishTask(int tryCount, Exception exception) {
         long stopTime = System.currentTimeMillis();
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
@@ -153,8 +194,8 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
         profileReport.runningTime = stopTime - profileReport.actualStartTime;
         profileReport.tryCount = tryCount;
-        profileReport.succeeded = taskSucceeded;
-
+        profileReport.succeeded = exception == null;
+	profileReport.exception = exception;
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
     }
@@ -167,22 +208,27 @@ public class ProfileCollectorImpl implements ProfileCollector {
      * @param producerName the name of the <code>ProfileProducer</code>
      *                     registering this operation
      *
-     * @return a new <code>ProfileOperation</code> that will report back
-     *         to this collector
-     *
-     * @throws IllegalStateException if no more operations can be registered
+     * @return the canonical <code>ProfileOperation</code> that will
+     *         report back to this collector.
      */
     ProfileOperation registerOperation(String opName, String producerName) {
-        int opId = nextOpId.getAndIncrement();
-        if (opId >= MAX_OPS) {
-            nextOpId.set(MAX_OPS);
-            throw new IllegalStateException("No more operations may be " +
-                                            "registered in the collector");
-        }
-        ops[opId] = new ProfileOperationImpl(opName, opId);
-        for (ProfileOperationListener listener : listeners)
-            listener.notifyNewOp(ops[opId]);
-        return ops[opId];
+	String name = producerName + "::" + opName;
+	
+	ProfileOperationImpl op = ops.get(name);
+
+	if (op == null) {
+	    int opId = opIdCounter.getAndIncrement();
+	    op = new ProfileOperationImpl(opName, opId);
+	    ops.putIfAbsent(name, op);
+	    op = ops.get(name);
+	}
+
+	PropertyChangeEvent event = 
+	    new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",null, op);
+
+        for (ProfileListener listener : listeners)
+            listener.propertyChange(event);
+        return op;
     }
 
     /**
@@ -196,12 +242,15 @@ public class ProfileCollectorImpl implements ProfileCollector {
             this.opName = opName;
             this.opId = opId;
         }
+
         public String getOperationName() {
             return opName;
         }
+
         public int getId() {
             return opId;
         }
+
         public String toString() {
             return opName;
         }
@@ -229,14 +278,34 @@ public class ProfileCollectorImpl implements ProfileCollector {
      *                  <code>false</code> otherwise
      *
      * @return a new <code>ProfileCounter</code> that will report back
-     *         to this collector
+     *         to this collector or the previously registered {@code
+     *         ProfileCounter} with the provided name.
      */
     ProfileCounter registerCounter(String counterName, String producerName,
                                    boolean taskLocal) {
-        if (taskLocal)
-            return new TaskLocalProfileCounter(counterName);
-        else
-            return new AggregateProfileCounter(counterName);
+
+	String name = producerName + "::" + counterName;
+	if (taskLocal) {
+	    if (taskLocalCounters.containsKey(name))
+		return taskLocalCounters.get(name);
+	    else {
+		ProfileCounter counter = 
+		    new TaskLocalProfileCounter(counterName);
+		taskLocalCounters.put(name, counter);
+		return counter;
+	    }
+	}	
+	else {
+	    if (aggregateCounters.containsKey(name)) {
+		return aggregateCounters.get(name);
+	    }
+	    else {
+		ProfileCounter counter = 
+		    new AggregateProfileCounter(counterName);
+		aggregateCounters.put(name, counter);
+		return counter;
+	    }
+	}
     }
 
     /**
@@ -288,6 +357,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
+
     /**
      * The concrete implementation of <code>AbstractProfileCounter</code> used
      * for counters that are local to tasks.
@@ -306,6 +376,130 @@ public class ProfileCollectorImpl implements ProfileCollector {
             getReport().incrementTaskCounter(getCounterName(), value);
         }
     }
+
+
+    /**
+     * Package-private method used by <code>ProfileConsumerImpl</code> to
+     * handle sample registrations.
+     *
+     * @param name the name of the sample
+     * @param taskLocal <code>true</code> if this counter is local to tasks,
+     *                  <code>false</code> otherwise
+     * @param maxSamples the maximum number of samples to keep at one
+     *        time before lossy behavior starts and the oldest values
+     *        are removed
+     *
+     * @return a new {@code ProfileCounter} that will report back to
+     *         this collector or the previously registered {@code
+     *         ProfileSample} with the provided name.
+     */
+    public ProfileSample registerSampleSource(String name, boolean taskLocal,
+					       long maxSamples) {
+	// REMINDER: this assume maxSamples isn't necessary when
+	// deciding whether a sample source is already present.
+	if (taskLocal) {
+	    if (taskLocalSamples.containsKey(name))
+		return taskLocalSamples.get(name);
+	    else {
+		ProfileSample sample = new TaskLocalProfileSample(name);
+		taskLocalSamples.put(name, sample);
+		return sample;
+	    }
+	}	
+	else {
+	    if (aggregateSamples.containsKey(name)) {
+		return aggregateSamples.get(name);
+	    }
+	    else {
+		ProfileSample sample = 
+		    new AggregateProfileSample(name, maxSamples);
+		aggregateSamples.put(name,sample);
+		return sample;
+	    }
+	}
+    }
+
+    /** A base-class for creating {@code ProfileSample}s. */
+    private abstract class AbstractProfileSample implements ProfileSample {
+
+        private final String name;
+
+        private final boolean taskLocal;
+
+        AbstractProfileSample(String name, boolean taskLocal) {
+            this.name = name;
+            this.taskLocal = taskLocal;
+        }
+
+        public String getSampleName() {
+            return name;
+        }
+
+        public boolean isTaskLocal() {
+            return taskLocal;
+        }
+
+        protected ProfileReportImpl getReport() {
+            ProfileReportImpl profileReport = profileReports.get();
+            if (profileReport == null)
+                throw new IllegalStateException("Cannot report operation " +
+                                                "because no task is active");
+            return profileReport;
+        }
+
+    }
+
+    /** The task-local implementation of {@code ProfileSample} */
+    private class TaskLocalProfileSample extends AbstractProfileSample {
+       
+ 
+	TaskLocalProfileSample(String name) {
+            super(name, true);
+        }
+        public void addSample(long value) {
+            getReport().addLocalSample(getSampleName(), value);
+        }
+
+    }
+
+
+    /**
+     * The {@code ProfileSample} implementation that collects samples
+     * for the lifetime the program.
+     */
+    private class AggregateProfileSample extends AbstractProfileSample {
+        
+	private final LinkedList<Long> samples;
+
+	private final long maxSamples;       
+	
+	AggregateProfileSample(String name, long maxSamples) {
+            super(name, false);
+	    this.maxSamples = maxSamples;
+	    samples = new LinkedList<Long>();
+        }
+
+        public void addSample(long value) {
+	    if (samples.size() == maxSamples)
+		samples.removeFirst(); // remove oldest
+	    samples.add(value);
+	    // NOTE: we return a sub-list view to ensure that the
+	    // ProfileReport only sees the samples that were added,
+	    // during its lifetime.  Creating a sub-list view is much
+	    // faster than copying the list, and is suitable for this
+	    // situation.  However, we still rely on the the
+	    // ProfileReport to make the view unmodifyable.  This
+	    // isn't done here since we can avoid doing that operation
+	    // until the getSamples() call, instead of having to do it
+	    // for each sample addition
+	    getReport().
+		registerAggregateSamples(getSampleName(), 
+					 samples.subList(0, samples.size()));
+        }
+
+    }
+
+
 
     /**
      * Private class that implements the long-running collector and reporter
@@ -351,11 +545,10 @@ public class ProfileCollectorImpl implements ProfileCollector {
                         Collections.
                         unmodifiableSet(profileReport.participants);
 
-                    for (ProfileOperationListener listener : listeners)
+                    for (ProfileListener listener : listeners)
                         listener.report(profileReport);
                 }
             } catch (InterruptedException ie) {}
         }
     }
-
 }

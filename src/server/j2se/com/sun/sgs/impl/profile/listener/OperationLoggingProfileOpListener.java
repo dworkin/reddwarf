@@ -1,18 +1,36 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
+
+import java.beans.PropertyChangeEvent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,7 +42,7 @@ import java.util.logging.Logger;
 
 
 /**
- * This implementation of <code>ProfileOperationListener</code> aggregates
+ * This implementation of <code>ProfileListener</code> aggregates
  * profiling data over a set number of operations, reports the aggregated
  * data when that number of operations have been reported, and then clears
  * its state and starts aggregating again. By default the interval is
@@ -38,9 +56,7 @@ import java.util.logging.Logger;
  * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
  * </code> property may be used to set the interval between reports.
  */
-public class OperationLoggingProfileOpListener
-    implements ProfileOperationListener
-{
+public class OperationLoggingProfileOpListener implements ProfileListener {
 
     // the name of the class
     private static final String CLASSNAME =
@@ -57,13 +73,11 @@ public class OperationLoggingProfileOpListener
     // the number of threads reported as running in the scheduler
     private long threadCount = 0;
 
-    // NOTE: this only supports MAX_OPS operations, which is fine as long
-    // as the collector will never allow more than this number to be
-    // registered, but when that changes, so too should this code
     private int maxOp = 0;
-    private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
-    private long [] opCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private Map<Integer,ProfileOperation> registeredOps =
+        new HashMap<Integer,ProfileOperation>();
+    private Map<Integer,Long> opCounts = new HashMap<Integer,Long>();
+
 
     // the commit/abort total counts, and the reported running time total
     private long commitCount = 0;
@@ -101,26 +115,23 @@ public class OperationLoggingProfileOpListener
 	localCounters = new HashMap<String,Long>();
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyNewOp(ProfileOperation op) {
-        int id = op.getId();
-        if (id > maxOp)
-            maxOp = id;
-        registeredOps[id] = op;
+    /** {@inheritDoc} */
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.newop")) {          
+	    ProfileOperation op = (ProfileOperation)(event.getNewValue());
+	    int id = op.getId();
+	    if (id > maxOp)
+		maxOp = id;
+	    registeredOps.put(id,op);
+	}
+	else {
+	    if (event.getPropertyName().
+		    equals("com.sun.sgs.profile.threadcount")) 
+		threadCount = ((Integer)(event.getNewValue())).intValue();	    
+	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        threadCount = schedulerThreadCount;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void report(ProfileReport profileReport) {
         if (profileReport.wasTaskSuccessful())
             commitCount++;
@@ -129,8 +140,11 @@ public class OperationLoggingProfileOpListener
 
         totalRunningTime += profileReport.getRunningTime();
 
-        for (ProfileOperation op : profileReport.getReportedOperations())
-            opCounts[op.getId()]++;
+        for (ProfileOperation op : profileReport.getReportedOperations()) {
+	    Long i = opCounts.get(op.getId());
+	    opCounts.put(op.getId(), (i == null)
+			 ? new Long(1) : i.longValue() + 1);	    
+	}
 
 	Map<String,Long> counterMap = profileReport.getUpdatedTaskCounters();
 	if (counterMap != null) {
@@ -150,9 +164,9 @@ public class OperationLoggingProfileOpListener
                 for (int i = 0; i <= maxOp; i++) {
                     if (i != 0)
                         opCountTally += "\n";
-                    opCountTally += "  " + registeredOps[i] + ": " +
-                        opCounts[i];
-                    opCounts[i] = 0;
+                    opCountTally += "  " + registeredOps.get(i) + ": " +
+                        opCounts.get(i);
+                    opCounts.put(i,0L);
                 }
 
 		String counterTally = "";
@@ -172,7 +186,7 @@ public class OperationLoggingProfileOpListener
 			   "\n" + counterTally);
             } else {
                 for (int i = 0; i <= maxOp; i++)
-                    opCounts[i] = 0;
+                    opCounts.put(i,0L);
             }
 
             commitCount = 0;
@@ -183,9 +197,7 @@ public class OperationLoggingProfileOpListener
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void shutdown() {
         // there is nothing to shutdown on this listener
     }

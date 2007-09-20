@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.channel;
@@ -104,7 +119,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
+    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -167,10 +182,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    contextFactory = new ContextFactory(contextMap);
 	    dataService = txnProxy.getService(DataService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
-	    nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
-		    txnProxy.getService(TaskService.class));
+
 	    taskScheduler.runTask(
 		new TransactionRunner(
 		    new AbstractKernelRunnable() {
@@ -205,7 +217,12 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     }
 
     /** {@inheritDoc} */
-    public void ready() { }
+    public void ready() { 
+        nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+    }
 
     /** {@inheritDoc} */
     public boolean shutdown() {

@@ -126,6 +126,7 @@ public class SgsTestStack {
      *		removed before the data service is created
      */
     public void setUp(boolean clean) throws Exception {
+	MinimalTestKernel.useMasterScheduler(serviceProps);
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);

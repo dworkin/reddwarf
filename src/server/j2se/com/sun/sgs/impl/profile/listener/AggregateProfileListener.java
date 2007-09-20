@@ -1,22 +1,43 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.listener;
+
+import com.sun.sgs.impl.profile.util.NetworkReporter;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
+
+import java.beans.PropertyChangeEvent;
+
 import java.io.IOException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -26,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
- * This implementation of <code>ProfileOperationListener</code> aggregates
+ * This implementation of <code>ProfileListener</code> aggregates
  * profiling data over the lifetime of the system, and reports at fixed
  * intervals. By default the time interval is 5 seconds.
  * <p>
@@ -34,22 +55,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * users may connect to that socket to watch the reports. The default
  * port used is 43005.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener.</code>
+ * The
+ * <code>com.sun.sgs.impl.profile.listener.AggregateProfileListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
-public class AggregateProfileOpListener implements ProfileOperationListener {
+public class AggregateProfileListener implements ProfileListener {
 
-    // NOTE: this only supports MAX_OPS operations, which is fine as long
-    // as the collector will never allow more than this number to be
-    // registered, but when that changes, so too should this code
     private int maxOp = 0;
-    private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
-    private long [] sOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
-    private long [] fOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private Map<Integer,ProfileOperation> registeredOps =
+        new HashMap<Integer,ProfileOperation>();
+    private Map<Integer,Long> sOpCounts = new HashMap<Integer,Long>();
+    private Map<Integer,Long> fOpCounts = new HashMap<Integer,Long>();
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -80,7 +99,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
 
     // the base name for properties
     private static final String PROP_BASE =
-        AggregateProfileOpListener.class.getName();
+        AggregateProfileListener.class.getName();
 
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
@@ -89,7 +108,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     private static final long DEFAULT_PERIOD = 5000;
 
     /**
-     * Creates an instance of <code>SnapshotProfileOpListener</code>.
+     * Creates an instance of <code>AggregateProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
      * @param owner the <code>TaskOwner</code> to use for all tasks run by
@@ -101,9 +120,9 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
      *
      * @throws IOException if the server socket cannot be created
      */
-    public AggregateProfileOpListener(Properties properties, TaskOwner owner,
-                                      TaskScheduler taskScheduler,
-                                      ResourceCoordinator resourceCoord)
+    public AggregateProfileListener(Properties properties, TaskOwner owner,
+                                    TaskScheduler taskScheduler,
+                                    ResourceCoordinator resourceCoord)
         throws IOException
     {
 	aggregateCounters = new ConcurrentHashMap<String,Long>();
@@ -123,26 +142,20 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
         handle.start();
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyNewOp(ProfileOperation op) {
-        int id = op.getId();
-        if (id > maxOp)
-            maxOp = id;
-        registeredOps[id] = op;
+    /** {@inheritDoc} */
+    public void propertyChange(PropertyChangeEvent event) {
+	if (event.getPropertyName().equals("com.sun.sgs.profile.newop")) {          
+	    ProfileOperation op = (ProfileOperation)(event.getNewValue());
+	    int id = op.getId();
+	    if (id > maxOp)
+		maxOp = id;
+	    registeredOps.put(id,op);
+	    sOpCounts.put(id, 0L);
+	    fOpCounts.put(id, 0L);
+	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyThreadCount(int schedulerThreadCount) {
-        // for now, this is ignored
-    }
-
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc}*/
     public void report(ProfileReport profileReport) {
         List<ProfileOperation> ops = profileReport.getReportedOperations();
         if (profileReport.wasTaskSuccessful()) {
@@ -152,14 +165,20 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
             delayTime += (profileReport.getActualStartTime() -
                           profileReport.getScheduledStartTime());
             tryCount += profileReport.getRetryCount();
-            for (ProfileOperation op : ops)
-                sOpCounts[op.getId()]++;
+            for (ProfileOperation op : ops) {
+                Long i = sOpCounts.get(op.getId());
+		sOpCounts.put(op.getId(), (i == null) 
+			      ? new Long(1) : i.longValue() + 1);
+	    }
         } else {
             fTaskCount++;
             fTaskOpCount += ops.size();
             fRunTime += profileReport.getRunningTime();
-            for (ProfileOperation op : ops)
-                fOpCounts[op.getId()]++;
+            for (ProfileOperation op : ops) {
+                Long i = fOpCounts.get(op.getId());
+		fOpCounts.put(op.getId(), (i == null)
+			      ? new Long(1) : i.longValue() + 1);
+	    }
         }
 
         if (profileReport.wasTaskTransactional()) {
@@ -193,9 +212,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
 	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public void shutdown() {
         handle.cancel();
     }
@@ -242,12 +259,19 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                 "  AvgOpCountOnFailure=" + avgFailedOps + "\n";
 
             reportStr += "OpCounts:\n";
-            for (int i = 1; i <= maxOp + 1; i++) {
-                reportStr += "   " + registeredOps[i-1] + "=" +
-                    sOpCounts[i-1] + "/" + (sOpCounts[i-1] + fOpCounts[i-1]);
-                if (((i % 3) == 0) || (i == (maxOp + 1)))
+	    int j, k = 0;
+            //for (int i = 1; i < maxOp + 1; i++) {
+	    for (Integer i : registeredOps.keySet()) {
+		//System.out.println("registeredOps: " + registeredOps);
+		//System.out.printf("registeredOps.get(%s) = %s\n",i, registeredOps.get(i));
+                reportStr += "   " + registeredOps.get(i) + "=" +
+                    (j = sOpCounts.get(i).intValue()) + "/" + 
+		    (j + fOpCounts.get(i).intValue());
+                //if (((i.intValue % 3) == 0) || (i.intValue() == (maxOp)))
+		if (++k % 3 == 0)
                     reportStr += "\n";
             }
+	    reportStr += "\n";
 
 	    if (! aggregateCounters.isEmpty()) {
 		reportStr += "AggregateCounters (total):\n";

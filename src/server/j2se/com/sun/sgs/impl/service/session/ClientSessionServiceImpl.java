@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.session;
@@ -150,10 +165,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    final TaskOwner taskOwner;
+    volatile TaskOwner taskOwner;
 
     /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
+    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -276,16 +291,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    dataService = txnProxy.getService(DataService.class);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
-	    taskOwner = txnProxy.getCurrentOwner();
-	    // TBD: the taskOwner has the incorrect context in it, so
-	    // it should be retrieved from the transaction proxy in
-	    // NDTS.  The NDTS constructor should be updated to take
-	    // a transaction proxy and obtain the task owner from it
-	    // when necessary.
-	    nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner,
-		    txnProxy.getService(TaskService.class));
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
@@ -333,11 +338,17 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     }
     
     /** {@inheritDoc} */
-    public void ready() {
+    public void ready()  throws Exception {
 	// TBD: the AcceptorListener.newConnection method needs to
 	// reject connections until ready is invoked.  Need to
 	// implement interlock for this.  -- ann (8/29/07)
 
+        // Update with the application owner
+	taskOwner = txnProxy.getCurrentOwner();
+        nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, taskOwner,
+		    txnProxy.getService(TaskService.class));
     }
 
     /**
@@ -1113,15 +1124,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	// TBD: the taskOwner default has the incorrect context.  It
-	// should be initialized in the ready method, or be fixed such
-	// that it is updated with the correct context.
 	TaskOwner owner =
 	    (ownerIdentity == null) ?
 	    taskOwner :
 	    new TaskOwnerImpl(ownerIdentity, taskOwner.getContext());
 	    
-	taskScheduler.runTask(new TransactionRunner(task), owner, true);
+	taskScheduler.runTransactionalTask(task, owner);
     }
 
     /**
@@ -1131,15 +1139,23 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	return shuttingDown;
     }
 
+
+    /**
+     * The {@code RecoveryListener} for handling requests to recover
+     * for a failed {@code ClientSessionService}.
+     */
     private class ClientSessionServiceRecoveryListener
 	implements RecoveryListener
     {
+	/** {@inheritDoc} */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    try {
-		runTransactionally(new AbstractKernelRunnable() {
-		    public void run() {
-		        notifyDisconnectedSessions(node.getId());
-		    }});
+		taskScheduler.runTransactionalTask(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    notifyDisconnectedSessions(node.getId());
+			}},
+		    taskOwner);
 	    } catch (Exception e) {
 		logger.logThrow(
  		    Level.WARNING, e,
@@ -1149,48 +1165,42 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    future.done();
 	}
 	
-    }
+	/**
+	 * For each {@code ClientSession} assigned to the specified
+	 * failed node, notifies the {@code ClientSessionListener} (if
+	 * any) that its corresponding session has been forcibly
+	 * disconnected, removes the listener's binding from the data
+	 * service, and then removes the client session's state and
+	 * its bindings from the data service.
+	 */
+	private void notifyDisconnectedSessions(long nodeId) {
+	    String nodePrefix = ClientSessionImpl.getNodePrefix(nodeId);
+	    for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
+ 				    dataService, nodePrefix))
+	    {
+		logger.log(
+		    Level.FINEST,
+		    "notifyDisconnectedSessions key: {0}",
+		    key);
 
-    private void runTransactionally(KernelRunnable task) throws Exception {
-	try {
-	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
-	} catch (Exception e) {
-	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
-	    throw e;
-	}
-    }
+		final String sessionKey = key;		
 
-    /**
-     * For each {@code ClientSessionListener} bound in the data
-     * service, schedules a transactional task that a) notifies the
-     * listener that its corresponding session has been forcibly
-     * disconnected, and that b) removes the listener's binding from
-     * the data service.  If the listener was a serializable object
-     * wrapped in a managed {@code ClientSessionListenerWrapper}, the
-     * task removes the wrapper as well.
-     */
-    private void notifyDisconnectedSessions(long nodeId) {
-	String nodePrefix = ClientSessionImpl.getNodePrefix(nodeId);
-	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
- 				dataService, nodePrefix))
-	{
-	    logger.log(
-		Level.FINEST,
-		"notifyDisconnectedSessions key: {0}",
-		key);
-
-	    final String sessionKey = key;		
-		
-	    scheduleTaskOnCommit(
-		new AbstractKernelRunnable() {
-		    public void run() throws Exception {
-			ClientSessionImpl sessionImpl = 
-			    dataService.getServiceBinding(
-				sessionKey, ClientSessionImpl.class);
-			sessionImpl.notifyListenerAndRemoveSession(
-			    dataService, false);
-
-		    }});
+		/*
+		 * TBD: this either has to be a durable task, or
+		 * it needs to inform the "recover" method that it
+		 * is done, and when all notifications are done, then
+		 * the future can report done.
+		 */
+		scheduleTaskOnCommit(
+		    new AbstractKernelRunnable() {
+			public void run() throws Exception {
+			    ClientSessionImpl sessionImpl = 
+				dataService.getServiceBinding(
+				    sessionKey, ClientSessionImpl.class);
+			    sessionImpl.notifyListenerAndRemoveSession(
+			        dataService, false);
+			}});
+	    }
 	}
     }
 }

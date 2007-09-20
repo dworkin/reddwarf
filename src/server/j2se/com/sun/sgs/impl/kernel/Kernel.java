@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
@@ -8,10 +23,10 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollectorImpl;
-import com.sun.sgs.impl.kernel.profile.ProfileRegistrarImpl;
-
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
+
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -19,11 +34,12 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
 
-import com.sun.sgs.kernel.ProfileCollector;
-import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileListener;
 
 import com.sun.sgs.service.Service;
 
@@ -49,12 +65,11 @@ import java.util.logging.Logger;
  * By default, profiling is not turned on. To enable profiling, the kernel
  * property <code>com.sun.sgs.impl.kernel.Kernel.profile.level</code> must
  * be given the value "on". If no profile listeners are specified, then the
- * default <code>AggregateProfileOpListener</code> and
- * <code>SnapshotProfileOpListener</code> are enabled. To specify that a
- * different set of <code>ProfileOperationListener</code>s should be used,
+ * default <code>AggregateProfileListener</code> is enabled. To specify that a
+ * different set of <code>ProfileListener</code>s should be used,
  * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
  * property must be specified with a colon-separated list of fully-qualified
- * classes, each of which implements <code>ProfileOperationListener</code>.
+ * classes, each of which implements <code>ProfileListener</code>.
  */
 class Kernel {
 
@@ -89,9 +104,7 @@ class Kernel {
         "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:" +
-        "com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener:" +
-        "com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener";
+        "com.sun.sgs.impl.kernel.profile.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -215,22 +228,21 @@ class Kernel {
                     listenerConstructor.newInstance(systemProperties,
                                                     owner, taskScheduler,
                                                     resourceCoordinator);
-                ProfileOperationListener listener =
-                    (ProfileOperationListener)obj;
+                ProfileListener listener = (ProfileListener)obj;
                 profileCollector.addListener(listener);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                    "ProfileOperationListener {0} ... " +
-                                    "it will not be available for profiling",
+                                    "ProfileListener {0} ... it will not " +
+                                    "be available for profiling",
                                     listenerClassName);
             }
         }
 
         // finally, register the scheduler as a listener too
-        if (taskScheduler instanceof ProfileOperationListener)
+        if (taskScheduler instanceof ProfileListener)
             profileCollector.
-                addListener((ProfileOperationListener)taskScheduler);
+                addListener((ProfileListener)taskScheduler);
     }
 
     /**

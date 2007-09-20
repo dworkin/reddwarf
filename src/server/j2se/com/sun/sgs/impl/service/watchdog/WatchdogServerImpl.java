@@ -1,5 +1,20 @@
  /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.watchdog;
@@ -16,7 +31,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -512,7 +526,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
 	try {
-	    taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+            taskScheduler.runTransactionalTask(task, taskOwner);
 	} catch (Exception e) {
 	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
 	    throw e;

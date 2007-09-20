@@ -1,9 +1,25 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 
 /**
@@ -13,7 +29,11 @@ import com.sun.sgs.auth.Identity;
  * Invocations of the {@code NodeMappingListener} methods are made outside
  * of a transaction, but modifications to the map will have been performed
  * inside a transaction.
- * 
+ * <p>
+ * The implementations for the methods of this interface should be
+ * idempotent because they may be invoked multiple times if the implementation
+ * throws an exception which implements {@link ExceptionRetryStatus} and 
+ * {@code shouldRetry} returns {@code true}.
  * 
  * @see NodeMappingService#addNodeMappingListener(NodeMappingListener)
  */

@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.service;
@@ -53,10 +68,13 @@ public interface NodeMappingService extends Service {
         
     /**
      * Assigns the identity to a node and adds the assignment to the map.   
-     * If the identity has no node assignment, a node is selected for it; 
-     * otherwise, no action is performed.   Additionally (and atomically),
-     * notes that the service considers the identity to be active, as
-     * though {@link #setStatus setStatus(service, identity, true)} had
+     * If the identity has no node assignment, or the current assignment
+     * is not to a live node, a node is selected for it; otherwise, no action 
+     * is performed.   
+     * <p>
+     * Additionally (and atomically), notes that the service considers the 
+     * identity to be active, as though 
+     * {@link #setStatus setStatus(service, identity, true)} had
      * been called on the assigned node.
      * <p>
      * <b> TBD:  Perhaps this atomic setService doesn't help.  It seems as

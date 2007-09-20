@@ -1,4 +1,4 @@
-Project Darkstar Server Software Development Kit
+Project Darkstar Server, Binary Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,37 +7,32 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Server Software Development Kit contains everything
-you need to develop game servers that run as applications in the Project
-Darkstar Server environment.  Information about building client
-applications is available as a separate download.
+The binary distribution of the Project Darkstar Server contains
+everything you need to develop game servers that run as applications in
+the Project Darkstar Server environment.  Information about building
+client applications is available as a separate download.
 
-In addition to the documents, APIs and examples, this kit contains a
-complete single-system version of the Project Darkstar Server.  The APIs
-in this version are the same as those that will be included in the
-full-scale, multi-node version of the system, which will be released in
-the future. The current system allows development of games that run on a
-single server. The server system will make use of the multi-threading
-capabilities of that server when they are available.
+In addition to the documents, APIs and examples, this distribution
+contains a complete single-system version of the Project Darkstar
+Server.
 
 CONTENTS
 
-The Software Development Kit (SDK) contains the following
-subdirectories:
+This distribution contains the following subdirectories:
 
 - doc
   Documentation for the server API
 
 - lib
-  JAR files and native libraries needed to develop for the Project
-  Darkstar Server, and to run server applications
+  JAR files needed to develop for the Project Darkstar Server, and to
+  run server applications
 
 - tutorial
   Documentation and sample code for the server tutorial
 	
 SUPPORTED PLATFORMS
 
-The SDK has been tested on the following operating systems and
+This distribution has been tested on the following operating systems and
 processors:
 
 - Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
@@ -46,16 +41,41 @@ processors:
 - Redhat Linux EL4 on 32-bit processors
 - Mac OS X 10.4 on PowerPC and Intel processors
 
-The SDK requires Java(TM) 2 Platform Standard Edition 5.0 or greater.
+This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
+greater.
 
 It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
 1.5.0_07 on Mac OS X platforms.
 
-The SDK requires Berkeley DB version 4.5.20.  The distribution includes
-builds of version 4.5.20 for all supported platforms.  Berkeley DB is
-highly portable; you can obtain and compile it for unsupported
-platforms.
+This distribution requires Berkeley DB version 4.5.20, which may be
+bundled with this distribution, or else can be obtained and compiled
+from:
+
+  http://www.oracle.com/database/berkeley-db/db/index.html
+
+The bundled files should be copied to the lib/bdb subdirectory.  If
+using files compiled separately, the Berkeley DB JAR file should be
+copied to the lib/bdb subdirectory, and the natives libraries for the
+current platform should be copied to proper subdirectory as specified in
+the startup scripts.
+
+This distribution requires Apache MINA, version 1.1, which may be
+bundled with this distribution, or else can be obtained from:
+
+  http://mina.apache.org/
+
+The mina-core-@MINA.VERSION@.jar JAR file should be copied to the lib
+subdirectory.
+
+MINA also requires Simple Logging Facade for Java (SLF4J), version 1.4,
+which may be bundled with this distribution, or else can be obtained
+from:
+
+  http://www.slf4j.org/
+
+The slf4j-api-@SLF4J.VERSION@.jar and slf4j-jdk14-@SLF4J.VERSION@.jar
+JAR files should be copied to the lib subdirectory.
 
 DEVELOPING AND RUNNING
 
@@ -89,9 +109,10 @@ To run the Project Darkstar server:
 
 KNOWN ISSUES
 
-This version of the SDK has the following limitations:
+This version of the Project Darkstar Server has the following
+limitations:
 
-- The SDK only supports single node operation.
+- It only supports single node operation.
 
 - I/O throttling has not been implemented in this release, so it is
   possible for clients to overwhelm the server with network traffic and
@@ -99,14 +120,14 @@ This version of the SDK has the following limitations:
   developers must ensure that clients do not send network traffic faster
   than the server application can process it.
 
-- The SDK does not support pluggable I/O transports.
+- It does not support pluggable I/O transports.
 
 - The API for customizing managers and services is incomplete and still
   under development.
 
-- The transaction coordinator implementation in the SDK does not support
-  more than one persistent service at a time.  This restriction prevents
-  using additional services that modify the contents of databases.
+- The transaction coordinator implementation does not support more than
+  one persistent service at a time.  This restriction prevents using
+  additional services that modify the contents of databases.
 
 
 MORE INFORMATION

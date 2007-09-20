@@ -1,9 +1,26 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.channel;
 
+import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
@@ -32,6 +49,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
@@ -43,6 +61,7 @@ import com.sun.sgs.io.Connector;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -81,18 +100,18 @@ public class TestChannelServiceImpl extends TestCase {
         System.getProperty("java.io.tmpdir") + File.separator +
 	"TestChannelServiceImpl.db";
 
-    /** The port for the client session service. */
-    private static int PORT = 0;
-
     /** Properties for the channel service and client session service. */
     private static Properties serviceProps = createProperties(
-	StandardProperties.APP_NAME, "TestChannelServiceImpl",
-	StandardProperties.APP_PORT, Integer.toString(PORT));
-
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestChannelServiceImpl");
+	    "com.sun.sgs.app.name", "TestChannelServiceImpl",
+	    "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+	    	DB_DIRECTORY,
+            "com.sun.sgs.impl.service.watchdog.server.start", "true",
+	    "com.sun.sgs.impl.service.watchdog.server.port", "0",
+	    "com.sun.sgs.impl.service.watchdog.renew.interval", "1000",
+	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
+	    "com.sun.sgs.impl.service.nodemap.server.port", "0"
+	    );
 
     private static final String CHANNEL_NAME = "three stooges";
     
@@ -103,19 +122,22 @@ public class TestChannelServiceImpl extends TestCase {
     private static final Set<CompactId> ALL_MEMBERS = new HashSet<CompactId>();
     
     private static Object disconnectedCallbackLock = new Object();
-    
+
+    /** Kernel/transaction-related test components. */
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
-
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
 
+    /** Services. */
     private DataServiceImpl dataService;
+    private WatchdogServiceImpl watchdogService;
+    private NodeMappingServiceImpl nodeMappingService;
+    private TaskServiceImpl taskService;
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
-    private TaskServiceImpl taskService;
     private DummyIdentityManager identityManager;
     
     /** The listen port for the client session service. */
@@ -141,6 +163,7 @@ public class TestChannelServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
 
+	MinimalTestKernel.useMasterScheduler(serviceProps);
         appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
@@ -153,6 +176,26 @@ public class TestChannelServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
+	// create watchdog service
+	watchdogService =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	txnProxy.setComponent(WatchdogService.class, watchdogService);
+	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
+	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
+	serviceRegistry.setComponent(
+	    WatchdogServiceImpl.class, watchdogService);
+
+	// create node mapping service
+        nodeMappingService = new NodeMappingServiceImpl(
+	    serviceProps, systemRegistry, txnProxy);
+        txnProxy.setComponent(NodeMappingService.class, nodeMappingService);
+        txnProxy.setComponent(
+	    NodeMappingServiceImpl.class, nodeMappingService);
+        serviceRegistry.setComponent(
+	    NodeMappingService.class, nodeMappingService);
+        serviceRegistry.setComponent(
+	    NodeMappingServiceImpl.class, nodeMappingService);
+	
 	// create task service
 	taskService = new TaskServiceImpl(
 	    new Properties(), systemRegistry, txnProxy);
@@ -161,7 +204,6 @@ public class TestChannelServiceImpl extends TestCase {
         serviceRegistry.setComponent(TaskManager.class, taskService);
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-	//serviceRegistry.registerAppContext();
 
 	// create identity manager
 	identityManager = new DummyIdentityManager();
@@ -182,9 +224,12 @@ public class TestChannelServiceImpl extends TestCase {
 	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
+	serviceRegistry.registerAppContext();
 	
 	// services ready
 	dataService.ready();
+	watchdogService.ready();
+	nodeMappingService.ready();
 	taskService.ready();
 	sessionService.ready();
 	channelService.ready();
@@ -230,6 +275,14 @@ public class TestChannelServiceImpl extends TestCase {
             taskService.shutdown();
             taskService = null;
         }
+	if (nodeMappingService != null) {
+	    nodeMappingService.shutdown();
+	    nodeMappingService = null;
+	}
+	if (watchdogService != null) {
+	    watchdogService.shutdown();
+	    watchdogService = null;
+	}
         if (dataService != null) {
             dataService.shutdown();
             dataService = null;
@@ -1490,7 +1543,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, registry, txnProxy);
+	return new DataServiceImpl(serviceProps, registry, txnProxy);
     }
     
     /* -- other classes -- */
