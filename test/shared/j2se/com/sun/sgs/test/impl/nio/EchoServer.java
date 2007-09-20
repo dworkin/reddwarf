@@ -30,9 +30,10 @@ public class EchoServer {
     public static final String DEFAULT_PORT = "5150";
 
     public static final String DEFAULT_BUFFER_SIZE = "32";
-    public static final String DEFAULT_NUM_THREADS =  "1";
+    public static final String DEFAULT_NUM_THREADS =  "4";
     public static final String DEFAULT_MAX_THREADS =  String.valueOf(Integer.MAX_VALUE);
     public static final String DEFAULT_BACKLOG     =  "0";
+    public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
         Integer.valueOf(System.getProperty("buffer_size", DEFAULT_BUFFER_SIZE));
@@ -40,6 +41,8 @@ public class EchoServer {
         Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
     private static final int MAX_THREADS =
         Integer.valueOf(System.getProperty("maxthreads", DEFAULT_MAX_THREADS));
+    private static final boolean DISABLE_NAGLE =
+        Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -89,7 +92,7 @@ public class EchoServer {
     void acceptedChannel(AsynchronousSocketChannel channel) {
         log.log(Level.FINER, "Accepted {0}", channel);
         try {
-            channel.setOption(StandardSocketOption.TCP_NODELAY, Boolean.FALSE);
+            channel.setOption(StandardSocketOption.TCP_NODELAY, DISABLE_NAGLE);
         } catch (IOException e) {
             log.throwing("EchoServer", "acceptedChannel", e);
         }
@@ -174,10 +177,11 @@ public class EchoServer {
         } catch (IOException ignore) { }
         
         if (numConnections.decrementAndGet() == 0) {
-            log.info("Shutting down group");
+            log.info("Closing acceptor");
             try {
                 acceptor.close();
             } catch (IOException ignore) { }
+            log.info("Shutting down group");
             group.shutdown();
         }
     }

@@ -3,12 +3,16 @@ package com.sun.sgs.impl.nio;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.sgs.nio.channels.CompletionHandler;
 
 class AsyncOp<R>
     extends FutureTask<R>
 {
+    static final Logger log = Logger.getLogger(AsyncOp.class.getName());
+
     private final Runnable completionRunner;
 
     static <R, A> AsyncOp<R>
@@ -43,6 +47,7 @@ class AsyncOp<R>
 
     @Override
     protected void done() {
+        log.log(Level.FINER, "done");
         if (completionRunner != null)
             completionRunner.run();
     }

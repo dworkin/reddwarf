@@ -22,6 +22,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -42,6 +44,9 @@ final class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
     implements AsyncChannelImpl
 {
+    static final Logger log =
+        Logger.getLogger(AsyncSocketChannelImpl.class.getName());
+
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -90,18 +95,26 @@ final class AsyncSocketChannelImpl
     }
 
     public void selected(int ops) {
+        log.log(Level.FINER, "selected {0}", ops);
+
         AsyncOp<?> ctask = null;
         AsyncOp<?> rtask = null;
         AsyncOp<?> wtask = null;
 
-        if ((ops & OP_CONNECT) != 0)
+        if ((ops & OP_CONNECT) != 0) {
             ctask = connectTaskUpdater.getAndSet(this, null);
+            log.log(Level.FINEST, "ctask {0}", ctask);
+        }
 
-        if ((ops & OP_READ) != 0)
+        if ((ops & OP_READ) != 0) {
             rtask = readTaskUpdater.getAndSet(this, null);
+            log.log(Level.FINEST, "rtask {0}", rtask);
+        }
 
-        if ((ops & OP_WRITE) != 0)
+        if ((ops & OP_WRITE) != 0) {
             wtask = writeTaskUpdater.getAndSet(this, null);
+            log.log(Level.FINEST, "wtask {0}", wtask);
+        }
 
         if (ctask != null)
             group.execute(ctask);
@@ -109,9 +122,13 @@ final class AsyncSocketChannelImpl
             group.execute(rtask);
         if (wtask != null)
             group.execute(wtask);
+
+        log.log(Level.FINER, "selected {0} done", ops);
     }
 
     public void setException(int ops, Throwable t) {
+        log.log(Level.FINER, "setException {0}", ops);
+
         AsyncOp<?> ctask = null;
         AsyncOp<?> rtask = null;
         AsyncOp<?> wtask = null;
@@ -131,6 +148,8 @@ final class AsyncSocketChannelImpl
             group.setException(rtask, t);
         if (wtask != null)
             group.setException(wtask, t);
+
+        log.log(Level.FINER, "setException {0} done", ops);
     }
 
     private void checkConnected() {
@@ -152,12 +171,12 @@ final class AsyncSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
+        group.unregisterChannel(this);
         try {
             channel.close();
         } finally {
             setException(OP_CONNECT | OP_READ | OP_WRITE,
                 new AsynchronousCloseException());
-            group.unregisterChannel(this);
         }
     }
 
@@ -331,6 +350,8 @@ final class AsyncSocketChannelImpl
         A attachment,
         CompletionHandler<Void, ? super A> handler)
     {
+        if (! channel.isOpen())
+            throw new ClosedAsynchronousChannelException();
         if (channel.isConnected())
             throw new AlreadyConnectedException();
 

@@ -33,9 +33,10 @@ public class EchoClient {
 
     public static final String DEFAULT_BUFFER_SIZE = "32";
     public static final String DEFAULT_NUM_CLIENTS =  "4";
-    public static final String DEFAULT_NUM_THREADS =  "1";
+    public static final String DEFAULT_NUM_THREADS =  "4";
     public static final String DEFAULT_MAX_THREADS =  String.valueOf(Integer.MAX_VALUE);
     public static final String DEFAULT_NUM_MSGS    =  "8";
+    public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
         Integer.valueOf(System.getProperty("buffer_size", DEFAULT_BUFFER_SIZE));
@@ -47,6 +48,8 @@ public class EchoClient {
         Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
     private static final int MAX_THREADS =
         Integer.valueOf(System.getProperty("maxthreads", DEFAULT_MAX_THREADS));
+    private static final boolean DISABLE_NAGLE =
+        Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -73,7 +76,7 @@ public class EchoClient {
         int port = Integer.valueOf(portString);
         try {
             channel = group.provider().openAsynchronousSocketChannel(group);
-            channel.setOption(StandardSocketOption.TCP_NODELAY, Boolean.FALSE);
+            channel.setOption(StandardSocketOption.TCP_NODELAY, DISABLE_NAGLE);
         } catch (IOException e) {
             log.throwing("EchoClient", "connect", e);
             throw e;
@@ -98,7 +101,12 @@ public class EchoClient {
                 startSignal.countDown();
             } catch (ExecutionException e) {
                 log.throwing("ConnectHandler", "completed", e);
-                // ignore
+                try {
+                    channel.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+                startSignal.countDown();
             }
         }
     }
@@ -121,7 +129,12 @@ public class EchoClient {
                 int rc = result.getNow();
                 log.log(Level.FINEST, "Read {0} bytes", rc);
                 if (rc < 0) {
-                    log.warning("Read bailed with -1");
+                    log.log(Level.WARNING, "Read bailed with {0}", rc);
+                    try {
+                        channel.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     disconnected();
                     return;
                 }
@@ -145,6 +158,11 @@ public class EchoClient {
                 channel.read(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("ReadHandler", "completed", e);
+                try {
+                    channel.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
                 disconnected();
                 // ignore
             }
@@ -195,8 +213,11 @@ public class EchoClient {
                 channel.write(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("WriteHandler", "completed", e);
-                disconnected();
-                // ignore
+                try {
+                    channel.close();
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
             }
         }
     }
