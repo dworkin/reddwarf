@@ -28,17 +28,20 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.ProfileCollector;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileReport;
+
 import com.sun.sgs.service.TransactionRunner;
+
+import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
 
@@ -59,8 +62,7 @@ import java.util.logging.Logger;
  * scheduler handles basic configuration and marshalling, but leaves all
  * the real work to its children.
  */
-public class MasterTaskScheduler
-    implements ProfileOperationListener, TaskScheduler {
+public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -213,15 +215,8 @@ public class MasterTaskScheduler
     /**
      * {@inheritDoc}
      */
-    public void notifyThreadCount(int count) {
-        // ignored, since we are the cause of this message
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void notifyNewOp(ProfileOperation op) {
-        // see comment in notifyThreadLeaving
+    public void propertyChange(PropertyChangeEvent event) {
+        // ignored but see comment in notifyThreadLeaving
     }
 
     /**

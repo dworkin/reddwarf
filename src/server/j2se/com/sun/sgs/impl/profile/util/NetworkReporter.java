@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.kernel.profile;
+package com.sun.sgs.impl.profile.util;
 
 import com.sun.sgs.kernel.ResourceCoordinator;
 
@@ -51,7 +51,7 @@ public class NetworkReporter {
      *
      * @throws IOException if the server socket cannot be created
      */
-    NetworkReporter(int port, ResourceCoordinator resourceCoordinator)
+    public NetworkReporter(int port, ResourceCoordinator resourceCoordinator)
         throws IOException
     {
         listeners = new HashSet<Socket>();

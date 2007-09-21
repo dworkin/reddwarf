@@ -28,8 +28,9 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;

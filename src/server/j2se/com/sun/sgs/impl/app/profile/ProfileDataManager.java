@@ -23,10 +23,10 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
-import com.sun.sgs.kernel.ProfileConsumer;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /**

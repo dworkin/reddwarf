@@ -35,11 +35,12 @@ import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.service.data.store.db.bdbdb.BdbDbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.kernel.ProfileConsumer;
-import com.sun.sgs.kernel.ProfileCounter;
-import com.sun.sgs.kernel.ProfileOperation;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileCounter;
+import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -227,14 +228,16 @@ public class DataStoreImpl
     private ProfileOperation getClassInfoOp = null;
 
     /**
-     * The counters used for profile reporting, which track the bytes read
-     * and written within a task, and how many objects were read and written
+     * The counters and samples used for profile reporting, which track the
+     * bytes read and written within a task, and how many objects were read
+     * and written
      */
     private ProfileCounter readBytesCounter = null;
     private ProfileCounter readObjectsCounter = null;
     private ProfileCounter writtenBytesCounter = null;
     private ProfileCounter writtenObjectsCounter = null;
-
+    private ProfileSample readBytesSample = null;
+    private ProfileSample writtenBytesSample = null;
     /**
      * Records information about all active transactions.
      *
@@ -682,6 +685,7 @@ public class DataStoreImpl
 	}
 	if (readBytesCounter != null) {
 	    readBytesCounter.incrementCount(result.length);
+	    readBytesSample.addSample(result.length);
 	    readObjectsCounter.incrementCount();
 	}
 	return result;
@@ -703,6 +707,7 @@ public class DataStoreImpl
 	    if (writtenBytesCounter != null) {
 		writtenBytesCounter.incrementCount(data.length);
 		writtenObjectsCounter.incrementCount();
+		writtenBytesSample.addSample(data.length);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -746,6 +751,7 @@ public class DataStoreImpl
 		if (writtenBytesCounter != null) {
 		    writtenBytesCounter.incrementCount(data.length);
 		    writtenObjectsCounter.incrementCount();
+		    writtenBytesSample.addSample(data.length);
 		}
 	    }
 	    txnInfo.modified = true;
@@ -1215,6 +1221,11 @@ public class DataStoreImpl
 	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
 	writtenObjectsCounter =
 	    consumer.registerCounter("writtenObjects", true);
+	readBytesSample = consumer.registerSampleSource("readBytes", true,
+							Integer.MAX_VALUE);
+	writtenBytesSample = consumer.registerSampleSource("writtenBytes", true,
+							   Integer.MAX_VALUE);
+
     }
 
     /* -- Other public methods -- */

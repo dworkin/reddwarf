@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.UtilMisc;
