@@ -351,4 +351,20 @@ sub get_base_url {
     }
 }
 
+# Returns the absolute pathname of the specified directory
+sub absolute_directory {
+    my ($dir) = @_;
+    my $orig = `pwd`;
+    chomp $orig;
+    if (!chdir($dir)) {
+	die "Error: Problem with directory: " . $dir . "\n";
+    }
+    my $result = `pwd`;
+    chomp $result;
+    if (!chdir($orig)) {
+	die "chdir failed: " . $orig;
+    }
+    return $result;
+}
+
 1;
