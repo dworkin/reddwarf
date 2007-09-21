@@ -987,6 +987,30 @@
     </javac>
   </target>
 
+  <!-- Builds the analysis code -->
+  <target name="analysis-classes" depends="build"
+          description="Builds the analysis code">
+    <mkdir dir="${build.dir}/analysis/classes"/>
+    <depend srcdir="analysis"
+            destdir="${build.dir}/analysis/classes"
+	    cache="${build.dir}/analysis/classes"
+	    closure="true"/>
+    <javac destdir="${build.dir}/analysis/classes"
+	   debug="on"
+	   nowarn="on">
+      <src>
+        <dirset dir="analysis" includes="src"/>
+      </src>
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+
   <!-- Runs the example ChatApp (server) -->
   <target name="example-chat-app" depends="example-classes"
           description="Runs the example ChatApp (server)">
@@ -1019,6 +1043,45 @@
       </classpath>
     </java>
   </target>
+
+  <!-- Runs the task timing analysis -->
+  <target name="analysis" depends="analysis-classes"
+          description="runs the task timing analysis">
+   <delete dir="/tmp/sgs-analysis"/>
+   <mkdir dir="/tmp/sgs-analysis"/>
+   <mkdir dir="/tmp/logs"/>
+   <chmod perm="a+w">
+     <fileset dir="/tmp/sgs-analysis"/>
+   </chmod>
+   <mkdir dir="/tmp/sgs-analysis/dsdb"/>
+   <java classname="com.sun.sgs.impl.kernel.Kernel"
+	 fork="true">
+
+     <jvmarg line="-server"/>
+     <jvmarg line="-XX:+UseParallelGC"/>
+     <jvmarg line="-XX:+UseFastAccessorMethods"/>
+     <jvmarg line="-XX:+AggressiveOpts"/>
+     <jvmarg line="-XX:+MaxFDLimit"/>
+     <jvmarg line="-XX:NewSize=512m"/>
+     <jvmarg line="-Xmx2g"/>     
+
+     <sysproperty key="com.sun.sgs.config.file"
+		  file="analysis/System.properties"/>
+     <sysproperty key="java.library.path" 
+		  file="${bdb.lib.dir}"/>
+     <sysproperty key="java.util.logging.config.file"
+		  file="logging.properties"/>
+     <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+		  value="true"/>
+
+     <classpath>
+        <pathelement location="${build.dir}/analysis/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="analysis/AnalysisApplication.properties"/>
+    </java>
+  </target>
+
 
   <!-- Runs the example HackApp (server) -->
   <target name="example-hack-app" depends="example-classes"
