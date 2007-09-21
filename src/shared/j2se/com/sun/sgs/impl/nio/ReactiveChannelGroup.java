@@ -16,14 +16,14 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,6 +39,10 @@ class ReactiveChannelGroup
 {
     static final Logger log =
         Logger.getLogger(ReactiveChannelGroup.class.getName());
+
+    public static final String SELECTORS_PROPERTY =
+        "com.sun.sgs.nio.async.reactive.selectors";
+    public static final String DEFAULT_SELECTORS = "1";
 
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
 
@@ -73,21 +77,27 @@ class ReactiveChannelGroup
     /**
      * Lock held on updates to runState and channel set.
      */
-    private final ReentrantLock mainLock = new ReentrantLock();
+    private final Object mainLock = new Object();
 
-    /**
-     * Wait condition to support awaitTermination
-     */
-    private final Condition termination = mainLock.newCondition();
+    final CountDownLatch termination;
 
-    /**
-     * Selector guard.  May be locked *after* mainLock, but not before.
-     */
-    private final Object selectorLock = new Object();
+    static final class SelectorHolder {
+        /*
+         * "this" also acts as the selector guard.
+         * May be locked *after* mainLock, but not before.
+         */
 
-    final Selector selector;
-    final DelayQueue<TimeoutHandler> timeouts =
-        new DelayQueue<TimeoutHandler>();
+        final Selector selector;
+        final DelayQueue<TimeoutHandler> timeouts =
+            new DelayQueue<TimeoutHandler>();
+
+        SelectorHolder(Selector selector) {
+            this.selector = selector;
+        }
+    }
+
+    final int numSelectors;
+    final List<SelectorHolder> selectors;
 
     static class TimeoutHandler implements Delayed, Runnable {
         private final AsyncChannelImpl asyncChannel;
@@ -133,27 +143,54 @@ class ReactiveChannelGroup
         }
     }
 
-    private final Runnable workerStrategy;
-    /**
-     * Creates a new AsyncChannelGroupImpl with the given provider and
-     * executor service.
-     *
-     * @param provider the provider
-     * @param executor the executor
-     */
     ReactiveChannelGroup(AsyncProviderImpl provider, ExecutorService executor)
         throws IOException
     {
+        this(provider, executor, 0);
+    }
+
+    // if numSelectors == 0, choose from a property
+    ReactiveChannelGroup(AsyncProviderImpl provider,
+                         ExecutorService executor,
+                         int numSelectors)
+        throws IOException
+    {
         super(provider, executor);
-        selector = selectorProvider().openSelector();
-        workerStrategy = new LoopingWorkerStrategy();
-        execute(workerStrategy);
+
+        if (numSelectors == 0) {
+            numSelectors = Integer.valueOf(System.getProperty(
+                SELECTORS_PROPERTY, DEFAULT_SELECTORS));
+        }
+
+        if (numSelectors <= 0)
+            throw new IllegalArgumentException(
+                "Selector count must be positive");
+
+        this.numSelectors = numSelectors;
+        this.termination = new CountDownLatch(numSelectors);
+
+        ArrayList<SelectorHolder> sels =
+            new ArrayList<SelectorHolder>(numSelectors);
+
+        for (int i = 0; i < numSelectors; ++i) {
+            sels.add(new SelectorHolder(selectorProvider().openSelector()));
+        }
+
+        selectors = Collections.unmodifiableList(sels);
+
+        for (SelectorHolder selector : selectors) {
+            execute(new LoopingWorkerStrategy(selector));
+        }
+    }
+
+    SelectorHolder getSelectorHolder(AsyncChannelImpl ach) {
+        int index = Math.abs(ach.hashCode()) % numSelectors;
+        return selectors.get(index);
     }
 
     @Override
     void registerChannel(AsyncChannelImpl ach) throws IOException {
-        mainLock.lock();
-        try {
+        synchronized (mainLock) {
             final SelectableChannel ch = ach.channel();
             if (isShutdown()) {
                 try {
@@ -162,18 +199,20 @@ class ReactiveChannelGroup
                 throw new ShutdownChannelGroupException();
             }
             ch.configureBlocking(false);
-            synchronized (selectorLock) {
+            SelectorHolder h = getSelectorHolder(ach);
+            synchronized (h) {
+                Selector selector = h.selector;
                 selector.wakeup();
                 ch.register(selector, 0, ach);
             }
-        } finally {
-            mainLock.unlock();
         }
     }
 
     @Override
     void unregisterChannel(AsyncChannelImpl ach) {
-        synchronized (selectorLock) {
+        SelectorHolder h = getSelectorHolder(ach);
+        synchronized (h) {
+            Selector selector = h.selector;
             selector.wakeup();
             SelectionKey key = ach.channel().keyFor(selector);
             if (key != null)
@@ -194,7 +233,9 @@ class ReactiveChannelGroup
             // TODO
             throw new UnsupportedOperationException("timeout not implemented");
         }
-        synchronized (selectorLock) {
+        SelectorHolder h = getSelectorHolder(ach);
+        synchronized (h) {
+            Selector selector = h.selector;
             selector.wakeup();
             SelectionKey key = ach.channel().keyFor(selector);
             if (key == null || (! key.isValid()))
@@ -223,16 +264,15 @@ class ReactiveChannelGroup
         }
     }
 
-    protected int doSelect() throws IOException {
-        return selector.select(getSelectorTimeout());
-    }
-
-    protected int getSelectorTimeout() {
-        final Delayed t = timeouts.peek();
+    static int getSelectorTimeout(DelayQueue<? extends Delayed> queue) {
+        final Delayed t = queue.peek();
         return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
     }
 
-    protected void doWork() throws IOException {
+    protected void doWork(SelectorHolder h) throws IOException {
+        Object selectorLock = h;
+        Selector selector = h.selector;
+        DelayQueue<TimeoutHandler> timeouts = h.timeouts;
 
         int rc = 0;
         log.log(Level.FINER, "preselect");
@@ -249,27 +289,22 @@ class ReactiveChannelGroup
 
         if (rc == 0) {
             log.log(Level.FINER, "select {0}", numKeys);            
-            rc = doSelect();
+            rc = selector.select(getSelectorTimeout(timeouts));
             log.log(Level.FINEST, "selected {0}", rc);
         }
 
         int state = runState;
         if (state != RUNNING) {
-            mainLock.lock();
-            try {
-                if (state == TERMINATED)
+            synchronized (mainLock) {
+                if (! selector.isOpen())
                     return;
-
                 if (selector.keys().isEmpty()) {
-                    runState = TERMINATED;
                     try {
                         selector.close();
                     } catch (IOException ignore) { }
-                    termination.signalAll();
+                    termination.countDown();
                     return;
                 }
-            } finally {
-                mainLock.unlock();
             }
         }
 
@@ -300,38 +335,45 @@ class ReactiveChannelGroup
         }
     }
 
-    class LoopingWorkerStrategy implements Runnable {
+    abstract class WorkerStrategy implements Runnable {
+        protected final SelectorHolder selectorHolder;
+        protected WorkerStrategy(SelectorHolder h) {
+            this.selectorHolder = h;
+        }
+    }
+    class LoopingWorkerStrategy extends WorkerStrategy {
+        LoopingWorkerStrategy(SelectorHolder h) {
+            super(h);
+        }
+
         public void run() {
             try {
-                while (runState != TERMINATED) {
-                    if (Thread.interrupted()) {
-                        shutdownNow();
-                    }
-                    doWork();
+                while (selectorHolder.selector.isOpen()) {
+                    doWork(selectorHolder);
                 }
             } catch (Exception e) {
                 // TODO
                 e.printStackTrace();
-                execute(this);
+                if (selectorHolder.selector.isOpen())
+                    execute(this);
             }
         }
     }
 
-    class RequeuingWorkerStrategy implements Runnable {
+    class RequeuingWorkerStrategy extends WorkerStrategy {
+        RequeuingWorkerStrategy(SelectorHolder h) {
+            super(h);
+        }
+
         public void run() {
             try {
-                if (runState == TERMINATED)
-                    return;
-                
-                if (Thread.interrupted())
-                    shutdownNow();
-
-                doWork();
+                doWork(selectorHolder);
             } catch (Exception e) {
                 // TODO
                 e.printStackTrace();
             }
-            execute(this);
+            if (selectorHolder.selector.isOpen())
+                execute(this);
         }
     }
 
@@ -344,19 +386,7 @@ class ReactiveChannelGroup
     public boolean awaitTermination(long timeout, TimeUnit unit)
         throws InterruptedException
     {
-        long nanos = unit.toNanos(timeout);
-        mainLock.lock();
-        try {
-            for (;;) {
-                if (runState == TERMINATED)
-                    return true;
-                if (nanos <= 0)
-                    return false;
-                nanos = termination.awaitNanos(nanos);
-            }
-        } finally {
-            mainLock.unlock();
-        }
+        return termination.await(timeout, unit);
     }
 
     /**
@@ -380,26 +410,18 @@ class ReactiveChannelGroup
      */
     @Override
     public ReactiveChannelGroup shutdown() {
-        mainLock.lock();
-        try {
+        synchronized (mainLock) {
             int state = runState;
             if (state < SHUTDOWN)
                 runState = SHUTDOWN;
 
-            synchronized (selectorLock) {
-                selector.wakeup();
-//                log.log(Level.INFO, "keys at shutdown {0}", selector.keys().size());
-//                for (SelectionKey key : selector.keys()) {
-//                    if (key.isValid())
-//                        log.log(Level.INFO, "{0} : {1} / {2}", new Object[] { key, key.interestOps(), key.readyOps()});
-//                    else
-//                        log.log(Level.INFO, "{0} : invalid", key);
-//                }
+            for (SelectorHolder h : selectors) {
+                synchronized (h) {
+                    h.selector.wakeup();
+                }
             }
 
             return this;
-        } finally {
-            mainLock.unlock();
         }
     }
 
@@ -409,25 +431,25 @@ class ReactiveChannelGroup
     @Override
     public ReactiveChannelGroup shutdownNow() throws IOException
     {
-        mainLock.lock();
-        try {
+        synchronized (mainLock) {
             int state = runState;
             if (state < STOP)
                 runState = STOP;
 
-            synchronized (selectorLock) {
-                selector.wakeup();
-                for (SelectionKey key : selector.keys())
-                    forceClose((AsyncChannelImpl) key.attachment());
+            for (SelectorHolder h : selectors) {
+                synchronized (h) {
+                    Selector selector = h.selector;
+                    selector.wakeup();
+                    for (SelectionKey key : selector.keys())
+                        forceClose((AsyncChannelImpl) key.attachment());
+                }
             }
 
             return this;
-        } finally {
-            mainLock.unlock();
         }
     }
 
-    private void forceClose(Closeable closeable) {
+    private static void forceClose(Closeable closeable) {
         try {
             closeable.close();
         } catch (IOException ignore) { }
