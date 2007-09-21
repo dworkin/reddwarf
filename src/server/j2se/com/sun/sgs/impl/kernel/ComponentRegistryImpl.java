@@ -22,8 +22,8 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.MissingResourceException;
 import java.util.Set;
 
@@ -34,16 +34,16 @@ import java.util.Set;
  * can have any objects added to it, but components cannot be removed. This
  * implementation is not thread-safe.
  */
-class ComponentRegistryImpl implements ComponentRegistry, Iterable<Object> {
+class ComponentRegistryImpl implements ComponentRegistry {
 
     // the set of components
-    private HashSet<Object> componentSet;
+    private LinkedHashSet<Object> componentSet;
 
     /**
      * Creates an empty instance of <code>ComponentRegistryImpl</code>.
      */
     ComponentRegistryImpl() {
-        componentSet = new HashSet<Object>();
+        componentSet = new LinkedHashSet<Object>();
     }
 
     /**
@@ -53,7 +53,7 @@ class ComponentRegistryImpl implements ComponentRegistry, Iterable<Object> {
      * @param components an initial <code>Set</code> of components
      */
     ComponentRegistryImpl(Set<Object> components) {
-        componentSet = new HashSet<Object>(components);
+        componentSet = new LinkedHashSet<Object>(components);
     }
 
     /**

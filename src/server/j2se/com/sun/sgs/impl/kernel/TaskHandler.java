@@ -78,15 +78,22 @@ public final class TaskHandler {
      */
     TaskHandler(TransactionCoordinator transactionCoordinator,
                 ProfileCollector profileCollector) {
-        if (TaskHandler.transactionCoordinator != null)
-            throw new IllegalStateException("an instance already exists");
         if (transactionCoordinator == null)
             throw new NullPointerException("null coordinator not allowed");
 
         logger.log(Level.CONFIG, "Creating the Task Handler");
 
-        TaskHandler.transactionCoordinator = transactionCoordinator;
-        TaskHandler.profileCollector = profileCollector;
+        synchronized (TaskHandler.class) {
+            if (TaskHandler.transactionCoordinator == null) {
+                TaskHandler.transactionCoordinator = transactionCoordinator;
+            } else if 
+                (TaskHandler.transactionCoordinator != transactionCoordinator) {
+                throw 
+                    new IllegalStateException("wrong transactionCoordinator");
+            }
+            
+            TaskHandler.profileCollector = profileCollector;
+        }
     }
 
     /**

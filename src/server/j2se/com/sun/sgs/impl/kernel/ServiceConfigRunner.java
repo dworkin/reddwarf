@@ -33,10 +33,11 @@ import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import java.util.HashSet;
 import java.util.Properties;
@@ -163,9 +164,15 @@ class ServiceConfigRunner implements Runnable {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e, "{0}: failed to create " +
                                 "services", appName);
-            // shutdown each of the created services
-            for (Object s : services)
-                ((Service)s).shutdown();
+            // shutdown each of the created services in reverse order
+            ArrayList<Object> list = new ArrayList<Object>();
+            for (Object service: services) {
+                list.add(service);
+            }
+            Collections.reverse(list);
+            for (Object service: list) {
+                ((Service) service).shutdown();
+            }
             return;
         }
 
@@ -216,7 +223,7 @@ class ServiceConfigRunner implements Runnable {
                                appName);
                 // run the startup task, notifying the kernel on success
                 scheduler.runTask(unboundedTransactionRunner, owner, true);
-                kernel.contextReady(ctx, true);
+                kernel.contextReady(owner, true);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.CONFIG))
                     logger.logThrow(Level.CONFIG, e, "{0}: failed to " +
@@ -225,7 +232,7 @@ class ServiceConfigRunner implements Runnable {
             }
         } else {
             // we're running without an application, so we're finished
-            kernel.contextReady(ctx, false);
+            kernel.contextReady(owner, false);
         }
 
         if (logger.isLoggable(Level.CONFIG))

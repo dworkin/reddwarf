@@ -145,4 +145,8 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         return serviceComponents.getComponent(type);
     }
 
+    /**
+     * Get the service components, used for shutdown.
+     */
+    ComponentRegistry getServices() { return serviceComponents; }
 }

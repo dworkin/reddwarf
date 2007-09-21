@@ -27,12 +27,14 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
+import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
@@ -40,7 +42,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
-
 import com.sun.sgs.service.Service;
 
 import java.io.FileInputStream;
@@ -49,6 +50,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Properties;
 
@@ -88,7 +90,9 @@ class Kernel {
     private final HashSet<Object> systemComponents;
 
     // the proxy used by all transactional components
-    private final TransactionProxyImpl transactionProxy;
+    private static final TransactionProxyImpl transactionProxy =
+        new TransactionProxyImpl();
+    private static TransactionCoordinator transactionCoordinator;
 
     // the registration point for producers of profiling data
     private final ProfileRegistrarImpl profileRegistrar;
@@ -110,6 +114,11 @@ class Kernel {
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
+    // the system registry used by this kernel, for testing
+    private ComponentRegistry systemRegistry = null;
+    // the last task owner created by this kernel, for testing
+    private TaskOwner lastOwner = null;
+    
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
      * the code components of the system are running and ready. Creating
@@ -159,15 +168,12 @@ class Kernel {
                 profileRegistrar = null;
             }
 
-            // create the transaction proxy and coordinator
-            transactionProxy = new TransactionProxyImpl();
-            TransactionCoordinatorImpl transactionCoordinator =
-                new TransactionCoordinatorImpl(systemProperties,
-                                               profileCollector);
-
             // create the task handler and scheduler
             TaskHandler taskHandler =
-                new TaskHandler(transactionCoordinator, profileCollector);
+                new TaskHandler(
+                  getTransactionCoordinator(systemProperties, profileCollector), 
+                  profileCollector);
+            
             MasterTaskScheduler scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
                                         taskHandler, profileCollector,
@@ -194,6 +200,21 @@ class Kernel {
 		       Version.getVersion());
 	}
     }
+    
+    /**
+     * Private factory for setting up our transaction coordinator. 
+     * Note that we only expect to have more than one coordinator created
+     * when we're running multiple stacks in a single VM, for testing.
+     */
+    private TransactionCoordinator getTransactionCoordinator(
+                    Properties props, ProfileCollectorImpl profileCollector) 
+    {
+        if (transactionCoordinator == null) {
+            transactionCoordinator = 
+                new TransactionCoordinatorImpl(props, profileCollector);
+        }
+        return transactionCoordinator;
+    } 
 
     /**
      * Private helper routine that loads all of the requested listeners
@@ -297,7 +318,7 @@ class Kernel {
         HashSet<Object> appSystemComponents =
             new HashSet<Object>(systemComponents);
         appSystemComponents.add(appIdentityManager);
-        ComponentRegistryImpl systemRegistry =
+        systemRegistry =
             new ComponentRegistryImpl(appSystemComponents);
 
         // startup the service creation in a separate thread
@@ -308,6 +329,25 @@ class Kernel {
             startTask(configRunner, null);
     }
 
+    /**
+     * Shut down all applications in this kernel in reverse
+     * order of how they were started.
+     */
+    void shutdown() {
+        for (AppKernelAppContext ctx: applications) {
+            ComponentRegistry services = ctx.getServices();
+            // reverse the list of services
+            ArrayList<Object> list = new ArrayList<Object>();
+            for (Object service: services) {
+                list.add(service);
+            }
+            Collections.reverse(list);
+            for (Object service: list) {
+                ((Service) service).shutdown();
+            }
+        }
+    }
+    
     /**
      * Creates a new identity authenticator.
      */
@@ -325,16 +365,15 @@ class Kernel {
     /**
      * Called when a context has finished loading and, if there is an
      * associated application, the application has started to run. This
-     * is typically called by <code>AppStartupRunner</code> after it has
-     * started an application or <code>ServiceConfigRunner</code> when
-     * a context with no application is ready.
+     * is called by <code>ServiceConfigRunner</code>.
      *
-     * @param context the application's kernel context
+     * @param owner the TaskOwner containing the context
      * @param hasApplication <code>true</code> if the context is associated
      *                       with a running application, <code>false</code>
      *                       otherwise 
      */
-    void contextReady(AppKernelAppContext context, boolean hasApplication) {
+    void contextReady(TaskOwner owner, boolean hasApplication) {
+        AppKernelAppContext context = (AppKernelAppContext) owner.getContext();
         applications.add(context);
         if (logger.isLoggable(Level.INFO)) {
             if (hasApplication)
@@ -343,6 +382,7 @@ class Kernel {
                 logger.log(Level.INFO, "{0}: non-application context is ready",
                            context);
         }
+        lastOwner = owner;
     }
 
     /**
