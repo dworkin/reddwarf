@@ -18,7 +18,7 @@
  * INCLUDES
  */
 #include <stdint.h>
-#include "sgs_compact_id.h"
+#include "impl/sgs_compact_id.h"
 #include "sgs_wire_protocol.h"
 
 

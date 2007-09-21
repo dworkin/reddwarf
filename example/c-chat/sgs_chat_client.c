@@ -41,6 +41,13 @@
 /** The name of the global channel */
 #define GLOBAL_CHANNEL_NAME  "-GLOBAL-"
 
+#ifndef FD_COPY
+#define FD_COPY fd_copy
+static int FD_COPY(fd_set* from, fd_set* to) {
+    return memcpy(from, to, sizeof(fd_set));
+}
+#endif /* FD_COPY */
+
 /*
  * Message callbacks
  */

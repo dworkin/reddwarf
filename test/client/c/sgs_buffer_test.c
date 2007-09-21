@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "sgs_buffer.h"
-#include "sgs_buffer_impl.h"
+#include "impl/sgs_buffer_impl.h"
 
 /*
  * function: printStats()
