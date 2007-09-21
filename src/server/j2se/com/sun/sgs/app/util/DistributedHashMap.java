@@ -360,10 +360,7 @@ public class DistributedHashMap<K,V>
 	table = new PrefixEntry[leafCapacity];
 	nodeDirectory = null;
 
-	int tmp;
-	for (tmp = 1; (1 << tmp) < directorySize; tmp++)
-	    ;
-	dirBits = tmp;
+	dirBits = requiredNumBits(directorySize);
 
 	this.splitThreshold = splitThreshold;
 
@@ -373,6 +370,19 @@ public class DistributedHashMap<K,V>
 	// established
 	if (depth == 0) 
 	    initDepth(minDepth);
+    }
+
+    /**
+     * Returns the number of bits needed to represent the specified number of
+     * values, which should be greater than zero.
+     *
+     * @param n the number
+     *
+     * @return the number of bits
+     */
+    private static int requiredNumBits(int n) {
+	assert n > 0;
+	return 32 - Integer.numberOfLeadingZeros(n - 1);
     }
 
     /** 
@@ -430,10 +440,7 @@ public class DistributedHashMap<K,V>
 	if (minConcurrency <= 0)
 	    throw new IllegalArgumentException("Non-positive minimum "+
 					       "concurrency: "+ minConcurrency);
-	int depth;
-	for (depth = 0; (1 << depth) < minConcurrency; depth++)
-	    ;
-	return depth;
+	return requiredNumBits(minConcurrency);
     }
 
     /**
@@ -466,8 +473,7 @@ public class DistributedHashMap<K,V>
 	// much more efficient
 
 	table = null; // this node is no longer a leaf
-	nodeDirectory = 
-	    new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
+	nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 	
 	// decide how many leaves to make based on the required depth.
 	// Note that we never create more than the maximum number of
@@ -526,6 +532,20 @@ public class DistributedHashMap<K,V>
     }
     
     /**
+     * Returns the maximum number of bits of the hash code that are used for
+     * looking up children of this node in the node directory.
+     *
+     * @return the number of directory bits for this node
+     */
+    private int getNodeDirBits() {
+	/*
+	 * If the node is very deep, then the number of bits used to do
+	 * directory lookups is limited by the total number of bits.
+	 */
+	return Math.min(MAX_DEPTH - depth, dirBits);
+    }
+
+    /**
      * Clears the map of all entries in {@code O(n log(n))} time.
      * When clearing, all non-{@code ManagedObject} key and values
      * persisted by this map will be removed from the {@code
@@ -577,11 +597,10 @@ public class DistributedHashMap<K,V>
      * @return the entry associated with the key or {@code null} if no
      *         such entry exists
      */ 
-    @SuppressWarnings("unchecked")
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);
-	for (PrefixEntry<K,V> e = leaf.table[leaf.indexFor(hash)];
+	for (PrefixEntry<K,V> e = leaf.getBucket(leaf.indexFor(hash));
 	     e != null; e = e.next) {
 	    
 	    Object k;
@@ -591,6 +610,75 @@ public class DistributedHashMap<K,V>
 	}
 	return null;
     } 
+
+    /**
+     * Returns the first entry in this leaf for the specified index, or {@code
+     * null} if there is none.
+     *
+     * @param index the index
+     *
+     * @return the entry or {@code null}
+     */
+    @SuppressWarnings("unchecked")
+    private PrefixEntry<K,V> getBucket(int index) {
+	return table[index];
+    }
+
+    /**
+     * Returns the first entry in this leaf, or {@code null} if there are no
+     * entries.
+     *
+     * @return the first entry in this leaf or {@code null}
+     */
+    PrefixEntry<K,V> firstEntry() {
+	for (int i = 0; i < table.length; i++) {
+	    PrefixEntry<K,V> entry = getBucket(i);
+	    if (entry != null) {
+		return entry;
+	    }
+	}
+	return null;
+    }
+
+    /**
+     * Returns the next entry in this leaf after the entry with the specified
+     * hash and key reference, or {@code null} if there are no entries after
+     * that position.
+     *
+     * @param hash the hash code
+     * @param keyRef the reference for the entry key
+     *
+     * @return the next entry or {@code null}
+     */
+    PrefixEntry<K,V> nextEntry(int hash, ManagedReference keyRef) {
+	BigInteger keyId = keyRef.getId();
+	for (int i = indexFor(hash); i < table.length; i++) {
+	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next) {
+		if (unsignedLessThan(e.hash, hash)) {
+		    continue;
+		} else if (e.hash != hash ||
+			   e.keyRef().getId().compareTo(keyId) > 0)
+		{
+		    return e;
+		}
+	    }
+	}
+	return null;
+    }
+
+    /**
+     * Compares the arguments as unsigned integers.
+     *
+     * @param x first value
+     * @param y second value
+     *
+     * @return {@code true} if {@code x} is less than {@code y} when viewed
+     *	       as an unsigned integer, else {@code false}
+     */
+    private static boolean unsignedLessThan(int x, int y) {
+	/* Flip the sign bit, so that negative values are considered larger */
+	return (x ^ 0x80000000) < (y ^ 0x80000000);
+    }
 
     /**
      * {@inheritDoc}
@@ -615,9 +703,8 @@ public class DistributedHashMap<K,V>
      * (i.e. they have not already been shifted to the maximum
      * possible precision).
      *
-     * @see #addEntry addEntry
+     * @see #addEntry
      */
-    @SuppressWarnings("unchecked")
     private void split() {
 	    
 	if (table == null) { // can't split an intermediate node!
@@ -647,11 +734,12 @@ public class DistributedHashMap<K,V>
 		(i < firstRight) ? leftChild : rightChild;
 	    PrefixEntry<K,V> prev = null;
 	    int prevIndex = 0;
-	    PrefixEntry<K,V> e = table[i];
+	    PrefixEntry<K,V> e = getBucket(i);
 	    while (e != null) {
 		prefix = e.hash;
 		int index = child.indexFor(e.hash);
 		PrefixEntry<K,V> next = e.next;
+		/* Chain to the previous node if the index is the same */
 		child.addEntry(e, index == prevIndex ? prev : null);
 		prev = e;
 		prevIndex = index;
@@ -730,8 +818,7 @@ public class DistributedHashMap<K,V>
 	    leftChild.parentRef = thisRef;
 	    
 	    table = null;
-	    nodeDirectory = 
-		new ManagedReference[1 << Math.min(MAX_DEPTH - depth, dirBits)];
+	    nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
 	    int right = nodeDirectory.length / 2;
 
@@ -791,7 +878,7 @@ public class DistributedHashMap<K,V>
 	// be valid for a directory at this depth, then shift only the
 	// significant bits down from the prefix and use those as an
 	// index into the directory.
-	int index = (prefix >>> (32 - Math.min(dirBits, MAX_DEPTH - depth)));
+	int index = (prefix >>> (32 - getNodeDirBits()));
 	return nodeDirectory[index].get(DistributedHashMap.class);	
     }		       
 
@@ -808,7 +895,6 @@ public class DistributedHashMap<K,V>
      * @param leftChildRef the left child of the node that will be
      *        replaced
      */
-    @SuppressWarnings("unchecked")
     private void addLeavesToDirectory(int prefix, 
 				      ManagedReference rightChildRef,
 				      ManagedReference leftChildRef) {		
@@ -820,12 +906,12 @@ public class DistributedHashMap<K,V>
 	// by the directory size.  The split() method checks that this
 	// directory has room; however, we still need to know how many
 	// bits are being used to calculate the index.
-	int maxBits = Math.min(dirBits, MAX_DEPTH - depth);	
+	int maxBits = getNodeDirBits();
 	int index = prefix >>> (32 - maxBits);
 
 	// the leaf is under this node, so just look it up using the
 	// directory
-	DistributedHashMap<K,V> leaf = 
+	@SuppressWarnings("unchecked") DistributedHashMap<K,V> leaf = 
 	    nodeDirectory[index].get(DistributedHashMap.class);
 
 	DataManager dm = AppContext.getDataManager();
@@ -900,13 +986,13 @@ public class DistributedHashMap<K,V>
      */
     static int hash(int h) {
 	/*
-	 * Bad hashes tend to have low bits set, and we choice nodes and
-	 * buckets from the high bits, so reverse them.
+	 * Bad hashes tend to have only low bits set, and we choose nodes and
+	 * buckets starting with the higher bits, so XOR some lower bits into
+	 * the higher bits.
 	 */
-	h = Integer.reverse(h);
-	h ^= (h >>> 20);
-	h ^= (h >>> 12);
-	return h ^ (h >>> 7) ^ (h >>> 4);
+	h ^= (h << 20);
+	h ^= (h << 12);
+	return h ^ (h << 7) ^ (h << 4);
     }
 
     /**
@@ -918,7 +1004,6 @@ public class DistributedHashMap<K,V>
      * @param value the value to be mapped to the key
      * @return the previous value mapped to the provided key, if any
      */
-    @SuppressWarnings("unchecked")
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
@@ -930,15 +1015,21 @@ public class DistributedHashMap<K,V>
  	PrefixEntry<K,V> newEntry = null;
 	BigInteger keyId = null;
 	PrefixEntry<K,V> prev = null;
-	for (PrefixEntry<K,V> e = leaf.table[i]; e != null; e = e.next) {
-	    if (unsignedGreaterThan(e.hash, hash)) {
-		break;
-	    } else if (unsignedGreaterThan(hash, e.hash)) {
+	for (PrefixEntry<K,V> e = leaf.getBucket(i); e != null; e = e.next) {
+	    /*
+	     * Keep bucket chain sorted by hash code, treating the hash codes
+	     * as unsigned integers so that they sort the same way as directory
+	     * lookups.
+	     */
+	    if (unsignedLessThan(e.hash, hash)) {
 		prev = e;
 		continue;
+	    } else if (e.hash != hash) {
+		break;
 	    }
 	    Object k = e.getKey();
 	    if (k == key || (k != null && k.equals(key))) {
+		/* Remove the unused new entry, if any */
 		if (newEntry != null) {
 		    newEntry.unmanage();
 		}
@@ -946,12 +1037,18 @@ public class DistributedHashMap<K,V>
 		// and return the old value
 		return e.setValue(value);
 	    }
+	    /* Create the new entry to get the ID of its key ref */
 	    if (newEntry == null) {
 		newEntry = new PrefixEntry<K,V>(hash, key, value);
 		keyId = newEntry.keyRef().getId();
 	    }
-	    if (e.keyRef().getId().compareTo(keyId) < 0) {
+	    /* Keep bucket chain sorted by key reference object ID */
+	    int compareKey = e.keyRef().getId().compareTo(keyId);
+	    if (compareKey < 0) {
 		prev = e;
+	    } else {
+		assert compareKey != 0 : "Entry is already present";
+		break;
 	    }
 	}
 
@@ -962,11 +1059,6 @@ public class DistributedHashMap<K,V>
 	leaf.addEntryMaybeSplit(newEntry, prev);
 
 	return null;
-    }
-
-    /** Compares the arguments as unsigned values. */
-    static boolean unsignedGreaterThan(int x, int y) {
-	return (x ^ 0x80000000) > (y ^ 0x80000000);
     }
 
     /**
@@ -985,9 +1077,9 @@ public class DistributedHashMap<K,V>
      * Adds a new entry at the specified index and determines if a
      * {@link #split()} operation is necessary.
      *
-     * @param	entry the entry to add
-     * @param	prev the entry immediately prior to the entry to add, or null
-     *		if the entry should be the first in the bucket
+     * @param entry the entry to add
+     * @param prev the entry immediately prior to the entry to add, or {@code
+     *	      null} if the entry should be the first in the bucket
      */
     private void addEntryMaybeSplit(PrefixEntry<K,V> entry,
 				    PrefixEntry<K,V> prev)
@@ -1003,40 +1095,27 @@ public class DistributedHashMap<K,V>
      * Adds the provided entry to the the current leaf, chaining as
      * necessary, but does <i>not</i> perform the size check for
      * splitting.  This should only be called from {@link #split()}
-     * when adding children entries.
+     * when adding children entries, or if splitting is already handled.
      *
-     * @param	entry the entry to add
-     * @param	prev the entry immediately prior to the entry to add, or null
-     *		if the entry should be the first in the bucket
+     * @param entry the entry to add
+     * @param prev the entry immediately prior to the entry to add, or {@code
+     *	      null} if the entry should be the first
      */
     private void addEntry(PrefixEntry<K,V> entry, PrefixEntry<K,V> prev) {
 	size++;
 	if (prev == null) {
 	    int index = indexFor(entry.hash);
-	    @SuppressWarnings("unchecked")
-	    PrefixEntry<K,V> current = table[index];
-	    entry.next = current;
+	    entry.next = getBucket(index);
 	    table[index] = entry;
 	} else {
-	    assert indexFor(entry.hash) == indexFor(prev.hash);
+	    assert indexFor(entry.hash) == indexFor(prev.hash) :
+	        "Previous node was in a different bucket";
 	    PrefixEntry<K,V> next = prev.next;
 	    prev.next = entry;
 	    entry.next = next;
 	}
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public boolean equals(Object o) {
-	if (o instanceof DistributedHashMap) {
-	    DataManager dm = AppContext.getDataManager();
-	    return dm.createReference(this).
-		equals(dm.createReference((DistributedHashMap)o));
-	}
-	return super.equals(o);
-    }  
-    
     /**
      * Returns whether this map has no mappings.  
      *
@@ -1092,20 +1171,22 @@ public class DistributedHashMap<K,V>
      *         (A {@code null} return can also indicate that the map
      *         previously associated {@code null} with {@code key}.)
      */
-    @SuppressWarnings("unchecked")
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	DistributedHashMap<K,V> leaf = lookup(hash);	
 
 	int i = leaf.indexFor(hash);
-	PrefixEntry<K,V> e = leaf.table[i]; 
+	PrefixEntry<K,V> e = leaf.getBucket(i);
 	PrefixEntry<K,V> prev = e;
 	while (e != null) {
 	    PrefixEntry<K,V> next = e.next;
 	    Object k;
-	    if (e.hash == hash && 
-		((k = e.getKey()) == key || (k != null && k.equals(key)))) {
-		
+	    if (unsignedLessThan(hash, e.hash)) {
+		break;
+	    } else if (e.hash == hash &&
+		       ((k = e.getKey()) == key ||
+			(k != null && k.equals(key))))
+	    {
 		// remove the value and reorder the chained keys
 		if (e == prev) // if this was the first element
 		    leaf.table[i] = next;
@@ -1137,6 +1218,37 @@ public class DistributedHashMap<K,V>
     }
 
     /**
+     * Removes the entry with the given hash code and key reference, if
+     * present.
+     *
+     * @param hash the hash code
+     * @param keyRef the reference for the entry key
+     *
+     * @see ConcurrentIterator#remove
+     */
+    void remove(int hash, ManagedReference keyRef) {
+	int index = indexFor(hash);
+	PrefixEntry<K,V> prev = null;
+	for (PrefixEntry<K,V> e = getBucket(index); e != null; e = e.next) {
+	    if (unsignedLessThan(hash, e.hash)) {
+		break;
+	    } else if (e.hash == hash && keyRef.equals(e.keyRef())) {
+		AppContext.getDataManager().markForUpdate(this);
+		modifications++;
+		size--;
+		if (prev == null) {
+		    table[index] = e.next;
+		} else {
+		    prev.next = e.next;
+		}
+		e.unmanage();
+		break;
+	    }
+	    prev = e;
+	}
+    }
+
+    /**
      * Returns the left-most leaf table from this node in the prefix
      * tree.
      *
@@ -1154,11 +1266,18 @@ public class DistributedHashMap<K,V>
      * number of buckets.
      *
      * @param h the hash value
-     * @param length the number of possible indices
+     *
      * @return the index for the given hash 
      */
     int indexFor(int h) {
-	int leafBits = Integer.numberOfTrailingZeros(leafCapacity);
+	/*
+	 * Return the bits immediately to the right of those used to choose
+	 * this node from the parent, but using the full complement of bits if
+	 * this is a very deep node.  Using the bits immediately after the
+	 * directory bits insures that the buckets are ordered the same way as
+	 * the nodes would be after a split.
+	 */
+	int leafBits = requiredNumBits(leafCapacity);
 	int shiftRight = 32 - Math.min(32, depth + leafBits);
 	return (h >>> shiftRight) & (table.length - 1);
     }
@@ -1540,34 +1659,40 @@ public class DistributedHashMap<K,V>
 	private static final long serialVersionUID = 0x1L;
 
 	/**
-	 * A reference to the root node of the table, used to look up the leaf
-	 * if the current leaf is split
+	 * A reference to the root node of the table, used to look up the
+	 * current leaf.
 	 */
 	private final ManagedReference rootRef;
 	
 	/**
 	 * A reference to the leaf containing the current position of the
-	 * iterator, or null if the iteration has not started.
+	 * iterator, or null if the iteration has not started or has been
+	 * completed.
 	 */
 	private ManagedReference currentLeafRef = null;
 
 	/**
-	 * The hash code of the entry at the current position of the iterator.
+	 * The hash code of the current entry.
 	 */
 	private int currentHash = 0;
 
 	/**
-	 * A reference to the managed object for the key or entry at the
-	 * current position of the iterator, or null if the iteration has not
-	 * started.  Set to the same value as the currentLeafField if the
-	 * iteration has been completed.
+	 * A reference to the managed object for the key of the current entry,
+	 * null if the iteration has not started, or the same value as rootRef
+	 * if the iteration has been completed.
 	 */
 	private ManagedReference currentKeyRef = null;
+
+	/** Set to true when the current entry is removed. */
+	private boolean currentRemoved = false;
 
 	/** The leaf containing the next entry, or null if not computed. */
 	private transient DistributedHashMap nextLeaf = null;
 
-	/** The next entry, or null if no next entry or if not computed. */
+	/**
+	 * The next entry, or null if there is no next entry or if not
+	 * computed.
+	 */
 	private transient PrefixEntry nextEntry = null;
 
 	/**
@@ -1581,9 +1706,9 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @param root the root node of the {@code DistributedHashMap}
 	 */
-	public ConcurrentIterator(DistributedHashMap root) {
+	ConcurrentIterator(DistributedHashMap root) {
 	    rootRef = AppContext.getDataManager().createReference(root);
-	    checkNext();
+	    getNext();
 	}
 
 	/** Makes sure that the next entry is up to date. */
@@ -1595,85 +1720,48 @@ public class DistributedHashMap<K,V>
 	    }
 	}
 
-	/** Computes the next entry. */
+	/**
+	 * Computes the next entry.
+	 */
 	private void getNext() {
-	    if (currentLeafRef == null) {
-		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
-		nextEntry = firstEntry(nextLeaf);
-	    } else if (currentLeafRef != currentKeyRef) {
-		try {
-		    nextLeaf = currentLeafRef.get(DistributedHashMap.class);
-		    if (nextLeaf.nodeDirectory != null) {
-			/* The leaf was converted to a directory node */
-			nextLeaf =
-			    rootRef.get(DistributedHashMap.class).lookup(
-				currentHash);
-		    }
-		} catch (ObjectNotFoundException e) {
-		    /* The leaf was removed */
-		    nextLeaf = rootRef.get(DistributedHashMap.class).lookup(
-			currentHash);
-		}
-		nextEntry = nextEntry(
-		    nextLeaf, currentHash, currentKeyRef);
-	    } else {
-		nextLeaf = rootRef.get(DistributedHashMap.class).leftMost();
+	    if (currentKeyRef == rootRef) {
+		/* No more entries */
+		nextLeaf = rootRef.get(DistributedHashMap.class);
 		nextEntry = null;
+	    } else {
+		if (currentLeafRef == null) {
+		    /* Find first entry */
+		    nextLeaf =
+			rootRef.get(DistributedHashMap.class).leftMost();
+		    nextEntry = nextLeaf.firstEntry();
+		} else {
+		    /* Find next entry */
+		    nextLeaf = getCurrentLeaf();
+		    nextEntry = nextLeaf.nextEntry(currentHash, currentKeyRef);
+		}
+		/* Find an entry in later leaves, if needed */
+		while (nextEntry == null && nextLeaf.rightLeafRef != null) {
+		    nextLeaf = nextLeaf.rightLeafRef.get(
+			DistributedHashMap.class);
+		    nextEntry = nextLeaf.firstEntry();
+		}
 	    }
 	    nextLeafModifications = nextLeaf.modifications;
 	}
 
-	/**
-	 * Returns the first entry starting with the specified leaf or null if
-	 * it is empty.
-	 */
-	private PrefixEntry firstEntry(DistributedHashMap leaf) {
-	    while (true) {
-		for (int i = 0; i < leaf.table.length; i++) {
-		    PrefixEntry entry = leaf.table[i];
-		    if (entry != null) {
-			return entry;
-		    }
+	/** Returns the current leaf. */
+	private DistributedHashMap getCurrentLeaf() {
+	    try {
+		DistributedHashMap leaf =
+		    currentLeafRef.get(DistributedHashMap.class);
+		/* Make sure the leaf was not converted to a directory node */
+		if (leaf.nodeDirectory == null) {
+		    return leaf;
 		}
-		if (leaf.rightLeafRef == null) {
-		    return null;
-		}
-		leaf = leaf.rightLeafRef.get(DistributedHashMap.class);
+	    } catch (ObjectNotFoundException e) {
+		/* The leaf was removed */
 	    }
-	}
-
-	/**
-	 * Returns the next entry on the leaf after the entry with the
-	 * specified hash and key, or null if there are no entries after that
-	 * position.
-	 */
-	private PrefixEntry nextEntry(DistributedHashMap leaf,
-				      int hash,
-				      ManagedReference keyRef)
-	{
-	    BigInteger keyId = keyRef.getId();
-	    while (true) {
-		for (int i = 0; i < leaf.table.length; i++) {
-		    for (PrefixEntry entry = leaf.table[i];
-			 entry != null;
-			 entry = entry.next)
-		    {
-			if (unsignedGreaterThan(hash, entry.hash)) {
-			    continue;
-			} else if (unsignedGreaterThan(entry.hash, hash)) {
-			    return entry;
-			}
-			BigInteger entryKeyId = entry.keyRef().getId();
-			if (entryKeyId.compareTo(keyId) > 0) {
-			    return entry;
-			}
-		    }
-		}
-		if (leaf.rightLeafRef == null) {
-		    return null;
-		}
-		leaf = leaf.rightLeafRef.get(DistributedHashMap.class);
-	    }
+	    return rootRef.get(DistributedHashMap.class).lookup(currentHash);
 	}
 
 	/**
@@ -1709,28 +1797,33 @@ public class DistributedHashMap<K,V>
 		AppContext.getDataManager().createReference(nextLeaf);
 	    currentHash = nextEntry.hash;
 	    currentKeyRef = nextEntry.keyRef();
+	    currentRemoved = false;
 	    Entry result = nextEntry;
 	    getNext();
 	    if (nextEntry == null) {
-		currentKeyRef = currentLeafRef;
+		currentKeyRef = rootRef;
 	    }
 	    return result;
 	}
 
 	/**
-	 * This operation is not supported.
-	 *
-	 * @throws UnsupportedOperationException if called
+	 * {@inheritDoc}
 	 */
 	public void remove() {
-	    throw new UnsupportedOperationException();
+	    if (currentRemoved) {
+		throw new IllegalStateException(
+		    "The current element has already been removed");
+	    } else if (currentLeafRef == null) {
+		throw new IllegalStateException("No current element");
+	    }
+	    getCurrentLeaf().remove(currentHash, currentKeyRef);
 	}
     }
 
     /**
      * An iterator over the entry set
      */
-    private static class EntryIterator<K,V> 
+    private static final class EntryIterator<K,V> 
 	extends ConcurrentIterator<Entry<K,V>> {
 	
 	private static final long serialVersionUID = 0x1L;
@@ -1773,7 +1866,7 @@ public class DistributedHashMap<K,V>
 	 * {@inheritDoc}
 	 */
 	@SuppressWarnings("unchecked")
-	    public K next() {
+	public K next() {
 	    return ((Entry<K,V>)nextEntry()).getKey();
 	}
     }
@@ -1783,8 +1876,7 @@ public class DistributedHashMap<K,V>
      * An iterator over the values in the tree
      */
     private static final class ValueIterator<K,V> 
-	extends ConcurrentIterator<V> 
-	implements Serializable {
+	extends ConcurrentIterator<V> {
 
 	public static final long serialVersionUID = 0x1L;
 
@@ -2005,7 +2097,7 @@ public class DistributedHashMap<K,V>
 	 */
 	private transient DistributedHashMap<K,V> root;
 
-	public Values(DistributedHashMap<K,V> root) {
+	Values(DistributedHashMap<K,V> root) {
 	    this.root = root;
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}

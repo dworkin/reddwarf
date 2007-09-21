@@ -220,21 +220,6 @@ public class DistributedHashSet<E>
     }
 
     /**
-     * {@inheritDoc}
-     */
-    public boolean equals(Object o) {
-	/// perform quick to check to see if o is really an instance
-	/// of this set
-	if (o instanceof DistributedHashSet) {
-	    DataManager dm = AppContext.getDataManager();
-	    if (dm.createReference(this).
-		equals(dm.createReference((DistributedHashSet)o)))
-		return true;
-	}
-	return super.equals(o);
-    }
-
-    /**
      * Returns {@code true} if this set contains the specified
      * element.
      *
