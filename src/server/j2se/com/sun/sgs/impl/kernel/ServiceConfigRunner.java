@@ -67,6 +67,8 @@ class ServiceConfigRunner implements Runnable {
         "com.sun.sgs.impl.service.session.ClientSessionServiceImpl";
     private static final String DEFAULT_DATA_SERVICE =
         "com.sun.sgs.impl.service.data.DataServiceImpl";
+    private static final String DEFAULT_LOGGING_SERVICE =
+        "com.sun.sgs.impl.service.logging.LoggingServiceImpl";
     private static final String DEFAULT_TASK_SERVICE =
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
     private static final String DEFAULT_WATCHDOG_SERVICE =
@@ -353,6 +355,25 @@ class ServiceConfigRunner implements Runnable {
         if (clientSessionService instanceof ProfileProducer) {
             if (profileRegistrar != null)
                 ((ProfileProducer)clientSessionService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+
+        // load the logging service, which has no associated manager
+
+        if (StandardService.LoggingService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+
+        String loggingServiceClass =
+            appProperties.getProperty(StandardProperties.
+                                      LOGGING_SERVICE,
+                                      DEFAULT_LOGGING_SERVICE);
+        Service loggingService =
+            createService(Class.forName(loggingServiceClass));
+        services.addComponent(loggingService);
+        if (clientSessionService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer)loggingService).
                     setProfileRegistrar(profileRegistrar);
         }
 

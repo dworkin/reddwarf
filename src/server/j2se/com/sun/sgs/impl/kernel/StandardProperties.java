@@ -127,6 +127,13 @@ public class StandardProperties {
 
     /**
      * An optional key specifying a specific class to use for an application's
+     * <code>LoggingService</code>.
+     */
+    public static final String LOGGING_SERVICE =
+        NS + "app.LoggingService";
+
+    /**
+     * An optional key specifying a specific class to use for an application's
      * <code>ChannelService</code>.
      */
     public static final String CHANNEL_SERVICE = NS + "app.channelService";
@@ -182,6 +189,8 @@ public class StandardProperties {
         TaskService,
         /** Enumeration for the Client Session Service. */
         ClientSessionService,
+        /** Enumeration for the Logging Service. */
+        LoggingService,	    
         /** Enumeration for the Channel Service. */
         ChannelService;
 
