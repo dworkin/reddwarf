@@ -1,0 +1,55 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ *
+ * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
+ * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
+ * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
+ */
+
+/*
+ * This file provides declarations for an implementation of session contexts.
+ */
+
+#ifndef SGS_CONTEXT_IMPL_H
+#define SGS_CONTEXT_IMPL_H 1
+
+
+/*
+ * INCLUDES
+ */
+#include "sgs_channel.h"
+#include "sgs_connection.h"
+#include "sgs_id.h"
+#include "sgs_session.h"
+
+
+/*
+ * sgs_context_impl typedef
+ */
+typedef struct sgs_context_impl sgs_context_impl;
+
+
+/*
+ * STRUCTS
+ */
+struct sgs_context_impl {
+    /** Hostname and port number (of server) to connect to: */
+    char hostname[100];
+    int port;
+  
+    /** function pointers to callbacks: */
+    void (*reg_fd_cb)(sgs_connection*, int, short);
+    void (*unreg_fd_cb)(sgs_connection*, int, short);
+  
+    void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_left_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const sgs_id*,
+        const uint8_t*, size_t);
+    void (*disconnected_cb)(sgs_connection*);
+    void (*logged_in_cb)(sgs_connection*, sgs_session*);
+    void (*login_failed_cb)(sgs_connection*, const uint8_t*, size_t);
+    void (*reconnected_cb)(sgs_connection*);
+    void (*recv_message_cb)(sgs_connection*, const uint8_t*, size_t);
+};
+
+#endif  /** #ifndef SGS_CONTEXT_IMPL_H */
