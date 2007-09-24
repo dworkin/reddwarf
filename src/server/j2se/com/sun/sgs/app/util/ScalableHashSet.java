@@ -19,21 +19,18 @@
 
 package com.sun.sgs.app.util;
 
-import java.io.Serializable;
-
-import java.util.AbstractSet;
-import java.util.Collection;
-import java.util.Iterator;
-
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-
+import java.io.Serializable;
+import java.util.AbstractSet;
+import java.util.Collection;
+import java.util.Iterator;
 
 /**
  * A concurrent, distributed implementation of {@code Set} backed by a
- * {@link DistributedHashSet}.  The internal structure of the set is
+ * {@link ScalableHashSet}.  The internal structure of the set is
  * separated into distributed pieces, which reduces the amount of data
  * any one operation needs to access.  The distributed structure
  * increases the concurrency and allows for parallel write operations
@@ -114,7 +111,7 @@ import com.sun.sgs.app.ManagedReference;
  *
  * <p>
  *
- * An instance of {@code DistributedHashSet} offers one parameter for
+ * An instance of {@code ScalableHashSet} offers one parameter for
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  This
  * parameter acts as a hint to the backing map on how to perform
@@ -137,11 +134,11 @@ import com.sun.sgs.app.ManagedReference;
  * @see Object#hashCode()
  * @see java.util.Set
  * @see java.util.HashSet
- * @see DistributedHashMap
+ * @see ScalableHashMap
  * @see Serializable
  * @see ManagedObject
  */
-public class DistributedHashSet<E>
+public class ScalableHashSet<E>
     extends AbstractSet<E>
     implements Serializable, ManagedObject {
 
@@ -158,18 +155,18 @@ public class DistributedHashSet<E>
     private final ManagedReference map;
 
     /**
-     * Creates a new empty set; the backing {@code DistributedHashMap}
+     * Creates a new empty set; the backing {@code ScalableHashMap}
      * has the default minimum concurrency (32).
      *
-     * @see DistributedHashMap#DistributedHashMap()
+     * @see ScalableHashMap#ScalableHashMap()
      */
-    public DistributedHashSet() {
+    public ScalableHashSet() {
 	map = AppContext.getDataManager().
-	    createReference(new DistributedHashMap<E,Marker>());	
+	    createReference(new ScalableHashMap<E,Marker>());	
     }
 
     /**
-     * Creates a new empty set; the backing {@code DistributedHashMap}
+     * Creates a new empty set; the backing {@code ScalableHashMap}
      * has the specified minimum concurrency.
      * 
      * @param minConcurrency the minimum number of write operations to
@@ -178,11 +175,11 @@ public class DistributedHashSet<E>
      * @throws IllegalArgumentException if minConcurrency is
      *         non-positive
      *
-     * @see DistributedHashMap#DistributedHashMap(int)
+     * @see ScalableHashMap#ScalableHashMap(int)
      */
-    public DistributedHashSet(int minConcurrency) {
+    public ScalableHashSet(int minConcurrency) {
 	map = AppContext.getDataManager().
-	    createReference(new DistributedHashMap<E,Marker>(minConcurrency));
+	    createReference(new ScalableHashMap<E,Marker>(minConcurrency));
     }
 
     /**
@@ -192,7 +189,7 @@ public class DistributedHashSet<E>
      *
      * @param c the collection of elements to be added to the set     
      */
-    public DistributedHashSet(Collection<? extends E> c) {
+    public ScalableHashSet(Collection<? extends E> c) {
 	this();
 	addAll(c);
     }
@@ -207,7 +204,7 @@ public class DistributedHashSet<E>
      */
     @SuppressWarnings({"unchecked"})
     public boolean add(E e) {
-	return map.get(DistributedHashMap.class).put(e, PRESENT) == null;
+	return map.get(ScalableHashMap.class).put(e, PRESENT) == null;
     }
 
     /**
@@ -216,7 +213,7 @@ public class DistributedHashSet<E>
      * a set takes {@code n log(n)} time.
      */ 
     public void clear() {
-	map.get(DistributedHashMap.class).clear();
+	map.get(ScalableHashMap.class).clear();
     }
 
     /**
@@ -229,7 +226,7 @@ public class DistributedHashSet<E>
      *         element.
      */
     public boolean contains(Object o) {
-	return map.get(DistributedHashMap.class).containsKey(o);
+	return map.get(ScalableHashMap.class).containsKey(o);
     }
 
     /**
@@ -238,7 +235,7 @@ public class DistributedHashSet<E>
      * @return {@code true} if this set contains no elements.
      */
     public boolean isEmpty() {
-	return map.get(DistributedHashMap.class).isEmpty();
+	return map.get(ScalableHashMap.class).isEmpty();
     }
 
     /**
@@ -249,7 +246,7 @@ public class DistributedHashSet<E>
      */
     @SuppressWarnings({"unchecked"})
     public Iterator<E> iterator() {
-	return map.get(DistributedHashMap.class).keySet().iterator();
+	return map.get(ScalableHashMap.class).keySet().iterator();
     }   
 
     /**
@@ -262,7 +259,7 @@ public class DistributedHashSet<E>
      *         this set
      */
     public boolean remove(Object o) {
-	return map.get(DistributedHashMap.class).remove(o) == PRESENT;
+	return map.get(ScalableHashMap.class).remove(o) == PRESENT;
     }
 
     /**
@@ -273,7 +270,7 @@ public class DistributedHashSet<E>
      * @return the number of elements in this set
      */
     public int size() {
-	return map.get(DistributedHashMap.class).size();
+	return map.get(ScalableHashMap.class).size();
     }
 
     /**

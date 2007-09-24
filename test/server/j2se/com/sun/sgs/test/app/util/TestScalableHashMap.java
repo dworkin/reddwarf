@@ -5,8 +5,8 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 
-import com.sun.sgs.app.util.DistributedHashMap;
-import com.sun.sgs.app.util.TestableDistributedHashMap;
+import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.app.util.ScalableHashMapTestable;
 
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
@@ -54,16 +54,16 @@ import org.junit.runner.RunWith;
 import com.sun.sgs.test.util.NameRunner;
 
 /**  
- * Test the {@link DistributedHashMap} class. 
+ * Test the {@link ScalableHashMap} class. 
  */
 @RunWith(NameRunner.class)
-public class TestDistributedHashMap extends TestCase {
+public class TestScalableHashMap extends TestCase {
 
 
     // the location for the database files
     private static String DB_DIRECTORY =
         System.getProperty("java.io.tmpdir") + File.separator +
-        "TestDistributedHashMap.db";
+        "TestScalableHashMap.db";
 
     // state variables that are needed for the infrastructure but should
     // not be accessed directly by any of the individual tests
@@ -83,8 +83,8 @@ public class TestDistributedHashMap extends TestCase {
      * Test management.
      */
 
-    public TestDistributedHashMap(String name) {
-	        super(name);
+    public TestScalableHashMap(String name) {
+	super(name);
     }
 
     @Before public void setUp() {
@@ -129,15 +129,15 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	    new ScalableHashMapTestable<Integer,Integer>();
 	txn.commit();
     }
 
     @Test public void testConstructorNoArgDepth() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	assertEquals(6, test.getMaxTreeDepth());
 	assertEquals(6, test.getMinTreeDepth());
 	txn.commit();
@@ -147,8 +147,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConstructorOneArgDepth() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(1);
 	assertEquals(1, test.getMaxTreeDepth());
 	assertEquals(1, test.getMinTreeDepth());
 	txn.commit();
@@ -157,8 +157,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConstructorOneArgDepth3() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(3);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(3);
 	assertEquals(3, test.getMaxTreeDepth());
 	assertEquals(3, test.getMinTreeDepth());
 	txn.commit();
@@ -168,8 +168,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConstructorOneArgDepth4() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(5);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(5);
 	assertEquals(4, test.getMaxTreeDepth());
 	assertEquals(4, test.getMinTreeDepth());
 	txn.commit();
@@ -183,7 +183,7 @@ public class TestDistributedHashMap extends TestCase {
 	DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(0);
+		new ScalableHashMapTestable<Integer,Integer>(0);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
@@ -204,7 +204,7 @@ public class TestDistributedHashMap extends TestCase {
 	for (int i = 0; i < 32; ++i) 
 	    control.put(i,i);
 	Map<Integer,Integer> test =
-	    new TestableDistributedHashMap<Integer,Integer>(control);
+	    new ScalableHashMapTestable<Integer,Integer>(control);
 	assertEquals(control, test);
 	txn.commit();
     }
@@ -216,7 +216,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
  	try {
  	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(null);
+		new ScalableHashMapTestable<Integer,Integer>(null);
  	}
  	catch(NullPointerException npe) { 
 	    txn.commit();
@@ -231,7 +231,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 5);
+		new ScalableHashMapTestable<Integer,Integer>(1, 32, 5);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
@@ -246,7 +246,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, 4);
+		new ScalableHashMapTestable<Integer,Integer>(1, 32, 4);
 	}
 	catch(IllegalArgumentException iae) { 
 	    txn.commit();
@@ -264,7 +264,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 0, 5);
+		new ScalableHashMapTestable<Integer,Integer>(1, 0, 5);
 	}
 	catch(IllegalArgumentException iae) { 	    
 	    txn.commit();
@@ -281,7 +281,7 @@ public class TestDistributedHashMap extends TestCase {
         DataManager dataManager = AppContext.getDataManager();
 	try {
 	    Map<Integer,Integer> test = 
-		new TestableDistributedHashMap<Integer,Integer>(1, 32, -1);
+		new ScalableHashMapTestable<Integer,Integer>(1, 32, -1);
 	}
 	catch(IllegalArgumentException iae) { 	    
 	    txn.commit();
@@ -300,7 +300,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 64; ++count) {
@@ -319,7 +319,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 32; ++count) {
@@ -337,7 +337,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 54; ++i) {
@@ -362,8 +362,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveLopsidedPositiveKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
@@ -387,8 +387,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveLopsidedNegativeKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
@@ -413,8 +413,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 96; ++i) {
@@ -439,8 +439,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveHalfRandomKeys() throws Exception {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	int[] vals = new int[128];
@@ -469,8 +469,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveHalfNegativeKeys() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
@@ -496,8 +496,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>();
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[12];
@@ -545,7 +545,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 24; ++i) {
@@ -572,7 +572,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, 2);
+	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -600,7 +600,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1, 8, 4);
+	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -628,7 +628,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1);
+	    new ScalableHashMapTestable<Integer,Integer>(1);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];
@@ -673,7 +673,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1,32, 2);
+	    new ScalableHashMapTestable<Integer,Integer>(1,32, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -722,7 +722,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction(100000);
         DataManager dataManager = AppContext.getDataManager();
 	Map<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(1,32,4);
+	    new ScalableHashMapTestable<Integer,Integer>(1,32,4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];
@@ -769,7 +769,7 @@ public class TestDistributedHashMap extends TestCase {
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	 for (int i = 0; i < 32; ++i) 
 	     control.put(i,i);
-	 Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	 Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	 test.putAll(control);
 	 assertEquals(control, test);
 	 txn.commit();
@@ -779,7 +779,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullPut() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
+	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -793,7 +793,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullGet() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
+	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
 
 	test.put(null, 0);
 	assertEquals(new Integer(0), test.get(null));
@@ -804,7 +804,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullContainsKey() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
+	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
 
 	test.put(null, 0);
 	assertTrue(test.containsKey(null));
@@ -815,7 +815,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullContainsKeyOnEmptyMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
+	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
 
 	assertFalse(test.containsKey(null));
 	
@@ -825,7 +825,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullContainsValue() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 
 	test.put(0, null);
 	assertTrue(test.containsValue(null));
@@ -837,7 +837,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullContainsValueOnSplitMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 
 	test.put(0, null);
 
@@ -849,7 +849,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testContainsKeyOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -870,7 +870,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testValues() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -890,7 +890,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testValuesOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -912,7 +912,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testContainsValue() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -934,7 +934,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testContainsValueOnSplitTree() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -958,7 +958,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testNullRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new TestableDistributedHashMap<String,Integer>(16);
+	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -978,7 +978,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testClear() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -1002,7 +1002,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testMultipleClearOperations() throws Exception {
         txn = createTransaction(1000000);
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	test.clear();
@@ -1034,7 +1034,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -1065,7 +1065,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testInvalidGet() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 
 	// put in numbers
 	for (int i = 4000; i < 4100; ++i) {
@@ -1091,7 +1091,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testLeafSize() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 
 	assertEquals(0, test.size());
 
@@ -1121,7 +1121,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testLeafSizeAfterRemove() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 
 	int SAMPLE_SIZE = 10;
 
@@ -1157,7 +1157,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1186,8 +1186,8 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1250,7 +1250,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
 
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -1274,8 +1274,8 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	// create a tree with an artificially small leaf size
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	HashMap<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
@@ -1342,7 +1342,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testKeyIterator() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -1365,7 +1365,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testKeyIteratorOnSplitMap() throws Exception {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
 
 
@@ -1388,7 +1388,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testValuesIterator() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
 	
 	
@@ -1410,7 +1410,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testValuesIteratorOnSplitMap() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
 	
 	
@@ -1435,7 +1435,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testInvalidRemove() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	
 	// put in numbers
 	for (int i = 4000; i < 4100; ++i) {
@@ -1455,7 +1455,7 @@ public class TestDistributedHashMap extends TestCase {
 	@Test public void testLeafSerialization() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[100];
@@ -1477,8 +1477,8 @@ public class TestDistributedHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 	
-	TestableDistributedHashMap<Integer,Integer> m = 
-	    (TestableDistributedHashMap<Integer,Integer>) ois.readObject();
+	ScalableHashMapTestable<Integer,Integer> m = 
+	    (ScalableHashMapTestable<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
 	
@@ -1491,7 +1491,7 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testSplitTreeSerialization() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new TestableDistributedHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[100];
@@ -1513,8 +1513,8 @@ public class TestDistributedHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 	
-	TestableDistributedHashMap<Integer,Integer> m = 
-	    (TestableDistributedHashMap<Integer,Integer>) ois.readObject();
+	ScalableHashMapTestable<Integer,Integer> m = 
+	    (ScalableHashMapTestable<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
 	
@@ -1526,7 +1526,7 @@ public class TestDistributedHashMap extends TestCase {
      * Tests on ManagedObject vs. Serializable object keys
      *
      * These tests should expose any bugs in the
-     * DistributedHashMap.PrefixEntry class, especially in the
+     * ScalableHashMap.PrefixEntry class, especially in the
      * setValue() method.  These should also expose any bugs in the
      * KeyValuePair class
      */
@@ -1534,7 +1534,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Bar,Foo> test = 
-	    new TestableDistributedHashMap<Bar,Foo>();
+	    new ScalableHashMapTestable<Bar,Foo>();
 	Map<Bar,Foo> control = new HashMap<Bar,Foo>();
 
 	for (int i = 0; i < 64; ++i) {
@@ -1552,7 +1552,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Foo,Bar> test = 
-	    new TestableDistributedHashMap<Foo,Bar>();
+	    new ScalableHashMapTestable<Foo,Bar>();
 	Map<Foo,Bar> control = new HashMap<Foo,Bar>();
 
 	for (int i = 0; i < 64; ++i) {
@@ -1570,7 +1570,7 @@ public class TestDistributedHashMap extends TestCase {
         txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Bar,Bar> test = 
-	    new TestableDistributedHashMap<Bar,Bar>();
+	    new ScalableHashMapTestable<Bar,Bar>();
 	Map<Bar,Bar> control = new HashMap<Bar,Bar>();
 
 	for (int i = 0; i < 64; ++i) {
@@ -1591,7 +1591,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Foo,Foo> test = 
-	    new TestableDistributedHashMap<Foo,Foo>();
+	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 	for (int i = 0; i < 64; ++i) {	    
@@ -1615,7 +1615,7 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction();
         DataManager dataManager = AppContext.getDataManager();
 	Map<Foo,Foo> test = 
-	    new TestableDistributedHashMap<Foo,Foo>();
+	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 	for (int i = 0; i < 64; ++i) {	    
@@ -1640,7 +1640,7 @@ public class TestDistributedHashMap extends TestCase {
      * Concurrent Iterator tests
      *
      * These tests should expose any problems when the
-     * DistributedHashMap.ConcurrentIterator class is serialized and
+     * ScalableHashMap.ConcurrentIterator class is serialized and
      * modifications are made to the map before it is deserialized.
      * This should simulate the conditions between transactions where
      * the map might be modified
@@ -1650,8 +1650,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIterator() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[128];
@@ -1682,8 +1682,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIteratorSerailization() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[256];
@@ -1733,8 +1733,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIteratorWithRemovals() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[1024];
@@ -1789,8 +1789,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIteratorWithAdditions() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	// immediately get the iterator while the map size is zero
@@ -1838,8 +1838,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIteratorWithReplacements() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Integer,Integer> test = 
-	    new TestableDistributedHashMap<Integer,Integer>(16);
+	ScalableHashMapTestable<Integer,Integer> test = 
+	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	
 	int[] a = new int[128];
@@ -1912,8 +1912,8 @@ public class TestDistributedHashMap extends TestCase {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
 
-	TestableDistributedHashMap<Equals,Integer> test = 
-	    new TestableDistributedHashMap<Equals,Integer>(16);
+	ScalableHashMapTestable<Equals,Integer> test = 
+	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 	
 	int[] a = new int[256];
@@ -1958,8 +1958,8 @@ public class TestDistributedHashMap extends TestCase {
     @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes() throws Exception {
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Equals,Integer> test = 
-	    new TestableDistributedHashMap<Equals,Integer>(16);
+	ScalableHashMapTestable<Equals,Integer> test = 
+	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 	
 	int[] a = new int[128];
@@ -2014,8 +2014,8 @@ public class TestDistributedHashMap extends TestCase {
 
 	txn = createTransaction();
 	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Equals,Integer> test = 
-	    new TestableDistributedHashMap<Equals,Integer>(16);
+	ScalableHashMapTestable<Equals,Integer> test = 
+	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	// immediately get the iterator while the map size is zero
@@ -2064,8 +2064,8 @@ public class TestDistributedHashMap extends TestCase {
 
  	txn = createTransaction();
  	DataManager dataManager = AppContext.getDataManager();
-	TestableDistributedHashMap<Equals,Integer> test = 
-	    new TestableDistributedHashMap<Equals,Integer>(16);
+	ScalableHashMapTestable<Equals,Integer> test = 
+	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	int[] a = new int[128];
@@ -2204,7 +2204,7 @@ public class TestDistributedHashMap extends TestCase {
 	properties.setProperty("com.sun.sgs.impl.service.data.store." +
 			       "DataStoreImpl.directory", DB_DIRECTORY);
 	properties.setProperty(StandardProperties.APP_NAME,
-			       "TestDistributedHashMap");
+			       "TestScalableHashMap");
 	dataService = new DataServiceImpl(properties, registry);
     }
 
@@ -2281,7 +2281,7 @@ public class TestDistributedHashMap extends TestCase {
       */
 
 //     public static junit.framework.Test suite() {
-// 	return new JUnit4TestAdapter(TestDistributedHashMap.class);
+// 	return new JUnit4TestAdapter(TestScalableHashMap.class);
 //     }
 
 

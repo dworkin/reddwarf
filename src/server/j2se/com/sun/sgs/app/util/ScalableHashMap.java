@@ -19,10 +19,14 @@
 
 package com.sun.sgs.app.util;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import java.io.Serializable;
-
 import java.math.BigInteger;
-
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -31,13 +35,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-
-import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.ObjectNotFoundException;
-
 
 /**
  * A concurrent, distributed implementation of {@code java.util.Map}.
@@ -127,7 +124,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
  *
  * <p>
  *
- * An instance of {@code DistributedHashMap} offers one parameter for
+ * An instance of {@code ScalableHashMap} offers one parameter for
  * performance tuning: {@code minConcurrency}, which specifies the
  * minimum number of write operations to support in parallel.  This
  * parameter acts as a hint to the map on how to perform resizing.  As
@@ -160,7 +157,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
  * @see Serializable
  * @see ManagedObject
  */
-public class DistributedHashMap<K,V> 
+public class ScalableHashMap<K,V> 
     extends AbstractMap<K,V>
     implements Serializable, ManagedObject {
     
@@ -254,7 +251,7 @@ public class DistributedHashMap<K,V>
     /**
      * The monotonic counter that reflects the number of times this
      * instance has been modified.  The counter is used by the {@link
-     * DistributedHashMap.ConcurrentIterator} to detect changes
+     * ScalableHashMap.ConcurrentIterator} to detect changes
      * between transactions.
      */
     private int modifications;
@@ -302,7 +299,7 @@ public class DistributedHashMap<K,V>
     private final int dirBits;
     
     /** 
-     * Constructs an empty {@code DistributedHashMap} at the provided
+     * Constructs an empty {@code ScalableHashMap} at the provided
      * depth, with the specified minimum concurrency, split threshold,
      * merge threshold, and the maximum number of tree levels to
      * collapse.
@@ -328,8 +325,8 @@ public class DistributedHashMap<K,V>
     // for performance optimization.  At no point should depth be
     // exposed for public modification.  directorySize should also not
     // be directly exposed.
-    DistributedHashMap(int depth, int minDepth, int splitThreshold,
-		       int directorySize) {
+    ScalableHashMap(int depth, int minDepth, int splitThreshold,
+		    int directorySize) {
 	if (depth < 0 || depth > MAX_DEPTH) {
 	    throw new IllegalArgumentException("Illegal tree depth: " + 
 					       depth);	    
@@ -386,7 +383,7 @@ public class DistributedHashMap<K,V>
     }
 
     /** 
-     * Constructs an empty {@code DistributedHashMap} with the provided
+     * Constructs an empty {@code ScalableHashMap} with the provided
      * minimum concurrency.
      *
      * @param minConcurrency the minimum number of concurrent write
@@ -394,28 +391,28 @@ public class DistributedHashMap<K,V>
      *
      * @throws IllegalArgumentException if minConcurrency is non-positive
      */
-    public DistributedHashMap(int minConcurrency) {
+    public ScalableHashMap(int minConcurrency) {
 	this(0, findMinDepthFor(minConcurrency), DEFAULT_SPLIT_THRESHOLD, 
 	     DEFAULT_DIRECTORY_SIZE);
     }
 
     /** 
-     * Constructs an empty {@code DistributedHashMap} with the default
+     * Constructs an empty {@code ScalableHashMap} with the default
      * minimum concurrency (32).
      */
-    public DistributedHashMap() {
+    public ScalableHashMap() {
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY), 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
     }
 
     /**
-     * Constructs a new {@code DistributedHashMap} with the same mappings
+     * Constructs a new {@code ScalableHashMap} with the same mappings
      * as the specified {@code Map}, and the default 
      * minimum concurrency (32).
      *
      * @param m the mappings to include
      */
-    public DistributedHashMap(Map<? extends K, ? extends V> m) {
+    public ScalableHashMap(Map<? extends K, ? extends V> m) {
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY), 
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
 	if (m == null)
@@ -486,11 +483,11 @@ public class DistributedHashMap<K,V>
 	dm.markForUpdate(this);
 	ManagedReference thisRef = dm.createReference(this);
 	
-	DistributedHashMap[] leaves = new DistributedHashMap[numLeaves];
+	ScalableHashMap[] leaves = new ScalableHashMap[numLeaves];
 	for (int i = 0; i < numLeaves; ++i) {
-	    leaves[i] = new DistributedHashMap(depth + leafDepthOffset,
-					       minDepth, splitThreshold,
-					       1 << dirBits);
+	    leaves[i] = new ScalableHashMap(depth + leafDepthOffset,
+					    minDepth, splitThreshold,
+					    1 << dirBits);
 	    leaves[i].parentRef = thisRef;
 	}
 	
@@ -527,7 +524,7 @@ public class DistributedHashMap<K,V>
 	// directory nodes under this
 	if (depth + leafDepthOffset < minDepth) {
 	    for (ManagedReference dirNode : nodeDirectory) 
-		dirNode.get(DistributedHashMap.class).initDepth(minDepth);
+		dirNode.get(ScalableHashMap.class).initDepth(minDepth);
 	}   
     }
     
@@ -561,13 +558,13 @@ public class DistributedHashMap<K,V>
 	else { // this is a directory node
 	    DataManager dm = AppContext.getDataManager();
 	    ManagedReference prevNodeRef = null;
-	    DistributedHashMap node = null; 
+	    ScalableHashMap node = null; 
 	    for (ManagedReference r : nodeDirectory) {
 		// skip re-clearing duplicate nodes in the directory
 		if (r == prevNodeRef) 
 		    continue;
 		prevNodeRef = r;
-		node = r.get(DistributedHashMap.class);
+		node = r.get(ScalableHashMap.class);
 		node.clear();
 		dm.removeObject(node);
 	    }
@@ -599,7 +596,7 @@ public class DistributedHashMap<K,V>
      */ 
     private PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	DistributedHashMap<K,V> leaf = lookup(hash);
+	ScalableHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.getBucket(leaf.indexFor(hash));
 	     e != null; e = e.next) {
 	    
@@ -714,12 +711,12 @@ public class DistributedHashMap<K,V>
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
-	DistributedHashMap<K,V> leftChild = 
-	    new DistributedHashMap<K,V>(depth+1, minDepth, splitThreshold,
-					1 << dirBits);
-	DistributedHashMap<K,V> rightChild = 
-	    new DistributedHashMap<K,V>(depth+1, minDepth, splitThreshold,
-					1 << dirBits);
+	ScalableHashMap<K,V> leftChild = 
+	    new ScalableHashMap<K,V>(depth+1, minDepth, splitThreshold,
+				     1 << dirBits);
+	ScalableHashMap<K,V> rightChild = 
+	    new ScalableHashMap<K,V>(depth+1, minDepth, splitThreshold,
+				     1 << dirBits);
 
 	// in order add this node to the parent directory, we to
 	// determine the prefix that will lead to this node.  Grabbing
@@ -730,7 +727,7 @@ public class DistributedHashMap<K,V>
 	// them to either the right child or left child
 	int firstRight = table.length / 2;
 	for (int i = 0; i < table.length; ++i) {
-	    DistributedHashMap<K,V> child =
+	    ScalableHashMap<K,V> child =
 		(i < firstRight) ? leftChild : rightChild;
 	    PrefixEntry<K,V> prev = null;
 	    int prevIndex = 0;
@@ -758,16 +755,14 @@ public class DistributedHashMap<K,V>
 	    dataManager.createReference(rightChild);
 	    
 	if (leftLeafRef != null) {
-	    DistributedHashMap leftLeaf = 
-		leftLeafRef.get(DistributedHashMap.class);
+	    ScalableHashMap leftLeaf = leftLeafRef.get(ScalableHashMap.class);
 	    leftLeaf.rightLeafRef = leftChildRef;
 	    leftChild.leftLeafRef = leftLeafRef;
 	    leftLeafRef = null;
 	}
 	
 	if (rightLeafRef != null) {
-	    DistributedHashMap rightLeaf = 
-		rightLeafRef.get(DistributedHashMap.class);
+	    ScalableHashMap rightLeaf = rightLeafRef.get(ScalableHashMap.class);
 	    rightLeaf.leftLeafRef = rightChildRef;
 	    rightChild.rightLeafRef = rightLeafRef;
 	    rightLeafRef = null;
@@ -835,7 +830,7 @@ public class DistributedHashMap<K,V>
 	    // notify the parent to remove this leaf by following
 	    // the provided prefix and then replace it with
 	    // references to the right and left children
-	    parentRef.get(DistributedHashMap.class).
+	    parentRef.get(ScalableHashMap.class).
 		addLeavesToDirectory(prefix, rightChildRef, leftChildRef);
 	}	        
     }
@@ -849,9 +844,9 @@ public class DistributedHashMap<K,V>
      * @return the leaf table responsible for storing all entries with
      *         the specified prefix
      */
-    private DistributedHashMap<K,V> lookup(int prefix) {
+    private ScalableHashMap<K,V> lookup(int prefix) {
 
-	DistributedHashMap<K,V> leaf = this;
+	ScalableHashMap<K,V> leaf = this;
 	int original = prefix;
 
 	while (leaf.table == null) {
@@ -872,14 +867,14 @@ public class DistributedHashMap<K,V>
      * @return the leaf node that is associated with the prefix
      */
     @SuppressWarnings("unchecked")
-    private DistributedHashMap<K,V> directoryLookup(int prefix) {
+    private ScalableHashMap<K,V> directoryLookup(int prefix) {
 	
 	// first, identify the number of bits in the prefix that will
 	// be valid for a directory at this depth, then shift only the
 	// significant bits down from the prefix and use those as an
 	// index into the directory.
 	int index = (prefix >>> (32 - getNodeDirBits()));
-	return nodeDirectory[index].get(DistributedHashMap.class);	
+	return nodeDirectory[index].get(ScalableHashMap.class);	
     }		       
 
     /**
@@ -911,8 +906,8 @@ public class DistributedHashMap<K,V>
 
 	// the leaf is under this node, so just look it up using the
 	// directory
-	@SuppressWarnings("unchecked") DistributedHashMap<K,V> leaf = 
-	    nodeDirectory[index].get(DistributedHashMap.class);
+	@SuppressWarnings("unchecked") ScalableHashMap<K,V> leaf = 
+	    nodeDirectory[index].get(ScalableHashMap.class);
 
 	DataManager dm = AppContext.getDataManager();
 
@@ -925,8 +920,8 @@ public class DistributedHashMap<K,V>
 	// update the leaf node to point to this directory node as
 	// their parent
 	ManagedReference thisRef = dm.createReference(this);
-	rightChildRef.get(DistributedHashMap.class).parentRef = thisRef;
-	leftChildRef.get(DistributedHashMap.class).parentRef = thisRef;
+	rightChildRef.get(ScalableHashMap.class).parentRef = thisRef;
+	leftChildRef.get(ScalableHashMap.class).parentRef = thisRef;
 	
 	// how many bits in the prefix are significant for looking up
 	// the child.  
@@ -1007,7 +1002,7 @@ public class DistributedHashMap<K,V>
     public V put(K key, V value) {
 
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	DistributedHashMap<K,V> leaf = lookup(hash);
+	ScalableHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 	leaf.modifications++;
 
@@ -1125,12 +1120,12 @@ public class DistributedHashMap<K,V>
 	if (table != null && size == 0) 
 	    return true;
 	else {
-	    DistributedHashMap cur = leftMost();
+	    ScalableHashMap cur = leftMost();
 	    if (cur.size > 0)
 		return false;
 
 	    while(cur.rightLeafRef != null) {
-		cur = cur.rightLeafRef.get(DistributedHashMap.class);
+		cur = cur.rightLeafRef.get(ScalableHashMap.class);
 		if (cur.size > 0)
 		    return false;
 	    } 
@@ -1152,11 +1147,11 @@ public class DistributedHashMap<K,V>
 	    return size;
 	
 	int totalSize = 0;
-	DistributedHashMap cur = leftMost();
+	ScalableHashMap cur = leftMost();
 	totalSize += cur.size;
 	while(cur.rightLeafRef != null) {
 	     totalSize += 
-		 (cur = cur.rightLeafRef.get(DistributedHashMap.class)).size;
+		 (cur = cur.rightLeafRef.get(ScalableHashMap.class)).size;
 	}
 	
 	return totalSize;
@@ -1173,7 +1168,7 @@ public class DistributedHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	DistributedHashMap<K,V> leaf = lookup(hash);	
+	ScalableHashMap<K,V> leaf = lookup(hash);	
 
 	int i = leaf.indexFor(hash);
 	PrefixEntry<K,V> e = leaf.getBucket(i);
@@ -1254,7 +1249,7 @@ public class DistributedHashMap<K,V>
      *
      * @return the left-most child under this node
      */
-    DistributedHashMap<K,V> leftMost() {
+    ScalableHashMap<K,V> leftMost() {
 	// NOTE: the left-most node will have a bit prefix of all
 	// zeros, which is what we use when searching for it
 	return lookup(0x0);
@@ -1285,7 +1280,7 @@ public class DistributedHashMap<K,V>
     /**
      * An implementation of {@code Map.Entry} that incorporates
      * information about the prefix at which it is stored, as well as
-     * whether the {@link DistributedHashMap} is responsible for the
+     * whether the {@link ScalableHashMap} is responsible for the
      * persistent lifetime of the value.
      *
      * <p>
@@ -1573,8 +1568,8 @@ public class DistributedHashMap<K,V>
 	/**
 	 * Removes any {@code Serializable} managed by this entry from
 	 * the data manager.  This should only be called from {@link
-	 * DistributedHashMap#clear()}, {@link
-	 * DistributedHashMap#remove(Object)}, or {@link #remove()}
+	 * ScalableHashMap#clear()}, {@link
+	 * ScalableHashMap#remove(Object)}, or {@link #remove()}
 	 * under the condition that this entry's map-managed object
 	 * will never be referenced again by the map.
 	 */
@@ -1646,7 +1641,7 @@ public class DistributedHashMap<K,V>
 
     /**
      * A concurrent, persistable {@code Iterator} implementation for
-     * the {@code DistributedHashMap}.  This implementation provides
+     * the {@code ScalableHashMap}.  This implementation provides
      * the following guarantees: <ul><li>if no modifications occur,
      * all elements will eventually be returned by {@link
      * ConcurrentIterator#next()}. <li>if any modifications occur, an
@@ -1687,7 +1682,7 @@ public class DistributedHashMap<K,V>
 	private boolean currentRemoved = false;
 
 	/** The leaf containing the next entry, or null if not computed. */
-	private transient DistributedHashMap nextLeaf = null;
+	private transient ScalableHashMap nextLeaf = null;
 
 	/**
 	 * The next entry, or null if there is no next entry or if not
@@ -1704,9 +1699,9 @@ public class DistributedHashMap<K,V>
 	/**
 	 * Constructs a new {@code ConcurrentIterator}.
 	 *
-	 * @param root the root node of the {@code DistributedHashMap}
+	 * @param root the root node of the {@code ScalableHashMap}
 	 */
-	ConcurrentIterator(DistributedHashMap root) {
+	ConcurrentIterator(ScalableHashMap root) {
 	    rootRef = AppContext.getDataManager().createReference(root);
 	    getNext();
 	}
@@ -1726,13 +1721,13 @@ public class DistributedHashMap<K,V>
 	private void getNext() {
 	    if (currentKeyRef == rootRef) {
 		/* No more entries */
-		nextLeaf = rootRef.get(DistributedHashMap.class);
+		nextLeaf = rootRef.get(ScalableHashMap.class);
 		nextEntry = null;
 	    } else {
 		if (currentLeafRef == null) {
 		    /* Find first entry */
 		    nextLeaf =
-			rootRef.get(DistributedHashMap.class).leftMost();
+			rootRef.get(ScalableHashMap.class).leftMost();
 		    nextEntry = nextLeaf.firstEntry();
 		} else {
 		    /* Find next entry */
@@ -1742,7 +1737,7 @@ public class DistributedHashMap<K,V>
 		/* Find an entry in later leaves, if needed */
 		while (nextEntry == null && nextLeaf.rightLeafRef != null) {
 		    nextLeaf = nextLeaf.rightLeafRef.get(
-			DistributedHashMap.class);
+			ScalableHashMap.class);
 		    nextEntry = nextLeaf.firstEntry();
 		}
 	    }
@@ -1750,10 +1745,10 @@ public class DistributedHashMap<K,V>
 	}
 
 	/** Returns the current leaf. */
-	private DistributedHashMap getCurrentLeaf() {
+	private ScalableHashMap getCurrentLeaf() {
 	    try {
-		DistributedHashMap leaf =
-		    currentLeafRef.get(DistributedHashMap.class);
+		ScalableHashMap leaf =
+		    currentLeafRef.get(ScalableHashMap.class);
 		/* Make sure the leaf was not converted to a directory node */
 		if (leaf.nodeDirectory == null) {
 		    return leaf;
@@ -1761,7 +1756,7 @@ public class DistributedHashMap<K,V>
 	    } catch (ObjectNotFoundException e) {
 		/* The leaf was removed */
 	    }
-	    return rootRef.get(DistributedHashMap.class).lookup(currentHash);
+	    return rootRef.get(ScalableHashMap.class).lookup(currentHash);
 	}
 
 	/**
@@ -1773,7 +1768,7 @@ public class DistributedHashMap<K,V>
 	}
 
 	/**
-	 * Returns the next entry in the {@code DistributedHashMap}.
+	 * Returns the next entry in the {@code ScalableHashMap}.
 	 * Note that due to the concurrent nature of this iterator,
 	 * this method may skip elements that have been added after
 	 * the iterator was constructed.  Likewise, it may return new
@@ -1785,7 +1780,7 @@ public class DistributedHashMap<K,V>
 	 * This method will never throw a {@link
 	 * java.util.ConcurrentModificatinException}.
 	 *
-	 * @return the next entry in the {@code DistributedHashMap}
+	 * @return the next entry in the {@code ScalableHashMap}
 	 *
 	 * @throws NoSuchElementException if no further entries exist
 	 */
@@ -1833,7 +1828,7 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie.
 	 */
-	EntryIterator(DistributedHashMap<K,V> root) {
+	EntryIterator(ScalableHashMap<K,V> root) {
 	    super(root);
 	}
 
@@ -1858,7 +1853,7 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie.
 	 */
-	KeyIterator(DistributedHashMap<K,V> root) {
+	KeyIterator(ScalableHashMap<K,V> root) {
 	    super(root);
 	}
 
@@ -1885,7 +1880,7 @@ public class DistributedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie.
 	 */
-	ValueIterator(DistributedHashMap<K,V> root) {
+	ValueIterator(ScalableHashMap<K,V> root) {
 	    super(root);
 	}
 
@@ -1935,10 +1930,10 @@ public class DistributedHashMap<K,V>
 	/**
 	 * A cached version of the root node for faster accessing
 	 */
-	private transient DistributedHashMap<K,V> root;
+	private transient ScalableHashMap<K,V> root;
 	
 
-	EntrySet(DistributedHashMap<K,V> root) {
+	EntrySet(ScalableHashMap<K,V> root) {
 	    this.root = root;
 	    rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -1946,7 +1941,7 @@ public class DistributedHashMap<K,V>
 	@SuppressWarnings("unchecked")
 	private void checkCache() {
 	    if (root == null) 
-		root = rootRef.get(DistributedHashMap.class);
+		root = rootRef.get(ScalableHashMap.class);
 	}
 	
 	public Iterator<Entry<K,V>> iterator() {
@@ -2017,9 +2012,9 @@ public class DistributedHashMap<K,V>
 	/**
 	 * A cached version of the root node for faster accessing
 	 */
-	private transient DistributedHashMap<K,V> root;
+	private transient ScalableHashMap<K,V> root;
 
-	KeySet(DistributedHashMap<K,V> root) {
+	KeySet(ScalableHashMap<K,V> root) {
 	    this.root = root;
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -2027,7 +2022,7 @@ public class DistributedHashMap<K,V>
         @SuppressWarnings("unchecked")
 	private void checkCache() {
 	    if (root == null) 
-		root = rootRef.get(DistributedHashMap.class);
+		root = rootRef.get(ScalableHashMap.class);
 	}
 
 	public Iterator<K> iterator() {
@@ -2095,9 +2090,9 @@ public class DistributedHashMap<K,V>
 	/**
 	 * A cached version of the root node for faster accessing
 	 */
-	private transient DistributedHashMap<K,V> root;
+	private transient ScalableHashMap<K,V> root;
 
-	Values(DistributedHashMap<K,V> root) {
+	Values(ScalableHashMap<K,V> root) {
 	    this.root = root;
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -2105,7 +2100,7 @@ public class DistributedHashMap<K,V>
         @SuppressWarnings("unchecked")
 	private void checkCache() {
 	    if (root == null) 
-		root = rootRef.get(DistributedHashMap.class);
+		root = rootRef.get(ScalableHashMap.class);
 	}
 
 	public Iterator<V> iterator() {
@@ -2135,7 +2130,7 @@ public class DistributedHashMap<K,V>
     }
 
     /**
-     * Saves the state of this {@code DistributedHashMap} instance to the
+     * Saves the state of this {@code ScalableHashMap} instance to the
      * provided stream.
      *
      * @serialData a {@code boolean} of whether this instance was a
@@ -2171,7 +2166,7 @@ public class DistributedHashMap<K,V>
     }
 
     /**
-     * Reconstructs the {@code DistributedHashMap} from the provided
+     * Reconstructs the {@code ScalableHashMap} from the provided
      * stream.
      */
     private void readObject(java.io.ObjectInputStream s) 
