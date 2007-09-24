@@ -6,6 +6,10 @@
 #ifndef SGS_CONNECTION_H
 #define SGS_CONNECTION_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct sgs_connection_impl sgs_connection;
 
 #include "sgs/config.h"
@@ -59,5 +63,9 @@ int sgs_connection_login(sgs_connection* connection, const char* login,
  * success and -1 on failure, with errno set to the specific error code.
  */
 int sgs_connection_logout(sgs_connection* connection, int force);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_CONNECTION_H */

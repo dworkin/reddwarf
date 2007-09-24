@@ -5,6 +5,10 @@
 #ifndef SGS_MAP_H
 #define SGS_MAP_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_linked_list_map sgs_map;
@@ -77,5 +81,9 @@ int sgs_map_put(sgs_map* map, void* key, void* value);
  * not altered and -1 is returned.
  */
 int sgs_map_remove(sgs_map* map, const void* key);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_MAP_H */

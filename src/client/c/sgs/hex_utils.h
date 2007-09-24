@@ -6,6 +6,10 @@
 #ifndef SGS_HEX_UTILS_H
 #define SGS_HEX_UTILS_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 /*
@@ -33,5 +37,9 @@ int hextobytes(const char* hexstr, uint8_t* ba);
  * Returns the integer value represented by the specified ascii hex character.
  */
 int hextoi(char c);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_HEX_UTILS_H */

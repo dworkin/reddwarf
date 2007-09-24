@@ -5,6 +5,10 @@
 #ifndef SGS_MESSAGE_H
 #define SGS_MESSAGE_H  1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_message_impl sgs_message;
@@ -158,5 +162,9 @@ void sgs_msg_destroy(sgs_message* msg);
 #ifndef NDEBUG
 void sgs_msg_dump(const sgs_message* msg);
 #endif /* !NDEBUG */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_MESSAGE_H */

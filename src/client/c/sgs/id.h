@@ -5,6 +5,10 @@
 #ifndef SGS_ID_H
 #define SGS_ID_H  1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_compact_id sgs_id;
@@ -67,5 +71,9 @@ size_t sgs_id_get_byte_len(const sgs_id* id);
 #ifndef NDEBUG
 void sgs_id_dump(const sgs_id* id);
 #endif /* !NDEBUG */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_ID_H */

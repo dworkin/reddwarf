@@ -5,6 +5,10 @@
 #ifndef SGS_SESSION_H
 #define SGS_SESSION_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_session_impl sgs_session;
@@ -42,5 +46,9 @@ const sgs_id* sgs_session_get_reconnectkey(const sgs_session* session);
  * Returns this session's unique ID.
  */
 const sgs_id* sgs_session_get_id(const sgs_session* session);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_SESSION_H */

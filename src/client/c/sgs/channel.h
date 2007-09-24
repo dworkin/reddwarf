@@ -12,6 +12,10 @@
 #ifndef SGS_CHANNEL_H
 #define SGS_CHANNEL_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_channel_impl sgs_channel;
@@ -87,5 +91,9 @@ int sgs_channel_send_one(sgs_channel* channel,
                          const uint8_t* data,
                          size_t datalen,
                          const sgs_id* recipient);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_CHANNEL_H */

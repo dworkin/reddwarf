@@ -1,6 +1,10 @@
 #ifndef SGS_SESSION_IMPL_H
 #define SGS_SESSION_IMPL_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_session_impl sgs_session_impl;
@@ -89,5 +93,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl* session);
  * code.
  */
 int sgs_session_impl_send_msg(sgs_session_impl* session);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_SESSION_IMPL_H */

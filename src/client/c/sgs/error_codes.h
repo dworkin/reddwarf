@@ -1,6 +1,10 @@
 #ifndef SGS_ERROR_CODES_H
 #define SGS_ERROR_CODES_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Custom errors: */
 
 /** The code has reached a state that it shouldn't (probable bug). */
@@ -23,5 +27,9 @@
 
 /** The server sent a mesage referring to an unknown channel. */
 #define SGS_ERR_UNKNOWN_CHANNEL 186
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_ERROR_CODES_H */

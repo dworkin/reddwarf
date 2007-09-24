@@ -1,6 +1,10 @@
 #ifndef SGS_CONNECTION_IMPL_H
 #define SGS_CONNECTION_IMPL_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_connection_impl sgs_connection_impl;
@@ -52,5 +56,9 @@ void sgs_connection_impl_disconnect(sgs_connection_impl *connection);
  */
 int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
     size_t buflen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_CONNECTION_IMPL_H */

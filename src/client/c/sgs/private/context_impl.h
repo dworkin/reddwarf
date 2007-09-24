@@ -1,6 +1,10 @@
 #ifndef SGS_CONTEXT_IMPL_H
 #define SGS_CONTEXT_IMPL_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 #include "sgs/context.h"
 #include "sgs/connection.h"
@@ -29,5 +33,9 @@ struct sgs_context_impl {
     void (*reconnected_cb)(sgs_connection*);
     void (*recv_message_cb)(sgs_connection*, const uint8_t*, size_t);
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_CONTEXT_IMPL_H */

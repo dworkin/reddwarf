@@ -47,6 +47,10 @@
 #ifndef SGS_PROTOCOL_H
 #define SGS_PROTOCOL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * The maximum length of any protocol message field defined as a
  * String or byte[]: 65535 bytes
@@ -187,5 +191,9 @@ typedef enum sgs_opcode {
      */
     SGS_OPCODE_CHANNEL_MESSAGE = 0x54,
 } sgs_opcode;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_PROTOCOL_H */

@@ -1,6 +1,10 @@
 #ifndef SGS_IO_UTILS_H
 #define SGS_IO_UTILS_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 #include "sgs/buffer.h"
 
@@ -29,5 +33,9 @@ ssize_t sgs_impl_read_from_fd(sgs_buffer* buffer, int fd);
  * number of bytes written to the file descriptor.
  */
 ssize_t sgs_impl_write_to_fd(sgs_buffer* buffer, int fd);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_IO_UTILS_H */

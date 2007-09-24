@@ -5,6 +5,10 @@
 #ifndef SGS_CONTEXT_H
 #define SGS_CONTEXT_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_context_impl sgs_context;
@@ -148,5 +152,9 @@ void sgs_ctx_set_recv_msg_cb(sgs_context* ctx,
  * Unregisters all event callback functions on the specified login context.
  */
 void sgs_ctx_unset_all_cbs(sgs_context* ctx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_CONTEXT_H */

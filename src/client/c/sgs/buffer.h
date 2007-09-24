@@ -5,6 +5,10 @@
 #ifndef SGS_BUFFER_H
 #define SGS_BUFFER_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 
 typedef struct sgs_buffer_impl sgs_buffer;
@@ -93,5 +97,9 @@ size_t sgs_buffer_size(const sgs_buffer* buffer);
  * errno is set to ENOBUFS.
  */
 int sgs_buffer_write(sgs_buffer* buffer, const uint8_t* data, size_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_BUFFER_H */

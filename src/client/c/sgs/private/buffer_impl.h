@@ -5,6 +5,10 @@
 #ifndef SGS_BUFFER_IMPL_H
 #define SGS_BUFFER_IMPL_H 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "sgs/config.h"
 #include "sgs/buffer.h"
 
@@ -27,5 +31,9 @@ struct sgs_buffer_impl {
 extern size_t readable_len(const sgs_buffer_impl* buffer);
 extern size_t tailpos (const sgs_buffer_impl* buffer);
 extern size_t writable_len(const sgs_buffer_impl* buffer);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !SGS_BUFFER_IMPL_H */
