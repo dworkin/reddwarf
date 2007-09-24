@@ -123,8 +123,8 @@ class ClientSessionHandler {
      *
      * @param	id the session ID
      */
-    ClientSessionHandler(byte[] id) {
-	this.sessionService = ClientSessionServiceImpl.getInstance();
+    ClientSessionHandler(ClientSessionServiceImpl sessionService, byte[] id) {
+	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
 	this.compactId = new CompactId(id);

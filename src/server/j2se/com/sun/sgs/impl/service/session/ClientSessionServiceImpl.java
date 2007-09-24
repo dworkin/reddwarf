@@ -555,7 +555,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	    logger.log(
 		Level.FINEST, "Accepting connection for session:{0}", nextId);
-	    ClientSessionHandler handler = new ClientSessionHandler(nextId);
+	    ClientSessionHandler handler =
+		new ClientSessionHandler(ClientSessionServiceImpl.this, nextId);
 	    handlers.put(handler.getSessionId(), handler);
 	    return handler.getConnectionListener();
 	}

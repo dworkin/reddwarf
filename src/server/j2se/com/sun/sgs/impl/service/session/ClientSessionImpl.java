@@ -284,7 +284,28 @@ public class ClientSessionImpl
 	    return sessionImpl;
 	}
     }
+
+    /* -- Public instance methods -- */
     
+    /**
+     * Returns the client session ID for this client session in {@code
+     * CompactId} format.
+     *
+     * @return	the client session ID as a {@code CompactId}
+     */
+    public CompactId getCompactSessionId() {
+	return compactId;
+    }
+
+    /**
+     * Returns the node ID for this client session.
+     *
+     * @return	the node ID for this client session
+     */
+    public long getNodeId() {
+	return nodeId;
+    }
+
     /* -- Other methods -- */
 
     /**
@@ -403,16 +424,6 @@ public class ClientSessionImpl
 		Level.WARNING, e, "session binding already removed:{0}",
 		sessionKey);
 	}
-    }
-
-    /**
-     * Returns the client session ID for this client session in {@code
-     * CompactId} format.
-     *
-     * @return the client session ID as a {@code CompactId}
-     */
-    public CompactId getCompactSessionId() {
-	return compactId;
     }
 
     /**

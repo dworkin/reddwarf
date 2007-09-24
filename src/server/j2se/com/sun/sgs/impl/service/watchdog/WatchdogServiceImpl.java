@@ -187,7 +187,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    private final TaskOwner taskOwner;
+    volatile TaskOwner taskOwner;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;
@@ -309,6 +309,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 		}
 	    }
 	    dataService = txnProxy.getService(DataService.class);
+	    // TBD: This task owner is probably not correct because it
+	    // contains the system context.
 	    taskOwner = txnProxy.getCurrentOwner();
 
 	    // TBD: should the watchdog service that starts the
@@ -348,7 +350,9 @@ public class WatchdogServiceImpl implements WatchdogService {
     public void ready() {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
-	// chance to register.
+	// chance to register and ensure that the taskOwner has the
+	// correct context for callbacks.
+	taskOwner = txnProxy.getCurrentOwner();
         if (serverImpl != null) {
             serverImpl.ready();
         }

@@ -224,7 +224,6 @@ public class TestChannelServiceImpl extends TestCase {
 	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
-	serviceRegistry.registerAppContext();
 	
 	// services ready
 	dataService.ready();
