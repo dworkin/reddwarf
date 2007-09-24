@@ -1460,6 +1460,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    fail("Expected TransactionTimeoutException");
 	} catch (TransactionTimeoutException e) {
 	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
 	}
     }
 
@@ -1503,6 +1504,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    fail("Expected TransactionTimeoutException");
 	} catch (TransactionTimeoutException e) {
 	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
 	}
     }
 

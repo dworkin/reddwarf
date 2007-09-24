@@ -156,9 +156,7 @@ final class TransactionImpl implements Transaction {
 	    TransactionTimeoutException exception =
 		new TransactionTimeoutException(
 		    "transaction timed out: " + runningTime + " ms");
-	    if (state != State.ABORTING) {
-		abort(exception);
-	    }
+	    abort(exception);
 	    throw exception;
 	}
     }
