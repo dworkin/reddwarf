@@ -7,34 +7,37 @@
  */
 
 /*
- * Tests sgs_id.h
+ * Tests sgs/id.h
  */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "sgs_id.h"
-#include "sgs_hex_utils.h"
+#include "sgs/id.h"
+#include "sgs/hex_utils.h"
 
 void test1() {
     uint8_t bytes[] = { 1, 2, 3 };
-    sgs_id id;
-    int result;
+    sgs_id* id;
     
-    result = sgs_id_init(&id, bytes, sizeof(bytes));
-    printf("init() == %d\n", result);
-    if (result == -1) perror("init()");
+    id = sgs_id_create(bytes, sizeof(bytes));
+    if (id == NULL) {
+        sgs_id_destroy(id);
+        perror("init()");
+    }
     
-    printf("bytelen = %ld\n", sgs_id_get_byte_len(&id));
-    printf("memcmp = %d\n", memcmp(bytes, sgs_id_get_bytes(&id),
-               sgs_id_get_byte_len(&id)));
+    printf("bytelen = %ld\n", sgs_id_get_byte_len(id));
+    printf("memcmp = %d\n", memcmp(bytes, sgs_id_get_bytes(id),
+               sgs_id_get_byte_len(id)));
+    sgs_id_destroy(id);
 }
 
 void test2() {
-    const char* hex = "02";
+    const char* hex = "0102";
     uint8_t bytebuf[1024];
-    sgs_id id;
-    int result, i;
+    sgs_id* id;
+    int result;
+    size_t i;
     
     result = hextobytes(hex, bytebuf);
     
@@ -45,19 +48,20 @@ void test2() {
     
     printf("hextobytes() returned %d\n", result);
     
-    if (sgs_id_init(&id, bytebuf, strlen(hex)/2) == -1) {
+    if ((id = sgs_id_create(bytebuf, strlen(hex)/2)) == NULL) {
         printf("Error: invalid ID string (%s).\n", hex);
         return;
     }
     
     printf("byte: { ");
     
-    for (i=0; i < sgs_id_get_byte_len(&id); i++) {
-        printf("%d", *(sgs_id_get_bytes(&id) + i));
+    for (i=0; i < sgs_id_get_byte_len(id); i++) {
         if (i > 0) printf(", ");
+        printf("%d", *(sgs_id_get_bytes(id) + i));
     }
     
     printf(" }\n");
+    sgs_id_destroy(id);
 }
 
 /*

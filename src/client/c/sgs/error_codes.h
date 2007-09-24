@@ -1,11 +1,3 @@
-/*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
 #ifndef SGS_ERROR_CODES_H
 #define SGS_ERROR_CODES_H 1
 
@@ -32,4 +24,4 @@
 /** The server sent a mesage referring to an unknown channel. */
 #define SGS_ERR_UNKNOWN_CHANNEL 186
 
-#endif  /** #ifndef SGS_ERROR_CODES_H */
+#endif /* !SGS_ERROR_CODES_H */

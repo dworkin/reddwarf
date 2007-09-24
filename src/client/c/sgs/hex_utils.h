@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides utility functions for converting between byte-arrays
  *  and hex-strings.
  */
@@ -14,10 +6,7 @@
 #ifndef SGS_HEX_UTILS_H
 #define SGS_HEX_UTILS_H 1
 
-
-/*
- * FUNCTION DECLARATIONS
- */
+#include "sgs/config.h"
 
 /*
  * function: bytestohex()
@@ -26,7 +15,7 @@
  *  followed by a null ('\0') character.  Writes to exactly len*2+1 entries
  *  of hexstr.
  */
-int bytestohex(const uint8_t *ba, const int len, char *hexstr);
+int bytestohex(const uint8_t* ba, const int len, char* hexstr);
 
 /*
  * function: hextobytes()
@@ -36,7 +25,7 @@ int bytestohex(const uint8_t *ba, const int len, char *hexstr);
  *  terminator) must be even or an error is returned.  Exactly (length of
  *  hexstr)/2 entries of ba will be written to.
  */
-int hextobytes(const char *hexstr, uint8_t *ba);
+int hextobytes(const char* hexstr, uint8_t* ba);
 
 /*
  * function: hextoi()
@@ -45,4 +34,4 @@ int hextobytes(const char *hexstr, uint8_t *ba);
  */
 int hextoi(char c);
 
-#endif  /** #ifndef SGS_HEX_UTILS_H */
+#endif /* !SGS_HEX_UTILS_H */

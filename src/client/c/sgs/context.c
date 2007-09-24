@@ -1,41 +1,27 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides an implementation of connection contexts.  Implements
  * functions declared in sgs_context.h.
  */
 
-/*
- * INCLUDES
- */
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include "sgs_context_impl.h"
-#include "sgs_connection.h"
-#include "sgs_id.h"
+#include "sgs/config.h"
+
+#include "sgs/channel.h"
+#include "sgs/connection.h"
+#include "sgs/id.h"
+#include "sgs/private.h"
+#include "sgs/session.h"
 
 /*
- * FUNCTION IMPLEMENTATIONS FOR SGS_CONTEXT.H
+ * sgs_ctx_destroy()
  */
-
-/*
- * sgs_ctx_free()
- */
-void sgs_ctx_free(sgs_context_impl *ctx) {
+void sgs_ctx_destroy(sgs_context_impl *ctx) {
     free(ctx);
 }
 
 /*
- * sgs_ctx_new()
+ * sgs_ctx_create()
  */
-sgs_context_impl *sgs_ctx_new(const char *hostname, const int port,
+sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, int, short),
     void (*unreg_fd)(sgs_connection*, int, short))
 {

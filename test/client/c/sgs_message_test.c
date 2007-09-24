@@ -9,14 +9,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "sgs_message.h"
+#include "sgs/message.h"
 
 /*
  * function: printMsg()
  */
 static void printMsg(sgs_message *pmsg) {
     const uint8_t *data = sgs_msg_get_bytes(pmsg);
-    int i;
+    size_t i;
   
     printf("{ ");
   

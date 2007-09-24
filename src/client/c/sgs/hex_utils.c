@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides utility functions for converting between byte-arrays
  *  and hex-strings.  Relevant declarations can be found in sgs_hex_utils.h.
  *
@@ -14,17 +6,9 @@
  *  Unless otherwise noted, all functions with an int return type return
  *  0 upon success and -1 upon failure, while also setting errno to the
  *  specific error code.
- */
+ */ 
 
-
-/*
- * INCLUDES
- */
-#include <errno.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include "sgs_hex_utils.h"
+#include "sgs/hex_utils.h"
 
 /*
  * bytestohex()

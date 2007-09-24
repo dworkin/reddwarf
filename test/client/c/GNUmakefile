@@ -8,7 +8,8 @@ SRCS = \
 	sgs_map_test.c \
 	sgs_message_test.c
 
-all: buffertest idtest maptest messagetest
+#all: buffertest idtest maptest messagetest
+all: buffertest idtest messagetest
 
 include $(TOPDIR)/etc/mk/sgs.mk
 

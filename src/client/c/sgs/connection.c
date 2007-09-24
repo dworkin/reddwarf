@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides implementations of functions relating to client-server
  * network connections.  Implements functions declared in sgs_connection.h.
  *
@@ -16,27 +8,52 @@
  *  specific error code.
  */
 
-#include <errno.h>
+#include "sgs/config.h"
+
+typedef struct sgs_connection_impl sgs_connection_impl;
+
+#include "sgs/buffer.h"
+#include "sgs/context.h"
+#include "sgs/error_codes.h"
+#include "sgs/protocol.h"
+#include "sgs/private.h"
+
 #include <fcntl.h>
 #include <netdb.h>
 #include <sys/select.h>
 #include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
-#include <string.h>
-#include <unistd.h>
-#include "sgs_connection_impl.h"
-#include "sgs_context.h"
-#include "sgs_error_codes.h"
 
-/*
- * STATIC FUNCTION DECLARATIONS
- * (can only be called by functions in this file)
- */
+#define SGS_CONNECTION_IMPL_IO_BUFSIZE SGS_MSG_MAX_LENGTH
+
+typedef enum {
+    SGS_CONNECTION_IMPL_DISCONNECTED,
+    SGS_CONNECTION_IMPL_CONNECTING,
+    SGS_CONNECTION_IMPL_CONNECTED,
+} sgs_connection_state;
+
+struct sgs_connection_impl {
+    /** File descriptor for the network socket to the server. */
+    int socket_fd;
+  
+    /** Whether we expect the server to close the socket: 1 = yes, 0 = no */
+    char expecting_disconnect;
+  
+    /** The current state of the connection. */
+    sgs_connection_state state;
+  
+    /** The login context (contains all callback functions). */
+    sgs_context *ctx;
+  
+    /** The session with the server (once connected). */
+    sgs_session_impl *session;
+  
+    /** Reusable I/O buffers for reading/writing from/to the network
+     * connection. */
+    sgs_buffer *inbuf, *outbuf;
+};
+
 static void conn_closed(sgs_connection_impl *connection);
 static int consume_data(sgs_connection_impl *connection);
-
-/*
- * FUNCTION IMPLEMENTATIONS FOR SGS_CONNECTION.H
- */
 
 /*
  * sgs_connection_do_work()
@@ -122,9 +139,9 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
  * sgs_connection_free()
  */
 void sgs_connection_free(sgs_connection_impl *connection) {
-    sgs_session_impl_free(connection->session);
-    sgs_buffer_free(connection->inbuf);
-    sgs_buffer_free(connection->outbuf);
+    sgs_session_destroy(connection->session);
+    sgs_buffer_destroy(connection->inbuf);
+    sgs_buffer_destroy(connection->outbuf);
     free(connection);
 }
 

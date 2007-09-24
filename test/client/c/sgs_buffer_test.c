@@ -9,16 +9,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "sgs_buffer.h"
-#include "impl/sgs_buffer_impl.h"
+#include "sgs/buffer.h"
 
 /*
  * function: printStats()
  */
-void printStats(const sgs_buffer_impl *buf) {
-    printf("pos=%u, size=%u, cap=%u, remaining=%u\n", buf->position,
+void printStats(const sgs_buffer *buf) {
+    printf("pos=%u, size=%u, cap=%u, remaining=%u\n",
+        sgs_buffer_position(buf),
         sgs_buffer_size(buf), sgs_buffer_capacity(buf),
-        sgs_buffer_remaining_capacity(buf));
+        sgs_buffer_remaining(buf));
 }
 
 /*
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     for (i=0; i < sizeof(content2); i++)
         content2[i] = 99;
   
-    buf = sgs_buffer_new(10);
+    buf = sgs_buffer_create(10);
     if (buf == NULL) { perror("new() failed.\n"); exit(-1); }
   
     result = sgs_buffer_peek(buf, content2, 1);
@@ -75,8 +75,7 @@ int main(int argc, char *argv[]) {
     printStats(buf);
   
     printf("internal: ");
-    for (i=0; i < 10; i++)
-        printf("%d ", buf->buf[i]);
+    sgs_buffer_dump(buf);
     printf("\n");
   
     result = sgs_buffer_write(buf, content, 9);
@@ -88,8 +87,7 @@ int main(int argc, char *argv[]) {
     printStats(buf);
   
     printf("internal: ");
-    for (i=0; i < 10; i++)
-        printf("%d ", buf->buf[i]);
+    sgs_buffer_dump(buf);
     printf("\n");
   
     result = sgs_buffer_read(buf, content2, 11);
@@ -101,7 +99,7 @@ int main(int argc, char *argv[]) {
     printStats(buf);
     printArr("results", content2, 10);
   
-    sgs_buffer_free(buf);
+    sgs_buffer_destroy(buf);
   
     printf("Goodbye!\n");
   

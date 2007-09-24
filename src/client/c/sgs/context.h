@@ -1,50 +1,28 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides declarations relating to session contexts.
  */
 
 #ifndef SGS_CONTEXT_H
 #define SGS_CONTEXT_H 1
 
+#include "sgs/config.h"
 
-/*
- * INCLUDES
- */
-#include "sgs_channel.h"
-#include "sgs_id.h"
-
-
-/*
- * sgs_context_impl provides the implementation for the sgs_context interface
- * (must be declared before any headers are included that reference this type)
- */
 typedef struct sgs_context_impl sgs_context;
 
-
-#include "sgs_connection.h"
-#include "sgs_session.h"
-
-
-/*
- * FUNCTION DECLARATIONS
- */
+#include "sgs/channel.h"
+#include "sgs/id.h"
+#include "sgs/connection.h"
+#include "sgs/session.h"
 
 /*
- * function: sgs_ctx_free()
+ * function: sgs_ctx_destroy()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_context.
  */
-void sgs_ctx_free(sgs_context *ctx);
+void sgs_ctx_destroy(sgs_context* ctx);
 
 /*
- * function: sgs_ctx_new()
+ * function: sgs_ctx_create()
  *
  * Creates a new login context.  Returns null on failure.
  *
@@ -66,7 +44,7 @@ void sgs_ctx_free(sgs_context *ctx);
  * events that will be ever be specified in reg_fd and unreg_fd will be POLLIN,
  * POLLOUT, and/or POLLERR.
  */
-sgs_context *sgs_ctx_new(const char *hostname, const int port,
+sgs_context* sgs_ctx_create(const char* hostname, const int port,
     void (*reg_fd)(sgs_connection*, int, short),
     void (*unreg_fd)(sgs_connection*, int, short));
 
@@ -78,7 +56,7 @@ sgs_context *sgs_ctx_new(const char *hostname, const int port,
  *   sgs_connection*: the connection making this callback
  *      sgs_channel*: the channel that was joined
  */
-void sgs_ctx_set_channel_joined_cb(sgs_context *ctx,
+void sgs_ctx_set_channel_joined_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, sgs_channel*));
 
 /*
@@ -89,7 +67,7 @@ void sgs_ctx_set_channel_joined_cb(sgs_context *ctx,
  *   sgs_connection*: the connection making this callback
  *      sgs_channel*: the channel that was left
  */
-void sgs_ctx_set_channel_left_cb(sgs_context *ctx,
+void sgs_ctx_set_channel_left_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, sgs_channel*));
 
 /*
@@ -103,7 +81,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context *ctx,
  *    const uint8_t*: the received message (not null-terminated)
  *            size_t: the length of the received message
  */
-void sgs_ctx_set_channel_recv_msg_cb(sgs_context *ctx,
+void sgs_ctx_set_channel_recv_msg_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
         const uint8_t*, size_t));
 
@@ -114,7 +92,7 @@ void sgs_ctx_set_channel_recv_msg_cb(sgs_context *ctx,
  * The function should take the following arguments:
  *   sgs_connection: the connection making this callback
  */
-void sgs_ctx_set_disconnected_cb(sgs_context *ctx,
+void sgs_ctx_set_disconnected_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*));
 
 /*
@@ -125,7 +103,7 @@ void sgs_ctx_set_disconnected_cb(sgs_context *ctx,
  *   sgs_connection: the connection making this callback
  *      sgs_session: a handle for making method calls on the session
  */
-void sgs_ctx_set_logged_in_cb(sgs_context *ctx,
+void sgs_ctx_set_logged_in_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, sgs_session*));
 
 /*
@@ -137,7 +115,7 @@ void sgs_ctx_set_logged_in_cb(sgs_context *ctx,
  *   const uint8_t*: an explanatory message from the server (not \0-terminated)
  *           size_t: the length of the message from the server
  */
-void sgs_ctx_set_login_failed_cb(sgs_context *ctx,
+void sgs_ctx_set_login_failed_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, const uint8_t*, size_t));
 
 /*
@@ -148,7 +126,7 @@ void sgs_ctx_set_login_failed_cb(sgs_context *ctx,
  * arguments:
  *   sgs_connection: the connection making this callback
  */
-void sgs_ctx_set_reconnected_cb(sgs_context *ctx,
+void sgs_ctx_set_reconnected_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*));
 
 /*
@@ -161,7 +139,7 @@ void sgs_ctx_set_reconnected_cb(sgs_context *ctx,
  *   const uint8_t*: the message sent by the server (not \0-terminated)
  *           size_t: the length of the message sent by the server
  */
-void sgs_ctx_set_recv_msg_cb(sgs_context *ctx,
+void sgs_ctx_set_recv_msg_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, const uint8_t*, size_t));
 
 /*
@@ -169,6 +147,6 @@ void sgs_ctx_set_recv_msg_cb(sgs_context *ctx,
  *
  * Unregisters all event callback functions on the specified login context.
  */
-void sgs_ctx_unset_all_cbs(sgs_context *ctx);
+void sgs_ctx_unset_all_cbs(sgs_context* ctx);
 
-#endif  /** #ifndef SGS_CONTEXT_H */
+#endif /* !SGS_CONTEXT_H */

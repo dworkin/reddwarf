@@ -1,55 +1,26 @@
-/*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
+#ifndef SGS_PRIVATE_H
+#define SGS_PRIVATE_H 1
 
-/*
- * This file provides functions relating to the client's side of a session with
- *  a Sun Gaming Server (SGS).  Its functionality is similar to that in the java
- *  class com.sun.sgs.client.simple.SimpleClient.
- */
+#include "sgs/config.h"
 
-#ifndef SGS_SESSION_IMPL_H
-#define SGS_SESSION_IMPL_H 1
+typedef struct sgs_connection_impl sgs_connection_impl;
 
+// SESSION_IMPL
 
-/*
- * INCLUDES
- */
-#include <stdint.h>
-#include "sgs_id.h"
-#include "impl/sgs_map.h"
-#include "sgs_message.h"
-#include "sgs_id.h"
-
-
-/*
- * sgs_session_impl typedef
- * (must be declared before sgs_connection_impl.h is loaded)
- */
 typedef struct sgs_session_impl sgs_session_impl;
 
-#include "sgs_connection_impl.h"
-
-
-/*
- * STRUCTS
- */
 struct sgs_session_impl {
     /** The underlying network connection. */
-    sgs_connection_impl *connection;
+    sgs_connection_impl* connection;
     
     /** Server-assigned unique ID for this session. */
-    sgs_id session_id;
+    sgs_id* session_id;
     
     /** Server-assigned key used to reconnect after disconnect. */
-    sgs_id reconnect_key;
+    sgs_id* reconnect_key;
     
     /** Map of channels to which this session is currently a member. */
-    sgs_map *channels;
+    sgs_map* channels;
     
     /**
      * Sequence number used in some messages (increment after each use).  We have
@@ -66,17 +37,12 @@ struct sgs_session_impl {
     uint8_t msg_buf[SGS_MSG_MAX_LENGTH];
 };
 
-
 /*
- * FUNCTION DECLARATIONS
- */
-
-/*
- * function: sgs_session_impl_free()
+ * function: sgs_session_impl_destroy()
  *
  * Performs any necessary memory deallocations to dispose of an sgs_session.
  */
-void sgs_session_impl_free(sgs_session_impl *session);
+void sgs_session_impl_destroy(sgs_session_impl* session);
 
 /*
  * function: sgs_session_impl_login()
@@ -85,8 +51,8 @@ void sgs_session_impl_free(sgs_session_impl *session);
  * login and password values.  Returns 0 on success and -1 on failure, with
  * errno set to the specific error code.
  */
-int sgs_session_impl_login(sgs_session_impl *session, const char *login,
-    const char *password);
+int sgs_session_impl_login(sgs_session_impl* session, const char* login,
+    const char* password);
 
 /*
  * function: sgs_session_impl_logout()
@@ -94,15 +60,15 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
  * Creates and sends a logout request message to the server.  Returns 0 on
  * success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_session_impl_logout(sgs_session_impl *session);
+int sgs_session_impl_logout(sgs_session_impl* session);
 
 /*
- * function: sgs_session_impl_new()
+ * function: sgs_session_impl_create()
  *
  * Creates a new sgs_session from the specified connection.  Returns null on
  * failure.
  */
-sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection);
+sgs_session_impl* sgs_session_impl_create(sgs_connection_impl* connection);
 
 /*
  * function: sgs_session_impl_recv_msg()
@@ -111,7 +77,7 @@ sgs_session_impl *sgs_session_impl_new(sgs_connection_impl *connection);
  * into the session's internal msg_buf field, ready to be processed.  Returns 0
  * on success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_session_impl_recv_msg(sgs_session_impl *session);
+int sgs_session_impl_recv_msg(sgs_session_impl* session);
 
 /*
  * function: sgs_session_impl_send_msg()
@@ -120,6 +86,30 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session);
  * the session's internal msg_buf field, ready to be sent to the server. Returns
  * 0 on success and -1 on failure, with errno set to the specific error code.
  */
-int sgs_session_impl_send_msg(sgs_session_impl *session);
+int sgs_session_impl_send_msg(sgs_session_impl* session);
 
-#endif  /** #ifndef SGS_SESSION_IMPL_H */
+// CONTEXT_IMPL
+
+typedef struct sgs_context_impl sgs_context_impl;
+
+struct sgs_context_impl {
+    /** Hostname and port number (of server) to connect to: */
+    char hostname[100];
+    int port;
+  
+    /** function pointers to callbacks: */
+    void (*reg_fd_cb)(sgs_connection*, int, short);
+    void (*unreg_fd_cb)(sgs_connection*, int, short);
+  
+    void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_left_cb)(sgs_connection*, sgs_channel*);
+    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const sgs_id*,
+        const uint8_t*, size_t);
+    void (*disconnected_cb)(sgs_connection*);
+    void (*logged_in_cb)(sgs_connection*, sgs_session*);
+    void (*login_failed_cb)(sgs_connection*, const uint8_t*, size_t);
+    void (*reconnected_cb)(sgs_connection*);
+    void (*recv_message_cb)(sgs_connection*, const uint8_t*, size_t);
+};
+
+#endif /* !SGS_PRIVATE_H */

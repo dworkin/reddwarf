@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file declares constants relevant to the SGS network wire protocol.
  */
 
@@ -52,8 +44,8 @@
  * </ul>
  */
 
-#ifndef SGS_WIRE_PROTOCOL_H
-#define SGS_WIRE_PROTOCOL_H
+#ifndef SGS_PROTOCOL_H
+#define SGS_PROTOCOL_H
 
 /**
  * The maximum length of any protocol message field defined as a
@@ -196,4 +188,4 @@ typedef enum sgs_opcode {
     SGS_OPCODE_CHANNEL_MESSAGE = 0x54,
 } sgs_opcode;
 
-#endif  /** #ifndef SGS_WIRE_PROTOCOL_H */
+#endif /* !SGS_PROTOCOL_H */

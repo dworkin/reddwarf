@@ -3,15 +3,12 @@
 TOPDIR=../../..
 
 SRCS = \
-	impl/sgs_buffer_impl.c \
-	impl/sgs_channel_impl.c \
-	impl/sgs_compact_id.c \
-	impl/sgs_connection_impl.c \
-	impl/sgs_context_impl.c \
-	impl/sgs_linked_list_map.c \
-	impl/sgs_hex_utils.c \
-	impl/sgs_message.c \
-	impl/sgs_session_impl.c
+	sgs/buffer.c \
+	sgs/compact_id.c \
+	sgs/context.c \
+	sgs/connection.c \
+	sgs/hex_utils.c \
+	sgs/message.c
 
 LIB = libsgsclient.a
 

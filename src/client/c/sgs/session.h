@@ -1,35 +1,15 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides declarations relating to client-server sessions.
  */
 
 #ifndef SGS_SESSION_H
 #define SGS_SESSION_H 1
 
+#include "sgs/config.h"
 
-/*
- * INCLUDES
- */
-#include <stdint.h>
-#include "sgs_id.h"
-
-
-/*
- * sgs_session_impl provides the implementation for the sgs_session interface.
- */
 typedef struct sgs_session_impl sgs_session;
 
-
-/*
- * FUNCTION DECLARATIONS
- */
+#include "sgs/id.h"
 
 /*
  * function: sgs_session_direct_send()
@@ -46,7 +26,7 @@ typedef struct sgs_session_impl sgs_session;
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_session_direct_send(sgs_session *session, const uint8_t *data,
+int sgs_session_direct_send(sgs_session* session, const uint8_t* data,
     size_t datalen);
 
 /*
@@ -54,13 +34,13 @@ int sgs_session_direct_send(sgs_session *session, const uint8_t *data,
  *
  * Returns the reconnection-key for this session.
  */
-const sgs_id *sgs_session_get_reconnectkey(const sgs_session *session);
+const sgs_id* sgs_session_get_reconnectkey(const sgs_session* session);
 
 /*
  * function: sgs_session_get_id()
  *
  * Returns this session's unique ID.
  */
-const sgs_id *sgs_session_get_id(const sgs_session *session);
+const sgs_id* sgs_session_get_id(const sgs_session* session);
 
-#endif  /** #ifndef SGS_SESSION_H */
+#endif /* !SGS_SESSION_H */

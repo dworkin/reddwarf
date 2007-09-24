@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides an implementation of compact-id data structures.
  * Implements functions declared in sgs_id.h.
  *
@@ -16,34 +8,34 @@
  *  specific error code.
  */
 
-/*
- * INCLUDES
- */
+#include "sgs/id.h"
+
 #include <errno.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "sgs_compact_id.h"
+
+/* The maximum length of an sgs_compact_id, in bytes. */
+#define SGS_COMPACT_ID_MAX_SIZE (8 + 0x0F)
+
+typedef struct sgs_compact_id {
+    /** uncompressed form */
+    uint8_t uncompressed[SGS_COMPACT_ID_MAX_SIZE];
+    uint8_t uncompressed_len;
+} sgs_compact_id;
 
 
-/*
- * STATIC FUNCTION DECLARATIONS
- * (can only be called by functions in this file)
- */
 static int8_t get_byte_count(uint8_t length_byte);
-static size_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
-    size_t srclen);
-static size_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+
+static ssize_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     size_t srclen);
 
-/*
- * FUNCTION IMPLEMENTATIONS FOR SGS_ID.H
- */
+static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+    size_t srclen);
 
 /*
  * sgs_id_compare()
  */
-int sgs_id_compare(const sgs_compact_id *a, const sgs_compact_id *b) {
+int sgs_id_compare(const sgs_id* a, const sgs_id* b) {
     if (a->uncompressed_len < b->uncompressed_len)
         return -1;
   
@@ -57,7 +49,7 @@ int sgs_id_compare(const sgs_compact_id *a, const sgs_compact_id *b) {
 /*
  * sgs_id_equals_server()
  */
-int sgs_id_equals_server(sgs_compact_id *id) {
+int sgs_id_is_server(sgs_id* id) {
     return ((id->uncompressed_len == 1) && (id->uncompressed[0] == 0));
 }
 
@@ -91,24 +83,35 @@ size_t sgs_id_get_byte_len(const sgs_compact_id *id) {
 
 
 /*
- * FUNCTION IMPLEMENTATIONS FOR SGS_COMPACT_ID.H
+ * sgs_compact_id_create()
  */
+sgs_id* sgs_id_create(const uint8_t *data, size_t len) {
+    sgs_compact_id* id = malloc(sizeof(sgs_compact_id));
 
-/*
- * sgs_compact_id_init()
- */
-size_t sgs_compact_id_init(sgs_compact_id *id, const uint8_t *data, size_t len) {
-    size_t result = unpack(id->uncompressed, sizeof(id->uncompressed), data, len);
-    if (result == -1) return -1;
+    if (id == NULL) return NULL;
+
+    ssize_t result =
+        unpack(id->uncompressed, sizeof(id->uncompressed), data, len);
+
+    if (result == -1) {
+        free(id);
+        return NULL;
+    }
     
     id->uncompressed_len = result;
-    return get_byte_count(data[0]);
+    return id;
+}
+
+void sgs_id_destroy(sgs_id* id) {
+    free(id);
 }
 
 /*
- * sgs_compact_id_write()
+ * sgs_id_write()
+ * 
+ * Used by message.c
  */
-size_t sgs_compact_id_write(const sgs_compact_id *id, uint8_t *buf, size_t len) {
+size_t sgs_id_write(const sgs_id* id, uint8_t* buf, size_t len) {
     return pack(buf, len, id->uncompressed, id->uncompressed_len);
 }
 
@@ -150,7 +153,7 @@ static int8_t get_byte_count(uint8_t length_byte) {
  *
  * Converts bytes from normal (unpacked) format to a compact format.
  */
-static size_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+static ssize_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     size_t srclen)
 {
     uint8_t b = src[0];
@@ -203,14 +206,17 @@ static size_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
  * Converts a byte array from a compact format to a normal (unpacked) format.
  * Returns -1 on error or the number of bytes written on success.
  */
-static size_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     size_t srclen)
 {
+    ssize_t byte_count;
     size_t size, first, datalen;
     uint8_t first_byte;
     
-    size = get_byte_count(src[0]);
-    if (size == -1) return -1;  /* bad byte value */
+    byte_count = get_byte_count(src[0]);
+    if (byte_count < 0) return -1;  /* bad byte value */
+
+    size = byte_count;
     
     if (srclen < size) {
         errno = EINVAL;
@@ -221,7 +227,7 @@ static size_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
         errno = ENOBUFS;
         return -1;
     }
-    
+
     if (size <= 8) {
         first_byte = src[0] & 0x3F;  /** clear out first 2 bits */
         first = 0;

@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides declarations for the sgs_channel interface, which
  * represents a client's view of a channel.  A channel is a communication group,
  * consisting of multiple clients and the server.
@@ -20,27 +12,18 @@
 #ifndef SGS_CHANNEL_H
 #define SGS_CHANNEL_H 1
 
-/*
- * sgs_channel_impl provides the implementation for the sgs_channel interface
- * (declare before any #includes)
- */
+#include "sgs/config.h"
+
 typedef struct sgs_channel_impl sgs_channel;
 
-/*
- * INCLUDES
- */
-#include "sgs_id.h"
+#include "sgs/id.h"
 
 /*
- * FUNCTION DECLARATIONS
- */
-
-/*
- * function: sgs_channel_get_name()
+ * function: sgs_channel_name()
  *
  * Returns the name of the specified channel.
  */
-const char *sgs_channel_get_name(const sgs_channel *channel);
+const wchar_t* sgs_channel_name(const sgs_channel* channel);
 
 /*
  * function: sgs_channel_send_all()
@@ -57,8 +40,9 @@ const char *sgs_channel_get_name(const sgs_channel *channel);
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_channel_send_all(sgs_channel* channel, const uint8_t *data,
-    size_t datalen);
+int sgs_channel_send_all(sgs_channel* channel,
+                         const uint8_t* data,
+                         size_t datalen);
 
 /*
  * function: sgs_channel_send_multi()
@@ -77,8 +61,11 @@ int sgs_channel_send_all(sgs_channel* channel, const uint8_t *data,
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_channel_send_multi(sgs_channel* channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipients[], size_t recipslen);
+int sgs_channel_send_multi(sgs_channel* channel,
+                           const uint8_t* data,
+                           size_t datalen,
+                           const sgs_id* recipients[],
+                           size_t recipslen);
 
 /*
  * function: sgs_channel_send_one()
@@ -96,7 +83,9 @@ int sgs_channel_send_multi(sgs_channel* channel, const uint8_t *data,
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_channel_send_one(sgs_channel* channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipient);
+int sgs_channel_send_one(sgs_channel* channel,
+                         const uint8_t* data,
+                         size_t datalen,
+                         const sgs_id* recipient);
 
-#endif  /** #ifndef SGS_CHANNEL_H */
+#endif /* !SGS_CHANNEL_H */

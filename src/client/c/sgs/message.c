@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides an implementation of functions relating to network
  * messages.  Implements functions declared in sgs_message.h.
  *
@@ -16,21 +8,42 @@
  *  code.
  */
 
+#include "sgs/config.h"
 #include <arpa/inet.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include "sgs_compact_id.h"
-#include "sgs_error_codes.h"
-#include "sgs_message.h"
-#include "sgs_wire_protocol.h"
+#include "sgs/id.h"
+#include "sgs/error_codes.h"
+#include "sgs/message.h"
+#include "sgs/protocol.h"
+
+typedef struct sgs_message_impl {
+    /** Pointer to the start of the memory reserved for this message. */
+    uint8_t* buf;
+  
+    /**
+     * Length of the memory reserved for this message.  This may be larger than
+     * the number of bytes in the actual message.  If a method attempts to add
+     * data to the message payload but there is no room (as indicated by this
+     * variable), that method must fail and not write beyond the memory limit
+     * imposed by this value.
+     */
+    size_t buflen;
+  
+    /**
+     * The number of size of this message (so far).  Since the first 4 bytes of
+     * any message contains its length (not including those 4 bytes), this
+     * variable is redundant with those bytes but is more convenient to use.
+     */
+    size_t size;
+} sgs_message_impl;
 
 /*
  * STATIC FUNCTION DECLARATIONS
  * (can only be called by functions in this file)
  */
 static void update_msg_len(sgs_message *pmsg);
+
+/* Import the sgs_id_write function for private use. */
+extern size_t sgs_id_write(const sgs_id* id, uint8_t* buf, size_t len);
 
 /*
  * sgs_msg_add_arb_content()
@@ -103,10 +116,10 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
 }
 
 /*
- * sgs_msg_add_compact_id()
+ * sgs_msg_add_id()
  */
-int sgs_msg_add_compact_id(sgs_message *msg, const sgs_compact_id *id) {
-    int result = sgs_compact_id_write(id, msg->buf + msg->size,
+int sgs_msg_add_id(sgs_message *msg, const sgs_id *id) {
+    int result = sgs_id_write(id, msg->buf + msg->size,
         msg->buflen - msg->size);
     
     if (result == -1) return -1;
