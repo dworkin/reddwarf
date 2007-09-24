@@ -19,6 +19,7 @@
  */
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 
 /*
@@ -107,7 +108,7 @@ int sgs_buffer_read(sgs_buffer *buffer, uint8_t *data, size_t len);
  * indicating that end-of-file was read.  The method sgs_buffer_eof() can be
  * used to disambiguate these two cases.
  */
-int sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd);
+ssize_t sgs_buffer_read_from_fd(sgs_buffer *buffer, int fd);
 
 /*
  * function: sgs_buffer_remaining_capacity()
@@ -144,6 +145,6 @@ int sgs_buffer_write(sgs_buffer *buffer, const uint8_t *data, size_t len);
  * requested length.  Returns -1 if an error occurs; otherwise returns the total
  * number of bytes written to the file descriptor.
  */
-int sgs_buffer_write_to_fd(sgs_buffer *buffer, int fd);
+ssize_t sgs_buffer_write_to_fd(sgs_buffer *buffer, int fd);
 
 #endif  /** #ifndef SGS_BUFFER_H */

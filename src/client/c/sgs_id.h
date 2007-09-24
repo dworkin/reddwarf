@@ -24,7 +24,7 @@
  * instances of sgs_id - otherwise compiler gives:
  *    error: storage size of 'foo' isn't known
  */
-#include "impl/sgs_compact_id.h"
+#include "sgs_compact_id.h"
 
 /*
  * sgs_compact_id provides the implementation for the sgs_id interface

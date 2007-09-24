@@ -56,4 +56,4 @@ size_t sgs_compact_id_init(sgs_compact_id *id, const uint8_t *data, size_t len);
  */
 size_t sgs_compact_id_write(const sgs_compact_id *id, uint8_t *buf, size_t len);
 
-#endif  /** #ifndef SGS_COMPACT_ID_H */
+#endif /* SGS_COMPACT_ID_H */

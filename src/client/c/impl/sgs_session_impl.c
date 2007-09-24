@@ -21,12 +21,12 @@
 #include <poll.h>
 #include <string.h>
 #include "sgs_channel.h"
-#include "sgs_channel_impl.h"
+#include "impl/sgs_channel_impl.h"
 #include "sgs_error_codes.h"
 #include "sgs_id.h"
-#include "sgs_map.h"
+#include "impl/sgs_map.h"
 #include "sgs_message.h"
-#include "sgs_session_impl.h"
+#include "impl/sgs_session_impl.h"
 
 /*
  * STATIC FUNCTION DECLARATIONS

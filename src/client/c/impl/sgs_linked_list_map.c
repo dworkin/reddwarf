@@ -13,8 +13,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "sgs_map.h"
-#include "sgs_linked_list_map.h"
+#include "impl/sgs_map.h"
+#include "impl/sgs_linked_list_map.h"
 
 /*
  * FUNCTION IMPLEMENTATIONS

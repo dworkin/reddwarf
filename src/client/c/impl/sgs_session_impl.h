@@ -21,7 +21,7 @@
  */
 #include <stdint.h>
 #include "sgs_id.h"
-#include "sgs_map.h"
+#include "impl/sgs_map.h"
 #include "sgs_message.h"
 #include "sgs_id.h"
 

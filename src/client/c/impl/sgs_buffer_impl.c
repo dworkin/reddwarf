@@ -116,8 +116,9 @@ int sgs_buffer_read(sgs_buffer_impl *buffer, uint8_t *data, size_t len) {
 /*
  * sgs_buffer_read_from_fd()
  */
-int sgs_buffer_read_from_fd(sgs_buffer_impl *buffer, int fd) {
-    size_t result, total = 0, writable = writable_len(buffer);
+ssize_t sgs_buffer_read_from_fd(sgs_buffer_impl *buffer, int fd) {
+    ssize_t result, total = 0;
+    size_t writable = writable_len(buffer);
     
     buffer->eof = 0;  /* Reset flag before any calls to read() */
     
@@ -178,8 +179,9 @@ int sgs_buffer_write(sgs_buffer_impl *buffer, const uint8_t *data, size_t len) {
 /*
  * sgs_buffer_write_to_fd()
  */
-int sgs_buffer_write_to_fd(sgs_buffer_impl *buffer, int fd) {
-    size_t result, total = 0, readable = readable_len(buffer);
+ssize_t sgs_buffer_write_to_fd(sgs_buffer_impl *buffer, int fd) {
+    ssize_t result, total = 0;
+    size_t readable = readable_len(buffer);
   
     while (readable > 0) {
         result = write(fd, buffer->buf + buffer->position, readable);

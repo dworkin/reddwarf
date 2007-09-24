@@ -135,7 +135,7 @@ sgs_channel_impl *sgs_channel_impl_new(sgs_session_impl *session,
 static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen, const sgs_id *recipients[], size_t recipslen)
 {
-    int i;
+    size_t i;
     uint16_t _uint16_tmp;
     sgs_session_impl *session = channel->session;
     sgs_message msg;
