@@ -12,6 +12,7 @@ all: buffertest idtest maptest messagetest
 
 include $(TOPDIR)/etc/mk/sgs.mk
 
+DBG += -g
 INCS += -I$(TOPDIR)/src/client/c
 LDFLAGS += -L$(TOPDIR)/src/client/c
 LIBS += -lsgsclient
