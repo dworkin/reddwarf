@@ -25,11 +25,11 @@
 #include <sys/select.h>
 /** included for optarg (declared in unistd.h on some, but not all systems) */
 #include <getopt.h>
-#include "sgs_connection.h"
-#include "sgs_context.h"
-#include "sgs_hex_utils.h"
-#include "sgs_map.h"
-#include "sgs_session.h"
+#include "sgs/connection.h"
+#include "sgs/context.h"
+#include "sgs/session.h"
+#include "sgs/hex_utils.h"
+#include "sgs/private/map.h"
 
 /** Timeout value for calls to select(), in milliseconds */
 #define SELECT_TIMEOUT  200
@@ -43,8 +43,8 @@
 
 #ifndef FD_COPY
 #define FD_COPY fd_copy
-static int FD_COPY(fd_set* from, fd_set* to) {
-    return memcpy(from, to, sizeof(fd_set));
+static fd_set* FD_COPY(fd_set* from, fd_set* to) {
+    return (fd_set*) memcpy(from, to, sizeof(fd_set));
 }
 #endif /* FD_COPY */
 
@@ -100,7 +100,8 @@ int main(int argc, char *argv[]) {
     int inbuf_alive = 0;
     int do_cmd_prompts = 1;
     char *token;
-    int c, i, len, result, token_len, work;
+    int c, i, result, token_len, work;
+    size_t len;
     char *hostname = DEFAULT_HOST;
     int port = DEFAULT_PORT;
     fd_set readset, writeset, exceptset;
@@ -159,12 +160,13 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
      * keys or values since we are not allocating these (just copying pointers
      * passed by callback functions).
      */
-    g_channel_map = sgs_map_new((int (*)(const void*,const void*))strcmp, NULL,
-        NULL);
+    g_channel_map = sgs_map_create((int (*)(const void*,const void*))strcmp,
+        NULL, NULL);
     
     /** Create sgs_context object and register event callbacks. */
-    g_context = sgs_ctx_new(hostname, port, register_fd_cb, unregister_fd_cb);
-    if (g_context == NULL) { perror("Error in sgs_ctx_new()"); bye(-1); }
+    g_context = sgs_ctx_create(hostname, port,
+        register_fd_cb, unregister_fd_cb);
+    if (g_context == NULL) { perror("Error in sgs_ctx_create()"); bye(-1); }
     
     sgs_ctx_set_channel_joined_cb(g_context, channel_joined_cb);
     sgs_ctx_set_channel_left_cb(g_context, channel_left_cb);
@@ -176,8 +178,8 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
     sgs_ctx_set_recv_msg_cb(g_context, recv_msg_cb);
     
     /** Create sgs_connection object. */
-    g_conn = sgs_connection_new(g_context);
-    if (g_conn == NULL) { perror("Error in sgs_connection_new()"); bye(-1); }
+    g_conn = sgs_connection_create(g_context);
+    if (g_conn == NULL) { perror("Error in sgs_connection_create()"); bye(-1); }
     
     if (do_cmd_prompts) {
         printf("Command: ");
@@ -196,7 +198,7 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
              * wait for more input).  So we need a special check for this case.
              */
             token = strtok(inbuf, "\n");
-            
+
             if (token == NULL || strlen(token) == len) {
                 inbuf_alive = 0;
             } else {
@@ -287,13 +289,13 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
  * channel_joined_cb()
  */
 static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel) {
-    const char *name = sgs_channel_get_name(channel);
-    int result = sgs_map_put(g_channel_map, (char*)name, channel);
-    printf(" - Callback -   Joined channel: %s\n", name);
+    const wchar_t *name = sgs_channel_name(channel);
+    int result = sgs_map_put(g_channel_map, (wchar_t *)name, channel);
+    printf(" - Callback -   Joined channel: %ls\n", name);
     
     if (result == 0) {
-        printf("Warning: client thought it was already a member of channel %s\
-...\n", name);
+        printf("Warning: client thought it was already a member of channel"
+            " %ls\n", name);
     } else if (result == -1) {
         perror("Error in sgs_map_put()");
     }
@@ -303,13 +305,13 @@ static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel) {
  * channel_left_cb()
  */
 static void channel_left_cb(sgs_connection *conn, sgs_channel *channel) {
-    const char *name = sgs_channel_get_name(channel);
+    const wchar_t *name = sgs_channel_name(channel);
     int result = sgs_map_remove(g_channel_map, name);
-    printf(" - Callback -   Left channel: %s\n", name);
+    printf(" - Callback -   Left channel: %ls\n", name);
     
     if (result == -1) {
-        printf("Warning: client did not think it was a member of channel %s\
-...\n", name);
+        printf("Warning: client did not think it was a member of channel"
+            "%ls\n", name);
     }
 }
 
@@ -320,7 +322,7 @@ static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
     const sgs_id *sender_id, const uint8_t *msg, size_t msglen)
 {
     char msgstr[msglen + 1];
-    const char *channel_name = sgs_channel_get_name(channel);
+    const wchar_t *channel_name = sgs_channel_name(channel);
     char *sender_desc;
     
     memcpy(msgstr, msg, msglen);
@@ -341,7 +343,7 @@ static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
             sender_desc);
     }
     
-    printf(" - Callback -   Received message on channel %s from %s: %s\n",
+    printf(" - Callback -   Received message on channel %ls from %s: %s\n",
         channel_name, sender_desc, msgstr);
     
     if (sender_id != NULL) free(sender_desc);
@@ -468,9 +470,9 @@ static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
  */
 static void bye(int exitval) {
     /* cleanup: */
-    if (g_context != NULL) sgs_ctx_free(g_context);
-    if (g_conn != NULL) sgs_connection_free(g_conn);
-    if (g_channel_map != NULL) sgs_map_free(g_channel_map);
+    sgs_map_destroy(g_channel_map);
+    sgs_connection_destroy(g_conn);
+    sgs_ctx_destroy(g_context);
     
     exit(exitval);
 }
@@ -507,11 +509,11 @@ static void process_user_cmd(char *cmd) {
     char strbuf[1024];
     uint8_t bytebuf[1024];
     int result;
-    sgs_id recipient;
+    sgs_id* recipient;
     sgs_channel *channel;
     
     token = strtok(cmd, " ");
-    
+
     if (token == NULL) {
         /** nothing entered? */
     }
@@ -623,7 +625,8 @@ normally necessary)\n");
             return;
         }
         
-        if (sgs_id_init(&recipient, bytebuf, strlen(token)/2) == -1) {
+        recipient = sgs_id_create(bytebuf, strlen(token)/2);
+        if (recipient == NULL) {
             printf("Error: invalid recipient ID (%s).\n", token);
             return;
         }
@@ -641,7 +644,7 @@ normally necessary)\n");
         }
         
         if (sgs_channel_send_one(channel, (uint8_t*)strbuf, strlen(strbuf),
-                &recipient) == -1) {
+                recipient) == -1) {
             perror("Error in sgs_session_channel_send()");
             return;
         }

@@ -2,21 +2,24 @@
 
 TOPDIR=../..
 
-SRCS = sgs_chat_client.c
+SRCS = chat_client.c
 
-all: chatclient
+EXE = chat_client
+
+all: $(EXE)
 
 include $(TOPDIR)/etc/mk/sgs.mk
 
+#DBG += -g
 INCS += -I$(TOPDIR)/src/client/c
 LDFLAGS += -L$(TOPDIR)/src/client/c
 LIBS += -lsgsclient
 
-chatclient: $(OBJS)
+$(EXE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) $(LDLIBS)
 
 clean: clean.default
 
 realclean: realclean.default
-	@/bin/rm -f chatclient
+	/bin/rm -f $(EXE)
 

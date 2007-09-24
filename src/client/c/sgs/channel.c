@@ -25,9 +25,9 @@ static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen, const sgs_id *recipients[], size_t recipslen);
 
 /*
- * sgs_channel_get_name()
+ * sgs_channel_name()
  */
-const wchar_t* sgs_channel_get_name(const sgs_channel_impl *channel) {
+const wchar_t* sgs_channel_name(const sgs_channel_impl *channel) {
     return channel->name;
 }
 

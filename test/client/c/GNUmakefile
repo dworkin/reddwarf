@@ -14,7 +14,7 @@ all: $(EXES)
 
 include $(TOPDIR)/etc/mk/sgs.mk
 
-DBG += -g
+#DBG += -g
 INCS += -I$(TOPDIR)/src/client/c
 LDFLAGS += -L$(TOPDIR)/src/client/c
 LIBS += -lsgsclient

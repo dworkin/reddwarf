@@ -202,6 +202,13 @@ static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     ssize_t byte_count;
     size_t size, first, datalen;
     uint8_t first_byte;
+
+    if (src == NULL) {
+        if (srclen == 0)
+            return 0;
+        else
+            return -1;
+    }
     
     byte_count = get_byte_count(src[0]);
     if (byte_count < 0) return -1;  /* bad byte value */
