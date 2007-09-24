@@ -1,24 +1,28 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides an implementation of a linked-list-based map data
  * structure.  Implements functions declared in sgs_map.h.
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include "impl/sgs_map.h"
-#include "impl/sgs_linked_list_map.h"
+#include "sgs/config.h"
+#include "sgs/private/map.h"
 
-/*
- * FUNCTION IMPLEMENTATIONS
- */
+/* have to do some magic here to declare a self-referential struct */
+typedef struct sgs_linked_list_map_elt sgs_linked_list_map_elt;
+
+struct sgs_linked_list_map_elt {
+    void *key;
+    void *value;
+    sgs_linked_list_map_elt *next;
+};
+
+struct sgs_linked_list_map {
+    int (*compare_keys)(const void*, const void*);
+    void (*free_map_key)(void*);
+    void (*free_map_value)(void*);
+    sgs_linked_list_map_elt *head;
+};
+
+typedef struct sgs_linked_list_map sgs_linked_list_map;
 
 /*
  * sgs_map_contains()
@@ -38,19 +42,19 @@ int sgs_map_contains(const sgs_linked_list_map *map, const void *key) {
 }
 
 /*
- * sgs_map_empty()
+ * sgs_map_clear()
  */
-void sgs_map_empty(sgs_linked_list_map *map) {
+void sgs_map_clear(sgs_linked_list_map *map) {
     while (map->head != NULL) {
         sgs_map_remove(map, map->head->key);
     }
 }
 
 /*
- * sgs_map_free()
+ * sgs_map_destroy()
  */
-void sgs_map_free(sgs_linked_list_map *map) {
-    sgs_map_empty(map);
+void sgs_map_destroy(sgs_linked_list_map *map) {
+    sgs_map_clear(map);
     free(map);
 }
 
@@ -72,9 +76,9 @@ void *sgs_map_get(const sgs_linked_list_map *map, const void *key) {
 }
 
 /*
- * sgs_map_new()
+ * sgs_map_create()
  */
-sgs_linked_list_map *sgs_map_new(int (*comparator)(const void*, const void*),
+sgs_linked_list_map *sgs_map_create(int (*comparator)(const void*, const void*),
     void (*free_map_key)(void*), void (*free_map_value)(void*))
 {
     sgs_linked_list_map *this_map;

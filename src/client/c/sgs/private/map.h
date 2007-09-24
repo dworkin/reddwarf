@@ -1,28 +1,13 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides declarations for map data structures.
  */
 
 #ifndef SGS_MAP_H
-#define SGS_MAP_H  1
+#define SGS_MAP_H 1
 
+#include "sgs/config.h"
 
-/*
- * sgs_linked_list_map provides the implementation for the sgs_map interface
- */
 typedef struct sgs_linked_list_map sgs_map;
-
-
-/*
- * FUNCTION DECLARATIONS
- */
 
 /*
  * function: sgs_map_contains()
@@ -30,21 +15,21 @@ typedef struct sgs_linked_list_map sgs_map;
  * Returns 1 if an element exists in the map associated with the specified key,
  * or 0 if not.
  */
-int sgs_map_contains(const sgs_map *map, const void *key);
+int sgs_map_contains(const sgs_map* map, const void* key);
 
 /*
- * function: sgs_map_empty()
+ * function: sgs_map_clear()
  *
  * Removes all elements from the map.
  */
-void sgs_map_empty(sgs_map *map);
+void sgs_map_clear(sgs_map* map);
 
 /*
- * function: sgs_map_free()
+ * function: sgs_map_destroy()
  *
  * Safely deallocates a map (and any contents).
  */
-void sgs_map_free(sgs_map *map);
+void sgs_map_destroy(sgs_map* map);
 
 /*
  * function: sgs_map_get()
@@ -56,17 +41,17 @@ void sgs_map_free(sgs_map *map);
  * present in the map or not; sgs_map_contains() can be used to disambiguate
  * these two cases.
  */
-void *sgs_map_get(const sgs_map *map, const void *key);
+void* sgs_map_get(const sgs_map* map, const void* key);
 
 /*
- * function: sgs_map_new()
+ * function: sgs_map_create()
  *
  * Allocates and initializes a map.  The comparator argument is a pointer to a
  * function that can be used to compare two keys.  The function must return 0 if
  * the two keys are equal and any non-zero value if the keys are not equal.
  * NULL is returned if allocation fails.
  */
-sgs_map *sgs_map_new(int (*comparator)(const void*, const void*),
+sgs_map* sgs_map_create(int (*comparator)(const void*, const void*),
     void (*free_map_key)(void*), void (*free_map_value)(void*));
 
 /*
@@ -82,7 +67,7 @@ sgs_map *sgs_map_new(int (*comparator)(const void*, const void*),
  *    0: success (element was inserted into the list; replaced existing element)
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_map_put(sgs_map *map, void *key, void *value);
+int sgs_map_put(sgs_map* map, void* key, void* value);
 
 /*
  * function: sgs_map_remove()
@@ -91,6 +76,6 @@ int sgs_map_put(sgs_map *map, void *key, void *value);
  * element is removed and 0 is returned.  If no such element exists, the map is
  * not altered and -1 is returned.
  */
-int sgs_map_remove(sgs_map *map, const void *key);
+int sgs_map_remove(sgs_map* map, const void* key);
 
-#endif  /** #ifndef SGS_MAP_H */
+#endif /* !SGS_MAP_H */

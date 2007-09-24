@@ -7,7 +7,7 @@
 
 #include "sgs/config.h"
 
-typedef sgs_message sgs_message_impl;
+typedef struct sgs_message_impl sgs_message;
 
 #include "sgs/id.h"
 #include "sgs/protocol.h"
@@ -83,12 +83,8 @@ int sgs_msg_add_uint32(sgs_message* pmsg, uint32_t val);
  * function: sgs_msg_deserialize()
  *
  * Initializes a message from a byte-array.
- *
- * returns:
- *   >0: success (return value is the number of bytes of buffer that were read)
- *   -1: failure (errno is set to specific error code)
  */
-int sgs_msg_deserialize(sgs_message* pmsg, uint8_t* buffer, size_t buflen);
+sgs_message* sgs_msg_deserialize(uint8_t* buffer, size_t buflen);
 
 /*
  * function: sgs_msg_get_bytes()
@@ -140,7 +136,7 @@ size_t sgs_msg_get_size(sgs_message* pmsg);
 uint8_t sgs_msg_get_version(sgs_message* pmsg);
 
 /*
- * function: sgs_msg_init()
+ * function: sgs_msg_create()
  *
  * Initializes the fields of a message without any optional content.
  *
@@ -152,10 +148,11 @@ uint8_t sgs_msg_get_version(sgs_message* pmsg);
  *  service_id: service id for this message
  *
  * returns:
- *   0: success
- *  -1: failure (errno is set to specific error code)
+ *  NULL: failure (errno is set to specific error code)
  */
-int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
+sgs_message* sgs_msg_create(uint8_t* buffer, size_t buflen,
     sgs_opcode opcode, sgs_service_id service_id);
+
+void sgs_msg_destroy(sgs_message* msg);
 
 #endif /* !SGS_MESSAGE_H */

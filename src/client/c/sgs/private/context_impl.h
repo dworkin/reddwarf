@@ -1,37 +1,15 @@
-/*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
- * This file provides declarations for an implementation of session contexts.
- */
-
 #ifndef SGS_CONTEXT_IMPL_H
 #define SGS_CONTEXT_IMPL_H 1
 
+#include "sgs/config.h"
+#include "sgs/context.h"
+#include "sgs/connection.h"
+#include "sgs/id.h"
+#include "sgs/session.h"
+#include "sgs/channel.h"
 
-/*
- * INCLUDES
- */
-#include "sgs_channel.h"
-#include "sgs_connection.h"
-#include "sgs_id.h"
-#include "sgs_session.h"
-
-
-/*
- * sgs_context_impl typedef
- */
 typedef struct sgs_context_impl sgs_context_impl;
 
-
-/*
- * STRUCTS
- */
 struct sgs_context_impl {
     /** Hostname and port number (of server) to connect to: */
     char hostname[100];
@@ -52,4 +30,4 @@ struct sgs_context_impl {
     void (*recv_message_cb)(sgs_connection*, const uint8_t*, size_t);
 };
 
-#endif  /** #ifndef SGS_CONTEXT_IMPL_H */
+#endif /* !SGS_CONTEXT_IMPL_H */

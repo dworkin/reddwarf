@@ -2,33 +2,10 @@
  * This file provides an implementation of a circular byte-buffer.
  */
 
+#include "sgs/config.h"
 #include "sgs/buffer.h"
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 
-typedef struct sgs_buffer_impl sgs_buffer_impl;
-
-struct sgs_buffer_impl {
-    /* Total amount of memory allocated to the "buf" pointer. */
-    size_t capacity;
-  
-    /* Current position of the start of the data in the buffer. */
-    size_t position;
-  
-    /* Number of bytes currently stored in the buffer. */
-    size_t size;
-  
-    /* Array of the actual data. */
-    uint8_t* buf;
-    
-    /* Flag used to indicate if a call to read() reached end-of-file */
-    int eof;
-};
-
-static size_t readable_len(const sgs_buffer_impl* buffer);
-static size_t tailpos (const sgs_buffer_impl* buffer);
-static size_t writable_len(const sgs_buffer_impl* buffer);
+#include "sgs/private/buffer_impl.h"
 
 /*
  * sgs_buffer_capacity()
@@ -86,7 +63,6 @@ sgs_buffer_impl* sgs_buffer_create(size_t capacity) {
     buffer->capacity = capacity;
     buffer->position = 0;
     buffer->size = 0;
-    buffer->eof = 0;
   
     return buffer;
 }
@@ -157,13 +133,13 @@ int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
 }
 
 /*
- * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
+ * PRIVATE FUNCTION IMPLEMENTATIONS
  */
 
 /*
  * readable_len()
  */
-static size_t readable_len(const sgs_buffer_impl* buffer) {
+size_t readable_len(const sgs_buffer_impl* buffer) {
     if (buffer->size == 0) return 0;
   
     if (tailpos(buffer) > buffer->position) {
@@ -184,14 +160,14 @@ static size_t readable_len(const sgs_buffer_impl* buffer) {
 /*
  * tailpos()
  */
-static size_t tailpos(const sgs_buffer_impl* buffer) {
+size_t tailpos(const sgs_buffer_impl* buffer) {
     return (buffer->position + buffer->size) % buffer->capacity;
 }
 
 /*
  * writable_len()
  */
-static size_t writable_len(const sgs_buffer_impl* buffer) {
+size_t writable_len(const sgs_buffer_impl* buffer) {
     size_t mytailpos = tailpos(buffer);
   
     if (mytailpos >= buffer->position) {

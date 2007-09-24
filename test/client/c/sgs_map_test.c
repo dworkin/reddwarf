@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include "sgs_map.h"
+#include "sgs/private/map.h"
 
 static int compare_ints(const void* a, const void* b);
 
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     int result;
     sgs_map *map;
     
-    map = sgs_map_new(compare_ints, free, NULL);
+    map = sgs_map_create(compare_ints, free, NULL);
     
     if (map == NULL) {
         fprintf(stderr, "Could not create sgs_map.\n");
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     pbuf = sgs_map_get(map, &lookup_key);
     printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
   
-    sgs_map_empty(map);
+    sgs_map_clear(map);
     printf("EMPTY()\n");
   
     lookup_key = 100;
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     pbuf = sgs_map_get(map, &lookup_key);
     printf("GET(%d) == %d.  value=%s\n", lookup_key, (pbuf != NULL), (char*)pbuf);
   
-    sgs_map_free(map);
+    sgs_map_destroy(map);
   
     printf("Goodbye!\n");
   

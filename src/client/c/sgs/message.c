@@ -15,6 +15,9 @@
 #include "sgs/message.h"
 #include "sgs/protocol.h"
 
+/* for sgs_id_impl_write() */
+#include "sgs/private/id_impl.h"
+
 typedef struct sgs_message_impl {
     /** Pointer to the start of the memory reserved for this message. */
     uint8_t* buf;
@@ -36,14 +39,7 @@ typedef struct sgs_message_impl {
     size_t size;
 } sgs_message_impl;
 
-/*
- * STATIC FUNCTION DECLARATIONS
- * (can only be called by functions in this file)
- */
 static void update_msg_len(sgs_message *pmsg);
-
-/* Import the sgs_id_write function for private use. */
-extern size_t sgs_id_write(const sgs_id* id, uint8_t* buf, size_t len);
 
 /*
  * sgs_msg_add_arb_content()
@@ -119,7 +115,7 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
  * sgs_msg_add_id()
  */
 int sgs_msg_add_id(sgs_message *msg, const sgs_id *id) {
-    int result = sgs_id_write(id, msg->buf + msg->size,
+    int result = sgs_id_impl_write(id, msg->buf + msg->size,
         msg->buflen - msg->size);
     
     if (result == -1) return -1;
@@ -139,32 +135,38 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
 /*
  * sgs_msg_deserialize()
  */
-int sgs_msg_deserialize(sgs_message *pmsg, uint8_t *buffer, size_t buflen) {
+sgs_message* sgs_msg_deserialize(uint8_t *buffer, size_t buflen) {
+    sgs_message* result = malloc(sizeof(sgs_message));
+    if (result == NULL)
+        return NULL;
+
     uint32_t *ptr;
   
     /** read message-length-field (first 4 bytes) */
     ptr = (uint32_t*)buffer;
-    pmsg->size = ntohl(*ptr);
+    result->size = ntohl(*ptr);
   
     /** account for the 4-bytes holding the length itself */
-    pmsg->size += 4;
+    result->size += 4;
   
     /** check if buffer is long enough to contain this whole message. */
-    if (buflen < pmsg->size) {
+    if (buflen < result->size) {
+        free(result);
         errno = EINVAL;
-        return -1;
+        return NULL;
     }
   
-    pmsg->buf = buffer;
-    pmsg->buflen = buflen;
+    result->buf = buffer;
+    result->buflen = buflen;
   
     /** invalid message: too big */
-    if (pmsg->size > SGS_MSG_MAX_LENGTH) {
+    if (result->size > SGS_MSG_MAX_LENGTH) {
         errno = EMSGSIZE;
-        return -1;
+        free(result);
+        return NULL;
     }
   
-    return pmsg->size;
+    return result;
 }
 
 /*
@@ -217,29 +219,38 @@ uint8_t sgs_msg_get_version(sgs_message *pmsg) {
 }
 
 /*
- * sgs_msg_init()
+ * sgs_msg_create()
  */
-int sgs_msg_init(sgs_message *pmsg, uint8_t *buffer, size_t buflen,
+sgs_message* sgs_msg_create(uint8_t *buffer, size_t buflen,
     sgs_opcode opcode, sgs_service_id service_id)
 {
+    sgs_message* result;
+
     /** Buffer is too small to hold any messages (even w/o any payload). */
     if (buflen < 7) {
         errno = ENOBUFS;
-        return -1;
+        return NULL;
     }
+
+    result = malloc(sizeof(sgs_message));
+    if (result == NULL)
+        return NULL;
   
-    pmsg->buf = buffer;
-    pmsg->buflen = buflen;
-    pmsg->size = 7;
+    result->buf = buffer;
+    result->buflen = buflen;
+    result->size = 7;
   
-    pmsg->buf[4] = SGS_MSG_VERSION;
-    pmsg->buf[5] = service_id;
-    pmsg->buf[6] = opcode;
-    update_msg_len(pmsg);
+    result->buf[4] = SGS_MSG_VERSION;
+    result->buf[5] = service_id;
+    result->buf[6] = opcode;
+    update_msg_len(result);
   
-    return 0;
+    return result;
 }
 
+void sgs_msg_destroy(sgs_message* msg) {
+    free(msg);
+}
 
 /*
  * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS

@@ -17,6 +17,13 @@ typedef struct sgs_compact_id sgs_id;
 sgs_id* sgs_id_create(const uint8_t* data, size_t len);
 
 /*
+ * function: sgs_id_duplicate()
+ *
+ * Creates an sgs_id from the specified sgs_id.
+ */
+sgs_id* sgs_id_duplicate(const sgs_id* id);
+
+/*
  * function: sgs_id_destroy()
  *
  * Destroys an sgs_id, freeing any resources it was holding.

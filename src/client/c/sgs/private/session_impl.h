@@ -1,13 +1,13 @@
-#ifndef SGS_PRIVATE_H
-#define SGS_PRIVATE_H 1
+#ifndef SGS_SESSION_IMPL_H
+#define SGS_SESSION_IMPL_H 1
 
 #include "sgs/config.h"
 
-typedef struct sgs_connection_impl sgs_connection_impl;
-
-// SESSION_IMPL
-
 typedef struct sgs_session_impl sgs_session_impl;
+
+#include "sgs/private/connection_impl.h"
+#include "sgs/private/map.h"
+#include "sgs/protocol.h"
 
 struct sgs_session_impl {
     /** The underlying network connection. */
@@ -23,9 +23,10 @@ struct sgs_session_impl {
     sgs_map* channels;
     
     /**
-     * Sequence number used in some messages (increment after each use).  We have
-     * to store this as two 32-bit ints instead of just a single 64-bit int so
-     * that we can use htonl() and ntohl() of which there are no 64-bit versions.
+     * Sequence number used in some messages (increment after each use).  We
+     * have to store this as two 32-bit ints instead of just a single 64-bit
+     * int so that we can use htonl() and ntohl() of which there are no 64-bit
+     * versions.
      */
     uint32_t seqnum_hi;
     uint32_t seqnum_lo;
@@ -82,34 +83,11 @@ int sgs_session_impl_recv_msg(sgs_session_impl* session);
 /*
  * function: sgs_session_impl_send_msg()
  *
- * Notifies the session that a new sgs_message has been created and written into
- * the session's internal msg_buf field, ready to be sent to the server. Returns
- * 0 on success and -1 on failure, with errno set to the specific error code.
+ * Notifies the session that a new sgs_message has been created and written
+ * into the session's internal msg_buf field, ready to be sent to the server.
+ * Returns 0 on success and -1 on failure, with errno set to the specific error
+ * code.
  */
 int sgs_session_impl_send_msg(sgs_session_impl* session);
 
-// CONTEXT_IMPL
-
-typedef struct sgs_context_impl sgs_context_impl;
-
-struct sgs_context_impl {
-    /** Hostname and port number (of server) to connect to: */
-    char hostname[100];
-    int port;
-  
-    /** function pointers to callbacks: */
-    void (*reg_fd_cb)(sgs_connection*, int, short);
-    void (*unreg_fd_cb)(sgs_connection*, int, short);
-  
-    void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
-    void (*channel_left_cb)(sgs_connection*, sgs_channel*);
-    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const sgs_id*,
-        const uint8_t*, size_t);
-    void (*disconnected_cb)(sgs_connection*);
-    void (*logged_in_cb)(sgs_connection*, sgs_session*);
-    void (*login_failed_cb)(sgs_connection*, const uint8_t*, size_t);
-    void (*reconnected_cb)(sgs_connection*);
-    void (*recv_message_cb)(sgs_connection*, const uint8_t*, size_t);
-};
-
-#endif /* !SGS_PRIVATE_H */
+#endif /* !SGS_SESSION_IMPL_H */

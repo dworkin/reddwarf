@@ -8,11 +8,9 @@
  *  specific error code.
  */
 
+#include "sgs/config.h"
 #include "sgs/id.h"
-
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
+#include "sgs/private/id_impl.h"
 
 /* The maximum length of an sgs_compact_id, in bytes. */
 #define SGS_COMPACT_ID_MAX_SIZE (8 + 0x0F)
@@ -35,7 +33,7 @@ static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
 /*
  * sgs_id_compare()
  */
-int sgs_id_compare(const sgs_id* a, const sgs_id* b) {
+int sgs_id_compare(const sgs_compact_id* a, const sgs_compact_id* b) {
     if (a->uncompressed_len < b->uncompressed_len)
         return -1;
   
@@ -49,22 +47,8 @@ int sgs_id_compare(const sgs_id* a, const sgs_id* b) {
 /*
  * sgs_id_equals_server()
  */
-int sgs_id_is_server(sgs_id* id) {
+int sgs_id_is_server(sgs_compact_id* id) {
     return ((id->uncompressed_len == 1) && (id->uncompressed[0] == 0));
-}
-
-/*
- * sgs_id_init()
- */
-int sgs_id_init(sgs_compact_id *id, const uint8_t *data, size_t len) {
-    if (len > sizeof(id->uncompressed)) {
-        errno = EINVAL;
-        return -1;
-    }
-    
-    memcpy(id->uncompressed, data, len);
-    id->uncompressed_len = len;
-    return 0;
 }
 
 /*
@@ -83,9 +67,9 @@ size_t sgs_id_get_byte_len(const sgs_compact_id *id) {
 
 
 /*
- * sgs_compact_id_create()
+ * sgs_id_create()
  */
-sgs_id* sgs_id_create(const uint8_t *data, size_t len) {
+sgs_compact_id* sgs_id_create(const uint8_t *data, size_t len) {
     sgs_compact_id* id = malloc(sizeof(sgs_compact_id));
 
     if (id == NULL) return NULL;
@@ -102,16 +86,22 @@ sgs_id* sgs_id_create(const uint8_t *data, size_t len) {
     return id;
 }
 
-void sgs_id_destroy(sgs_id* id) {
-    free(id);
+sgs_compact_id* sgs_id_duplicate(const sgs_compact_id* id) {
+    return id;
+}
+
+void sgs_id_destroy(sgs_compact_id* id) {
+    // no-op
 }
 
 /*
- * sgs_id_write()
- * 
- * Used by message.c
+ * PRIVATE IMPL FUNCTIONS
  */
-size_t sgs_id_write(const sgs_id* id, uint8_t* buf, size_t len) {
+
+/*
+ * sgs_id_impl_write()
+ */
+size_t sgs_id_impl_write(const sgs_compact_id* id, uint8_t* buf, size_t len) {
     return pack(buf, len, id->uncompressed, id->uncompressed_len);
 }
 

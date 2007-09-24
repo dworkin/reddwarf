@@ -8,7 +8,7 @@
 #include "sgs/channel.h"
 #include "sgs/connection.h"
 #include "sgs/id.h"
-#include "sgs/private.h"
+#include "sgs/private/context_impl.h"
 #include "sgs/session.h"
 
 /*
@@ -27,7 +27,7 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
 {
     sgs_context_impl *ctx = NULL;
   
-    ctx = (sgs_context_impl*)malloc(sizeof(struct sgs_context_impl));
+    ctx = malloc(sizeof(struct sgs_context_impl));
     if (ctx == NULL) return NULL;
   
     if (strlen(hostname) + 1 > sizeof(ctx->hostname)) {
@@ -43,7 +43,8 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     ctx->reg_fd_cb = reg_fd;
     ctx->unreg_fd_cb = unreg_fd;
   
-    sgs_ctx_unset_all_cbs(ctx);  /** initialize all callback functions to NULL */
+    /* initialize all callback functions to NULL */
+    sgs_ctx_unset_all_cbs(ctx);
   
     return ctx;
 }
@@ -135,3 +136,4 @@ void sgs_ctx_unset_all_cbs(sgs_context_impl *ctx)
     ctx->reconnected_cb      = NULL;
     ctx->recv_message_cb     = NULL;
 }
+

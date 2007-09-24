@@ -2,23 +2,22 @@
  * This file provides an implementation of a circular byte-buffer.
  */
 
-#include "sgs/io_utils.h"
+#include "sgs/config.h"
+#include "sgs/private/io_utils.h"
+#include "sgs/private/buffer_impl.h"
 
 /*
- * sgs_buffer_read_from_fd()
+ * sgs_impl_read_from_fd()
  */
-ssize_t sgs_buffer_read_from_fd(sgs_buffer_impl *buffer, int fd) {
+ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, int fd) {
     ssize_t result, total = 0;
     size_t writable = writable_len(buffer);
-    
-    buffer->eof = 0;  /* Reset flag before any calls to read() */
     
     while (writable > 0) {
         result = read(fd, buffer->buf + tailpos(buffer), writable);
         if (result == -1) return -1;  /* error */
         
         if (result == 0) {   /* EOF */
-            buffer->eof = 1;
             return total;
         }
         
@@ -32,9 +31,9 @@ ssize_t sgs_buffer_read_from_fd(sgs_buffer_impl *buffer, int fd) {
 }
 
 /*
- * sgs_buffer_write_to_fd()
+ * sgs_impl_write_to_fd()
  */
-ssize_t sgs_buffer_write_to_fd(sgs_buffer_impl *buffer, int fd) {
+ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, int fd) {
     ssize_t result, total = 0;
     size_t readable = readable_len(buffer);
   

@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file provides implementations of functions relating to sgs_channels.
  *
  * Conventions:
@@ -15,14 +7,15 @@
  *  specific error code.
  */
 
+#include "sgs/config.h"
+#include "sgs/error_codes.h"
+#include "sgs/id.h"
+#include "sgs/message.h"
+#include "sgs/private/channel_impl.h"
+#include "sgs/private/session_impl.h"
+
 #include <arpa/inet.h>
-#include <errno.h>
-#include <string.h>
-#include "sgs_channel_impl.h"
-#include "sgs_error_codes.h"
-#include "sgs_compact_id.h"
-#include "sgs_id.h"
-#include "sgs_message.h"
+#include <wchar.h>
 
 /*
  * STATIC FUNCTION DECLARATIONS
@@ -31,15 +24,10 @@
 static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen, const sgs_id *recipients[], size_t recipslen);
 
-
-/*
- * FUNCTION IMPLEMENTATIONS FOR SGS_CHANNEL.H
- */
-
 /*
  * sgs_channel_get_name()
  */
-const char *sgs_channel_get_name(const sgs_channel_impl *channel) {
+const wchar_t* sgs_channel_get_name(const sgs_channel_impl *channel) {
     return channel->name;
 }
 
@@ -75,14 +63,15 @@ int sgs_channel_send_one(sgs_channel_impl *channel, const uint8_t *data,
 
 
 /*
- * FUNCTION IMPLEMENTATIONS FOR SGS_CHANNEL_IMPL.H
+ * PRIVATE IMPL FUNCTIONS
  */
 
 
 /*
- * sgs_channel_impl_free()
+ * sgs_channel_impl_destroy()
  */
-void sgs_channel_impl_free(sgs_channel_impl *channel) {
+void sgs_channel_impl_destroy(sgs_channel_impl *channel) {
+    sgs_id_destroy(channel->id);
     free(channel->name);
     free(channel);
 }
@@ -91,30 +80,32 @@ void sgs_channel_impl_free(sgs_channel_impl *channel) {
  * sgs_channel_impl_get_id()
  */
 sgs_id *sgs_channel_impl_get_id(sgs_channel_impl *channel) {
-    return &channel->id;
+    return channel->id;
 }
 
 /*
- * sgs_channel_impl_new()
+ * sgs_channel_impl_create()
  */
-sgs_channel_impl *sgs_channel_impl_new(sgs_session_impl *session,
-    const sgs_id *id, const char *name, size_t namelen)
+sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
+    const sgs_id* id, const char* namebytes, size_t namelen)
 {
     sgs_channel_impl *channel;
-    channel = (sgs_channel_impl*)malloc(sizeof(struct sgs_channel_impl));
-    if (channel == NULL) return NULL;
-    
+    channel = malloc(sizeof(struct sgs_channel_impl));
+    if (channel == NULL)
+        return NULL;
+
     channel->session = session;
-    channel->id = *id;
-    channel->name = (char*)malloc(namelen + 1);
+    channel->id = sgs_id_duplicate(id);
+    channel->name = malloc(sizeof(wchar_t) * (namelen + 1));
     
-    if (channel->name == NULL) {
-        /** roll back allocation of channel */
-        free(channel);
+    if (channel->id == NULL ||
+        channel->name == NULL)
+    {
+        sgs_channel_impl_destroy(channel);
         return NULL;
     }
     
-    memcpy(channel->name, name, namelen);
+    mbstowcs(channel->name, namebytes, namelen);
     channel->name[namelen] = '\0';
     
     return channel;
@@ -138,35 +129,36 @@ static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     size_t i;
     uint16_t _uint16_tmp;
     sgs_session_impl *session = channel->session;
-    sgs_message msg;
+    sgs_message* msg;
     
     /** Initialize static fields of message. */
-    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
-            SGS_OPCODE_CHANNEL_SEND_REQUEST, SGS_CHANNEL_SERVICE) == -1)
+    msg = sgs_msg_create(session->msg_buf, sizeof(session->msg_buf), 
+            SGS_OPCODE_CHANNEL_SEND_REQUEST, SGS_CHANNEL_SERVICE);
+    if (msg == NULL)
         return -1;
     
     /** Add channel-id data field to message. */
-    if (sgs_msg_add_compact_id(&msg, &channel->id) == -1)
+    if (sgs_msg_add_id(msg, channel->id) == -1)
         return -1;
     
     /** Add sequence number to message. */
-    if (sgs_msg_add_uint32(&msg, session->seqnum_hi) == -1) return -1;
-    if (sgs_msg_add_uint32(&msg, session->seqnum_lo) == -1) return -1;
+    if (sgs_msg_add_uint32(msg, session->seqnum_hi) == -1) return -1;
+    if (sgs_msg_add_uint32(msg, session->seqnum_lo) == -1) return -1;
     
     /** Add recipient-count to message. */
     if (recipslen > UINT16_MAX) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
     _uint16_tmp = htons(recipslen);
-    if (sgs_msg_add_arb_content(&msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
+    if (sgs_msg_add_arb_content(msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
         return -1;
     
     /** Add each recipient-id to message. */
     for (i=0; i < recipslen; i++) {
-        if (sgs_msg_add_compact_id(&msg, recipients[i]) == -1)
+        if (sgs_msg_add_id(msg, recipients[i]) == -1)
             return -1;
     }
     
     /** Add message payload to message. */
-    if (sgs_msg_add_fixed_content(&msg, data, datalen) == -1) return -1;
+    if (sgs_msg_add_fixed_content(msg, data, datalen) == -1) return -1;
     
     /** Done assembling message; tell session to send it. */
     if (sgs_session_impl_send_msg(session) == -1) return -1;

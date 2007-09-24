@@ -10,13 +10,12 @@
 
 #include "sgs/config.h"
 
-typedef struct sgs_connection_impl sgs_connection_impl;
-
 #include "sgs/buffer.h"
 #include "sgs/context.h"
 #include "sgs/error_codes.h"
 #include "sgs/protocol.h"
-#include "sgs/private.h"
+#include "sgs/private/connection_impl.h"
+#include "sgs/private/io_utils.h"
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -24,33 +23,6 @@ typedef struct sgs_connection_impl sgs_connection_impl;
 #include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
 
 #define SGS_CONNECTION_IMPL_IO_BUFSIZE SGS_MSG_MAX_LENGTH
-
-typedef enum {
-    SGS_CONNECTION_IMPL_DISCONNECTED,
-    SGS_CONNECTION_IMPL_CONNECTING,
-    SGS_CONNECTION_IMPL_CONNECTED,
-} sgs_connection_state;
-
-struct sgs_connection_impl {
-    /** File descriptor for the network socket to the server. */
-    int socket_fd;
-  
-    /** Whether we expect the server to close the socket: 1 = yes, 0 = no */
-    char expecting_disconnect;
-  
-    /** The current state of the connection. */
-    sgs_connection_state state;
-  
-    /** The login context (contains all callback functions). */
-    sgs_context *ctx;
-  
-    /** The session with the server (once connected). */
-    sgs_session_impl *session;
-  
-    /** Reusable I/O buffers for reading/writing from/to the network
-     * connection. */
-    sgs_buffer *inbuf, *outbuf;
-};
 
 static void conn_closed(sgs_connection_impl *connection);
 static int consume_data(sgs_connection_impl *connection);
@@ -96,11 +68,11 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     
     if (FD_ISSET(sockfd, &readset)) {
         /** Read stuff off the socket and write it to the in-buffer. */
-        result = sgs_buffer_read_from_fd(connection->inbuf, sockfd);
+        result = sgs_impl_read_from_fd(connection->inbuf, sockfd);
         if (result == -1) return -1;
         
         /* Return value of 0 may or may not mean that EOF was read. */
-        if ((result == 0) && sgs_buffer_eof(connection->inbuf)) {
+        if ((result == 0) && (sgs_buffer_remaining(connection->inbuf) > 0)) {
             conn_closed(connection);   /** The server closed the socket. */
             return 0;
         }
@@ -116,12 +88,12 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         }
         
         /** Read stuff out of the out-buffer and write it to the socket. */
-        result = sgs_buffer_write_to_fd(connection->outbuf, sockfd);
+        result = sgs_impl_write_to_fd(connection->outbuf, sockfd);
         if (result == -1) return -1;
     }
     
     /** If there is room in inbuf, then register interest in socket reads. */
-    if (sgs_buffer_remaining_capacity(connection->inbuf) > 0)
+    if (sgs_buffer_remaining(connection->inbuf) > 0)
         connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
     else
         connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
@@ -136,10 +108,10 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
 }
 
 /*
- * sgs_connection_free()
+ * sgs_connection_destroy()
  */
-void sgs_connection_free(sgs_connection_impl *connection) {
-    sgs_session_destroy(connection->session);
+void sgs_connection_destroy(sgs_connection_impl *connection) {
+    sgs_session_impl_destroy(connection->session);
     sgs_buffer_destroy(connection->inbuf);
     sgs_buffer_destroy(connection->outbuf);
     free(connection);
@@ -245,31 +217,28 @@ int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
 }
 
 /*
- * sgs_connection_new()
+ * sgs_connection_create()
  */
-sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
+sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
     sgs_connection_impl *connection;
     
-    connection = (sgs_connection_impl*)malloc(sizeof(struct sgs_connection_impl));
+    connection = malloc(sizeof(struct sgs_connection_impl));
     if (connection == NULL) return NULL;
 
     connection->expecting_disconnect = 0;
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
     connection->ctx = ctx;
-    connection->session = sgs_session_impl_new(connection);
-    connection->inbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
-    connection->outbuf = sgs_buffer_new(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+    connection->session = sgs_session_impl_create(connection);
+    connection->inbuf = sgs_buffer_create(SGS_CONNECTION_IMPL_IO_BUFSIZE);
+    connection->outbuf = sgs_buffer_create(SGS_CONNECTION_IMPL_IO_BUFSIZE);
     
-    /** Check if any new() calls failed. */
-    if (connection->session == NULL || connection->inbuf == NULL ||
-        connection->outbuf == NULL) {
-    
+    /** Check if any create() calls failed. */
+    if (connection->session == NULL
+        || connection->inbuf == NULL
+        || connection->outbuf == NULL)
+    {
         /** Allocation of at least one object failed. */
-        if (connection->session != NULL)
-            sgs_session_impl_free(connection->session);
-        if (connection->inbuf != NULL) sgs_buffer_free(connection->inbuf);
-        if (connection->outbuf != NULL) sgs_buffer_free(connection->outbuf);
-        free(connection);
+        sgs_connection_destroy(connection);
         return NULL;
     }
   
@@ -278,7 +247,7 @@ sgs_connection_impl *sgs_connection_new(sgs_context *ctx) {
 
 
 /*
- * FUNCTION IMPLEMENTATIONS FOR SGS_CONNECTION_IMPL.H
+ * PRIVATE IMPL FUNCTIONS
  */
 
 /*
