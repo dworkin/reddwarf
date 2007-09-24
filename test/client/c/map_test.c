@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include "sgs/private/map.h"
+#include "sgs/map.h"
 
 static int compare_ints(const void* a, const void* b);
 

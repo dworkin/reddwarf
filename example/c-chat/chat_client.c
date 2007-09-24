@@ -30,7 +30,7 @@
 #include "sgs/context.h"
 #include "sgs/session.h"
 #include "sgs/hex_utils.h"
-#include "sgs/private/map.h"
+#include "sgs/map.h"
 
 /** Timeout value for calls to select(), in milliseconds */
 #define SELECT_TIMEOUT  200

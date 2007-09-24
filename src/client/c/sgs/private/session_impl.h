@@ -10,7 +10,7 @@ extern "C" {
 typedef struct sgs_session_impl sgs_session_impl;
 
 #include "sgs/private/connection_impl.h"
-#include "sgs/private/map.h"
+#include "sgs/map.h"
 #include "sgs/protocol.h"
 
 struct sgs_session_impl {

@@ -4,7 +4,7 @@ TOPDIR=../../..
 
 SRCS = \
 	sgs/hex_utils.c \
-	sgs/private/linked_map.c \
+	sgs/linked_map.c \
 	sgs/buffer.c \
 	sgs/private/io_utils.c \
 	sgs/message.c \

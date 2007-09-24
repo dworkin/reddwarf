@@ -4,7 +4,7 @@
  */
 
 #include "sgs/config.h"
-#include "sgs/private/map.h"
+#include "sgs/map.h"
 
 /* have to do some magic here to declare a self-referential struct */
 typedef struct sgs_linked_list_map_elt sgs_linked_list_map_elt;

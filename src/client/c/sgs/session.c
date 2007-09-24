@@ -15,7 +15,7 @@
 #include "sgs/private/channel_impl.h"
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
-#include "sgs/private/map.h"
+#include "sgs/map.h"
 #include "sgs/message.h"
 #include "sgs/private/session_impl.h"
 

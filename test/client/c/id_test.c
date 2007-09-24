@@ -20,7 +20,7 @@ void test1() {
     uint8_t bytes[] = { 1, 2, 3 };
     sgs_id* id;
     
-    id = sgs_id_create(bytes, sizeof(bytes));
+    id = sgs_id_create(bytes, sizeof(bytes), NULL);
     if (id == NULL) {
         sgs_id_destroy(id);
         perror("init()");
@@ -48,7 +48,7 @@ void test2() {
     
     printf("hextobytes() returned %d\n", result);
     
-    if ((id = sgs_id_create(bytebuf, strlen(hex)/2)) == NULL) {
+    if ((id = sgs_id_create(bytebuf, strlen(hex)/2, NULL)) == NULL) {
         printf("Error: invalid ID string (%s).\n", hex);
         return;
     }
