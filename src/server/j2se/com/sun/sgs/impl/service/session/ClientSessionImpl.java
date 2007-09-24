@@ -70,6 +70,9 @@ public class ClientSessionImpl
     /** The session ID. */
     private transient CompactId compactId;
 
+    /** The local ClientSessionService. */
+    private transient ClientSessionServiceImpl sessionService;
+
     /** The session ID bytes. */
     private final byte[] idBytes;
 
@@ -95,25 +98,28 @@ public class ClientSessionImpl
      *
      * @param	compactId a session ID
      */
-    ClientSessionImpl(CompactId compactId) {
-	if (compactId == null) {
-	    throw new NullPointerException("null compactId");
+    ClientSessionImpl(ClientSessionServiceImpl sessionService, CompactId compactId) {
+	if (sessionService == null || compactId == null) {
+	    throw new NullPointerException("null argument");
 	}
+	this.sessionService = sessionService;
 	this.compactId = compactId;
 	this.idBytes = compactId.getId();
-	this.sessionServer = getClientSessionService().getServerProxy();
+	this.sessionServer = sessionService.getServerProxy();
     }
 
     /**
      * Constructs an instance from the specified fields in the
      * external form.
      */
-    private ClientSessionImpl(CompactId compactId,
+    private ClientSessionImpl(ClientSessionServiceImpl sessionService,
+			      CompactId compactId,
 			      Identity identity,
 			      long nodeId,
 			      ClientSessionServer sessionServer,
 			      boolean connected)
     {
+	this.sessionService = sessionService;
 	this.compactId = compactId;
 	this.idBytes = compactId.getId();
 	this.identity = identity;
@@ -169,7 +175,7 @@ public class ClientSessionImpl
 		putBytes(message);
 	    // FIXME: The protocol message should be assembled at the
 	    // session server and the sequence number should be assigned there.
-	    getClientSessionService().sendProtocolMessage(
+	    sessionService.sendProtocolMessage(
 		this, buf.getBuffer(), Delivery.RELIABLE);
 
 	} catch (RuntimeException e) {
@@ -184,7 +190,7 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public void disconnect() {
 	if (isConnected()) {
-	    getClientSessionService().disconnect(this);
+	    sessionService.disconnect(this);
 	}
 	logger.log(Level.FINEST, "disconnect returns");
     }
@@ -274,12 +280,15 @@ public class ClientSessionImpl
 	}
 
 	private Object readResolve() throws ObjectStreamException {
+	    ClientSessionServiceImpl sessionService =
+		ClientSessionServiceImpl.getInstance();
 	    ClientSessionImpl sessionImpl =
-		getClientSessionService().getLocalClientSession(idBytes);
+		sessionService.getLocalClientSession(idBytes);
 	    if (sessionImpl == null) {
 		CompactId compactId = new CompactId(idBytes);
 		sessionImpl = new ClientSessionImpl(
-		    compactId, identity, nodeId, sessionServer, connected);
+		    sessionService, compactId, identity, nodeId,
+		    sessionServer, connected);
 	    }
 	    return sessionImpl;
 	}
@@ -570,12 +579,5 @@ public class ClientSessionImpl
 	ClientSessionListener get() {
 	    return listener;
 	}
-    }
-
-    /**
-     * Returns the client session service instance.
-     */
-    private static ClientSessionServiceImpl getClientSessionService() {
-	return ClientSessionServiceImpl.getInstance();
     }
 }

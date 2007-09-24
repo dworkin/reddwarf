@@ -129,7 +129,7 @@ class ClientSessionHandler {
 	this.connectionListener = new Listener();
 	this.compactId = new CompactId(id);
 	this.idBytes = compactId.getId();
-	this.sessionImpl = new ClientSessionImpl(compactId);
+	this.sessionImpl = new ClientSessionImpl(sessionService, compactId);
 	this.reconnectionKey = compactId; // not used yet
 
 	if (logger.isLoggable(Level.FINEST)) {
