@@ -7,17 +7,19 @@ DIST = \
 	$(DISTDIR)/$(DISTNAME).zip \
 	$(DISTDIR)/$(DISTNAME).tar.gz
 
-all: $(DIST)
+.DEFAULT: $(DIST)
+
+all: build $(DIST)
 
 build: build_src build_test build_example
 
 build_src: 
 	cd $(TOPDIR)/src/client/c && $(MAKE)
 
-build_test: 
+build_test: build_src
 	cd $(TOPDIR)/test/client/c && $(MAKE)
 
-build_example: 
+build_example: build_src
 	cd $(TOPDIR)/example/c-chat && $(MAKE)
 
 dist: build_src build_example

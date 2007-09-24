@@ -25,6 +25,7 @@
 #include <sys/select.h>
 /** included for optarg (declared in unistd.h on some, but not all systems) */
 #include <getopt.h>
+#include <wchar.h>
 #include "sgs/connection.h"
 #include "sgs/context.h"
 #include "sgs/session.h"
@@ -39,12 +40,12 @@
 #define DEFAULT_PORT  2502
 
 /** The name of the global channel */
-#define GLOBAL_CHANNEL_NAME  "-GLOBAL-"
+static const wchar_t GLOBAL_CHANNEL_NAME[] = L"-GLOBAL-";
 
 #ifndef FD_COPY
 #define FD_COPY fd_copy
-static fd_set* FD_COPY(fd_set* from, fd_set* to) {
-    return (fd_set*) memcpy(from, to, sizeof(fd_set));
+static fd_set* fd_copy(fd_set* from, fd_set* to) {
+    return (fd_set*) memcpy(to, from, sizeof(fd_set));
 }
 #endif /* FD_COPY */
 
@@ -160,7 +161,7 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
      * keys or values since we are not allocating these (just copying pointers
      * passed by callback functions).
      */
-    g_channel_map = sgs_map_create((int (*)(const void*,const void*))strcmp,
+    g_channel_map = sgs_map_create((int (*)(const void*,const void*))wcscmp,
         NULL, NULL);
     
     /** Create sgs_context object and register event callbacks. */
@@ -222,7 +223,7 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
         
         result = select(g_maxfd + 1, &readset, &writeset, &exceptset,
             &timeout_tv);
-        
+
         if (result == -1) {
             perror("Error calling select()");
         }
@@ -496,6 +497,13 @@ static int concatstr(const char *prefix, const char *suffix, char *buf,
     return 0;
 }
 
+static wchar_t* to_wcs(const char* s) {
+    int wlen = mbstowcs(NULL, s, 0);
+    wchar_t* result = malloc(sizeof(wchar_t) * (wlen + 1));
+    mbstowcs(result, s, wlen);
+    return result;
+}
+
 /*
  * function: process_user_cmd()
  *
@@ -612,20 +620,22 @@ normally necessary)\n");
             printf("Invalid command.  Syntax: psend <user> <msg>\n");
             return;
         }
+
+        int nbytes = strlen(token) / 2;
         
-        if (strlen(token)/2 > sizeof(bytebuf)) {
+        if (nbytes > sizeof(bytebuf)) {
             printf("Error: ran out of buffer space (recipient ID too big).\n");
             return;
         }
         
         result = hextobytes(token, bytebuf);
-        
+
         if (result == -1) {
             printf("Error: invalid recipient ID (%s).\n", token);
             return;
         }
         
-        recipient = sgs_id_create(bytebuf, strlen(token)/2);
+        recipient = sgs_id_create(bytebuf, nbytes, NULL);
         if (recipient == NULL) {
             printf("Error: invalid recipient ID (%s).\n", token);
             return;
@@ -661,12 +671,17 @@ normally necessary)\n");
             printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
             return;
         }
-        
-        channel = sgs_map_get(g_channel_map, token);
+
+        wchar_t* chname = to_wcs(token);
+        channel = sgs_map_get(g_channel_map, chname);
+
         if (channel == NULL) {
-            printf("Error: Channel \"%s\" not found.\n", token);
+            printf("Error: Channel \"%ls\" not found.\n", chname);
+            free(chname);
             return;
         }
+
+        free(chname);
         
         token = strtok(NULL, "");
         

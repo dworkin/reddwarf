@@ -65,6 +65,6 @@ int hextoi(char c) {
   
     if (c >= 'a' && c <= 'f')
         return c - 'a' + 10;
-  
+
     return -1;
 }

@@ -166,8 +166,8 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
     }
     
     session->connection = connection;
-    session->session_id = sgs_id_create(NULL, 0);
-    session->reconnect_key = sgs_id_create(NULL, 0);
+    session->session_id = sgs_id_create(NULL, 0, NULL);
+    session->reconnect_key = sgs_id_create(NULL, 0, NULL);
     session->seqnum_hi = 0;
     session->seqnum_lo = 0;
 
@@ -186,7 +186,7 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
  */
 int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     int8_t result;
-    uint16_t namelen, offset;
+    ssize_t namelen, offset;
     sgs_id* channel_id;
     sgs_id* sender_id;
     sgs_message* msg;
@@ -197,6 +197,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     msg = sgs_msg_deserialize(session->msg_buf, sizeof(session->msg_buf));
     if (msg == NULL)
         return -1;
+
+    //sgs_msg_dump(msg);
     
     msg_datalen = sgs_msg_get_datalen(msg);
     msg_data = sgs_msg_get_data(msg);
@@ -210,14 +212,13 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
         switch (sgs_msg_get_opcode(msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
             /** field 1: session-id (compact-id format) */
-            session->session_id = sgs_id_create(msg_data, msg_datalen);
+            session->session_id =
+                sgs_id_create(msg_data, msg_datalen, &offset);
             if (session->session_id == NULL) return -1;
             
-            offset = sgs_id_get_byte_len(session->session_id);
-
             /** field 2: reconnection-key (compact-id format) */
             session->reconnect_key =
-                sgs_id_create(msg_data + offset, msg_datalen - offset);
+                sgs_id_create(msg_data + offset, msg_datalen - offset, NULL);
             if (session->reconnect_key == NULL) return -1;
             
             if (session->connection->ctx->logged_in_cb != NULL)
@@ -277,7 +278,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             /** field 2: channel-id (compact-id format) */
             channel_id =
                 sgs_id_create(msg_data + namelen + 2,
-                    msg_datalen - namelen - 2);
+                    msg_datalen - namelen - 2, NULL);
             if (channel_id == NULL) return -1;
             
             channel = sgs_channel_impl_create(session, channel_id,
@@ -298,7 +299,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
       
         case SGS_OPCODE_CHANNEL_LEAVE:
             /** field 1: channel-id (compact-id format) */
-            channel_id = sgs_id_create(msg_data, msg_datalen);
+            channel_id = sgs_id_create(msg_data, msg_datalen, NULL);
             if (channel_id == NULL) return -1;
             
             channel = sgs_map_get(session->channels, channel_id);
@@ -317,22 +318,23 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             
         case SGS_OPCODE_CHANNEL_MESSAGE:
             /** field 1: channel-id (compact-id format) */
-            channel_id = sgs_id_create(msg_data, msg_datalen);
+            channel_id = sgs_id_create(msg_data, msg_datalen, &offset);
             if (channel_id == NULL) return -1;
-            
-            offset = sgs_id_get_byte_len(channel_id);
 
             /**
              * field 2: sequence number (8 bytes)
              * TODO next 8 bytes are a sequence number that is currently ignored
              */
             offset += 8;
+
+            ssize_t offset2;
             
             /** field 3: session-id of sender (compact-id format) */
-            sender_id = sgs_id_create(msg_data + offset, msg_datalen - offset);
+            sender_id = sgs_id_create(msg_data + offset, msg_datalen - offset,
+                &offset2);
             if (sender_id == NULL) return -1;
-            
-            offset = sgs_id_get_byte_len(sender_id);
+                
+            offset += offset2;
             
             channel = sgs_map_get(session->channels, channel_id);
             if (channel == NULL) {

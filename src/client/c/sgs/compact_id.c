@@ -27,7 +27,7 @@ static int8_t get_byte_count(uint8_t length_byte);
 static ssize_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     size_t srclen);
 
-static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
     size_t srclen);
 
 /*
@@ -69,22 +69,36 @@ size_t sgs_id_get_byte_len(const sgs_compact_id *id) {
 /*
  * sgs_id_create()
  */
-sgs_compact_id* sgs_id_create(const uint8_t *data, size_t len) {
+sgs_compact_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc) {
     sgs_compact_id* id = malloc(sizeof(sgs_compact_id));
 
     if (id == NULL) return NULL;
 
+    id->uncompressed_len = sizeof(id->uncompressed);
+
     ssize_t result =
-        unpack(id->uncompressed, sizeof(id->uncompressed), data, len);
+        unpack(id, data, len);
+
+    if (rc != NULL)
+        *rc = result;
 
     if (result == -1) {
         free(id);
         return NULL;
     }
     
-    id->uncompressed_len = result;
     return id;
 }
+
+#ifndef NDEBUG
+# include <stdio.h>
+void sgs_id_dump(const sgs_compact_id* id) {
+    for (size_t i = 0; i < id->uncompressed_len; ++i) {
+        printf("%2.2x", id->uncompressed[i]);
+    }
+    printf("\n");
+}
+#endif /* !NDEBUG */
 
 sgs_compact_id* sgs_id_duplicate(const sgs_compact_id* id) {
     return id;
@@ -194,22 +208,21 @@ static ssize_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
  * function: unpack()
  *
  * Converts a byte array from a compact format to a normal (unpacked) format.
- * Returns -1 on error or the number of bytes written on success.
+ * Returns -1 on error or the number of bytes read on success.
  */
-static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
+static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
     size_t srclen)
 {
     ssize_t byte_count;
     size_t size, first, datalen;
     uint8_t first_byte;
 
-    if (src == NULL) {
-        if (srclen == 0)
-            return 0;
-        else
-            return -1;
+    if (srclen == 0) {
+        memset(id->uncompressed, 0, 1);
+        id->uncompressed_len = 1;
+        return 0;
     }
-    
+
     byte_count = get_byte_count(src[0]);
     if (byte_count < 0) return -1;  /* bad byte value */
 
@@ -220,7 +233,7 @@ static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
         return -1;
     }
     
-    if (size > dstlen) {
+    if (size > id->uncompressed_len) {
         errno = ENOBUFS;
         return -1;
     }
@@ -239,17 +252,18 @@ static ssize_t unpack(uint8_t *dst, size_t dstlen, const uint8_t *src,
             /** all bytes are zero, so first byte is last byte */
             first = size - 1;
         }
-        
+
         datalen = size - first;
-        memcpy(dst, src + first, datalen);
+        memcpy(id->uncompressed, src + first, datalen);
     
         if (first == 0) {
-            dst[0] = first_byte;
+            id->uncompressed[0] = first_byte;
         }
     } else {
         datalen = size - 1;
-        memcpy(dst, src + 1, datalen);
+        memcpy(id->uncompressed, src + 1, datalen);
     }
-    
-    return datalen;
+
+    id->uncompressed_len = datalen;
+    return size;
 }

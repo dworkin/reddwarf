@@ -252,6 +252,17 @@ void sgs_msg_destroy(sgs_message* msg) {
     free(msg);
 }
 
+#ifndef NDEBUG
+void sgs_msg_dump(const sgs_message* msg) {
+    for (size_t i = 0; i < msg->size; ++i) {
+        if (i > 0)
+            printf(" ");
+        printf("%2.2x", msg->buf[i]);
+    }
+    printf("\n");
+}
+#endif /* !NDEBUG */
+
 /*
  * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
  * (these are functions that can only be called within this file)

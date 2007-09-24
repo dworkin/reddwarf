@@ -13,8 +13,9 @@ typedef struct sgs_compact_id sgs_id;
  * function: sgs_id_create()
  *
  * Creates an sgs_id from the specified byte array.
+ * Returns the bytes of data used in rc, if rc not NULL.
  */
-sgs_id* sgs_id_create(const uint8_t* data, size_t len);
+sgs_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc);
 
 /*
  * function: sgs_id_duplicate()
@@ -62,5 +63,9 @@ const uint8_t* sgs_id_get_bytes(const sgs_id* id);
  * this method will return 0;
  */
 size_t sgs_id_get_byte_len(const sgs_id* id);
+
+#ifndef NDEBUG
+void sgs_id_dump(const sgs_id* id);
+#endif /* !NDEBUG */
 
 #endif /* !SGS_ID_H */
