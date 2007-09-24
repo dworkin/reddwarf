@@ -3,12 +3,14 @@
 TOPDIR=../../..
 
 SRCS = \
-	sgs_buffer_test.c \
-	sgs_id_test.c \
-	sgs_map_test.c \
-	sgs_message_test.c
+	buffer_test.c \
+	id_test.c \
+	map_test.c \
+	message_test.c
 
-all: buffertest idtest maptest messagetest
+EXES = buffer_test id_test map_test message_test
+
+all: $(EXES)
 
 include $(TOPDIR)/etc/mk/sgs.mk
 
@@ -17,20 +19,11 @@ INCS += -I$(TOPDIR)/src/client/c
 LDFLAGS += -L$(TOPDIR)/src/client/c
 LIBS += -lsgsclient
 
-buffertest: $(OBJDIR)/sgs_buffer_test.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
-
-idtest: $(OBJDIR)/sgs_id_test.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
-
-maptest: $(OBJDIR)/sgs_map_test.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
-
-messagetest: $(OBJDIR)/sgs_message_test.o
+%_test: $(OBJDIR)/%_test.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
 
 clean: clean.default
 
 realclean: realclean.default
-	@/bin/rm -f buffertest idtest maptest messagetest
+	/bin/rm -f $(EXES)
 
