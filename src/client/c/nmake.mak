@@ -5,15 +5,15 @@ TOPDIR=..\..\..
 !include $(TOPDIR)\etc\mk\nmake.mk
 
 OBJS = \
-	obj\hex_utils.obj \
-	obj\linked_map.obj \
-	obj\buffer.obj \
-	obj\io_utils.obj \
-	obj\message.obj \
-	obj\compact_id.obj \
-	obj\context.obj \
-	obj\session.obj \
-	obj\channel.obj
+	$(OBJDIR)\hex_utils.obj \
+	$(OBJDIR)\linked_map.obj \
+	$(OBJDIR)\buffer.obj \
+	$(OBJDIR)\io_utils.obj \
+	$(OBJDIR)\message.obj \
+	$(OBJDIR)\compact_id.obj \
+	$(OBJDIR)\context.obj \
+	$(OBJDIR)\session.obj \
+	$(OBJDIR)\channel.obj
 
 # TODO
 # obj\connection.obj
@@ -23,13 +23,14 @@ LIB = sgsclient.lib
 all: $(LIB)
 
 $(LIB): $(OBJS)
-    lib.exe /OUT:$(LIB) $(OBJS) $(LIBS)
+	lib.exe /OUT:$(LIB) $(OBJS) $(LIBS)
 
-{sgs\}.c{obj\}.obj::
-    $(CC) $(CFLAGS) /Foobj\ -c $<
+{sgs\}.c{$(OBJDIR)\}.obj::
+	-md "$(OBJDIR)"
+	$(CC) $(CFLAGS) /Fo"$(OBJDIR)"\ -c $<
 
 clean:
-    rd /s /q obj
+	-rd /s /q "$(OBJDIR)"
 
 realclean: clean
-    del /q $(LIB)
+	-del /q $(LIB)

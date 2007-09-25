@@ -6,10 +6,6 @@
  * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
  */
 
-#include <stdlib.h>  /** included for exit() */
-#include <stdio.h>
-#include <sys/time.h>
-#include <unistd.h>
 #include "sgs/map.h"
 
 static int compare_ints(const void* a, const void* b);

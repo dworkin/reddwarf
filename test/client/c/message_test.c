@@ -6,9 +6,6 @@
  * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
 #include "sgs/message.h"
 
 /*

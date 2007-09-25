@@ -10,9 +10,6 @@
  * Tests sgs/id.h
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 #include "sgs/id.h"
 #include "sgs/hex_utils.h"
 
