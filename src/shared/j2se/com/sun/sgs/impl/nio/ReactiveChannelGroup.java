@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
@@ -81,9 +82,16 @@ class ReactiveChannelGroup
 
     final CountDownLatch termination;
 
-    static final class SelectorHolder {
+    abstract class WorkerStrategy implements Runnable {
+        protected final Callable<Boolean> task;
+        protected WorkerStrategy(Callable<Boolean> task) {
+            this.task = task;
+        }
+    }
+
+    abstract class Reactor implements Callable<Boolean> {
         /*
-         * "this" also acts as the selector guard.
+         * "this" Reactor also acts as the selector guard.
          * May be locked *after* mainLock, but not before.
          */
 
@@ -91,13 +99,86 @@ class ReactiveChannelGroup
         final DelayQueue<TimeoutHandler> timeouts =
             new DelayQueue<TimeoutHandler>();
 
-        SelectorHolder(Selector selector) {
+        Reactor(Selector selector) {
             this.selector = selector;
         }
     }
 
-    final int numSelectors;
-    final List<SelectorHolder> selectors;
+    class BlockingReactor extends Reactor {
+        BlockingReactor(Selector selector) {
+            super(selector);
+        }
+
+        public Boolean call() throws IOException {
+            Object selectorLock = this;
+
+            int rc = 0;
+            log.log(Level.FINER, "preselect");
+            // Obtain and release the guard to allow other tasks to run
+            // after waking the selector.
+            synchronized (selectorLock) {
+                // FIXME experimenting with a selectNow to clear
+                // spurious wakeups
+                rc = selector.selectNow();
+                log.log(Level.FINER, "preselect returned {0}", rc);
+            }
+
+            int numKeys = selector.keys().size();
+
+            if (rc == 0) {
+                log.log(Level.FINER, "select {0}", numKeys);            
+                rc = selector.select(getSelectorTimeout(timeouts));
+                log.log(Level.FINEST, "selected {0}", rc);
+            }
+
+            int state = runState;
+            if (state != RUNNING) {
+                synchronized (mainLock) {
+                    if (! selector.isOpen())
+                        return false;
+                    if (selector.keys().isEmpty()) {
+                        try {
+                            selector.close();
+                        } catch (IOException ignore) { }
+                        termination.countDown();
+                        return false;
+                    }
+                }
+            }
+
+            Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
+
+            while (keys.hasNext()) {
+                SelectionKey key = keys.next();
+                keys.remove();
+
+                AsyncChannelImpl ach;
+                int readyOps;
+                synchronized (selectorLock) {
+                    if (! key.isValid())
+                        continue;
+                    readyOps = key.readyOps();
+                    key.interestOps(key.interestOps() & (~ readyOps));
+                    ach = (AsyncChannelImpl) key.attachment();
+                }
+                ach.selected(readyOps);
+            }
+
+            if (timeouts.peek() != null) {
+                List<TimeoutHandler> expiredHandlers =
+                    new ArrayList<TimeoutHandler>();
+                timeouts.drainTo(expiredHandlers);
+
+                for (TimeoutHandler expired : expiredHandlers)
+                    expired.run();
+            }
+
+            return true;
+        }
+    }
+
+    final int numReactors;
+    final List<Reactor> reactors;
 
     static class TimeoutHandler implements Delayed, Runnable {
         private final AsyncChannelImpl asyncChannel;
@@ -152,40 +233,41 @@ class ReactiveChannelGroup
     // if numSelectors == 0, choose from a property
     ReactiveChannelGroup(AsyncProviderImpl provider,
                          ExecutorService executor,
-                         int numSelectors)
+                         int numReactors)
         throws IOException
     {
         super(provider, executor);
 
-        if (numSelectors == 0) {
-            numSelectors = Integer.valueOf(System.getProperty(
+        if (numReactors == 0) {
+            numReactors = Integer.valueOf(System.getProperty(
                 SELECTORS_PROPERTY, DEFAULT_SELECTORS));
         }
 
-        if (numSelectors <= 0)
+        if (numReactors <= 0)
             throw new IllegalArgumentException(
                 "Selector count must be positive");
 
-        this.numSelectors = numSelectors;
-        this.termination = new CountDownLatch(numSelectors);
+        this.numReactors = numReactors;
+        this.termination = new CountDownLatch(numReactors);
 
-        ArrayList<SelectorHolder> sels =
-            new ArrayList<SelectorHolder>(numSelectors);
+        ArrayList<Reactor> tmpReactors =
+            new ArrayList<Reactor>(numReactors);
 
-        for (int i = 0; i < numSelectors; ++i) {
-            sels.add(new SelectorHolder(selectorProvider().openSelector()));
+        for (int i = 0; i < numReactors; ++i) {
+            Selector sel = selectorProvider().openSelector();
+            tmpReactors.add(new BlockingReactor(sel));
         }
 
-        selectors = Collections.unmodifiableList(sels);
+        reactors = Collections.unmodifiableList(tmpReactors);
 
-        for (SelectorHolder selector : selectors) {
+        for (Reactor selector : reactors) {
             execute(new LoopingWorkerStrategy(selector));
         }
     }
 
-    SelectorHolder getSelectorHolder(AsyncChannelImpl ach) {
-        int index = Math.abs(ach.hashCode()) % numSelectors;
-        return selectors.get(index);
+    Reactor getSelectorHolder(AsyncChannelImpl ach) {
+        int index = Math.abs(ach.hashCode()) % numReactors;
+        return reactors.get(index);
     }
 
     @Override
@@ -199,7 +281,7 @@ class ReactiveChannelGroup
                 throw new ShutdownChannelGroupException();
             }
             ch.configureBlocking(false);
-            SelectorHolder h = getSelectorHolder(ach);
+            Reactor h = getSelectorHolder(ach);
             synchronized (h) {
                 Selector selector = h.selector;
                 selector.wakeup();
@@ -210,7 +292,7 @@ class ReactiveChannelGroup
 
     @Override
     void unregisterChannel(AsyncChannelImpl ach) {
-        SelectorHolder h = getSelectorHolder(ach);
+        Reactor h = getSelectorHolder(ach);
         synchronized (h) {
             Selector selector = h.selector;
             selector.wakeup();
@@ -233,7 +315,7 @@ class ReactiveChannelGroup
             // TODO
             throw new UnsupportedOperationException("timeout not implemented");
         }
-        SelectorHolder h = getSelectorHolder(ach);
+        Reactor h = getSelectorHolder(ach);
         synchronized (h) {
             Selector selector = h.selector;
             selector.wakeup();
@@ -269,110 +351,39 @@ class ReactiveChannelGroup
         return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
     }
 
-    protected void doWork(SelectorHolder h) throws IOException {
-        Object selectorLock = h;
-        Selector selector = h.selector;
-        DelayQueue<TimeoutHandler> timeouts = h.timeouts;
-
-        int rc = 0;
-        log.log(Level.FINER, "preselect");
-        // Obtain and release the guard to allow other tasks to run
-        // after waking the selector.
-        synchronized (selectorLock) {
-            // FIXME experimenting with a selectNow to clear
-            // spurious wakeups
-            rc = selector.selectNow();
-            log.log(Level.FINER, "preselect returned {0}", rc);
-        }
-
-        int numKeys = selector.keys().size();
-
-        if (rc == 0) {
-            log.log(Level.FINER, "select {0}", numKeys);            
-            rc = selector.select(getSelectorTimeout(timeouts));
-            log.log(Level.FINEST, "selected {0}", rc);
-        }
-
-        int state = runState;
-        if (state != RUNNING) {
-            synchronized (mainLock) {
-                if (! selector.isOpen())
-                    return;
-                if (selector.keys().isEmpty()) {
-                    try {
-                        selector.close();
-                    } catch (IOException ignore) { }
-                    termination.countDown();
-                    return;
-                }
-            }
-        }
-
-        Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
-
-        while (keys.hasNext()) {
-            SelectionKey key = keys.next();
-            keys.remove();
-
-            AsyncChannelImpl ach;
-            int readyOps;
-            synchronized (selectorLock) {
-                if (! key.isValid())
-                    continue;
-                readyOps = key.readyOps();
-                key.interestOps(key.interestOps() & (~ readyOps));
-                ach = (AsyncChannelImpl) key.attachment();
-            }
-            ach.selected(readyOps);
-        }
-
-        if (timeouts.peek() != null) {
-            List<TimeoutHandler> expiredHandlers = new ArrayList<TimeoutHandler>();
-            timeouts.drainTo(expiredHandlers);
-
-            for (TimeoutHandler expired : expiredHandlers)
-                expired.run();
-        }
-    }
-
-    abstract class WorkerStrategy implements Runnable {
-        protected final SelectorHolder selectorHolder;
-        protected WorkerStrategy(SelectorHolder h) {
-            this.selectorHolder = h;
-        }
-    }
     class LoopingWorkerStrategy extends WorkerStrategy {
-        LoopingWorkerStrategy(SelectorHolder h) {
-            super(h);
+        LoopingWorkerStrategy(Callable<Boolean> task) {
+            super(task);
         }
 
         public void run() {
             try {
-                while (selectorHolder.selector.isOpen()) {
-                    doWork(selectorHolder);
+                boolean keepRunning = true;
+                while (keepRunning) {
+                    keepRunning = task.call();
                 }
             } catch (Exception e) {
                 // TODO
                 e.printStackTrace();
-                if (selectorHolder.selector.isOpen())
-                    execute(this);
+                execute(this);
             }
         }
     }
 
     class RequeuingWorkerStrategy extends WorkerStrategy {
-        RequeuingWorkerStrategy(SelectorHolder h) {
-            super(h);
+        RequeuingWorkerStrategy(Callable<Boolean> task) {
+            super(task);
         }
 
         public void run() {
+            boolean keepRunning = true;
             try {
-                doWork(selectorHolder);
+                keepRunning = task.call();
             } catch (Exception e) {
                 // TODO
                 e.printStackTrace();
             }
-            if (selectorHolder.selector.isOpen())
+            if (keepRunning)
                 execute(this);
         }
     }
@@ -415,7 +426,7 @@ class ReactiveChannelGroup
             if (state < SHUTDOWN)
                 runState = SHUTDOWN;
 
-            for (SelectorHolder h : selectors) {
+            for (Reactor h : reactors) {
                 synchronized (h) {
                     h.selector.wakeup();
                 }
@@ -436,7 +447,7 @@ class ReactiveChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (SelectorHolder h : selectors) {
+            for (Reactor h : reactors) {
                 synchronized (h) {
                     Selector selector = h.selector;
                     selector.wakeup();
@@ -449,7 +460,7 @@ class ReactiveChannelGroup
         }
     }
 
-    private static void forceClose(Closeable closeable) {
+    static void forceClose(Closeable closeable) {
         try {
             closeable.close();
         } catch (IOException ignore) { }

@@ -24,7 +24,7 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
@@ -62,19 +62,12 @@ class AsyncDatagramChannelImpl
     final AbstractAsyncChannelGroup group;
     final DatagramChannel channel;
 
-    volatile AsyncOp<?> connectTask = null;
-    volatile AsyncOp<?> readTask = null;
-    volatile AsyncOp<?> writeTask = null;
-
-    private static final AtomicReferenceFieldUpdater<AsyncDatagramChannelImpl, AsyncOp>
-        connectTaskUpdater = AtomicReferenceFieldUpdater.newUpdater(
-            AsyncDatagramChannelImpl.class, AsyncOp.class, "connectTask");
-    private static final AtomicReferenceFieldUpdater<AsyncDatagramChannelImpl, AsyncOp>
-        readTaskUpdater = AtomicReferenceFieldUpdater.newUpdater(
-            AsyncDatagramChannelImpl.class, AsyncOp.class, "readTask");
-    private static final AtomicReferenceFieldUpdater<AsyncDatagramChannelImpl, AsyncOp>
-        writeTaskUpdater = AtomicReferenceFieldUpdater.newUpdater(
-            AsyncDatagramChannelImpl.class, AsyncOp.class, "writeTask");
+    final AtomicReference<AsyncOp<?>> connectTask =
+        new AtomicReference<AsyncOp<?>>();
+    final AtomicReference<AsyncOp<?>> readTask =
+        new AtomicReference<AsyncOp<?>>();
+    final AtomicReference<AsyncOp<?>> writeTask =
+        new AtomicReference<AsyncOp<?>>();
 
     AsyncDatagramChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
@@ -94,10 +87,10 @@ class AsyncDatagramChannelImpl
         AsyncOp<?> wtask = null;
 
         if ((ops & OP_READ) != 0)
-            rtask = readTaskUpdater.getAndSet(this, null);
+            rtask = readTask.getAndSet(null);
 
         if ((ops & OP_WRITE) != 0)
-            wtask = writeTaskUpdater.getAndSet(this, null);
+            wtask = writeTask.getAndSet(null);
 
         if (rtask != null)
             group.execute(rtask);
@@ -114,13 +107,13 @@ class AsyncDatagramChannelImpl
         AsyncOp<?> wtask = null;
 
         if ((ops & OP_CONNECT) != 0)
-            ctask = connectTaskUpdater.getAndSet(this, null);
+            ctask = connectTask.getAndSet(null);
 
         if ((ops & OP_READ) != 0)
-            rtask = readTaskUpdater.getAndSet(this, null);
+            rtask = readTask.getAndSet(null);
 
         if ((ops & OP_WRITE) != 0)
-            wtask = writeTaskUpdater.getAndSet(this, null);
+            wtask = writeTask.getAndSet(null);
 
         if (ctask != null)
             group.setException(ctask, t);
@@ -349,7 +342,7 @@ class AsyncDatagramChannelImpl
                     return null;
                 }});
 
-        if (! connectTaskUpdater.compareAndSet(this, null, task))
+        if (! connectTask.compareAndSet(null, task))
             throw new ConnectionPendingException();
 
         group.execute(task);
@@ -381,7 +374,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return readTask != null;
+        return readTask.get() != null;
     }
 
     /**
@@ -389,7 +382,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return writeTask != null;
+        return writeTask.get() != null;
     }
 
     /**
@@ -414,7 +407,7 @@ class AsyncDatagramChannelImpl
                     return channel.receive(dst);
                 }});
 
-        if (! readTaskUpdater.compareAndSet(this, null, task))
+        if (! readTask.compareAndSet(null, task))
             throw new ReadPendingException();
 
         group.awaitReady(this, OP_READ, timeout, unit);
@@ -444,7 +437,7 @@ class AsyncDatagramChannelImpl
                     return channel.send(src, target);
                 }});
 
-        if (! writeTaskUpdater.compareAndSet(this, null, task))
+        if (! writeTask.compareAndSet(null, task))
             throw new WritePendingException();
 
         group.awaitReady(this, OP_WRITE, timeout, unit);
@@ -473,7 +466,7 @@ class AsyncDatagramChannelImpl
                     return channel.read(dst);
                 }});
 
-        if (! readTaskUpdater.compareAndSet(this, null, task))
+        if (! readTask.compareAndSet(null, task))
             throw new ReadPendingException();
 
         group.awaitReady(this, OP_READ, timeout, unit);
@@ -502,7 +495,7 @@ class AsyncDatagramChannelImpl
                     return channel.write(src);
                 }});
 
-        if (! writeTaskUpdater.compareAndSet(this, null, task))
+        if (! writeTask.compareAndSet(null, task))
             throw new WritePendingException();
 
         group.awaitReady(this, OP_WRITE, timeout, unit);

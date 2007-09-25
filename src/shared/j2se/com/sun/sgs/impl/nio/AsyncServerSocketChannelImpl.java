@@ -16,7 +16,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
@@ -44,11 +44,8 @@ final class AsyncServerSocketChannelImpl
     final AbstractAsyncChannelGroup group;
     final ServerSocketChannel channel;
 
-    volatile AsyncOp<?> acceptTask = null;
-
-    private static final AtomicReferenceFieldUpdater<AsyncServerSocketChannelImpl, AsyncOp>
-        acceptTaskUpdater = AtomicReferenceFieldUpdater.newUpdater(
-            AsyncServerSocketChannelImpl.class, AsyncOp.class, "acceptTask");
+    final AtomicReference<AsyncOp<?>> acceptTask =
+        new AtomicReference<AsyncOp<?>>();
 
     AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
         throws IOException
@@ -67,7 +64,7 @@ final class AsyncServerSocketChannelImpl
         if (ops != OP_ACCEPT)
             throw new IllegalStateException("Unexpected ops " + ops);
 
-        AsyncOp<?> task = acceptTaskUpdater.getAndSet(this, null);
+        AsyncOp<?> task = acceptTask.getAndSet(null);
         if (task != null)
             group.execute(task);
     }
@@ -76,7 +73,7 @@ final class AsyncServerSocketChannelImpl
         if (op != OP_ACCEPT)
             throw new IllegalStateException("Unexpected op " + op);
 
-        AsyncOp<?> task = acceptTaskUpdater.getAndSet(this, null);
+        AsyncOp<?> task = acceptTask.getAndSet(null);
         if (task != null)
             group.setException(task, t);
     }
@@ -192,7 +189,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return acceptTask != null;
+        return acceptTask.get() != null;
     }
 
     /**
@@ -210,7 +207,7 @@ final class AsyncServerSocketChannelImpl
                     return new AsyncSocketChannelImpl(group, channel.accept());
                 }});
 
-        if (! acceptTaskUpdater.compareAndSet(this, null, task))
+        if (! acceptTask.compareAndSet(null, task))
             throw new AcceptPendingException();
 
         group.awaitReady(this, OP_ACCEPT);
