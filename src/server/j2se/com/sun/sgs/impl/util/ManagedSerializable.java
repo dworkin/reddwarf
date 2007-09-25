@@ -44,7 +44,7 @@ import java.io.Serializable;
  * improvement.
  *
  * <p>
- * 
+ *
  * Following is an example of where an existing class has been retrofitted to
  * have {@code ManagedReference} references to its large fields, rather than
  * standard references.
@@ -58,17 +58,17 @@ import java.io.Serializable;
  *     String name;
  *     Collection&lt;Item&gt; inventory;
  *     MapArea currentLocation;
- *     
- *     public MyPlayerObj(...) { 
- *         ... 
+ *
+ *     public MyPlayerObj(...) {
+ *         ...
  *         inventory = new ArrayList&lt;Item&gt;();
  *     }
  *
  *     ...
  *
  *     public void findNearbyPlayers() {
- *         for (Player p : currentLocation.getPlayers()) 
- *             ....
+ *         for (Player p : currentLocation.getPlayers())
+ *             ...
  *     }
  * }
  * </pre>
@@ -78,15 +78,15 @@ import java.io.Serializable;
  * <pre>
  * public class MyPlayerObj {
  *     String name;
- *     
+ *
  *     // a reference of type ManagedSerializable&lt;Collection&lt;Item&gt;&gt;
  *     ManagedReference inventoryRef;
  *
  *     // a reference of type ManagedSerializable&lt;MapArea&gt;
  *     ManagedReference currentLocationRef;
- *     
- *     public MyPlayerObj(...) { 
- *         ... 
+ *
+ *     public MyPlayerObj(...) {
+ *         ...
  *         Collection&lt;Item&gt; inventory = new ArrayList&lt;Item&gt;();
  *         inventoryRef = AppContext.getDataManager().
  *             createReference(
@@ -96,34 +96,38 @@ import java.io.Serializable;
  *     ...
  *
  *     public void findNearbyPlayers() {
- *         ManagedSerializable&lt;MapArea&gt; curLocWrapper = 
+ *         ManagedSerializable&lt;MapArea&gt; curLocWrapper =
  *             currentLocationRef.get(ManagerSerializable.class);
  *         MapArea currentLocation = curLocWrapper.get();
  *
- *         for (Player p : currentLocation.getPlayers()) 
+ *         for (Player p : currentLocation.getPlayers())
  *             ...
  *     }
  * }
  * </pre>
- *     
+ *
  * Application developers are responsible for removing {@code
  * ManagedSerializable} instances by calling {@link DataManager#removeObject
  * DataManager.removeObject}.  Developers should call {@link
  * DataManager#markForUpdate DataManager.markForUpdate} or {@link
  * ManagedReference#getForUpdate DataManager.getForUpdate} if the application
  * modifies objects wrapped by instances of this class.
+ *
+ * @param <T> the type of the wrapped object
  */
 public class ManagedSerializable<T> implements ManagedObject, Serializable {
-	
+
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
-    
+
     /**
      * The serializable object being wrapped by this instance, which may be
-     * null.
+     * {@code null}.
+     *
+     * @serial
      */
     private T object;
-    
+
     /**
      * Constructs an instance of this class that wraps the specified object,
      * which must not implement {@link ManagedObject}, but must either
@@ -186,7 +190,7 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
     /**
      * Replaces the object wrapped by this instance with the specified object,
      * which must not implement {@link ManagedObject}, but must either
-     * implement {@link Serializable} or be {@code null}
+     * implement {@link Serializable} or be {@code null}.
      *
      * @param object the new object to wrap
      *

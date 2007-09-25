@@ -29,109 +29,96 @@ import java.util.Collection;
 import java.util.Iterator;
 
 /**
- * A concurrent, distributed implementation of {@code Set} backed by a
- * {@link ScalableHashSet}.  The internal structure of the set is
- * separated into distributed pieces, which reduces the amount of data
- * any one operation needs to access.  The distributed structure
- * increases the concurrency and allows for parallel write operations
- * to successfully complete.
- * 
- * <p>
- *
- * Developers may use this class as a drop-in replacement for the
- * {@link java.util.HashSet} class for use in a {@link ManagedObject}.
- * A {@code HashSet} will typically perform better than this class
- * when the number of mappings is small and the objects being stored
- * are small, and when minimal concurrency is required.  As the size
- * of the serialized {@code HashSet} increases, this class will
- * perform significantly better.  Developers are encouraged to profile
- * the serialized size of their set to determine which implementation
- * will perform better.  Note that {@code HashSet} has no implicit
- * concurrency, so this class may perform better in situations where
- * multiple tasks need to modify the set concurrently, even if the
- * total number of mappings is small.  Also note that this class
- * should be used instead of other {@code Set} implementations to
- * store {@code ManagedObject} instances.
+ * A scalable implementation of {@code Set} backed by a {@link
+ * ScalableHashSet}.  The internal structure of the set is separated into
+ * distributed pieces, which reduces the amount of data any one operation needs
+ * to access.  The distributed structure increases the concurrency and allows
+ * for parallel write operations to successfully complete.
  *
  * <p>
  *
- * This class marks itself for update as necessary; no additional
- * calls to the {@link DataManager} are necessary when modifying the
- * map.  Developers do not need to call {@code markForUpdate} or
- * {@code getForUpdate} on this set, as this will eliminate all the
- * concurrency benefits of this class.  However, calling {@code
- * getForUpdate} or {@code markForUpdate} can be used if a operation
- * needs to prevent all access to the set.
+ * Developers may use this class as a drop-in replacement for the {@link
+ * java.util.HashSet} class for use in a {@link ManagedObject}.  A {@code
+ * HashSet} will typically perform better than this class when the number of
+ * mappings is small and the objects being stored are small, and when minimal
+ * concurrency is required.  As the size of the serialized {@code HashSet}
+ * increases, this class will perform significantly better.  Developers are
+ * encouraged to profile the serialized size of their set to determine which
+ * implementation will perform better.  Note that {@code HashSet} has no
+ * implicit concurrency, so this class may perform better in situations where
+ * multiple tasks need to modify the set concurrently, even if the total number
+ * of mappings is small.  Also note that this class should be used instead of
+ * other {@code Set} implementations to store {@code ManagedObject} instances.
  *
  * <p>
  *
- * This implementation requires that all elements must be {@link
- * Serializable}.  If an element is an instance of {@code
- * Serializable} but does not implement {@code ManagedObject}, this
- * class will persist the element as necessary; when such an element
- * is removed from the set, it is also removed from the {@code
- * DataManager}.  If an element is an instance of {@code
- * ManagedObject}, the developer will be responsible for removing
- * these objects from the {@code DataManager} when done with them.
- * Developers should not remove these object from the {@code
- * DataManager} prior to removing them from the set.
+ * This class marks itself for update as necessary; no additional calls to the
+ * {@link DataManager} are necessary when modifying the map.  Developers do not
+ * need to call {@code markForUpdate} or {@code getForUpdate} on this set, as
+ * this will eliminate all the concurrency benefits of this class.  However,
+ * calling {@code getForUpdate} or {@code markForUpdate} can be used if a
+ * operation needs to prevent all access to the set.
  *
  * <p>
  *
- * This class offers constant time operations for {@code add}, {@code
- * remove}, {@code contains}, and {@code isEmpty}.  Unlike {@code
- * HashSet}, the {@code size} and {@code clear} operations are not
- * constant time; these two operations require a traversal of all the
- * elements in the set.  Like {@code HashSet}, this class permits the
- * {@code null} element.
+ * This implementation requires that all elements must be {@link Serializable}.
+ * If an element is an instance of {@code Serializable} but does not implement
+ * {@code ManagedObject}, this class will persist the element as necessary;
+ * when such an element is removed from the set, it is also removed from the
+ * {@code DataManager}.  If an element is an instance of {@code ManagedObject},
+ * the developer will be responsible for removing these objects from the {@code
+ * DataManager} when done with them.  Developers should not remove these object
+ * from the {@code DataManager} prior to removing them from the set.
  *
  * <p>
  *
- * <a name="iterator"></a>
- * The {@code Iterator} for this class implements {@code
- * Serializable}.  An single iterator may be saved by a different
- * {@code ManagedObject} instances, which create a distinct copy of
- * the original iterator.  A copy starts its iteration from where the
- * state of the original was at the time of the copy.  However each
- * copy maintains a separate, independent state from the original will
- * therefore not reflect any changes to the original iterator.  These
- * iterators do not throw {@link
- * java.util.ConcurrentModificationException}.  The iterator for this
- * class is stable with respect to the concurrent changes to the
- * associated collection; an iterator will not the same object twice
- * after a change is made.  An iterator may ignore additions and
- * removals to the associated collection that occur before the
- * iteration site.  This set provides no guarantees on the order of
- * elements when iterating.  
+ * This class offers constant time operations for {@code add}, {@code remove},
+ * {@code contains}, and {@code isEmpty}.  Unlike {@code HashSet}, the {@code
+ * size} and {@code clear} operations are not constant time; these two
+ * operations require a traversal of all the elements in the set.  Like {@code
+ * HashSet}, this class permits the {@code null} element.
  *
  * <p>
  *
- * The {@code Iterator} for this set implements all optional
- * operations.
+ * <a name="iterator"></a> The {@code Iterator} for this class implements
+ * {@code Serializable}.  An single iterator may be saved by a different {@code
+ * ManagedObject} instances, which create a distinct copy of the original
+ * iterator.  A copy starts its iteration from where the state of the original
+ * was at the time of the copy.  However each copy maintains a separate,
+ * independent state from the original will therefore not reflect any changes
+ * to the original iterator.  These iterators do not throw {@link
+ * java.util.ConcurrentModificationException}.  The iterator for this class is
+ * stable with respect to the concurrent changes to the associated collection;
+ * an iterator will not the same object twice after a change is made.  An
+ * iterator may ignore additions and removals to the associated collection that
+ * occur before the iteration site.  This set provides no guarantees on the
+ * order of elements when iterating.
  *
  * <p>
  *
- * An instance of {@code ScalableHashSet} offers one parameter for
- * performance tuning: {@code minConcurrency}, which specifies the
- * minimum number of write operations to support in parallel.  This
- * parameter acts as a hint to the backing map on how to perform
- * resizing.  As the set grows, the number of supported parallel
- * operations will also grow beyond the specified minimum.  Setting
- * the minimum concurrency too high will waste space and time, while
- * setting it too low will cause conflicts until the map grows
- * sufficiently to support more concurrent operations.
+ * The {@code Iterator} for this set implements all optional operations.
  *
  * <p>
  *
- * Since the expected distribution of objects in the set is
- * essentially random, the actual concurrency will vary.  Developers
- * are strongly encouraged to use hash codes that provide a normal
- * distribution; a large number of collisions will likely reduce the
- * performance.
+ * An instance of {@code ScalableHashSet} offers one parameter for performance
+ * tuning: {@code minConcurrency}, which specifies the minimum number of write
+ * operations to support in parallel.  This parameter acts as a hint to the
+ * backing map on how to perform resizing.  As the set grows, the number of
+ * supported parallel operations will also grow beyond the specified minimum.
+ * Setting the minimum concurrency too high will waste space and time, while
+ * setting it too low will cause conflicts until the map grows sufficiently to
+ * support more concurrent operations.
+ *
+ * <p>
+ *
+ * Since the expected distribution of objects in the set is essentially random,
+ * the actual concurrency will vary.  Developers are strongly encouraged to use
+ * hash codes that provide a normal distribution; a large number of collisions
+ * will likely reduce the performance.
  *
  * @param <E> the type of elements maintained by this set
  *
- * @see Object#hashCode()
+ * @see Object#hashCode Object.hashCode
  * @see java.util.Set
  * @see java.util.HashSet
  * @see ScalableHashMap
@@ -142,38 +129,48 @@ public class ScalableHashSet<E>
     extends AbstractSet<E>
     implements Serializable, ManagedObject {
 
-    private static final long serialVersionUID = 1230892300L;
+    /** The version of the serialized form. */
+    private static final long serialVersionUID = 1;
 
     /**
-     * The internal marker for whether an object is present in the set
+     * The internal marker for whether an object is present in the set.
      */
     private static final Marker PRESENT = new Marker();
 
     /**
+     * The minor version number, which can be modified to note a compatible
+     * change to the data structure.
+     *
+     * @serial
+     */
+    private final short minorVersion = 0;
+
+    /**
      * The reference to the backing map for this set.
+     *
+     * @serial
      */
     private final ManagedReference map;
 
     /**
      * Creates a new empty set; the backing {@code ScalableHashMap}
-     * has the default minimum concurrency (32).
+     * has the default minimum concurrency ({@code 32}).
      *
      * @see ScalableHashMap#ScalableHashMap()
      */
     public ScalableHashSet() {
 	map = AppContext.getDataManager().
-	    createReference(new ScalableHashMap<E,Marker>());	
+	    createReference(new ScalableHashMap<E,Marker>());
     }
 
     /**
-     * Creates a new empty set; the backing {@code ScalableHashMap}
-     * has the specified minimum concurrency.
-     * 
-     * @param minConcurrency the minimum number of write operations to
-     *        support in parallel
+     * Creates a new empty set; the backing {@code ScalableHashMap} has the
+     * specified minimum concurrency.
      *
-     * @throws IllegalArgumentException if minConcurrency is
-     *         non-positive
+     * @param minConcurrency the minimum number of write operations to support
+     *        in parallel
+     *
+     * @throws IllegalArgumentException if minConcurrency is non-positive
      *
      * @see ScalableHashMap#ScalableHashMap(int)
      */
@@ -183,47 +180,43 @@ public class ScalableHashSet<E>
     }
 
     /**
-     * Creates a new set containing the elements in the specified
-     * collection.  The new set will have the default minimum
-     * concurrency (32).
+     * Creates a new set containing the elements in the specified collection.
+     * The new set will have the default minimum concurrency ({@code 32}).
      *
-     * @param c the collection of elements to be added to the set     
+     * @param c the collection of elements to be added to the set
      */
     public ScalableHashSet(Collection<? extends E> c) {
 	this();
 	addAll(c);
     }
-    
+
     /**
-     * Adds the specified element to this set if was not already
-     * present.
+     * Adds the specified element to this set if was not already present.
      *
      * @param e the element to be added
-     * @return {@code true} if the set did not already contain the
-     *         specified element
+     * @return {@code true} if the set did not already contain the specified
+     *         element
      */
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     public boolean add(E e) {
 	return map.get(ScalableHashMap.class).put(e, PRESENT) == null;
     }
 
     /**
-     * Removes all the elements in this set.  Note that unlike {@code
-     * HashSet}, this operation is <i>not</i> constant time.  Clearing
-     * a set takes {@code n log(n)} time.
-     */ 
+     * Removes all the elements in this set.  Note that unlike {@code HashSet},
+     * this operation is <i>not</i> constant time.  Clearing a set takes {@code
+     * O(n*log(n))} time.
+     */
     public void clear() {
 	map.get(ScalableHashMap.class).clear();
     }
 
     /**
-     * Returns {@code true} if this set contains the specified
-     * element.
+     * Returns {@code true} if this set contains the specified element.
      *
      * @param o the element whose presence in the set is to be tested
      *
-     * @return {@code true} if this set contains the specified
-     *         element.
+     * @return {@code true} if this set contains the specified element
      */
     public boolean contains(Object o) {
 	return map.get(ScalableHashMap.class).containsKey(o);
@@ -232,40 +225,38 @@ public class ScalableHashSet<E>
     /**
      * Returns {@code true} if this set contains no elements.
      *
-     * @return {@code true} if this set contains no elements.
+     * @return {@code true} if this set contains no elements
      */
     public boolean isEmpty() {
 	return map.get(ScalableHashMap.class).isEmpty();
     }
 
     /**
-     * Returns a concurrent, {@code Serializable} {@code Iterator}
-     * over the elements in this set.
+     * Returns a concurrent, {@code Serializable} {@code Iterator} over the
+     * elements in this set.
      *
      * @return an iterator over the elements in this set
      */
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     public Iterator<E> iterator() {
 	return map.get(ScalableHashMap.class).keySet().iterator();
-    }   
+    }
 
     /**
      * Removes the specified element from this set if it was present.
      *
-     * @param o the element that should be removed from the set, if
-     *          present
+     * @param o the element that should be removed from the set, if present
      *
-     * @return {@code true} if the element was initially present in
-     *         this set
+     * @return {@code true} if the element was initially present in this set
      */
     public boolean remove(Object o) {
 	return map.get(ScalableHashMap.class).remove(o) == PRESENT;
     }
 
     /**
-     * Returns the number of elements in this set.  Note that unlike
-     * {@code HashMap}, this is <i>not</i> a constant time operation.
-     * Determining the size of a set takes {@code n log(n)}.
+     * Returns the number of elements in this set.  Note that unlike {@code
+     * HashMap}, this is <i>not</i> a constant time operation.  Determining the
+     * size of a set takes {@code O(n*log(n))}.
      *
      * @return the number of elements in this set
      */
@@ -274,13 +265,13 @@ public class ScalableHashSet<E>
     }
 
     /**
-     * An internal marker class for storing as the value in the
-     * backing map.  All marker objects are equivalent to ensure
-     * equality across JVMs.
+     * An internal marker class for storing as the value in the backing map.
+     * All marker objects are equivalent to ensure equality after
+     * deserialization without the added cost of write replacement.
      */
-    private static class Marker implements Serializable { 
-	private static final long serialVersionUID = 3;
-	
+    private static final class Marker implements Serializable {
+	private static final long serialVersionUID = 1;
+
 	public int hashCode() {
 	    return 0;
 	}
@@ -288,5 +279,5 @@ public class ScalableHashSet<E>
 	public boolean equals(Object o) {
 	    return o instanceof Marker;
 	}
-    }   
+    }
 }

@@ -4,30 +4,24 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
-
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.app.util.ScalableHashMapTestable;
-
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
-
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
-
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-
+import com.sun.sgs.test.util.NameRunner;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,19 +33,12 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-
+import junit.framework.JUnit4TestAdapter;
 import junit.framework.TestCase;
-
-import static org.junit.Assert.*;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import junit.framework.JUnit4TestAdapter;
 import org.junit.runner.RunWith;
-
-import com.sun.sgs.test.util.NameRunner;
 
 /**  
  * Test the {@link ScalableHashMap} class. 
@@ -87,27 +74,25 @@ public class TestScalableHashMap extends TestCase {
 	super(name);
     }
 
-    @Before public void setUp() {
-//         System.err.println("Testcase: " );
-	try {
-	    appContext = MinimalTestKernel.createContext();
-	    DummyComponentRegistry serviceRegistry =
-		MinimalTestKernel.getServiceRegistry(appContext);
-	    deleteDirectory();
-	    createDataService(MinimalTestKernel.getSystemRegistry(appContext));
+    @Before public void setUp() throws Exception {
+//	System.err.println("Testcase: " );
+	appContext = MinimalTestKernel.createContext();
+	DummyComponentRegistry serviceRegistry =
+	    MinimalTestKernel.getServiceRegistry(appContext);
+	serviceRegistry.setComponent(
+	    TaskScheduler.class,
+	    MinimalTestKernel.getSystemRegistry(
+		appContext).getComponent(TaskScheduler.class));
+	deleteDirectory();
+	createDataService(serviceRegistry);
 	    
-	    txn = createTransaction(10000);
-	    dataService.configure(serviceRegistry, txnProxy);
-	    txnProxy.setComponent(DataService.class, dataService);
-	    txnProxy.setComponent(DataServiceImpl.class, dataService);
-	    serviceRegistry.setComponent(DataManager.class, dataService);
-	    serviceRegistry.setComponent(DataService.class, dataService);
-	    serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-	    txn.commit();
-	}
-	catch (Exception e) {
-	    e.printStackTrace();
-	}
+	txn = createTransaction(10000);
+	txnProxy.setComponent(DataService.class, dataService);
+	txnProxy.setComponent(DataServiceImpl.class, dataService);
+	serviceRegistry.setComponent(DataManager.class, dataService);
+	serviceRegistry.setComponent(DataService.class, dataService);
+	serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+	txn.commit();
     }
 
     @After public void tearDown() {
@@ -2205,7 +2190,7 @@ public class TestScalableHashMap extends TestCase {
 			       "DataStoreImpl.directory", DB_DIRECTORY);
 	properties.setProperty(StandardProperties.APP_NAME,
 			       "TestScalableHashMap");
-	dataService = new DataServiceImpl(properties, registry);
+	dataService = new DataServiceImpl(properties, registry, txnProxy);
     }
 
     private void deleteDirectory() {
