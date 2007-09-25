@@ -9,7 +9,6 @@
  */
 
 #include "sgs/config.h"
-#include <arpa/inet.h>
 #include "sgs/id.h"
 #include "sgs/error_codes.h"
 #include "sgs/message.h"
@@ -17,6 +16,8 @@
 
 /* for sgs_id_impl_write() */
 #include "sgs/private/id_impl.h"
+
+static const int SGS_MSG_MAX_CONTENT_LEN = 65535;
 
 typedef struct sgs_message_impl {
     /** Pointer to the start of the memory reserved for this message. */
@@ -51,13 +52,13 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
   
     /** check that this won't make the message too long */
     if (new_size > SGS_MSG_MAX_LENGTH) {
-        errno = EMSGSIZE;
+        errno = EINVAL;
         return -1;
     }
   
     /** check that this message has enough room allocated */
     if (new_size > pmsg->buflen) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return -1;
     }
   
@@ -80,20 +81,20 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     size_t new_size = pmsg->size + clen + 2;  /** 2 bytes for length field */
     uint16_t _uint16_tmp;
   
-    if (clen > UINT16_MAX) {
+    if (clen > SGS_MSG_MAX_CONTENT_LEN) {
         errno = SGS_ERR_SIZE_ARG_TOO_LARGE;
         return -1;
     }
   
     /** check that this won't make the message too long */
     if (new_size > SGS_MSG_MAX_LENGTH) {
-        errno = EMSGSIZE;
+        errno = EINVAL;
         return -1;
     }
   
     /** check that this message has enough room allocated */
     if (new_size > pmsg->buflen) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return -1;
     }
   
@@ -136,15 +137,18 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
  * sgs_msg_deserialize()
  */
 sgs_message* sgs_msg_deserialize(uint8_t *buffer, size_t buflen) {
-    sgs_message* result = malloc(sizeof(sgs_message));
+    uint32_t len;
+    sgs_message* result;
+    
+    result = malloc(sizeof(sgs_message));
+
     if (result == NULL)
         return NULL;
 
-    uint32_t *ptr;
   
     /** read message-length-field (first 4 bytes) */
-    ptr = (uint32_t*)buffer;
-    result->size = ntohl(*ptr);
+    len = *((uint32_t*)buffer);
+    result->size = ntohl(len);
   
     /** account for the 4-bytes holding the length itself */
     result->size += 4;
@@ -161,7 +165,7 @@ sgs_message* sgs_msg_deserialize(uint8_t *buffer, size_t buflen) {
   
     /** invalid message: too big */
     if (result->size > SGS_MSG_MAX_LENGTH) {
-        errno = EMSGSIZE;
+        errno = EINVAL;
         free(result);
         return NULL;
     }
@@ -228,7 +232,7 @@ sgs_message* sgs_msg_create(uint8_t *buffer, size_t buflen,
 
     /** Buffer is too small to hold any messages (even w/o any payload). */
     if (buflen < 7) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return NULL;
     }
 
@@ -254,12 +258,15 @@ void sgs_msg_destroy(sgs_message* msg) {
 
 #ifndef NDEBUG
 void sgs_msg_dump(const sgs_message* msg) {
-    for (size_t i = 0; i < msg->size; ++i) {
-        if (i > 0)
-            printf(" ");
-        printf("%2.2x", msg->buf[i]);
+    size_t i;
+
+    for (i = 0; i < msg->size; ++i) {
+        printf("  %2.2x", msg->buf[i]);
+        if ((i % 16) == 0)
+            printf("\n");
     }
-    printf("\n");
+    if ((i % 16) != 1)
+        printf("\n");
 }
 #endif /* !NDEBUG */
 

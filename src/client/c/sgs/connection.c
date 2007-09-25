@@ -17,10 +17,12 @@
 #include "sgs/private/connection_impl.h"
 #include "sgs/private/io_utils.h"
 
-#include <fcntl.h>
+#ifndef WIN32
 #include <netdb.h>
 #include <sys/select.h>
-#include <poll.h>  /** just for POLLIN, POLLOUT, POLLERR declarations */
+#endif /* !WIN32 */
+
+#include <fcntl.h>
 
 #define SGS_CONNECTION_IMPL_IO_BUFSIZE SGS_MSG_MAX_LENGTH
 
@@ -33,8 +35,11 @@ static int consume_data(sgs_connection_impl *connection);
 int sgs_connection_do_work(sgs_connection_impl *connection) {
     fd_set readset, writeset, exceptset;
     struct timeval timeout_tv;
-    int result, sockfd = connection->socket_fd;
+    int result;
+    int sockfd;
     socklen_t optlen;
+
+    sockfd = connection->socket_fd;
     
     FD_ZERO(&readset);
     FD_ZERO(&writeset);

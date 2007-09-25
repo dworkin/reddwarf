@@ -14,8 +14,9 @@
 #include "sgs/private/channel_impl.h"
 #include "sgs/private/session_impl.h"
 
-#include <arpa/inet.h>
 #include <wchar.h>
+
+static const int SGS_MAX_RECIPIENTS = 65535;
 
 /*
  * STATIC FUNCTION DECLARATIONS
@@ -146,7 +147,7 @@ static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     if (sgs_msg_add_uint32(msg, session->seqnum_lo) == -1) return -1;
     
     /** Add recipient-count to message. */
-    if (recipslen > UINT16_MAX) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
+    if (recipslen > SGS_MAX_RECIPIENTS) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
     _uint16_tmp = htons(recipslen);
     if (sgs_msg_add_arb_content(msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
         return -1;

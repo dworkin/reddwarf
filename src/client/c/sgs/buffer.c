@@ -21,7 +21,8 @@ size_t sgs_buffer_position(const sgs_buffer_impl* buffer) {
 #ifndef NDEBUG
 # include <stdio.h>
 void sgs_buffer_dump(const sgs_buffer_impl* buf) {
-    for (size_t i = 0; i < buf->size; ++i) {
+    size_t i;
+    for (i = 0; i < buf->size; ++i) {
         printf("%2.2x ", buf->buf[i]);
     }
 }
@@ -117,7 +118,7 @@ int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
     size_t writable = writable_len(buffer);
     
     if (len > sgs_buffer_remaining(buffer)) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return -1;
     }
     

@@ -70,14 +70,15 @@ size_t sgs_id_get_byte_len(const sgs_compact_id *id) {
  * sgs_id_create()
  */
 sgs_compact_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc) {
-    sgs_compact_id* id = malloc(sizeof(sgs_compact_id));
-
+    ssize_t result;
+    sgs_compact_id* id;
+    
+    id = malloc(sizeof(sgs_compact_id));
     if (id == NULL) return NULL;
 
     id->uncompressed_len = sizeof(id->uncompressed);
 
-    ssize_t result =
-        unpack(id, data, len);
+    result = unpack(id, data, len);
 
     if (rc != NULL)
         *rc = result;
@@ -93,7 +94,8 @@ sgs_compact_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc) {
 #ifndef NDEBUG
 # include <stdio.h>
 void sgs_id_dump(const sgs_compact_id* id) {
-    for (size_t i = 0; i < id->uncompressed_len; ++i) {
+    size_t i;
+    for (i = 0; i < id->uncompressed_len; ++i) {
         printf("%2.2x", id->uncompressed[i]);
     }
     printf("\n");
@@ -101,10 +103,12 @@ void sgs_id_dump(const sgs_compact_id* id) {
 #endif /* !NDEBUG */
 
 sgs_compact_id* sgs_id_duplicate(const sgs_compact_id* id) {
-    return id;
+    // FIXME
+    return (sgs_compact_id*) id;
 }
 
 void sgs_id_destroy(sgs_compact_id* id) {
+    // FIXME
     // no-op
 }
 
@@ -191,7 +195,7 @@ static ssize_t pack(uint8_t *dst, size_t dstlen, const uint8_t *src,
     }
     
     if (size > dstlen) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return -1;
     }
     
@@ -234,7 +238,7 @@ static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
     }
     
     if (size > id->uncompressed_len) {
-        errno = ENOBUFS;
+        errno = EINVAL;
         return -1;
     }
 

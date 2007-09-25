@@ -11,7 +11,6 @@
 
 #include "sgs/config.h"
 #include "sgs/channel.h"
-#include <poll.h>
 #include "sgs/private/channel_impl.h"
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
@@ -186,13 +185,14 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
  */
 int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     int8_t result;
-    ssize_t namelen, offset;
+    ssize_t namelen, offset, offset2;
     sgs_id* channel_id;
     sgs_id* sender_id;
     sgs_message* msg;
     const uint8_t* msg_data;
     sgs_channel* channel;
     size_t msg_datalen;
+            
     
     msg = sgs_msg_deserialize(session->msg_buf, sizeof(session->msg_buf));
     if (msg == NULL)
@@ -327,8 +327,6 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              */
             offset += 8;
 
-            ssize_t offset2;
-            
             /** field 3: session-id of sender (compact-id format) */
             sender_id = sgs_id_create(msg_data + offset, msg_datalen - offset,
                 &offset2);
@@ -365,13 +363,16 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 }
 
 int sgs_session_impl_send_msg(sgs_session_impl *session) {
-    sgs_message* msg = sgs_msg_deserialize(session->msg_buf,
+    size_t msg_size;
+    sgs_message* msg;
+
+    msg = sgs_msg_deserialize(session->msg_buf,
             sizeof(session->msg_buf));
     
     if (msg == NULL)
         return -1;
 
-    size_t msg_size = sgs_msg_get_size(msg);
+    msg_size = sgs_msg_get_size(msg);
     sgs_msg_destroy(msg);
     
     /** Send message buffer to connection to be sent. */
@@ -397,11 +398,9 @@ int sgs_session_impl_send_msg(sgs_session_impl *session) {
  * Increments the session's internal sequence number.
  */
 static void increment_seqnum(sgs_session_impl *session) {
-    if (session->seqnum_lo == UINT32_MAX) {
+    session->seqnum_lo++;
+    if (session->seqnum_lo == 0) {
         session->seqnum_hi++;
-        session->seqnum_lo = 0;
-    } else {
-        session->seqnum_lo++;
     }
 }
 

@@ -94,7 +94,7 @@ size_t sgs_buffer_size(const sgs_buffer* buffer);
  *
  * Copies data into the buffer as long as the length of the data is less than
  * the remaining capacity of the buffer, returning 0.  Otherwise, returns -1 and
- * errno is set to ENOBUFS.
+ * errno is set to EINVAL.
  */
 int sgs_buffer_write(sgs_buffer* buffer, const uint8_t* data, size_t len);
 
