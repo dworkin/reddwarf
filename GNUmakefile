@@ -40,7 +40,8 @@ build_dist:
 	svn -q export $(TOPDIR)/etc/CHANGELOG-client $(DISTNAME)/CHANGELOG
 	svn -q export $(TOPDIR)/etc/LICENSE-client $(DISTNAME)/LICENSE
 	svn -q export $(TOPDIR)/etc/NOTICE-client-doc.txt $(DISTNAME)/NOTICE.txt
-	svn -q export $(TOPDIR)/etc/README-client-c-source $(DISTNAME)/README
+	cat $(TOPDIR)/etc/README-client-c-source | \
+	    sed 's/@VERSION@/$(VERSION)/g' > $(DISTNAME)/README
 
 clean:
 	@cd $(TOPDIR)/src/client/c && $(MAKE) $@
