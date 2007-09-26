@@ -1,9 +1,6 @@
 # Include file for SGS Makefile
 
-VERSION=0.9.3
-
 BINDIR  = $(TOPDIR)/bin
-DISTDIR = $(TOPDIR)/dist
 OBJDIR  = .obj
 
 .DEFAULT: all

@@ -2,14 +2,14 @@
 
 TOPDIR = .
 
-DISTNAME = sgs_c_api_$(VERSION)
-DIST = \
-	$(DISTDIR)/$(DISTNAME).zip \
-	$(DISTDIR)/$(DISTNAME).tar.gz
+VERSION = 0.9.3
 
-.DEFAULT: $(DIST)
+DISTNAME = sgs_c_client_$(VERSION)
 
-all: build $(DIST)
+DIST =  $(DISTNAME).zip \
+	$(DISTNAME).tar.gz
+
+all: $(DIST)
 
 build: build_src build_test build_example
 
@@ -22,23 +22,36 @@ build_test: build_src
 build_example: build_src
 	cd $(TOPDIR)/example/c-chat && $(MAKE)
 
-dist: build_src build_example
+dist: realclean
+	@mkdir -p $(DISTNAME)
+	@mkdir -p $(DISTNAME)/etc
+	@mkdir -p $(DISTNAME)/src/client
+	@mkdir -p $(DISTNAME)/test/client
+	@mkdir -p $(DISTNAME)/example
+	svn -q export $(TOPDIR)/src/client/c $(DISTNAME)/src/client/c
+	svn -q export $(TOPDIR)/test/client/c $(DISTNAME)/test/client/c
+	svn -q export $(TOPDIR)/example/c-chat $(DISTNAME)/example/c-chat
+	svn -q export $(TOPDIR)/etc/mk $(DISTNAME)/etc/mk
+	svn -q export $(TOPDIR)/GNUmakefile $(DISTNAME)/GNUmakefile
+	svn -q export $(TOPDIR)/env.bat $(DISTNAME)/env.bat
 
 clean:
-	cd $(TOPDIR)/src/client/c && $(MAKE) $@
-	cd $(TOPDIR)/test/client/c && $(MAKE) $@
-	cd $(TOPDIR)/example/c-chat && $(MAKE) $@
+	@cd $(TOPDIR)/src/client/c && $(MAKE) $@
+	@cd $(TOPDIR)/test/client/c && $(MAKE) $@
+	@cd $(TOPDIR)/example/c-chat && $(MAKE) $@
 
 realclean:
-	cd $(TOPDIR)/src/client/c && $(MAKE) $@
-	cd $(TOPDIR)/test/client/c && $(MAKE) $@
-	cd $(TOPDIR)/example/c-chat && $(MAKE) $@
+	-rm -rf $(DISTNAME)
+	-rm -f $(DIST)
+	@cd $(TOPDIR)/src/client/c && $(MAKE) $@
+	@cd $(TOPDIR)/test/client/c && $(MAKE) $@
+	@cd $(TOPDIR)/example/c-chat && $(MAKE) $@
 
-$(DISTDIR)/$(DISTNAME).zip: dist
-	@mkdir -p $(DISTDIR)
+$(DISTNAME).zip: dist
+	$(ZIP) -r9q $@ $(DISTNAME)
 
-$(DISTDIR)/$(DISTNAME).tar.gz: dist
-	@mkdir -p $(DISTDIR)
+$(DISTNAME).tar.gz: dist
+	$(TAR) cf - $(DISTNAME) | $(GZIP) -c > $@
 
 .PHONY: all build build_src build_test build_example dist
 

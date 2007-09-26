@@ -7,4 +7,6 @@ INCS = -I.
 CFLAGS = $(DBG) $(OPT) $(DEFS) $(INCS)
 LDFLAGS = $(DBG) $(OPT)
 LDLIBS = -lnsl -lsocket
-
+ZIP=zip
+GZIP=gzip
+TAR=tar

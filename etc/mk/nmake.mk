@@ -1,9 +1,6 @@
 # Include file for SGS NMake Makefile
 
-VERSION=0.9.3
-
 BINDIR  = $(TOPDIR)\bin
-DISTDIR = $(TOPDIR)\dist
 OBJDIR  = obj
 
 VCDIR  = "C:\Program Files\Microsoft Visual Studio 8\VC"
