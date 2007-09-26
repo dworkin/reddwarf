@@ -33,12 +33,25 @@ import java.math.BigInteger;
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+
+/*
+ * FIXME: Modify clear to remove the objects associated with the children nodes
+ * in a separate task, to avoid scaling problems.  -tjb@sun.com (09/26/2007)
+ *
+ * FIXME: Add an asynchronous version of size to avoid scaling problems.
+ * -tjb@sun.com (09/26/2007)
+ *
+ * XXX: Maybe modify getEntry and containsValue to check if the specified
+ * object has the same object ID as a deleted object?  -tjb@sun.com
+ * (09/26/2007)
+ */
 
 /**
  * A scalable implementation of {@link Map}.  The internal structure of the map
@@ -52,16 +65,16 @@ import java.util.Set;
  * Developers may use this class as a drop-in replacement for the {@link
  * java.util.HashMap} class for use in a {@link ManagedObject}.  A {@code
  * HashMap} will typically perform better than this class when the number of
- * mappings is small and the objects being stored are small, and when minimal
+ * mappings is small, the objects being stored are small, and minimal
  * concurrency is required.  As the size of the serialized {@code HashMap}
  * increases, this class will perform significantly better.  Developers are
  * encouraged to profile the size of their map to determine which
- * implementation will perform better.  Note that {@code HashMap} has no
- * implicit concurrency where two {@code Task}s running in parallel are able to
- * modify it at the same time, so this class may perform in situations where
- * multiple tasks need to modify the set concurrently, even if the total number
- * of mappings is small.  Also note that this class should be used instead of
- * other {@code Map} implementations to store {@code ManagedObject} instances.
+ * implementation will perform better.  Note that {@code HashMap} does not
+ * provide any concurrency for {@code Task}s running in parallel that attempt
+ * to modify the map at the same time, so this class may perform in situations
+ * where multiple tasks need to modify the map concurrently, even if the total
+ * number of mappings is small.  Also note that, unlike {@code HashMap}, this
+ * class can be used to store {@code ManagedObject} instances directly.
  *
  * <p>
  *
@@ -75,14 +88,16 @@ import java.util.Set;
  * <p>
  *
  * This implementation requires that all keys and values be instances of {@link
- * Serializable}.  If a key or value is an instance of {@code Serializable} but
- * does not implement {@code ManagedObject}, this class will persist the object
- * as necessary; when such an object is removed from the map, it is also
- * removed from the {@code DataManager}.  If a key or value is an instance of
- * {@code ManagedObject}, the developer will be responsible for removing these
- * objects from the {@code DataManager} when done with them.  Developers should
- * not remove these object from the {@code DataManager} prior to removing them
- * from the map.
+ * Serializable}.  Attempting to add keys or values to the map that do not
+ * implement {@code Serializable} will result in an {@link
+ * IllegalArgumentException} being thrown.  If a key or value is an instance of
+ * {@code Serializable} but does not implement {@code ManagedObject}, this
+ * class will persist the object as necessary; when such an object is removed
+ * from the map, it is also removed from the {@code DataManager}.  If a key or
+ * value is an instance of {@code ManagedObject}, the developer will be
+ * responsible for removing these objects from the {@code DataManager} when
+ * done with them.  Developers should not remove these object from the {@code
+ * DataManager} prior to removing them from the map.
  *
  * <p>
  *
@@ -94,8 +109,8 @@ import java.util.Set;
  * <p>
  *
  * <a name="iterator"></a> The {@code Iterator} for each view also implements
- * {@code Serializable}.  An single iterator may be saved by a different {@code
- * ManagedObject} instances, which create a distinct copy of the original
+ * {@code Serializable}.  A single iterator may be saved by different {@code
+ * ManagedObject} instances, which will create distinct copies of the original
  * iterator.  A copy starts its iteration from where the state of the original
  * was at the time of the copy.  However, a copy maintains a separate,
  * independent state from the original and will therefore not reflect any
@@ -107,18 +122,27 @@ import java.util.Set;
  *
  * <p>
  *
- * These iterators do not throw {@link
- * java.util.ConcurrentModificationException}.  An iterator is stable with
- * respect to the concurrent changes to the associated collection.  An iterator
- * may ignore additions and removals to the associated collection that occur
- * before the iteration site.
+ * The iterators do not throw {@link
+ * java.util.ConcurrentModificationException}.  The iterators are stable with
+ * respect to the concurrent changes to the associated collection, but may
+ * ignore additions and removals made during to the collection during
+ * iteration.
  *
  * <p>
  *
- * Note that unlike most collections, the {@code size} operation is <u>not</u>
- * a constant time operation.  Because of the asynchronous nature of the map,
- * determining the size requires accessing all of the entries in the tree.  The
- * {@code isEmpty} operation, however, is still {@code O(1)}.
+ * If a call to the {@link Iterator#next next} method on the iterators causes a
+ * {@link ObjectNotFoundException} to be thrown because the return value has
+ * been removed from the {@code DataManager}, note that the iterator will still
+ * have successfully moved to the next entry in its iteration.  In this case,
+ * the {@link Iterator#remove remove} method may be called on the iterator to
+ * remove the current object even though that object could not be returned.
+ *
+ * <p>
+ *
+ * Note that, unlike most collections, the {@code size}, {@code isEmpty}, and
+ * {@code clear} methods are <u>not</u> constant time operations.  Because of
+ * the asynchronous nature of the map, these methods may require accessing all
+ * of the entries in the tree.
  *
  * <p>
  *
@@ -157,17 +181,59 @@ public class ScalableHashMap<K,V>
     extends AbstractMap<K,V>
     implements Serializable, ManagedObject {
 
+    /*
+     * This class's implementation is based on the paper "Extendible hashing -
+     * a fast access method for dynamic files" by Fagin, Nievergelt, Pippenger,
+     * and Strong, ACM Transactions on Database Systems, Volume 4, Issue 3
+     * (September 1979), pp 315 - 344.
+     *
+     * The basic structure is a tree whose leaves are standard hash tables.
+     * Each non-leaf, or directory, node contains a fixed-size array, the node
+     * directory, of references to its children.  Keys are looked up in the
+     * tree based on their hash code.  Each directory node records its depth in
+     * the tree, which represents the number of the high order bits of the hash
+     * code to ignore when selecting the child node.  The necessary number of
+     * bits following that position are used as an index into the node
+     * directory to select the child node.  Although the full node directory
+     * array is allocated at the start, the children nodes are allocated as
+     * needed, and appear multiple times in the directory in order to select
+     * the proper node for the multiple indices that are associated with it.
+     * For example, if a node's directory can support 32 children but has only
+     * 2, then the first 16 entries in the node directory will point to the
+     * first child, and the remainder to the second child.
+     *
+     * Leaf nodes contain an array of hash buckets, each of which stores a
+     * linked list of the entries that hash to the that bucket.  The hash
+     * bucket chosen is based on the bits immediately below those used to
+     * choose the node in the parent's node directory.
+     *
+     * When a leaf node becomes too full, it is split into two nodes, which
+     * either replace the original node as children of that node's parent, or
+     * become children of the original node, which becomes a directory node.
+     * Once split, nodes are never merged, to avoid the concurrency conflicts
+     * that such a merge might produce.
+     *
+     * To support iteration, the entries in the bucket chains are ordered by
+     * hash code, treating the hash code as an unsigned integer so that buckets
+     * are ordered the same way as children nodes are.  Using the same order
+     * for nodes and buckets insures that the order of entries will be
+     * maintained when a node is split.  Keys with the same hash code are
+     * further ordered by the object ID of managed object that stores the key.
+     * Storing the hash code and object ID in the iterator provides a way to
+     * uniquely identify the location of the iteration within the table.
+     */
+
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
     /**
      * The split threshold used when none is specified in the constructor.
      */
-    // NOTE: through emprical testing, it has been shown that 98 elements is
+    // NOTE: through empirical testing, it has been shown that 98 elements is
     // the maximum number of PrefixEntries that will fit onto a 4K page.  As
-    // the datastore page size changes (or if object level locking becomes
+    // the data store page size changes (or if object level locking becomes
     // used), this should be adjusted to minimize page-level contention from
-    // writes the leaf nodes
+    // writes to the leaf nodes.
     private static final int DEFAULT_SPLIT_THRESHOLD = 98;
 
     /**
@@ -184,26 +250,33 @@ public class ScalableHashMap<K,V>
 	DEFAULT_DIRECTORY_SIZE;
 
     /**
-     * The default number of {@code PrefixEntry} entries per array for a leaf
+     * The default number of {@code PrefixEntry} slots allocated in the leaf
      * table.
      */
     // NOTE: *must* be a power of 2.
     private static final int DEFAULT_LEAF_CAPACITY = 1 << 8; // 256
 
     /**
-     * The maximum depth of this tree
+     * The number of bits in an int, which is also the number of bits available
+     * for performing lookup ups in the node directory.
      */
-    // NOTE: this is limited by the number of bits in the prefix, which
-    //       currently is implemented as a 32-bit int
-    private static final int MAX_DEPTH = 32;
+    private static final int INT_SIZE = 32;
+
+    /**
+     * The maximum depth of this tree.  The value is limited by the number of
+     * bits in the hash code and by the need to have at least one bit available
+     * for choosing the child node.
+     */
+    private static final int MAX_DEPTH = INT_SIZE - 1;
 
     /**
      * The minor version number, which can be modified to note a compatible
-     * change to the data structure.
+     * change to the data structure.  Incompatible changes should be marked by
+     * a change to the serialVersionUID.
      *
      * @serial
      */
-    private final short minorVersion = 0;
+    private final short minorVersion = 1;
 
     /**
      * The parent node directly above this.  For the root node, this
@@ -219,18 +292,16 @@ public class ScalableHashMap<K,V>
     //       intermediate nodes.
 
     /**
-     * The leaf node immediately to the left of this table if this node is
-     * itself a leaf.  If this node is an intermediate node in tree this
-     * reference as well as the {@code rightLeafRef} will be {@code null}.
+     * The leaf node immediately to the left of this node if this is a leaf
+     * node, else {@code null}.
      *
      * @serial
      */
     ManagedReference leftLeafRef;
 
     /**
-     * The leaf node immediately to the left of this table if this node is
-     * itself a leaf.  If this node is an intermediate node in tree this
-     * reference as well as the {@code rightLeafRef} will be {@code null}
+     * The leaf node immediately to the right of this node if this is a leaf
+     * node, else {@code null}.
      *
      * @serial
      */
@@ -246,7 +317,7 @@ public class ScalableHashMap<K,V>
      */
     // NOTE: for a diagram of how this directory is arranged, see Fagin et
     //	     al. "Extendible Hashing" (1979) p. 321, fig 3
-    private ManagedReference[] nodeDirectory;
+    ManagedReference[] nodeDirectory;
 
     /**
      * The fixed-size table for storing all Map entries.  This table will be
@@ -264,11 +335,11 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
-    private int modifications;
+    int modifications;
 
     /**
-     * The number of elements in this node's table.  Note that this is
-     * <i>not</i> the total number of elements in the entire tree.  For a
+     * The number of entries in this node's table.  Note that this is
+     * <i>not</i> the total number of entries in the entire tree.  For a
      * directory node, this should be set to 0.
      *
      * @serial
@@ -276,8 +347,8 @@ public class ScalableHashMap<K,V>
     private int size;
 
     /**
-     * The maximum number of {@code PrefixEntry} entries in this table before
-     * it will split this table into two leaf tables.
+     * The maximum number of {@code PrefixEntry} entries in a leaf node before
+     * it will split into two leaf nodes.
      *
      * @see #split split
      * @serial
@@ -308,33 +379,34 @@ public class ScalableHashMap<K,V>
     final int depth;
 
     /**
-     * The number of bits used in the node directory.  This is calculated based
-     * on the {@code directorySize} provided in the constructor.
+     * The maximum number of bits used in the node directory.  This is
+     * calculated based on the {@code directorySize} provided in the
+     * constructor.
      *
      * @see #addLeavesToDirectory addLeavesToDirectory
      * @serial
      */
-    private final int dirBits;
+    private final int maxDirBits;
 
     /**
-     * Constructs an empty {@code ScalableHashMap} at the provided depth, with
-     * the specified minimum concurrency, split threshold, merge threshold, and
-     * the maximum number of tree levels to collapse.
+     * Constructs an empty {@code ScalableHashMap}.
      *
-     * @param depth the depth of this table in the tree
-     * @param minDepth the necessary depth to support the minimum number of
-     *        concurrent write operations to support
-     * @param splitThreshold the number of entries at a leaf node that will
+     * @param depth the depth of this node in the tree
+     * @param minDepth the minimum depth of leaf nodes requested to support a
+     *        minimum number of concurrent write operations
+     * @param splitThreshold the number of entries in a leaf node that will
      *        cause the leaf to split
-     * @param directorySize the maximum number of entries in the directory.
-     *        This is equivalent to the maximum number of leaves under this
-     *        node when all children have been added to it.
+     * @param directorySize the maximum number of children nodes of a directory
+     *        node
      *
-     * @throws IllegalArgumentException if: <ul>
-     *         <li> {@code depth} is out of the range of valid prefix lengths
-     *	       <li> {@code minDepth} is negative
+     * @throws IllegalArgumentException if:
+     *	       <ul>
+     *         <li> {@code depth} is negative or greater than {@link #MAX_DEPTH}
+     *	       <li> {@code minDepth} is negative or greater than {@code
+     *		    MAX_DEPTH}
      *	       <li> {@code splitThreshold} is non-positive
-     *         <li> {@code directorySize} is less than two </ul>
+     *         <li> {@code directorySize} is less than two
+     *	       </ul>
      */
     // NOTE: this constructor is currently left package private but future
     // implementations could expose some of these parameters for performance
@@ -343,20 +415,20 @@ public class ScalableHashMap<K,V>
     ScalableHashMap(int depth, int minDepth, int splitThreshold,
 		    int directorySize) {
 	if (depth < 0 || depth > MAX_DEPTH) {
-	    throw new IllegalArgumentException("Illegal tree depth: " +
-					       depth);
+	    throw new IllegalArgumentException(
+		"Illegal tree depth: " + depth);
 	}
-	if (minDepth < 0) {
-	    throw new IllegalArgumentException("Illegal minimum depth: "
-					       + minDepth);
+	if (minDepth < 0 || minDepth > MAX_DEPTH) {
+	    throw new IllegalArgumentException(
+		"Illegal minimum depth: " + minDepth);
 	}
 	if (splitThreshold <= 0) {
-	    throw new IllegalArgumentException("Illegal split threshold: " +
-					      splitThreshold);
+	    throw new IllegalArgumentException(
+		"Illegal split threshold: " + splitThreshold);
 	}
 	if (directorySize < 2) {
-	    throw new IllegalArgumentException("Illegal directory size: " +
-					       directorySize);
+	    throw new IllegalArgumentException(
+		"Illegal directory size: " + directorySize);
 	}
 
 	this.depth = depth;
@@ -368,11 +440,11 @@ public class ScalableHashMap<K,V>
 	leftLeafRef = null;
 	rightLeafRef = null;
 
-	this.leafCapacity = DEFAULT_LEAF_CAPACITY;
+	leafCapacity = DEFAULT_LEAF_CAPACITY;
 	table = new PrefixEntry[leafCapacity];
 	nodeDirectory = null;
 
-	dirBits = requiredNumBits(directorySize);
+	maxDirBits = requiredNumBits(directorySize);
 
 	this.splitThreshold = splitThreshold;
 
@@ -394,7 +466,7 @@ public class ScalableHashMap<K,V>
      */
     private static int requiredNumBits(int n) {
 	assert n > 0;
-	return 32 - Integer.numberOfLeadingZeros(n - 1);
+	return INT_SIZE - Integer.numberOfLeadingZeros(n - 1);
     }
 
     /**
@@ -426,17 +498,17 @@ public class ScalableHashMap<K,V>
      *
      * @param m the mappings to include
      */
-    public ScalableHashMap(Map<? extends K, ? extends V> m) {
+    public ScalableHashMap(Map<? extends K, ? extends V> map) {
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY),
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
-	if (m == null) {
-	    throw new NullPointerException("The provided map is null");
+	if (map == null) {
+	    throw new NullPointerException("The map argument must not be null");
 	}
-	putAll(m);
+	putAll(map);
     }
 
     /**
-     * Returns the minimum depth of the tree necessary to support the provided
+     * Returns the minimum depth of the tree necessary to support the requested
      * minimum number of concurrent write operations.
      *
      * @param minConcurrency the minimum number of concurrent write operations
@@ -446,12 +518,12 @@ public class ScalableHashMap<K,V>
      *
      * @throws IllegalArgumentException if minConcurrency is non-positive
      */
-    static int findMinDepthFor(int minConcurrency) {
+    private static int findMinDepthFor(int minConcurrency) {
 	if (minConcurrency <= 0) {
-	    throw new IllegalArgumentException("Non-positive minimum "+
-					       "concurrency: "+ minConcurrency);
+	    throw new IllegalArgumentException(
+		"Non-positive minimum concurrency: " + minConcurrency);
 	}
-	return requiredNumBits(minConcurrency);
+	return Math.min(MAX_DEPTH, requiredNumBits(minConcurrency));
     }
 
     /**
@@ -478,7 +550,7 @@ public class ScalableHashMap<K,V>
 	    return;
 	}
 	// rather than split repeatedly, this method inlines all splits at once
-	// and links the children together.  This is much more efficient
+	// and links the children together.  This is much more efficient.
 
 	table = null; // this node is no longer a leaf
 	nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
@@ -487,8 +559,8 @@ public class ScalableHashMap<K,V>
 	// that we never create more than the maximum number of leaves here.
 	// If we need more depth, we will use a recursive call to the ensure
 	// depth on the leaves.
-	int leafDepthOffset = Math.min(minDepth - depth, dirBits);
-	int numLeaves = 1 << leafDepthOffset;
+	int leafBits = Math.min(minDepth - depth, maxDirBits);
+	int numLeaves = 1 << leafBits;
 
 	DataManager dm = AppContext.getDataManager();
 	dm.markForUpdate(this);
@@ -496,9 +568,8 @@ public class ScalableHashMap<K,V>
 
 	ScalableHashMap[] leaves = new ScalableHashMap[numLeaves];
 	for (int i = 0; i < numLeaves; ++i) {
-	    leaves[i] = new ScalableHashMap(depth + leafDepthOffset,
-					    minDepth, splitThreshold,
-					    1 << dirBits);
+	    leaves[i] = new ScalableHashMap(
+		depth + leafBits, minDepth, splitThreshold, 1 << maxDirBits);
 	    leaves[i].parentRef = thisRef;
 	}
 
@@ -521,28 +592,25 @@ public class ScalableHashMap<K,V>
 	leftLeafRef = null;
 	rightLeafRef = null;
 
-	int entriesPerLeaf = nodeDirectory.length / leaves.length;
+	int entriesPerLeaf = nodeDirectory.length / numLeaves;
 
 	// lastly, fill the directory with the references
-	for (int i = 0, j = 0; i < nodeDirectory.length; ) {
-	    nodeDirectory[i] = dm.createReference(leaves[j]);
-	    if (++i % entriesPerLeaf == 0) {
-		j++;
-	    }
+	int pos = 0;
+	for (ScalableHashMap leaf : leaves) {
+	    int nextPos = pos + entriesPerLeaf;
+	    Arrays.fill(nodeDirectory, pos, nextPos, dm.createReference(leaf));
+	    pos = nextPos;
 	}
 
-	// if the maximum depth of any leaf node under this is still smaller
-	// than the minimum depth, call ensure depth on the directory nodes
-	// under this
-	if (depth + leafDepthOffset < minDepth) {
-	    for (ManagedReference dirNode : nodeDirectory)
-		dirNode.get(ScalableHashMap.class).initDepth(minDepth);
+	/* Make sure the leaves have the minimum required depth. */
+	for (ScalableHashMap leaf : leaves) {
+	    leaf.initDepth(minDepth);
 	}
     }
 
     /**
-     * Returns the maximum number of bits of the hash code that are used for
-     * looking up children of this node in the node directory.
+     * Returns the number of bits of the hash code that are used for looking up
+     * children of this node in the node directory.
      *
      * @return the number of directory bits for this node
      */
@@ -551,7 +619,7 @@ public class ScalableHashMap<K,V>
 	 * If the node is very deep, then the number of bits used to do
 	 * directory lookups is limited by the total number of bits.
 	 */
-	return Math.min(MAX_DEPTH - depth, dirBits);
+	return Math.min(INT_SIZE - depth, maxDirBits);
     }
 
     /**
@@ -560,26 +628,27 @@ public class ScalableHashMap<K,V>
      * map will be removed from the {@code DataManager}
      */
     public void clear() {
-
+	DataManager dm = AppContext.getDataManager();
+	dm.markForUpdate(this);
+	modifications++;
 	if (table != null) { // this is a leaf node
 	    for (PrefixEntry e : table) {
-		if (e != null) {
+		while (e != null) {
+		    PrefixEntry next = e.next;
 		    e.unmanage();
+		    e = next;
 		}
 	    }
 	} else { // this is a directory node
-	    DataManager dm = AppContext.getDataManager();
 	    ManagedReference prevNodeRef = null;
-	    ScalableHashMap node = null;
-	    for (ManagedReference r : nodeDirectory) {
+	    for (ManagedReference ref : nodeDirectory) {
 		// skip re-clearing duplicate nodes in the directory
-		if (r == prevNodeRef) {
-		    continue;
+		if (ref != prevNodeRef) {
+		    prevNodeRef = ref;
+		    ScalableHashMap node = ref.get(ScalableHashMap.class);
+		    node.clear();
+		    dm.removeObject(node);
 		}
-		prevNodeRef = r;
-		node = r.get(ScalableHashMap.class);
-		node.clear();
-		dm.removeObject(node);
 	    }
 	}
 
@@ -588,8 +657,6 @@ public class ScalableHashMap<K,V>
 	    table = new PrefixEntry[leafCapacity];
 	    size = 0;
 	}
-
-	modifications++;
     }
 
     /**
@@ -607,21 +674,38 @@ public class ScalableHashMap<K,V>
      * @return the entry associated with the key or {@code null} if no such
      *         entry exists
      */
-    private PrefixEntry<K,V> getEntry(Object key) {
+    PrefixEntry<K,V> getEntry(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	ScalableHashMap<K,V> leaf = lookup(hash);
 	for (PrefixEntry<K,V> e = leaf.getBucket(leaf.indexFor(hash));
 	     e != null; e = e.next)
 	{
-	    if (e.hash == hash && safeEquals(e.getKey(), key)) {
-		return e;
+	    if (e.hash == hash) {
+		K k;
+		try {
+		    k = e.getKey();
+		} catch (ObjectNotFoundException onfe) {
+		    continue;
+		}
+		if (safeEquals(k, key)) {
+		    return e;
+		}
+	    } else if (unsignedLessThan(hash, e.hash)) {
+		break;
 	    }
 	}
 	return null;
     }
 
-    /** Returns true if the objects are equal or both null. */
-    private static boolean safeEquals(Object x, Object y) {
+    /**
+     * Returns {@code true} if the objects are equal or both {@code null}.
+     *
+     * @param x first argument
+     * @param y second argument
+     *
+     * @return whether the objects are equal or both {@code null}
+     */
+    static boolean safeEquals(Object x, Object y) {
 	return x == y || (x != y && x.equals(y));
     }
 
@@ -701,7 +785,13 @@ public class ScalableHashMap<K,V>
      * map size increases due to the cost of accessing the data manager.
      */
     public boolean containsValue(Object value) {
-	for (V v : values()) {
+	for (Iterator<V> i = values().iterator(); i.hasNext(); ) {
+	    V v;
+	    try {
+		v = i.next();
+	    } catch (ObjectNotFoundException e) {
+		continue;
+	    }
 	    if (safeEquals(v, value)) {
 		return true;
 	    }
@@ -710,31 +800,30 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Divides the entries in this node into two leaf nodes on the basis of
-     * prefix, and then marks this node as an intermediate node.  This method
-     * should only be called when the entries contained within this node have
-     * valid prefix bits remaining (i.e. they have not already been shifted to
-     * the maximum possible precision).
+     * Divides the entries in this leaf node into two leaf nodes on the basis
+     * of prefix, and then either adds the new nodes to the parent or converts
+     * this node to a directory node.  This method should only be called when
+     * the entries contained within this node have valid prefix bits remaining
+     * (i.e. they have not already been shifted to the maximum possible
+     * precision).
      *
      * @see #addEntry addEntry
      */
     private void split() {
-
-	if (table == null) { // can't split an intermediate node!
-	    return;
-	}
+	assert table != null : "Can't split an directory node";
+	assert depth < MAX_DEPTH : "Can't split at maximum depth";
 
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
 	ScalableHashMap<K,V> leftChild =
-	    new ScalableHashMap<K,V>(depth+1, minDepth, splitThreshold,
-				     1 << dirBits);
+	    new ScalableHashMap<K,V>(
+		depth+1, minDepth, splitThreshold, 1 << maxDirBits);
 	ScalableHashMap<K,V> rightChild =
-	    new ScalableHashMap<K,V>(depth+1, minDepth, splitThreshold,
-				     1 << dirBits);
+	    new ScalableHashMap<K,V>(
+		depth+1, minDepth, splitThreshold, 1 << maxDirBits);
 
-	// in order add this node to the parent directory, we to determine the
+	// to add this node to the parent directory, we need to determine the
 	// prefix that will lead to this node.  Grabbing a hash code from one
 	// of our entries will suffice.
 	int prefix = 0x0; // this should never stay at its initial value
@@ -742,7 +831,7 @@ public class ScalableHashMap<K,V>
 	// iterate over all the entries in this table and assign them to either
 	// the right child or left child
 	int firstRight = table.length / 2;
-	for (int i = 0; i < table.length; ++i) {
+	for (int i = 0; i < table.length; i++) {
 	    ScalableHashMap<K,V> child =
 		(i < firstRight) ? leftChild : rightChild;
 	    PrefixEntry<K,V> prev = null;
@@ -760,8 +849,7 @@ public class ScalableHashMap<K,V>
 	    }
 	}
 
-	// null out the intermediate node's table as an optimization to reduce
-	// serialization time.
+	// null out the intermediate node's table
 	table = null;
 	size = 0;
 
@@ -792,32 +880,24 @@ public class ScalableHashMap<K,V>
 
 	// This node should form a new directory node in the following cases:
 	//
-	// 1. If this node is the root (parent == null).
+	// 1. This node is the root node.
 	//
-	// 2. The directory represents a limited subtree of the trie structure.
-	//    Within the directory, on a fixed number of levels may be
-	//    represented.  Since this is a binary trie, the maximum depth of
-	//    the subtree is precalculated as dirBits, which is in practice
-	//    log_2(directory.length).  If a new leaf nodes need to be added
-	//    that would cause the directory to exceed its implicit maximum
-	//    depth, the lowest leaf node on the path to where the new leaf
-	//    nodes will be added should become itself a directory node.  The
-	//    idicies in parent's directory that would have been used for
-	//    storing the children are already in use by nodes at the maximum
-	//    depth of the directory.
+	// 2. This node has reached the maximum permitted depth relative to its
+	//    parent.  Each directory node uses at most maxDirBits of the hash
+	//    code to determine the position of a child node in its directory.
+	//    If the depth of this node relative to its parent already uses
+	//    that number of bits, then an additional level of directory nodes
+	//    is needed to reach the desired depth.  Note that a node will
+	//    reach its maximum depth only after all of its parents have
+	//    already done so.
 	//
-	// 3. The minimum concurrency requires a minimum depth to the tree.
-	//    When the trie is constructed, a leaves will be of this minimum
-	//    depth.  When one of these leaves needs to split, it should not be
-	//    added to its parent directory.  This is required so that no
-	//    changes to a node at or below the minimum depth require
-	//    write-locking a directory node above it; avoiding this write-lock
-	//    eliminates the chance of write-locking the entire tree.
-	//    Therefore, if this node was a leaf node at the minimum depth, it
-	//    must become a new directory node.
-	//
+	// 3. The minimum concurrency requested requires that the parent node
+	//    not be modified.  When the trie is constructed, leaves are
+	//    created at a minimum depth.  When one of these leaves needs to
+	//    split, it should not be added to its parent directory, in order
+	//    to provide the requested concurrency.
 	if (parentRef == null ||
-	    depth % dirBits == 0 ||
+	    depth % maxDirBits == 0 ||
 	    depth == minDepth) {
 
 	    // this leaf node will become a directory node
@@ -828,14 +908,12 @@ public class ScalableHashMap<K,V>
 	    table = null;
 	    nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
-	    int right = nodeDirectory.length / 2;
+	    int firstRightIndex = nodeDirectory.length / 2;
 
-	    // update the new directory with redundant references to each of
-	    // the new leaf nodes.
-	    for (int i = 0; i < right; i++) {
-		nodeDirectory[i] = leftChildRef;
-		nodeDirectory[i | right] = rightChildRef;
-	    }
+	    // update the new directory with references to the new leaf nodes
+	    Arrays.fill(nodeDirectory, 0, firstRightIndex, leftChildRef);
+	    Arrays.fill(nodeDirectory, firstRightIndex, nodeDirectory.length,
+			rightChildRef);
 	} else {
 	    // In all other cases, this node can be added to its parent
 	    // directory.
@@ -843,8 +921,8 @@ public class ScalableHashMap<K,V>
 	    // notify the parent to remove this leaf by following the provided
 	    // prefix and then replace it with references to the right and left
 	    // children
-	    parentRef.get(ScalableHashMap.class).
-		addLeavesToDirectory(prefix, rightChildRef, leftChildRef);
+	    parentRef.get(ScalableHashMap.class).addLeavesToDirectory(
+		prefix, leftChildRef, rightChildRef);
 	}
     }
 
@@ -856,35 +934,38 @@ public class ScalableHashMap<K,V>
      * @return the leaf table responsible for storing all entries with the
      *         specified prefix
      */
-    private ScalableHashMap<K,V> lookup(int prefix) {
-
-	ScalableHashMap<K,V> leaf = this;
-	int original = prefix;
-
-	while (leaf.table == null) {
-	    leaf = leaf.directoryLookup(prefix);
-	    prefix = original << leaf.depth;
+    ScalableHashMap<K,V> lookup(int prefix) {
+	ScalableHashMap<K,V> node = this;
+	while (node.table == null) {
+	    int index = highBits(prefix << node.depth, node.getNodeDirBits());
+	    node = node.getChildNode(index);
 	}
-
-	return leaf;
+	return node;
     }
 
     /**
-     * Uses the provided prefix to look up the appropriate node in the
-     * directory.
+     * Returns the child node with the specified index.
      *
-     * @param prefix the current prefix of the lookup at this directory node
+     * @param index the index of the child node
      *
-     * @return the leaf node that is associated with the prefix
+     * @return the child node
      */
     @SuppressWarnings("unchecked")
-    private ScalableHashMap<K,V> directoryLookup(int prefix) {
-
-	// first, identify the number of bits in the prefix that will be valid
-	// for a directory at this depth, then shift only the significant bits
-	// down from the prefix and use those as an index into the directory.
-	int index = (prefix >>> (32 - getNodeDirBits()));
+    private ScalableHashMap<K,V> getChildNode(int index) {
 	return nodeDirectory[index].get(ScalableHashMap.class);
+    }
+
+    /**
+     * Shifts the specified number of the highest order bits to the rightmost
+     * position in the value, so that they can be used as an integer value.
+     *
+     * @param n the value
+     * @param numBits the number of highest order bits
+     *
+     * @return the requested highest order bits of the value
+     */
+    private static int highBits(int n, int numBits) {
+	return n >>> (INT_SIZE - numBits);
     }
 
     /**
@@ -894,68 +975,59 @@ public class ScalableHashMap<K,V>
      * proper conditions.
      *
      * @param prefix the prefix that leads to the node that will be replaced
-     * @param rightChildRef the right child of the node that will be replaced
      * @param leftChildRef the left child of the node that will be replaced
+     * @param rightChildRef the right child of the node that will be replaced
      */
     private void addLeavesToDirectory(int prefix,
-				      ManagedReference rightChildRef,
-				      ManagedReference leftChildRef) {
+				      ManagedReference leftChildRef,
+				      ManagedReference rightChildRef) {
 	prefix <<= this.depth;
 
-	// calculate the maximum number of bits available for the directory.
-	// Because the hash code is only 32 bits, it may not be equal to the
-	// maximum tree depth, which is determined by the directory size.  The
-	// split() method checks that this directory has room; however, we
-	// still need to know how many bits are being used to calculate the
-	// index.
-	int maxBits = getNodeDirBits();
-	int index = prefix >>> (32 - maxBits);
+	int dirBits = getNodeDirBits();
+	int index = highBits(prefix, dirBits);
 
 	// the leaf is under this node, so just look it up using the directory
-	@SuppressWarnings("unchecked") ScalableHashMap<K,V> leaf =
-	    nodeDirectory[index].get(ScalableHashMap.class);
+	ScalableHashMap<K,V> leaf = getChildNode(index);
 
 	DataManager dm = AppContext.getDataManager();
 
 	// remove the old leaf node
 	dm.removeObject(leaf);
-	// mark this leaf for update since it will be changing its directory
+	// mark this node for update since we will be changing its directory
 	dm.markForUpdate(this);
 
-	// update the leaf node to point to this directory node as their parent
+	// update the new children nodes to point to this directory node as
+	// their parent
 	ManagedReference thisRef = dm.createReference(this);
 	rightChildRef.get(ScalableHashMap.class).parentRef = thisRef;
 	leftChildRef.get(ScalableHashMap.class).parentRef = thisRef;
 
 	// how many bits in the prefix are significant for looking up the
-	// child.
-	int sigBits = (leaf.depth - depth);
+	// old leaf
+	int sigBits = leaf.depth - depth;
 
-	// create a bit mask for the parent's significant bits
-	int mask = ((1 << sigBits) - 1) << (maxBits - sigBits);
+	// create a bit mask for the bits in the directory index that selected
+	// the old leaf
+	int mask = ((1 << sigBits) - 1) << (dirBits - sigBits);
 
 	// this section calculates the starting and end points for the left and
 	// right leaf nodes in the directory.  It then adds references to the
 	// directory, which may include adding redundant references.
 
-	// directory index where the left child starts
+	// directory index where the old leaf started, which is where left
+	// child starts
 	int left = index & mask;
 
-	// bit offset between the left and right children in the directory
-	// array.  When we logical-or this offset with the left index, we get
-	// the index where the right child starts in the directory
-	int off = 1 << ((maxBits - sigBits) - 1);
+	// number of entries for each of left and right children -- half the
+	// total number of entries for the old leaf
+	int numEach = 1 << ((dirBits - sigBits) - 1);
 
-	// exclusive upper bound index in the directory for where the left
-	// child ends.  This is also where the right child starts in the
-	// directory.
-	int right = left | off;
+	// directory index where the right child starts
+	int right = left + numEach;
 
-	// update all the directory entres for the prefix
-	for (int i = left; i < right; ++i) {
-	    nodeDirectory[i] = leftChildRef;
-	    nodeDirectory[i | off] = rightChildRef;
-	}
+	// update the directory entries
+	Arrays.fill(nodeDirectory, left, left + numEach, leftChildRef);
+	Arrays.fill(nodeDirectory, right, right + numEach, rightChildRef);
     }
 
     /**
@@ -981,7 +1053,7 @@ public class ScalableHashMap<K,V>
      * @param h the initial hash value
      * @return a re-hashed version of the provided hash value
      */
-    static int hash(int h) {
+    private static int hash(int h) {
 	/*
 	 * Bad hashes tend to have only low bits set, and we choose nodes and
 	 * buckets starting with the higher bits, so XOR some lower bits into
@@ -1002,7 +1074,8 @@ public class ScalableHashMap<K,V>
      * @return the previous value mapped to the provided key, if any
      */
     public V put(K key, V value) {
-
+	checkSerializable(key, "key");
+	checkSerializable(value, "value");
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	ScalableHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
@@ -1058,6 +1131,23 @@ public class ScalableHashMap<K,V>
     }
 
     /**
+     * Checks that an object supplied as an argument is either {@code null} or
+     * implements {@code Serializable}.
+     *
+     * @param object the object
+     * @param argName the name of the argument
+     *
+     * @throws IllegalArgumentException if the object is not {@code null} and
+     *	       does not implement {@code Serializable}
+     */
+    static void checkSerializable(Object object, String argName) {
+	if (object != null && !(object instanceof Serializable)) {
+	    throw new IllegalArgumentException(
+		"The " + argName + " argument must be Serializable");
+	}
+    }
+
+    /**
      * Copies all of the mappings from the provided map into this map.  This
      * operation will replace any mappings for keys currently in the map if
      * they occur in both this map and the provided map.
@@ -1090,14 +1180,14 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Adds the provided entry to the the current leaf, chaining as necessary,
-     * but does <i>not</i> perform the size check for splitting.  This should
-     * only be called from {@link #split split} when adding children entries,
-     * or if splitting is already handled.
+     * Adds the provided entry to the the current leaf, but does <i>not</i>
+     * perform the size check for splitting.  This should only be called from
+     * {@link #split split} when adding children entries, or if splitting is
+     * already handled.
      *
      * @param entry the entry to add
      * @param prev the entry immediately prior to the entry to add, or {@code
-     *	      null} if the entry should be the first
+     *	      null} if the entry should be the first in the list
      */
     private void addEntry(PrefixEntry<K,V> entry, PrefixEntry<K,V> prev) {
 	size++;
@@ -1181,23 +1271,28 @@ public class ScalableHashMap<K,V>
 	    if (unsignedLessThan(hash, e.hash)) {
 		break;
 	    } else if (e.hash == hash && safeEquals(e.getKey(), key)) {
+		/*
+		 * Retrieve the value first, in case it has been removed from
+		 * the DataManager.
+		 */
+		V v = e.getValue();
+
+		// mark that this table's state has changed
+		AppContext.getDataManager().markForUpdate(leaf);
+		leaf.modifications++;
+		leaf.size--;
+
 		// remove the value and reorder the chained keys
 		if (e == prev) { // if this was the first element
 		    leaf.table[i] = next;
 		} else {
 		    prev.next = next;
 		}
-		// mark that this table's state has changed
-		AppContext.getDataManager().markForUpdate(leaf);
-
-		V v = e.getValue();
 
 		// if this data structure is responsible for the persistence
-		// lifetime of the key or value, remove them from the datastore
+		// lifetime of the key or value, remove them from the data
+		// store
 		e.unmanage();
-
-		--leaf.size;
-		leaf.modifications++;
 
 		// NOTE: this is where we would attempt a merge operation if we
 		// decide to later support one
@@ -1260,7 +1355,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the index for the given hash
      */
-    int indexFor(int h) {
+    private int indexFor(int h) {
 	/*
 	 * Return the bits immediately to the right of those used to choose
 	 * this node from the parent, but using the full complement of bits if
@@ -1269,25 +1364,27 @@ public class ScalableHashMap<K,V>
 	 * the nodes would be after a split.
 	 */
 	int leafBits = requiredNumBits(leafCapacity);
-	int shiftRight = 32 - Math.min(32, depth + leafBits);
-	return (h >>> shiftRight) & (table.length - 1);
+	int leftOffset = Math.min(INT_SIZE, depth + leafBits);
+	return highBits(h, leftOffset) & (leafCapacity - 1);
     }
 
     /**
      * An implementation of {@code Entry} that incorporates information about
      * the prefix at which it is stored, as well as whether the {@link
-     * ScalableHashMap} is responsible for the persistent lifetime of the
-     * value.
+     * ScalableHashMap} is responsible for the persistent lifetime of the key
+     * and value.
      *
      * <p>
      *
      * If a key or value that does not implement {@link ManagedObject} is
      * stored in the map, then it is wrapped using the {@link
      * ManagedSerializable} utility class so that the entry may have a {@code
-     * ManagedReference} to the value, rather than a Java reference.
+     * ManagedReference} to the value, rather than a standard reference.
+     *
+     * <p>
      *
      * This class performs an optimization if both key and value do not
-     * implemented {@code ManagedObject}.  In this case, both objects will be
+     * implement {@code ManagedObject}.  In this case, both objects will be
      * stored together in a {@link KeyValuePair}, which reduces the number of
      * accesses to the data store.
      *
@@ -1296,96 +1393,136 @@ public class ScalableHashMap<K,V>
     private static class PrefixEntry<K,V>
 	implements Entry<K,V>, Serializable {
 
+	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
-	/**
-	 * The reference to key for this entry. The class type of this
-	 * reference will depend on whether the map is managing the key.
-	 */
-	private ManagedReference keyRef;
+	/** The state bit mask for when the key is wrapped. */
+	private static final int KEY_WRAPPED = 1;
+
+	/** The state bit mask for when the value is wrapped. */
+	private static final int VALUE_WRAPPED = 2;
+
+	/** The state value for when the key and value are stored as a pair. */
+	private static final int KEY_VALUE_PAIR = 4;
 
 	/**
-	 * A reference to the value.  The class type of this reference will
-	 * depend on whether this map is managing the value.
+	 * A reference to the key, or key and value pair, for this entry. The
+	 * class type of this reference will depend on whether the map is
+	 * managing the key, and whether the key and value are paired.
+	 *
+	 * @serial
+	 */
+	private ManagedReference keyOrPairRef;
+
+	/**
+	 * A reference to the value, or null if the key and value are paired.
+	 * The class type of this reference will depend on whether this map is
+	 * managing the value.
+	 *
+	 * @serial
 	 */
 	private ManagedReference valueRef;
 
 	/**
-	 * If both the key and the value are not {@code ManagedObject}
-	 * instances, they will be combined into a single {@link KeyValuePair}
-	 * that is referred to by this {@code ManagedReference}.
-	 */
-	private ManagedReference keyValuePairRef;
-
-	/**
 	 * The next chained entry in this entry's bucket.
+	 *
+	 * @serial
 	 */
-	private PrefixEntry<K,V> next;
+	PrefixEntry<K,V> next;
 
 	/**
 	 * The hash value for this entry.  This value is also used to compute
 	 * the prefix.
+	 *
+	 * @serial
 	 */
-	private final int hash;
+	final int hash;
 
 	/**
-	 * Whether the key stored in this entry is actually stored as a {@link
-	 * ManagedSerializable}.
+	 * The state of the key and value, which is either a non-zero
+	 * combination of the KEY_WRAPPED and VALUE_WRAPPED, or is
+	 * KEY_VALUE_PAIR.
+	 *
+	 * @serial
 	 */
-	boolean isKeyWrapped;
+	byte state = 0;
 
 	/**
-	 * Whether the value stored in this entry is actually stored as a
-	 * {@link ManagedSerializable}.
-	 */
-	boolean isValueWrapped;
-
-	/**
-	 * Whether the key and value are currently stored together in a {@link
-	 * KeyValuePair}.
-	 */
-	boolean isKeyValueCombined;
-
-	/**
-	 * Constructs a new {@code PrefixEntry} with the provided hash code,
-	 * key, value and chained neighbor.
+	 * Constructs a new {@code PrefixEntry}.
 	 *
 	 * @param h the hash code for the key
 	 * @param k the key
 	 * @param v the value
 	 */
 	PrefixEntry(int h, K k, V v) {
+	    this.hash = h;
 
 	    DataManager dm = AppContext.getDataManager();
 
 	    // if both the key and value are not ManagedObjects, we can save a
 	    // get() and createReference() call each by merging them in a
 	    // single KeyValuePair
-	    isKeyValueCombined = (!(k instanceof ManagedObject) &&
-				  !(v instanceof ManagedObject));
-	    if (isKeyValueCombined) {
-		keyValuePairRef =
-		    dm.createReference(new KeyValuePair<K,V>(k,v));
-
-		keyRef = null;
-		valueRef = null;
+	    if (!(k instanceof ManagedObject) &&
+		!(v instanceof ManagedObject))
+	    {
+		setKeyValuePair();
+		keyOrPairRef = dm.createReference(new KeyValuePair<K,V>(k, v));
 	    } else {
 		// For the key and value, if each is already a ManagedObject,
 		// then we obtain a ManagedReference to the object itself,
 		// otherwise, we need to wrap it in a ManagedSerializable and
 		// get a ManagedReference to that
-		isKeyWrapped = !(k instanceof ManagedObject);
-		keyRef = dm.createReference(isKeyWrapped
-					    ? new ManagedSerializable<K>(k)
-					    : (ManagedObject) k);
-		isValueWrapped = !(v instanceof ManagedObject);
-		valueRef = dm.createReference(isValueWrapped
-					      ? new ManagedSerializable<V>(v)
-					      : (ManagedObject) v);
-		keyValuePairRef = null;
+		setKeyWrapped(!(k instanceof ManagedObject));
+		keyOrPairRef = dm.createReference(
+		    isKeyWrapped() ? new ManagedSerializable<K>(k)
+		    : (ManagedObject) k);
+		setValueWrapped(!(v instanceof ManagedObject));
+		valueRef = dm.createReference(
+		    isValueWrapped() ? new ManagedSerializable<V>(v)
+		    : (ManagedObject) v);
 	    }
+	}
 
-	    this.hash = h;
+	/** Returns whether the key and value are stored as a pair. */
+	private boolean isKeyValuePair() {
+	    return state == KEY_VALUE_PAIR;
+	}
+
+	/** Notes that the key and value are stored as a pair. */
+	private void setKeyValuePair() {
+	    state = KEY_VALUE_PAIR;
+	}
+
+	/** Returns whether the key is wrapped. */
+	private boolean isKeyWrapped() {
+	    return (state & KEY_WRAPPED) != 0;
+	}
+
+	/** Notes whether the key is wrapped. */
+	private void setKeyWrapped(boolean wrapped) {
+	    if (wrapped) {
+		state &= ~KEY_VALUE_PAIR;
+		state |= KEY_WRAPPED;
+	    } else {
+		assert state != KEY_VALUE_PAIR;
+		state &= ~KEY_WRAPPED;
+	    }
+	}
+
+	/** Returns whether the value is wrapped. */
+	private boolean isValueWrapped() {
+	    return (state & VALUE_WRAPPED) != 0;
+	}
+
+	/** Notes whether the value is wrapped. */
+	private void setValueWrapped(boolean wrapped) {
+	    if (wrapped) {
+		state &= ~KEY_VALUE_PAIR;
+		state |= VALUE_WRAPPED;
+	    } else {
+		assert state != KEY_VALUE_PAIR;
+		state &= ~VALUE_WRAPPED;
+	    }
 	}
 
 	/**
@@ -1399,13 +1536,13 @@ public class ScalableHashMap<K,V>
 	 */
 	@SuppressWarnings("unchecked")
 	public final K getKey() {
-	    if (isKeyValueCombined) {
-		return (K) (keyValuePairRef.get(KeyValuePair.class).getKey());
+	    if (isKeyValuePair()) {
+		return (K) keyOrPairRef.get(KeyValuePair.class).getKey();
+	    } else if (isKeyWrapped()) {
+		return ((ManagedSerializable<K>)
+			keyOrPairRef.get(ManagedSerializable.class)).get();
 	    } else {
-		return (isKeyWrapped)
-		    ? ((ManagedSerializable<K>)
-		       keyRef.get(ManagedSerializable.class)).get()
-		    : (K) keyRef.get(Object.class);
+		return (K) keyOrPairRef.get(ManagedObject.class);
 	    }
 	}
 
@@ -1420,7 +1557,7 @@ public class ScalableHashMap<K,V>
 	 * @see ConcurrentIterator
 	 */
 	ManagedReference keyRef() {
-	    return (isKeyValueCombined) ? keyValuePairRef : keyRef;
+	    return keyOrPairRef;
 	}
 
 	/**
@@ -1434,87 +1571,58 @@ public class ScalableHashMap<K,V>
 	 */
 	@SuppressWarnings("unchecked")
 	public final V getValue() {
-	    if (isKeyValueCombined) {
-		return (V) keyValuePairRef.get(KeyValuePair.class).getValue();
+	    if (isKeyValuePair()) {
+		return (V) keyOrPairRef.get(KeyValuePair.class).getValue();
+	    } else if (isValueWrapped()) {
+		return ((ManagedSerializable<V>)
+			valueRef.get(ManagedSerializable.class)).get();
 	    } else {
-		return (isValueWrapped)
-		    ? ((ManagedSerializable<V>)
-		       valueRef.get(ManagedSerializable.class)).get()
-		    : (V) valueRef.get(Object.class);
+		return (V) valueRef.get(ManagedObject.class);
 	    }
 	}
 
 	/**
 	 * Replaces the previous value of this entry with the provided value.
-	 * If {@code newValue} is not of type {@code ManagedObject}, the value
-	 * is wrapped by a {@code ManagedSerializable} and stored in the data
-	 * manager.
 	 *
 	 * @param newValue the value to be stored
 	 * @return the previous value of this entry
 	 */
 	@SuppressWarnings("unchecked")
 	public final V setValue(V newValue) {
-	    V oldValue;
-	    ManagedSerializable<V> wrapper = null;
-	    KeyValuePair<K,V> pair = null;
+	    checkSerializable(newValue, "newValue");
+	    V oldValue = getValue();
 	    DataManager dm = AppContext.getDataManager();
-
-	    if (isKeyValueCombined) {
-		pair = keyValuePairRef.get(KeyValuePair.class);
-		oldValue = pair.getValue();
-	    } else {
-		// unpack the value from the wrapper prior to returning it
-		if (isValueWrapped) {
-		    wrapper = valueRef.get(ManagedSerializable.class);
-		    oldValue = wrapper.get();
-		} else {
-		    oldValue = (V) valueRef.get(Object.class);
-		}
-	    }
-
-	    // if v is already a ManagedObject, then do not wrap it with a
-	    // ManagedSerializable, and instead acquire a ManagedReference to
-	    // it like we would for the ManagedSerializable.
 	    if (newValue instanceof ManagedObject) {
-
-		// if previously the key and value were combined, split them
-		// out.
-		if (isKeyValueCombined) {
-		    keyRef = dm.createReference(
+		if (isKeyValuePair()) {
+		    KeyValuePair<K,V> pair =
+			keyOrPairRef.get(KeyValuePair.class);
+		    keyOrPairRef = dm.createReference(
 			new ManagedSerializable<K>(pair.getKey()));
 		    dm.removeObject(pair);
-		    isKeyWrapped = true;
-		    isKeyValueCombined = false;
+		    setKeyWrapped(true);
+		} else if (isValueWrapped()) {
+		    dm.removeObject(valueRef.get(ManagedObject.class));
+		    setValueWrapped(false);
 		}
-
 		valueRef = dm.createReference((ManagedObject) newValue);
-		isValueWrapped = false;
-
-		// if the previous value was wrapper, remove the wrapper from
-		// the datastore
-		if (wrapper != null) {
-		    dm.removeObject(wrapper);
+	    } else if (isKeyValuePair()) {
+		keyOrPairRef.get(KeyValuePair.class).setValue(newValue);
+	    } else if (isKeyWrapped()) {
+		ManagedSerializable<K> keyWrapper =
+		    keyOrPairRef.get(ManagedSerializable.class);
+		keyOrPairRef = dm.createReference(
+		    new KeyValuePair<K,V>(keyWrapper.get(), newValue));
+		dm.removeObject(keyWrapper);
+		if (isValueWrapped()) {
+		    dm.removeObject(valueRef.get(ManagedObject.class));
 		}
+		setKeyValuePair();
+	    } else if (isValueWrapped()) {
+		valueRef.get(ManagedSerializable.class).set(newValue);
 	    } else {
-		// NOTE: if the value has been switched from Serializable to
-		// ManagedObject back to Serializable, we do not support the
-		// case for collapsing back to a KeyValuePair
-		if (isKeyValueCombined) {
-		    pair.setValue(newValue);
-		} else {
-		    // re-use the old wrapper if we have one to avoid making
-		    // another create call
-		    if (wrapper != null) {
-			wrapper.set(newValue);
-		    } else {
-			// otherwise, we need to wrap it in a new
-			// ManagedSerializable
-			valueRef = dm.createReference(
-			    new ManagedSerializable<V>(newValue));
-			isValueWrapped = true; // already true in the if-case
-		    }
-		}
+		valueRef = dm.createReference(
+		    new ManagedSerializable<V>(newValue));
+		setValueWrapped(true);
 	    }
 	    return oldValue;
 	}
@@ -1538,8 +1646,10 @@ public class ScalableHashMap<K,V>
 	 * {@inheritDoc}
 	 */
 	public final int hashCode() {
-	    return ((keyRef==null   ? 0 : getKey().hashCode())) ^
-		    (valueRef==null ? 0 : getValue().hashCode());
+	    K key = getKey();
+	    V value = getValue();
+	    return ((key==null   ? 0 : key.hashCode())) ^
+		    (value==null ? 0 : value.hashCode());
 	}
 
 	/**
@@ -1561,24 +1671,23 @@ public class ScalableHashMap<K,V>
 	final void unmanage() {
 	    DataManager dm = AppContext.getDataManager();
 
-	    if (isKeyValueCombined) {
+	    if (isKeyValuePair()) {
 		try {
-		    dm.removeObject(keyValuePairRef.get(KeyValuePair.class));
+		    dm.removeObject(keyOrPairRef.get(ManagedObject.class));
 		} catch (ObjectNotFoundException onfe) {
 		    // silent
 		}
 	    } else {
-		if (isKeyWrapped) {
+		if (isKeyWrapped()) {
 		    try {
-			dm.removeObject(keyRef.get(ManagedSerializable.class));
+			dm.removeObject(keyOrPairRef.get(ManagedObject.class));
 		    } catch (ObjectNotFoundException onfe) {
 			// silent
 		    }
 		}
-		if (isValueWrapped) {
+		if (isValueWrapped()) {
 		    try {
-			dm.removeObject(
-			    valueRef.get(ManagedSerializable.class));
+			dm.removeObject(valueRef.get(ManagedObject.class));
 		    } catch (ObjectNotFoundException onfe) {
 			// silent
 		    }
@@ -1602,20 +1711,20 @@ public class ScalableHashMap<K,V>
 
 	private V value;
 
-	public KeyValuePair(K key, V value) {
+	KeyValuePair(K key, V value) {
 	    this.key = key;
 	    this.value = value;
 	}
 
-	public K getKey() {
+	K getKey() {
 	    return key;
 	}
 
-	public V getValue() {
+	V getValue() {
 	    return value;
 	}
 
-	public void setValue(V value) {
+	void setValue(V value) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    this.value = value;
 	}
@@ -1623,26 +1732,21 @@ public class ScalableHashMap<K,V>
 
     /**
      * A concurrent, persistable {@code Iterator} implementation for the {@code
-     * ScalableHashMap}.  This implementation provides the following
-     * guarantees: <ul>
-     *
-     * <li>if no modifications occur, all elements will eventually be returned
-     *	   by {@link ConcurrentIterator#next ConcurrentIterator.next}.
-     *
-     * <li>if any modifications occur, an element will be returned at most once
-     *     from {@code next}, with no guarantee to the number of elements
-     *     returned.
-     *
-     * </ul>
+     * ScalableHashMap}.  This implementation is stable with respect to the
+     * concurrent changes to the associated collection, but may ignore
+     * additions and removals made during to the collection during iteration.
      */
     abstract static class ConcurrentIterator<E>
 	implements Iterator<E>, Serializable {
 
+	/** The version of the serialized form. */
 	private static final long serialVersionUID = 0x1L;
 
 	/**
 	 * A reference to the root node of the table, used to look up the
 	 * current leaf.
+	 *
+	 * @serial
 	 */
 	private final ManagedReference rootRef;
 
@@ -1650,11 +1754,15 @@ public class ScalableHashMap<K,V>
 	 * A reference to the leaf containing the current position of the
 	 * iterator, or null if the iteration has not started or has been
 	 * completed.
+	 *
+	 * @serial
 	 */
 	private ManagedReference currentLeafRef = null;
 
 	/**
 	 * The hash code of the current entry.
+	 *
+	 * @serial
 	 */
 	private int currentHash = 0;
 
@@ -1662,10 +1770,16 @@ public class ScalableHashMap<K,V>
 	 * A reference to the managed object for the key of the current entry,
 	 * null if the iteration has not started, or the same value as rootRef
 	 * if the iteration has been completed.
+	 *
+	 * @serial
 	 */
 	private ManagedReference currentKeyRef = null;
 
-	/** Set to true when the current entry is removed. */
+	/**
+	 * Whether the current entry has been removed.
+	 *
+	 * @serial
+	 */
 	private boolean currentRemoved = false;
 
 	/** The leaf containing the next entry, or null if not computed. */
@@ -2155,8 +2269,7 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Reconstructs the {@code ScalableHashMap} from the provided
-     * stream.
+     * Reconstructs the {@code ScalableHashMap} from the provided stream.
      */
     private void readObject(ObjectInputStream s)
 	throws IOException, ClassNotFoundException {

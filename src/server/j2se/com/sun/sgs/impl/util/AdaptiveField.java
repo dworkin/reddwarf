@@ -34,7 +34,7 @@ import java.io.Serializable;
  * <p>
  *
  * A {@code ManagedObject} will deserialize all of its non-transient fields,
- * which at times is undesireable for latency (e.g. when the field is large, or
+ * which at times is undesirable for latency (e.g. when the field is large, or
  * will not be used).  An {@code AdaptiveField} allow the developer finer
  * control over whether a field needs to be included in the serialization graph
  * by providing a common interface for interacting with the field regardless of

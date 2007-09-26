@@ -139,11 +139,12 @@ public class ScalableHashSet<E>
 
     /**
      * The minor version number, which can be modified to note a compatible
-     * change to the data structure.
+     * change to the data structure.  Incompatible changes should be marked by
+     * a change to the serialVersionUID.
      *
      * @serial
      */
-    private final short minorVersion = 0;
+    private final short minorVersion = 1;
 
     /**
      * The reference to the backing map for this set.
