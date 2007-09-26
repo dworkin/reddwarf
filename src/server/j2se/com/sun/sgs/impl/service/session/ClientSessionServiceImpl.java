@@ -1053,6 +1053,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * Returns the client session service relevant to the current
      * context.
      *
+     * <p>Note: this method is public so that the {@link
+     * ClientSessionId#getClientSession{byte[])} method can access
+     * this service to obtain a {@code ClientSession} for an ID
+     * encapsulated in a byte array.
+     *
+     * <p>TBD: Alternatively, a {@code getClientSession(byte[])}
+     * method could be added to the {@link ClientSessionManager}
+     * interface.
+     *
      * @return the client session service relevant to the current
      * context
      */
@@ -1101,8 +1110,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Schedules a non-durable, non-transactional task using the given
      * {@code Identity} as the owner.
-     * 
-     * @see NonDurableTaskScheduler#scheduleNonTransactionalTask(KernelRunnable, Identity)
      */
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)

@@ -67,6 +67,8 @@ public class ClientSessionId implements Serializable {
      * @param	sessionId a byte array containing a client session ID
      *
      * @return	a {@code ClientSession}, or {@code null}
+     * @throws	TransactionException if the operation failed because of
+     *		a problem with the current transaction
      */
     public static ClientSession getClientSession(byte[] sessionId) {
 	return
@@ -79,6 +81,8 @@ public class ClientSessionId implements Serializable {
      * {@code ClientSessionId}.
      *
      * @return	a {@code ClientSession}, or {@code null}
+     * @throws	TransactionException if the operation failed because of
+     *		a problem with the current transaction
      */
     public ClientSession getClientSession() {
 	return getClientSession(sessionId);

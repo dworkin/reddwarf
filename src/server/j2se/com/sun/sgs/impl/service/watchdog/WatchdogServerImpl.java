@@ -297,15 +297,18 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     public void ready() {
 	synchronized (lock) {
 	    switch (state) {
+		
+	    case INITIALIZED:
+		setState(State.READY);
+		break;
+		
+	    case READY:
+		return;
+		
 	    case SHUTTING_DOWN:
 	    case SHUTDOWN:
 		throw new IllegalStateException("service shutting down");
-	    case READY:
-		return;
-	    default:
-		break;
 	    }
-	    setState(State.READY);
 	}
 	localNodeId = txnProxy.getService(WatchdogService.class).
 	    getLocalNodeId();

@@ -1453,7 +1453,7 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- other methods -- */
 
     private static final String SESSION_PREFIX =
-	ChannelServiceImpl.class.getName() + ".session.";
+	"com.sun.sgs.impl.service.channel.session.";
     
     private static String getSessionKey(byte[] sessionId) {
 	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
