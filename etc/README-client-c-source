@@ -1,0 +1,82 @@
+Project Darkstar C Client SDK, Source Distribution
+Version @VERSION@
+
+INTRODUCTION
+
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
+
+The source distribution of the Project Darkstar C Client SDK contains the
+source code needed to develop and run game clients that communicate with
+each other and with game servers implemented with the Project Darkstar
+Server.  The Project Darkstar Server is available as a separate
+download.
+
+
+CONTENTS
+
+This distribution contains the following subdirectories:
+
+- example
+  Source code for a simple chat example
+
+- src
+  Source code for the client implementation
+
+- test
+  Source code for tests
+
+
+BUILDING
+
+Unix:
+
+- Ensure that the files etc/mk/sgs.mk and etc/mk/$(UNAME).mk
+  contain appropriate settings for your platform.
+
+- Invoke GNU make with the target "build" at the top level:
+    % make build
+  or
+    % gmake build
+
+Windows:
+
+- Ensure that the appropriate compiler tools are available in
+  your %Path%.  See env.bat for an example.
+
+- Ensure that the files etc/mk/nmake.mk and src/client/c/nmake.mak
+  contain appropriate settings for your platform.  In particular,
+  you may need to adjust the paths to the compiler includes and
+  libraries in etc/mk/nmake.mk.
+
+- In src/client/c, invoke nmake.exe as follows:
+    > nmake.exe /F nmake.mak
+
+
+KNOWN ISSUES
+
+This version of the Project Darkstar C Client SDK has the following
+limitations:
+
+- The Windows implementation is incomplete.
+
+- I/O throttling has not been implemented in this release, so it is
+  possible for clients to overwhelm the server with network traffic and
+  cause the server to run out of memory.  As a temporary workaround,
+  developers must ensure that clients do not send network traffic faster
+  than the server application can process it.
+
+
+MORE INFORMATION
+
+For more information, please see the tutorial in the doc directory.
+Also check the http://www.projectdarkstar.com website, which has links
+to more information and to the Project Darkstar forums.
+
+See the CHANGELOG file for a list of changes.
+
+If you cannot find an answer to your question in any of these places,
+please email the Darkstar team at:
+
+   ProjectDarkstar@games.dev.java.net

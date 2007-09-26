@@ -9,7 +9,9 @@ DISTNAME = sgs_c_client_$(VERSION)
 DIST =  $(DISTNAME).zip \
 	$(DISTNAME).tar.gz
 
-all: $(DIST)
+all: build
+
+dist: $(DIST)
 
 build: build_src build_test build_example
 
@@ -22,7 +24,8 @@ build_test: build_src
 build_example: build_src
 	cd $(TOPDIR)/example/c-chat && $(MAKE)
 
-dist: realclean
+build_dist:
+	-rm -rf $(DISTNAME)
 	@mkdir -p $(DISTNAME)
 	@mkdir -p $(DISTNAME)/etc
 	@mkdir -p $(DISTNAME)/src/client
@@ -34,6 +37,10 @@ dist: realclean
 	svn -q export $(TOPDIR)/etc/mk $(DISTNAME)/etc/mk
 	svn -q export $(TOPDIR)/GNUmakefile $(DISTNAME)/GNUmakefile
 	svn -q export $(TOPDIR)/env.bat $(DISTNAME)/env.bat
+	svn -q export $(TOPDIR)/etc/CHANGELOG-client $(DISTNAME)/CHANGELOG
+	svn -q export $(TOPDIR)/etc/LICENSE-client $(DISTNAME)/LICENSE
+	svn -q export $(TOPDIR)/etc/NOTICE-client-doc.txt $(DISTNAME)/NOTICE.txt
+	svn -q export $(TOPDIR)/etc/README-client-c-source $(DISTNAME)/README
 
 clean:
 	@cd $(TOPDIR)/src/client/c && $(MAKE) $@
@@ -47,10 +54,10 @@ realclean:
 	@cd $(TOPDIR)/test/client/c && $(MAKE) $@
 	@cd $(TOPDIR)/example/c-chat && $(MAKE) $@
 
-$(DISTNAME).zip: dist
+$(DISTNAME).zip: build_dist
 	$(ZIP) -r9q $@ $(DISTNAME)
 
-$(DISTNAME).tar.gz: dist
+$(DISTNAME).tar.gz: build_dist
 	$(TAR) cf - $(DISTNAME) | $(GZIP) -c > $@
 
 .PHONY: all build build_src build_test build_example dist
