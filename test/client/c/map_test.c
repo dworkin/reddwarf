@@ -34,7 +34,7 @@
 
 static int compare_ints(const void* a, const void* b);
 
-static int print_get(int key, void* value) {
+static int print_get(int key, const void* value) {
     return printf("GET(%d) == %s\n", key,
         (value == NULL) ? "<empty>" : (char*)value);
 }
@@ -46,12 +46,13 @@ int main(int argc, char *argv[]) {
     int lookup_key;
     char str1[] = "foobar";
     char str2[] = "chicken soup";
-    void *pbuf;
+    const void *pbuf;
     int *pkey;
+    int *pkey2;
     int result;
     sgs_map *map;
     
-    map = sgs_map_create(compare_ints, free, NULL);
+    map = sgs_map_create(compare_ints);
     
     if (map == NULL) {
         fprintf(stderr, "Could not create sgs_map.\n");
@@ -69,16 +70,16 @@ int main(int argc, char *argv[]) {
     pbuf = sgs_map_get(map, pkey);
     print_get(*pkey, pbuf);
     
-    pkey = malloc(sizeof(int));
-    *pkey = 200;
-    pbuf = sgs_map_get(map, pkey);
-    print_get(*pkey, pbuf);
+    pkey2 = malloc(sizeof(int));
+    *pkey2 = 200;
+    pbuf = sgs_map_get(map, pkey2);
+    print_get(*pkey2, pbuf);
     
-    result = sgs_map_put(map, pkey, str2);
-    printf("Added element {%d, %s}.  result=%d\n", *pkey, str2, result);
+    result = sgs_map_put(map, pkey2, str2);
+    printf("Added element {%d, %s}.  result=%d\n", *pkey2, str2, result);
     
-    pbuf = sgs_map_get(map, pkey);
-    print_get(*pkey, pbuf);
+    pbuf = sgs_map_get(map, pkey2);
+    print_get(*pkey2, pbuf);
     
     lookup_key = 100;
     pbuf = sgs_map_get(map, &lookup_key);
@@ -112,6 +113,8 @@ int main(int argc, char *argv[]) {
     print_get(lookup_key, pbuf);
   
     sgs_map_destroy(map);
+    free(pkey2);
+    free(pkey);
   
     printf("Goodbye!\n");
   

@@ -52,12 +52,9 @@ typedef struct sgs_buffer_impl sgs_buffer;
  */
 size_t sgs_buffer_capacity(const sgs_buffer* buffer);
 
-// XXX remove?
 size_t sgs_buffer_position(const sgs_buffer* buffer);
 
-#ifndef NDEBUG
 void sgs_buffer_dump(const sgs_buffer* buffer);
-#endif /* !NDEBUG */
 
 /*
  * function: sgs_buffer_clear()

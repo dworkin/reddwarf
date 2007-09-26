@@ -36,7 +36,7 @@
  * function: printStats()
  */
 void printStats(const sgs_buffer *buf) {
-    printf("pos=%u, size=%u, cap=%u, remaining=%u\n",
+    printf("pos=%lu, size=%lu, cap=%lu, remaining=%lu\n",
         sgs_buffer_position(buf),
         sgs_buffer_size(buf), sgs_buffer_capacity(buf),
         sgs_buffer_remaining(buf));
@@ -62,7 +62,8 @@ int main(int argc, char *argv[]) {
     sgs_buffer *buf;
     uint8_t content[100];
     uint8_t content2[100];
-    int result, i;
+    int result;
+    size_t i;
   
     for (i=0; i < sizeof(content); i++)
         content[i] = i;

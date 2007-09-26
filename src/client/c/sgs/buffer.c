@@ -58,7 +58,9 @@ void sgs_buffer_dump(const sgs_buffer_impl* buf) {
         printf("%2.2x ", buf->buf[i]);
     }
 }
-#endif /* !NDEBUG */
+#else /* NDEBUG */
+void sgs_buffer_dump(const sgs_buffer_impl* buf) { }
+#endif /* NDEBUG */
 
 /*
  * sgs_buffer_clear()

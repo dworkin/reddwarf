@@ -191,9 +191,7 @@ sgs_message* sgs_msg_create(uint8_t* buffer, size_t buflen,
 
 void sgs_msg_destroy(sgs_message* msg);
 
-#ifndef NDEBUG
 void sgs_msg_dump(const sgs_message* msg);
-#endif /* !NDEBUG */
 
 #ifdef __cplusplus
 }

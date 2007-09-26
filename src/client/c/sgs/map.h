@@ -87,23 +87,21 @@ void* sgs_map_get(const sgs_map* map, const void* key);
  * the two keys are equal and any non-zero value if the keys are not equal.
  * NULL is returned if allocation fails.
  */
-sgs_map* sgs_map_create(int (*comparator)(const void*, const void*),
-    void (*free_map_key)(void*), void (*free_map_value)(void*));
+sgs_map* sgs_map_create(int (*comparator)(const void*, const void*));
 
 /*
  * function: sgs_map_put()
  *
  * Inserts a new element into the map associated with the specified key/value
- * pair, both of which are _copied_ from the specified data arrays.  If an
- * element already exists in the map with the specified key, that element is
- * replaced.
+ * pair.  If an element already exists in the map with the specified key,
+ * that element is replaced.
  * 
  * returns:
  *    1: success (element was inserted into the list; did not previously exist)
  *    0: success (element was inserted into the list; replaced existing element)
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_map_put(sgs_map* map, void* key, void* value);
+int sgs_map_put(sgs_map* map, const void* key, void* value);
 
 /*
  * function: sgs_map_remove()

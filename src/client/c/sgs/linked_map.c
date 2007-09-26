@@ -42,15 +42,13 @@
 typedef struct sgs_linked_list_map_elt sgs_linked_list_map_elt;
 
 struct sgs_linked_list_map_elt {
-    void *key;
+    const void *key;
     void *value;
     sgs_linked_list_map_elt *next;
 };
 
 struct sgs_linked_list_map {
     int (*compare_keys)(const void*, const void*);
-    void (*free_map_key)(void*);
-    void (*free_map_value)(void*);
     sgs_linked_list_map_elt *head;
 };
 
@@ -110,8 +108,8 @@ void *sgs_map_get(const sgs_linked_list_map *map, const void *key) {
 /*
  * sgs_map_create()
  */
-sgs_linked_list_map *sgs_map_create(int (*comparator)(const void*, const void*),
-    void (*free_map_key)(void*), void (*free_map_value)(void*))
+sgs_linked_list_map *
+sgs_map_create(int (*comparator)(const void*, const void*))
 {
     sgs_linked_list_map *this_map;
     
@@ -119,8 +117,6 @@ sgs_linked_list_map *sgs_map_create(int (*comparator)(const void*, const void*),
     if (this_map == NULL) return NULL;
     
     this_map->compare_keys = comparator;
-    this_map->free_map_key = free_map_key;
-    this_map->free_map_value = free_map_value;
     this_map->head = NULL;
     return this_map;
 }
@@ -128,7 +124,7 @@ sgs_linked_list_map *sgs_map_create(int (*comparator)(const void*, const void*),
 /*
  * sgs_map_put()
  */
-int sgs_map_put(sgs_linked_list_map *map, void *key, void *value) {
+int sgs_map_put(sgs_linked_list_map *map, const void *key, void *value) {
     sgs_linked_list_map_elt *ptr = map->head;
     sgs_linked_list_map_elt *prev = NULL;
     
@@ -136,9 +132,6 @@ int sgs_map_put(sgs_linked_list_map *map, void *key, void *value) {
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
             /** Element already exists with this key; replace it. */
-            if (map->free_map_key != NULL) map->free_map_key(ptr->key);
-            if (map->free_map_value != NULL) map->free_map_value(ptr->value);
-            
             ptr->key = key;
             ptr->value = value;
             return 0;
@@ -190,8 +183,8 @@ int sgs_map_remove(sgs_linked_list_map *map, const void *key) {
                 prev->next = ptr->next;
             
             /** delete this element */
-            if (map->free_map_key != NULL) map->free_map_key(ptr->key);
-            if (map->free_map_value != NULL) map->free_map_value(ptr->value);
+            ptr->key = NULL;
+            ptr->value = NULL;
             free(ptr);
             
             return 0;

@@ -100,9 +100,7 @@ const uint8_t* sgs_id_get_bytes(const sgs_id* id);
  */
 size_t sgs_id_get_byte_len(const sgs_id* id);
 
-#ifndef NDEBUG
 void sgs_id_dump(const sgs_id* id);
-#endif /* !NDEBUG */
 
 #ifdef __cplusplus
 }

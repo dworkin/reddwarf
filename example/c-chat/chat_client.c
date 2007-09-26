@@ -185,8 +185,7 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
      * keys or values since we are not allocating these (just copying pointers
      * passed by callback functions).
      */
-    g_channel_map = sgs_map_create((int (*)(const void*,const void*))wcscmp,
-        NULL, NULL);
+    g_channel_map = sgs_map_create((int (*)(const void*,const void*))wcscmp);
     
     /** Create sgs_context object and register event callbacks. */
     g_context = sgs_ctx_create(hostname, port,
@@ -314,14 +313,20 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
  * channel_joined_cb()
  */
 static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel) {
-    const wchar_t *name = sgs_channel_name(channel);
-    int result = sgs_map_put(g_channel_map, (wchar_t *)name, channel);
+    int result;
+    const wchar_t *name;
+
+    name = sgs_channel_name(channel);
     printf(" - Callback -   Joined channel: %ls\n", name);
-    
-    if (result == 0) {
+
+    if (sgs_map_contains(g_channel_map, name)) {
         printf("Warning: client thought it was already a member of channel"
             " %ls\n", name);
-    } else if (result == -1) {
+        return;
+    }
+    
+    result = sgs_map_put(g_channel_map, name, channel);
+    if (result == -1) {
         perror("Error in sgs_map_put()");
     }
 }
@@ -330,10 +335,13 @@ static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel) {
  * channel_left_cb()
  */
 static void channel_left_cb(sgs_connection *conn, sgs_channel *channel) {
-    const wchar_t *name = sgs_channel_name(channel);
-    int result = sgs_map_remove(g_channel_map, name);
+    const wchar_t *name;
+    int result;
+
+    name = sgs_channel_name(channel);
     printf(" - Callback -   Left channel: %ls\n", name);
     
+    result = sgs_map_remove(g_channel_map, name);
     if (result == -1) {
         printf("Warning: client did not think it was a member of channel"
             "%ls\n", name);
@@ -540,6 +548,7 @@ static void process_user_cmd(char *cmd) {
     char *token, *token2, *tmp;
     char strbuf[1024];
     uint8_t bytebuf[1024];
+    size_t nbytes;
     int result;
     sgs_id* recipient;
     sgs_channel *channel;
@@ -645,7 +654,7 @@ normally necessary)\n");
             return;
         }
 
-        int nbytes = strlen(token) / 2;
+        nbytes = strlen(token) / 2;
         
         if (nbytes > sizeof(bytebuf)) {
             printf("Error: ran out of buffer space (recipient ID too big).\n");

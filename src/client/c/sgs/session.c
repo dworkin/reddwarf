@@ -187,8 +187,7 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
      * their usual argument types.
      */
     session->channels =
-        sgs_map_create((int(*)(const void*, const void*))sgs_id_compare,
-            NULL, (void (*)(void *))sgs_channel_impl_destroy);
+        sgs_map_create((int(*)(const void*, const void*))sgs_id_compare);
     
     if (session->channels == NULL) {
         /** roll back allocation of session */
@@ -197,18 +196,11 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
     }
     
     session->connection = connection;
-    session->session_id = sgs_id_create(NULL, 0, NULL);
-    session->reconnect_key = sgs_id_create(NULL, 0, NULL);
+    session->session_id = NULL;
+    session->reconnect_key = NULL;
     session->seqnum_hi = 0;
     session->seqnum_lo = 0;
 
-    if (session->session_id == NULL
-        || session->reconnect_key == NULL)
-    {
-        sgs_session_impl_destroy(session);
-        return NULL;
-    }
-    
     return session;
 }
 
@@ -313,13 +305,18 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                     msg_datalen - namelen - 2, NULL);
             if (channel_id == NULL) return -1;
             
+            if (sgs_map_contains(session->channels, channel_id)) {
+                errno = SGS_ERR_ILLEGAL_STATE;
+                sgs_id_destroy(channel_id);
+                return -1;
+            }
+            
             channel = sgs_channel_impl_create(session, channel_id,
                 (const char*)(msg_data + 2), namelen);
             
             if (channel == NULL) return -1;
-            
-            result = sgs_map_put(session->channels,
-                sgs_channel_impl_get_id(channel), channel);
+
+            result = sgs_map_put(session->channels, channel_id, channel);
             
             if (result == -1) return -1;
             
@@ -335,6 +332,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             if (channel_id == NULL) return -1;
             
             channel = sgs_map_get(session->channels, channel_id);
+            sgs_id_destroy(channel_id);
+
             if (channel == NULL) {
                 errno = SGS_ERR_UNKNOWN_CHANNEL;
                 return -1;
@@ -344,7 +343,10 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                 session->connection->ctx->channel_left_cb(session->connection,
                     channel);
             
-            sgs_map_remove(session->channels, channel_id);
+            sgs_map_remove(session->channels,
+                sgs_channel_impl_get_id(channel));
+
+            sgs_channel_impl_destroy(channel);
             
             return 0;
             
@@ -352,6 +354,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             /** field 1: channel-id (compact-id format) */
             channel_id = sgs_id_create(msg_data, msg_datalen, &offset);
             if (channel_id == NULL) return -1;
+
+            channel = sgs_map_get(session->channels, channel_id);
+            sgs_id_destroy(channel_id);
 
             /**
              * field 2: sequence number (8 bytes)
@@ -366,7 +371,6 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                 
             offset += offset2;
             
-            channel = sgs_map_get(session->channels, channel_id);
             if (channel == NULL) {
                 errno = SGS_ERR_UNKNOWN_CHANNEL;
                 return -1;
@@ -380,6 +384,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                     channel, sender_id, msg_data + offset + 2,
                     read_len_header(msg_data + offset));
             }
+
+            sgs_id_destroy(sender_id);
             
             return 0;
       

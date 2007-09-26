@@ -300,7 +300,9 @@ void sgs_msg_dump(const sgs_message* msg) {
     if ((i % 16) != 1)
         printf("\n");
 }
-#endif /* !NDEBUG */
+#else /* NDEBUG */
+void sgs_msg_dump(const sgs_message* msg) { }
+#endif /* NDEBUG */
 
 /*
  * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS

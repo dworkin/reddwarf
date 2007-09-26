@@ -112,7 +112,7 @@ void sgs_channel_impl_destroy(sgs_channel_impl *channel) {
 /*
  * sgs_channel_impl_get_id()
  */
-sgs_id *sgs_channel_impl_get_id(sgs_channel_impl *channel) {
+const sgs_id* sgs_channel_impl_get_id(sgs_channel_impl *channel) {
     return channel->id;
 }
 
@@ -120,7 +120,7 @@ sgs_id *sgs_channel_impl_get_id(sgs_channel_impl *channel) {
  * sgs_channel_impl_create()
  */
 sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
-    const sgs_id* id, const char* namebytes, size_t namelen)
+    sgs_id* id, const char* namebytes, size_t namelen)
 {
     sgs_channel_impl *channel;
     channel = malloc(sizeof(struct sgs_channel_impl));
@@ -128,16 +128,15 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
         return NULL;
 
     channel->session = session;
-    channel->id = sgs_id_duplicate(id);
+    channel->id = id;
     channel->name = malloc(sizeof(wchar_t) * (namelen + 1));
     
-    if (channel->id == NULL ||
-        channel->name == NULL)
+    if (channel->name == NULL)
     {
         sgs_channel_impl_destroy(channel);
         return NULL;
     }
-    
+
     mbstowcs(channel->name, namebytes, namelen);
     channel->name[namelen] = '\0';
     

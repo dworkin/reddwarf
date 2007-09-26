@@ -48,9 +48,9 @@
 #define SGS_COMPACT_ID_MAX_SIZE (8 + 0x0F)
 
 typedef struct sgs_compact_id {
-    /** uncompressed form */
-    uint8_t uncompressed[SGS_COMPACT_ID_MAX_SIZE];
-    uint8_t uncompressed_len;
+    /** buf form */
+    uint8_t buf[SGS_COMPACT_ID_MAX_SIZE];
+    uint8_t buf_len;
 } sgs_compact_id;
 
 
@@ -66,35 +66,35 @@ static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
  * sgs_id_compare()
  */
 int sgs_id_compare(const sgs_compact_id* a, const sgs_compact_id* b) {
-    if (a->uncompressed_len < b->uncompressed_len)
+    if (a->buf_len < b->buf_len)
         return -1;
   
-    if (a->uncompressed_len > b->uncompressed_len)
+    if (a->buf_len > b->buf_len)
         return 1;
   
-    /** else, a->uncompressed_len == b->uncompressed_len */
-    return memcmp(a->uncompressed, b->uncompressed, a->uncompressed_len);
+    /** else, a->buf_len == b->buf_len */
+    return memcmp(a->buf, b->buf, a->buf_len);
 }
 
 /*
  * sgs_id_equals_server()
  */
 int sgs_id_is_server(sgs_compact_id* id) {
-    return ((id->uncompressed_len == 1) && (id->uncompressed[0] == 0));
+    return ((id->buf_len == 1) && (id->buf[0] == 0));
 }
 
 /*
  * sgs_id_get_bytes()
  */
 const uint8_t *sgs_id_get_bytes(const sgs_compact_id *id) {
-    return id->uncompressed;
+    return id->buf;
 }
 
 /*
  * sgs_id_get_byte_len()
  */
 size_t sgs_id_get_byte_len(const sgs_compact_id *id) {
-    return id->uncompressed_len;
+    return id->buf_len;
 }
 
 
@@ -108,7 +108,7 @@ sgs_compact_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc) {
     id = malloc(sizeof(sgs_compact_id));
     if (id == NULL) return NULL;
 
-    id->uncompressed_len = sizeof(id->uncompressed);
+    id->buf_len = sizeof(id->buf);
 
     result = unpack(id, data, len);
 
@@ -127,21 +127,29 @@ sgs_compact_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc) {
 # include <stdio.h>
 void sgs_id_dump(const sgs_compact_id* id) {
     size_t i;
-    for (i = 0; i < id->uncompressed_len; ++i) {
-        printf("%2.2x", id->uncompressed[i]);
+    for (i = 0; i < id->buf_len; ++i) {
+        printf("%2.2x", id->buf[i]);
     }
     printf("\n");
 }
-#endif /* !NDEBUG */
+#else /* NDEBUG */
+void sgs_id_dump(const sgs_compact_id* id) { }
+#endif /* NDEBUG */
 
 sgs_compact_id* sgs_id_duplicate(const sgs_compact_id* id) {
-    // FIXME
-    return (sgs_compact_id*) id;
+    sgs_compact_id* result;
+    
+    result = malloc(sizeof(sgs_compact_id));
+    if (result == NULL) return NULL;
+
+    result->buf_len = id->buf_len;
+    memcpy(result->buf, id->buf, id->buf_len);
+
+    return result;
 }
 
 void sgs_id_destroy(sgs_compact_id* id) {
-    // FIXME
-    // no-op
+    free(id);
 }
 
 /*
@@ -152,7 +160,7 @@ void sgs_id_destroy(sgs_compact_id* id) {
  * sgs_id_impl_write()
  */
 size_t sgs_id_impl_write(const sgs_compact_id* id, uint8_t* buf, size_t len) {
-    return pack(buf, len, id->uncompressed, id->uncompressed_len);
+    return pack(buf, len, id->buf, id->buf_len);
 }
 
 
@@ -254,8 +262,8 @@ static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
     uint8_t first_byte;
 
     if (srclen == 0) {
-        memset(id->uncompressed, 0, 1);
-        id->uncompressed_len = 1;
+        memset(id->buf, 0, 1);
+        id->buf_len = 1;
         return 0;
     }
 
@@ -269,7 +277,7 @@ static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
         return -1;
     }
     
-    if (size > id->uncompressed_len) {
+    if (size > id->buf_len) {
         errno = EINVAL;
         return -1;
     }
@@ -290,16 +298,16 @@ static ssize_t unpack(sgs_compact_id* id, const uint8_t *src,
         }
 
         datalen = size - first;
-        memcpy(id->uncompressed, src + first, datalen);
+        memcpy(id->buf, src + first, datalen);
     
         if (first == 0) {
-            id->uncompressed[0] = first_byte;
+            id->buf[0] = first_byte;
         }
     } else {
         datalen = size - 1;
-        memcpy(id->uncompressed, src + 1, datalen);
+        memcpy(id->buf, src + 1, datalen);
     }
 
-    id->uncompressed_len = datalen;
+    id->buf_len = datalen;
     return size;
 }

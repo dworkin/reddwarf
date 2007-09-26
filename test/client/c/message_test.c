@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     msg = sgs_msg_create(buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST,
         SGS_APPLICATION_SERVICE);
   
-    printf("INIT() == %p\n", msg);
+    printf("INIT() == %p\n", (void*) msg);
   
     content[0] = 10;
     content[1] = 11;
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 
 
     msg = sgs_msg_deserialize(buf, sizeof(buf));
-    printf("DESER == %p\n", msg);
+    printf("DESER == %p\n", (void*) msg);
     printMsg(msg);
   
     sgs_msg_destroy(msg);

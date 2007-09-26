@@ -69,7 +69,7 @@ void sgs_channel_impl_destroy(sgs_channel_impl* channel);
  *
  * Returns a pointer to this channel's ID.
  */
-sgs_id* sgs_channel_impl_get_id(sgs_channel_impl* channel);
+const sgs_id* sgs_channel_impl_get_id(sgs_channel_impl* channel);
 
 /*
  * function: sgs_channel_impl_create()
@@ -78,7 +78,7 @@ sgs_id* sgs_channel_impl_get_id(sgs_channel_impl* channel);
  * and id.  Returns null on failure.
  */
 sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl* session,
-    const sgs_id* id, const char* namebytes, size_t namelen);
+    sgs_id* id, const char* namebytes, size_t namelen);
 
 #ifdef __cplusplus
 }
