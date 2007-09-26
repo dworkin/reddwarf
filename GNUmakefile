@@ -34,9 +34,9 @@ build_dist:
 	svn -q export $(TOPDIR)/src/client/c $(DISTNAME)/src/client/c
 	svn -q export $(TOPDIR)/test/client/c $(DISTNAME)/test/client/c
 	svn -q export $(TOPDIR)/example/c-chat $(DISTNAME)/example/c-chat
-	svn -q export $(TOPDIR)/etc/mk $(DISTNAME)/etc/mk
 	svn -q export $(TOPDIR)/GNUmakefile $(DISTNAME)/GNUmakefile
-	svn -q export $(TOPDIR)/env.bat $(DISTNAME)/env.bat
+	svn -q export $(TOPDIR)/etc/mk $(DISTNAME)/etc/mk
+	svn -q export $(TOPDIR)/etc/env.bat $(DISTNAME)/env.bat
 	svn -q export $(TOPDIR)/etc/CHANGELOG-client $(DISTNAME)/CHANGELOG
 	svn -q export $(TOPDIR)/etc/LICENSE-client $(DISTNAME)/LICENSE
 	svn -q export $(TOPDIR)/etc/NOTICE-client-doc.txt $(DISTNAME)/NOTICE.txt
