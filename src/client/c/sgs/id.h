@@ -100,6 +100,11 @@ const uint8_t* sgs_id_get_bytes(const sgs_id* id);
  */
 size_t sgs_id_get_byte_len(const sgs_id* id);
 
+/*
+ * function: sgs_id_dump()
+ *
+ * Dumps an sgs_id to stdout (noop if NDEBUG defined).
+ */
 void sgs_id_dump(const sgs_id* id);
 
 #ifdef __cplusplus

@@ -52,8 +52,18 @@ typedef struct sgs_buffer_impl sgs_buffer;
  */
 size_t sgs_buffer_capacity(const sgs_buffer* buffer);
 
+/*
+ * function: sgs_buffer_position()
+ *
+ * Returns the curent position of a buffer.
+ */
 size_t sgs_buffer_position(const sgs_buffer* buffer);
 
+/*
+ * function: sgs_buffer_dump()
+ *
+ * Dumps a buffer to stdout (noop if NDEBUG defined).
+ */
 void sgs_buffer_dump(const sgs_buffer* buffer);
 
 /*

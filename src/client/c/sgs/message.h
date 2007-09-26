@@ -189,8 +189,18 @@ uint8_t sgs_msg_get_version(sgs_message* pmsg);
 sgs_message* sgs_msg_create(uint8_t* buffer, size_t buflen,
     sgs_opcode opcode, sgs_service_id service_id);
 
+/*
+ * function: sgs_msg_destroy()
+ *
+ * Frees up any resources associated with the given sgs_message.
+ */
 void sgs_msg_destroy(sgs_message* msg);
 
+/*
+ * function: sgs_msg_dump()
+ *
+ * Dumps an sgs_msg to stdout (noop if NDEBUG defined).
+ */
 void sgs_msg_dump(const sgs_message* msg);
 
 #ifdef __cplusplus

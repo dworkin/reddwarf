@@ -63,7 +63,7 @@ void sgs_map_clear(sgs_map* map);
 /*
  * function: sgs_map_destroy()
  *
- * Safely deallocates a map (and any contents).
+ * Safely deallocates a map (but not its contents).
  */
 void sgs_map_destroy(sgs_map* map);
 
