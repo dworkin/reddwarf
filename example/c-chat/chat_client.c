@@ -1,12 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
- *
- * THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN
- * MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT
- * THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.
- */
-
-/*
  * This file implements a client for the example-chat-app SGS application.
  *
  * Conventions:
