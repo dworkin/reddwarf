@@ -1,8 +1,8 @@
 # SGS C Client Makefile
 
-TOPDIR=..\..\..
+TOPDIR=.
 
-!include $(TOPDIR)\etc\mk\nmake.mk
+!include $(TOPDIR)\etc\nmake.mk
 
 OBJS = \
 	$(OBJDIR)\hex_utils.obj \

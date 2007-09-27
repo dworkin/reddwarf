@@ -1,5 +1,4 @@
 Project Darkstar C Client SDK, Source Distribution
-Version @VERSION@
 
 INTRODUCTION
 
@@ -32,23 +31,23 @@ BUILDING
 
 Unix:
 
-- Ensure that the files etc/mk/sgs.mk and etc/mk/$(UNAME).mk
+- Ensure that the files etc/sgs.mk and etc/$(UNAME).mk
   contain appropriate settings for your platform.
 
-- Invoke GNU make with the target "build" at the top level:
-    % make build
+- Invoke GNU make at the top level:
+    % make
   or
-    % gmake build
+    % gmake
 
 Windows:
 
 - Ensure that the appropriate compiler tools are available in
   your %Path%.  See env.bat for an example.
 
-- Ensure that the files etc/mk/nmake.mk and src/client/c/nmake.mak
-  contain appropriate settings for your platform.  In particular,
+- Ensure that the files nmake.mak and etc/nmake.mk contain
+  appropriate settings for your platform.  In particular,
   you may need to adjust the paths to the compiler includes and
-  libraries in etc/mk/nmake.mk.
+  libraries in etc/nmake.mk.
 
 - In src/client/c, invoke nmake.exe as follows:
     > nmake.exe /F nmake.mak

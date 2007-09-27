@@ -1,6 +1,6 @@
 # SGS C Client Makefile
 
-TOPDIR=../../..
+TOPDIR=.
 
 SRCS = \
 	sgs/hex_utils.c \
@@ -18,13 +18,18 @@ LIB = libsgsclient.a
 
 all: $(LIB)
 
-include $(TOPDIR)/etc/mk/sgs.mk
+include $(TOPDIR)/etc/sgs.mk
 
 $(LIB): $(OBJS)
 	$(AR) $@ $(OBJS)
 
-clean: clean.default
+clean:
+	-/bin/rm -rf $(OBJDIR)
+	-@cd $(TOPDIR)/test && $(MAKE) $@
+	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 
-realclean: realclean.default
-	@/bin/rm -f $(LIB)
+realclean: clean
+	-/bin/rm -f $(LIB)
+	-@cd $(TOPDIR)/test && $(MAKE) $@
+	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 

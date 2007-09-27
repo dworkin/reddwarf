@@ -1,8 +1,8 @@
 # SGS C Client Makefile
 
-TOPDIR=..\..\..
+TOPDIR=..
 
-!include $(TOPDIR)\etc\mk\nmake.mk
+!include $(TOPDIR)\etc\nmake.mk
 
 EXES = \
         buffer_test.exe \
@@ -12,8 +12,8 @@ EXES = \
 
 all: $(EXES)
 
-INCS = $(INCS) /I$(TOPDIR)\src\client\c
-LDFLAGS = /LIBPATH:$(TOPDIR)\src\client\c $(LDFLAGS)
+INCS = $(INCS) /I$(TOPDIR)
+LDFLAGS = /LIBPATH:$(TOPDIR) $(LDFLAGS)
 LIBS = sgsclient.lib $(LIBS)
 
 .c.exe:

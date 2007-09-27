@@ -1,6 +1,6 @@
 # SGS C Client Chat Example Makefile
 
-TOPDIR=../..
+TOPDIR=..
 
 SRCS = chat_client.c
 
@@ -8,18 +8,19 @@ EXE = chat_client
 
 all: $(EXE)
 
-include $(TOPDIR)/etc/mk/sgs.mk
+include $(TOPDIR)/etc/sgs.mk
 
 #DBG += -g
-INCS += -I$(TOPDIR)/src/client/c
-LDFLAGS += -L$(TOPDIR)/src/client/c
+INCS += -I$(TOPDIR)
+LDFLAGS += -L$(TOPDIR)
 LIBS += -lsgsclient
 
 $(EXE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) $(LDLIBS)
 
-clean: clean.default
+clean:
+	-/bin/rm -rf $(OBJDIR)
 
-realclean: realclean.default
-	/bin/rm -f $(EXE)
+realclean: clean
+	-/bin/rm -f $(EXE)
 

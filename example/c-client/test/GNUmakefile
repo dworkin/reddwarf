@@ -1,6 +1,6 @@
 # SGS C Client Tests Makefile
 
-TOPDIR=../../..
+TOPDIR=..
 
 SRCS = \
 	buffer_test.c \
@@ -12,18 +12,19 @@ EXES = buffer_test id_test map_test message_test
 
 all: $(EXES)
 
-include $(TOPDIR)/etc/mk/sgs.mk
+include $(TOPDIR)/etc/sgs.mk
 
 #DBG += -g
-INCS += -I$(TOPDIR)/src/client/c
-LDFLAGS += -L$(TOPDIR)/src/client/c
+INCS += -I$(TOPDIR)
+LDFLAGS += -L$(TOPDIR)
 LIBS += -lsgsclient
 
 %_test: $(OBJDIR)/%_test.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
 
-clean: clean.default
+clean:
+	-/bin/rm -rf $(OBJDIR)
 
-realclean: realclean.default
-	/bin/rm -f $(EXES)
+realclean: clean
+	-/bin/rm -f $(EXES)
 
