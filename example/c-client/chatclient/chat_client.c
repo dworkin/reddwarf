@@ -700,6 +700,7 @@ normally necessary)\n");
     else if (strcmp(token, "chsend") == 0) {
         if (g_session == NULL) {
             printf("Error: not logged in!\n");
+            fflush(stdout);
             return;
         }
         
@@ -707,6 +708,7 @@ normally necessary)\n");
         
         if (token == NULL) {
             printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
+            fflush(stdout);
             return;
         }
 
@@ -715,6 +717,7 @@ normally necessary)\n");
 
         if (channel == NULL) {
             printf("Error: Channel \"%ls\" not found.\n", chname);
+            fflush(stdout);
             free(chname);
             return;
         }
@@ -725,6 +728,7 @@ normally necessary)\n");
         
         if (token == NULL) {
             printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
+            fflush(stdout);
             return;
         }
         
@@ -738,6 +742,7 @@ normally necessary)\n");
     else if (strcmp(token, "chjoin") == 0 || strcmp(token, "join") == 0) {
         if (g_session == NULL) {
             printf("Error: not logged in!\n");
+            fflush(stdout);
             return;
         }
         
