@@ -7,9 +7,7 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
@@ -19,7 +17,6 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.File;
@@ -162,19 +159,17 @@ public class SgsTestNode {
         int requestedDataPort =
             isServerNode ?
             0 :
-            getDataServerPort(serverNode.getProxy().getService(DataServiceImpl.class));
+            getDataServerPort(serverNode.getDataService());
         
 	int requestedWatchdogPort =
 	    isServerNode ?
 	    0 :
-            serverNode.getProxy().
-                getService(WatchdogServiceImpl.class).getServer().getPort();
+            serverNode.getWatchdogService().getServer().getPort();
         
 	int requestedNodeMapPort =
 	    isServerNode ?
 	    0 :
-	    getNodeMapServerPort(serverNode.getProxy().
-                                getService(NodeMappingServiceImpl.class));
+	    getNodeMapServerPort(serverNode.getNodeMappingService());
 	
         // The node mapping service will only work if it's running
         // on a full stack.
@@ -407,7 +402,7 @@ public class SgsTestNode {
      * Returns the bound port for the node mapping server.
      */
     private static int getNodeMapServerPort(
-	NodeMappingServiceImpl nodmapService)
+        NodeMappingServiceImpl nodemapService)
 	throws Exception
     {
         Field serverImplField = 
@@ -417,7 +412,7 @@ public class SgsTestNode {
                 NodeMappingServerImpl.class.getDeclaredMethod("getPort");
         getPortMethod.setAccessible(true);
 	NodeMappingServerImpl server =
-	    (NodeMappingServerImpl) serverImplField.get(nodmapService);
+	    (NodeMappingServerImpl) serverImplField.get(nodemapService);
 	return (Integer) getPortMethod.invoke(server);
     }
 }

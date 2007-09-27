@@ -130,7 +130,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         for (int i = 0; i < NUM_NODES; i++) {
             SgsTestNode node = 
-                new SgsTestNode("TestFull", serverNode, null, props, false);
+                new SgsTestNode("TestNodeMappingServiceImpl", 
+                                serverNode, null, props, false);
             additionalNodes[i] = node;
         
             NodeMappingService nmap = node.getNodeMappingService();
