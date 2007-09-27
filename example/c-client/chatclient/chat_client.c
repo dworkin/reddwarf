@@ -31,7 +31,8 @@
  */
 
 /*
- * This file implements a client for the example-chat-app SGS application.
+ * This file implements a client for the example-chat-app application,
+ * and can also be used with the "Hello Channels" tutorial application.
  *
  * Conventions:
  *  Unless otherwise noted, all functions with an int return type return

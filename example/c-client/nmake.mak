@@ -1,4 +1,4 @@
-# SGS C Client Makefile
+# Project Darkstar Example C Client Makefile
 
 TOPDIR=.
 
@@ -15,8 +15,9 @@ OBJS = \
 	$(OBJDIR)\session.obj \
 	$(OBJDIR)\channel.obj
 
-# TODO
-# obj\connection.obj
+# TODO: connection.c needs to be ported to the Winsock2 API,
+# either in a separate implementation file or with ifdefs.
+#       $(OBJDIR)\connection.obj
 
 LIB = sgsclient.lib
 

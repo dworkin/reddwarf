@@ -1,4 +1,4 @@
-# SGS C Client Chat Example Makefile
+# Project Darkstar Example C Chat Client Makefile
 
 TOPDIR=..
 

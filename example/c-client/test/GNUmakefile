@@ -1,4 +1,4 @@
-# SGS C Client Tests Makefile
+# Project Darkstar Example C Client Tests Makefile
 
 TOPDIR=..
 
