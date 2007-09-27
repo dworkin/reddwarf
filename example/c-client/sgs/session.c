@@ -47,7 +47,7 @@
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
 #include "sgs/map.h"
-#include "sgs/message.h"
+#include "sgs/private/message.h"
 #include "sgs/private/session_impl.h"
 
 /*
@@ -68,23 +68,22 @@ static uint16_t read_len_header(const uint8_t *data);
 int sgs_session_direct_send(sgs_session_impl *session, const uint8_t *data,
     size_t datalen)
 {
-    sgs_message* msg =
-        sgs_msg_create(session->msg_buf, sizeof(session->msg_buf),
-            SGS_OPCODE_SESSION_MESSAGE, SGS_APPLICATION_SERVICE);
-  
-    if (msg == NULL)
+    sgs_message msg;
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
+            SGS_OPCODE_SESSION_MESSAGE, SGS_APPLICATION_SERVICE) == -1)
         return -1;
   
     /** Add sequence number to message. */
-    if (sgs_msg_add_uint32(msg, session->seqnum_hi) == -1) return -1;
-    if (sgs_msg_add_uint32(msg, session->seqnum_lo) == -1) return -1;
+    if (sgs_msg_add_uint32(&msg, session->seqnum_hi) == -1) return -1;
+    if (sgs_msg_add_uint32(&msg, session->seqnum_lo) == -1) return -1;
   
     /** Add message payload to message. */
-    if (sgs_msg_add_fixed_content(msg, data, datalen) == -1) return -1;
+    if (sgs_msg_add_fixed_content(&msg, data, datalen) == -1) return -1;
   
     /** Done assembling message; send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-            sgs_msg_get_size(msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
   
     /** Only update sequence number if message is (appears) successfully sent */
@@ -127,25 +126,24 @@ void sgs_session_impl_destroy(sgs_session_impl *session) {
 int sgs_session_impl_login(sgs_session_impl *session, const char *login,
     const char *password)
 {
-    sgs_message* msg =
-        sgs_msg_create(session->msg_buf, sizeof(session->msg_buf),
-            SGS_OPCODE_LOGIN_REQUEST, SGS_APPLICATION_SERVICE);
-  
-    if (msg == NULL)
+    sgs_message msg;
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
+            SGS_OPCODE_LOGIN_REQUEST, SGS_APPLICATION_SERVICE) == -1)
         return -1;
   
     /** Add "login" data field to message. */
-    if (sgs_msg_add_fixed_content(msg, (uint8_t*)login, strlen(login)) == -1)
+    if (sgs_msg_add_fixed_content(&msg, (uint8_t*)login, strlen(login)) == -1)
         return -1;
   
     /** Add "password" data field to message. */
-    if (sgs_msg_add_fixed_content(msg, (uint8_t*)password,
+    if (sgs_msg_add_fixed_content(&msg, (uint8_t*)password,
             strlen(password)) == -1)
         return -1;
   
     /** Done assembling message; send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-            sgs_msg_get_size(msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
   
     return 0;
@@ -155,16 +153,15 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
  * sgs_session_impl_logout()
  */
 int sgs_session_impl_logout(sgs_session_impl *session) {
-    sgs_message* msg =
-        sgs_msg_create(session->msg_buf, sizeof(session->msg_buf),
-            SGS_OPCODE_LOGOUT_REQUEST, SGS_APPLICATION_SERVICE);
-  
-    if (msg == NULL)
+    sgs_message msg;
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
+            SGS_OPCODE_LOGOUT_REQUEST, SGS_APPLICATION_SERVICE) == -1)
         return -1;
   
     // Done assembling message; send message buffer to connection to be sent.
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-            sgs_msg_get_size(msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
   
     return 0;
@@ -212,28 +209,28 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     ssize_t namelen, offset, offset2;
     sgs_id* channel_id;
     sgs_id* sender_id;
-    sgs_message* msg;
+    sgs_message msg;
     const uint8_t* msg_data;
     sgs_channel* channel;
     size_t msg_datalen;
             
     
-    msg = sgs_msg_deserialize(session->msg_buf, sizeof(session->msg_buf));
-    if (msg == NULL)
+    if (sgs_msg_deserialize(&msg, session->msg_buf,
+            sizeof(session->msg_buf)) == -1)
         return -1;
 
-    //sgs_msg_dump(msg);
+    //sgs_msg_dump(&msg);
     
-    msg_datalen = sgs_msg_get_datalen(msg);
-    msg_data = sgs_msg_get_data(msg);
+    msg_datalen = sgs_msg_get_datalen(&msg);
+    msg_data = sgs_msg_get_data(&msg);
     
-    if (sgs_msg_get_version(msg) != SGS_MSG_VERSION) {
+    if (sgs_msg_get_version(&msg) != SGS_MSG_VERSION) {
         errno = SGS_ERR_BAD_MSG_VERSION;
         return -1;
     }
     
-    if (sgs_msg_get_service(msg) == SGS_APPLICATION_SERVICE) {
-        switch (sgs_msg_get_opcode(msg)) {
+    if (sgs_msg_get_service(&msg) == SGS_APPLICATION_SERVICE) {
+        switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
             /** field 1: session-id (compact-id format) */
             session->session_id =
@@ -293,8 +290,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             return -1;
         }
     }
-    else if (sgs_msg_get_service(msg) == SGS_CHANNEL_SERVICE) {
-        switch (sgs_msg_get_opcode(msg)) {
+    else if (sgs_msg_get_service(&msg) == SGS_CHANNEL_SERVICE) {
+        switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_CHANNEL_JOIN:
             /** field 1: channel name (first 2 bytes = length of string) */
             namelen = read_len_header(msg_data);
@@ -402,16 +399,13 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
 int sgs_session_impl_send_msg(sgs_session_impl *session) {
     size_t msg_size;
-    sgs_message* msg;
+    sgs_message msg;
 
-    msg = sgs_msg_deserialize(session->msg_buf,
-            sizeof(session->msg_buf));
-    
-    if (msg == NULL)
+    if (sgs_msg_deserialize(&msg, session->msg_buf,
+            sizeof(session->msg_buf)) == -1)
         return -1;
 
-    msg_size = sgs_msg_get_size(msg);
-    sgs_msg_destroy(msg);
+    msg_size = sgs_msg_get_size(&msg);
     
     /** Send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,

@@ -43,7 +43,17 @@ extern "C" {
 
 #include "sgs/config.h"
 
-typedef struct sgs_message_impl sgs_message;
+typedef struct {
+    /* The buffer for this message. NOTE! Not owned by this struct. */
+    uint8_t* buf;
+
+    /* Buffer capacity. */
+    size_t capacity;
+
+    /* Message length. */
+    size_t len;
+
+} sgs_message;
 
 #include "sgs/id.h"
 #include "sgs/protocol.h"
@@ -98,7 +108,7 @@ int sgs_msg_add_fixed_content(sgs_message* pmsg, const uint8_t* content,
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_msg_add_id(sgs_message* msg, const sgs_id* id);
+int sgs_msg_add_id(sgs_message* pmsg, const sgs_id* id);
 
 /*
  * function: sgs_msg_add_uint32()
@@ -120,59 +130,59 @@ int sgs_msg_add_uint32(sgs_message* pmsg, uint32_t val);
  *
  * Initializes a message from a byte-array.
  */
-sgs_message* sgs_msg_deserialize(uint8_t* buffer, size_t buflen);
+int sgs_msg_deserialize(sgs_message* pmsg, uint8_t* buffer, size_t buflen);
 
 /*
  * function: sgs_msg_get_bytes()
  *
  * Returns a pointer to this message's byte-array representation.
  */
-const uint8_t* sgs_msg_get_bytes(sgs_message* pmsg);
+const uint8_t* sgs_msg_get_bytes(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_data()
  * 
  * Returns a pointer to the start of this message's data payload.
  */
-const uint8_t* sgs_msg_get_data(sgs_message* pmsg);
+const uint8_t* sgs_msg_get_data(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_datalen()
  * 
  * Returns the length of this message's data payload.
  */
-size_t sgs_msg_get_datalen(sgs_message* pmsg);
+size_t sgs_msg_get_datalen(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_opcode()
  * 
  * Returns the current op-code of this message.
  */
-uint8_t sgs_msg_get_opcode(sgs_message* pmsg);
+uint8_t sgs_msg_get_opcode(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_service()
  * 
  * Returns the current service-id of this message.
  */
-uint8_t sgs_msg_get_service(sgs_message* pmsg);
+uint8_t sgs_msg_get_service(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_size()
  *
  * Returns the total length of this message.
  */
-size_t sgs_msg_get_size(sgs_message* pmsg);
+size_t sgs_msg_get_size(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_version()
  * 
  * Returns the current version-ID of this message.
  */
-uint8_t sgs_msg_get_version(sgs_message* pmsg);
+uint8_t sgs_msg_get_version(const sgs_message* pmsg);
 
 /*
- * function: sgs_msg_create()
+ * function: sgs_msg_init()
  *
  * Initializes the fields of a message without any optional content.
  *
@@ -186,22 +196,15 @@ uint8_t sgs_msg_get_version(sgs_message* pmsg);
  * returns:
  *  NULL: failure (errno is set to specific error code)
  */
-sgs_message* sgs_msg_create(uint8_t* buffer, size_t buflen,
+int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
     sgs_opcode opcode, sgs_service_id service_id);
-
-/*
- * function: sgs_msg_destroy()
- *
- * Frees up any resources associated with the given sgs_message.
- */
-void sgs_msg_destroy(sgs_message* msg);
 
 /*
  * function: sgs_msg_dump()
  *
  * Dumps an sgs_msg to stdout (noop if NDEBUG defined).
  */
-void sgs_msg_dump(const sgs_message* msg);
+void sgs_msg_dump(const sgs_message* pmsg);
 
 #ifdef __cplusplus
 }

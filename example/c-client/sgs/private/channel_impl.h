@@ -44,7 +44,7 @@ typedef struct sgs_channel_impl sgs_channel_impl;
 #include "sgs/private/session_impl.h"
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
-#include "sgs/message.h"
+#include "sgs/private/message.h"
 
 struct sgs_channel_impl {
     /* The underlying server session. */

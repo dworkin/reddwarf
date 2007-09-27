@@ -43,7 +43,7 @@
  */
 ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, int fd) {
     ssize_t result, total = 0;
-    size_t writable = writable_len(buffer);
+    ssize_t writable = writable_len(buffer);
     
     while (writable > 0) {
         result = read(fd, buffer->buf + tailpos(buffer), writable);
@@ -67,7 +67,7 @@ ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, int fd) {
  */
 ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, int fd) {
     ssize_t result, total = 0;
-    size_t readable = readable_len(buffer);
+    ssize_t readable = readable_len(buffer);
   
     while (readable > 0) {
         result = write(fd, buffer->buf + buffer->position, readable);

@@ -42,13 +42,13 @@
 #include "sgs/config.h"
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
-#include "sgs/message.h"
+#include "sgs/private/message.h"
 #include "sgs/private/channel_impl.h"
 #include "sgs/private/session_impl.h"
 
 #include <wchar.h>
 
-static const int SGS_MAX_RECIPIENTS = 65535;
+static const size_t SGS_MAX_RECIPIENTS = 65535;
 
 /*
  * STATIC FUNCTION DECLARATIONS
@@ -158,39 +158,40 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
 static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen, const sgs_id *recipients[], size_t recipslen)
 {
+    int result;
     size_t i;
     uint16_t _uint16_tmp;
     sgs_session_impl *session = channel->session;
-    sgs_message* msg;
+    sgs_message msg;
     
     /** Initialize static fields of message. */
-    msg = sgs_msg_create(session->msg_buf, sizeof(session->msg_buf), 
+    result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
             SGS_OPCODE_CHANNEL_SEND_REQUEST, SGS_CHANNEL_SERVICE);
-    if (msg == NULL)
+    if (result < 0)
         return -1;
     
     /** Add channel-id data field to message. */
-    if (sgs_msg_add_id(msg, channel->id) == -1)
+    if (sgs_msg_add_id(&msg, channel->id) == -1)
         return -1;
     
     /** Add sequence number to message. */
-    if (sgs_msg_add_uint32(msg, session->seqnum_hi) == -1) return -1;
-    if (sgs_msg_add_uint32(msg, session->seqnum_lo) == -1) return -1;
+    if (sgs_msg_add_uint32(&msg, session->seqnum_hi) == -1) return -1;
+    if (sgs_msg_add_uint32(&msg, session->seqnum_lo) == -1) return -1;
     
     /** Add recipient-count to message. */
     if (recipslen > SGS_MAX_RECIPIENTS) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
     _uint16_tmp = htons(recipslen);
-    if (sgs_msg_add_arb_content(msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
+    if (sgs_msg_add_arb_content(&msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
         return -1;
     
     /** Add each recipient-id to message. */
     for (i=0; i < recipslen; i++) {
-        if (sgs_msg_add_id(msg, recipients[i]) == -1)
+        if (sgs_msg_add_id(&msg, recipients[i]) == -1)
             return -1;
     }
     
     /** Add message payload to message. */
-    if (sgs_msg_add_fixed_content(msg, data, datalen) == -1) return -1;
+    if (sgs_msg_add_fixed_content(&msg, data, datalen) == -1) return -1;
     
     /** Done assembling message; tell session to send it. */
     if (sgs_session_impl_send_msg(session) == -1) return -1;

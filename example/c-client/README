@@ -2,10 +2,6 @@ Project Darkstar C Client SDK, Source Distribution
 
 INTRODUCTION
 
-Project Darkstar lets developers write scalable, reliable, persistent
-and fault-tolerant game server applications using simple
-single-threaded, event-driven code.
-
 The source distribution of the Project Darkstar C Client SDK contains the
 source code needed to develop and run game clients that communicate with
 each other and with game servers implemented with the Project Darkstar
@@ -17,10 +13,10 @@ CONTENTS
 
 This distribution contains the following subdirectories:
 
-- example
+- chatclient
   Source code for a simple chat example
 
-- src
+- sgs
   Source code for the client implementation
 
 - test
@@ -49,7 +45,7 @@ Windows:
   you may need to adjust the paths to the compiler includes and
   libraries in etc/nmake.mk.
 
-- In src/client/c, invoke nmake.exe as follows:
+- At the top level, invoke nmake.exe:
     > nmake.exe /F nmake.mak
 
 
@@ -69,11 +65,9 @@ limitations:
 
 MORE INFORMATION
 
-For more information, please see the tutorial in the doc directory.
-Also check the http://www.projectdarkstar.com website, which has links
-to more information and to the Project Darkstar forums.
-
-See the CHANGELOG file for a list of changes.
+For more information, please check the http://www.projectdarkstar.com
+website, which has links to more information and to the Project
+Darkstar forums.
 
 If you cannot find an answer to your question in any of these places,
 please email the Darkstar team at:

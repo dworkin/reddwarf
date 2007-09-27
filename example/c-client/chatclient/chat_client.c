@@ -678,19 +678,24 @@ normally necessary)\n");
         
         if (token == NULL) {
             printf("Invalid command.  Syntax: psend <user> <msg>\n");
+            sgs_id_destroy(recipient);
             return;
         }
         
         if (concatstr("/pm ", token, strbuf, sizeof(strbuf)) == -1) {
             printf("Error: ran out of buffer space (user input too big?).\n");
+            sgs_id_destroy(recipient);
             return;
         }
         
         if (sgs_channel_send_one(channel, (uint8_t*)strbuf, strlen(strbuf),
                 recipient) == -1) {
             perror("Error in sgs_session_channel_send()");
+            sgs_id_destroy(recipient);
             return;
         }
+
+        sgs_id_destroy(recipient);
     }
     else if (strcmp(token, "chsend") == 0) {
         if (g_session == NULL) {

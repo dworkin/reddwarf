@@ -30,12 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "sgs/message.h"
+#include "sgs/private/message.h"
 
 /*
  * function: printMsg()
  */
-static void printMsg(sgs_message *pmsg) {
+static void printMsg(const sgs_message *pmsg) {
     const uint8_t *data = sgs_msg_get_bytes(pmsg);
     size_t i;
   
@@ -52,15 +52,15 @@ static void printMsg(sgs_message *pmsg) {
  * function: main()
  */
 int main(int argc, char *argv[]) {
-    sgs_message* msg;
+    sgs_message msg;
     uint8_t buf[1024];
     uint8_t content[100];
     int result;
   
-    msg = sgs_msg_create(buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST,
-        SGS_APPLICATION_SERVICE);
+    result = sgs_msg_init(&msg, buf, sizeof(buf),
+        SGS_OPCODE_LOGIN_REQUEST, SGS_APPLICATION_SERVICE);
   
-    printf("INIT() == %p\n", (void*) msg);
+    printf("INIT() == %d\n", result);
   
     content[0] = 10;
     content[1] = 11;
@@ -68,21 +68,19 @@ int main(int argc, char *argv[]) {
     content[3] = 13;
     content[4] = 14;
   
-    result = sgs_msg_add_arb_content(msg, content, 5);
+    result = sgs_msg_add_arb_content(&msg, content, 5);
     printf("ADD-ARB() == %d\n", result);
-    printMsg(msg);
+    printMsg(&msg);
   
-    result = sgs_msg_add_fixed_content(msg, content, 5);
+    result = sgs_msg_add_fixed_content(&msg, content, 5);
     printf("ADD-FIXED() == %d\n", result);
-    printMsg(msg);
-    sgs_msg_destroy(msg);
+    printMsg(&msg);
 
 
-    msg = sgs_msg_deserialize(buf, sizeof(buf));
-    printf("DESER == %p\n", (void*) msg);
-    printMsg(msg);
+    result = sgs_msg_deserialize(&msg, buf, sizeof(buf));
+    printf("DESER == %d\n", result);
+    printMsg(&msg);
   
-    sgs_msg_destroy(msg);
     printf("Goodbye!\n");
   
     return 0;

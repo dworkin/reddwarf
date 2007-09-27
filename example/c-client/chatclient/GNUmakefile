@@ -12,6 +12,7 @@ include $(TOPDIR)/etc/sgs.mk
 
 #DBG += -g
 INCS += -I$(TOPDIR)
+CFLAGS += -Wno-unused
 LDFLAGS += -L$(TOPDIR)
 LIBS += -lsgsclient
 
