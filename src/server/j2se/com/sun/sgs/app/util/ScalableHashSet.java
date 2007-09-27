@@ -23,6 +23,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collection;
@@ -40,15 +41,31 @@ import java.util.Iterator;
  * Developers may use this class as a drop-in replacement for the {@link
  * java.util.HashSet} class for use in a {@link ManagedObject}.  A {@code
  * HashSet} will typically perform better than this class when the number of
- * mappings is small and the objects being stored are small, and when minimal
+ * mappings is small, the objects being stored are small, and minimal
  * concurrency is required.  As the size of the serialized {@code HashSet}
  * increases, this class will perform significantly better.  Developers are
  * encouraged to profile the serialized size of their set to determine which
- * implementation will perform better.  Note that {@code HashSet} has no
- * implicit concurrency, so this class may perform better in situations where
- * multiple tasks need to modify the set concurrently, even if the total number
- * of mappings is small.  Also note that this class should be used instead of
- * other {@code Set} implementations to store {@code ManagedObject} instances.
+ * implementation will perform better.  Note that {@code HashSet} does not
+ * provide any concurrency for {@code Task}s running in parallel that attempt
+ * to modify the set at the same time, so this class may perform better in
+ * situations where multiple tasks need to modify the set concurrently, even if
+ * the total number of elements is small.  Also note that, unlike {@code
+ * HashSet}, this class can be used to store {@code ManagedObject} instances
+ * directly.
+ *
+ * <p>
+ *
+ * This implementation requires that all non-{@code null} elements implement
+ * {@link Serializable}.  Attempting to add elements to the set that do not
+ * implement {@code Serializable} will result in an {@link
+ * IllegalArgumentException} being thrown.  If an element is an instance of
+ * {@code Serializable} but does not implement {@code ManagedObject}, this
+ * class will persist the element as necessary; when such an element is removed
+ * from the set, it is also removed from the {@code DataManager}.  If an
+ * element is an instance of {@code ManagedObject}, the developer will be
+ * responsible for removing these objects from the {@code DataManager} when
+ * done with them.  Developers should not remove these object from the {@code
+ * DataManager} prior to removing them from the set.
  *
  * <p>
  *
@@ -61,42 +78,11 @@ import java.util.Iterator;
  *
  * <p>
  *
- * This implementation requires that all elements must be {@link Serializable}.
- * If an element is an instance of {@code Serializable} but does not implement
- * {@code ManagedObject}, this class will persist the element as necessary;
- * when such an element is removed from the set, it is also removed from the
- * {@code DataManager}.  If an element is an instance of {@code ManagedObject},
- * the developer will be responsible for removing these objects from the {@code
- * DataManager} when done with them.  Developers should not remove these object
- * from the {@code DataManager} prior to removing them from the set.
- *
- * <p>
- *
- * This class offers constant time operations for {@code add}, {@code remove},
- * {@code contains}, and {@code isEmpty}.  Unlike {@code HashSet}, the {@code
- * size} and {@code clear} operations are not constant time; these two
- * operations require a traversal of all the elements in the set.  Like {@code
- * HashSet}, this class permits the {@code null} element.
- *
- * <p>
- *
- * <a name="iterator"></a> The {@code Iterator} for this class implements
- * {@code Serializable}.  An single iterator may be saved by a different {@code
- * ManagedObject} instances, which create a distinct copy of the original
- * iterator.  A copy starts its iteration from where the state of the original
- * was at the time of the copy.  However each copy maintains a separate,
- * independent state from the original will therefore not reflect any changes
- * to the original iterator.  These iterators do not throw {@link
- * java.util.ConcurrentModificationException}.  The iterator for this class is
- * stable with respect to the concurrent changes to the associated collection;
- * an iterator will not the same object twice after a change is made.  An
- * iterator may ignore additions and removals to the associated collection that
- * occur before the iteration site.  This set provides no guarantees on the
- * order of elements when iterating.
- *
- * <p>
- *
- * The {@code Iterator} for this set implements all optional operations.
+ * This class offers constant-time implementations of the {@code add}, {@code
+ * remove} and {@code contains} methods.  Note that, unlike most collections,
+ * the {@code size} and {@code isEmpty} methods for this class are <u>not</u>
+ * constant-time operations.  Because of the asynchronous nature of the set,
+ * these operations may require accessing all of the entries in the set.
  *
  * <p>
  *
@@ -115,6 +101,41 @@ import java.util.Iterator;
  * the actual concurrency will vary.  Developers are strongly encouraged to use
  * hash codes that provide a normal distribution; a large number of collisions
  * will likely reduce the performance.
+ *
+ * <p>
+ *
+ * <a name="iterator"></a> The {@code Iterator} for this class implements
+ * {@code Serializable}.  A single iterator may be saved by different {@code
+ * ManagedObject} instances, which will create distinct copies of the original
+ * iterator.  A copy starts its iteration from where the state of the original
+ * was at the time of the copy.  However, each copy maintains a separate,
+ * independent state from the original and will therefore not reflect any
+ * changes to the original iterator.  To share a single {@code Iterator}
+ * between multiple {@code ManagedObject} <i>and</i> have the iterator use a
+ * consistent view for each, the iterator should be contained within a shared
+ * {@code ManagedObject}.
+ *
+ * <p>
+ *
+ * The iterator do not throw {@link java.util.ConcurrentModificationException}.
+ * The iterator for this class is stable with respect to the concurrent changes
+ * to the associated collection, but may ignore additions and removals made to
+ * the set during iteration.
+ *
+ * <p>
+ *
+ * If a call to the {@link Iterator#next next} method on the iterator causes a
+ * {@link ObjectNotFoundException} to be thrown because the return value has
+ * been removed from the {@code DataManager}, the iterator will still have
+ * successfully moved to the next entry in its iteration.  In this case, the
+ * {@link Iterator#remove remove} method may be called on the iterator to
+ * remove the current object even though that object could not be returned.
+ *
+ * <p>
+ *
+ * This class and its iterator implement all optional operations and support
+ * {@code null} elements.  This set provides no guarantees on the order of
+ * elements when iterating.
  *
  * @param <E> the type of elements maintained by this set
  *
@@ -154,8 +175,8 @@ public class ScalableHashSet<E>
     private final ManagedReference map;
 
     /**
-     * Creates a new empty set; the backing {@code ScalableHashMap}
-     * has the default minimum concurrency ({@code 32}).
+     * Creates an empty set; the backing {@code ScalableHashMap} has the
+     * default minimum concurrency ({@code 32}).
      *
      * @see ScalableHashMap#ScalableHashMap()
      */
@@ -165,13 +186,14 @@ public class ScalableHashSet<E>
     }
 
     /**
-     * Creates a new empty set; the backing {@code ScalableHashMap} has the
+     * Creates an empty set; the backing {@code ScalableHashMap} has the
      * specified minimum concurrency.
      *
-     * @param minConcurrency the minimum number of write operations to support
-     *        in parallel
+     * @param minConcurrency the minimum number of concurrent write operations
+     *	      to support
      *
-     * @throws IllegalArgumentException if minConcurrency is non-positive
+     * @throws IllegalArgumentException if {@code minConcurrency} is
+     *	       non-positive
      *
      * @see ScalableHashMap#ScalableHashMap(int)
      */
@@ -185,6 +207,10 @@ public class ScalableHashSet<E>
      * The new set will have the default minimum concurrency ({@code 32}).
      *
      * @param c the collection of elements to be added to the set
+     *
+     * @throws IllegalArgumentException if any elements contained in the
+     *	       argument are not {@code null} and do not implement {@code
+     *	       Serializable}
      */
     public ScalableHashSet(Collection<? extends E> c) {
 	this();
@@ -192,11 +218,15 @@ public class ScalableHashSet<E>
     }
 
     /**
-     * Adds the specified element to this set if was not already present.
+     * Adds the specified element to this set if it was not already present.
      *
      * @param e the element to be added
+     *
      * @return {@code true} if the set did not already contain the specified
      *         element
+     *
+     * @throws IllegalArgumentException if the argument is not {@code null} and
+     *	       does not implement {@code Serializable}
      */
     @SuppressWarnings("unchecked")
     public boolean add(E e) {

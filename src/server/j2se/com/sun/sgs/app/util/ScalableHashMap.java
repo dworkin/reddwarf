@@ -42,15 +42,14 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 /*
- * FIXME: Modify clear to remove the objects associated with the children nodes
+ * TBD: Modify clear to remove the objects associated with the children nodes
  * in a separate task, to avoid scaling problems.  -tjb@sun.com (09/26/2007)
  *
- * FIXME: Add an asynchronous version of size to avoid scaling problems.
+ * TBD: Add an asynchronous version of size to avoid scaling problems.
  * -tjb@sun.com (09/26/2007)
  *
- * XXX: Maybe modify getEntry and containsValue to check if the specified
- * object has the same object ID as a deleted object?  -tjb@sun.com
- * (09/26/2007)
+ * FIXME: Modify clear to maintain the initially requested minimum depth.
+ * -tjb@sun.com (09/27/2007)
  */
 
 /**
@@ -68,13 +67,28 @@ import java.util.Set;
  * mappings is small, the objects being stored are small, and minimal
  * concurrency is required.  As the size of the serialized {@code HashMap}
  * increases, this class will perform significantly better.  Developers are
- * encouraged to profile the size of their map to determine which
+ * encouraged to profile the serialized size of their map to determine which
  * implementation will perform better.  Note that {@code HashMap} does not
  * provide any concurrency for {@code Task}s running in parallel that attempt
- * to modify the map at the same time, so this class may perform in situations
- * where multiple tasks need to modify the map concurrently, even if the total
- * number of mappings is small.  Also note that, unlike {@code HashMap}, this
- * class can be used to store {@code ManagedObject} instances directly.
+ * to modify the map at the same time, so this class may perform better in
+ * situations where multiple tasks need to modify the map concurrently, even if
+ * the total number of mappings is small.  Also note that, unlike {@code
+ * HashMap}, this class can be used to store {@code ManagedObject} instances
+ * directly.
+ *
+ * <p>
+ *
+ * This implementation requires that all non-{@code null} keys and values
+ * implement {@link Serializable}.  Attempting to add keys or values to the map
+ * that do not implement {@code Serializable} will result in an {@link
+ * IllegalArgumentException} being thrown.  If a key or value is an instance of
+ * {@code Serializable} but does not implement {@code ManagedObject}, this
+ * class will persist the object as necessary; when such an object is removed
+ * from the map, it is also removed from the {@code DataManager}.  If a key or
+ * value is an instance of {@code ManagedObject}, the developer will be
+ * responsible for removing these objects from the {@code DataManager} when
+ * done with them.  Developers should not remove these object from the {@code
+ * DataManager} prior to removing them from the map.
  *
  * <p>
  *
@@ -87,62 +101,10 @@ import java.util.Set;
  *
  * <p>
  *
- * This implementation requires that all keys and values be instances of {@link
- * Serializable}.  Attempting to add keys or values to the map that do not
- * implement {@code Serializable} will result in an {@link
- * IllegalArgumentException} being thrown.  If a key or value is an instance of
- * {@code Serializable} but does not implement {@code ManagedObject}, this
- * class will persist the object as necessary; when such an object is removed
- * from the map, it is also removed from the {@code DataManager}.  If a key or
- * value is an instance of {@code ManagedObject}, the developer will be
- * responsible for removing these objects from the {@code DataManager} when
- * done with them.  Developers should not remove these object from the {@code
- * DataManager} prior to removing them from the map.
- *
- * <p>
- *
- * This class provides {@code Serializable} views from the {@link #entrySet
- * entrySet}, {@link #keySet keySet} and {@link #values values} methods.  These
- * views may be shared and persisted by multiple {@code ManagedObject}
- * instances.
- *
- * <p>
- *
- * <a name="iterator"></a> The {@code Iterator} for each view also implements
- * {@code Serializable}.  A single iterator may be saved by different {@code
- * ManagedObject} instances, which will create distinct copies of the original
- * iterator.  A copy starts its iteration from where the state of the original
- * was at the time of the copy.  However, a copy maintains a separate,
- * independent state from the original and will therefore not reflect any
- * changes to the original iterator.  To share a single {@code Iterator}
- * between multiple {@code ManagedObject} <i>and</i> have the iterator use a
- * consistent view for each, the iterator should be contained within a shared
- * {@code ManagedObject}, such as by wrapping it with a {@link
- * ManagedSerializable}.
- *
- * <p>
- *
- * The iterators do not throw {@link
- * java.util.ConcurrentModificationException}.  The iterators are stable with
- * respect to the concurrent changes to the associated collection, but may
- * ignore additions and removals made during to the collection during
- * iteration.
- *
- * <p>
- *
- * If a call to the {@link Iterator#next next} method on the iterators causes a
- * {@link ObjectNotFoundException} to be thrown because the return value has
- * been removed from the {@code DataManager}, note that the iterator will still
- * have successfully moved to the next entry in its iteration.  In this case,
- * the {@link Iterator#remove remove} method may be called on the iterator to
- * remove the current object even though that object could not be returned.
- *
- * <p>
- *
- * Note that, unlike most collections, the {@code size}, {@code isEmpty}, and
- * {@code clear} methods are <u>not</u> constant time operations.  Because of
- * the asynchronous nature of the map, these methods may require accessing all
- * of the entries in the tree.
+ * Note that, unlike most collections, the {@code size} and {@code isEmpty}
+ * methods for this class are <u>not</u> constant-time operations.  Because of
+ * the asynchronous nature of the map, these operations may require accessing
+ * all of the entries in the map.
  *
  * <p>
  *
@@ -164,10 +126,45 @@ import java.util.Set;
  *
  * <p>
  *
- * This class and its iterator implement all of the optional {@code Map}
- * operations and supports both {@code null} keys and values.  This map
- * provides no guarantees on the order of elements when iterating over the key
- * set, values or entry set.
+ * This class provides {@code Serializable} views from the {@link #entrySet
+ * entrySet}, {@link #keySet keySet} and {@link #values values} methods.  These
+ * views may be shared and persisted by multiple {@code ManagedObject}
+ * instances.
+ *
+ * <p>
+ *
+ * <a name="iterator"></a> The {@code Iterator} for each view also implements
+ * {@code Serializable}.  A single iterator may be saved by different {@code
+ * ManagedObject} instances, which will create distinct copies of the original
+ * iterator.  A copy starts its iteration from where the state of the original
+ * was at the time of the copy.  However, each copy maintains a separate,
+ * independent state from the original and will therefore not reflect any
+ * changes to the original iterator.  To share a single {@code Iterator}
+ * between multiple {@code ManagedObject} <i>and</i> have the iterator use a
+ * consistent view for each, the iterator should be contained within a shared
+ * {@code ManagedObject}.
+ *
+ * <p>
+ *
+ * The iterators do not throw {@link
+ * java.util.ConcurrentModificationException}.  The iterators are stable with
+ * respect to the concurrent changes to the associated collection, but may
+ * ignore additions and removals made to the collection during iteration.
+ *
+ * <p>
+ *
+ * If a call to the {@link Iterator#next next} method on the iterators causes a
+ * {@link ObjectNotFoundException} to be thrown because the return value has
+ * been removed from the {@code DataManager}, the iterator will still have
+ * successfully moved to the next entry in its iteration.  In this case, the
+ * {@link Iterator#remove remove} method may be called on the iterator to
+ * remove the current object even though that object could not be returned.
+ *
+ * <p>
+ *
+ * This class and its iterator implement all optional operations and support
+ * both {@code null} keys and values.  This map provides no guarantees on the
+ * order of elements when iterating over the key set, values or entry set.
  *
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
@@ -329,9 +326,8 @@ public class ScalableHashMap<K,V>
 
     /**
      * The monotonic counter that reflects the number of times this instance
-     * has been modified.  The counter is used by the {@link
-     * ScalableHashMap.ConcurrentIterator} to detect changes between
-     * transactions.
+     * has been modified.  The counter is used by the {@code
+     * ConcurrentIterator} class to detect changes between transactions.
      *
      * @serial
      */
@@ -389,7 +385,7 @@ public class ScalableHashMap<K,V>
     private final int maxDirBits;
 
     /**
-     * Constructs an empty {@code ScalableHashMap}.
+     * Creates an empty map.
      *
      * @param depth the depth of this node in the tree
      * @param minDepth the minimum depth of leaf nodes requested to support a
@@ -470,13 +466,13 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Constructs an empty {@code ScalableHashMap} with the provided minimum
-     * concurrency.
+     * Creates an empty map with the specified minimum concurrency.
      *
      * @param minConcurrency the minimum number of concurrent write operations
-     *        supported
+     *        to support
      *
-     * @throws IllegalArgumentException if minConcurrency is non-positive
+     * @throws IllegalArgumentException if {@code minConcurrency} is
+     *	       non-positive
      */
     public ScalableHashMap(int minConcurrency) {
 	this(0, findMinDepthFor(minConcurrency), DEFAULT_SPLIT_THRESHOLD,
@@ -484,8 +480,8 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Constructs an empty {@code ScalableHashMap} with the default minimum
-     * concurrency ({@code 32}).
+     * Constructs an empty map with the default minimum concurrency ({@code
+     * 32}).
      */
     public ScalableHashMap() {
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY),
@@ -493,10 +489,14 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Constructs a new {@code ScalableHashMap} with the same mappings as the
-     * specified {@code Map}, and the default minimum concurrency ({@code 32}).
+     * Constructs a new map with the same mappings as the specified {@code
+     * Map}, and the default minimum concurrency ({@code 32}).
      *
-     * @param m the mappings to include
+     * @param map the mappings to include
+     *
+     * @throws IllegalArgumentException if any of the keys or values contained
+     *	       in the argument are not {@code null} and do not implement {@code
+     *	       Serializable}
      */
     public ScalableHashMap(Map<? extends K, ? extends V> map) {
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY),
@@ -1039,8 +1039,12 @@ public class ScalableHashMap<K,V>
      * mapping exists.
      *
      * @param key the key whose mapped value is to be returned
+     *
      * @return the value mapped to the provided key or {@code null} if no such
      *         mapping exists
+     *
+     * @throws ObjectNotFoundException if the value associated with the key has
+     *	       been removed from the {@link DataManager}
      */
     public V get(Object key) {
 	PrefixEntry<K,V> entry = getEntry(key);
@@ -1067,15 +1071,44 @@ public class ScalableHashMap<K,V>
     /**
      * Associates the specified key with the provided value and returns the
      * previous value if the key was previous mapped.  This map supports both
-     * {@code null} keys and values.
+     * {@code null} keys and values. <p>
+     *
+     * If the value currently associated with {@code key} has been removed from
+     * the {@link DataManager}, then an {@link ObjectNotFoundException} will be
+     * thrown and the mapping will not be changed.
      *
      * @param key the key
      * @param value the value to be mapped to the key
+     *
      * @return the previous value mapped to the provided key, if any
+     *
+     * @throws IllegalArgumentException if either {@code key} or {@code value}
+     *	       is not {@code null} and does not implement {@code Serializable}
+     * @throws ObjectNotFoundException if the previous value associated with
+     *	       the key has been removed from the {@link DataManager}
      */
     public V put(K key, V value) {
 	checkSerializable(key, "key");
 	checkSerializable(value, "value");
+	return putInternal(key, value, true);
+    }
+
+    /**
+     * Like put, but does not check if arguments are serializable, and only
+     * returns the old value if requested, to avoid an exception if the old
+     * value is not found.
+     *     
+     * @param key the key
+     * @param value the value to be mapped to the key
+     * @param returnOldValue whether to return the old value
+     *
+     * @return the previous value mapped to the provided key, if any.  Always
+     *	       returns {@code null} if {@code returnOldValue} is {@code false}
+     * @throws ObjectNotFoundException if the previous value associated with
+     *	       the key has been removed from the {@link DataManager} and is
+     *	       being returned
+     */
+    private V putInternal(K key, V value, boolean returnOldValue) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	ScalableHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
@@ -1104,7 +1137,12 @@ public class ScalableHashMap<K,V>
 		}
 		// if the keys and hash match, swap the values and return the
 		// old value
-		return e.setValue(value);
+		if (returnOldValue) {
+		    return e.setValue(value);
+		} else {
+		    e.setValueInternal(value);
+		    return null;
+		}
 	    }
 	    /* Create the new entry to get the ID of its key ref */
 	    if (newEntry == null) {
@@ -1153,10 +1191,25 @@ public class ScalableHashMap<K,V>
      * they occur in both this map and the provided map.
      *
      * @param m the map to be copied
+     *
+     * @throws IllegalArgumentException if any of the keys or values contained
+     *	       in the argument are not {@code null} and do not implement {@code
+     *	       Serializable}.  If this exception is thrown, some of the entries
+     *	       from the argument may have already been added to this map.
      */
     public void putAll(Map<? extends K, ? extends V> m) {
 	for (Entry<? extends K,? extends V> e : m.entrySet()) {
-	    put(e.getKey(), e.getValue());
+	    K key = e.getKey();
+	    if (key != null && !(key instanceof Serializable)) {
+		throw new IllegalArgumentException(
+		    "The collection contains a non-serializable key");
+	    }
+	    V value = e.getValue();
+	    if (value != null && !(value instanceof Serializable)) {
+		throw new IllegalArgumentException(
+		    "The collection contains a non-serializable value");
+	    }
+	    putInternal(key, value, false);
 	}
     }
 
@@ -1251,13 +1304,21 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Removes the mapping for the specified key from this map if present.
+     * Removes the mapping for the specified key from this map if present. <p>
+     *
+     * If the value currently associated with {@code key} has been removed from
+     * the {@link DataManager}, then an {@link ObjectNotFoundException} will be
+     * thrown and the mapping will not be removed.
      *
      * @param  key key whose mapping is to be removed from the map
+     *
      * @return the previous value associated with {@code key}, or {@code null}
      *         if there was no mapping for {@code key}.  (A {@code null} return
      *         can also indicate that the map previously associated {@code
      *         null} with {@code key}.)
+     *
+     * @throws ObjectNotFoundException if the value associated with the key has
+     *	       been removed from the {@link DataManager}
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
@@ -1587,10 +1648,22 @@ public class ScalableHashMap<K,V>
 	 * @param newValue the value to be stored
 	 * @return the previous value of this entry
 	 */
-	@SuppressWarnings("unchecked")
 	public final V setValue(V newValue) {
 	    checkSerializable(newValue, "newValue");
 	    V oldValue = getValue();
+	    setValueInternal(newValue);
+	    return oldValue;
+	}
+
+	/**
+	 * Replaces the previous value of this entry with the provided value.
+	 * Does not check if the new value is serializable or return the old
+	 * value.
+	 *
+	 * @param newValue the value to be stored
+	 */
+	@SuppressWarnings("unchecked")
+	void setValueInternal(V newValue) {
 	    DataManager dm = AppContext.getDataManager();
 	    if (newValue instanceof ManagedObject) {
 		if (isKeyValuePair()) {
@@ -1624,7 +1697,6 @@ public class ScalableHashMap<K,V>
 		    new ManagedSerializable<V>(newValue));
 		setValueWrapped(true);
 	    }
-	    return oldValue;
 	}
 
 	/**
