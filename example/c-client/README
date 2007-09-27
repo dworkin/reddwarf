@@ -35,6 +35,14 @@ Unix:
   or
     % gmake
 
+- To build the tests:
+    % cd test
+    % make
+
+- To build the chat client example:
+    % cd chatclient
+    % make
+
 Windows:
 
 - Ensure that the appropriate compiler tools are available in
@@ -47,6 +55,46 @@ Windows:
 
 - At the top level, invoke nmake.exe:
     > nmake.exe /F nmake.mak
+
+- To build the tests:
+    % cd test
+    % nmake.exe /F nmake.mak
+
+
+RUNNING TESTS
+
+- After building the tests (see above), the resulting test
+  executables can be run manually.  For example, on Unix:
+
+    % cd test
+    % ./buffer_test
+
+  ...and so on with the other test executables.
+  
+
+RUNNING THE CHAT CLIENT
+
+The chat client example requires a running SGS server with the
+Hello Channels tutorial application running.
+
+After building the chat client (see above), invoke the resulting
+executable.  For example, on Unix:
+
+    % cd chatclient
+    % ./chat_client
+
+Type "help" at the command prompt for a list of commands.
+
+A simple chat session:
+
+  > login user1 mypass
+  > chsend Foo hello
+  > srvsend test_direct_send
+  > logout
+
+Note that the chat client example includes commands that are not
+understood by the tutorial application and will simply be echoed
+to the server log.
 
 
 KNOWN ISSUES
