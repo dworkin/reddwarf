@@ -33,7 +33,6 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -54,7 +53,6 @@ import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -117,8 +115,6 @@ class Kernel {
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
-    private static final String IDENTITY_COORDINATOR_CLASS_PROPERTY =
-            "com.sun.sgs.impl.kernel.Kernel.identity.coordinator";
     // the system registry used by this kernel, for testing
     private ComponentRegistry systemRegistry = null;
     // the last task owner created by this kernel, for testing
@@ -287,8 +283,6 @@ class Kernel {
 
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: configuring application", appName);
-
-        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
         // create the authentication coordinator used for this application
         ArrayList<IdentityAuthenticator> authenticators =
@@ -311,23 +305,15 @@ class Kernel {
         }
 
         IdentityCoordinator appIdentityCoordinator;
-        String identityCoordinatorClassName = properties.getProperty(
-		IDENTITY_COORDINATOR_CLASS_PROPERTY);
         try {
-            if (identityCoordinatorClassName == null) {
-                appIdentityCoordinator = new IdentityCoordinatorImpl(authenticators);
-            } else {
-                appIdentityCoordinator = wrappedProps.getClassInstanceProperty(
-                    IDENTITY_COORDINATOR_CLASS_PROPERTY, IdentityCoordinator.class,
-                    new Class[] {List.class}, authenticators);
-            }
+            appIdentityCoordinator = new IdentityCoordinatorImpl(authenticators);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e,
                                 "Failed to created Identity Coordinator");
             throw e;
         }
-        
+
         // now that we have the app's authenticators, create a system
         // registry to use in setting up the services
         HashSet<Object> appSystemComponents =
