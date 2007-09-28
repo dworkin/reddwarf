@@ -89,7 +89,7 @@ class ReactiveChannelGroup
         }
     }
 
-    abstract class Reactor implements Callable<Boolean> {
+    abstract class Reactor implements Callable<Boolean>, Closeable {
         /*
          * "this" Reactor also acts as the selector guard.
          * May be locked *after* mainLock, but not before.
@@ -101,6 +101,20 @@ class ReactiveChannelGroup
 
         Reactor(Selector selector) {
             this.selector = selector;
+        }
+        
+        public void close() throws IOException {
+            synchronized (this) {
+                selector.wakeup();
+                for (SelectionKey key : selector.keys()) {
+                    try {
+                        AsyncChannelImpl channel =
+                            (AsyncChannelImpl) key.attachment();
+                        if (channel != null)
+                            channel.close();
+                    } catch (IOException ignore) { }
+                }
+            }   
         }
     }
 
@@ -139,9 +153,10 @@ class ReactiveChannelGroup
                     if (selector.keys().isEmpty()) {
                         try {
                             selector.close();
-                        } catch (IOException ignore) { }
-                        termination.countDown();
-                        return false;
+                            return false;
+                        } finally {
+                            termination.countDown();
+                        }
                     }
                 }
             }
@@ -214,6 +229,10 @@ class ReactiveChannelGroup
         public boolean equals(Object obj) {
             if (this == obj)
                 return true;
+            if (obj == null)
+                return false;
+            if (! (obj instanceof TimeoutHandler))
+                return false;
             TimeoutHandler other = (TimeoutHandler) obj;
             return asyncChannel == other.asyncChannel && op == other.op;
         }
@@ -266,7 +285,7 @@ class ReactiveChannelGroup
     }
 
     Reactor getSelectorHolder(AsyncChannelImpl ach) {
-        int index = Math.abs(ach.hashCode()) % numReactors;
+        int index = Math.abs(ach.hashCode() % numReactors);
         return reactors.get(index);
     }
 
@@ -426,9 +445,9 @@ class ReactiveChannelGroup
             if (state < SHUTDOWN)
                 runState = SHUTDOWN;
 
-            for (Reactor h : reactors) {
-                synchronized (h) {
-                    h.selector.wakeup();
+            for (Reactor reactor : reactors) {
+                synchronized (reactor) {
+                    reactor.selector.wakeup();
                 }
             }
 
@@ -447,22 +466,10 @@ class ReactiveChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (Reactor h : reactors) {
-                synchronized (h) {
-                    Selector selector = h.selector;
-                    selector.wakeup();
-                    for (SelectionKey key : selector.keys())
-                        forceClose((AsyncChannelImpl) key.attachment());
-                }
-            }
+            for (Reactor reactor : reactors)
+                reactor.close();
 
             return this;
         }
-    }
-
-    static void forceClose(Closeable closeable) {
-        try {
-            closeable.close();
-        } catch (IOException ignore) { }
     }
 }

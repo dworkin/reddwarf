@@ -37,11 +37,17 @@ abstract class AsyncProviderImpl
                     String cn = System.getProperty(
                         "com.sun.sgs.nio.channels.DefaultThreadPoolFactory");
                     if (cn != null) {
+                        Class<?> c;
                         try {
-                            Class<?> c = Class.forName(cn, true,
+                            c = Class.forName(cn, true,
                                 ClassLoader.getSystemClassLoader());
                             return (ThreadPoolFactory) c.newInstance();
-                        } catch (Exception ignore) { }
+                        } catch (ClassNotFoundException ignore) {
+                        } catch (InstantiationException ignore) {
+                        } catch (IllegalAccessException ignore) {
+                        }
+                        // Any exception will fall-thru and return
+                        // the default pool.
                     }
                     return DefaultThreadPoolFactory.create();
                 }
@@ -56,8 +62,8 @@ abstract class AsyncProviderImpl
                 defaultGroupInstance = openAsynchronousChannelGroup(executor);
                 // TODO is a cleanup thread needed/useful? -JM
             }
+            return defaultGroupInstance;
         }
-        return defaultGroupInstance;
     }
 
     private AbstractAsyncChannelGroup checkGroup(AsynchronousChannelGroup group)

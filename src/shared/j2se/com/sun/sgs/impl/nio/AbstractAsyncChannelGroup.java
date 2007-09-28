@@ -56,11 +56,22 @@ abstract class AbstractAsyncChannelGroup
                long timeout,
                TimeUnit unit);
 
-    void setException(final AsyncOp<?> task, final Throwable t) {
-        execute(new Runnable() {
-            public void run() {
-                task.setException(t);
-            }});
+    void setException(AsyncOp<?> task, Throwable t) {
+        execute(new ExceptionSetter(task, t));
+    }
+    
+    static class ExceptionSetter implements Runnable {
+        private final AsyncOp<?> asyncOp;
+        private final Throwable throwable;
+
+        ExceptionSetter(AsyncOp<?> task, Throwable t) {
+            this.asyncOp = task;
+            this.throwable = t;
+        }
+
+        public void run() {
+            asyncOp.setException(throwable);
+        }
     }
 
     /**

@@ -4,7 +4,6 @@
 
 package com.sun.sgs.impl.nio;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SelectableChannel;
 import java.util.HashSet;
@@ -223,8 +222,11 @@ class TPCChannelGroup
             if (state < STOP)
                 runState = STOP;
 
-            for (AsyncChannelImpl channel : channels)
-                forceClose(channel);
+            for (AsyncChannelImpl channel : channels) {
+                try {
+                    channel.close();
+                } catch (IOException ignore) { }
+            }
 
             tryTerminate();
             return this;
@@ -233,9 +235,6 @@ class TPCChannelGroup
         }
     }
 
-    private void forceClose(Closeable closeable) {
-        try {
-            closeable.close();
-        } catch (IOException ignore) { }
+    private static void forceClose(AsyncChannelImpl channel) {
     }
 }
