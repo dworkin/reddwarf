@@ -31,7 +31,8 @@
  */
 
 /*
- * This file declares constants relevant to the SGS network wire protocol.
+ * This file declares constants relevant to the Project Darkstar network
+ * wire protocol.
  */
 
 /**

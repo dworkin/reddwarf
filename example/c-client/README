@@ -12,6 +12,9 @@ CONTENTS
 - chatclient
   Source code for a simple chat example
 
+- etc
+  Platform makefiles
+
 - sgs
   Source code for the example C client implementation
 
@@ -77,7 +80,7 @@ After building the chat client (see above), invoke the resulting
 executable.  For example, on Unix:
 
     % cd chatclient
-    % ./chat_client
+    % ./chat_client -p 1139
 
 Type "help" at the command prompt for a list of commands.
 

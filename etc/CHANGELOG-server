@@ -1,3 +1,7 @@
+Version 0.9.4:
+- Fix a bug that caused timeout exceptions that occurred when
+  deserializing managed references to not be retried
+
 Version 0.9.3:
 - Document the network protocol and public server configuration
   properties
