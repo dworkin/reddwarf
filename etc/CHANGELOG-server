@@ -1,6 +1,8 @@
 Version 0.9.4:
 - Fix a bug that caused timeout exceptions that occurred when
   deserializing managed references to not be retried
+- Modify TCP connection establishment to disable Nagle's Algorithm,
+  to reduce latency
 
 Version 0.9.3:
 - Document the network protocol and public server configuration
