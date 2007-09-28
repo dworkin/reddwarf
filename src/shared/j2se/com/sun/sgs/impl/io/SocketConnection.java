@@ -25,6 +25,8 @@ import java.util.logging.Logger;
 
 import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoSession;
+import org.apache.mina.common.TransportType;
+import org.apache.mina.transport.socket.nio.SocketSessionConfig;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Connection;
@@ -63,12 +65,20 @@ public class SocketConnection implements Connection, FilterListener {
     SocketConnection(ConnectionListener listener, CompleteMessageFilter filter,
                  IoSession session)
     {
-        if (listener == null || filter == null || session == null) {
+        if (listener == null || filter == null || session == null)
             throw new NullPointerException("null argument to constructor");
-        }
+
+        if (session.getTransportType() != TransportType.SOCKET)
+            throw new IllegalArgumentException(
+                "IoSession is not a Socket session");
+
         this.listener = listener;
         this.filter = filter;
         this.session = session;
+
+        // Cast is safe because we ensure TransportType == SOCKET above.
+        SocketSessionConfig cfg = (SocketSessionConfig) session.getConfig();
+        cfg.setTcpNoDelay(true);
     }
 
     /**
