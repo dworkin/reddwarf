@@ -32,7 +32,7 @@
 
 /*
  * This file provides functions relating to the client's side of a session with
- *  a Sun Gaming Server (SGS).  Its functionality is similar to that in the java
+ *  a Project Darkstar Server.  Its functionality is similar to that in the java
  *  class com.sun.sgs.client.simple.SimpleClient.
  *
  * Conventions:
