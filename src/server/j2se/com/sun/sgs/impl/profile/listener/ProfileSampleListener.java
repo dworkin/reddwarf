@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A text-output listener that displays the distribution for all
- * {@link com.sun.sgs.kernel.ProfileSample}s updated during a
+ * {@link com.sun.sgs.profile.ProfileSample}s updated during a
  * fixed-size window of tasks as well as the lifetime of the program.
  * This class uses a {@link PowerOfTwoHistogram} to display the
  * distribution for each sample
