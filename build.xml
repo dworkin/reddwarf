@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="sgs-jsr203" default="build" basedir=".">
+
+  <description>
+    Builds Project Darkstar JSR-203 Implementation
+  </description>
+
+  <!-- First load the user's properties -->
+  <property name="user.properties.file"
+	    location="${user.home}/.build.properties"/>
+  <property file="${user.properties.file}"/>
+
+  <!-- VARIABLE DEFINITIONS -->
+
+  <!-- Build location -->
+  <property name="build.dir" location="build"/>
+  <property name="lib.dir" location="lib"/>
+
+  <!-- Values for controlling compilation -->
+  <property name="javac.source" value="1.5"/>
+  <property name="javac.compilerargs"
+	    value="-Xlint"/>
+
+  <!-- Where to find Ruby on the current platform -->
+  <property name="ruby" location="/usr/bin/ruby"/>
+
+  <!-- Version information -->
+  <property name="project.release" value="0.9.3"/>
+  <!-- Set to true when building an external release -->
+  <property name="external.release" value="false"/>
+
+  <!-- Values for the JavaDocs -->
+  <property name="project.name" value="Project Darkstar JSR-203"/>
+  <tstamp>
+    <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
+  </tstamp>
+
+  <property name="jdk.doc.api.url"
+	    value="http://java.sun.com/j2se/1.5/docs/api"/>
+  <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
+
+  <property name="apidoc.server.zip"
+            location="${build.dir}/sgs-server-apidoc.zip"/>
+  <property name="apidoc.client.zip"
+            location="${build.dir}/sgs-client-apidoc.zip"/>
+
+  <!-- Values for testing -->
+  <property name="test.logging" location="logging.properties"/>
+  <property name="test.assertions" value="-enableassertions"/>
+  <property name="test.jvm.args" value="${test.assertions}"/>
+  <property name="test.formatter.type" value="plain"/>
+  <property name="test.showoutput" value="false"/>
+  <property name="test.include" value="**/Test*.java"/>
+
+  <property name="echotest.bufsize" value="32"/>
+  <property name="echotest.server.logging" location="server-log.properties"/>
+  <property name="echotest.client.logging" location="client-log.properties"/>
+  <property name="echotest.jvm.args" value="-server -d64 -XX:+UseBoundThreads -XX:+MaxFDLimit"/>
+
+  <!-- Shared code class path -->
+  <path id="shared.classpath">
+    <pathelement location="${build.dir}/classes/shared"/>
+  </path>
+
+  <!-- TARGET DEFINITIONS -->
+
+  <!-- Builds everything -->
+  <target name="all" depends="build, jar, javadoc, checkstyle, test"
+	  description="Builds everything"/>
+
+  <!-- Builds a debug version of the complete project -->
+  <target name="build" depends="build-shared"
+	  description="Builds code"/>
+
+  <!-- Builds the shared code -->
+  <target name="build-shared">
+    <mkdir dir="${build.dir}/classes/shared"/>
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/shared"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/shared/j2se" destdir="${build.dir}/classes/shared"
+           classpathref="shared.classpath" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Removes all built files and all ~ files -->
+  <target name="clean" description="Removes all built files and all ~ files">
+    <delete dir="${build.dir}"/>
+    <delete>
+      <fileset dir="." defaultexcludes="no" includes="**/*~"/>
+    </delete>
+  </target>
+
+  <!-- Builds the documentation -->
+  <target name="doc" depends="javadoc" description="Builds documentation"/>
+
+  <!-- Build the JavaDoc from the source -->
+  <target name="javadoc" depends="javadoc-internal"
+	  description="Builds javadoc"/>
+
+  <!-- Build the internal JavaDoc -->
+  <target name="javadoc-internal" depends="build"
+          description="Builds internal (full) javadoc">
+    <javadoc destdir="${build.dir}/javadoc/internal"
+             packagenames="com.sun.*"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no" access="package">
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="shared.classpath"/>
+      </classpath>
+      <sourcepath>
+        <dirset dir="src" includes="*/j2se"/>
+        <dirset dir="test" includes="*/j2se"/>
+      </sourcepath>
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Project Darkstar JSR-203, Version
+        ${project.version}<br>${project.build}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Builds the jar files for the project classes -->
+  <target name="jar" depends="jar-shared"
+	  description="Builds JAR files"/>
+
+  <!-- Builds the shared JAR file -->
+  <target name="jar-shared" depends="build-shared"
+	  description="Builds the shared JAR file">
+    <mkdir dir="${build.dir}/lib"/>
+    <jar destfile="${build.dir}/lib/sgs-jsr203.jar">
+      <fileset dir="${build.dir}/classes/shared"/>
+    </jar>
+  </target>
+
+  <!-- Checks Java coding style -->
+  <target name="checkstyle"
+	  depends="checkstyle-shared"
+	  description="Checks Java coding style">
+  </target>
+
+  <!-- Checks shared Java coding style -->
+  <target name="checkstyle-shared"
+	  depends="build-shared,-checkstyle.init"
+	  description="Checks shared Java coding style">
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
+		classpathref="shared.classpath">
+      <fileset dir="src/shared/j2se"/>
+    </checkstyle>
+  </target>
+
+  <!-- Verify checkstyle.jar is set, build local checkstyle classes,
+       and define the checkstyle task. -->
+  <target name="-checkstyle.init">
+      <fail unless="checkstyle.jar"
+	    message="The checkstyle.jar property must be set to the location of the checkstyle-all JAR file"/>
+      <mkdir dir="${build.dir}/classes/checkstyle"/>
+      <depend srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	      cache="${build.dir}/depend" closure="true"/>
+      <javac srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	     classpath="${checkstyle.jar}" includeAntRuntime="no"
+	     debug="${build.debug}" debuglevel="${build.debug.level}"
+	     source="${javac.source}">
+	<compilerarg line="${javac.compilerargs}"/>
+      </javac>
+      <taskdef resource="checkstyletask.properties"
+	       classpath="${build.dir}/classes/checkstyle:${checkstyle.jar}"/>
+  </target>
+
+  <!-- Checks for bugs using FindBugs (http://findbugs.sourceforge.net) -->
+  <target name="findbugs"
+	  depends="findbugs-shared"
+	  description="Checks for bugs using FindBugs"/>
+
+  <!-- Checks for bugs in shared code -->
+  <target name="findbugs-shared" depends="build-shared, -findbugs.init"
+	  description="Checks for bugs in shared code">
+    <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
+	      reportLevel="low" output="emacs">
+      <sourcePath path="src/shared/j2se"/>
+      <class location="${build.dir}/classes/shared"/>
+      <auxClasspath>
+	<path refid="shared.classpath"/>
+      </auxClasspath>
+    </findbugs>
+  </target>
+
+  <!-- Defines the findbugs task -->
+  <target name="-findbugs.init">
+    <fail unless="findbugs.dir"
+	  message="The findbugs.dir property must be set to a directory containing the FindBugs installation"/>
+    <taskdef name="findbugs"
+	     classname="edu.umd.cs.findbugs.anttask.FindBugsTask"
+	     classpath="${findbugs.dir}/lib/findbugs-ant.jar"/>
+  </target>
+
+  <!-- Compile and run tests -->
+  <target name="test" depends="test-shared"
+	  description="Compiles and runs tests"/>
+
+  <!-- Compile and run shared tests -->
+  <target name="test-shared" depends="test-shared.classes"
+	  description="Compiles and runs shared tests">
+    <mkdir dir="${build.dir}/test"/>
+    <delete dir="${build.dir}/test/output"/>
+    <mkdir dir="${build.dir}/test/output"/>
+    <junit fork="true"
+	   printsummary="on"
+	   showoutput="${test.showoutput}"
+	   tempdir="${build.dir}/test/output"
+	   failureproperty="tests.failed">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
+      </classpath>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+      </syspropertyset>
+      <formatter type="${test.formatter.type}"/>
+      <batchtest todir="${build.dir}/test/output">
+	<fileset dir="test/shared/j2se"
+	  includes="${test.include}"/>
+      </batchtest>
+    </junit>
+    <fail if="tests.failed" message="Some tests failed"/>
+  </target>
+
+  <!-- Compiles tests -->
+  <target name="test-shared.classes" depends="build-shared">
+    <mkdir dir="${build.dir}/test/classes/shared"/>
+    <depend srcdir="test/shared/j2se"
+	    destdir="${build.dir}/test/classes/shared"
+	    cache="${build.dir}/test/depend"
+	    closure="true"/>
+    <javac srcdir="test/shared/j2se"
+	   destdir="${build.dir}/test/classes/shared"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="shared.classpath"
+	   includes="**/*.java">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Run IO test server -->
+  <target name="io-test-server" depends="test-shared.classes"
+          description="Runs the IO test server">
+    <java classname="com.sun.sgs.test.impl.nio.EchoServer"
+          fork="true">
+      <jvmarg line="${echotest.jvm.args}"/>
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="java.net.preferIPv4Stack" value="true"/>
+      <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
+                   value="com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${echotest.server.logging}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="port" value="38502"/>
+      <sysproperty key="buffer_size" value="${echotest.bufsize}"/>
+      <sysproperty key="threads" value="4"/>
+      <sysproperty key="maxthreads" value="16"/>
+      <sysproperty key="tcp_nodelay" value="true"/>
+      <sysproperty key="backlog" value="5"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run IO test client -->
+  <target name="io-test-client" depends="test-shared.classes"
+          description="Runs the IO test client">
+    <java classname="com.sun.sgs.test.impl.nio.EchoClient"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="java.net.preferIPv4Stack" value="true"/>
+      <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
+                   value="com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${echotest.client.logging}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="port" value="38502"/>
+      <sysproperty key="buffer_size" value="${echotest.bufsize}"/>
+      <sysproperty key="threads" value="4"/>
+      <sysproperty key="maxthreads" value="16"/>
+      <sysproperty key="tcp_nodelay" value="true"/>
+      <sysproperty key="clients" value="200"/>
+      <sysproperty key="messages" value="1000"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+</project>
