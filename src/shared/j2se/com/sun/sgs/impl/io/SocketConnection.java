@@ -68,17 +68,14 @@ public class SocketConnection implements Connection, FilterListener {
         if (listener == null || filter == null || session == null)
             throw new NullPointerException("null argument to constructor");
 
-        if (session.getTransportType() != TransportType.SOCKET)
-            throw new IllegalArgumentException(
-                "IoSession is not a Socket session");
-
         this.listener = listener;
         this.filter = filter;
         this.session = session;
 
-        // Cast is safe because we ensure TransportType == SOCKET above.
-        SocketSessionConfig cfg = (SocketSessionConfig) session.getConfig();
-        cfg.setTcpNoDelay(true);
+        if (session.getTransportType() == TransportType.SOCKET) {
+            SocketSessionConfig cfg = (SocketSessionConfig)session.getConfig();
+            cfg.setTcpNoDelay(true);
+        }
     }
 
     /**
