@@ -41,7 +41,6 @@ import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import com.sun.sgs.service.WatchdogService;
@@ -687,7 +686,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * Task for setting a status and returning information about
      * whether the identity is considered dead by this node.
      */
-    private class SetStatusTask implements KernelRunnable {
+    private class SetStatusTask extends AbstractKernelRunnable {
         final private boolean active;
         final private String idKey;
         final private String removeKey;
@@ -701,10 +700,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             idKey = NodeMapUtil.getIdentityKey(id);
             removeKey = NodeMapUtil.getPartialStatusKey(id);
             statusKey = NodeMapUtil.getStatusKey(id, localNodeId, serviceName);
-        }
-        
-        public String getBaseTaskType() {
-            return this.getClass().getName();
         }
         
         public void run() throws UnknownIdentityException { 
@@ -812,7 +807,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private class MapChangeNotifier implements NotifyClient {
         MapChangeNotifier() { }
         
-        public void removed(final Identity id, final Node newNode) {
+        public void removed(Identity id, Node newNode) {
 
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
@@ -823,16 +818,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
                                "Queuing remove notification for " +
                                "identity: {0}, " + "newNode: {1}}", 
                                id, newNode);
-                    for (final NodeMappingListener listener : 
-                         nodeChangeListeners) 
-                    {     
+                    for (NodeMappingListener listener : nodeChangeListeners) {     
                         TaskReservation res =
                             taskScheduler.reserveTask( 
-                                new AbstractKernelRunnable() {
-                                    public void run() {
-                                        listener.mappingRemoved(id, newNode);
-                                    }                    
-                                }, taskOwner);
+                                new MapRemoveTask(listener, id, newNode),
+                                taskOwner);
                         pendingNotifications.add(res);
                     }
                     return;
@@ -840,17 +830,13 @@ public class NodeMappingServiceImpl implements NodeMappingService
             }
             
             // The normal case.
-            for (final NodeMappingListener listener : nodeChangeListeners) {
+            for (NodeMappingListener listener : nodeChangeListeners) {
                 taskScheduler.scheduleTask( 
-                        new AbstractKernelRunnable() {
-                            public void run() {
-                                listener.mappingRemoved(id, newNode);
-                            }                    
-                        }, taskOwner);
+                    new MapRemoveTask(listener, id, newNode), taskOwner);
             }
         }
 
-        public void added(final Identity id, final Node oldNode) {
+        public void added(Identity id, Node oldNode) {
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
             // in this case, and will use them when ready() has been called.
@@ -860,16 +846,13 @@ public class NodeMappingServiceImpl implements NodeMappingService
                                "Queuing added notification for " +
                                "identity: {0}, " + "oldNode: {1}}", 
                                id, oldNode);
-                    for (final NodeMappingListener listener : 
+                    for (NodeMappingListener listener : 
                          nodeChangeListeners) 
                     {
                         TaskReservation res =
                             taskScheduler.reserveTask( 
-                                new AbstractKernelRunnable() {
-                                    public void run() {
-                                        listener.mappingAdded(id, oldNode);
-                                    }                    
-                                }, taskOwner);
+                                new MapAddTask(listener, id, oldNode),
+                                taskOwner);
                         pendingNotifications.add(res);
                     }
                     return;
@@ -879,16 +862,51 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // The normal case.
             for (final NodeMappingListener listener : nodeChangeListeners) {
                 taskScheduler.scheduleTask(
-                        new AbstractKernelRunnable() {
-                            public void run() {
-                                listener.mappingAdded(id, oldNode);
-                            }                    
-                        }, taskOwner);
+                    new MapAddTask(listener, id, oldNode), taskOwner);
             }
         }
     }
-    
      
+    /**
+     * Let a listener know that the mapping for an id to this node has
+     * been removed, and what the new node mapping is (or null if there
+     * is no new mapping).
+     */
+    private static final class MapRemoveTask extends AbstractKernelRunnable {
+        final NodeMappingListener listener;
+        final Identity id;
+        final Node newNode;
+        MapRemoveTask(NodeMappingListener listener, Identity id, Node newNode) 
+        {
+            this.listener = listener;
+            this.id = id;
+            this.newNode = newNode;
+        }
+        public void run() {
+            listener.mappingRemoved(id, newNode);
+        }
+    }
+    
+    /**
+     * Let a listener know that the mapping for an id to this node has
+     * been added, and what the old node mapping was (or null if this is
+     * a brand new mapping).
+     */
+    private static final class MapAddTask extends AbstractKernelRunnable {
+        final NodeMappingListener listener;
+        final Identity id;
+        final Node oldNode;
+        MapAddTask(NodeMappingListener listener, Identity id, Node oldNode) 
+        {
+            this.listener = listener;
+            this.id = id;
+            this.oldNode = oldNode;
+        }
+        public void run() {
+            listener.mappingAdded(id, oldNode);
+        }
+    }
+    
     /**
      * Returns a string representation of this instance.
      *
@@ -903,8 +921,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
      *  Run the given task synchronously, and transactionally.
      * @param task the task
      */
-    private void runTransactionally(KernelRunnable task) throws Exception {
-        taskScheduler.runTask(new TransactionRunner(task), taskOwner, true);
+    private void runTransactionally(KernelRunnable task) throws Exception {     
+        taskScheduler.runTransactionalTask(task, taskOwner);
     }
             
     /* -- Implement transaction participant/context for 'getNode' -- */

@@ -28,8 +28,9 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
@@ -135,8 +136,9 @@ class ServiceConfigRunner implements Runnable {
 
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
-        AppKernelAppContext ctx = new AppKernelAppContext(appName, services);
-        ctx.setServices(services);
+        ComponentRegistryImpl managers = new ComponentRegistryImpl();
+        AppKernelAppContext ctx = 
+                new AppKernelAppContext(appName, services, managers);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -168,7 +170,6 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // register any profiling managers and fill in the manager registry
-        ComponentRegistryImpl managers = new ComponentRegistryImpl();
         for (Object manager : managerSet) {
             if (profileRegistrar != null) {
                 if (manager instanceof ProfileProducer)
@@ -179,8 +180,7 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // with the managers created, setup the final context and owner
-        ctx = new AppKernelAppContext(appName, managers);
-        ctx.setServices(services);
+        ctx = new AppKernelAppContext(appName, services, managers);
         owner = new TaskOwnerImpl(id, ctx);
         ThreadState.setCurrentOwner(owner);
 

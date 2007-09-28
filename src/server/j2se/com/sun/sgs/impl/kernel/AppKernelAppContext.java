@@ -34,7 +34,7 @@ import java.util.MissingResourceException;
 /**
  * This is the implementation of <code>KernelAppContext</code> used by
  * the kernel to manage the context of a single application. It knows
- * the name of an application, its available manages, and its backing
+ * the name of an application, its available managers, and its backing
  * services.
  */
 class AppKernelAppContext extends AbstractKernelAppContext {
@@ -43,7 +43,7 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     private final ComponentRegistry managerComponents;
 
     // the services used in this context
-    private ComponentRegistry serviceComponents = null;
+    private final ComponentRegistry serviceComponents;
 
     // the three standard managers, which are cached since they are used
     // extremely frequently
@@ -56,12 +56,15 @@ class AppKernelAppContext extends AbstractKernelAppContext {
      *
      * @param applicationName the name of the application represented by
      *                        this context
+     * @param serviceComponents the services available in this context
      * @param managerComponents the managers available in this context
      */
     AppKernelAppContext (String applicationName,
+                         ComponentRegistry serviceComponents,
                          ComponentRegistry managerComponents) {
         super(applicationName);
 
+        this.serviceComponents = serviceComponents;
         this.managerComponents = managerComponents;
 
         // pre-fetch the three standard managers...if any of them isn't
@@ -133,15 +136,6 @@ class AppKernelAppContext extends AbstractKernelAppContext {
             throw new ManagerNotFoundException("couldn't find manager: " +
                                                type.getName());
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    void setServices(ComponentRegistry serviceComponents) {
-        if (this.serviceComponents != null)
-            throw new IllegalStateException("Services have already been set");
-        this.serviceComponents = serviceComponents;
     }
 
     /**

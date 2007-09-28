@@ -171,8 +171,12 @@ public class TestNodeMappingServiceImpl extends TestCase {
         System.err.println("Testcase: " + getName());
         setUp(true);
     }
-
+    
     protected void setUp(boolean clean) throws Exception {
+        setUp(true, serviceProps);
+    }
+
+    protected void setUp(boolean clean, Properties props) throws Exception {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
@@ -180,6 +184,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         nodemap = new HashMap<Long, NodeMappingService>();
         nodeListenerMap = new HashMap<Long, TestListener>();
         
+        MinimalTestKernel.useMasterScheduler(props);
 	appContext[0] = MinimalTestKernel.createContext();
 	systemRegistry[0] = MinimalTestKernel.getSystemRegistry(appContext[0]);
 	serviceRegistry[0] = MinimalTestKernel.getServiceRegistry(appContext[0]);
@@ -188,7 +193,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         // Create the initial stack and grab our server field.
         createStack(appContext[0], systemRegistry[0], serviceRegistry[0], 
-                    serviceProps, true);
+                    props, true);
         server = 
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);        
                
@@ -201,8 +206,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
                              Properties props, boolean special) 
                  throws Exception
     {
+        // create the services
         
-	// create services
         // We are running with a non-multinode data service.
         // set data service classes in serviceRegistry
         txnProxy.setComponent(DataService.class, dataService);
@@ -514,6 +519,48 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
+    public void testRoundRobinAutoMove() throws Exception {
+        commitTransaction();
+        // Remove what happened at setup().  I know, I know...
+        tearDown();
+        
+        final int MOVE_COUNT = 5;
+        // Create a new nodeMappingServer which will move an identity
+        // automatically every so often.
+        Properties p = new Properties(serviceProps);
+        p.setProperty("com.sun.sgs.impl.service.nodemap.policy.movecount", 
+                      String.valueOf(MOVE_COUNT));
+
+        setUp(true, p);
+        addNodes();
+
+        // Now assign a few ids.  
+        Identity ids[] = new Identity[MOVE_COUNT];
+        Node assignments[] = new Node[MOVE_COUNT];
+        for (int i = 0; i < MOVE_COUNT; i++) {
+            Identity id = new DummyIdentity("identity" + i);
+            ids[i] = id;
+            nodeMappingService.assignNode(DataService.class, id);
+            verifyMapCorrect(id);
+
+            createTransaction();
+            assignments[i] = nodeMappingService.getNode(id);
+            commitTransaction();
+        }
+
+        // We expected an automatic move to have occurred.
+        boolean foundDiff = false;
+        for (int i = 0; i < MOVE_COUNT; i++) {
+            createTransaction();
+            Node current = nodeMappingService.getNode(ids[i]);
+            commitTransaction();
+            foundDiff = foundDiff || 
+                        (current.getId() != assignments[i].getId());
+        }
+
+        assertTrue("expected an id to move", foundDiff);
+     }
+    
     public void testAssignNodeInTransaction() throws Exception {
         // TODO should API specify a transaction exception will be thrown?
         nodeMappingService.assignNode(NodeMappingService.class, new DummyIdentity());
@@ -696,7 +743,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone
         createTransaction();
         try {
@@ -743,7 +790,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         service.setStatus(NodeMappingService.class, id, false);
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone
         createTransaction();
         try {
@@ -770,7 +817,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
         nodeMappingService.setStatus(NodeMappingService.class, id, true);
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Error if we cannot find the identity!
         createTransaction();
         try {
@@ -925,7 +972,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         service.setStatus(NodeMappingService.class, id, false);
 
-        Thread.sleep(REMOVE_TIME * 2);
+        Thread.sleep(REMOVE_TIME * 4);
         // Identity should now be gone... this is a hole in the
         // implementation, currently.  It won't be removed.
         createTransaction();

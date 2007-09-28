@@ -94,18 +94,6 @@ abstract class AbstractKernelAppContext implements KernelAppContext {
     abstract <T> T getManager(Class<T> type);
 
     /**
-     * Sets the <code>Service</code>s available in this context. This is done
-     * as part of application startup. This method may only be called once
-     * for the lifetime of a given context.
-     *
-     * @param serviceComponents the <code>Service</code>s used in this context
-     *
-     * @throws IllegalStateException if the <code>Service</code>s have already
-     *                               been set
-     */
-    abstract void setServices(ComponentRegistry serviceComponents);
-
-    /**
      * Returns a <code>Service</code> based on the given type. If the type is
      * unknown, or if there is more than one <code>Service</code> of the
      * given type, <code>MissingResourceException</code> is thrown. This is

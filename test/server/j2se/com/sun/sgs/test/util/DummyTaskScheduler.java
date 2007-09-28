@@ -220,6 +220,28 @@ public class DummyTaskScheduler implements TaskScheduler {
             }
         }
     }
+
+    /**
+     * This implementation of <code>TaskScheduler</code> doesn't support
+     * this method because there is no single standard facility in the
+     * tests for managing transactions and the associated state. Without
+     * this, there's no way to know how to actually setup and run (or
+     * re-join) the transaction correctly. If the tests are updated to
+     * provide a single setup mechanism for creating and running transactions
+     * then this method should be implemented to use that framework.
+     *
+     * @param task the task to run
+     * @param owner the owner for the task
+     *
+     * @throws UnsupportedOperationException always, because this method
+     *                                       is not supported
+     */
+    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+        throws Exception
+    {
+        throw new UnsupportedOperationException("Dummy Scheduler doesn't " +
+                                                "support transactional tasks");
+    }
     
     /**
      * A private implementation of <code>TaskReservation</code> that

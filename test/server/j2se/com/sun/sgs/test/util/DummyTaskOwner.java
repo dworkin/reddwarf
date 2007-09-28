@@ -32,7 +32,7 @@ public class DummyTaskOwner implements TaskOwner {
     private final Identity identity = new DummyIdentity();
 
     /** The kernel application context. */
-    private final KernelAppContext kernelAppContext =
+    private KernelAppContext kernelAppContext =
         new EmptyKernelAppContext("dummyApp-" + Math.random());
 
     /** Creates an instance of this class. */
@@ -46,5 +46,9 @@ public class DummyTaskOwner implements TaskOwner {
 
     public Identity getIdentity() {
 	return identity;
+    }
+    
+    public void setContext(KernelAppContext ctx) {
+        kernelAppContext = ctx;
     }
 }
