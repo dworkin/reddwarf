@@ -47,7 +47,7 @@ my ($repository) = $trunk_url =~ m!^((file|svn)://[^/]*/[^/]+)/.*$!;
 my ($svnserver) = $repository =~ m!^((file|svn)://[^/]*)/.*$!;
 
 # The svnmergeup usage message
-my $svnmergeup_usage = "Usage: $svnmergeup [-fhnpv] [-i rev] BRANCH_URL_OR_DIRECTORY [TRUNK_DIRECTORY]
+my $svnmergeup_usage = "Usage: $svnmergeup [-fhnpv] [-i rev] BRANCH_URL_OR_DIRECTORY
 Options:
   -f                    : Force
   -h                    : Help
@@ -106,9 +106,9 @@ test("No arguments",
      $svnmergeup,
      check_diff_fail($svnmergeup_usage));
 
-test("Three arguments",
+test("Two arguments",
      "cd $escaped_trunk",
-     "$svnmergeup a b c",
+     "$svnmergeup a b",
      check_diff_fail($svnmergeup_usage));
 
 test("Unknown option",
@@ -148,18 +148,17 @@ test("-h option",
 test("Run in /",
      "cd /",
      "$svnmergeup -n $escaped_branch",
-     check_diff_fail("Error: Trunk directory is not top of trunk: /"));
+     check_diff_fail("Error: Current directory not top of trunk: /"));
 
 test("Run in branch",
      "cd $escaped_branch",
      "$svnmergeup -n $escaped_branch",
-     check_diff_fail("Error: Trunk directory is not top of trunk: $branch"));
+     check_diff_fail("Error: Current directory not top of trunk: $branch"));
 
 test("Run in subdirectory of branch",
      "cd $escaped_branch/dir",
      "$svnmergeup -n $escaped_branch",
-     check_diff_fail(
-	 "Error: Trunk directory is not top of trunk: $branch/dir"));
+     check_diff_fail("Error: Current directory not top of trunk: $branch/dir"));
 
 ####
 # Check branch argument as directory
@@ -168,18 +167,17 @@ test("Run in subdirectory of branch",
 test("Argument is /tmp",
      "cd $escaped_trunk",
      "$svnmergeup -n /tmp",
-     check_diff_fail("Error: Branch argument is not top of branch: /tmp"));
+     check_diff_fail("Error: Argument not top of branch: /tmp"));
 
 test("Argument is trunk",
      "cd $escaped_trunk",
      "$svnmergeup -n $escaped_trunk",
-     check_diff_fail("Error: Branch argument is not top of branch: $trunk"));
+     check_diff_fail("Error: Argument not top of branch: $trunk"));
 
 test("Argument is subdirectory of branch",
      "cd $escaped_trunk",
      "$svnmergeup -n $escaped_branch/dir",
-     check_diff_fail(
-	 "Error: Branch argument is not top of branch: $branch/dir"));
+     check_diff_fail("Error: Argument not top of branch: $branch/dir"));
 
 test("Argument is wrong branch",
      "cd $escaped_wrong_trunk",
@@ -193,38 +191,35 @@ test("Argument is wrong branch",
 test("Argument is HTTP URL",
      "cd $escaped_trunk",
      "$svnmergeup -n http://www.sun.com",
-     check_diff_fail(
-	 "Error: Branch argument is not top of branch: http://www.sun.com"));
+     check_diff_fail("Error: Argument not top of branch: http://www.sun.com"));
 
 test("Argument is SVN URL with unknown server",
      "cd $escaped_trunk",
      "$svnmergeup -n svn://whatserveristhis/foo",
-     check_diff_fail("Error: Branch argument is not top of branch: " .
-		     "svn://whatserveristhis/foo"));
+     check_diff_fail(
+	 "Error: Argument not top of branch: svn://whatserveristhis/foo"));
 
 test("Argument is SVN URL with unknown repository",
      "cd $escaped_trunk",
      "$svnmergeup -n svn://$svnserver/whatrepositoryisthis/foo",
-     check_diff_fail("Error: Branch argument is not top of branch: " .
+     check_diff_fail("Error: Argument not top of branch: " .
 		     "svn://$svnserver/whatrepositoryisthis/foo"));
 
 test("Argument is trunk URL",
      "cd $escaped_trunk",
      "$svnmergeup -n $trunk_url",
-     check_diff_fail(
-	 "Error: Branch argument is not top of branch: $trunk_url"));
+     check_diff_fail("Error: Argument not top of branch: $trunk_url"));
 
 test("Argument is non-existent subdirectory of branch URL",
      "cd $escaped_trunk",
      "$svnmergeup -n $branch_url/whatisthissubdirectory",
-     check_diff_fail("Error: Branch argument is not top of branch: " .
+     check_diff_fail("Error: Argument not top of branch: " .
 		     "$branch_url/whatisthissubdirectory"));
 
 test("Argument is subdirectory of branch URL",
      "cd $escaped_trunk",
      "$svnmergeup -n $branch_url/dir",
-     check_diff_fail(
-	 "Error: Branch argument is not top of branch: $branch_url/dir"));
+     check_diff_fail("Error: Argument not top of branch: $branch_url/dir"));
 
 test("Argument is wrong branch URL",
      "cd $escaped_wrong_trunk",
@@ -251,45 +246,6 @@ test("Argument is wrong branch URL",
 	 "$svnmergeup -n $unknown_branch",
 	 check_diff_fail("Error: Branch not found: $unknown_branch"));
 }
-
-####
-# Check trunk argument
-####
-
-test("Trunk argument is non-existent directory",
-     "cd $escaped_branch",
-     "$svnmergeup -n . /this/is-an/unknown/directory",
-     check_diff_fail("Error: Trunk directory is not top of trunk: " .
-		     "/this/is-an/unknown/directory")
-    );
-
-test("Trunk argument is /tmp",
-     "cd $escaped_branch",
-     "$svnmergeup -n . /tmp",
-     check_diff_fail("Error: Trunk directory is not top of trunk: /tmp"));
-
-test("Trunk argument is a URL",
-     "cd $escaped_branch",
-     "$svnmergeup -n . $trunk_url",
-     check_diff_fail(
-	 "Error: Trunk directory is not top of trunk: $trunk_url"));
-
-test("Trunk argument is branch",
-     "cd $escaped_branch",
-     "$svnmergeup -n . $escaped_branch",
-     check_diff_fail("Error: Trunk directory is not top of trunk: $branch"));
-
-test("Trunk argument is subdirectory of trunk",
-     "cd $escaped_branch",
-     "$svnmergeup -n . $escaped_trunk/dir",
-     check_diff_fail(
-	 "Error: Trunk directory is not top of trunk: $trunk/dir"));
-
-test("Argument is wrong trunk",
-     "cd $escaped_branch",
-     "$svnmergeup -n . $escaped_wrong_trunk",
-     check_diff_fail(
-	 "Error: Branch and trunk not related: ., $escaped_wrong_trunk"));
 
 ####
 # Check modified and not updated
@@ -322,16 +278,20 @@ test("Force trunk directory modified",
 
 test("Branch directory needs updating",
      join(" &&\n",
+	  "cd $escaped_branch_copy",
+	  "svn update",
 	  "cd $escaped_branch",
 	  "date > file2.txt",
 	  "svn commit file2.txt -m \"Modify file2.txt\"",
 	  "cd $escaped_trunk"),
      "$svnmergeup -n $escaped_branch_copy",
      check_diff_pass("Warning: Branch working copy needs to be updated: " .
-		$branch_copy));
+		     $branch_copy));
 
 test("Trunk directory needs updating",
      join(" &&\n",
+	  "cd $escaped_trunk_copy",
+	  "svn update",
 	  "cd $escaped_trunk",
 	  "date > file.txt",
 	  "svn commit file.txt -m \"Modify file.txt\"",
@@ -346,6 +306,8 @@ test("Trunk directory needs updating",
 
 test("Trunk modified and needs updating",
      join(" &&\n",
+	  "cd $escaped_trunk_copy",
+	  "svn update",
 	  "cd $escaped_trunk",
 	  "date > file.txt",
 	  "svn commit -m ''",
@@ -363,6 +325,8 @@ test("Trunk modified and needs updating",
 
 test("Branch modified and needs updating",
      join(" &&\n",
+	  "cd $escaped_branch_copy",
+	  "svn update",
 	  "cd $escaped_branch",
 	  "date > file2.txt",
 	  "svn commit -m ''",

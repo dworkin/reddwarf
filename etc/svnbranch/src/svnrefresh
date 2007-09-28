@@ -76,7 +76,9 @@ exits.  Use this option to note refreshes that have been performed
 without using this utility.
 
 If the -n option is specified, prints information about the operations
-that would be carried out if the commands were actually run.
+that would be carried out if the commands were actually run.  Also
+prints information about whether the branch working copy is modified or
+needs to be updated.
 
 If the -p option is specified, prints the revision the branch is
 currently refreshed to.  It is an error to specify both the -i and -p
@@ -92,8 +94,8 @@ executables available in the current path.
 Exits with a non-zero status if:
 - The current directory is not the top level directory of a working copy
   for a branch
-- The branch working copy needs to be updated or contains modifications
-  and neither -f or -n flag is not specified
+- The branch working copy is modified, or needs to be updated, and
+  neither -f or -n flag is not specified
 - The trunk argument is specified and is not a repository URL or working
   copy pathname for the top level directory of the trunk
 - The trunk argument specifies a working copy that contains
@@ -226,12 +228,7 @@ sub check_branch_and_trunk {
     }
     my $result = get_update_modified(".", !$opt_f);
     if ($result) {
-	my $msg = "Branch working copy $result: " . `pwd`;
-	if ($opt_n) {
-	    warn "Warning: $msg";
-	} else {
-	    die "Error: $msg";
-	}
+	warn_or_die($opt_n, "Branch working copy $result: " . `pwd`);
     }
 }
 
@@ -288,7 +285,7 @@ sub check_moves {
 	$moves = get_moves(
 	    $branch_url, command("$svn log -v -r $log_start:$branch_rev ."));
 	if ($moves) {
-	    warn "Warning: Branch contains moves:\n$moves";
+	    warn "Warning: Branch changes contain moves:\n$moves";
 	}
     }
 }
