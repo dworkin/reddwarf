@@ -9,13 +9,13 @@ import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-final class TestingThreadFactory
+final class VerboseThreadFactory
     implements ThreadFactory, Thread.UncaughtExceptionHandler
 {
     private final Logger log;
     private final ThreadFactory factory;
 
-    public TestingThreadFactory(Logger log, ThreadFactory factory) {
+    public VerboseThreadFactory(Logger log, ThreadFactory factory) {
         this.log = log;
         this.factory =
             factory != null ? factory : Executors.defaultThreadFactory();

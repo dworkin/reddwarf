@@ -194,7 +194,7 @@ public class EchoServer {
     public final static void main(String[] args) throws Exception {
 
         ThreadFactory threadFactory =
-            new TestingThreadFactory(log, Executors.defaultThreadFactory());
+            new VerboseThreadFactory(log, Executors.defaultThreadFactory());
 
         ThreadPoolExecutor executor = (ThreadPoolExecutor)
             (MAX_THREADS == Integer.MAX_VALUE
