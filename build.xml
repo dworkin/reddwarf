@@ -54,6 +54,7 @@
   <property name="test.include" value="**/Test*.java"/>
 
   <property name="echotest.bufsize" value="32"/>
+  <property name="echotest.selectors" value="2"/>
   <property name="echotest.server.logging" location="server-log.properties"/>
   <property name="echotest.client.logging" location="client-log.properties"/>
   <property name="echotest.jvm.args" value="-server -d64 -XX:+UseBoundThreads -XX:+MaxFDLimit"/>
@@ -111,7 +112,6 @@
 	     author="no" access="package">
       <classpath>
         <pathelement location="${build.dir}/test/classes/shared"/>
-        <pathelement location="${build.dir}/example/classes"/>
         <path refid="shared.classpath"/>
       </classpath>
       <sourcepath>
@@ -271,6 +271,9 @@
       <sysproperty key="java.net.preferIPv4Stack" value="true"/>
       <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
                    value="com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider"/>
+
+      <sysproperty key="com.sun.sgs.nio.async.reactive.selectors"
+                   value="${echotest.selectors}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${echotest.server.logging}"/>
       <sysproperty key="host" value="localhost"/>
@@ -292,7 +295,7 @@
           description="Runs the IO test client">
     <java classname="com.sun.sgs.test.impl.nio.EchoClient"
           fork="true">
-      <jvmarg line="${test.jvm.args}"/>
+      <jvmarg line="${echotest.jvm.args}"/>
       <sysproperty key="java.awt.headless" value="true"/>
       <sysproperty key="java.net.preferIPv4Stack" value="true"/>
       <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
