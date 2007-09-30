@@ -132,7 +132,8 @@ final class AsyncSocketChannelImpl
     public void setException(int ops, Throwable t) {
         if (log.isLoggable(Level.FINER)) {
             log.log(Level.FINER, "setException {0} : {1} ",
-                new Object[] { this, opsToString(ops) });
+                new Object[] { this,
+                    AbstractAsyncChannelGroup.opsToString(ops) });
         }
 
         AsyncOp<?> ctask = null;
@@ -156,7 +157,8 @@ final class AsyncSocketChannelImpl
             group.setException(wtask, t);
 
         if (log.isLoggable(Level.FINER)) {
-            log.log(Level.FINER, "setException {0} done", opsToString(ops));
+            log.log(Level.FINER, "setException {0} done", 
+                AbstractAsyncChannelGroup.opsToString(ops));
         }
     }
 
