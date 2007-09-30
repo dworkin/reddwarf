@@ -12,6 +12,10 @@ import java.util.concurrent.ExecutorService;
  */
 public class ReactiveAsyncChannelProvider extends AsyncProviderImpl {
 
+    /**
+     * Constructs an instance of this class.  Public visibility to allow
+     * instantiation from a property at runtime.
+     */
     ReactiveAsyncChannelProvider() {
         super();
     }

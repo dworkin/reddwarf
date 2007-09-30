@@ -12,7 +12,11 @@ import java.util.concurrent.ExecutorService;
  */
 public class TPCAsyncChannelProvider extends AsyncProviderImpl {
 
-    TPCAsyncChannelProvider() {
+    /**
+     * Constructs an instance of this class.  Public visibility to allow
+     * instantiation from a property at runtime.
+     */
+    public TPCAsyncChannelProvider() {
         super();
     }
 
