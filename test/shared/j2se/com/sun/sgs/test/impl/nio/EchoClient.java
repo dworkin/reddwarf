@@ -47,8 +47,7 @@ public class EchoClient {
     public static final String DEFAULT_NUM_THREADS = "4";
 
     /**  The default maximum number of threads: {@value} */
-    public static final String DEFAULT_MAX_THREADS =
-        String.valueOf(Integer.MAX_VALUE);
+    public static final int DEFAULT_MAX_THREADS = Integer.MAX_VALUE;
 
     /** The default number of messages to send: {@value} */
     public static final String DEFAULT_NUM_MSGS = "8";
@@ -65,7 +64,8 @@ public class EchoClient {
     private static final int NUM_THREADS =
         Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
     private static final int MAX_THREADS =
-        Integer.valueOf(System.getProperty("maxthreads", DEFAULT_MAX_THREADS));
+        Integer.valueOf(System.getProperty("maxthreads",
+            String.valueOf(DEFAULT_MAX_THREADS)));
     private static final boolean DISABLE_NAGLE =
         Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
 

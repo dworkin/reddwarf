@@ -29,41 +29,25 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  */
 public class EchoServer {
 
-    /**
-     * The default host address to listen on:
-     * {@value EchoServer#DEFAULT_HOST}
-     */
+    /** The default host address to listen on: {@value} */
     public static final String DEFAULT_HOST = "0.0.0.0";
 
-    /** The default port to listen on: {@value EchoServer#DEFAULT_PORT} */
+    /** The default port to listen on: {@value} */
     public static final String DEFAULT_PORT = "5150";
 
-    /** The default message size: {@value EchoServer#DEFAULT_BUFFER_SIZE}  */
+    /** The default message size: {@value}  */
     public static final String DEFAULT_BUFFER_SIZE = "32";
     
-    /**
-     * The default number of threads:
-     * {@value EchoServer#DEFAULT_NUM_THREADS}
-     */
+    /** The default number of threads: {@value} */
     public static final String DEFAULT_NUM_THREADS = "4";
 
-    /**
-     * The default maximum number of threads:
-     * {@value EchoServer#DEFAULT_MAX_THREADS}
-     */
-    public static final String DEFAULT_MAX_THREADS =
-        String.valueOf(Integer.MAX_VALUE);
+    /** The default maximum number of threads: {@value} */
+    public static final int DEFAULT_MAX_THREADS = Integer.MAX_VALUE;
 
-    /**
-     * The default accept() backlog:
-     * {@value EchoServer#DEFAULT_BACKLOG}
-     */
+    /** The default accept() backlog: {@value} */
     public static final String DEFAULT_BACKLOG = "0";
 
-    /**
-     * Whether to disable the Nagle algorithm by default:
-     * {@value EchoServer#DEFAULT_DISABLE_NAGLE}
-     */
+    /** Whether to disable the Nagle algorithm by default: {@value} */
     public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
@@ -71,7 +55,8 @@ public class EchoServer {
     private static final int NUM_THREADS =
         Integer.valueOf(System.getProperty("threads", DEFAULT_NUM_THREADS));
     private static final int MAX_THREADS =
-        Integer.valueOf(System.getProperty("maxthreads", DEFAULT_MAX_THREADS));
+        Integer.valueOf(System.getProperty("maxthreads",
+            String.valueOf(DEFAULT_MAX_THREADS)));
     private static final boolean DISABLE_NAGLE =
         Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
 

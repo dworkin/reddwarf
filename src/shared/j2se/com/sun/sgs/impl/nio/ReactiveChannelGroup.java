@@ -46,14 +46,14 @@ class ReactiveChannelGroup
 
     /**
      * The property to specify the number of reactors to be used by
-     * channel groups: {@value ReactiveChannelGroup#SELECTORS_PROPERTY}
+     * channel groups: {@value}
      */
     public static final String SELECTORS_PROPERTY =
         "com.sun.sgs.nio.async.reactive.selectors";
 
     /**
      * The default number of reactors to be used by
-     * channel groups: {@value ReactiveChannelGroup#DEFAULT_SELECTORS}
+     * channel groups: {@value}
      */
     public static final String DEFAULT_SELECTORS = "1";
 
