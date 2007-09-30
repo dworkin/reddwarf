@@ -126,6 +126,29 @@ abstract class AbstractAsyncChannelGroup
         }
     }
 
+    private static final String[] opsTable = new String[] {
+        "(none)",
+        "OP_READ",
+        "OP_ACCEPT",
+        "OP_ACCEPT | OP_READ",
+        "OP_WRITE",
+        "OP_READ | OP_WRITE",
+        "OP_ACCEPT | OP_WRITE",
+        "~OP_CONNECT",
+        "OP_CONNECT",
+        "OP_CONNECT | OP_READ",
+        "OP_ACCEPT | OP_CONNECT",
+        "~OP_WRITE",
+        "OP_CONNECT | OP_WRITE",
+        "~OP_ACCEPT",
+        "~OP_READ",
+        "(all)"
+    };
+
+    static String opsToString(int ops) {
+        return opsTable[ops];
+    }
+
     /**
      * Invokes {@code shutdown} when this channel group is no longer
      * referenced.

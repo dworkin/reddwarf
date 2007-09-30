@@ -163,7 +163,10 @@ class ReactiveChannelGroup
             if (rc == 0) {
                 log.log(Level.FINER, "select {0}", numKeys);            
                 rc = selector.select(getSelectorTimeout(timeouts));
-                log.log(Level.FINEST, "selected {0}", rc);
+                if (log.isLoggable(Level.FINER)) {
+                    log.log(Level.FINER, "selected {0} / {1}",
+                        new Object[] { rc, numKeys });
+                }
             }
 
             int state = runState;
@@ -367,11 +370,27 @@ class ReactiveChannelGroup
             Selector selector = h.selector;
             selector.wakeup();
             SelectionKey key = ach.channel().keyFor(selector);
-            if (key == null || (! key.isValid()))
+            if (key == null || (! key.isValid())) {
+                if (log.isLoggable(Level.FINER)) {
+                    log.log(Level.FINER, "awaitReady {0} : invalid ", this);
+                }
                 throw new ClosedAsynchronousChannelException();
+            }
             int interestOps = key.interestOps();
+            if (log.isLoggable(Level.FINEST)) {
+                log.log(Level.FINEST, "awaitReady {0} : old {1} : add {2}",
+                    new Object[] { ach,
+                        AbstractAsyncChannelGroup.opsToString(interestOps),
+                        op });
+            }
             checkPending(interestOps, op);
-            key.interestOps(interestOps | op);
+            interestOps |= op;
+            key.interestOps(interestOps);
+            if (log.isLoggable(Level.FINEST)) {
+                log.log(Level.FINEST, "awaitReady {0} : new {1} ",
+                    new Object[] { ach,
+                        AbstractAsyncChannelGroup.opsToString(interestOps) });
+            }
         }
     }
 

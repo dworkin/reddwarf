@@ -90,7 +90,11 @@ final class AsyncSocketChannelImpl
 
     /** {@inheritDoc} */
     public void selected(int ops) {
-        log.log(Level.FINER, "selected {0}", ops);
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "zelected {0} : {1} ",
+                new Object[] { this,
+                    AbstractAsyncChannelGroup.opsToString(ops) });
+        }
 
         AsyncOp<?> ctask = null;
         AsyncOp<?> rtask = null;
@@ -118,12 +122,18 @@ final class AsyncSocketChannelImpl
         if (wtask != null)
             group.execute(wtask);
 
-        log.log(Level.FINER, "selected {0} done", ops);
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "zelected {0} done",
+                AbstractAsyncChannelGroup.opsToString(ops));
+        }
     }
 
     /** {@inheritDoc} */
     public void setException(int ops, Throwable t) {
-        log.log(Level.FINER, "setException {0}", ops);
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "setException {0} : {1} ",
+                new Object[] { this, opsToString(ops) });
+        }
 
         AsyncOp<?> ctask = null;
         AsyncOp<?> rtask = null;
@@ -145,7 +155,9 @@ final class AsyncSocketChannelImpl
         if (wtask != null)
             group.setException(wtask, t);
 
-        log.log(Level.FINER, "setException {0} done", ops);
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "setException {0} done", opsToString(ops));
+        }
     }
 
     private void checkConnected() {
