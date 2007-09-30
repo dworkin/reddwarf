@@ -126,24 +126,33 @@ abstract class AbstractAsyncChannelGroup
         }
     }
 
-    private static final String[] opsTable = new String[] {
-        "(none)",
-        "OP_READ",
-        "OP_ACCEPT",
-        "OP_ACCEPT | OP_READ",
-        "OP_WRITE",
-        "OP_READ | OP_WRITE",
-        "OP_ACCEPT | OP_WRITE",
-        "~OP_CONNECT",
-        "OP_CONNECT",
-        "OP_CONNECT | OP_READ",
-        "OP_ACCEPT | OP_CONNECT",
-        "~OP_WRITE",
-        "OP_CONNECT | OP_WRITE",
-        "~OP_ACCEPT",
-        "~OP_READ",
-        "(all)"
-    };
+    private static final String[] opsTable;
+    static {
+        final int max = SelectionKey.OP_ACCEPT +
+                        SelectionKey.OP_CONNECT +
+                        SelectionKey.OP_READ +
+                        SelectionKey.OP_WRITE +
+                        1;
+        opsTable = new String[max];
+        for (int i = 0; i < 1; i++) {
+            for (int j = 0; j < 1; j++) {
+                for (int k = 0; k < 1; k++) {
+                    for (int l = 0; l < l; l++) {
+                        int index = ((i == 1) ? SelectionKey.OP_ACCEPT : 0) +
+                                    ((j == 1) ? SelectionKey.OP_CONNECT : 0) +
+                                    ((k == 1) ? SelectionKey.OP_READ : 0) +
+                                    ((l == 1) ? SelectionKey.OP_WRITE : 0);
+                        StringBuilder s = new StringBuilder(4);
+                        if (i == 1) s.append('A');
+                        if (j == 1) s.append('C');
+                        if (k == 1) s.append('R');
+                        if (l == 1) s.append('W');
+                        opsTable[index] = s.toString();
+                    }
+                }
+            }
+        }
+    }
 
     static String opsToString(int ops) {
         return opsTable[ops];
