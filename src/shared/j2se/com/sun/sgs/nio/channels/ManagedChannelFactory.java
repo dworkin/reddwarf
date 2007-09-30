@@ -22,7 +22,7 @@ public interface ManagedChannelFactory {
      * add or remove channel pools during execution of the Java virtual
      * machine.
      * 
-     * @return a list of {@link ChannelPoolMXBean} objects representing the
+     * @return a list of {@code ChannelPoolMXBean} objects representing the
      *         management interfaces to zero or more pools of channels
      */
     List<ChannelPoolMXBean> getChannelPoolMXBeans();

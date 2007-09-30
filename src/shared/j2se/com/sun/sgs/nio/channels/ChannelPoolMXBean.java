@@ -1,13 +1,11 @@
 package com.sun.sgs.nio.channels;
 
-import javax.management.MXBean;
-
 /**
  * The management interface for a channel pool.
  * <p>
  * A Java virtual machine has several instances of the implementation class
  * of this interface. A class implementing this interface is an
- * {@link MXBean} that is obtained by calling the
+ * {@code javax.management.MXBean} that is obtained by calling the
  * {@link Channels#getChannelPoolMXBeans()} method
  * [[NOT IMPLEMENTED: or from the platform MBeanServer]].
  * <p>

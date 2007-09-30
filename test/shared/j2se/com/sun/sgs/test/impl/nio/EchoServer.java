@@ -251,7 +251,7 @@ public class EchoServer {
         server.start();
 
         log.info("Awaiting group termination");        
-        if (! group.awaitTermination(1, TimeUnit.DAYS)) {
+        if (! group.awaitTermination(3600, TimeUnit.SECONDS)) {
             log.warning("Forcing group termination");
             group.shutdownNow();
             if (! group.awaitTermination(5, TimeUnit.SECONDS)) {

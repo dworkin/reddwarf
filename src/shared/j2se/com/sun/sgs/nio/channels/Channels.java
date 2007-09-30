@@ -1,6 +1,5 @@
 package com.sun.sgs.nio.channels;
 
-import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -65,7 +64,9 @@ public final class Channels {
             throw (RuntimeException) t;
         } else {
             // TODO is there something more appropriate to throw? -JM
-            throw new IOError(t);
+            IOException ex = new IOException();
+            ex.initCause(t);
+            throw ex;
         }
     }
 
