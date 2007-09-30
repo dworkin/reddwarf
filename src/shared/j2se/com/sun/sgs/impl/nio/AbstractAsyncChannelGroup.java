@@ -134,10 +134,10 @@ abstract class AbstractAsyncChannelGroup
                         SelectionKey.OP_WRITE +
                         1;
         opsTable = new String[max];
-        for (int i = 0; i < 1; i++) {
-            for (int j = 0; j < 1; j++) {
-                for (int k = 0; k < 1; k++) {
-                    for (int l = 0; l < l; l++) {
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                for (int k = 0; k < 2; k++) {
+                    for (int l = 0; l < 2; l++) {
                         int index = ((i == 1) ? SelectionKey.OP_ACCEPT : 0) +
                                     ((j == 1) ? SelectionKey.OP_CONNECT : 0) +
                                     ((k == 1) ? SelectionKey.OP_READ : 0) +
