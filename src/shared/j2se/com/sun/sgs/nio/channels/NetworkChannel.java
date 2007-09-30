@@ -7,6 +7,23 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Set;
 
+/**
+ * A channel to a network socket.
+ * <p>
+ * A channel that implements this interface is a channel to a network
+ * socket. The {@link #bind} method is used to bind the socket to a local
+ * {@link SocketAddress address}, the {@link #getLocalAddress} method
+ * returns the address that the socket is bound to, and the
+ * {@link #setOption} and {@link #getOption} methods are used to set and
+ * query socket options. An implementation of this interface should specify
+ * the socket options that it supports.
+ * <p>
+ * The {#link #bind} and {@link #setOption} methods that do not otherwise
+ * have a value to return are specified to return the network channel upon
+ * which they are invoked. This allows method invocations to be chained.
+ * Implementations of this interface should specialize the return type so
+ * that method invocations on the implementation class can be chained.
+ */
 public interface NetworkChannel extends Channel {
 
     /**
@@ -15,11 +32,14 @@ public interface NetworkChannel extends Channel {
      * This method is used to establish an association between the socket
      * and a local address. Once an association is established then the
      * socket remains bound until the channel is closed. An attempt to bind
-     * a socket that is already bound throws AlreadyBoundException. If the
-     * local parameter has the value null then the socket will be bound to
-     * an address that is assigned automatically.
+     * a socket that is already bound throws {@link AlreadyBoundException}.
+     * If the {@code local} parameter has the value {@code null} then the
+     * socket will be bound to an address that is assigned automatically.
+     * <p>
+     * An implementation of this interface should specify if a permission is
+     * required when a security manager is installed.
      * 
-     * @param local the address to bind the socket, or null to bind the
+     * @param local the address to bind the socket, or {@code null} to bind the
      *        socket to an automatically assigned socket address
      * @return this channel
      * @throws AlreadyBoundException if the socket is already bound
@@ -32,9 +52,11 @@ public interface NetworkChannel extends Channel {
 
     /**
      * Returns the socket address that this channel's socket is bound to, or
-     * null if the socket is not bound.
+     * {@code null} if the socket is not bound.
      * 
-     * @return the local address; null if the socket is not bound
+     * @return the socket address that the socket is bound to, or {@code null}
+     *         if the channel is not {@link Channel#isOpen() open}
+     *         or the channel's socket is not bound
      * @throws IOException if an I/O error occurs
      */
     SocketAddress getLocalAddress() throws IOException;
@@ -42,10 +64,10 @@ public interface NetworkChannel extends Channel {
     /**
      * Sets the value of a socket option.
      * <p>
-     * The name parameter is the name of the socket option. The value
-     * parameter is the value of the option and is of the type specified by
-     * the option. A value of null may be a valid value for some socket
-     * options.
+     * The {@code name} parameter is the name of the socket option.
+     * The {@code value} parameter is the value of the option and is of the
+     * {@link SocketOption#type() type} specified by the option. A value of
+     * {@code null} may be a valid value for some socket options.
      * 
      * @param name the name of the socket option
      * @param value the value of the socket option
@@ -62,8 +84,11 @@ public interface NetworkChannel extends Channel {
 
     /**
      * Returns the value of a socket option.
+     * <p>
+     * The return type is specific to the socket option and {@code null}
+     * may be a valid value for some socket options.
      * 
-     * @param name the name of the socket option
+     * @param name the socket option
      * @return the value of the socket option
      * @throws IllegalArgumentException if the socket option is not
      *         supported by this channel

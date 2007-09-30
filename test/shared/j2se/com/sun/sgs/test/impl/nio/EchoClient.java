@@ -26,16 +26,43 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * An echo client for testing.
+ */
 public class EchoClient {
 
+    /** The default host: {@value EchoClient#DEFAULT_HOST} */
     public static final String DEFAULT_HOST = "127.0.0.1";
+
+    /** The default port: {@value EchoClient#DEFAULT_PORT} */
     public static final String DEFAULT_PORT = "5150";
 
+    /** The default message size: {@value EchoClient#DEFAULT_BUFFER_SIZE}  */
     public static final String DEFAULT_BUFFER_SIZE = "32";
-    public static final String DEFAULT_NUM_CLIENTS =  "4";
-    public static final String DEFAULT_NUM_THREADS =  "4";
-    public static final String DEFAULT_MAX_THREADS =  String.valueOf(Integer.MAX_VALUE);
-    public static final String DEFAULT_NUM_MSGS    =  "8";
+
+    /** The default number of clients: {@value EchoClient#DEFAULT_NUM_CLIENTS} */
+    public static final String DEFAULT_NUM_CLIENTS = "4";
+
+    /** The default number of threads: {@value EchoClient#DEFAULT_NUM_THREADS} */
+    public static final String DEFAULT_NUM_THREADS = "4";
+
+    /**
+     * The default maximum number of threads:
+     * {@value EchoClient#DEFAULT_MAX_THREADS}
+     */
+    public static final String DEFAULT_MAX_THREADS =
+        String.valueOf(Integer.MAX_VALUE);
+
+    /**
+     * The default number of messages to send:
+     * {@value EchoClient#DEFAULT_NUM_MSGS}
+     */
+    public static final String DEFAULT_NUM_MSGS = "8";
+
+    /**
+     * Whether to disable the Nagle algorithm by default:
+     * {@value EchoClient#DEFAULT_DISABLE_NAGLE}
+     */
     public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
@@ -66,11 +93,17 @@ public class EchoClient {
     static final AtomicLong totalBytesWritten = new AtomicLong();
     static long startTime = 0;
 
+    /**
+     * Constructs a new instance of the echo client with the given
+     * {@link AsynchronousChannelGroup}.
+     * 
+     * @param group the asynchronous channel group for this client
+     */
     protected EchoClient(AsynchronousChannelGroup group) {
         this.group = group;
     }
 
-    public void connect() throws Exception {
+    void connect() throws Exception {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
@@ -84,7 +117,7 @@ public class EchoClient {
         channel.connect(new InetSocketAddress(host, port), new ConnectHandler()).get();
     }
  
-    public void start() throws Exception {
+    void start() throws Exception {
         WriteHandler wh = new WriteHandler();
         ReadHandler rh = new ReadHandler();
         wh.start();
@@ -94,6 +127,9 @@ public class EchoClient {
     final class ConnectHandler
         implements CompletionHandler<Void, Object>
     {
+        /**
+         * {@inheritDoc}
+         */
         public void completed(IoFuture<Void, Object> result) {
             try {
                 log.log(Level.FINE, "Connected {0}", channel);
@@ -124,6 +160,9 @@ public class EchoClient {
             channel.read(buf, NUM_MSGS - 1, this);
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public void completed(IoFuture<Integer, Integer> result) {
             try {
                 int rc = result.getNow();
@@ -192,6 +231,9 @@ public class EchoClient {
             channel.write(buf, NUM_MSGS - 1, this);
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public void completed(IoFuture<Integer, Integer> result) {
             try {
                 int wc =
@@ -237,6 +279,7 @@ public class EchoClient {
      * Runs the IO server test.
      *
      * @param args the commandline arguments
+     * @throws Exception if an error occurs
      */
     public final static void main(String[] args) throws Exception {
 

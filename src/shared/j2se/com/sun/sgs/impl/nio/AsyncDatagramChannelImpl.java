@@ -32,8 +32,10 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.MembershipKey;
+import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.SocketOption;
+import com.sun.sgs.nio.channels.StandardProtocolFamily;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 import com.sun.sgs.nio.channels.WritePendingException;
 
@@ -59,7 +61,7 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AbstractAsyncChannelGroup group;
+    final AbstractAsyncChannelGroup channelGroup;
     final DatagramChannel channel;
 
     final AtomicReference<AsyncOp<?>> connectTask =
@@ -69,19 +71,27 @@ class AsyncDatagramChannelImpl
     final AtomicReference<AsyncOp<?>> writeTask =
         new AtomicReference<AsyncOp<?>>();
 
-    AsyncDatagramChannelImpl(AbstractAsyncChannelGroup group)
+    AsyncDatagramChannelImpl(ProtocolFamily pf, AbstractAsyncChannelGroup group)
         throws IOException
     {
         super(group.provider());
-        this.group = group;
+        this.channelGroup = group;
+
+        if (! ((pf == null) || (pf == StandardProtocolFamily.INET))) {
+            throw new UnsupportedOperationException(
+                "Only IPv4 datagrams are supported");
+        }
+
         this.channel = group.selectorProvider().openDatagramChannel();
         group.registerChannel(this);
     }
 
+    /** {@inheritDoc} */
     public DatagramChannel channel() {
         return channel;
     }
 
+    /** {@inheritDoc} */
     public void selected(int ops) {
         AsyncOp<?> rtask = null;
         AsyncOp<?> wtask = null;
@@ -93,11 +103,12 @@ class AsyncDatagramChannelImpl
             wtask = writeTask.getAndSet(null);
 
         if (rtask != null)
-            group.execute(rtask);
+            channelGroup.execute(rtask);
         if (wtask != null)
-            group.execute(wtask);
+            channelGroup.execute(wtask);
     }
 
+    /** {@inheritDoc} */
     public void setException(int ops, Throwable t) {
         // OP_CONNECT is never selected, but allow it to throw an exception
         // to help with close()
@@ -116,11 +127,11 @@ class AsyncDatagramChannelImpl
             wtask = writeTask.getAndSet(null);
 
         if (ctask != null)
-            group.setException(ctask, t);
+            channelGroup.setException(ctask, t);
         if (rtask != null)
-            group.setException(rtask, t);
+            channelGroup.setException(rtask, t);
         if (wtask != null)
-            group.setException(wtask, t);
+            channelGroup.setException(wtask, t);
     }
 
     private void checkClosedAsync() {
@@ -150,7 +161,7 @@ class AsyncDatagramChannelImpl
         } finally {
             setException(OP_CONNECT | OP_READ | OP_WRITE,
                 new AsynchronousCloseException());
-            group.unregisterChannel(this);
+            channelGroup.unregisterChannel(this);
         }
     }
 
@@ -345,7 +356,7 @@ class AsyncDatagramChannelImpl
         if (! connectTask.compareAndSet(null, task))
             throw new ConnectionPendingException();
 
-        group.execute(task);
+        channelGroup.execute(task);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -365,7 +376,7 @@ class AsyncDatagramChannelImpl
                     return null;
                 }});
 
-        group.execute(task);
+        channelGroup.execute(task);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -410,7 +421,7 @@ class AsyncDatagramChannelImpl
         if (! readTask.compareAndSet(null, task))
             throw new ReadPendingException();
 
-        group.awaitReady(this, OP_READ, timeout, unit);
+        channelGroup.awaitReady(this, OP_READ, timeout, unit);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -440,7 +451,7 @@ class AsyncDatagramChannelImpl
         if (! writeTask.compareAndSet(null, task))
             throw new WritePendingException();
 
-        group.awaitReady(this, OP_WRITE, timeout, unit);
+        channelGroup.awaitReady(this, OP_WRITE, timeout, unit);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -469,7 +480,7 @@ class AsyncDatagramChannelImpl
         if (! readTask.compareAndSet(null, task))
             throw new ReadPendingException();
 
-        group.awaitReady(this, OP_READ, timeout, unit);
+        channelGroup.awaitReady(this, OP_READ, timeout, unit);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -498,7 +509,7 @@ class AsyncDatagramChannelImpl
         if (! writeTask.compareAndSet(null, task))
             throw new WritePendingException();
 
-        group.awaitReady(this, OP_WRITE, timeout, unit);
+        channelGroup.awaitReady(this, OP_WRITE, timeout, unit);
         return AttachedFuture.wrap(task, attachment);
     }
 }

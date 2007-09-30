@@ -24,15 +24,46 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * An echo server for testing.
+ */
 public class EchoServer {
 
+    /**
+     * The default host address to listen on:
+     * {@value EchoServer#DEFAULT_HOST}
+     */
     public static final String DEFAULT_HOST = "0.0.0.0";
+
+    /** The default port to listen on: {@value EchoServer#DEFAULT_PORT} */
     public static final String DEFAULT_PORT = "5150";
 
+    /** The default message size: {@value EchoServer#DEFAULT_BUFFER_SIZE}  */
     public static final String DEFAULT_BUFFER_SIZE = "32";
-    public static final String DEFAULT_NUM_THREADS =  "4";
-    public static final String DEFAULT_MAX_THREADS =  String.valueOf(Integer.MAX_VALUE);
-    public static final String DEFAULT_BACKLOG     =  "0";
+    
+    /**
+     * The default number of threads:
+     * {@value EchoServer#DEFAULT_NUM_THREADS}
+     */
+    public static final String DEFAULT_NUM_THREADS = "4";
+
+    /**
+     * The default maximum number of threads:
+     * {@value EchoServer#DEFAULT_MAX_THREADS}
+     */
+    public static final String DEFAULT_MAX_THREADS =
+        String.valueOf(Integer.MAX_VALUE);
+
+    /**
+     * The default accept() backlog:
+     * {@value EchoServer#DEFAULT_BACKLOG}
+     */
+    public static final String DEFAULT_BACKLOG = "0";
+
+    /**
+     * Whether to disable the Nagle algorithm by default:
+     * {@value EchoServer#DEFAULT_DISABLE_NAGLE}
+     */
     public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
@@ -50,11 +81,17 @@ public class EchoServer {
     AsynchronousServerSocketChannel acceptor;
     private AtomicInteger numConnections = new AtomicInteger();
 
+    /**
+     * Constructs a new instance of the echo server with the given
+     * {@link AsynchronousChannelGroup}.
+     * 
+     * @param group the asynchronous channel group for this cserverlient
+     */
     protected EchoServer(AsynchronousChannelGroup group) {
         this.group = group;
     }
 
-    public void start() throws IOException {
+    void start() throws IOException {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
@@ -73,6 +110,9 @@ public class EchoServer {
     final class AcceptHandler
         implements CompletionHandler<AsynchronousSocketChannel, Object>
     {
+        /**
+         * {@inheritDoc}
+         */
         public void completed(IoFuture<AsynchronousSocketChannel, Object> result) {
             try {
                 acceptedChannel(result.getNow());
@@ -115,6 +155,9 @@ public class EchoServer {
             this.channel = channel;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public void completed(IoFuture<Integer, ByteBuffer> result) {
             if (! channel.isOpen()) {
                 disconnected(channel);
@@ -128,7 +171,7 @@ public class EchoServer {
             }
         }
 
-        public void readCompleted(IoFuture<Integer, ByteBuffer> result) {
+        void readCompleted(IoFuture<Integer, ByteBuffer> result) {
             try {
                 int rc = result.getNow();
                 log.log(Level.FINEST, "Read {0} bytes", rc);
@@ -147,7 +190,7 @@ public class EchoServer {
             }
         }
 
-        public void writeCompleted(IoFuture<Integer, ByteBuffer> result) {
+        void writeCompleted(IoFuture<Integer, ByteBuffer> result) {
             try {
                 int wc =
                     result.getNow();
@@ -169,7 +212,7 @@ public class EchoServer {
         }
     }
 
-    public void disconnected(AsynchronousSocketChannel channel) {
+    void disconnected(AsynchronousSocketChannel channel) {
         log.log(Level.FINE, "Disconnected {0}", channel);
 
         try {
@@ -190,6 +233,7 @@ public class EchoServer {
      * Runs the IO server test.
      *
      * @param args the commandline arguments
+     * @throws Exception if an error occurs
      */
     public final static void main(String[] args) throws Exception {
 

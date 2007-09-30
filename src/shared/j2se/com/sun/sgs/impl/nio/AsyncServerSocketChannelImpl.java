@@ -56,10 +56,12 @@ final class AsyncServerSocketChannelImpl
         group.registerChannel(this);
     }
 
+    /** {@inheritDoc} */
     public ServerSocketChannel channel() {
         return channel;
     }
 
+    /** {@inheritDoc} */
     public void selected(int ops) {
         if (ops != OP_ACCEPT)
             throw new IllegalStateException("Unexpected ops " + ops);
@@ -69,6 +71,7 @@ final class AsyncServerSocketChannelImpl
             group.execute(task);
     }
 
+    /** {@inheritDoc} */
     public void setException(int op, Throwable t) {
         if (op != OP_ACCEPT)
             throw new IllegalStateException("Unexpected op " + op);

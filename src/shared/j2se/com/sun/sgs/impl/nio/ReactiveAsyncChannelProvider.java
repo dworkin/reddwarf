@@ -7,12 +7,16 @@ package com.sun.sgs.impl.nio;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * A select-based asynchronous IO provider.
+ */
 public class ReactiveAsyncChannelProvider extends AsyncProviderImpl {
 
-    public ReactiveAsyncChannelProvider() {
+    ReactiveAsyncChannelProvider() {
         super();
     }
 
+    /** {@inheritDoc} */
     @Override
     public ReactiveChannelGroup
     openAsynchronousChannelGroup(ExecutorService executor)

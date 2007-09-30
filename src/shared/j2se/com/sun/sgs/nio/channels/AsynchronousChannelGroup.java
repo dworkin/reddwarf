@@ -6,8 +6,70 @@ import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * An organization of asynchronous channels for the purpose of resource
+ * sharing.
+ * <p>
+ * An asynchronous channel group encapsulates the mechanics required to
+ * handle the completion of I/O operations initiated by
+ * {@link AsynchronousChannel asynchronous channels} that are bound to the
+ * group. A group is created with an {@link ExecutorService} to which tasks
+ * are submitted to handle I/O events and dispatch to
+ * {@link CompletionHandler completion handlers} that consume the result of
+ * asynchronous operations performed on channels in the group.
+ * <p>
+ * An asynchronous channel group is created by invoking the {@link #open}
+ * method. Channels are bound to a group by specifying the group when the
+ * channel is constructed. If a group is not specified then the channel is
+ * bound to a <em>default group</em> that is constructed automatically.
+ * The executor for the default group is created by invoking the
+ * {@link ThreadPoolFactory#newThreadPool() newThreadPool} method on a
+ * {@link ThreadPoolFactory} located as follows:
+ * <ul>
+ * <li> If the system property
+ * {@code java.nio.channels.DefaultThreadPoolFactory} is defined then it is
+ * taken to be the fully-qualified name of a concrete thread pool factory
+ * class. The class is loaded and instantiated.
+ * <li> If the system property is not defined, or the process to load and
+ * instantiate it fails, then a system-default factory class is
+ * instantiated.
+ * </ul>
+ * <h4>Shutdown and Termination</h4>
+ * The {@link #shutdown} method is used to initiate an
+ * <em>orderly shutdown</em> of the group. An orderly shutdown marks the
+ * group as shutdown; further attempts to construct a channel that binds to
+ * the group will throw {@link ShutdownChannelGroupException}. Whether or
+ * not a group is shutdown can be tested using the {@link #isShutdown}
+ * method. Once shutdown, a group <em>terminates</em> when all
+ * asynchronous channels that are bound to the group are closed and
+ * resources used by the group are released. Once a group is terminated then
+ * any actively executing completion handlers run to completion; no attempt
+ * is made to stop or interrupt threads that are executing completion
+ * handlers. The {@link #isTerminated} method is used to test if the group
+ * has terminated, and the {@link #awaitTermination} method can be used to
+ * block until the group has terminated.
+ * <p>
+ * The {@link #shutdownNow} method can be used to initiate a
+ * <em>forceful shutdown</em> of the group. In addition to the actions
+ * performed by an orderly shutdown, the {@code shutdownNow} method closes
+ * all open channels in the group as if by invoking the
+ * {@link AsynchronousChannel#close close} method. A group will typically
+ * terminate quickly after the {@code shutdownNow} method has been invoked.
+ * <p>
+ * NOT IMPLEMENTED:
+ * <ul>
+ * <li>{@code getDefaultUncaughtExceptionHandler}
+ * <li>{@code setDefaultUncaughtExceptionHandler}
+ * </ul>
+ * 
+ * @see AsynchronousSocketChannel#open(AsynchronousChannelGroup)
+ * @see AsynchronousServerSocketChannel#open(AsynchronousChannelGroup)
+ * @see AsynchronousDatagramChannel#open(ProtocolFamily,
+ *      AsynchronousChannelGroup)
+ */
 public abstract class AsynchronousChannelGroup {
 
+    /** The asynchronous channel provider for this group. */
     private final AsynchronousChannelProvider provider;
 
     /**
@@ -33,12 +95,15 @@ public abstract class AsynchronousChannelGroup {
     /**
      * Creates an asynchronous channel group.
      * <p>
-     * The new group is created by invoking the openAsynchronousChannelGroup
-     * method of the system-wide default AsynchronousChannelProvider object.
+     * The new group is created by invoking the
+     * {@link AsynchronousChannelProvider#openAsynchronousChannelGroup(ExecutorService)
+     * openAsynchronousChannelGroup} method of the system-wide default
+     * {@link AsynchronousChannelProvider} object.
      * <p>
-     * The executor parameter is the ExecutorService to which tasks will be
-     * submitted to handle I/O events and dispatch completion results for
-     * operations initiated on asynchronous channels in the group.
+     * The {@code executor} parameter is the {@link ExecutorService} to
+     * which tasks will be submitted to handle I/O events and dispatch
+     * completion results for operations initiated on asynchronous channels
+     * in the group.
      * <p>
      * The tasks and the usage of the executor are highly implementation
      * specific. Consequently, care should be taken when configuring the
@@ -64,14 +129,14 @@ public abstract class AsynchronousChannelGroup {
     /**
      * Tells whether or not this asynchronous channel group is shutdown.
      *
-     * @return true if this asynchronous channel group is shutdown
+     * @return {@code true} if this asynchronous channel group is shutdown
      */
     public abstract boolean isShutdown();
 
     /**
      * Tells whether or not this asynchronous channel group is terminated.
      *
-     * @return true if this asynchronous channel group is terminated
+     * @return {@code true} if this asynchronous channel group is terminated
      */
     public abstract boolean isTerminated();
 
@@ -79,8 +144,8 @@ public abstract class AsynchronousChannelGroup {
      * Initiates an orderly shutdown of the group.
      * <p>
      * This method marks the group as shutdown. Further attempts to
-     * construct channel that binds to this group will throw
-     * ShutdownChannelGroupException. The group terminates when all
+     * construct a channel that binds to this group will throw
+     * {@link ShutdownChannelGroupException}. The group terminates when all
      * asynchronous channels in the group are closed and all resources have
      * been released. This method has no effect if the group is already
      * shutdown.
@@ -92,14 +157,15 @@ public abstract class AsynchronousChannelGroup {
     /**
      * Shuts down the group and closes all open channels in the group.
      * <p>
-     * In addition to the actions performed by the shutdown method, this
-     * method invokes the close method on all open channels in the group.
-     * This method does not attempt to stop actively executing completion
-     * handlers.
+     * In addition to the actions performed by the {@link #shutdown} method,
+     * this method invokes the {@link AsynchronousChannel#close close}
+     * method on all open channels in the group. This method does not
+     * attempt to stop actively executing
+     * {@link CompletionHandler completion handlers}.
      * <p>
-     * The group is likely to terminate quickly after invoking this method
-     * but there is no guarantee that the group has terminated on completion
-     * of this method
+     * The group is likely to terminate <em>quickly</em> after invoking this
+     * method but there is no guarantee that the group has terminated on
+     * completion of this method.
      * 
      * @return this group
      * @throws IOException if an I/O error occurs
@@ -115,8 +181,8 @@ public abstract class AsynchronousChannelGroup {
      * 
      * @param timeout the maximum time to wait
      * @param unit the time unit of the timeout argument
-     * @return true if the group has terminated; false if the timeout
-     *         elapsed before termination
+     * @return {@code true} if the group has terminated; {@code false} if
+     *         the timeout elapsed before termination
      * @throws InterruptedException if interrupted while waiting
      */
     public abstract boolean awaitTermination(long timeout, TimeUnit unit)

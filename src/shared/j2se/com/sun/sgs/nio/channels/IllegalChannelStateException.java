@@ -1,25 +1,20 @@
 package com.sun.sgs.nio.channels;
 
+/**
+ * Unchecked exception received when a channel operation is attempted that
+ * has previously completed due to a timeout.
+ * <p>
+ * [[Not specified by JSR-203, but referenced in the JSR-203 Javadoc]]
+ */
 public class IllegalChannelStateException
     extends IllegalStateException
 {
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Constructs an instance of this class.
+     */
     public IllegalChannelStateException() {
         super();
-    }
-
-    public IllegalChannelStateException(String message) {
-        super(message);
-    }
-
-    public IllegalChannelStateException(Throwable cause) {
-        super(cause == null ? null : cause.toString());
-        initCause(cause);
-    }
-
-    public IllegalChannelStateException(String message, Throwable cause) {
-        super(message);
-        initCause(cause);
     }
 }

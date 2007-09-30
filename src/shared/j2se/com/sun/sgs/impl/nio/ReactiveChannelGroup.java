@@ -35,14 +35,26 @@ import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
 
+/**
+ * A select-based AsynchronousChannelGroup.
+ */
 class ReactiveChannelGroup
     extends AbstractAsyncChannelGroup
 {
     static final Logger log =
         Logger.getLogger(ReactiveChannelGroup.class.getName());
 
+    /**
+     * The property to specify the number of reactors to be used by
+     * channel groups: {@value ReactiveChannelGroup#SELECTORS_PROPERTY}
+     */
     public static final String SELECTORS_PROPERTY =
         "com.sun.sgs.nio.async.reactive.selectors";
+
+    /**
+     * The default number of reactors to be used by
+     * channel groups: {@value ReactiveChannelGroup#DEFAULT_SELECTORS}
+     */
     public static final String DEFAULT_SELECTORS = "1";
 
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
@@ -83,7 +95,14 @@ class ReactiveChannelGroup
     final CountDownLatch termination;
 
     abstract class WorkerStrategy implements Runnable {
+        /** The task to run. */
         protected final Callable<Boolean> task;
+
+        /**
+         * Creates a new {@code WorkerStrategy} to run the given task.
+         * 
+         * @param task the task to run
+         */
         protected WorkerStrategy(Callable<Boolean> task) {
             this.task = task;
         }
@@ -102,7 +121,8 @@ class ReactiveChannelGroup
         Reactor(Selector selector) {
             this.selector = selector;
         }
-        
+
+        /** {@inheritDoc} */
         public void close() throws IOException {
             synchronized (this) {
                 selector.wakeup();
@@ -123,6 +143,7 @@ class ReactiveChannelGroup
             super(selector);
         }
 
+        /** {@inheritDoc} */
         public Boolean call() throws IOException {
             Object selectorLock = this;
 
@@ -212,19 +233,23 @@ class ReactiveChannelGroup
             timeoutUnit = unit;
         }
 
+        /** {@inheritDoc} */
         public long getDelay(TimeUnit unit) {
             return unit.convert(timeout, timeoutUnit);
         }
 
+        /** {@inheritDoc} */
         public int compareTo(Delayed o) {
             final long other = o.getDelay(timeoutUnit);
             return (timeout<other ? -1 : (timeout==other ? 0 : 1));
         }
 
+        /** {@inheritDoc} */
         public void run() {
             asyncChannel.setException(op, new AbortedByTimeoutException());
         }
 
+        /** {@inheritDoc} */
         @Override
         public boolean equals(Object obj) {
             if (this == obj)
@@ -237,6 +262,7 @@ class ReactiveChannelGroup
             return asyncChannel == other.asyncChannel && op == other.op;
         }
 
+        /** {@inheritDoc} */
         @Override
         public int hashCode() {
             return asyncChannel.hashCode() ^ (1 << op);
@@ -252,27 +278,29 @@ class ReactiveChannelGroup
     // if numSelectors == 0, choose from a property
     ReactiveChannelGroup(AsyncProviderImpl provider,
                          ExecutorService executor,
-                         int numReactors)
+                         int requestedReactors)
         throws IOException
     {
         super(provider, executor);
 
-        if (numReactors == 0) {
-            numReactors = Integer.valueOf(System.getProperty(
+        int n = requestedReactors;
+
+        if (n == 0) {
+            n = Integer.valueOf(System.getProperty(
                 SELECTORS_PROPERTY, DEFAULT_SELECTORS));
         }
 
-        if (numReactors <= 0)
+        if (n <= 0)
             throw new IllegalArgumentException(
                 "Selector count must be positive");
 
-        this.numReactors = numReactors;
-        this.termination = new CountDownLatch(numReactors);
+        this.numReactors = n;
+        this.termination = new CountDownLatch(n);
 
         ArrayList<Reactor> tmpReactors =
-            new ArrayList<Reactor>(numReactors);
+            new ArrayList<Reactor>(n);
 
-        for (int i = 0; i < numReactors; ++i) {
+        for (int i = 0; i < n; ++i) {
             Selector sel = selectorProvider().openSelector();
             tmpReactors.add(new BlockingReactor(sel));
         }
@@ -375,6 +403,7 @@ class ReactiveChannelGroup
             super(task);
         }
 
+        /** {@inheritDoc} */
         public void run() {
             try {
                 boolean keepRunning = true;
@@ -394,6 +423,7 @@ class ReactiveChannelGroup
             super(task);
         }
 
+        /** {@inheritDoc} */
         public void run() {
             boolean keepRunning = true;
             try {

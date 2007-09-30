@@ -6,6 +6,7 @@ package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.Selector;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -13,8 +14,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
+/**
+ * A Thread-Per-Connection AsynchronousChannelGroup.
+ */
 class TPCChannelGroup
     extends AbstractAsyncChannelGroup
 {
@@ -86,7 +91,9 @@ class TPCChannelGroup
         mainLock.lock();
         try {
             if (isShutdown()) {
-                forceClose(ach);
+                try {
+                    ach.close();
+                } catch (IOException ignore) { }
                 throw new ShutdownChannelGroupException();
             }
             channels.add(ach);
@@ -134,12 +141,11 @@ class TPCChannelGroup
     {
         if (timeout == 0)
             return;
-/*
-        Selector sel = getSelectorProvider().openSelector();
+
+        Selector sel = selectorProvider().openSelector();
         channel.register(sel, ops);
         if (sel.select(timeout) == 0)
             throw new AbortedByTimeoutException();
-*/
     }
 
     /* Termination support. */
@@ -233,8 +239,5 @@ class TPCChannelGroup
         } finally {
             mainLock.unlock();
         }
-    }
-
-    private static void forceClose(AsyncChannelImpl channel) {
     }
 }

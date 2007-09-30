@@ -11,24 +11,46 @@ import java.security.PrivilegedAction;
 import java.util.concurrent.ExecutorService;
 
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
+import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * Base implementation of AsynchronousChannelProvider.  Handles the
+ * creation of the default thread pool and default channel group.
+ */
 abstract class AsyncProviderImpl
     extends AsynchronousChannelProvider
 {
+    /** The SelectorProvider. */
     private final SelectorProvider selectorProvider;
+
+    /** The default group, or {@code null}. */
     private AbstractAsyncChannelGroup defaultGroupInstance = null;
 
+    /**
+     * Default constructor that initializes this async provider using
+     * the system-default {@link SelectorProvider}.
+     *
+     * @see SelectorProvider#provider()
+     */
     protected AsyncProviderImpl() {
         this(SelectorProvider.provider());
     }
 
+    /**
+     * Constructor that initializes this async provider using
+     * the given {@link SelectorProvider}.
+     *
+     * @param selProvider the {@code SelectorProvider}
+     */
     protected AsyncProviderImpl(SelectorProvider selProvider) {
         if (selProvider == null)
             throw new NullPointerException("null SelectorProvider");
         selectorProvider = selProvider;
     }
+
+    // Private methods related to thread pools and channel groups.
 
     private static ThreadPoolFactory getThreadPoolFactory() {
         return AccessController.doPrivileged(
@@ -81,32 +103,31 @@ abstract class AsyncProviderImpl
         return (AbstractAsyncChannelGroup) group;
     }
 
+    // Package-private methods
+
     SelectorProvider selectorProvider() {
         return selectorProvider;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    // AsynchronousChannelProvider methods
+
+    /** {@inheritDoc} */
     @Override
     abstract public AbstractAsyncChannelGroup
     openAsynchronousChannelGroup(ExecutorService executor)
         throws IOException;
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public AsyncDatagramChannelImpl
-    openAsynchronousDatagramChannel(AsynchronousChannelGroup group)
+    openAsynchronousDatagramChannel(ProtocolFamily pf,
+                                    AsynchronousChannelGroup group)
         throws IOException
     {
-        return new AsyncDatagramChannelImpl(checkGroup(group));
+        return new AsyncDatagramChannelImpl(pf, checkGroup(group));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public AsyncServerSocketChannelImpl
     openAsynchronousServerSocketChannel(AsynchronousChannelGroup group)
@@ -115,13 +136,11 @@ abstract class AsyncProviderImpl
         return new AsyncServerSocketChannelImpl(checkGroup(group));
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     @Override
     public AsyncSocketChannelImpl
-        openAsynchronousSocketChannel(AsynchronousChannelGroup group)
-            throws IOException
+    openAsynchronousSocketChannel(AsynchronousChannelGroup group)
+        throws IOException
     {
         return new AsyncSocketChannelImpl(checkGroup(group));
     }

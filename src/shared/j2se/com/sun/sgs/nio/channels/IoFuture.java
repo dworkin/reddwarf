@@ -9,7 +9,7 @@ import java.util.concurrent.Future;
  * A {@code Future} representing the result of an asynchronous I/O
  * operation.
  * <p>
- * In addition to the methods defined by the {@code Future} interface, an
+ * In addition to the methods defined by the {@link Future} interface, an
  * {@code IoFuture} allows for the attachment of a single arbitrary object.
  * Where the same {@link CompletionHandler} instance is used to consume the
  * result of several operations then the attachment object can be used to

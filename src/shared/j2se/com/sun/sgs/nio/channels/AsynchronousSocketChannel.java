@@ -14,6 +14,87 @@ import java.util.concurrent.TimeUnit;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * An asynchronous channel for stream-oriented connecting sockets.
+ * <p>
+ * Asynchronous socket channels are created in one of two ways. A
+ * newly-created AsynchronousSocketChannel is created by invoking one of the
+ * open methods defined by this class. A newly-created channel is open but
+ * not yet connected. A connected AsynchronousSocketChannel is created when
+ * a connection is made to the socket of an AsynchronousServerSocketChannel.
+ * It is not possible to create an asynchronous socket channel for an
+ * arbitrary, pre-existing socket.
+ * <p>
+ * A newly-created channel is connected by invoking its connect method; once
+ * connected, a channel remains connected until it is closed. Whether or not
+ * a socket channel is connected may be determined by invoking its
+ * getConnectedAddress method. Whether or not a connect operation is in
+ * progress may be determined by invoking the isConnectionPending method. An
+ * attempt to invoke an I/O operation upon an unconnected channel will cause
+ * a NotYetConnectedException to be thrown.
+ * <p>
+ * Channels of this type are safe for use by multiple concurrent threads.
+ * They support concurrent reading and writing, though at most one read
+ * operation and one write operation can be outstanding at any time. If a
+ * thread initiates a read operation before a previous read operation has
+ * completed then a ReadPendingException will be thrown. Similarly, an
+ * attempt to initiate a write operation before a previous write has
+ * completed will throw a WritePendingException. Whether or not a read or
+ * write operation is pending may be determined by invoking the
+ * isReadPending and isWritePending methods.
+ * <p>
+ * Socket options are configured using the setOption method. Asynchronous
+ * socket channels support the following options:
+ * <blockquote>
+ * <table>
+ * <tr>
+ * <th>Option Name</th>
+ * <th>Description</th>
+ * </tr>
+ * <tr>
+ * <td>{@link StandardSocketOption#SO_SNDBUF SO_SNDBUF}</td>
+ * <td>The size of the socket send buffer</td>
+ * </tr>
+ * <tr>
+ * <td>{@link StandardSocketOption#SO_RCVBUF SO_RCVBUF}</td>
+ * <td> The size of the socket receive buffer </td>
+ * </tr>
+ * <tr>
+ * <td>{@link StandardSocketOption#SO_KEEPALIVE SO_KEEPALIVE}</td>
+ * <td>Keep connection alive</td>
+ * </tr>
+ * <tr>
+ * <td>{@link StandardSocketOption#SO_REUSEADDR SO_REUSEADDR}</td>
+ * <td>Re-use address</td>
+ * </tr>
+ * <tr>
+ * <td>{@link StandardSocketOption#TCP_NODELAY TCP_NODELAY}</td>
+ * <td>Disable the Nagle algorithm</td>
+ * </tr>
+ * </table>
+ * </blockquote>
+ * and may support additional (implementation
+ * specific) options. The list of options supported is obtained by invoking
+ * the options method.
+ * <h4>Timeouts</h4>
+ * The read and write methods defined by this class allow a timeout to be
+ * specified when initiating a read or write operation. If the timeout
+ * elapses before an operation completes then the operation completes by
+ * throwing ExecutionException with cause AbortedByTimeoutException. A
+ * timeout may leave the channel, or the underlying connection, in an
+ * inconsistent state. Where an implementation cannot guarantee that no
+ * bytes have been read from the channel then it puts the channel into an
+ * implementation specific error state and a subsequent attempt to initiate
+ * a read operation throws an unspecified runtime exception. Similarly if a
+ * write operation times and the implementation cannot guarantee that no
+ * bytes have been written to the channel then it prohibits further write
+ * operations by throwing an unspecified runtime exception.
+ * <p>
+ * When a timeout elapses then the state of the ByteBuffer, or the sequence
+ * of buffers, for the I/O operation is not defined. Buffers should be
+ * discarded or at least care must be taken to ensure that the buffers are
+ * not accessed while the channel remains open.
+ */
 public abstract class AsynchronousSocketChannel extends AsynchronousChannel
     implements AsynchronousByteChannel, NetworkChannel
 {
@@ -163,6 +244,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * method verifies that its checkConnect method permits connecting to
      * the address and port number of the given remote endpoint.
      * 
+     * @param <A> the attachment type
      * @param remote the remote address to which this channel is to be
      *        connected
      * @param attachment the object to attach to the returned IoFuture
@@ -199,6 +281,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * connect(SocketAddress,A,CompletionHandler) with the attachment
      * parameter set to null.
      * 
+     * @param <A> the attachment type
      * @param remote the remote address to which this channel is to be
      *        connected
      * @param handler the handler for consuming the result; can be null
@@ -240,6 +323,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * Otherwise this method works in the same manner as the
      * AsynchronousByteChannel.read(ByteBuffer,A,CompletionHandler) method.
      * 
+     * @param <A> the attachment type
      * @param dst the buffer into which bytes are to be transferred
      * @param timeout the timeout, or 0L for no timeout
      * @param unit the time unit of the timeout argument
@@ -274,6 +358,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * read(ByteBuffer,long,TimeUnit,A,CompletionHandler) with a timeout of
      * 0L.
      * 
+     * @param <A> the attachment type
      * @param dst the buffer into which bytes are to be transferred
      * @param attachment the object to attach to the returned IoFuture
      *        object; can be null
@@ -306,6 +391,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * read(ByteBuffer,long,TimeUnit,A,CompletionHandler) with a timeout of
      * 0L, and an attachment of null.
      * 
+     * @param <A> the attachment type
      * @param dst the buffer into which bytes are to be transferred
      * @param handler the handler for consuming the result; can be null
      * @return an IoFuture object representing the pending result
@@ -358,6 +444,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * cause AbortedByTimeoutException. In that case it is guranteed that no
      * bytes have been read from the channel into the given buffers.
      * 
+     * @param <A> the attachment type
      * @param dsts the buffers into which bytes are to be transferred
      * @param offset the offset within the buffer array of the first buffer
      *        into which bytes are to be transferred; must be non-negative
@@ -404,6 +491,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * Otherwise this method works in the same manner as the
      * AsynchronousByteChannel.write(ByteBuffer,A,CompletionHandler) method.
      * 
+     * @param <A> the attachment type
      * @param src the buffer from which bytes are to be retrieved
      * @param timeout the timeout, or 0L for no timeout
      * @param unit the time unit of the timeout argument
@@ -436,6 +524,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * write(ByteBuffer,long,TimeUnit,A,CompletionHandler) with a timeout of
      * 0L.
      * 
+     * @param <A> the attachment type
      * @param src the buffer from which bytes are to be retrieved
      * @param attachment the object to attach to the returned IoFuture
      *        object; can be null
@@ -466,6 +555,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * write(ByteBuffer,long,TimeUnit,A,CompletionHandler) with a timeout of
      * 0L, and an attachment of null.
      * 
+     * @param <A> the attachment type
      * @param src the buffer from which bytes are to be retrieved
      * @param handler the handler for consuming the result; can be null
      * @return an IoFuture object representing the pending result
@@ -516,6 +606,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * cause AbortedByTimeoutException. In that case it is guranteed that no
      * bytes have written to the channel from the given buffers.
      * 
+     * @param <A> the attachment type
      * @param srcs the buffers from which bytes are to be retrieved
      * @param offset the offset within the buffer array of the first buffer
      *        from which bytes are to be retrieved; must be non-negative and

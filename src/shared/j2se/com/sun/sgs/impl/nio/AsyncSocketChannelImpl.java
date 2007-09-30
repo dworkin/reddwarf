@@ -83,10 +83,12 @@ final class AsyncSocketChannelImpl
         group.registerChannel(this);
     }
 
+    /** {@inheritDoc} */
     public SocketChannel channel() {
         return channel;
     }
 
+    /** {@inheritDoc} */
     public void selected(int ops) {
         log.log(Level.FINER, "selected {0}", ops);
 
@@ -119,6 +121,7 @@ final class AsyncSocketChannelImpl
         log.log(Level.FINER, "selected {0} done", ops);
     }
 
+    /** {@inheritDoc} */
     public void setException(int ops, Throwable t) {
         log.log(Level.FINER, "setException {0}", ops);
 

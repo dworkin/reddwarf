@@ -7,12 +7,16 @@ package com.sun.sgs.impl.nio;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * A Thread-Per-Connection asynchronous IO provider.
+ */
 public class TPCAsyncChannelProvider extends AsyncProviderImpl {
 
-    public TPCAsyncChannelProvider() {
+    TPCAsyncChannelProvider() {
         super();
     }
 
+    /** {@inheritDoc} */
     @Override
     public TPCChannelGroup
     openAsynchronousChannelGroup(ExecutorService executor)

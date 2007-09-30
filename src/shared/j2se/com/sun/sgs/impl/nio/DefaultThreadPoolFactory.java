@@ -9,6 +9,9 @@ import java.util.concurrent.Executors;
 
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 
+/**
+ * Factory for obtaining the default {@code ThreadPoolFactory}.
+ */
 class DefaultThreadPoolFactory implements ThreadPoolFactory {
 
     static class LazyInstanceHolder {
@@ -16,6 +19,10 @@ class DefaultThreadPoolFactory implements ThreadPoolFactory {
             new DefaultThreadPoolFactory();
     }
 
+    /**
+     * Returns the default {@code ThreadPoolFactory}.
+     * @return the default {@code ThreadPoolFactory}
+     */
     static DefaultThreadPoolFactory create() {
         return LazyInstanceHolder.instance;
     }

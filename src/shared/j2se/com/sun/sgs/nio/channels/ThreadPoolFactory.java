@@ -12,11 +12,13 @@ import java.util.concurrent.ExecutorService;
  * An implementation will typically use the factory methods defined by the
  * {@link java.util.concurrent.Executors Executors} class to create the
  * thread pool.
+ * <p>
+ * [[Note: JSR-203 creates this interface in {@code java.util.concurrent}]]
  */
 public interface ThreadPoolFactory {
 
     /**
-     * Constructs a new ExecutorService.
+     * Constructs a new {@link ExecutorService}.
      *
      * @return the newly-created thread pool
      */
