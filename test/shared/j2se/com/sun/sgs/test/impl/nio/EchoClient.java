@@ -31,38 +31,29 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  */
 public class EchoClient {
 
-    /** The default host: {@value EchoClient#DEFAULT_HOST} */
+    /** The default host: {@value} */
     public static final String DEFAULT_HOST = "127.0.0.1";
 
-    /** The default port: {@value EchoClient#DEFAULT_PORT} */
+    /** The default port: {@value} */
     public static final String DEFAULT_PORT = "5150";
 
-    /** The default message size: {@value EchoClient#DEFAULT_BUFFER_SIZE}  */
+    /** The default message size: {@value}  */
     public static final String DEFAULT_BUFFER_SIZE = "32";
 
-    /** The default number of clients: {@value EchoClient#DEFAULT_NUM_CLIENTS} */
+    /** The default number of clients: {@value} */
     public static final String DEFAULT_NUM_CLIENTS = "4";
 
-    /** The default number of threads: {@value EchoClient#DEFAULT_NUM_THREADS} */
+    /** The default number of threads: {@value} */
     public static final String DEFAULT_NUM_THREADS = "4";
 
-    /**
-     * The default maximum number of threads:
-     * {@value EchoClient#DEFAULT_MAX_THREADS}
-     */
+    /**  The default maximum number of threads: {@value} */
     public static final String DEFAULT_MAX_THREADS =
         String.valueOf(Integer.MAX_VALUE);
 
-    /**
-     * The default number of messages to send:
-     * {@value EchoClient#DEFAULT_NUM_MSGS}
-     */
+    /** The default number of messages to send: {@value} */
     public static final String DEFAULT_NUM_MSGS = "8";
 
-    /**
-     * Whether to disable the Nagle algorithm by default:
-     * {@value EchoClient#DEFAULT_DISABLE_NAGLE}
-     */
+    /** Whether to disable the Nagle algorithm by default: {@value} */
     public static final String DEFAULT_DISABLE_NAGLE = "false";
 
     private static final int BUFFER_SIZE =
