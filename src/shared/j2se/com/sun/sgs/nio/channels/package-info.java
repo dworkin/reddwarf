@@ -4,24 +4,24 @@
  summary="Lists asynchronous channels and their descriptions">
  <tr><th><p align="left">Asynchronous I/O</p></th>
      <th><p align="left">Description</p></th></tr>
- <tr><td valign=top>{@link AsynchronousChannel}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousChannel}</td>
  <td>A channel capable of asynchronous operations</td></tr>
  <tr><td valign=top>{@code AsynchronousFileChannel}</td>
  <td>[[NOT IMPLEMENTED]] An asynchronous channel for reading,
  writing, and manipulating a file</td></tr>
 
- <tr><td valign=top>{@link AsynchronousSocketChannel}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousSocketChannel}</td>
  <td>An asynchronous channel to a stream-oriented connecting socket</td></tr>
- <tr><td valign=top>{@link AsynchronousServerSocketChannel}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousServerSocketChannel}</td>
  <td>An asynchronous channel to a stream-oriented listening socket</td></tr>  
- <tr><td valign=top>{@link AsynchronousDatagramChannel}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousDatagramChannel}</td>
  <td>An asynchronous channel to a datagram-oriented socket</td></tr>
 
- <tr><td valign=top>{@link CompletionHandler}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.CompletionHandler}</td>
  <td>A handler for consuming the result of an asynchronous operation</td></tr>   
- <tr><td valign=top>{@link IoFuture}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.IoFuture}</td>
  <td>A Future representing the result of an asynchronous I/O operation</td></tr> 
- <tr><td valign=top>{@link AsynchronousChannelGroup}</td>
+ <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousChannelGroup}</td>
  <td>A grouping of asynchronous channels for the purpose of resource
  sharing</td></tr> 
  </table></blockquote>
@@ -30,13 +30,13 @@
  Asynchronous I/O is provided by asynchronous channels, I/O futures, and 
  completion handlers. 
  <p>
- {@link AsynchronousChannel Asynchronous channels} are a 
+ {@link com.sun.sgs.nio.channels.AsynchronousChannel Asynchronous channels} are a 
  special type of channel capable of asynchronous I/O operations. Asynchronous
  channels are non-blocking and define methods to initiate asynchronous 
- operations, returning an {@link IoFuture} representing the 
+ operations, returning an {@link com.sun.sgs.nio.channels.IoFuture} representing the 
  pending result of each operation. The {@code IoFuture} can be used to poll or
  wait for the result of the operation. Asynchronous I/O operations can also 
- specify a {@link CompletionHandler} to invoke when the 
+ specify a {@link com.sun.sgs.nio.channels.CompletionHandler} to invoke when the 
  operation completes. A completion handler is user provided code that is
  executed to consume the result of I/O operation.
  <p>
@@ -75,7 +75,7 @@
  <p>
  Unless otherwise noted, passing a {@code null} argument to a constructor
  or method in any class or interface in this package will cause a
- {@link NullPointerException} to be thrown.
+ {@link java.lang.NullPointerException} to be thrown.
  */
 package com.sun.sgs.nio.channels;
 
