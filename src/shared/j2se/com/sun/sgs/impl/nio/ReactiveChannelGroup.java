@@ -148,14 +148,14 @@ class ReactiveChannelGroup
             Object selectorLock = this;
 
             int rc = 0;
-            log.log(Level.FINER, "preselect");
+//            log.log(Level.FINER, "preselect");
             // Obtain and release the guard to allow other tasks to run
             // after waking the selector.
             synchronized (selectorLock) {
                 // FIXME experimenting with a selectNow to clear
                 // spurious wakeups
-                rc = selector.selectNow();
-                log.log(Level.FINER, "preselect returned {0}", rc);
+//                rc = selector.selectNow();
+//                log.log(Level.FINER, "preselect returned {0}", rc);
             }
 
             int numKeys = selector.keys().size();
@@ -312,7 +312,7 @@ class ReactiveChannelGroup
         }
     }
 
-    Reactor getSelectorHolder(AsyncChannelImpl ach) {
+    Reactor getReactor(AsyncChannelImpl ach) {
         int index = Math.abs(ach.hashCode() % numReactors);
         return reactors.get(index);
     }
@@ -328,9 +328,9 @@ class ReactiveChannelGroup
                 throw new ShutdownChannelGroupException();
             }
             ch.configureBlocking(false);
-            Reactor h = getSelectorHolder(ach);
-            synchronized (h) {
-                Selector selector = h.selector;
+            Reactor reactor = getReactor(ach);
+            synchronized (reactor) {
+                Selector selector = reactor.selector;
                 selector.wakeup();
                 ch.register(selector, 0, ach);
             }
@@ -339,9 +339,9 @@ class ReactiveChannelGroup
 
     @Override
     void unregisterChannel(AsyncChannelImpl ach) {
-        Reactor h = getSelectorHolder(ach);
-        synchronized (h) {
-            Selector selector = h.selector;
+        Reactor reactor = getReactor(ach);
+        synchronized (reactor) {
+            Selector selector = reactor.selector;
             selector.wakeup();
             SelectionKey key = ach.channel().keyFor(selector);
             if (key != null)
@@ -362,7 +362,7 @@ class ReactiveChannelGroup
             // TODO
             throw new UnsupportedOperationException("timeout not implemented");
         }
-        Reactor h = getSelectorHolder(ach);
+        Reactor h = getReactor(ach);
         synchronized (h) {
             Selector selector = h.selector;
             selector.wakeup();
