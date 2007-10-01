@@ -1,4 +1,4 @@
-Project Darkstar Client Source Distribution
+Project Darkstar Client SDK, Source Distribution
 Version @VERSION@
 
 INTRODUCTION
@@ -7,10 +7,11 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The Project Darkstar Client Source Distribution contains the source code
-needed to develop and run game clients that communicate with each other
-and with game servers implemented with the Project Darkstar Server.  The
-Project Darkstar Server is available as a separate download.
+The source distribution of the Project Darkstar Client SDK contains the
+source code needed to develop and run game clients that communicate with
+each other and with game servers implemented with the Project Darkstar
+Server.  The Project Darkstar Server is available as a separate
+download.
 
 CONTENTS
 
@@ -20,7 +21,7 @@ This distribution contains the following subdirectories:
   Documentation for the client tutorial
 
 - example
-  Source code for the client tutorial
+  Source code for the client tutorial and the example C client
 
 - src
   Source code for the client implementation
@@ -35,16 +36,16 @@ should be downloaded and included in the classpath:
 
 - Apache MINA, version 1.1:
 
-  http://mina.apache.org/downloads.html
+  http://mina.apache.org/
 
 - Simple Logging Facade for Java (SLF4J), version 1.4:
 
-  http://www.slf4j.org/download.html
+  http://www.slf4j.org/
 
 
 KNOWN ISSUES
 
-This version of the Project Darkstar Client has the following
+This version of the Project Darkstar Client SDK has the following
 limitations:
 
 - It only includes a J2SE(TM) client implementation.  Developers can use

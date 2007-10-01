@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
@@ -13,8 +28,9 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
+
+import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
@@ -56,6 +72,8 @@ class ServiceConfigRunner implements Runnable {
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
     private static final String DEFAULT_WATCHDOG_SERVICE =
         "com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl";
+    private static final String DEFAULT_NODE_MAPPING_SERVICE =
+        "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
@@ -118,8 +136,9 @@ class ServiceConfigRunner implements Runnable {
 
         // create an empty context and register with the scheduler
         ComponentRegistryImpl services = new ComponentRegistryImpl();
-        AppKernelAppContext ctx = new AppKernelAppContext(appName, services);
-        ctx.setServices(services);
+        ComponentRegistryImpl managers = new ComponentRegistryImpl();
+        AppKernelAppContext ctx = 
+                new AppKernelAppContext(appName, services, managers);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
         try {
@@ -151,7 +170,6 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // register any profiling managers and fill in the manager registry
-        ComponentRegistryImpl managers = new ComponentRegistryImpl();
         for (Object manager : managerSet) {
             if (profileRegistrar != null) {
                 if (manager instanceof ProfileProducer)
@@ -162,8 +180,7 @@ class ServiceConfigRunner implements Runnable {
         }
 
         // with the managers created, setup the final context and owner
-        ctx = new AppKernelAppContext(appName, managers);
-        ctx.setServices(services);
+        ctx = new AppKernelAppContext(appName, services, managers);
         owner = new TaskOwnerImpl(id, ctx);
         ThreadState.setCurrentOwner(owner);
 
@@ -288,6 +305,24 @@ class ServiceConfigRunner implements Runnable {
                     setProfileRegistrar(profileRegistrar);
         }
 
+        // load the node mapping service, which has no associated manager
+
+        if (StandardService.NodeMappingService.ordinal() >
+            finalStandardService.ordinal())
+            return;
+	
+        String nodemapServiceClass =
+            appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
+                                      DEFAULT_NODE_MAPPING_SERVICE);
+        Service nodemapService =
+            createService(Class.forName(nodemapServiceClass));
+        services.addComponent(nodemapService);
+        if (nodemapService instanceof ProfileProducer) {
+            if (profileRegistrar != null)
+                ((ProfileProducer) nodemapService).
+                    setProfileRegistrar(profileRegistrar);
+        }
+        
         // load the task service
 	
         if (StandardService.TaskService.ordinal() >

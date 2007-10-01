@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.io;
@@ -10,6 +25,8 @@ import java.util.logging.Logger;
 
 import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoSession;
+import org.apache.mina.common.TransportType;
+import org.apache.mina.transport.socket.nio.SocketSessionConfig;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Connection;
@@ -48,12 +65,17 @@ public class SocketConnection implements Connection, FilterListener {
     SocketConnection(ConnectionListener listener, CompleteMessageFilter filter,
                  IoSession session)
     {
-        if (listener == null || filter == null || session == null) {
+        if (listener == null || filter == null || session == null)
             throw new NullPointerException("null argument to constructor");
-        }
+
         this.listener = listener;
         this.filter = filter;
         this.session = session;
+
+        if (session.getTransportType() == TransportType.SOCKET) {
+            SocketSessionConfig cfg = (SocketSessionConfig)session.getConfig();
+            cfg.setTcpNoDelay(true);
+        }
     }
 
     /**
