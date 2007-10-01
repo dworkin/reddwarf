@@ -31,14 +31,14 @@ import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
@@ -47,16 +47,20 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.ProtocolMessageListener;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
+import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Collections;
@@ -80,20 +84,9 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> property. <p>
  */
-public class ChannelServiceImpl implements ChannelManager, Service {
-
-    /** Service state. */
-    private static enum State {
-        /** The service is initialized */
-	INITIALIZED,
-        /** The service is ready */
-        READY,
-        /** The service is shutting down */
-        SHUTTING_DOWN,
-        /** The service is shut down */
-        SHUTDOWN
-    }
-
+public class ChannelServiceImpl
+    extends AbstractService implements ChannelManager
+{
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
@@ -119,37 +112,24 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     /**
      * The transaction context map, or null if configure has not been called.
      */
-    private static TransactionContextMap<Context> contextMap = null;
-
-    /** The transaction proxy. */    
-    private static TransactionProxy txnProxy = null;
-
-    /** The lock for {@code state} and {@code callsInProgress} fields. */
-    private final Object lock = new Object();
-    
-    /** The server state. */
-    private State state;
-    
-    /** The count of calls in progress. */
-    private int callsInProgress = 0;
+    private static volatile TransactionContextMap<Context> contextMap = null;
 
     /** List of contexts that have been prepared (non-readonly) or commited. */
     private final List<Context> contextList = new LinkedList<Context>();
 
-    /** The name of this application. */
-    private final String appName;
+    /** The task scheduler. */
+    private final TaskScheduler taskScheduler;
 
-    /** The listener that receives incoming channel protocol messages. */
-    private final ProtocolMessageListener protocolMessageListener;
-    
+    private volatile TaskOwner taskOwner;
+
     /** The data service. */
     private final DataService dataService;
 
+    /** The watchdog service. */
+    private final WatchdogService watchdogService;
+
     /** The client session service. */
     private final ClientSessionService sessionService;
-
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
     volatile NonDurableTaskScheduler nonDurableTaskScheduler;
@@ -181,15 +161,14 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	Collections.synchronizedMap(
 	    new HashMap<CompactId, CachedChannelState>());
 
-    /** Thread for shutting down the server. */
-    private volatile Thread shutdownThread;
-    
     /**
-     * Constructs an instance of this class with the specified properties.
+     * Constructs an instance of this class with the specified {@code
+     * properties}, {@code systemRegistry}, and {@code txnProxy}.
      *
-     * @param properties service properties
-     * @param systemRegistry system registry
-     * @param txnProxy transaction proxy
+     * @param	properties service properties
+     * @param	systemRegistry system registry
+     * @param	txnProxy transaction proxy
+     *
      * @throws Exception if a problem occurs when creating the service
      */
     public ChannelServiceImpl(Properties properties,
@@ -197,34 +176,23 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 			      TransactionProxy txnProxy)
 	throws Exception
     {
+	super(properties, systemRegistry, txnProxy, logger);
+	
 	logger.log(
 	    Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
 	    properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	try {
-	    if (systemRegistry == null) {
-		throw new NullPointerException("null systemRegistry");
-	    } else if (txnProxy == null) {
-		throw new NullPointerException("null txnProxy");
-	    }
-	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
-	    if (appName == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_NAME +
-		    " property must be specified");
-	    }	
 	    synchronized (ChannelServiceImpl.class) {
-		if (ChannelServiceImpl.txnProxy == null) {
-		    ChannelServiceImpl.txnProxy = txnProxy;
+		if (ChannelServiceImpl.contextMap == null) {
 		    contextMap = new TransactionContextMap<Context>(txnProxy);
-		} else {
-		    assert ChannelServiceImpl.txnProxy == txnProxy;
 		}
 	    }
 	    contextFactory = new ContextFactory(contextMap);
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    dataService = txnProxy.getService(DataService.class);
+	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 
 	    int serverPort = wrappedProps.getIntProperty(
@@ -244,26 +212,11 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		throw e;
 	    }
 
-	    // TBD: this needs to be handled by recovery listener...
-	    taskScheduler.runTask(
-		new TransactionRunner(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    /*
-			     * Remove all sessions from all channels since all
-			     * previously stored sessions have been
-			     * disconnected.
-			     */
-			    removeAllSessionsFromChannels();
-			    removeChannelSets();
-			}
-		    }),
-		txnProxy.getCurrentOwner(), true);
-	    
-	    protocolMessageListener = new ChannelProtocolMessageListener();
+	    watchdogService.addRecoveryListener(
+		new ChannelServiceRecoveryListener());
 	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
-	    setState(State.INITIALIZED);
+		SimpleSgsProtocol.CHANNEL_SERVICE,
+		new ChannelProtocolMessageListener());
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -274,30 +227,11 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
     }
  
-    /* -- Implement Service -- */
+    /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
-    public String getName() {
-	return toString();
-    }
-
-    /** {@inheritDoc} */
-    public void ready() { 
-	synchronized (lock) {
-	    switch (state) {
-		
-	    case INITIALIZED:
-		setState(State.READY);
-		break;
-		
-	    case READY:
-		return;
-		
-	    case SHUTTING_DOWN:
-	    case SHUTDOWN:
-		throw new IllegalStateException("service shutting down");
-	    }
-	}
+    protected void doReady() {
+	taskOwner = txnProxy.getCurrentOwner();
         nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
 		    taskScheduler, txnProxy.getCurrentOwner(),
@@ -305,126 +239,17 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    protected void doShutdown() {
 	logger.log(Level.FINEST, "shutdown");
 	
-	synchronized (lock) {
-	    switch (state) {
-		
-	    case INITIALIZED:
-		throw new IllegalStateException("service not ready");
-		
-	    case READY:
-		logger.log(Level.FINEST, "initiating shutdown");
-		while (callsInProgress > 0) {
-		    try {
-			lock.wait();
-		    } catch (InterruptedException e) {
-			// TBD: should the state be set back to 'ready' 
-			// so that shutdown can be re-initiated?
-			return false;
-		    }
-		}
-		shutdownThread = new ShutdownThread();
-		shutdownThread.start();
-		state = State.SHUTTING_DOWN;
-		break;
-
-	    case SHUTTING_DOWN:
-		break;
-		
-	    case SHUTDOWN:
-		return true;
-	    }
-	}
-
 	try {
-	    shutdownThread.join();
-	} catch (InterruptedException e) {
-	    // TBD: should the state be set back to 'ready'
-	    // so that shutdown can be re-initiated?
-	    return false;
-	}
-
-	return true;
-    }
-    
-
-    /**
-     * Thread for shutting down service/server.
-     */
-    private final class ShutdownThread extends Thread {
-
-	/** Constructs an instance of this class as a daemon thread. */
-	ShutdownThread() {
-	    super(CLASSNAME + "$ShutdownThread");
-	    setDaemon(true);
-	}
-	
-	public void run() {
-	    try {
-		exporter.unexport();
-	    } catch (RuntimeException e) {
-		logger.logThrow(Level.FINEST, e, "unexport server throws");
-		// swallow exception
-	    }
-	    setState(ChannelServiceImpl.State.SHUTDOWN);
-	}
-    }
-
-    /* -- State-related private methods -- */
-
-    /** Sets this server's state to {@code newState}. */
-    private void setState(State newState) {
-	synchronized (lock) {
-	    state = newState;
+	    exporter.unexport();
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "unexport server throws");
+	    // swallow exception
 	}
     }
     
-    /**
-     * Increments the number of calls in progress.  This method should
-     * be invoked by remote methods to both increment in progress call
-     * count and to check the state of this server.  When the call has
-     * completed processing, the remote method should invoke {@link
-     * #callFinished callFinished} before returning.
-     *
-     * @throws	IllegalStateException if this service is shutting down
-     */
-    private void callStarted() {
-	synchronized (lock) {
-	    if (shuttingDown()) {
-		throw new IllegalStateException("service is shutting down");
-	    }
-	    callsInProgress++;
-	}
-    }
-
-    /**
-     * Decrements the in progress call count, and if this server is
-     * shutting down and the count reaches 0, then notify the waiting
-     * shutdown thread that it is safe to continue.  A remote method
-     * should invoke this method when it has completed processing.
-     */
-    private void callFinished() {
-	synchronized (lock) {
-	    callsInProgress--;
-	    if (state == State.SHUTTING_DOWN && callsInProgress == 0) {
-		lock.notifyAll();
-	    }
-	}
-    }
-    
-    /**
-     * Returns {@code true} if this server is shutting down.
-     */
-    private boolean shuttingDown() {
-	synchronized (lock) {
-	    return
-		state == State.SHUTTING_DOWN ||
-		state == State.SHUTDOWN;
-	}
-    }
-
     /* -- Implement ChannelManager -- */
 
     /** {@inheritDoc} */
@@ -542,7 +367,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 
     private final class ChannelServerImpl implements ChannelServer {
 	
-	/** {@inheritDoc */
+	/** {@inheritDoc} */
 	public void join(byte[] channelId, long nodeId) {
 	    callStarted();
 	    try {
@@ -552,7 +377,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }
 	}
 	
-	/** {@inheritDoc */
+	/** {@inheritDoc} */
 	public void leave(byte[] channelId, long nodeId) {
 	    callStarted();
 	    try {
@@ -562,7 +387,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }
 	}
 	
-	/** {@inheritDoc */
+	/** {@inheritDoc} */
 	public void send(byte[] channelId, byte[][] recipients, byte[] message) {
 	    callStarted();
 	    try {
@@ -572,7 +397,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }
 	}
 	
-	/** {@inheritDoc */
+	/** {@inheritDoc} */
 	public void close(byte[] channelId, long nodeId) {
 	    callStarted();
 	    try {
@@ -1240,5 +1065,34 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    putByteArray(message);
 
         return buf.getBuffer();
+    }
+
+    /**
+     * The {@code RecoveryListener} for handling requests to recover
+     * for a failed {@code ChannelService}.
+     */
+    private class ChannelServiceRecoveryListener
+	implements RecoveryListener
+    {
+	/** {@inheritDoc} */
+	public void recover(final Node node, RecoveryCompleteFuture future) {
+	    try {
+		taskScheduler.runTransactionalTask(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    // FIXME: This is only correct for single node...
+			    removeAllSessionsFromChannels();
+			    removeChannelSets();
+			}},
+		    taskOwner);
+		future.done();
+	    } catch (Exception e) {
+		logger.logThrow(
+ 		    Level.WARNING, e,
+		    "removing sessions from channels for node:{0} throws",
+		    node.getId());
+		// TBD: what should it do if it can't recover?
+	    }
+	}
     }
 }

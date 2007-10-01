@@ -21,9 +21,7 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
-import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityManager;
@@ -31,7 +29,6 @@ import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
-import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -58,7 +55,6 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -295,8 +291,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				idBlockSize,
 				txnProxy,
 				taskScheduler);
-	    localNodeId = txnProxy.getService(WatchdogService.class).
-		getLocalNodeId();
+	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
 	    ServerSocketEndpoint endpoint =
@@ -342,7 +337,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	// reject connections until ready is invoked.  Need to
 	// implement interlock for this.  -- ann (8/29/07)
 
-        // Update with the application owner
+        // TBD: Update with the application owner? Is this correct?
 	taskOwner = txnProxy.getCurrentOwner();
         nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
@@ -437,7 +432,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	if (sessionId == null) {
 	    throw new NullPointerException("null sessionId");
 	}
-	checkLocalNodeAlive();
+	// TBD: this method needs to be rethought.
+	//checkLocalNodeAlive();
 	ClientSessionHandler handler = getHandler(sessionId);
 	return
 	    (handler != null) ?
