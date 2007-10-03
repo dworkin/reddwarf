@@ -5,6 +5,7 @@
 package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
+import java.nio.channels.spi.SelectorProvider;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -13,11 +14,28 @@ import java.util.concurrent.ExecutorService;
 public class ReactiveAsyncChannelProvider extends AsyncProviderImpl {
 
     /**
-     * Constructs an instance of this class.  Public visibility to allow
+     * Creates an asynchronous channel provider using the system default
+     * {@link SelectorProvider}.  Public visibility to allow
      * instantiation from a property at runtime.
+     * 
+     * @see SelectorProvider#provider()
      */
     public ReactiveAsyncChannelProvider() {
-        super();
+        this(null);
+    }
+
+    /**
+     * Creates an asynchronous channel provider using the given
+     * {@link SelectorProvider}. If the parameter is {code null}, the
+     * system default {@code SelectorProvider} will be used.
+     * 
+     * @param selProvider the {@code SelectorProvider}, or {@code null} to
+     *        use the system default {@code SelectorProvider}
+     * 
+     * @see SelectorProvider#provider()
+     */
+    protected ReactiveAsyncChannelProvider(SelectorProvider selProvider) {
+        super(selProvider);
     }
 
     /** {@inheritDoc} */

@@ -45,12 +45,7 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
  * All of the methods in this class are safe for use by multiple concurrent
  * threads.
  * <p>
- * NOT IMPLEMENTED:
- * <ul>
- * <li>{@code openAsynchronousFileChannel}
- * <li>{@code getUncaughtExceptionHandler}
- * <li>{@code setUncaughtExceptionHandler}
- * </ul>
+ * NOT IMPLEMENTED: {@code openAsynchronousFileChannel}
  */
 public abstract class AsynchronousChannelProvider {
 
@@ -205,4 +200,22 @@ public abstract class AsynchronousChannelProvider {
                                     AsynchronousChannelGroup group)
         throws IOException;
 
+    /**
+     * Set the uncaught exception handler for the default group.
+     * 
+     * @param eh the object to use as the default uncaught exception
+     *        handler, or {@code null} for no default handler
+     * @throws SecurityException [TBD]
+     */
+    public abstract void
+    setUncaughtExceptionHandler(Thread.UncaughtExceptionHandler eh);
+
+    /**
+     * Returns the uncaught exception handler for the default group.
+     * 
+     * @return the uncaught exception handler for the default group, or
+     *         {@code null} if there is no default handler
+     */
+    public abstract Thread.UncaughtExceptionHandler
+    getUncaughtExceptionHandler();
 }

@@ -188,4 +188,35 @@ public abstract class AsynchronousChannelGroup {
     public abstract boolean awaitTermination(long timeout, TimeUnit unit)
         throws InterruptedException;
 
+    /**
+     * Set the uncaught exception handler for the default group.
+     * <p>
+     * The uncaught exception handler is invoked when the execution of a
+     * {@link CompletionHandler}, consuming the result of an operation on a
+     * channel bound to the default group, terminates with an uncaught
+     * {@code Error} or {@code RuntimeException}.
+     * <p>
+     * [TBD - need to define interaction with normal uncaught exception
+     * handling mechanism]
+     * 
+     * @param eh the object to use as the default uncaught exception
+     *        handler, or {@code null} for no default handler
+     * @throws SecurityException [TBD]
+     */
+    public static void
+    setDefaultUncaughtExceptionHandler(Thread.UncaughtExceptionHandler eh) {
+        AsynchronousChannelProvider.provider().setUncaughtExceptionHandler(eh);
+    }
+
+    /**
+     * Returns the uncaught exception handler for the default group.
+     * 
+     * @return the uncaught exception handler for the default group, or
+     *         {@code null} if there is no default handler
+     */
+    public static Thread.UncaughtExceptionHandler
+    getDefaultUncaughtExceptionHandler() {
+        return AsynchronousChannelProvider.provider()
+                                            .getUncaughtExceptionHandler();
+    }
 }

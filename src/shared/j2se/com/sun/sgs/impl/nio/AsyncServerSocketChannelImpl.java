@@ -8,17 +8,16 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
-import java.nio.channels.AsynchronousCloseException;
+import java.net.SocketException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.UnresolvedAddressException;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
 
-import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -41,51 +40,29 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AbstractAsyncChannelGroup group;
-    final ServerSocketChannel channel;
+    final AsyncKey<ServerSocketChannel> key;
+    final AsyncGroupImpl group;
 
-    final AtomicReference<AsyncOp<?>> acceptTask =
-        new AtomicReference<AsyncOp<?>>();
-
-    AsyncServerSocketChannelImpl(AbstractAsyncChannelGroup group)
+    AsyncServerSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
     {
         super(group.provider());
         this.group = group;
-        this.channel = group.selectorProvider().openServerSocketChannel();
-        group.registerChannel(this);
+        ServerSocketChannel channel =
+            group.selectorProvider().openServerSocketChannel();
+        key = group.register(channel);
     }
 
     /** {@inheritDoc} */
     public ServerSocketChannel channel() {
-        return channel;
-    }
-
-    /** {@inheritDoc} */
-    public void selected(int ops) {
-        if (ops != OP_ACCEPT)
-            throw new IllegalStateException("Unexpected ops " + ops);
-
-        AsyncOp<?> task = acceptTask.getAndSet(null);
-        if (task != null)
-            group.execute(task);
-    }
-
-    /** {@inheritDoc} */
-    public void setException(int op, Throwable t) {
-        if (op != OP_ACCEPT)
-            throw new IllegalStateException("Unexpected op " + op);
-
-        AsyncOp<?> task = acceptTask.getAndSet(null);
-        if (task != null)
-            group.setException(task, t);
+        return key.channel();
     }
 
     /**
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return channel.isOpen();
+        return key.channel().isOpen();
     }
 
     /**
@@ -93,12 +70,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public void close() throws IOException {
-        try {
-            channel.close();
-        } finally {
-            setException(OP_ACCEPT, new AsynchronousCloseException());
-            group.unregisterChannel(this);
-        }
+        key.close();
     }
 
     /**
@@ -109,15 +81,23 @@ final class AsyncServerSocketChannelImpl
                                              int backlog)
         throws IOException
     {
-        final ServerSocket socket = channel.socket();
-        if (socket.isClosed())
-            throw new ClosedChannelException();
-        if (socket.isBound())
-            throw new AlreadyBoundException();
         if ((local != null) && (!(local instanceof InetSocketAddress)))
             throw new UnsupportedAddressTypeException();
 
-        socket.bind(local, backlog);
+        InetSocketAddress inetLocal = (InetSocketAddress) local;
+        if ((inetLocal != null) && inetLocal.isUnresolved())
+            throw new UnresolvedAddressException();
+
+        final ServerSocket socket = key.channel().socket();
+
+        try {
+            socket.bind(local, backlog);
+        } catch (SocketException e) {
+            if (socket.isBound())
+                throw new AlreadyBoundException();
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+        }
         return this;
     }
 
@@ -125,7 +105,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return channel.socket().getLocalSocketAddress();
+        return key.channel().socket().getLocalSocketAddress();
     }
 
     /**
@@ -142,18 +122,25 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = channel.socket();
-        switch (stdOpt) {
-        case SO_RCVBUF:
-            socket.setReceiveBufferSize(((Integer)value).intValue());
-            break;
+        final ServerSocket socket = key.channel().socket();
+        
+        try {
+            switch (stdOpt) {
+            case SO_RCVBUF:
+                socket.setReceiveBufferSize(((Integer)value).intValue());
+                break;
 
-        case SO_REUSEADDR:
-            socket.setReuseAddress(((Boolean)value).booleanValue());
-            break;
+            case SO_REUSEADDR:
+                socket.setReuseAddress(((Boolean)value).booleanValue());
+                break;
 
-        default:
-            throw new IllegalArgumentException("Unsupported option " + name);
+            default:
+                throw new IllegalArgumentException("Unsupported option " + name);
+            }
+        } catch (SocketException e) {
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+            throw e;
         }
         return this;
     }
@@ -166,18 +153,24 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = channel.socket();
-        switch (stdOpt) {
-        case SO_RCVBUF:
-            return socket.getReceiveBufferSize();
+        final ServerSocket socket = key.channel().socket();
+        
+        try {
+            switch (stdOpt) {
+            case SO_RCVBUF:
+                return socket.getReceiveBufferSize();
 
-        case SO_REUSEADDR:
-            return socket.getReuseAddress();
+            case SO_REUSEADDR:
+                return socket.getReuseAddress();
 
-        default:
-            break;
+            default:
+                throw new IllegalArgumentException("Unsupported option " + name);
+            }
+        } catch (SocketException e) {
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+            throw e;
         }
-        throw new IllegalArgumentException("Unsupported option " + name);
     }
 
     /**
@@ -192,7 +185,7 @@ final class AsyncServerSocketChannelImpl
      */
     @Override
     public boolean isAcceptPending() {
-        return acceptTask.get() != null;
+        return key.isOpPending(OP_ACCEPT);
     }
 
     /**
@@ -203,17 +196,11 @@ final class AsyncServerSocketChannelImpl
             A attachment,
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
-        AsyncOp<AsynchronousSocketChannel> task =
-            AsyncOp.create(attachment, handler,
+        return key.execute(OP_ACCEPT, attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
-                    return new AsyncSocketChannelImpl(group, channel.accept());
+                    return new AsyncSocketChannelImpl(
+                        group, key.channel().accept());
                 }});
-
-        if (! acceptTask.compareAndSet(null, task))
-            throw new AcceptPendingException();
-
-        group.awaitReady(this, OP_ACCEPT);
-        return AttachedFuture.wrap(task, attachment);
     }
 }

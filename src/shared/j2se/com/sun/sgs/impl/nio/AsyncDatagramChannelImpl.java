@@ -11,20 +11,22 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyConnectedException;
-import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.DatagramChannel;
-import java.nio.channels.NotYetConnectedException;
+import java.nio.channels.UnresolvedAddressException;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
@@ -32,20 +34,17 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.MembershipKey;
+import com.sun.sgs.nio.channels.MulticastChannel;
 import com.sun.sgs.nio.channels.ProtocolFamily;
-import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardProtocolFamily;
 import com.sun.sgs.nio.channels.StandardSocketOption;
-import com.sun.sgs.nio.channels.WritePendingException;
 
-import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
-    implements AsyncChannelImpl
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -61,94 +60,35 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AbstractAsyncChannelGroup channelGroup;
-    final DatagramChannel channel;
+    final AsyncGroupImpl channelGroup;
+    final AsyncKey<DatagramChannel> key;
 
-    final AtomicReference<AsyncOp<?>> connectTask =
-        new AtomicReference<AsyncOp<?>>();
-    final AtomicReference<AsyncOp<?>> readTask =
-        new AtomicReference<AsyncOp<?>>();
-    final AtomicReference<AsyncOp<?>> writeTask =
-        new AtomicReference<AsyncOp<?>>();
+    final ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl> mcastKeys =
+        new ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl>();
 
-    AsyncDatagramChannelImpl(ProtocolFamily pf, AbstractAsyncChannelGroup group)
+    final AtomicBoolean connectionPending = new AtomicBoolean();
+
+    AsyncDatagramChannelImpl(ProtocolFamily pf, AsyncGroupImpl group)
         throws IOException
     {
         super(group.provider());
-        this.channelGroup = group;
+        channelGroup = group;
 
         if (! ((pf == null) || (pf == StandardProtocolFamily.INET))) {
             throw new UnsupportedOperationException(
                 "Only IPv4 datagrams are supported");
         }
 
-        this.channel = group.selectorProvider().openDatagramChannel();
-        group.registerChannel(this);
-    }
-
-    /** {@inheritDoc} */
-    public DatagramChannel channel() {
-        return channel;
-    }
-
-    /** {@inheritDoc} */
-    public void selected(int ops) {
-        AsyncOp<?> rtask = null;
-        AsyncOp<?> wtask = null;
-
-        if ((ops & OP_READ) != 0)
-            rtask = readTask.getAndSet(null);
-
-        if ((ops & OP_WRITE) != 0)
-            wtask = writeTask.getAndSet(null);
-
-        if (rtask != null)
-            channelGroup.execute(rtask);
-        if (wtask != null)
-            channelGroup.execute(wtask);
-    }
-
-    /** {@inheritDoc} */
-    public void setException(int ops, Throwable t) {
-        // OP_CONNECT is never selected, but allow it to throw an exception
-        // to help with close()
-
-        AsyncOp<?> ctask = null;
-        AsyncOp<?> rtask = null;
-        AsyncOp<?> wtask = null;
-
-        if ((ops & OP_CONNECT) != 0)
-            ctask = connectTask.getAndSet(null);
-
-        if ((ops & OP_READ) != 0)
-            rtask = readTask.getAndSet(null);
-
-        if ((ops & OP_WRITE) != 0)
-            wtask = writeTask.getAndSet(null);
-
-        if (ctask != null)
-            channelGroup.setException(ctask, t);
-        if (rtask != null)
-            channelGroup.setException(rtask, t);
-        if (wtask != null)
-            channelGroup.setException(wtask, t);
-    }
-
-    private void checkClosedAsync() {
-        if (! channel.isOpen())
-            throw new ClosedAsynchronousChannelException();
-    }
-
-    private void checkConnected() {
-        if (! channel.isConnected())
-            throw new NotYetConnectedException();
+        DatagramChannel channel =
+            group.selectorProvider().openDatagramChannel();
+        key = group.register(channel);
     }
 
     /**
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return channel.isOpen();
+        return key.channel().isOpen();
     }
 
     /**
@@ -156,13 +96,8 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public void close() throws IOException {
-        try {
-            channel.close();
-        } finally {
-            setException(OP_CONNECT | OP_READ | OP_WRITE,
-                new AsynchronousCloseException());
-            channelGroup.unregisterChannel(this);
-        }
+        key.close();
+        mcastKeys.clear();
     }
 
     /**
@@ -172,15 +107,23 @@ class AsyncDatagramChannelImpl
     public AsynchronousDatagramChannel bind(SocketAddress local)
         throws IOException
     {
-        final DatagramSocket socket = channel.socket();
-        if (socket.isClosed())
-            throw new ClosedChannelException();
-        if (socket.isBound())
-            throw new AlreadyBoundException();
         if ((local != null) && (!(local instanceof InetSocketAddress)))
             throw new UnsupportedAddressTypeException();
 
-        socket.bind(local);
+        InetSocketAddress inetLocal = (InetSocketAddress) local;
+        if ((inetLocal != null) && inetLocal.isUnresolved())
+            throw new UnresolvedAddressException();
+
+        final DatagramSocket socket = key.channel().socket();
+        try {
+            socket.bind(inetLocal);
+        } catch (SocketException e) {
+            if (socket.isBound())
+                throw new AlreadyBoundException();
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+        }
+
         return this;
     }
 
@@ -188,7 +131,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return channel.socket().getLocalSocketAddress();
+        return key.channel().socket().getLocalSocketAddress();
     }
 
     /**
@@ -205,48 +148,56 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = channel.socket();
-        switch (stdOpt) {
-        case SO_SNDBUF:
-            socket.setSendBufferSize(((Integer)value).intValue());
-            break;
+        final DatagramSocket socket = key.channel().socket();
+        
+        try {
+            switch (stdOpt) {
+            case SO_SNDBUF:
+                socket.setSendBufferSize(((Integer)value).intValue());
+                break;
 
-        case SO_RCVBUF:
-            socket.setReceiveBufferSize(((Integer)value).intValue());
-            break;
+            case SO_RCVBUF:
+                socket.setReceiveBufferSize(((Integer)value).intValue());
+                break;
 
-        case SO_REUSEADDR:
-            socket.setReuseAddress(((Boolean)value).booleanValue());
-            break;
+            case SO_REUSEADDR:
+                socket.setReuseAddress(((Boolean)value).booleanValue());
+                break;
 
-        case SO_BROADCAST:
-            socket.setBroadcast(((Boolean)value).booleanValue());
-            break;
+            case SO_BROADCAST:
+                socket.setBroadcast(((Boolean)value).booleanValue());
+                break;
 
-        case IP_TOS:
-            socket.setTrafficClass(((Integer)value).intValue());
-            break;
+            case IP_TOS:
+                socket.setTrafficClass(((Integer)value).intValue());
+                break;
 
-        case IP_MULTICAST_IF: {
-            MulticastSocket msocket = (MulticastSocket) socket;
-            msocket.setNetworkInterface((NetworkInterface)value);
-            break;
-        }
+            case IP_MULTICAST_IF: {
+                MulticastSocket msocket = (MulticastSocket) socket;
+                msocket.setNetworkInterface((NetworkInterface)value);
+                break;
+            }
 
-        case IP_MULTICAST_TTL: {
-            MulticastSocket msocket = (MulticastSocket) socket;
-            msocket.setTimeToLive(((Integer)value).intValue());
-            break;
-        }
+            case IP_MULTICAST_TTL: {
+                MulticastSocket msocket = (MulticastSocket) socket;
+                msocket.setTimeToLive(((Integer)value).intValue());
+                break;
+            }
 
-        case IP_MULTICAST_LOOP: {
-            MulticastSocket msocket = (MulticastSocket) socket;
-            msocket.setLoopbackMode(((Boolean)value).booleanValue());
-            break;
-        }
+            case IP_MULTICAST_LOOP: {
+                MulticastSocket msocket = (MulticastSocket) socket;
+                msocket.setLoopbackMode(((Boolean)value).booleanValue());
+                break;
+            }
 
-        default:
-            throw new IllegalArgumentException("Unsupported option " + name);
+            default:
+                throw new IllegalArgumentException("Unsupported option " +
+                    name);
+            }
+        } catch (SocketException e) {
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+            throw e;
         }
         return this;
     }
@@ -259,43 +210,50 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = channel.socket();
-        switch (stdOpt) {
-        case SO_SNDBUF:
-            return socket.getSendBufferSize();
+        final DatagramSocket socket = key.channel().socket();
+        
+        try {
+            switch (stdOpt) {
+            case SO_SNDBUF:
+                return socket.getSendBufferSize();
 
-        case SO_RCVBUF:
-            return socket.getReceiveBufferSize();
+            case SO_RCVBUF:
+                return socket.getReceiveBufferSize();
 
-        case SO_REUSEADDR:
-            return socket.getReuseAddress();
+            case SO_REUSEADDR:
+                return socket.getReuseAddress();
 
-        case SO_BROADCAST:
-            return socket.getBroadcast();
+            case SO_BROADCAST:
+                return socket.getBroadcast();
 
-        case IP_TOS:
-            return socket.getTrafficClass();
+            case IP_TOS:
+                return socket.getTrafficClass();
 
-        case IP_MULTICAST_IF: {
-            MulticastSocket msocket = (MulticastSocket) socket;
-            return msocket.getNetworkInterface();
+            case IP_MULTICAST_IF: {
+                MulticastSocket msocket = (MulticastSocket) socket;
+                return msocket.getNetworkInterface();
+            }
+
+            case IP_MULTICAST_TTL: {
+                MulticastSocket msocket = (MulticastSocket) socket;
+                return msocket.getTimeToLive();
+            }
+
+            case IP_MULTICAST_LOOP: {
+                // TODO should we reverse the value of this IP_MULTICAST_LOOP?
+                MulticastSocket msocket = (MulticastSocket) socket;
+                return msocket.getLoopbackMode();
+            }
+
+            default:
+                throw new IllegalArgumentException("Unsupported option " +
+                    name);
+            }
+        } catch (SocketException e) {
+            if (socket.isClosed())
+                throw new ClosedChannelException();
+            throw e;
         }
-
-        case IP_MULTICAST_TTL: {
-            MulticastSocket msocket = (MulticastSocket) socket;
-            return msocket.getTimeToLive();
-        }
-
-        case IP_MULTICAST_LOOP: {
-            // TODO should we reverse the value of this IP_MULTICAST_LOOP?
-            MulticastSocket msocket = (MulticastSocket) socket;
-            return msocket.getLoopbackMode();
-        }
-
-        default:
-            break;
-        }
-        throw new IllegalArgumentException("Unsupported option " + name);
     }
 
     /**
@@ -311,17 +269,48 @@ class AsyncDatagramChannelImpl
     public MembershipKey join(InetAddress group, NetworkInterface interf)
         throws IOException
     {
-        // TODO
-        throw new UnsupportedOperationException();
+        if (!(key.channel().socket() instanceof MulticastSocket))
+            throw new UnsupportedOperationException("not a multicast socket");
+
+        MulticastSocket msocket = ((MulticastSocket) key.channel().socket());
+
+        if (group == null)
+            throw new NullPointerException("null multicast group");
+
+        if (interf == null)
+            throw new NullPointerException("null interface");
+
+        if (! group.isMulticastAddress())
+            throw new UnsupportedAddressTypeException();
+
+        InetSocketAddress mcastaddr = new InetSocketAddress(group, 0);
+        MembershipKeyImpl newKey = new MembershipKeyImpl(mcastaddr, interf);
+
+        MembershipKeyImpl existingKey =
+            mcastKeys.putIfAbsent(newKey, newKey);
+
+        if (existingKey != null)
+            return existingKey;
+
+        boolean success = false;
+        try {
+            msocket.joinGroup(mcastaddr, interf);
+            success = true;
+            return newKey;
+        } finally {
+            if (! success)
+                mcastKeys.remove(newKey);
+        }
     }
 
     /**
      * {@inheritDoc}
+     * 
+     * This implementation always throws {@code UnsupportedOperationException}.
      */
     public MembershipKey join(InetAddress group, NetworkInterface interf,
         InetAddress source) throws IOException
     {
-        // TODO
         throw new UnsupportedOperationException();
     }
 
@@ -331,7 +320,7 @@ class AsyncDatagramChannelImpl
     @Override
     public SocketAddress getConnectedAddress() throws IOException
     {
-        return channel.socket().getRemoteSocketAddress();
+        return key.channel().socket().getRemoteSocketAddress();
     }
 
     /**
@@ -340,23 +329,44 @@ class AsyncDatagramChannelImpl
     @Override
     public <A> IoFuture<Void, A> connect(
             final SocketAddress remote,
-            A attachment,
-            CompletionHandler<Void, ? super A> handler)
+            final A attachment,
+            final CompletionHandler<Void, ? super A> handler)
     {
-        if (channel.isConnected())
-            throw new AlreadyConnectedException();
+        if ((remote != null) && (!(remote instanceof InetSocketAddress)))
+            throw new UnsupportedAddressTypeException();
 
-        AsyncOp<Void> task = AsyncOp.create(attachment, handler,
+        InetSocketAddress inetRemote = (InetSocketAddress) remote;
+        if ((inetRemote != null) && inetRemote.isUnresolved())
+            throw new UnresolvedAddressException();
+
+        FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    channel.connect(remote);
+                    try {
+                        key.channel().connect(remote);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new ClosedAsynchronousChannelException(), e);
+                    }
                     return null;
-                }});
+                }})
+            {
+                @Override protected void done() {
+                    connectionPending.set(false);
+                    channelGroup.executeCompletion(handler, attachment, this);
+                }
+            };
 
-        if (! connectTask.compareAndSet(null, task))
+        if (key.channel().isConnected())
+            throw new AlreadyConnectedException();
+
+        if (! key.channel().isOpen())
+            throw new ClosedAsynchronousChannelException();
+            
+        if (! connectionPending.compareAndSet(false, true))
             throw new ConnectionPendingException();
 
-        channelGroup.execute(task);
+        key.execute(task);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -364,19 +374,28 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public <A> IoFuture<Void, A> disconnect(A attachment,
-        CompletionHandler<Void, ? super A> handler)
+    public <A> IoFuture<Void, A> disconnect(final A attachment,
+        final CompletionHandler<Void, ? super A> handler)
     {
-        checkClosedAsync();
-
-        AsyncOp<Void> task = AsyncOp.create(attachment, handler,
+        FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    channel.disconnect();
-                    return null;
-                }});
+                    if (! key.channel().isOpen())
+                        throw new ClosedAsynchronousChannelException();
 
-        channelGroup.execute(task);
+                    key.channel().disconnect();
+                    return null;
+                }})
+            {
+                @Override protected void done() {
+                    channelGroup.executeCompletion(handler, attachment, this);
+                }
+            };
+
+        if (! key.channel().isOpen())
+            throw new ClosedAsynchronousChannelException();
+
+        key.execute(task);
         return AttachedFuture.wrap(task, attachment);
     }
 
@@ -385,7 +404,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isReadPending() {
-        return readTask.get() != null;
+        return key.isOpPending(OP_READ);
     }
 
     /**
@@ -393,7 +412,7 @@ class AsyncDatagramChannelImpl
      */
     @Override
     public boolean isWritePending() {
-        return writeTask.get() != null;
+        return key.isOpPending(OP_WRITE);
     }
 
     /**
@@ -407,22 +426,11 @@ class AsyncDatagramChannelImpl
             A attachment,
             CompletionHandler<SocketAddress, ? super A> handler)
     {
-        checkClosedAsync();
-
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-
-        AsyncOp<SocketAddress> task = AsyncOp.create(attachment, handler,
+        return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    return channel.receive(dst);
+                    return key.channel().receive(dst);
                 }});
-
-        if (! readTask.compareAndSet(null, task))
-            throw new ReadPendingException();
-
-        channelGroup.awaitReady(this, OP_READ, timeout, unit);
-        return AttachedFuture.wrap(task, attachment);
     }
 
     /**
@@ -437,22 +445,11 @@ class AsyncDatagramChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
-        checkClosedAsync();
-
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-
-        AsyncOp<Integer> task = AsyncOp.create(attachment, handler,
+        return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.send(src, target);
+                    return key.channel().send(src, target);
                 }});
-
-        if (! writeTask.compareAndSet(null, task))
-            throw new WritePendingException();
-
-        channelGroup.awaitReady(this, OP_WRITE, timeout, unit);
-        return AttachedFuture.wrap(task, attachment);
     }
 
     /**
@@ -466,22 +463,11 @@ class AsyncDatagramChannelImpl
             A attachment,
             CompletionHandler<Integer, ? super A> handler)
     {
-        checkConnected();
-
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-
-        AsyncOp<Integer> task = AsyncOp.create(attachment, handler,
+        return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.read(dst);
+                    return key.channel().read(dst);
                 }});
-
-        if (! readTask.compareAndSet(null, task))
-            throw new ReadPendingException();
-
-        channelGroup.awaitReady(this, OP_READ, timeout, unit);
-        return AttachedFuture.wrap(task, attachment);
     }
 
     /**
@@ -495,21 +481,130 @@ class AsyncDatagramChannelImpl
             A attachment,
           CompletionHandler<Integer, ? super A> handler)
     {
-        checkConnected();
-
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-
-        AsyncOp<Integer> task = AsyncOp.create(attachment, handler,
+        return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.write(src);
+                    return key.channel().write(src);
                 }});
+    }
 
-        if (! writeTask.compareAndSet(null, task))
-            throw new WritePendingException();
+    class MembershipKeyImpl extends MembershipKey {
 
-        channelGroup.awaitReady(this, OP_WRITE, timeout, unit);
-        return AttachedFuture.wrap(task, attachment);
+        final InetSocketAddress mcastaddr;
+        final NetworkInterface netIf;
+
+        MembershipKeyImpl(InetSocketAddress mcastaddr,
+                          NetworkInterface netIf)
+        {
+            this.mcastaddr = mcastaddr;
+            this.netIf = netIf;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean isValid() {
+            return mcastKeys.contains(this);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void drop() throws IOException {
+            mcastKeys.remove(this);
+            MulticastSocket msocket = (MulticastSocket)key.channel().socket();
+            msocket.leaveGroup(mcastaddr, netIf);
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation always throws {@code UnsupportedOperationException}.
+         */
+        @Override
+        public MembershipKey block(InetAddress source) throws IOException {
+            if (source == null)
+                throw new NullPointerException("null source");
+            throw new UnsupportedOperationException(
+                "source filtering not supported");
+        }
+
+        /**
+         * {@inheritDoc}
+         * 
+         * This implementation always throws
+         * {@code UnsupportedOperationException}.
+         */
+        @Override
+        public MembershipKey unblock(InetAddress source) throws IOException {
+            if (source == null)
+                throw new NullPointerException("null source");
+            throw new IllegalStateException(
+                "source filtering not supported, so none are blocked");
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public MulticastChannel getChannel() {
+            return AsyncDatagramChannelImpl.this;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public InetAddress getGroup() {
+            return mcastaddr.getAddress();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public NetworkInterface getNetworkInterface() {
+            return netIf;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation is not source-specific, so always
+         * returns {@code null}.
+         */
+        @Override
+        public InetAddress getSourceAddress() {
+            return null;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this)
+                return true;
+            if (obj == null)
+                return false;
+            if (!(obj instanceof MembershipKey))
+                return false;
+            MembershipKey o = (MembershipKey) obj;
+            return getChannel().equals(o.getChannel())
+                   && getGroup().equals(o.getGroup())
+                   && getNetworkInterface().equals(o.getNetworkInterface());
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int hashCode() {
+            return getChannel().hashCode()
+                    ^ getGroup().hashCode()
+                    ^ getNetworkInterface().hashCode();
+        }
     }
 }
