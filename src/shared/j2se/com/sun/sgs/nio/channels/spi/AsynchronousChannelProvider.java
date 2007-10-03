@@ -39,7 +39,7 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
  * {@link ManagementFactory#getPlatformMBeanServer} method]].
  * To ensure that the {@link ObjectName} for uniquely identifying the
  * {@code ChannelPoolMXBean} objects is unique it is recommended that the
- * <i>pool name</i> is "asynchronous.</i>name</i>" where <i>name</i>
+ * <i>pool name</i> is "asynchronous.<i>name</i>" where <i>name</i>
  * identifies the provider's channel pool.
  * <p>
  * All of the methods in this class are safe for use by multiple concurrent

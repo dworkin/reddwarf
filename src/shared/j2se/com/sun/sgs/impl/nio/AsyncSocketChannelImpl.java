@@ -37,7 +37,6 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 
 class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
-    implements AsyncChannelImpl
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -66,13 +65,6 @@ class AsyncSocketChannelImpl
         super(group.provider());
         this.group = group;
         key = group.register(channel);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public SocketChannel channel() {
-        return key.channel();
     }
 
     /**

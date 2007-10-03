@@ -108,7 +108,7 @@ public interface AsynchronousByteChannel extends Channel {
      * <p>
      * Suppose that a byte sequence of length <i>n</i> is written, where
      * <code>0 &lt;= <i>n</i> &lt;= <i>r</i></code>. This byte sequence will be
-     * transferred from the buffer starting at index <i>p</p>, where <i>p</i>
+     * transferred from the buffer starting at index <i>p</i>, where <i>p</i>
      * is the buffer's position at the moment the write is performed; the
      * index of the last byte written will be
      * <code><i>p</i> + <i>n</i> - 1</code>.  Upon completion the

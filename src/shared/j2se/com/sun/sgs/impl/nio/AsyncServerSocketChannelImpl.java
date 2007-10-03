@@ -30,7 +30,6 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
-    implements AsyncChannelImpl
 {
     private static final Set<SocketOption> socketOptions;
     static {
@@ -51,11 +50,6 @@ final class AsyncServerSocketChannelImpl
         ServerSocketChannel channel =
             group.selectorProvider().openServerSocketChannel();
         key = group.register(channel);
-    }
-
-    /** {@inheritDoc} */
-    public ServerSocketChannel channel() {
-        return key.channel();
     }
 
     /**

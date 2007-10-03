@@ -13,7 +13,6 @@ import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
-import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.DatagramChannel;
@@ -102,6 +101,16 @@ class AsyncDatagramChannelImpl
 
     /**
      * {@inheritDoc}
+     * <p>
+     * This method performs exactly the same security checks as the bind
+     * method of the DatagramSocket class. That is, if a security manager
+     * has been installed then this method verifies that its checkListen
+     * method permits waiting for a connection request on the specified
+     * local port number.
+     * 
+     * @throws SecurityException if a security manager exists and its
+     *         {@link SecurityManager#checkListen checkListen} method
+     *         doesn't allow the operation.
      */
     @Override
     public AsynchronousDatagramChannel bind(SocketAddress local)
@@ -186,6 +195,7 @@ class AsyncDatagramChannelImpl
 
             case IP_MULTICAST_LOOP: {
                 MulticastSocket msocket = (MulticastSocket) socket;
+                // TODO should we reverse the sense of setLoopbackMode? -JM
                 msocket.setLoopbackMode(((Boolean)value).booleanValue());
                 break;
             }
@@ -240,9 +250,9 @@ class AsyncDatagramChannelImpl
             }
 
             case IP_MULTICAST_LOOP: {
-                // TODO should we reverse the value of this IP_MULTICAST_LOOP?
                 MulticastSocket msocket = (MulticastSocket) socket;
-                return msocket.getLoopbackMode();
+                // TODO should we reverse the sense of getLoopbackMode? -JM
+                return (msocket.getLoopbackMode());
             }
 
             default:
@@ -356,9 +366,6 @@ class AsyncDatagramChannelImpl
                     channelGroup.executeCompletion(handler, attachment, this);
                 }
             };
-
-        if (key.channel().isConnected())
-            throw new AlreadyConnectedException();
 
         if (! key.channel().isOpen())
             throw new ClosedAsynchronousChannelException();

@@ -84,6 +84,7 @@ import java.nio.channels.ClosedChannelException;
  *     InetAddress group = InetAddress.getByName("225.4.5.6");
  *
  *     MembershipKey key = dc.join(group, ni);
+ * </pre>
  */
 
 public interface MulticastChannel extends NetworkChannel {

@@ -5,6 +5,7 @@ import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.NotYetConnectedException;
@@ -53,8 +54,8 @@ class Reactor {
             selector.wakeup();
             for (SelectionKey key : selector.keys()) {
                 try {
-                    AsyncChannelImpl channel =
-                        (AsyncChannelImpl) key.attachment();
+                    Closeable channel =
+                        (Closeable) key.attachment();
                     if (channel != null)
                         channel.close();
                 } catch (IOException ignore) { }
