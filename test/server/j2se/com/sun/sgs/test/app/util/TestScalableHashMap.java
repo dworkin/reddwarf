@@ -1,9 +1,27 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 package com.sun.sgs.test.app.util;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.app.util.ScalableHashMapTestable;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -28,43 +46,41 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import junit.framework.JUnit4TestAdapter;
 import junit.framework.TestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-/**  
- * Test the {@link ScalableHashMap} class. 
+/**
+ * Test the {@link ScalableHashMap} class.
  */
 @RunWith(NameRunner.class)
 public class TestScalableHashMap extends TestCase {
 
-
     // the location for the database files
-    private static String DB_DIRECTORY =
-        System.getProperty("java.io.tmpdir") + File.separator +
-        "TestScalableHashMap.db";
+    private static final String DB_DIRECTORY =
+	System.getProperty("java.io.tmpdir") + File.separator +
+	"TestScalableHashMap.db";
 
     // state variables that are needed for the infrastructure but should
     // not be accessed directly by any of the individual tests
-    private static DummyTransactionProxy txnProxy =
-        MinimalTestKernel.getTransactionProxy();
+    private static final DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
+
+    private static final Random RANDOM = new Random(1337);
+
     private DummyAbstractKernelAppContext appContext;
     private DataServiceImpl dataService;
 
     // the transaction used, which is class state so that it can be aborted
     // (if it's still active) at teardown
     private DummyTransaction txn;
-
-
-    public static final Random RANDOM = new Random(1337);
 
     /**
      * Test management.
@@ -75,7 +91,6 @@ public class TestScalableHashMap extends TestCase {
     }
 
     @Before public void setUp() throws Exception {
-//	System.err.println("Testcase: " );
 	appContext = MinimalTestKernel.createContext();
 	DummyComponentRegistry serviceRegistry =
 	    MinimalTestKernel.getServiceRegistry(appContext);
@@ -85,54 +100,51 @@ public class TestScalableHashMap extends TestCase {
 		appContext).getComponent(TaskScheduler.class));
 	deleteDirectory();
 	createDataService(serviceRegistry);
-	    
-	txn = createTransaction(10000);
 	txnProxy.setComponent(DataService.class, dataService);
 	txnProxy.setComponent(DataServiceImpl.class, dataService);
 	serviceRegistry.setComponent(DataManager.class, dataService);
 	serviceRegistry.setComponent(DataService.class, dataService);
 	serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-	txn.commit();
     }
 
     @After public void tearDown() {
-        if ((txn != null) &&
-            (txn.getState() == DummyTransaction.State.ACTIVE)) {
-            System.err.println("had to abort txn for test: " + getName());
-            txn.abort(null);
-        }
-        if (dataService != null)
-            dataService.shutdown();
-        deleteDirectory();
-        MinimalTestKernel.destroyContext(appContext);
+	if (txn != null && txn.getState() == DummyTransaction.State.ACTIVE) {
+	    System.err.println("had to abort txn for test: " + getName());
+	    txn.abort(null);
+	}
+	if (dataService != null) {
+	    dataService.shutdown();
+	}
+	deleteDirectory();
+	MinimalTestKernel.destroyContext(appContext);
     }
 
-    
-    /* Constructor tests */
-    
+    /*
+     * Test no arg constructor
+     */
+
     @Test public void testConstructorNoArg() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
+	ScalableHashMapTestable test =
 	    new ScalableHashMapTestable<Integer,Integer>();
+	assertEquals(6, test.getMaxTreeDepth());
+	assertEquals(6, test.getMinTreeDepth());
+	dataService.setBinding("test", test);
 	txn.commit();
-    }
-
-    @Test public void testConstructorNoArgDepth() throws Exception {
-	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();	
+	test = dataService.getBinding("test", ScalableHashMapTestable.class);
 	assertEquals(6, test.getMaxTreeDepth());
 	assertEquals(6, test.getMinTreeDepth());
 	txn.commit();
     }
 
+    /*
+     * Test minimum concurrency constructor
+     */
 
     @Test public void testConstructorOneArgDepth() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(1);
 	assertEquals(1, test.getMaxTreeDepth());
 	assertEquals(1, test.getMinTreeDepth());
@@ -141,151 +153,118 @@ public class TestScalableHashMap extends TestCase {
 
     @Test public void testConstructorOneArgDepth3() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(3);
 	assertEquals(3, test.getMaxTreeDepth());
 	assertEquals(3, test.getMinTreeDepth());
 	txn.commit();
     }
 
-
     @Test public void testConstructorOneArgDepth4() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(5);
 	assertEquals(4, test.getMaxTreeDepth());
 	assertEquals(4, test.getMinTreeDepth());
 	txn.commit();
     }
 
-
-    @Test (expected=IllegalArgumentException.class)
-    public void testConstructorOneArgWithZeroMaxConcurrencyException() 
-	throws Exception {
+    @Test public void testConstructorOneArgWithZeroMaxConcurrencyException()
+	throws Exception
+    {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
 	try {
-	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(0);
-	}
-	catch(IllegalArgumentException iae) { 
-	    txn.commit();
-	    return;
+	    new ScalableHashMap<Integer,Integer>(0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
 	}
 	txn.commit();
-	assertTrue(false);
     }
 
     // NOTE: we do not test the maximum concurrency in the
     // constructor, as this would take far too long to test (hours).
 
+    /*
+     * Test copy constructor
+     */
 
     @Test public void testCopyConstructor() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+	txn = createTransaction();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	for (int i = 0; i < 32; ++i) 
+	for (int i = 0; i < 32; i++) {
 	    control.put(i,i);
-	Map<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(control);
+	}
+	ScalableHashMap test = new ScalableHashMap<Integer,Integer>(control);
+	assertEquals(control, test);
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	test = dataService.getBinding("test", ScalableHashMap.class);
 	assertEquals(control, test);
 	txn.commit();
     }
 
-    
-    @Test (expected=NullPointerException.class)
- 	public void testNullCopyConstructor() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
- 	try {
- 	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(null);
- 	}
- 	catch(NullPointerException npe) { 
-	    txn.commit();
-	    return;
-	}
-	assertTrue(false);
-	txn.commit();
-    }
-    
-    @Test public void testMuiltParameterConstructor() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+    @Test public void testNullCopyConstructor() throws Exception {
+	txn = createTransaction();
 	try {
-	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(1, 32, 5);
-	}
-	catch(IllegalArgumentException iae) { 
-	    txn.commit();
-	    assertTrue(false);
-	    return;
+	    new ScalableHashMap<Integer,Integer>(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException npe) {
 	}
 	txn.commit();
     }
 
-    @Test public void testPreSplitWithMultipleLevelsConstructor() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+    @Test public void testMultiParamConstructor() throws Exception {
+	txn = createTransaction();
+	new ScalableHashMapTestable<Integer,Integer>(1, 32, 5);
+	new ScalableHashMapTestable<Integer,Integer>(1, 32, 4);
+	txn.commit();
+    }
+
+    @Test public void testMultiParamConstructorBadMinConcurrency()
+	throws Exception
+    {
+	txn = createTransaction();
 	try {
-	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(1, 32, 4);
-	}
-	catch(IllegalArgumentException iae) { 
-	    txn.commit();
-	    assertTrue(false);
-	    return;
+	    new ScalableHashMapTestable<Integer,Integer>(0, 1, 5);
+	    fail("Expected IllegalArgumentException");
+	} catch(IllegalArgumentException iae) {
 	}
 	txn.commit();
     }
 
-
-    @Test public void testConstructorSplitThesholdException() 
-	throws Exception {
-
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+    @Test public void testMultiParamConstructorBadSplitThreshold()
+	throws Exception
+    {
+	txn = createTransaction();
 	try {
-	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(1, 0, 5);
-	}
-	catch(IllegalArgumentException iae) { 	    
-	    txn.commit();
-	    return;
+	    new ScalableHashMapTestable<Integer,Integer>(1, 0, 5);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
 	}
 	txn.commit();
-	assertTrue(false);
+
     }
 
-    @Test public void testConstructorInvalidTableSize() 
-	throws Exception {
-
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+    @Test public void testMultiParamConstructorBadDirectorySize()
+	throws Exception
+    {
+	txn = createTransaction();
 	try {
-	    Map<Integer,Integer> test = 
-		new ScalableHashMapTestable<Integer,Integer>(1, 32, -1);
-	}
-	catch(IllegalArgumentException iae) { 	    
-	    txn.commit();
-	    return;
+	    new ScalableHashMapTestable<Integer,Integer>(1, 32, -1);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
 	}
 	txn.commit();
-	assertTrue(false);
     }
-    
 
     /*
-     * test putting and getting
+     * Test miscellaneous putting and getting
      */
 
     @Test public void testPutAndGetOnSingleLeaf() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 64; ++count) {
@@ -296,15 +275,13 @@ public class TestScalableHashMap extends TestCase {
 	    control.put(~i, ~i);
 	    assertEquals(control, test);
 	}
-	
-        txn.commit();
+
+	txn.commit();
     }
 
     @Test public void testPutAndGetOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int count = 0; count < 32; ++count) {
@@ -314,19 +291,16 @@ public class TestScalableHashMap extends TestCase {
 	    assertEquals(control, test);
 	}
 
-        txn.commit();
+	txn.commit();
     }
 
-
     @Test public void testPutAndRemoveSingleLeaf() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 54; ++i) {
-	    
+
 	    test.put(i, i);
 	    test.put(~i, ~i);
 	    control.put(i, i);
@@ -337,22 +311,20 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(i);
 	    control.remove(i);
 	}
-	
 
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
     @Test public void testPutAndRemoveLopsidedPositiveKeys() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
-	    
+
 	    test.put(i, i);
 	    control.put(i, i);
 	}
@@ -363,21 +335,20 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(i);
 	    control.remove(i);
 	}
-	
+
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
     @Test public void testPutAndRemoveLopsidedNegativeKeys() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
-	    
+
 	    test.put(-i, i);
 	    control.put(-i, i);
 	}
@@ -388,22 +359,20 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(-i);
 	    control.remove(-i);
 	}
-	
+
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
-
     @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 96; ++i) {
-	    
+
 	    test.put(i, i);
 	    test.put(-i, -i);
 	    control.put(i, i);
@@ -415,17 +384,16 @@ public class TestScalableHashMap extends TestCase {
 	for (int i = 0; i < 127; i += 2) {
 	    assertEquals(control.remove(i), test.remove(i));
 	}
-	
+
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
     @Test public void testPutAndRemoveHalfRandomKeys() throws Exception {
-        txn = createTransaction(100000);
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction(100000);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	int[] vals = new int[128];
@@ -434,7 +402,7 @@ public class TestScalableHashMap extends TestCase {
 	    int j = (i < 64) ? -RANDOM.nextInt() : RANDOM.nextInt();
 	    vals[i] = j;
 	    test.put(j, i);
-	    control.put(j, i);	    
+	    control.put(j, i);
 	}
 
 	assertEquals(control, test);
@@ -443,23 +411,20 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(vals[i]);
 	    control.remove(vals[i]);
 	}
-	
+
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
-    
-
     @Test public void testPutAndRemoveHalfNegativeKeys() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
 	for (int i = 0; i < 128; ++i) {
-	    
+
 	    test.put(-i, -i);
 	    control.put(-i, -i);
 	}
@@ -470,19 +435,16 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(-i);
 	    control.remove(-i);
 	}
-	
+
 	assertEquals(control, test);
-	
-        txn.commit();
+
+	txn.commit();
     }
 
-
-
     @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[12];
@@ -513,24 +475,23 @@ public class TestScalableHashMap extends TestCase {
 
 	for (Integer k : control.keySet()) {
 	    assertTrue(test.containsKey(k));
-	    assertTrue(test.containsValue(control.get(k)));		       
+	    assertTrue(test.containsValue(control.get(k)));
 	}
 
 	for (Integer k : test.keySet()) {
 	    assertTrue(control.containsKey(k));
-	    assertTrue(control.containsValue(test.get(k)));		       
+	    assertTrue(control.containsValue(test.get(k)));
 	}
-	
+
 	assertEquals(control, test);
 
 	txn.commit();
     }
 
-
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	for (int i = 0; i < 24; ++i) {
@@ -551,12 +512,11 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnNoMergeTreeWithNoCollapse() 
+    @Test public void testPutAndRemoveOnNoMergeTreeWithNoCollapse()
 	throws Exception {
-        
+
 	txn = createTransaction(100000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
+	Map<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
@@ -579,12 +539,11 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnNoMergeTreeWithColllapse() 
+    @Test public void testPutAndRemoveOnNoMergeTreeWithColllapse()
 	throws Exception {
 
-        txn = createTransaction(100000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
+	txn = createTransaction(100000);
+	Map<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
@@ -607,13 +566,9 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-
     @Test public void testRepeatedPutAndRemove() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>(1);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(1);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];
@@ -625,14 +580,12 @@ public class TestScalableHashMap extends TestCase {
 	    control.put(j,j);
 	}
 	assertEquals(control, test);
-// 	System.out.println("puts passed");
 
 	for (int i = 0; i < inputs.length; i += 4) {
 	    test.remove(inputs[i]);
 	    control.remove(inputs[i]);
 	}
 	assertEquals(control, test);
-// 	System.out.println("removes passed");
 
 	for (int i = 0; i < inputs.length; i += 3) {
 	    test.put(inputs[i],inputs[i]);
@@ -652,12 +605,11 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testRepeatedPutAndRemoveWithNoMergeAndNoCollapse() 
+    @Test public void testRepeatedPutAndRemoveWithNoMergeAndNoCollapse()
 	throws Exception {
-        
+
 	txn = createTransaction(100000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
+	Map<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(1,32, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
@@ -697,16 +649,14 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(control, test);
 
-
 	txn.commit();
     }
 
-    @Test public void testRepeatedPutAndRemoveWithNoMergeAndCollapse() 
+    @Test public void testRepeatedPutAndRemoveWithNoMergeAndCollapse()
 	throws Exception {
 
-        txn = createTransaction(100000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = 
+	txn = createTransaction(100000);
+	Map<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(1,32,4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
@@ -717,9 +667,7 @@ public class TestScalableHashMap extends TestCase {
 	    inputs[i] = j;
 	    test.put(j,j);
 	    control.put(j,j);
-// 	    if (!equals(control, test))
-// 		System.out.println("put #" + i);
-// 	    assertEquals(control, test);
+	    // assertTrue("put #" + i, equals(control, test))
 	}
 
 	assertEquals(control, test);
@@ -744,97 +692,259 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(control, test);
 
-
 	txn.commit();
     }
 
+    /*
+     * Test putAll
+     */
+
     @Test public void testPutAll() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+	txn = createTransaction();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	 for (int i = 0; i < 32; ++i) 
+	 for (int i = 0; i < 32; ++i)
 	     control.put(i,i);
-	 Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	 Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	 test.putAll(control);
 	 assertEquals(control, test);
 	 txn.commit();
      }
 
+    /*
+     * Test put
+     */
 
-    @Test public void testNullPut() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
+    @Test public void testPutNotSerializable() throws Exception {
+	txn = createTransaction();
+	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
+	Object nonSerializable = Thread.currentThread();
+	try {
+	    test.put(nonSerializable, Boolean.TRUE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    assertTrue(test.isEmpty());
+	}
+	try {
+	    test.put(Boolean.TRUE, nonSerializable);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    assertTrue(test.isEmpty());
+	}
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testPutOldValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar value = new Bar(33);
+	dataService.setBinding("value", value);
+	test.put(Boolean.TRUE, value);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(
+	    dataService.getBinding("value", ManagedObject.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.put(Boolean.TRUE, Boolean.FALSE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.put(Boolean.TRUE, Boolean.FALSE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+    }
+
+    @Test public void testPutNull() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
-
 	test.put(null, 0);
 	control.put(null, 0);
-	
 	assertEquals(control, test);
-
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	assertEquals(control,
+		     dataService.getBinding("test", ScalableHashMap.class));
 	txn.commit();
     }
 
-    @Test public void testNullGet() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
+    /*
+     * Test get
+     */
 
+    @SuppressWarnings("unchecked")
+    @Test public void testGetValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar value = new Bar(33);
+	dataService.setBinding("value", value);
+	test.put(Boolean.TRUE, value);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(
+	    dataService.getBinding("value", ManagedObject.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.get(Boolean.TRUE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.get(Boolean.TRUE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+    }
+
+    @Test public void testGetNullKey() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
 	test.put(null, 0);
 	assertEquals(new Integer(0), test.get(null));
-	
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	assertEquals(
+	    new Integer(0),
+	    dataService.getBinding("test", ScalableHashMap.class).get(null));
 	txn.commit();
     }
 
-    @Test public void testNullContainsKey() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
+    @Test public void testGetNullValue() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,String> test =
+	    new ScalableHashMap<Integer,String>(16);
+	test.put(0, null);
+	assertEquals(null, test.get(0));
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	assertEquals(
+	    null,
+	    dataService.getBinding("test", ScalableHashMap.class).get(0));
+	txn.commit();
+    }
 
+    /*
+     * Test containsKey
+     */
+
+    @Test public void testContainsKeyNull() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
 	test.put(null, 0);
 	assertTrue(test.containsKey(null));
-	
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	assertTrue(
+	    dataService.getBinding(
+		"test", ScalableHashMap.class).containsKey(null));
 	txn.commit();
     }
 
-    @Test public void testNullContainsKeyOnEmptyMap() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
-
+    @Test public void testContainsKeyNullOnEmptyMap() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
 	assertFalse(test.containsKey(null));
-	
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();	
+	assertFalse(
+	    dataService.getBinding(
+		"test", ScalableHashMap.class).containsKey(null));
 	txn.commit();
     }
 
-    @Test public void testNullContainsValue() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
-
-	test.put(0, null);
-	assertTrue(test.containsValue(null));
-	
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap(16);
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, 1);
+	test.put(new Bar(2), 2);
+	txn.commit();
+	txn = createTransaction();	
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsKey(new Bar(1)));
+	assertEquals(2, test.size());
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsKey(new Bar(1)));
+	assertEquals(2, test.size());	
 	txn.commit();
     }
 
+    /*
+     * Test containsValue
+     */
 
-    @Test public void testNullContainsValueOnSplitMap() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
-
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueNull() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	test.put(0, null);
-
+	dataService.setBinding("test", test);
 	assertTrue(test.containsValue(null));
-	
+	txn.commit();
+	txn = createTransaction();	
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsValue(null));	
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueNullEmptyMap() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
+	dataService.setBinding("test", test);
+	assertFalse(test.containsValue(null));
+	txn.commit();
+	txn = createTransaction();	
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsValue(null));	
+	txn.commit();
+    }
+
+    @Test public void testContainsValueNullOnSplitMap() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	test.put(0, null);
+	assertTrue(test.containsValue(null));
 	txn.commit();
     }
 
     @Test public void testContainsKeyOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -853,9 +963,8 @@ public class TestScalableHashMap extends TestCase {
     }
 
     @Test public void testValues() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -873,9 +982,8 @@ public class TestScalableHashMap extends TestCase {
     }
 
     @Test public void testValuesOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Collection<Integer> control = new ArrayList<Integer>(50);
 
 	int[] inputs = new int[50];
@@ -892,12 +1000,9 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    
-
     @Test public void testContainsValue() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -914,12 +1019,10 @@ public class TestScalableHashMap extends TestCase {
 
 	txn.commit();
     }
-
 
     @Test public void testContainsValueOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -937,13 +1040,9 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    
-
-
     @Test public void testNullRemove() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<String,Integer> test = new ScalableHashMapTestable<String,Integer>(16);
+	txn = createTransaction();
+	Map<String,Integer> test = new ScalableHashMap<String,Integer>(16);
 	Map<String,Integer> control = new HashMap<String,Integer>();
 
 	test.put(null, 0);
@@ -958,12 +1057,9 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-
     @Test public void testClear() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
@@ -978,21 +1074,20 @@ public class TestScalableHashMap extends TestCase {
 
 	test.clear();
 	control.clear();
-	
+
 	assertEquals(control, test);
-	
+
 	txn.commit();
     }
 
     @Test public void testMultipleClearOperations() throws Exception {
-        txn = createTransaction(1000000);
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction(1000000);
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	test.clear();
 	assertEquals(control, test);
-	
+
 	// add just a few elements
 	for (int i = 0; i < 33; ++i) {
 	    int j = RANDOM.nextInt();
@@ -1010,21 +1105,18 @@ public class TestScalableHashMap extends TestCase {
 
 	test.clear();
 	assertEquals(control, test);
-	
+
 	txn.commit();
     }
-    
-
 
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
 
-	for (int i = 0; i < inputs.length; ++i)	   
+	for (int i = 0; i < inputs.length; ++i)
 	    inputs[i] = RANDOM.nextInt();
 
 	for (int i = 0; i < inputs.length; ++i)	{
@@ -1048,9 +1140,8 @@ public class TestScalableHashMap extends TestCase {
     }
 
     @Test public void testInvalidGet() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	// put in numbers
 	for (int i = 4000; i < 4100; ++i) {
@@ -1059,24 +1150,20 @@ public class TestScalableHashMap extends TestCase {
 
 	// get from outside the range of the put
 	for (int i = 0; i < 100; ++i) {
-	    	    
+
 	    assertEquals(null,test.get(i));
 	}
-	
-        txn.commit();
+
+	txn.commit();
     }
 
-//     /*
-//      *
-//      * Size Tests
-//      *
-//      */
-
+    /*
+     * Size Tests
+     */
 
     @Test public void testLeafSize() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
 
@@ -1100,13 +1187,12 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(0, test.size());
 
-        txn.commit();
-    }    
+	txn.commit();
+    }
 
     @Test public void testLeafSizeAfterRemove() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	int SAMPLE_SIZE = 10;
 
@@ -1120,7 +1206,6 @@ public class TestScalableHashMap extends TestCase {
 	    inputs3[i] = RANDOM.nextInt();
 	}
 
-	
 	for (int i = 0; i < inputs1.length; ++i) {
 	    test.put(inputs1[i], inputs1[i]);
 	    test.put(inputs2[i], inputs2[i]);
@@ -1133,16 +1218,14 @@ public class TestScalableHashMap extends TestCase {
 	    test.remove(inputs2[i]);
 	    assertEquals(beforeSize, test.size());
 	}
-	
-        txn.commit();
-    }    
 
+	txn.commit();
+    }
 
     @Test public void testTreeSizeOnSplitTree() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+	txn = createTransaction();
 	// create a tree with an artificially small leaf size
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1164,15 +1247,14 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(31, test.size());
 
-        txn.commit();
-    }    
+	txn.commit();
+    }
 
     @Test public void testTreeSizeOnSplitTreeWithRemovals() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+	txn = createTransaction();
 	// create a tree with an artificially small leaf size
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 
 	assertEquals(0, test.size());
 
@@ -1221,23 +1303,17 @@ public class TestScalableHashMap extends TestCase {
 	}
 	assertEquals(103, test.size());
 
-        txn.commit();
-    }    
-
+	txn.commit();
+    }
 
     /*
-     *
      * Iterator Tests
-     *
      */
 
     @Test public void testIteratorOnSplitTree() throws Exception {
-        txn = createTransaction();
-
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
-
 
 	// get from outside the range of the put
 	for (int i = 0; i < 33; ++i) {
@@ -1249,22 +1325,19 @@ public class TestScalableHashMap extends TestCase {
 	for (Integer i : test.keySet()) {
 	    control.remove(i);
 	}
-	    
-	assertEquals(0, control.size());
-        txn.commit();
-    }    
 
+	assertEquals(0, control.size());
+	txn.commit();
+    }
 
     @Test public void testIteratorOnSplitTreeWithRemovals() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
+	txn = createTransaction();
 	// create a tree with an artificially small leaf size
-	ScalableHashMapTestable<Integer,Integer> test = 
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	HashMap<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
-
 
 	int[] inserts = new int[128];
 	for (int i = 0; i < inserts.length; ++i) {
@@ -1277,8 +1350,6 @@ public class TestScalableHashMap extends TestCase {
 	    control.put(inserts[i], inserts[i]);
 	}
 
-
-	
 	assertEquals(control, test);
 
 	// remove 10
@@ -1321,15 +1392,13 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(control, test);
 
-        txn.commit();
-    }    
+	txn.commit();
+    }
 
     @Test public void testKeyIterator() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
-
 
 	// get from outside the range of the put
 	for (int i = 0; i < 100; ++i) {
@@ -1341,18 +1410,15 @@ public class TestScalableHashMap extends TestCase {
 	    control.remove(i);
 	}
 
-
 	assertEquals(0, control.size());
-	
+
 	txn.commit();
     }
 
     @Test public void testKeyIteratorOnSplitMap() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
-
 
 	// get from outside the range of the put
 	for (int i = 0; i < 33; ++i) {
@@ -1364,295 +1430,266 @@ public class TestScalableHashMap extends TestCase {
 	    control.remove(i);
 	}
 
-	assertEquals(0, control.size());	    
-	
+	assertEquals(0, control.size());
+
 	txn.commit();
     }
-    
 
     @Test public void testValuesIterator() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Set<Integer> control = new HashSet<Integer>();
-	
-	
+
 	// get from outside the range of the put
 	for (int i = 0; i < 100; ++i) {
 	    test.put(i,i);
 	    control.add(i);
 	}
-	
+
 	for (Integer i : test.values()) {
 	    control.remove(i);
-	}	    
+	}
 
 	assertEquals(0, control.size());
-		
+
 	txn.commit();
     }
-    
+
     @Test public void testValuesIteratorOnSplitMap() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Set<Integer> control = new HashSet<Integer>();
-	
-	
+
 	// get from outside the range of the put
 	for (int i = 0; i < 33; ++i) {
 	    test.put(i,i);
 	    control.add(i);
 	}
-	
+
 	for (Integer i : test.values()) {
 	    control.remove(i);
-	}	    
-
+	}
 
 	assertEquals(0, control.size());
-		
+
 	txn.commit();
     }
 
-
-    
     @Test public void testInvalidRemove() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
-	
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+
 	// put in numbers
 	for (int i = 4000; i < 4100; ++i) {
 	    test.put(i, i);
 	}
-	
+
 	// get from outside the range of the put
 	for (int i = 0; i < 100; ++i) {
 
 	    assertEquals(null, test.remove(i));
 	}
-	
+
 	txn.commit();
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
 	@Test public void testLeafSerialization() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[100];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	    
+
 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
 	ObjectOutputStream oos = new ObjectOutputStream(baos);
 	oos.writeObject(test);
-	
+
 	byte[] serializedForm = baos.toByteArray();
 
-	ByteArrayInputStream bais = 
+	ByteArrayInputStream bais =
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
-	ScalableHashMapTestable<Integer,Integer> m = 
-	    (ScalableHashMapTestable<Integer,Integer>) ois.readObject();
+
+	ScalableHashMap<Integer,Integer> m =
+	    (ScalableHashMap<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
-	
+
 	txn.commit();
     }
-   
 
-
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     @Test public void testSplitTreeSerialization() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	Map<Integer,Integer> test = new ScalableHashMapTestable<Integer,Integer>(16);
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[100];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	    
+
 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
 	ObjectOutputStream oos = new ObjectOutputStream(baos);
 	oos.writeObject(test);
-	
+
 	byte[] serializedForm = baos.toByteArray();
 
-	ByteArrayInputStream bais = 
+	ByteArrayInputStream bais =
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
-	ScalableHashMapTestable<Integer,Integer> m = 
-	    (ScalableHashMapTestable<Integer,Integer>) ois.readObject();
+
+	ScalableHashMap<Integer,Integer> m =
+	    (ScalableHashMap<Integer,Integer>) ois.readObject();
 
 	assertEquals(control, m);
-	
+
 	txn.commit();
     }
-
 
     /*
      * Tests on ManagedObject vs. Serializable object keys
      *
-     * These tests should expose any bugs in the
-     * ScalableHashMap.PrefixEntry class, especially in the
-     * setValue() method.  These should also expose any bugs in the
-     * KeyValuePair class
+     * These tests should expose any bugs in the ScalableHashMap.PrefixEntry
+     * class, especially in the setValue() method.  These should also expose
+     * any bugs in the KeyValuePair class
      */
+
     @Test public void testOnManagedObjectKeys() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Bar,Foo> test = 
-	    new ScalableHashMapTestable<Bar,Foo>();
+	txn = createTransaction();
+	Map<Bar,Foo> test = new ScalableHashMap<Bar,Foo>();
 	Map<Bar,Foo> control = new HashMap<Bar,Foo>();
 
 	for (int i = 0; i < 64; ++i) {
-	    
+
 	    test.put(new Bar(i), new Foo(i));
 	    control.put(new Bar(i), new Foo(i));
 	    assertEquals(control, test);
-	}	
+	}
 
-	
-        txn.commit();
+	txn.commit();
     }
 
     @Test public void testOnManagedObjectValues() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Foo,Bar> test = 
-	    new ScalableHashMapTestable<Foo,Bar>();
+	txn = createTransaction();
+	Map<Foo,Bar> test = new ScalableHashMap<Foo,Bar>();
 	Map<Foo,Bar> control = new HashMap<Foo,Bar>();
 
 	for (int i = 0; i < 64; ++i) {
-	    
+
 	    test.put(new Foo(i), new Bar(i));
 	    control.put(new Foo(i), new Bar(i));
 	    assertEquals(control, test);
-	}	
+	}
 
-	
-        txn.commit();
+	txn.commit();
     }
 
     @Test public void testOnManagedObjectKeysAndValues() throws Exception {
-        txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Bar,Bar> test = 
+	txn = createTransaction();
+	Map<Bar,Bar> test =
 	    new ScalableHashMapTestable<Bar,Bar>();
 	Map<Bar,Bar> control = new HashMap<Bar,Bar>();
 
 	for (int i = 0; i < 64; ++i) {
-	    
+
 	    test.put(new Bar(i), new Bar(i));
 	    control.put(new Bar(i), new Bar(i));
 	    assertEquals(control, test);
-	}	
+	}
 
-	
-        txn.commit();
+	txn.commit();
     }
 
-
-    @Test public void testSerializableKeysReplacedWithManagedObjects() 
+    @Test public void testSerializableKeysReplacedWithManagedObjects()
 	throws Exception {
-        
+
 	txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Foo,Foo> test = 
+	Map<Foo,Foo> test =
 	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
-	for (int i = 0; i < 64; ++i) {	    
+	for (int i = 0; i < 64; ++i) {
 	    test.put(new Foo(i), new Foo(i));
 	    control.put(new Foo(i), new Foo(i));
 	    assertEquals(control, test);
-	}	
+	}
 
-	for (int i = 0; i < 64; ++i) {	    
+	for (int i = 0; i < 64; ++i) {
 	    test.put(new Bar(i), new Foo(i));
 	    control.put(new Bar(i), new Foo(i));
 	    assertEquals(control, test);
-	}	
-	
-        txn.commit();
+	}
+
+	txn.commit();
     }
 
-    @Test public void testSerializableValuesReplacedWithManagedObjects() 
+    @Test public void testSerializableValuesReplacedWithManagedObjects()
 	throws Exception {
-        
+
 	txn = createTransaction();
-        DataManager dataManager = AppContext.getDataManager();
-	Map<Foo,Foo> test = 
+	Map<Foo,Foo> test =
 	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
-	for (int i = 0; i < 64; ++i) {	    
+	for (int i = 0; i < 64; ++i) {
 	    test.put(new Foo(i), new Foo(i));
 	    control.put(new Foo(i), new Foo(i));
 	    assertEquals(control, test);
-	}	
+	}
 
-	for (int i = 0; i < 64; ++i) {	    
+	for (int i = 0; i < 64; ++i) {
 	    test.put(new Foo(i), new Bar(i));
 	    control.put(new Foo(i), new Bar(i));
 	    assertEquals(control, test);
-	}	
-	
-        txn.commit();
+	}
+
+	txn.commit();
     }
-
-
-
 
     /*
      * Concurrent Iterator tests
      *
      * These tests should expose any problems when the
-     * ScalableHashMap.ConcurrentIterator class is serialized and
-     * modifications are made to the map before it is deserialized.
-     * This should simulate the conditions between transactions where
-     * the map might be modified
+     * ScalableHashMap.ConcurrentIterator class is serialized and modifications
+     * are made to the map before it is deserialized.  This should simulate the
+     * conditions between transactions where the map might be modified
      */
-     
-    @SuppressWarnings({"unchecked"})
+
+    @SuppressWarnings("unchecked")
     @Test public void testConcurrentIterator() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
-	for (Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator(); 
-	     it.hasNext();) {
+	for (Iterator<Map.Entry<Integer,Integer>> it =
+		 test.entrySet().iterator();
+	     it.hasNext(); ) {
 
 	    Map.Entry<Integer,Integer> e = it.next();
 	    assertTrue(entrySet.contains(e));
@@ -1663,23 +1700,22 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @SuppressWarnings({"unchecked"})
-    @Test public void testConcurrentIteratorSerailization() throws Exception {
+    @SuppressWarnings("unchecked")
+    @Test public void testConcurrentIteratorSerialization() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[256];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
@@ -1690,16 +1726,16 @@ public class TestScalableHashMap extends TestCase {
 	    entries++;
 	}
 
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
- 	byte[] serializedForm = baos.toByteArray();
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
+	byte[] serializedForm = baos.toByteArray();
+
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
 
 	while(it.hasNext()) {
@@ -1713,46 +1749,44 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithRemovals() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[1024];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
 	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
 	// then remove half of the entries
 	for (int i = 0; i < a.length; i += 2) {
 	    test.remove(a[i]);
 	    control.remove(a[i]);
 	}
 
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	       
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
 
 	// ensure that the deserialized iterator reads the remaining
@@ -1769,12 +1803,10 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithAdditions() throws Exception {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
@@ -1782,28 +1814,28 @@ public class TestScalableHashMap extends TestCase {
 	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	       
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
 
 	// ensure that the deserialized iterator reads the all the new
@@ -1819,23 +1851,24 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @SuppressWarnings({"unchecked"})
-    @Test public void testConcurrentIteratorWithReplacements() throws Exception {
+    @SuppressWarnings("unchecked")
+    @Test public void testConcurrentIteratorWithReplacements()
+	throws Exception
+    {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Integer,Integer> test = 
+	ScalableHashMapTestable<Integer,Integer> test =
 	    new ScalableHashMapTestable<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	
+
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Integer,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
@@ -1849,10 +1882,10 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(a.length / 2, entries);
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
 	// now repalce all th elements in the map
 	test.clear();
 	control.clear();
@@ -1864,12 +1897,12 @@ public class TestScalableHashMap extends TestCase {
 	}
 
 	// reserialize the iterator
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
 
 	while(it.hasNext()) {
@@ -1885,47 +1918,44 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-
-
     /*
      * Tests on concurrent iterator edge cases
      */
 
-    @SuppressWarnings({"unchecked"})
-    @Test public void testConcurrentIteratorSerailizationEqualHashCodes() throws Exception {
+    @SuppressWarnings("unchecked")
+    @Test public void testConcurrentIteratorSerializationEqualHashCodes()
+	throws Exception
+    {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-
-	ScalableHashMapTestable<Equals,Integer> test = 
+	ScalableHashMapTestable<Equals,Integer> test =
 	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
-	
+
 	int[] a = new int[256];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
 	    a[i] = j;
 	}
-	
+
 	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
 	for (int i = 0; i < a.length / 2; ++i) {
 	    Map.Entry<Equals,Integer> e = it.next();
 	    assertTrue(control.remove(e.getKey()) != null);
 	}
 
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
- 	byte[] serializedForm = baos.toByteArray();
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
+	byte[] serializedForm = baos.toByteArray();
+
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
 
 	while(it.hasNext()) {
@@ -1938,46 +1968,46 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-
-    @SuppressWarnings({"unchecked"})
-    @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes() throws Exception {
+    @SuppressWarnings("unchecked")
+    @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes()
+	throws Exception
+    {
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Equals,Integer> test = 
+	ScalableHashMapTestable<Equals,Integer> test =
 	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
-	
+
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
 	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
 	// then remove half of the entries
 	for (int i = 0; i < a.length; i += 2) {
 	    test.remove(a[i]);
 	    control.remove(a[i]);
 	}
 
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	       
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
 
 	// ensure that the deserialized iterator reads the remaining
@@ -1993,13 +2023,12 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithAdditionsEqualHashCodes()
 	throws Exception {
 
 	txn = createTransaction();
-	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Equals,Integer> test = 
+	ScalableHashMapTestable<Equals,Integer> test =
 	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
@@ -2007,28 +2036,27 @@ public class TestScalableHashMap extends TestCase {
 	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
 	    a[i] = j;
 	}
-	
-	//Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
+
 	int entries = 0;
 
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	       
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
 
 	// ensure that the deserialized iterator reads the all the new
@@ -2043,25 +2071,24 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-     @SuppressWarnings({"unchecked"})
-     @Test public void testConcurrentIteratorWithReplacementsOnEqualHashCodes() 
+     @SuppressWarnings("unchecked")
+     @Test public void testConcurrentIteratorWithReplacementsOnEqualHashCodes()
 	 throws Exception {
 
- 	txn = createTransaction();
- 	DataManager dataManager = AppContext.getDataManager();
-	ScalableHashMapTestable<Equals,Integer> test = 
+	txn = createTransaction();
+	ScalableHashMapTestable<Equals,Integer> test =
 	    new ScalableHashMapTestable<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	int[] a = new int[128];
-	
+
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
 	    a[i] = j;
 	}
-	
+
 	Set<Map.Entry<Equals,Integer>> entrySet = control.entrySet();
 	int entries = 0;
 
@@ -2075,13 +2102,13 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(a.length / 2, entries);
 
 	// serialize the iterator
- 	ByteArrayOutputStream baos = new ByteArrayOutputStream();
- 	ObjectOutputStream oos = new ObjectOutputStream(baos);
- 	oos.writeObject(it);
-	
-	// now repalce all th elements in the map
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	ObjectOutputStream oos = new ObjectOutputStream(baos);
+	oos.writeObject(it);
+
+	// now repalce all the elements in the map
 	test.clear();
-	control.clear();	
+	control.clear();
 
 	for (int i = 0; i < a.length; ++i) {
 	    int j = RANDOM.nextInt();
@@ -2093,12 +2120,12 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control.size(), test.size());
 
 	// reserialize the iterator
- 	byte[] serializedForm = baos.toByteArray();
+	byte[] serializedForm = baos.toByteArray();
 
- 	ByteArrayInputStream bais = 
- 	    new ByteArrayInputStream(serializedForm);
- 	ObjectInputStream ois = new ObjectInputStream(bais);
-	
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(serializedForm);
+	ObjectInputStream ois = new ObjectInputStream(bais);
+
 	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
 
 	while(it.hasNext()) {
@@ -2109,24 +2136,12 @@ public class TestScalableHashMap extends TestCase {
 
 	// due to the random nature of the entries, we can't check
 	// that it read in another half other elements.  However this
-	// should still check that no execptions were thrown.
+	// should still check that no exceptions were thrown.
 
 	txn.commit();
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-    /**
+    /*
      * Utility routines.
      */
 
@@ -2144,50 +2159,54 @@ public class TestScalableHashMap extends TestCase {
 	    Integer key = e.getKey();
 	    Integer value = e.getValue();
 	    if (value == null) {
-		if (!(m2.get(key)==null && m2.containsKey(key))) {						
+		if (!(m2.get(key)==null && m2.containsKey(key))) {
 		    System.out.printf("keys not equal, m2 has key: %s? %s\n",
-				      key, m2.containsKey(key));					  
+				      key, m2.containsKey(key));
 		    return false;
 		}
 	    } else {
 		if (!value.equals(m2.get(key))) {
 		    System.out.printf("m1.get(%s) not equal: %s: %s\n",
 				      key, value, m2.get(key));
-		    System.out.println("m2.containsKey() ? " + m2.containsKey(key));
+		    System.out.println("m2.containsKey() ? " +
+				       m2.containsKey(key));
 		    return false;
 		}
 	    }
 	}
-	
+
 	return true;
     }
-    
+
+    /** Creates a transaction with the default timeout. */
     private DummyTransaction createTransaction() {
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
 
+    /** Creates a transacction with the specified timeout. */
     private DummyTransaction createTransaction(long timeout) {
 	DummyTransaction txn = new DummyTransaction(timeout);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
 
+    /** Creates the data service. */
     private void createDataService(DummyComponentRegistry registry)
 	throws Exception
     {
 	File dir = new File(DB_DIRECTORY);
 	if (! dir.exists()) {
 	    if (! dir.mkdir()) {
-		throw new RuntimeException("couldn't create db directory: " +
-					   DB_DIRECTORY);
+		throw new RuntimeException(
+		    "couldn't create db directory: " + DB_DIRECTORY);
 	    }
 	}
-
 	Properties properties = new Properties();
-	properties.setProperty("com.sun.sgs.impl.service.data.store." +
-			       "DataStoreImpl.directory", DB_DIRECTORY);
+	properties.setProperty(
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+	    DB_DIRECTORY);
 	properties.setProperty(StandardProperties.APP_NAME,
 			       "TestScalableHashMap");
 	dataService = new DataServiceImpl(properties, registry, txnProxy);
@@ -2208,11 +2227,13 @@ public class TestScalableHashMap extends TestCase {
      * Test classes
      */
 
+    /**
+     * A serializable object that is equal to objects of the same type with the
+     * same value.
+     */
     static class Foo implements Serializable {
-
 	private static final long serialVersionUID = 1L;
-
-	public int i;
+	private final int i;
 
 	public Foo(int i) {
 	    this.i = i;
@@ -2223,51 +2244,37 @@ public class TestScalableHashMap extends TestCase {
 	}
 
 	public boolean equals(Object o) {
-	    return (o instanceof Foo) 
-		? ((Foo)o).i == i
-		: false;
+	    return o != null &&
+		getClass() == o.getClass() &&
+		((Foo) o).i == i;
 	}
     }
 
+    /**
+     * A managed object that is equal to objects of the same type with the
+     * same value.
+     */
     static class Bar extends Foo implements ManagedObject {
-
 	private static final long serialVersionUID = 1L;
-	
+
 	public Bar(int i) {
 	    super(i);
 	}
-	
     }
-    
 
-    static class Equals implements Serializable {
-
+    /**
+     * A serializable object that is equal to objects of the same type with the
+     * type, but whose hashCode method always returns zero.
+     */
+    static class Equals extends Foo {
 	private static final long serialVersionUID = 1L;
 
-	int i;
-
 	public Equals(int i) {
-	    this.i = i;
-	}
-
-	public boolean equals(Object o) {
-	    return (o instanceof Equals)
-		? ((Equals)o).i == i : false;
+	    super(i);
 	}
 
 	public int hashCode() {
 	    return 0;
 	}
-	
     }
-
-     /**
-      * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-      */
-
-//     public static junit.framework.Test suite() {
-// 	return new JUnit4TestAdapter(TestScalableHashMap.class);
-//     }
-
-
 }

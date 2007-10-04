@@ -518,7 +518,7 @@ public class ScalableHashMap<K,V>
      *
      * @throws IllegalArgumentException if minConcurrency is non-positive
      */
-    private static int findMinDepthFor(int minConcurrency) {
+    static int findMinDepthFor(int minConcurrency) {
 	if (minConcurrency <= 0) {
 	    throw new IllegalArgumentException(
 		"Non-positive minimum concurrency: " + minConcurrency);
@@ -706,7 +706,7 @@ public class ScalableHashMap<K,V>
      * @return whether the objects are equal or both {@code null}
      */
     static boolean safeEquals(Object x, Object y) {
-	return x == y || (x != y && x.equals(y));
+	return x == y || (x != null && x.equals(y));
     }
 
     /**
