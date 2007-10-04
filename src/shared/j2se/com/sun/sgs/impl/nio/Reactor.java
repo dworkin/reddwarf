@@ -7,7 +7,6 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SelectableChannel;
@@ -98,26 +97,27 @@ class Reactor {
 
             int numKeys = selector.keys().size();
 
+            if (log.isLoggable(Level.FINER)) {
+                log.log(Level.FINER, "{0} select on {1} keys",
+                    new Object[] { this, numKeys });
+            }
+
+            int rc = selector.select(getSelectorTimeout(timeouts));
+            if (log.isLoggable(Level.FINER)) {
+                log.log(Level.FINER, "{0} selected {1} / {2}",
+                    new Object[] { this, rc, numKeys });
+            }
+
             if (shuttingDown) {
-                selector.selectNow();
-                if (log.isLoggable(Level.FINER)) {
-                    log.log(Level.FINER, "{0} wants shutdown, {1} keys",
+                numKeys = selector.keys().size();
+                if (log.isLoggable(Level.FINE)) {
+                    log.log(Level.FINE, "{0} wants shutdown, {1} keys",
                         new Object[] { this, numKeys });
                 }
                 if (numKeys == 0) {
                     selector.close();
                     return false;
                 }
-            }
-
-            if (log.isLoggable(Level.FINER)) {
-                log.log(Level.FINER, "{0} select on {1} keys",
-                    new Object[] { this, numKeys });
-            }
-            int rc = selector.select(getSelectorTimeout(timeouts));
-            if (log.isLoggable(Level.FINE)) {
-                log.log(Level.FINE, "{0} selected {1} / {2}",
-                    new Object[] { this, rc, numKeys });
             }
 
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -139,14 +139,15 @@ class Reactor {
                 asyncKey.selected(readyOps);
             }
 
-            if (timeouts.peek() != null) {
-                List<TimeoutHandler> expiredHandlers =
-                    new ArrayList<TimeoutHandler>();
-                timeouts.drainTo(expiredHandlers);
+            List<TimeoutHandler> expiredHandlers =
+                new ArrayList<TimeoutHandler>();
+            timeouts.drainTo(expiredHandlers);
 
-                for (TimeoutHandler expired : expiredHandlers)
-                    expired.run();
-            }
+            for (TimeoutHandler expired : expiredHandlers)
+                expired.run();
+
+            expiredHandlers.clear();
+
         } catch (Throwable t) {
             log.log(Level.WARNING, this.toString(), t);
             return false;
@@ -187,22 +188,27 @@ class Reactor {
                 log.log(Level.FINE, "awaitReady {0} : invalid ", this);
                 throw new ClosedAsynchronousChannelException();
             }
-            int interestOps = key.interestOps();
-            if (log.isLoggable(Level.FINEST)) {
-                log.log(Level.FINEST, "awaitReady {0} : old {1} : add {2}",
-                    new Object[] { task,
+
+            int interestOps;
+            synchronized (asyncKey) {
+                interestOps = key.interestOps();
+                if (log.isLoggable(Level.FINEST)) {
+                    log.log(Level.FINEST, "awaitReady {0} : old {1} : add {2}",
+                        new Object[] { task,
                         Util.formatOps(interestOps),
                         Util.formatOps(op) });
-            }
-            if ((op & (OP_READ | OP_WRITE)) != 0) {
-                if (channel instanceof SocketChannel) {
-                    if (! ((SocketChannel) channel).isConnected())
-                        throw new NotYetConnectedException();
                 }
+                if ((op & (OP_READ | OP_WRITE)) != 0) {
+                    if (channel instanceof SocketChannel) {
+                        if (! ((SocketChannel) channel).isConnected())
+                            throw new NotYetConnectedException();
+                    }
+                }
+
+                interestOps |= op;
+                key.interestOps(interestOps);
             }
 
-            interestOps |= op;
-            key.interestOps(interestOps);
             if (log.isLoggable(Level.FINEST)) {
                 log.log(Level.FINEST, "awaitReady {0} : new {1} ",
                     new Object[] { task,

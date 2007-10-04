@@ -144,11 +144,6 @@ public class EchoServer {
          * {@inheritDoc}
          */
         public void completed(IoFuture<Integer, ByteBuffer> result) {
-            if (! channel.isOpen()) {
-                disconnected(channel);
-                return;
-            }
-
             if (writing) {
                 writeCompleted(result);
             } else {
@@ -161,6 +156,8 @@ public class EchoServer {
                 int rc = result.getNow();
                 log.log(Level.FINEST, "Read {0} bytes", rc);
                 if (rc < 0) {
+                    log.log(Level.FINE, "{0} read {1} bytes",
+                        new Object[] { channel, rc} );
                     disconnected(channel);
                     return;
                 }
@@ -170,6 +167,9 @@ public class EchoServer {
                 writing = true;
                 channel.write(buf, buf, this);
             } catch (ExecutionException e) {
+                log.throwing("ChannelHandler", "readCompleted", e);
+                disconnected(channel);
+            } catch (RuntimeException e) {
                 log.throwing("ChannelHandler", "readCompleted", e);
                 disconnected(channel);
             }
@@ -191,6 +191,9 @@ public class EchoServer {
                     channel.read(buf, buf, this);
                 }
             } catch (ExecutionException e) {
+                log.throwing("ChannelHandler", "writeCompleted", e);
+                disconnected(channel);
+            } catch (RuntimeException e) {
                 log.throwing("ChannelHandler", "writeCompleted", e);
                 disconnected(channel);
             }
@@ -231,9 +234,17 @@ public class EchoServer {
             new VerboseThreadFactory(log, Executors.defaultThreadFactory());
 
         ThreadPoolExecutor executor = (ThreadPoolExecutor)
-            (MAX_THREADS == Integer.MAX_VALUE
-                ? Executors.newCachedThreadPool(threadFactory)
-                : Executors.newFixedThreadPool(MAX_THREADS, threadFactory));
+            ((MAX_THREADS == Integer.MAX_VALUE)
+                 ? Executors.newCachedThreadPool(threadFactory)
+                 : Executors.newFixedThreadPool(MAX_THREADS, threadFactory));
+
+        executor.setKeepAliveTime(10, TimeUnit.SECONDS);
+        executor.setCorePoolSize(NUM_THREADS);
+
+        log.log(Level.INFO,
+            "Prestarting {0,number,integer} threads", NUM_THREADS);
+
+        executor.prestartAllCoreThreads();
 
         AsynchronousChannelProvider provider =
             AsynchronousChannelProvider.provider();
@@ -242,13 +253,6 @@ public class EchoServer {
             provider.openAsynchronousChannelGroup(executor);
 
         log.log(Level.INFO, "ChannelGroup is a {0}", group.getClass());
-
-        executor.setCorePoolSize(NUM_THREADS);
-
-        log.log(Level.INFO,
-            "Prestarting {0,number,integer} threads", NUM_THREADS);
-
-        executor.prestartAllCoreThreads();
 
         log.info("Starting the server");
 

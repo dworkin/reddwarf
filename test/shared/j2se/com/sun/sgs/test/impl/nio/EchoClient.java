@@ -160,12 +160,7 @@ public class EchoClient {
                 log.log(Level.FINEST, "Read {0} bytes", rc);
                 if (rc < 0) {
                     log.log(Level.WARNING, "Read bailed with {0}", rc);
-                    try {
-                        channel.close();
-                    } catch (IOException e) {
-                        log.throwing("ReadHandler", "close after read -1", e);
-                    }
-                    disconnected();
+                    disconnected(true);
                     return;
                 }
                 bytesRead += rc;
@@ -177,10 +172,7 @@ public class EchoClient {
                 }
                 if (opsRemaining == 0) {
                     log.finer("Reader finished; closing");
-                    try {
-                        channel.close();
-                    } catch (IOException ignore) { }
-                    disconnected();
+                    disconnected(true);
                     return;
                 }
                 buf.clear();
@@ -188,13 +180,10 @@ public class EchoClient {
                 channel.read(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("ReadHandler", "completed", e);
-                try {
-                    channel.close();
-                } catch (IOException ioe) {
-                    log.throwing("ReadHandler", "close on exception", ioe);
-                }
-                disconnected();
-                // ignore
+                disconnected(true);
+            } catch (RuntimeException e) {
+                log.throwing("ReadHandler", "completed", e);
+                disconnected(true);
             }
         }
     }
@@ -246,21 +235,29 @@ public class EchoClient {
                 channel.write(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("WriteHandler", "completed", e);
-                try {
-                    channel.close();
-                } catch (IOException ioe) {
-                    log.throwing("WriteHandler", "close on exception", ioe);
-                }
+                disconnected(true);
+            } catch (RuntimeException e) {
+                log.throwing("WriteHandler", "completed", e);
+                disconnected(true);
             }
         }
     }
 
-    void disconnected() {
+    void disconnected(boolean wantClose) {
         if (log.isLoggable(Level.FINE)) {
             log.log(Level.FINE,
                 "Disconnected {0} read:{1} wrote:{2}",
                 new Object[] { channel, bytesRead, bytesWritten });
         }
+
+        if (wantClose) {
+            try {
+                channel.close();
+            } catch (IOException ioe) {
+                log.throwing("EchoClient", "disconnected", ioe);
+            }
+        }
+
         totalBytesRead.addAndGet(bytesRead);
         totalBytesWritten.addAndGet(bytesWritten);
         doneSignal.countDown();
@@ -278,9 +275,17 @@ public class EchoClient {
             new VerboseThreadFactory(log, Executors.defaultThreadFactory());
 
         ThreadPoolExecutor executor = (ThreadPoolExecutor)
-            (MAX_THREADS == Integer.MAX_VALUE
-                ? Executors.newCachedThreadPool(threadFactory)
-                : Executors.newFixedThreadPool(MAX_THREADS, threadFactory));
+            ((MAX_THREADS == Integer.MAX_VALUE)
+                 ? Executors.newCachedThreadPool(threadFactory)
+                 : Executors.newFixedThreadPool(MAX_THREADS, threadFactory));
+
+        executor.setKeepAliveTime(10, TimeUnit.SECONDS);
+        executor.setCorePoolSize(NUM_THREADS);
+
+        log.log(Level.INFO,
+            "Prestarting {0,number,integer} threads", NUM_THREADS);
+
+        executor.prestartAllCoreThreads();
 
         AsynchronousChannelProvider provider =
             AsynchronousChannelProvider.provider();
@@ -292,12 +297,6 @@ public class EchoClient {
 
         startSignal = new CountDownLatch(NUM_CLIENTS);
         doneSignal = new CountDownLatch(NUM_CLIENTS);
-
-        log.log(Level.INFO,
-            "Prestarting {0,number,integer} threads", NUM_THREADS);
-
-        executor.setCorePoolSize(NUM_THREADS);
-        executor.prestartAllCoreThreads();
 
         log.log(Level.INFO,
             "Connecting {0,number,integer} clients", NUM_CLIENTS);

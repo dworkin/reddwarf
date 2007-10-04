@@ -84,6 +84,11 @@ class AsyncSocketChannelImpl
         key = group.register(channel);
     }
 
+    @Override
+    public String toString() {
+        return "AsyncSocketChannelImpl:" + key;
+    }
+
     /**
      * {@inheritDoc}
      */
