@@ -95,9 +95,12 @@ class Reactor {
                 // Obtain and release the guard to allow other tasks
                 // to run after waking the selector.
 
-                if (shuttingDown && selector.keys().isEmpty()) {
-                    selector.close();
-                    return false;
+                if (shuttingDown) {
+                    selector.selectNow();
+                    if (selector.keys().isEmpty()) {
+                        selector.close();
+                        return false;
+                    }
                 }
             }
 
