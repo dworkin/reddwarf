@@ -36,11 +36,11 @@ class ReactiveChannelGroup
     protected static final int SHUTDOWN_NOW = 2;
     protected static final int DONE         = 3;
 
-    /** Lock held on updates to lifecycleState. */
-    final ReentrantLock stateLock = new ReentrantLock();
-
-    /** Termination condition. */
-    private final Condition terminationCondition = stateLock.newCondition();
+    /**
+     * Lock held on updates to lifecycleState, and condition variable
+     * for awaiting group termination.
+     */
+    final Object stateLock = new Object();
 
     /**
      * The property to specify the number of reactors to be used by
@@ -101,26 +101,24 @@ class ReactiveChannelGroup
     AsyncKey register(SelectableChannel ch) throws IOException {
         ch.configureBlocking(false);
         AsyncKey asyncKey = null;
-        @SuppressWarnings("hiding")
-        final ReentrantLock stateLock = this.stateLock;
-        stateLock.lock();
-        try {
-            if (lifecycleState != RUNNING)
-                throw new ShutdownChannelGroupException();
+        synchronized (stateLock) {
+            try {
+                if (lifecycleState != RUNNING)
+                    throw new ShutdownChannelGroupException();
 
-            int k = reactorBucketStrategy(ch);
-            Reactor reactor = reactors.get(Math.abs(k % reactors.size()));
-            asyncKey = reactor.register(ch);
-            return asyncKey;
-        } finally {
-            stateLock.unlock();
-            if (asyncKey == null) {
-                try {
-                    ch.close();
-                } catch (Throwable t) {
+                int k = reactorBucketStrategy(ch);
+                Reactor reactor = reactors.get(Math.abs(k % reactors.size()));
+                asyncKey = reactor.register(ch);
+                return asyncKey;
+            } finally {
+                if (asyncKey == null) {
                     try {
-                        log.log(Level.FINE, "exception closing" + ch, t);
-                    } catch (Throwable ignore) {}
+                        ch.close();
+                    } catch (Throwable t) {
+                        try {
+                            log.log(Level.FINE, "exception closing" + ch, t);
+                        } catch (Throwable ignore) {}
+                    }
                 }
             }
         }
@@ -151,19 +149,14 @@ class ReactiveChannelGroup
             } catch (Throwable t) {
                 exception = t;
             }
-            
-            @SuppressWarnings("hiding")
-            final ReentrantLock stateLock =
-                ReactiveChannelGroup.this.stateLock;
-            stateLock.lock();
-            try {
+
+            synchronized (stateLock) {
                 reactors.remove(reactor);
                 tryTerminate();
-            } finally {
-                stateLock.unlock();
-                if (exception != null)
-                    log.log(Level.WARNING, "reactor exception", exception);
             }
+
+            if (exception != null)
+                log.log(Level.WARNING, "reactor exception", exception);
         }
     }
 
@@ -177,19 +170,20 @@ class ReactiveChannelGroup
         throws InterruptedException
     {
         long nanos = unit.toNanos(timeout);
-        @SuppressWarnings("hiding")
-        final ReentrantLock stateLock = this.stateLock;
-        stateLock.lock();
-        try {
+        final long deadline =
+            TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis()) + nanos;
+
+        synchronized (stateLock) {
             for (;;) {
-                if (lifecycleState == DONE   )
+                if (lifecycleState == DONE)
                     return true;
                 if (nanos <= 0)
                     return false;
-                nanos = terminationCondition.awaitNanos(nanos);
+                long millis = TimeUnit.NANOSECONDS.toMillis(nanos);
+                stateLock.wait(millis, (int) (nanos % 1000000));
+                nanos = deadline -
+                    TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis());
             }
-        } finally {
-            stateLock.unlock();
         }
     }
 
@@ -214,10 +208,7 @@ class ReactiveChannelGroup
      */
     @Override
     public ReactiveChannelGroup shutdown() {
-        @SuppressWarnings("hiding")
-        final ReentrantLock stateLock = this.stateLock;
-        stateLock.lock();
-        try {
+        synchronized (stateLock) {
             if (lifecycleState < SHUTDOWN)
                 lifecycleState = SHUTDOWN;
 
@@ -227,8 +218,6 @@ class ReactiveChannelGroup
             tryTerminate();
 
             return this;
-        } finally {
-            stateLock.unlock();
         }
     }
 
@@ -237,10 +226,7 @@ class ReactiveChannelGroup
      */
     @Override
     public ReactiveChannelGroup shutdownNow() throws IOException {
-        @SuppressWarnings("hiding")
-        final ReentrantLock stateLock = this.stateLock;
-        stateLock.lock();
-        try {
+        synchronized (stateLock) {
             if (lifecycleState < SHUTDOWN_NOW)
                 lifecycleState = SHUTDOWN_NOW;
 
@@ -253,8 +239,6 @@ class ReactiveChannelGroup
             tryTerminate();
 
             return this;
-        } finally {
-            stateLock.unlock();
         }
     }
 
@@ -266,14 +250,15 @@ class ReactiveChannelGroup
      * NOTE: Must be called with stateLock held!
      */
     private void tryTerminate() {
-        assert stateLock.isHeldByCurrentThread();
-
         if (lifecycleState == RUNNING || lifecycleState == DONE)
             return;
 
+        if (log.isLoggable(Level.FINER))
+            log.log(Level.FINER, "tryTerminate reactors = ", reactors.size());
+
         if (reactors.isEmpty()) {
             lifecycleState = DONE;
-            terminationCondition.signalAll();
+            stateLock.notifyAll();
             log.log(Level.FINE, "terminated {0}", this);
         }
     }
