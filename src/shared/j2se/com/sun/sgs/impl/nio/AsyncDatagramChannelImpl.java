@@ -15,6 +15,7 @@ import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.DatagramChannel;
@@ -472,7 +473,12 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    return channel.receive(dst);
+                    try {
+                        return channel.receive(dst);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -491,7 +497,12 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.send(src, target);
+                    try {
+                        return channel.send(src, target);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -509,7 +520,12 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.read(dst);
+                    try {
+                        return channel.read(dst);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -527,7 +543,12 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.write(src);
+                    try {
+                        return channel.write(src);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 

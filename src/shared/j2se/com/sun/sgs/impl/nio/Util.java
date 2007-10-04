@@ -208,4 +208,18 @@ final class Util {
                         (((ops & OP_ACCEPT)  != 0) ? 8 : 0)];
     }
 
+    static String opName(int op) {
+        switch (op) {
+        case OP_READ:
+            return "OP_READ";
+        case OP_WRITE:
+            return "OP_WRITE";
+        case OP_CONNECT:
+            return "OP_CONNECT";
+        case OP_ACCEPT:
+            return "OP_ACCEPT";
+        default:
+            return "unknownOp";
+        }
+    }
 }

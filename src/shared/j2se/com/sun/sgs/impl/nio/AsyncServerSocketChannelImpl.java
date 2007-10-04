@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.UnresolvedAddressException;
@@ -201,8 +202,13 @@ final class AsyncServerSocketChannelImpl
         return key.execute(OP_ACCEPT, attachment, handler,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
-                    return new AsyncSocketChannelImpl(
-                        group, channel.accept());
+                    try {
+                        return new AsyncSocketChannelImpl(
+                            group, channel.accept());
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 }

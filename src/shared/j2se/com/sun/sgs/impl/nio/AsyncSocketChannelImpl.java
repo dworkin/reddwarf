@@ -14,6 +14,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SocketChannel;
@@ -315,8 +316,13 @@ class AsyncSocketChannelImpl
         return key.execute(OP_CONNECT, attachment, handler,
                 new Callable<Void>() {
                     public Void call() throws IOException {
-                        channel.finishConnect();
-                        return null;
+                        try {
+                            channel.finishConnect();
+                            return null;
+                        } catch (ClosedChannelException e) {
+                            throw Util.initCause(
+                                new AsynchronousCloseException(), e);
+                        }
                     }});
     }
 
@@ -334,7 +340,12 @@ class AsyncSocketChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.read(dst);
+                    try {
+                        return channel.read(dst);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -359,7 +370,12 @@ class AsyncSocketChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return channel.read(dsts, offset, length);
+                    try {
+                        return channel.read(dsts, offset, length);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -377,7 +393,12 @@ class AsyncSocketChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return channel.write(src);
+                    try {
+                        return channel.write(src);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 
@@ -402,7 +423,12 @@ class AsyncSocketChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return channel.write(srcs, offset, length);
+                    try {
+                        return channel.write(srcs, offset, length);
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
                 }});
     }
 }

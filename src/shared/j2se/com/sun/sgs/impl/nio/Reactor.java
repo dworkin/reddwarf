@@ -94,20 +94,18 @@ class Reactor {
             synchronized (selectorLock) {
                 // Obtain and release the guard to allow other tasks
                 // to run after waking the selector.
-
-                if (shuttingDown) {
-                    log.log(Level.FINER, "checking shutdown");
-                    selector.selectNow();
-                    log.log(Level.FINER, "want shutdown; keys = {0}",
-                        selector.keys().size());
-                    if (selector.keys().isEmpty()) {
-                        selector.close();
-                        return false;
-                    }
-                }
             }
 
             int numKeys = selector.keys().size();
+
+            if (shuttingDown) {
+                selector.selectNow();
+                log.log(Level.FINEST, "want shutdown, {0} keys", numKeys);
+                if (numKeys == 0) {
+                    selector.close();
+                    return false;
+                }
+            }
 
             log.log(Level.FINER, "select {0}", numKeys);            
             int rc = selector.select(getSelectorTimeout(timeouts));
@@ -199,7 +197,7 @@ class Reactor {
                         throw new NotYetConnectedException();
                 }
             }
-            // checkPending(interestOps, op);
+
             interestOps |= op;
             key.interestOps(interestOps);
             if (log.isLoggable(Level.FINEST)) {
@@ -215,31 +213,14 @@ class Reactor {
         return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
     }
 
-    class AsyncOp<R> extends FutureTask<R> {
+    static class AsyncOp<R> extends FutureTask<R> {
 
-        AsyncOp(Callable<R> callable)
-        {
+        AsyncOp(Callable<R> callable) {
             super(callable);
         }
 
-        /**
-         * {@inheritDoc}
-         * 
-         * Overridden to make public
-         */
-        @Override
-        public void set(R v) {
-            super.set(v);
-        }
-
-        /**
-         * {@inheritDoc}
-         * 
-         * Overridden to make public
-         */
-        @Override
-        public void setException(Throwable t) {
-            super.setException(t);
+        void timeoutExpired() {
+            setException(new AbortedByTimeoutException());
         }
     }
 
@@ -269,9 +250,10 @@ class Reactor {
             Runnable selectedTask = task.getAndSet(null);
             if (selectedTask == null) {
                 log.log(Level.FINEST,
-                    "selected but nothing to do {0}", asyncKey);
+                    "selected but nothing to do {0}", this);
                 return;
             } else {
+                log.log(Level.FINER, "selected {0}", this);
                 selectedTask.run();
             }
         }
@@ -304,14 +286,15 @@ class Reactor {
             return AttachedFuture.wrap(opTask, attachment);
         }
 
-        void timedOut() {
+        void timeoutExpired() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
             if (expiredTask == null) {
                 log.log(Level.FINEST,
-                    "timed out but nothing to do {0}", asyncKey);
+                    "timed out but nothing to do {0}", this);
                 return;
             } else {
-                expiredTask.setException(new AbortedByTimeoutException());
+                log.log(Level.FINER, "timeout {0}", this);
+                expiredTask.timeoutExpired();
             }
         }
 
@@ -347,6 +330,12 @@ class Reactor {
             timeouts.add(timeoutHandler);
 
             return AttachedFuture.wrap(opTask, attachment);
+        }
+        
+        @Override
+        public String toString() {
+            return String.format("PendingOp[key=%s,op=%s]",
+                asyncKey, Util.opName(op));
         }
     }
 
@@ -393,7 +382,7 @@ class Reactor {
                     return;
                 reactor.unregister(this);
             }
-            log.log(Level.FINE, "closing {0}", this);
+            log.log(Level.FINER, "closing {0}", this);
             pendingAccept.selected();
             pendingConnect.selected();
             pendingRead.selected();
@@ -516,7 +505,7 @@ class Reactor {
 
         /** {@inheritDoc} */
         public void run() {
-            task.timedOut();
+            task.timeoutExpired();
         }
     }
 }
