@@ -96,6 +96,11 @@ class Reactor {
                 return false;
             }
 
+            if (shuttingDown && selector.keys().isEmpty()) {
+                selector.close();
+                return false;
+            }
+
             int numKeys = selector.keys().size();
 
             log.log(Level.FINER, "select {0}", numKeys);            
@@ -103,11 +108,6 @@ class Reactor {
             if (log.isLoggable(Level.FINER)) {
                 log.log(Level.FINER, "selected {0} / {1}",
                     new Object[] { rc, numKeys });
-            }
-
-            if (shuttingDown && selector.keys().isEmpty()) {
-                selector.close();
-                return false;
             }
 
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
