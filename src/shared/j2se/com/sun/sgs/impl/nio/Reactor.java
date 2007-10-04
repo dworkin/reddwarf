@@ -385,6 +385,9 @@ class Reactor {
          */
         public void close() throws IOException {
             log.log(Level.FINER, "closing {0}", this);
+            if (! key.isValid()) {
+                log.log(Level.FINE, "key is already invalid {0}", this);
+            }
             Reactor.this.unregister(this);
             try {
                 key.channel().close();

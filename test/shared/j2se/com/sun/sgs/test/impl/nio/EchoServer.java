@@ -210,7 +210,9 @@ public class EchoServer {
 
         try {
             channel.close();
-        } catch (IOException ignore) { }
+        } catch (IOException e) {
+            log.throwing("EchoServer", "disconnected", e);
+        }
         
         if (nConn == 0) {
             log.info("Closing acceptor");
