@@ -262,7 +262,8 @@ class Reactor {
         void selected() {
             Runnable selectedTask = task.getAndSet(null);
             if (selectedTask == null) {
-                log.log(Level.WARNING, "selected but nothing to do");
+                log.log(Level.FINER,
+                    "selected but nothing to do {0}", asyncKey);
                 return;
             } else {
                 selectedTask.run();
@@ -300,7 +301,8 @@ class Reactor {
         void timedOut() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
             if (expiredTask == null) {
-                log.log(Level.WARNING, "timed out but nothing to do");
+                log.log(Level.FINER,
+                    "timed out but nothing to do {0}", asyncKey);
                 return;
             } else {
                 expiredTask.setException(new AbortedByTimeoutException());
@@ -385,6 +387,7 @@ class Reactor {
                     return;
                 reactor.unregister(this);
             }
+            log.log(Level.FINE, "closing {0}", this);
             pendingAccept.selected();
             pendingConnect.selected();
             pendingRead.selected();
