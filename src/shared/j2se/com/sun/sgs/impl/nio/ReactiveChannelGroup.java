@@ -10,8 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -101,25 +99,23 @@ class ReactiveChannelGroup
     AsyncKey register(SelectableChannel ch) throws IOException {
         ch.configureBlocking(false);
         AsyncKey asyncKey = null;
+        Reactor reactor = null;
         synchronized (stateLock) {
-            try {
-                if (lifecycleState != RUNNING)
-                    throw new ShutdownChannelGroupException();
+            if (lifecycleState != RUNNING)
+                throw new ShutdownChannelGroupException();
 
-                int k = reactorBucketStrategy(ch);
-                Reactor reactor = reactors.get(Math.abs(k % reactors.size()));
-                asyncKey = reactor.register(ch);
-                return asyncKey;
-            } finally {
-                if (asyncKey == null) {
-                    try {
-                        ch.close();
-                    } catch (Throwable t) {
-                        try {
-                            log.log(Level.FINE, "exception closing" + ch, t);
-                        } catch (Throwable ignore) {}
-                    }
-                }
+            int k = reactorBucketStrategy(ch);
+            reactor = reactors.get(Math.abs(k % reactors.size()));
+        }
+    
+        try {
+            asyncKey = reactor.register(ch);
+            return asyncKey;
+        } finally {
+            if (asyncKey == null) {
+                try {
+                    ch.close();
+                } catch (Throwable ignore) {}
             }
         }
     }
@@ -253,13 +249,15 @@ class ReactiveChannelGroup
         if (lifecycleState == RUNNING || lifecycleState == DONE)
             return;
 
-        if (log.isLoggable(Level.FINER))
-            log.log(Level.FINER, "tryTerminate reactors = ", reactors.size());
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, " {0} tryTerminate: {1} reactors",
+                new Object[] { this, reactors.size() });
+        }
 
         if (reactors.isEmpty()) {
             lifecycleState = DONE;
             stateLock.notifyAll();
-            log.log(Level.FINE, "terminated {0}", this);
+            log.log(Level.FINE, "{0} terminated", this);
         }
     }
 

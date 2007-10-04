@@ -198,13 +198,18 @@ public class EchoServer {
     }
 
     void disconnected(AsynchronousSocketChannel channel) {
-        log.log(Level.FINE, "Disconnected {0}", channel);
+        int nConn = numConnections.decrementAndGet();
+
+        if (log.isLoggable(Level.FINE)) {
+            log.log(Level.FINE, "Disconnected {0}, {1} connections open",
+                new Object[] { channel, nConn });
+        }
 
         try {
             channel.close();
         } catch (IOException ignore) { }
         
-        if (numConnections.decrementAndGet() == 0) {
+        if (nConn == 0) {
             log.info("Closing acceptor");
             try {
                 acceptor.close();

@@ -34,6 +34,7 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
 
 class Reactor {
@@ -86,7 +87,7 @@ class Reactor {
         try {
 
             if (! selector.isOpen()) {
-                log.log(Level.WARNING, "selector is closed", this);
+                log.log(Level.WARNING, "{0} selector is closed", this);
                 return false;
             }
 
@@ -99,18 +100,24 @@ class Reactor {
 
             if (shuttingDown) {
                 selector.selectNow();
-                log.log(Level.FINEST, "want shutdown, {0} keys", numKeys);
+                if (log.isLoggable(Level.FINER)) {
+                    log.log(Level.FINER, "{0} wants shutdown, {1} keys",
+                        new Object[] { this, numKeys });
+                }
                 if (numKeys == 0) {
                     selector.close();
                     return false;
                 }
             }
 
-            log.log(Level.FINER, "select {0}", numKeys);            
-            int rc = selector.select(getSelectorTimeout(timeouts));
             if (log.isLoggable(Level.FINER)) {
-                log.log(Level.FINER, "selected {0} / {1}",
-                    new Object[] { rc, numKeys });
+                log.log(Level.FINER, "{0} select on {1} keys",
+                    new Object[] { this, numKeys });
+            }
+            int rc = selector.select(getSelectorTimeout(timeouts));
+            if (log.isLoggable(Level.FINE)) {
+                log.log(Level.FINE, "{0} selected {1} / {2}",
+                    new Object[] { this, rc, numKeys });
             }
 
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -141,8 +148,7 @@ class Reactor {
                     expired.run();
             }
         } catch (Throwable t) {
-            // TODO
-            log.log(Level.WARNING, "reactor loop", t);
+            log.log(Level.WARNING, this.toString(), t);
             return false;
         }
 
@@ -152,13 +158,13 @@ class Reactor {
     ReactiveAsyncKey
     register(SelectableChannel ch) throws IOException {
         synchronized (selectorLock) {
+            if (shuttingDown)
+                throw new ShutdownChannelGroupException();
+
             selector.wakeup();
             SelectionKey key = ch.register(selector, 0);
-            if (! selector.isOpen()) {
-                key.cancel();
-                throw new CancelledKeyException();
-            }
-            ReactiveAsyncKey asyncKey = new ReactiveAsyncKey(this, key);
+
+            ReactiveAsyncKey asyncKey = new ReactiveAsyncKey(key);
             key.attach(asyncKey);
             return asyncKey;
         }
@@ -178,9 +184,7 @@ class Reactor {
             SelectionKey key = asyncKey.key;
             SelectableChannel channel = asyncKey.channel();
             if (key == null || (! key.isValid())) {
-                if (log.isLoggable(Level.FINER)) {
-                    log.log(Level.FINER, "awaitReady {0} : invalid ", this);
-                }
+                log.log(Level.FINE, "awaitReady {0} : invalid ", this);
                 throw new ClosedAsynchronousChannelException();
             }
             int interestOps = key.interestOps();
@@ -330,7 +334,7 @@ class Reactor {
 
             return AttachedFuture.wrap(opTask, attachment);
         }
-        
+
         @Override
         public String toString() {
             return String.format("PendingOp[key=%s,op=%s]",
@@ -340,7 +344,6 @@ class Reactor {
 
     class ReactiveAsyncKey implements AsyncKey {
 
-        final Reactor reactor;
         final SelectionKey key;
 
         final PendingOperation pendingAccept =
@@ -367,8 +370,7 @@ class Reactor {
                     throw new WritePendingException();
                 }};
 
-        ReactiveAsyncKey(Reactor reactor, SelectionKey key) {
-            this.reactor = reactor;
+        ReactiveAsyncKey(SelectionKey key) {
             this.key = key;
         }
 
@@ -376,12 +378,8 @@ class Reactor {
          * {@inheritDoc}
          */
         public void close() throws IOException {
-            synchronized (this) {
-                if (! key.isValid())
-                    return;
-                reactor.unregister(this);
-            }
             log.log(Level.FINER, "closing {0}", this);
+            Reactor.this.unregister(this);
             pendingAccept.selected();
             pendingConnect.selected();
             pendingRead.selected();
@@ -412,10 +410,6 @@ class Reactor {
          */
         public SelectableChannel channel() {
             return key.channel();
-        }
-        
-        Reactor reactor() {
-            return reactor;
         }
 
         /**
@@ -477,6 +471,13 @@ class Reactor {
          */
         public void execute(Runnable command) {
             executor.execute(command);
+        }
+
+        @Override
+        public String toString() {
+            return String.format(
+                "ReactiveAsyncKey[reactor=%s,channel=%s,valid=%b]",
+                Reactor.this, key.channel(), key.isValid());
         }
     }
 
