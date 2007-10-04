@@ -17,14 +17,14 @@ import com.sun.sgs.nio.channels.IoFuture;
  * TODO doc
  * @param <T> 
  */
-interface AsyncKey<T extends SelectableChannel>
+interface AsyncKey
     extends Closeable, Executor
 {
     /**
      * TODO doc
      * @return the channel
      */
-    T channel();
+    SelectableChannel channel();
     
     /**
      * TODO doc

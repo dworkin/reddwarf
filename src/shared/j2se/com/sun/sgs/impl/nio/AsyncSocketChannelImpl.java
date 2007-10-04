@@ -53,7 +53,8 @@ class AsyncSocketChannelImpl
     }
 
     final AsyncGroupImpl group;
-    final AsyncKey<SocketChannel> key;
+    final SocketChannel channel;
+    final AsyncKey key;
 
     /**
      * TODO doc
@@ -78,6 +79,7 @@ class AsyncSocketChannelImpl
     {
         super(group.provider());
         this.group = group;
+        this.channel = channel;
         key = group.register(channel);
     }
 
@@ -85,7 +87,7 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return key.channel().isOpen();
+        return channel.isOpen();
     }
 
     /**
@@ -110,7 +112,7 @@ class AsyncSocketChannelImpl
         if ((inetLocal != null) && inetLocal.isUnresolved())
             throw new UnresolvedAddressException();
 
-        final Socket socket = key.channel().socket();
+        final Socket socket = channel.socket();
         try {
             socket.bind(inetLocal);
         } catch (SocketException e) {
@@ -126,7 +128,7 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return key.channel().socket().getLocalSocketAddress();
+        return channel.socket().getLocalSocketAddress();
     }
 
     /**
@@ -143,7 +145,7 @@ class AsyncSocketChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final Socket socket = key.channel().socket();
+        final Socket socket = channel.socket();
         
         try {
             switch (stdOpt) {
@@ -187,7 +189,7 @@ class AsyncSocketChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final Socket socket = key.channel().socket();
+        final Socket socket = channel.socket();
         try {
             switch (stdOpt) {
             case SO_SNDBUF:
@@ -229,7 +231,7 @@ class AsyncSocketChannelImpl
     public AsyncSocketChannelImpl shutdown(ShutdownType how)
         throws IOException
     {
-        final Socket socket = key.channel().socket();
+        final Socket socket = channel.socket();
         try {
             synchronized (key) {
                 if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
@@ -260,7 +262,7 @@ class AsyncSocketChannelImpl
      */
     @Override
     public SocketAddress getConnectedAddress() throws IOException {
-        return key.channel().socket().getRemoteSocketAddress();
+        return channel.socket().getRemoteSocketAddress();
     }
 
     /**
@@ -268,7 +270,7 @@ class AsyncSocketChannelImpl
      */
     @Override
     public boolean isConnectionPending() {
-        return key.channel().isConnectionPending();
+        return channel.isConnectionPending();
     }
 
     /**
@@ -297,7 +299,7 @@ class AsyncSocketChannelImpl
         final CompletionHandler<Void, ? super A> handler)
     {
         try {
-            if (key.channel().connect(remote)) {
+            if (channel.connect(remote)) {
                 Future<Void> result = Util.finishedFuture(null);
                 group.executeCompletion(handler, attachment, result);
                 return AttachedFuture.wrap(result, attachment);
@@ -313,7 +315,7 @@ class AsyncSocketChannelImpl
         return key.execute(OP_CONNECT, attachment, handler,
                 new Callable<Void>() {
                     public Void call() throws IOException {
-                        key.channel().finishConnect();
+                        channel.finishConnect();
                         return null;
                     }});
     }
@@ -332,7 +334,7 @@ class AsyncSocketChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return key.channel().read(dst);
+                    return channel.read(dst);
                 }});
     }
 
@@ -357,7 +359,7 @@ class AsyncSocketChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return key.channel().read(dsts, offset, length);
+                    return channel.read(dsts, offset, length);
                 }});
     }
 
@@ -375,7 +377,7 @@ class AsyncSocketChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return key.channel().write(src);
+                    return channel.write(src);
                 }});
     }
 
@@ -400,7 +402,7 @@ class AsyncSocketChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Long>() {
                 public Long call() throws IOException {
-                    return key.channel().write(srcs, offset, length);
+                    return channel.write(srcs, offset, length);
                 }});
     }
 }

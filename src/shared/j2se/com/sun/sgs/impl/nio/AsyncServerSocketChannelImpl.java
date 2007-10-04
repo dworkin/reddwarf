@@ -42,8 +42,9 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncKey<ServerSocketChannel> key;
     final AsyncGroupImpl group;
+    final ServerSocketChannel channel;
+    final AsyncKey key;
 
     /**
      * TODO doc
@@ -55,8 +56,7 @@ final class AsyncServerSocketChannelImpl
     {
         super(group.provider());
         this.group = group;
-        ServerSocketChannel channel =
-            group.selectorProvider().openServerSocketChannel();
+        channel = group.selectorProvider().openServerSocketChannel();
         key = group.register(channel);
     }
 
@@ -64,7 +64,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return key.channel().isOpen();
+        return channel.isOpen();
     }
 
     /**
@@ -90,7 +90,7 @@ final class AsyncServerSocketChannelImpl
         if ((inetLocal != null) && inetLocal.isUnresolved())
             throw new UnresolvedAddressException();
 
-        final ServerSocket socket = key.channel().socket();
+        final ServerSocket socket = channel.socket();
 
         try {
             socket.bind(local, backlog);
@@ -107,7 +107,7 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return key.channel().socket().getLocalSocketAddress();
+        return channel.socket().getLocalSocketAddress();
     }
 
     /**
@@ -124,7 +124,7 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = key.channel().socket();
+        final ServerSocket socket = channel.socket();
         
         try {
             switch (stdOpt) {
@@ -155,7 +155,7 @@ final class AsyncServerSocketChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final ServerSocket socket = key.channel().socket();
+        final ServerSocket socket = channel.socket();
         
         try {
             switch (stdOpt) {
@@ -202,7 +202,7 @@ final class AsyncServerSocketChannelImpl
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     return new AsyncSocketChannelImpl(
-                        group, key.channel().accept());
+                        group, channel.accept());
                 }});
     }
 }

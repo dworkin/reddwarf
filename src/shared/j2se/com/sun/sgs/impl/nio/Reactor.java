@@ -116,8 +116,8 @@ class Reactor {
                 SelectionKey key = keys.next();
                 keys.remove();
 
-                ReactiveAsyncKey<?> asyncKey =
-                    (ReactiveAsyncKey<?>) key.attachment();
+                ReactiveAsyncKey asyncKey =
+                    (ReactiveAsyncKey) key.attachment();
 
                 int readyOps;
                 synchronized (asyncKey) {
@@ -146,8 +146,8 @@ class Reactor {
         return true;
     }
 
-    <T extends SelectableChannel> ReactiveAsyncKey<T>
-    register(T ch) throws IOException {
+    ReactiveAsyncKey
+    register(SelectableChannel ch) throws IOException {
         synchronized (selectorLock) {
             selector.wakeup();
             SelectionKey key = ch.register(selector, 0);
@@ -155,26 +155,25 @@ class Reactor {
                 key.cancel();
                 throw new CancelledKeyException();
             }
-            ReactiveAsyncKey<T> asyncKey = new ReactiveAsyncKey<T>(this, key);
+            ReactiveAsyncKey asyncKey = new ReactiveAsyncKey(this, key);
             key.attach(asyncKey);
             return asyncKey;
         }
     }
 
     void
-    unregister(ReactiveAsyncKey<? extends SelectableChannel> asyncKey) {
+    unregister(ReactiveAsyncKey asyncKey) {
         asyncKey.key.cancel();
         selector.wakeup();
     }
 
     <R, A> void
-    awaitReady(SelectableChannel channel,
-               int op,
-               AsyncOp<R> task)
+    awaitReady(ReactiveAsyncKey asyncKey, int op, AsyncOp<R> task)
     {
         synchronized (selectorLock) {
             selector.wakeup();
-            SelectionKey key = channel.keyFor(selector);
+            SelectionKey key = asyncKey.key;
+            SelectableChannel channel = asyncKey.channel();
             if (key == null || (! key.isValid())) {
                 if (log.isLoggable(Level.FINER)) {
                     log.log(Level.FINER, "awaitReady {0} : invalid ", this);
@@ -238,13 +237,22 @@ class Reactor {
         }
     }
 
-    class Something {
+    class PendingOperation {
 
-        /**
-         * TODO doc
-         */
+        /** TODO doc */
         protected final AtomicReference<AsyncOp<?>> task =
             new AtomicReference<AsyncOp<?>>();
+
+        private volatile TimeoutHandler timeoutHandler = null;
+
+        private final ReactiveAsyncKey asyncKey;
+
+        private final int op;
+
+        PendingOperation(ReactiveAsyncKey asyncKey, int op) {
+            this.asyncKey = asyncKey;
+            this.op = op;
+        }
 
         /**
          * TODO doc
@@ -279,14 +287,15 @@ class Reactor {
             if (! task.compareAndSet(null, opTask))
                 pendingPolicy();
 
+            try {
+                Reactor.this.awaitReady(asyncKey, op, opTask);
+            } catch (RuntimeException e) {
+                task.set(null);
+                throw e;
+            }
+
             return AttachedFuture.wrap(opTask, attachment);
         }
-    }
-
-    class TimedSomething extends Something {
-
-        /** TODO doc */
-        protected volatile TimeoutHandler timeoutHandler = null;
 
         void timedOut() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
@@ -314,13 +323,13 @@ class Reactor {
             AsyncOp<R> opTask = new AsyncOp<R>(callable) {
                 @Override
                 protected void done() {
-                    try {
-                        timeouts.remove(timeoutHandler);
-                    } catch (Throwable t) {
-                        // ignore
+                    if (timeoutHandler != null) {
+                        try {
+                            timeouts.remove(timeoutHandler);
+                        } catch (Throwable ignore) { }
+                        timeoutHandler = null;
                     }
-                    timeoutHandler = null;
-                    super.done();
+                    group.executeCompletion(handler, attachment, this);
                 }};
 
             if (! task.compareAndSet(null, opTask))
@@ -333,30 +342,34 @@ class Reactor {
         }
     }
 
-    class ReactiveAsyncKey<T extends SelectableChannel> implements AsyncKey<T> {
+    class ReactiveAsyncKey implements AsyncKey {
 
         final Reactor reactor;
         final SelectionKey key;
 
-        final Something acceptThing = new Something() {
-            protected void pendingPolicy() {
-                throw new AcceptPendingException();
-            }};
+        final PendingOperation pendingAccept =
+            new PendingOperation(this, OP_ACCEPT) {
+                protected void pendingPolicy() {
+                    throw new AcceptPendingException();
+                }};
 
-        final Something connectThing = new Something() {
-            protected void pendingPolicy() {
-                throw new ConnectionPendingException();
-            }};
+        final PendingOperation pendingConnect =
+            new PendingOperation(this, OP_CONNECT) {
+                protected void pendingPolicy() {
+                    throw new ConnectionPendingException();
+                }};
 
-        final TimedSomething readThing = new TimedSomething() {
-            protected void pendingPolicy() {
-                throw new ReadPendingException();
-            }};
+        final PendingOperation pendingRead =
+            new PendingOperation(this, OP_READ) {
+                protected void pendingPolicy() {
+                    throw new ReadPendingException();
+                }};
 
-        final TimedSomething writeThing = new TimedSomething() {
-            protected void pendingPolicy() {
-                throw new WritePendingException();
-            }};
+        final PendingOperation pendingWrite = 
+            new PendingOperation(this, OP_WRITE) {
+                protected void pendingPolicy() {
+                    throw new WritePendingException();
+                }};
 
         ReactiveAsyncKey(Reactor reactor, SelectionKey key) {
             this.reactor = reactor;
@@ -372,10 +385,10 @@ class Reactor {
                     return;
                 reactor.unregister(this);
             }
-            acceptThing.selected();
-            connectThing.selected();
-            readThing.selected();
-            writeThing.selected();
+            pendingAccept.selected();
+            pendingConnect.selected();
+            pendingRead.selected();
+            pendingWrite.selected();
             key.channel().close();
         }
 
@@ -385,13 +398,13 @@ class Reactor {
         public boolean isOpPending(int op) {
             switch (op) {
             case OP_ACCEPT:
-                return acceptThing.isPending();
+                return pendingAccept.isPending();
             case OP_CONNECT:
-                return connectThing.isPending();
+                return pendingConnect.isPending();
             case OP_READ:
-                return readThing.isPending();
+                return pendingRead.isPending();
             case OP_WRITE:
-                return writeThing.isPending();
+                return pendingWrite.isPending();
             default:
                 throw new AssertionError("bad op " + op);
             }
@@ -400,9 +413,8 @@ class Reactor {
         /**
          * {@inheritDoc}
          */
-        @SuppressWarnings("unchecked")
-        public T channel() {
-            return (T) key.channel();
+        public SelectableChannel channel() {
+            return key.channel();
         }
         
         Reactor reactor() {
@@ -414,13 +426,13 @@ class Reactor {
          */
         public void selected(int ops) {
             if ((ops & OP_WRITE) != 0)
-                writeThing.selected();
+                pendingWrite.selected();
             if ((ops & OP_READ) != 0)
-                readThing.selected();
+                pendingRead.selected();
             if ((ops & OP_CONNECT) != 0)
-                connectThing.selected();
+                pendingConnect.selected();
             if ((ops & OP_ACCEPT) != 0)
-                acceptThing.selected();
+                pendingAccept.selected();
         }
 
         /**
@@ -432,10 +444,10 @@ class Reactor {
         {
             switch (op) {
             case OP_READ:
-                return readThing.execute(
+                return pendingRead.execute(
                     attachment, handler, timeout, unit, callable);
             case OP_WRITE:
-                return writeThing.execute(
+                return pendingWrite.execute(
                     attachment, handler, timeout, unit, callable);
             default:
                 throw new AssertionError("bad op " + op);
@@ -451,13 +463,13 @@ class Reactor {
         {
             switch (op) {
             case OP_ACCEPT:
-                return acceptThing.execute(attachment, handler, callable);
+                return pendingAccept.execute(attachment, handler, callable);
             case OP_CONNECT:
-                return connectThing.execute(attachment, handler, callable);
+                return pendingConnect.execute(attachment, handler, callable);
             case OP_READ:
-                return readThing.execute(attachment, handler, callable);
+                return pendingRead.execute(attachment, handler, callable);
             case OP_WRITE:
-                return writeThing.execute(attachment, handler, callable);
+                return pendingWrite.execute(attachment, handler, callable);
             default:
                 throw new AssertionError("bad op " + op);
             }
@@ -473,11 +485,11 @@ class Reactor {
 
 
     class TimeoutHandler implements Delayed, Runnable {
-        private final TimedSomething task;
+        private final PendingOperation task;
         private final long timeout;
         private final TimeUnit timeUnit;
 
-        TimeoutHandler(TimedSomething task, long timeout, TimeUnit unit) {
+        TimeoutHandler(PendingOperation task, long timeout, TimeUnit unit) {
             this.task = task;
             this.timeout = timeout;
             this.timeUnit = unit;

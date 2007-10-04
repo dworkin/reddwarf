@@ -44,8 +44,8 @@ abstract class AsyncGroupImpl
         this.executor = executor;
     }
 
-    abstract <T extends SelectableChannel> AsyncKey<T>
-    register(T ch) throws IOException;
+    abstract AsyncKey
+    register(SelectableChannel ch) throws IOException;
 
     <R, A> void
     executeCompletion(CompletionHandler<R, A> handler,

@@ -77,7 +77,8 @@ class AsyncDatagramChannelImpl
         DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
 
     final AsyncGroupImpl channelGroup;
-    final AsyncKey<DatagramChannel> key;
+    final DatagramChannel channel;
+    final AsyncKey key;
     final ProtocolFamily protocolFamily;
 
     final ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl> mcastKeys =
@@ -104,8 +105,7 @@ class AsyncDatagramChannelImpl
 
         protocolFamily = (pf != null) ? pf : DEFAULT_PROTOCOL_FAMILY;
 
-        DatagramChannel channel =
-            group.selectorProvider().openDatagramChannel();
+        channel = group.selectorProvider().openDatagramChannel();
         key = group.register(channel);
     }
 
@@ -113,7 +113,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public boolean isOpen() {
-        return key.channel().isOpen();
+        return channel.isOpen();
     }
 
     /**
@@ -149,7 +149,7 @@ class AsyncDatagramChannelImpl
         if ((inetLocal != null) && inetLocal.isUnresolved())
             throw new UnresolvedAddressException();
 
-        final DatagramSocket socket = key.channel().socket();
+        final DatagramSocket socket = channel.socket();
         try {
             socket.bind(inetLocal);
         } catch (SocketException e) {
@@ -166,7 +166,7 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public SocketAddress getLocalAddress() throws IOException {
-        return key.channel().socket().getLocalSocketAddress();
+        return channel.socket().getLocalSocketAddress();
     }
 
     /**
@@ -183,7 +183,7 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Bad parameter for " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = key.channel().socket();
+        final DatagramSocket socket = channel.socket();
         
         try {
             switch (stdOpt) {
@@ -246,7 +246,7 @@ class AsyncDatagramChannelImpl
             throw new IllegalArgumentException("Unsupported option " + name);
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
-        final DatagramSocket socket = key.channel().socket();
+        final DatagramSocket socket = channel.socket();
         
         try {
             switch (stdOpt) {
@@ -305,10 +305,10 @@ class AsyncDatagramChannelImpl
     public MembershipKey join(InetAddress group, NetworkInterface interf)
         throws IOException
     {
-        if (!(key.channel().socket() instanceof MulticastSocket))
+        if (!(channel.socket() instanceof MulticastSocket))
             throw new UnsupportedOperationException("not a multicast socket");
 
-        MulticastSocket msocket = ((MulticastSocket) key.channel().socket());
+        MulticastSocket msocket = ((MulticastSocket) channel.socket());
 
         if (group == null)
             throw new NullPointerException("null multicast group");
@@ -366,7 +366,7 @@ class AsyncDatagramChannelImpl
     @Override
     public SocketAddress getConnectedAddress() throws IOException
     {
-        return key.channel().socket().getRemoteSocketAddress();
+        return channel.socket().getRemoteSocketAddress();
     }
 
     /**
@@ -389,7 +389,7 @@ class AsyncDatagramChannelImpl
             new Callable<Void>() {
                 public Void call() throws IOException {
                     try {
-                        key.channel().connect(remote);
+                        channel.connect(remote);
                     } catch (ClosedChannelException e) {
                         throw Util.initCause(
                             new ClosedAsynchronousChannelException(), e);
@@ -403,7 +403,7 @@ class AsyncDatagramChannelImpl
                 }
             };
 
-        if (! key.channel().isOpen())
+        if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
 
         if (! connectionPending.compareAndSet(false, true))
@@ -423,10 +423,10 @@ class AsyncDatagramChannelImpl
         FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    if (! key.channel().isOpen())
+                    if (! channel.isOpen())
                         throw new ClosedAsynchronousChannelException();
 
-                    key.channel().disconnect();
+                    channel.disconnect();
                     return null;
                 }})
             {
@@ -435,7 +435,7 @@ class AsyncDatagramChannelImpl
                 }
             };
 
-        if (! key.channel().isOpen())
+        if (! channel.isOpen())
             throw new ClosedAsynchronousChannelException();
 
         key.execute(task);
@@ -472,7 +472,7 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<SocketAddress>() {
                 public SocketAddress call() throws IOException {
-                    return key.channel().receive(dst);
+                    return channel.receive(dst);
                 }});
     }
 
@@ -491,7 +491,7 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return key.channel().send(src, target);
+                    return channel.send(src, target);
                 }});
     }
 
@@ -509,7 +509,7 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return key.channel().read(dst);
+                    return channel.read(dst);
                 }});
     }
 
@@ -527,7 +527,7 @@ class AsyncDatagramChannelImpl
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Integer>() {
                 public Integer call() throws IOException {
-                    return key.channel().write(src);
+                    return channel.write(src);
                 }});
     }
 
@@ -557,7 +557,7 @@ class AsyncDatagramChannelImpl
         @Override
         public void drop() throws IOException {
             mcastKeys.remove(this);
-            MulticastSocket msocket = (MulticastSocket)key.channel().socket();
+            MulticastSocket msocket = (MulticastSocket)channel.socket();
             msocket.leaveGroup(mcastaddr, netIf);
         }
 

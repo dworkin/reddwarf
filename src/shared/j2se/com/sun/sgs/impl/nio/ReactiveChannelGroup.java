@@ -116,10 +116,9 @@ class ReactiveChannelGroup
         }
     }
 
-    <T extends SelectableChannel> AsyncKey<T>
-    register(T ch) throws IOException {
+    AsyncKey register(SelectableChannel ch) throws IOException {
         ch.configureBlocking(false);
-        AsyncKey<T> asyncKey = null;
+        AsyncKey asyncKey = null;
         @SuppressWarnings("hiding")
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
