@@ -171,6 +171,7 @@ class ReactiveChannelGroup
                     ReactiveChannelGroup.this.mainLock;
                 mainLock.lock();
                 try {
+                    log.log(Level.FINER, "handling reactor shutdown");
                     reactors.remove(reactor);
                     tryTerminate();
                 } finally {
