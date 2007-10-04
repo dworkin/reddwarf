@@ -47,12 +47,14 @@ class ReactiveChannelGroup
      * channel groups: {@value}
      */
     public static final String REACTORS_PROPERTY =
-        "com.sun.sgs.nio.async.reactive.selectors";
+        "com.sun.sgs.nio.async.reactive.reactors";
 
     /**
-     * The default number of reactors to be used by channel groups: {@value}
+     * The default number of reactors to be used by channel groups:
+     * {@code Runtime.getRuntime().availableProcessors()}
      */
-    public static final int DEFAULT_REACTORS = 1;
+    public static final int DEFAULT_REACTORS = 
+        Runtime.getRuntime().availableProcessors();
 
     final List<Reactor> reactors;
 
@@ -256,7 +258,16 @@ class ReactiveChannelGroup
         }
     }
 
+    /**
+     * If the group is trying to shutdown, check that all the reactors
+     * have shutdown.  If they have, mark this group as done and wake
+     * anyone blocked on awaitTermination.
+     * 
+     * NOTE: Must be called with stateLock held!
+     */
     private void tryTerminate() {
+        assert stateLock.isHeldByCurrentThread();
+
         if (lifecycleState == RUNNING || lifecycleState == DONE)
             return;
 

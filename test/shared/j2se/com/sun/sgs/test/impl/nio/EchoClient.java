@@ -131,7 +131,7 @@ public class EchoClient {
                 try {
                     channel.close();
                 } catch (IOException ioe) {
-                    ioe.printStackTrace();
+                    log.throwing("ConnectHandler", "close on exception", ioe);
                 }
                 startSignal.countDown();
             }
@@ -163,7 +163,7 @@ public class EchoClient {
                     try {
                         channel.close();
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        log.throwing("ReadHandler", "close after read -1", e);
                     }
                     disconnected();
                     return;
@@ -191,7 +191,7 @@ public class EchoClient {
                 try {
                     channel.close();
                 } catch (IOException ioe) {
-                    ioe.printStackTrace();
+                    log.throwing("ReadHandler", "close on exception", ioe);
                 }
                 disconnected();
                 // ignore
@@ -249,7 +249,7 @@ public class EchoClient {
                 try {
                     channel.close();
                 } catch (IOException ioe) {
-                    ioe.printStackTrace();
+                    log.throwing("WriteHandler", "close on exception", ioe);
                 }
             }
         }
