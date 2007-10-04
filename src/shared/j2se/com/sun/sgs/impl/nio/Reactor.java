@@ -86,19 +86,19 @@ class Reactor {
     boolean run() {
         try {
 
-            synchronized (selectorLock) {
-                // Obtain and release the guard to allow other tasks
-                // to run after waking the selector.
-            }
-
             if (! selector.isOpen()) {
                 log.log(Level.WARNING, "selector is closed", this);
                 return false;
             }
 
-            if (shuttingDown && selector.keys().isEmpty()) {
-                selector.close();
-                return false;
+            synchronized (selectorLock) {
+                // Obtain and release the guard to allow other tasks
+                // to run after waking the selector.
+
+                if (shuttingDown && selector.keys().isEmpty()) {
+                    selector.close();
+                    return false;
+                }
             }
 
             int numKeys = selector.keys().size();
