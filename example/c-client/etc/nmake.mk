@@ -1,4 +1,4 @@
-# Include file for SGS NMake Makefile
+# Include file for Project Darkstar example C client NMake Makefile
 
 BINDIR  = $(TOPDIR)\bin
 OBJDIR  = obj

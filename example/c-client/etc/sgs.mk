@@ -1,4 +1,4 @@
-# Include file for SGS Makefile
+# Include file for Project Darkstar example C client Makefile
 
 OBJDIR  = .obj
 
