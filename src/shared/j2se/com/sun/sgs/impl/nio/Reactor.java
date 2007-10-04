@@ -50,7 +50,6 @@ class Reactor {
 
     volatile boolean shuttingDown = false;
 
-
     Reactor(ReactiveChannelGroup group, Executor executor) throws IOException {
         this.group = group;
         this.executor = executor;
@@ -129,8 +128,8 @@ class Reactor {
                         continue;
                     readyOps = key.readyOps();
                     key.interestOps(key.interestOps() & (~ readyOps));
-                    asyncKey.selected(readyOps);
                 }
+                asyncKey.selected(readyOps);
             }
 
             if (timeouts.peek() != null) {
