@@ -1130,7 +1130,13 @@ public class ScalableHashMap<K,V>
 	    } else if (e.hash != hash) {
 		break;
 	    }
-	    if (safeEquals(e.getKey(), key)) {
+	    boolean keyMatches;
+	    try {
+		keyMatches = safeEquals(e.getKey(), key);
+	    } catch (ObjectNotFoundException onfe) {
+		 keyMatches = false;
+	    }
+	    if (keyMatches) {
 		/* Remove the unused new entry, if any */
 		if (newEntry != null) {
 		    newEntry.unmanage();
@@ -1331,34 +1337,41 @@ public class ScalableHashMap<K,V>
 	    PrefixEntry<K,V> next = e.next;
 	    if (unsignedLessThan(hash, e.hash)) {
 		break;
-	    } else if (e.hash == hash && safeEquals(e.getKey(), key)) {
-		/*
-		 * Retrieve the value first, in case it has been removed from
-		 * the DataManager.
-		 */
-		V v = e.getValue();
-
-		// mark that this table's state has changed
-		AppContext.getDataManager().markForUpdate(leaf);
-		leaf.modifications++;
-		leaf.size--;
-
-		// remove the value and reorder the chained keys
-		if (e == prev) { // if this was the first element
-		    leaf.table[i] = next;
-		} else {
-		    prev.next = next;
+	    } else if (e.hash == hash) {
+		boolean keyMatches;
+		try {
+		    keyMatches = safeEquals(e.getKey(), key);
+		} catch (ObjectNotFoundException onfe) {
+		    keyMatches = false;
 		}
+		if (keyEquals) {
+		    /*
+		     * Retrieve the value first, in case it has been removed
+		     * from the DataManager.
+		     */
+		    V v = e.getValue();
 
-		// if this data structure is responsible for the persistence
-		// lifetime of the key or value, remove them from the data
-		// store
-		e.unmanage();
+		    // mark that this table's state has changed
+		    AppContext.getDataManager().markForUpdate(leaf);
+		    leaf.modifications++;
+		    leaf.size--;
 
-		// NOTE: this is where we would attempt a merge operation if we
-		// decide to later support one
-		return v;
+		    // remove the value and reorder the chained keys
+		    if (e == prev) { // if this was the first element
+			leaf.table[i] = next;
+		    } else {
+			prev.next = next;
+		    }
 
+		    // if this data structure is responsible for the
+		    // persistence lifetime of the key or value, remove them
+		    // from the data store
+		    e.unmanage();
+
+		    // NOTE: this is where we would attempt a merge operation
+		    // if we decide to later support one
+		    return v;
+		}
 	    }
 	    prev = e;
 	    e = e.next;
@@ -1963,14 +1976,16 @@ public class ScalableHashMap<K,V>
 	    }
 	    currentLeafRef =
 		AppContext.getDataManager().createReference(nextLeaf);
-	    currentHash = nextEntry.hash;
-	    currentKeyRef = nextEntry.keyRef();
+	    if (nextEntry == null) {
+		currentLeafRef = null;
+		currentKeyRef = rootRef;
+	    } else {
+		currentHash = nextEntry.hash;
+		currentKeyRef = nextEntry.keyRef();
+	    }
 	    currentRemoved = false;
 	    Entry result = nextEntry;
 	    getNext();
-	    if (nextEntry == null) {
-		currentKeyRef = rootRef;
-	    }
 	    return result;
 	}
 
@@ -1985,6 +2000,7 @@ public class ScalableHashMap<K,V>
 		throw new IllegalStateException("No current element");
 	    }
 	    getCurrentLeaf().remove(currentHash, currentKeyRef);
+	    currentRemoved = true;
 	}
     }
 

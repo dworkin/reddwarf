@@ -28,6 +28,7 @@ import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -48,6 +49,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
@@ -131,7 +133,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(6, test.getMinTreeDepth());
 	dataService.setBinding("test", test);
 	txn.commit();
-	txn = createTransaction();	
+	txn = createTransaction();
 	test = dataService.getBinding("test", ScalableHashMapTestable.class);
 	assertEquals(6, test.getMaxTreeDepth());
 	assertEquals(6, test.getMinTreeDepth());
@@ -198,7 +200,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 	dataService.setBinding("test", test);
 	txn.commit();
-	txn = createTransaction();	
+	txn = createTransaction();
 	test = dataService.getBinding("test", ScalableHashMap.class);
 	assertEquals(control, test);
 	txn.commit();
@@ -213,6 +215,10 @@ public class TestScalableHashMap extends TestCase {
 	}
 	txn.commit();
     }
+
+    /*
+     * Test non-public constructor
+     */
 
     @Test public void testMultiParamConstructor() throws Exception {
 	txn = createTransaction();
@@ -259,7 +265,828 @@ public class TestScalableHashMap extends TestCase {
     }
 
     /*
-     * Test miscellaneous putting and getting
+     * Test putAll
+     */
+
+    @Test public void testPutAllMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	for (int i = 0; i < 32; i++) {
+	     control.put(i,i);
+	}
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	test.putAll(control);
+	assertEquals(control, test);
+	txn.commit();
+     }
+
+    @Test public void testPutAllNullArg() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	try {
+	    test.putAll(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+	txn.commit();
+    }
+
+    @Test public void testPutAllNotSerializable() throws Exception {
+	txn = createTransaction();
+	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
+	Object nonSerializable = Thread.currentThread();
+	Map<Object,Object> other = new HashMap<Object,Object>();
+	other.put(nonSerializable, Boolean.TRUE);
+	try {
+	    test.putAll(other);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	}
+	other.clear();
+	other.put(Boolean.TRUE, nonSerializable);
+	try {
+	    test.putAll(other);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	}
+	txn.commit();
+    }
+
+    @Test public void testPutAllNullItems() throws Exception {
+	txn = createTransaction();
+	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
+	Object nonSerializable = Thread.currentThread();
+	Map<Object,Object> control = new HashMap<Object,Object>();
+	test.put(0, null);
+	control.put(0, null);
+	test.put(null, 0);
+	control.put(null, 0);
+	assertEquals(test, control);
+	txn.commit();
+    }
+
+    /*
+     * Test put
+     */
+
+    @Test public void testPutMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	Foo result = test.put(1, new Foo(1));
+	assertEquals(null, result);
+	result = test.put(1, new Foo(1));
+	assertEquals(new Foo(1), result);
+	result = test.put(1, new Foo(37));
+	assertEquals(new Foo(1), result);
+	txn.commit();
+    }
+
+    @Test public void testPutNotSerializable() throws Exception {
+	txn = createTransaction();
+	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
+	Object nonSerializable = Thread.currentThread();
+	try {
+	    test.put(nonSerializable, Boolean.TRUE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    assertTrue(test.isEmpty());
+	}
+	try {
+	    test.put(Boolean.TRUE, nonSerializable);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    assertTrue(test.isEmpty());
+	}
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testPutOldValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(Boolean.TRUE, bar);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.put(Boolean.TRUE, Boolean.FALSE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.put(Boolean.TRUE, Boolean.FALSE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testPutOldKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, Boolean.TRUE);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.put(new Bar(1), Boolean.FALSE));
+	assertEquals(Boolean.FALSE, test.get(new Bar(1)));
+	txn.abort(null);
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.put(new Bar(1), Boolean.FALSE));
+	assertEquals(Boolean.FALSE, test.get(new Bar(1)));
+	txn.commit();
+    }
+
+    @Test public void testPutNullKey() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
+	Map<String,Integer> control = new HashMap<String,Integer>();
+	test.put(null, 0);
+	control.put(null, 0);
+	assertEquals(control, test);
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertEquals(control,
+		     dataService.getBinding("test", ScalableHashMap.class));
+	txn.commit();
+    }
+
+    @Test public void testPutNullValue() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,String> test =
+	    new ScalableHashMap<Integer,String>(16);
+	Map<Integer,String> control = new HashMap<Integer,String>();
+	test.put(0, null);
+	control.put(0, null);
+	assertEquals(control, test);
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertEquals(control,
+		     dataService.getBinding("test", ScalableHashMap.class));
+	txn.commit();
+    }
+
+    /*
+     * Test get
+     */
+
+    @Test public void testGetMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	assertEquals(null, test.get(1));
+	test.put(1, new Foo(1));
+	assertEquals(new Foo(1), test.get(1));
+	assertEquals(null, test.get(new Foo(1)));
+	assertEquals(null, test.get(2));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testGetValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(Boolean.TRUE, bar);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.get(Boolean.TRUE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.get(Boolean.TRUE);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    assertEquals(1, test.size());
+	}
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testGetKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, Boolean.TRUE);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.get(new Bar(1)));
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.get(new Bar(1)));
+	txn.commit();
+    }
+
+    @Test public void testGetNullKey() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
+	test.put(null, 0);
+	assertEquals(new Integer(0), test.get(null));
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertEquals(
+	    new Integer(0),
+	    dataService.getBinding("test", ScalableHashMap.class).get(null));
+	txn.commit();
+    }
+
+    @Test public void testGetNullValue() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,String> test =
+	    new ScalableHashMap<Integer,String>(16);
+	test.put(0, null);
+	assertEquals(null, test.get(0));
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertEquals(
+	    null,
+	    dataService.getBinding("test", ScalableHashMap.class).get(0));
+	txn.commit();
+    }
+
+    /*
+     * Test containsKey
+     */
+
+    @Test public void testContainsKeyMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	assertFalse(test.containsKey(1));
+	test.put(1, new Foo(1));
+	assertTrue(test.containsKey(1));
+	assertFalse(test.containsKey(new Foo(1)));
+	assertFalse(test.containsKey(2));
+	txn.commit();
+    }
+
+    @Test public void testContainsKeyNull() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
+	test.put(null, 0);
+	assertTrue(test.containsKey(null));
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertTrue(
+	    dataService.getBinding(
+		"test", ScalableHashMap.class).containsKey(null));
+	txn.commit();
+    }
+
+    @Test public void testContainsKeyNullOnEmptyMap() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<String,Integer> test =
+	    new ScalableHashMap<String,Integer>(16);
+	assertFalse(test.containsKey(null));
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	assertFalse(
+	    dataService.getBinding(
+		"test", ScalableHashMap.class).containsKey(null));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsKeyKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap(16);
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, 1);
+	test.put(new Bar(2), 2);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsKey(new Bar(1)));
+	assertEquals(2, test.size());
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsKey(new Bar(1)));
+	assertEquals(2, test.size());
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsKeyValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap(16);
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(1, bar);
+	test.put(2, new Bar(2));
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsKey(1));
+	assertEquals(2, test.size());
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsKey(1));
+	assertEquals(2, test.size());
+	txn.commit();
+    }
+
+    @Test public void testContainsKeyOnSplitTree() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; i++) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	}
+
+	for (int i = 0; i < inputs.length; i++) {
+	    assertTrue(test.containsKey(inputs[i]));
+	}
+
+	txn.commit();
+    }
+
+    /*
+     * Test containsValue
+     */
+
+    @Test public void testContainsValueMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	assertFalse(test.containsValue(new Foo(1)));
+	test.put(1, new Foo(1));
+	assertTrue(test.containsValue(new Foo(1)));
+	assertFalse(test.containsValue(1));
+	assertFalse(test.containsValue(new Foo(2)));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueNull() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
+	test.put(0, null);
+	dataService.setBinding("test", test);
+	assertTrue(test.containsValue(null));
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsValue(null));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueNullEmptyMap() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
+	dataService.setBinding("test", test);
+	assertFalse(test.containsValue(null));
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsValue(null));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(1, bar);
+	test.put(2, new Bar(2));
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsValue(new Bar(1)));
+	assertEquals(2, test.size());
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertFalse(test.containsValue(new Bar(1)));
+	assertEquals(2, test.size());
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testContainsValueKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, 1);
+	test.put(new Bar(2), 2);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsValue(1));
+	assertEquals(2, test.size());
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.containsValue(1));
+	assertEquals(2, test.size());
+	txn.commit();
+    }
+
+    @Test public void testContainsValueNullOnSplitMap() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	test.put(0, null);
+	assertTrue(test.containsValue(null));
+	txn.commit();
+    }
+
+    @Test public void testContainsValue() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; i++) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	}
+
+	for (int i = 0; i < inputs.length; i++) {
+	    assertTrue(test.containsValue(-inputs[i]));
+	}
+
+	txn.commit();
+    }
+
+    @Test public void testContainsValueOnSplitTree() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; i++) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	}
+
+	for (int i = 0; i < inputs.length; i++) {
+	    assertTrue(test.containsValue(-inputs[i]));
+	}
+
+	txn.commit();
+    }
+
+    /*
+     * Test values
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test public void testValues() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	Collection<Integer> values = test.values();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+	Collection<Integer> controlValues = control.values();
+	assertTrue(values.isEmpty());
+	assertIteratorDone(values.iterator());
+
+	for (int i = 0; i < 50; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,-j);
+	    control.put(j,-j);
+	}
+
+	assertEquals(50, values.size());
+	assertTrue(controlValues.containsAll(values));
+	assertIteratorContains(controlValues, values.iterator());
+
+	dataService.setBinding("values", new ManagedSerializable(values));
+	txn.commit();
+	txn = createTransaction();
+	values = (Collection)
+	    dataService.getBinding("values", ManagedSerializable.class).get();
+	assertEquals(50, values.size());
+	assertTrue(controlValues.containsAll(values));
+	assertIteratorContains(controlValues, values.iterator());
+
+	txn.commit();
+    }
+
+    @Test public void testValuesOnSplitTree() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Collection<Integer> control = new ArrayList<Integer>(50);
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; i++) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,-j);
+	    control.add(-j);
+	}
+
+	assertTrue(control.containsAll(test.values()));
+
+	txn.commit();
+    }
+
+    /*
+     * Test keySet
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test public void testKeySet() throws Exception {
+	txn = createTransaction();
+	Map test = new ScalableHashMap();
+	Set keys = test.keySet();
+	Map control = new HashMap();
+	Set controlKeys = control.keySet();
+	assertEquals(controlKeys, keys);
+	assertIteratorDone(keys.iterator());
+	assertEquals(controlKeys.hashCode(), keys.hashCode());
+	for (int i = 0; i < 50; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,-j);
+	    control.put(j,-j);
+	}
+	assertEquals(controlKeys, keys);
+	assertIteratorContains(controlKeys, keys.iterator());
+	assertEquals(controlKeys.hashCode(), keys.hashCode());
+	dataService.setBinding("keys", new ManagedSerializable(keys));
+	txn.commit();
+	txn = createTransaction();
+	keys = (Set)
+	    dataService.getBinding("keys", ManagedSerializable.class).get();
+	assertEquals(controlKeys, keys);
+	assertIteratorContains(controlKeys, keys.iterator());
+	assertEquals(controlKeys.hashCode(), keys.hashCode());
+	txn.commit();
+    }
+
+    /*
+     * Test entrySet
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test public void testEntrySet() throws Exception {
+	txn = createTransaction();
+	Map test = new ScalableHashMap();
+	Set entries = test.entrySet();
+	Map control = new HashMap();
+	Set controlEntries = control.entrySet();
+	assertEquals(controlEntries, entries);
+	assertIteratorDone(entries.iterator());
+	assertEquals(controlEntries.hashCode(), entries.hashCode());
+	for (int i = 0; i < 50; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,-j);
+	    control.put(j,-j);
+	}
+	assertEquals(controlEntries, entries);
+	assertIteratorContains(controlEntries, entries.iterator());
+	assertEquals(controlEntries.hashCode(), entries.hashCode());
+	dataService.setBinding("entries", new ManagedSerializable(entries));
+	txn.commit();
+	txn = createTransaction();
+	entries = (Set)
+	    dataService.getBinding("entries", ManagedSerializable.class).get();
+	assertEquals(controlEntries, entries);
+	assertEquals(controlEntries.hashCode(), entries.hashCode());
+	txn.commit();
+    }
+
+    /*
+     * Test equals and hashCode
+     */
+
+    @SuppressWarnings("unchecked")
+    @Test public void testEquals() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	assertFalse(test.equals(null));
+	assertFalse(test.equals(1));
+	Map control = new HashMap();
+	assertTrue(test.equals(control));
+	assertEquals(test.hashCode(), control.hashCode());
+	for (int i = 0; i < 50; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,-j);
+	    control.put(j,-j);
+	}
+	assertTrue(test.equals(control));
+	assertEquals(test.hashCode(), control.hashCode());
+	dataService.setBinding("test", test);
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertTrue(test.equals(control));
+	assertEquals(test.hashCode(), control.hashCode());
+	txn.commit();
+    }
+
+    /*
+     * Test remove
+     */
+
+    @Test public void testRemoveMisc() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	assertEquals(null, test.remove(1));
+	test.put(1, new Foo(1));
+	assertEquals(null, test.remove(2));
+	assertEquals(null, test.remove(new Foo(1)));
+	assertEquals(new Foo(1), test.remove(1));
+	assertTrue(test.isEmpty());
+	assertEquals(null, test.remove(1));
+	txn.commit();
+    }
+
+    @Test public void testRemoveNullKey() throws Exception {
+	txn = createTransaction();
+	Map<String,Integer> test = new ScalableHashMap<String,Integer>(16);
+	Map<String,Integer> control = new HashMap<String,Integer>();
+	test.put(null, 0);
+	control.put(null, 0);
+	assertEquals(control, test);
+	test.remove(null);
+	control.remove(null);
+	assertEquals(control, test);
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testRemoveValueNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(1, bar);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.remove(1);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+	assertEquals(null, test.remove(2));
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	try {
+	    test.remove(1);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+	assertEquals(null, test.remove(2));
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testRemoveKeyNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(bar, 1);
+	txn.commit();
+	txn = createTransaction();
+	dataService.removeObject(dataService.getBinding("bar", Bar.class));
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.remove(new Bar(1)));
+	assertEquals(null, test.remove(1));
+	assertEquals(null, test.remove(new Bar(2)));
+	txn.commit();
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(null, test.remove(new Bar(1)));
+	assertEquals(null, test.remove(1));
+	assertEquals(null, test.remove(new Bar(2)));
+	txn.commit();
+    }
+
+    /*
+     * Test clear
+     */
+
+    @Test public void testClear() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	int[] inputs = new int[50];
+
+	for (int i = 0; i < inputs.length; i++) {
+	    int j = RANDOM.nextInt();
+	    inputs[i] = j;
+	    test.put(j,j);
+	    control.put(j,j);
+	}
+	assertEquals(control, test);
+
+	test.clear();
+	control.clear();
+
+	/*
+	 * XXX: Test that clear does not change the minimum depth.
+	 * -tjb@sun.com (10/04/2007)
+	 */
+
+	assertEquals(control, test);
+
+	txn.commit();
+    }
+
+    @Test public void testMultipleClearOperations() throws Exception {
+	txn = createTransaction(1000000);
+	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
+
+	test.clear();
+	assertEquals(control, test);
+
+	// add just a few elements
+	for (int i = 0; i < 33; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+
+	// add just enough elements to force a split
+	for (int i = 0; i < 1024; i++) {
+	    int j = RANDOM.nextInt();
+	    test.put(j,j);
+	}
+
+	test.clear();
+	assertEquals(control, test);
+
+	txn.commit();
+    }
+
+    /*
+     * Miscellaneous tests
      */
 
     @Test public void testPutAndGetOnSingleLeaf() throws Exception {
@@ -299,7 +1126,7 @@ public class TestScalableHashMap extends TestCase {
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 54; ++i) {
+	for (int i = 0; i < 54; i++) {
 
 	    test.put(i, i);
 	    test.put(~i, ~i);
@@ -323,7 +1150,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 128; ++i) {
+	for (int i = 0; i < 128; i++) {
 
 	    test.put(i, i);
 	    control.put(i, i);
@@ -347,7 +1174,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 128; ++i) {
+	for (int i = 0; i < 128; i++) {
 
 	    test.put(-i, i);
 	    control.put(-i, i);
@@ -371,7 +1198,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 96; ++i) {
+	for (int i = 0; i < 96; i++) {
 
 	    test.put(i, i);
 	    test.put(-i, -i);
@@ -398,7 +1225,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] vals = new int[128];
 
-	for (int i = 0; i < 128; ++i) {
+	for (int i = 0; i < 128; i++) {
 	    int j = (i < 64) ? -RANDOM.nextInt() : RANDOM.nextInt();
 	    vals[i] = j;
 	    test.put(j, i);
@@ -423,7 +1250,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new LinkedHashMap<Integer,Integer>();
 
-	for (int i = 0; i < 128; ++i) {
+	for (int i = 0; i < 128; i++) {
 
 	    test.put(-i, -i);
 	    control.put(-i, -i);
@@ -449,7 +1276,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[12];
 
-	for (int i = 0; i < 12; ++i) {
+	for (int i = 0; i < 12; i++) {
 	    int j = RANDOM.nextInt();
 	    a[i] = j;
 	    test.put(j, i);
@@ -494,7 +1321,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
-	for (int i = 0; i < 24; ++i) {
+	for (int i = 0; i < 24; i++) {
 
 	    test.put(i, i);
 	    test.put(~i, ~i);
@@ -522,7 +1349,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[1024];
 
-	for (int i = 0; i < inputs.length; ++i) {
+	for (int i = 0; i < inputs.length; i++) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
@@ -539,7 +1366,7 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    @Test public void testPutAndRemoveOnNoMergeTreeWithColllapse()
+    @Test public void testPutAndRemoveOnNoMergeTreeWithCollapse()
 	throws Exception {
 
 	txn = createTransaction(100000);
@@ -549,7 +1376,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[1024];
 
-	for (int i = 0; i < inputs.length; ++i) {
+	for (int i = 0; i < inputs.length; i++) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
@@ -573,7 +1400,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[400];
 
-	for (int i = 0; i < inputs.length; ++i) {
+	for (int i = 0; i < inputs.length; i++) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
@@ -615,7 +1442,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[1024];
 
-	for (int i = 0; i < inputs.length; ++i) {
+	for (int i = 0; i < inputs.length; i++) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
@@ -662,7 +1489,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[400];
 
-	for (int i = 0; i < inputs.length; ++i) {
+	for (int i = 0; i < inputs.length; i++) {
 	    int j = RANDOM.nextInt();
 	    inputs[i] = j;
 	    test.put(j,j);
@@ -695,420 +1522,6 @@ public class TestScalableHashMap extends TestCase {
 	txn.commit();
     }
 
-    /*
-     * Test putAll
-     */
-
-    @Test public void testPutAll() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	 for (int i = 0; i < 32; ++i)
-	     control.put(i,i);
-	 Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
-	 test.putAll(control);
-	 assertEquals(control, test);
-	 txn.commit();
-     }
-
-    /*
-     * Test put
-     */
-
-    @Test public void testPutNotSerializable() throws Exception {
-	txn = createTransaction();
-	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
-	Object nonSerializable = Thread.currentThread();
-	try {
-	    test.put(nonSerializable, Boolean.TRUE);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    assertTrue(test.isEmpty());
-	}
-	try {
-	    test.put(Boolean.TRUE, nonSerializable);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    assertTrue(test.isEmpty());
-	}
-	txn.commit();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testPutOldValueNotFound() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap test = new ScalableHashMap();
-	dataService.setBinding("test", test);
-	Bar value = new Bar(33);
-	dataService.setBinding("value", value);
-	test.put(Boolean.TRUE, value);
-	txn.commit();
-	txn = createTransaction();
-	dataService.removeObject(
-	    dataService.getBinding("value", ManagedObject.class));
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	try {
-	    test.put(Boolean.TRUE, Boolean.FALSE);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    assertEquals(1, test.size());
-	}
-	txn.commit();
-	txn = createTransaction();
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	try {
-	    test.put(Boolean.TRUE, Boolean.FALSE);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    assertEquals(1, test.size());
-	}
-	txn.commit();
-    }
-
-    @Test public void testPutNull() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<String,Integer> test =
-	    new ScalableHashMap<String,Integer>(16);
-	Map<String,Integer> control = new HashMap<String,Integer>();
-	test.put(null, 0);
-	control.put(null, 0);
-	assertEquals(control, test);
-	dataService.setBinding("test", test);
-	txn.commit();
-	txn = createTransaction();	
-	assertEquals(control,
-		     dataService.getBinding("test", ScalableHashMap.class));
-	txn.commit();
-    }
-
-    /*
-     * Test get
-     */
-
-    @SuppressWarnings("unchecked")
-    @Test public void testGetValueNotFound() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap test = new ScalableHashMap();
-	dataService.setBinding("test", test);
-	Bar value = new Bar(33);
-	dataService.setBinding("value", value);
-	test.put(Boolean.TRUE, value);
-	txn.commit();
-	txn = createTransaction();
-	dataService.removeObject(
-	    dataService.getBinding("value", ManagedObject.class));
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	try {
-	    test.get(Boolean.TRUE);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    assertEquals(1, test.size());
-	}
-	txn.commit();
-	txn = createTransaction();
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	try {
-	    test.get(Boolean.TRUE);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    assertEquals(1, test.size());
-	}
-	txn.commit();
-    }
-
-    @Test public void testGetNullKey() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<String,Integer> test =
-	    new ScalableHashMap<String,Integer>(16);
-	test.put(null, 0);
-	assertEquals(new Integer(0), test.get(null));
-	dataService.setBinding("test", test);
-	txn.commit();
-	txn = createTransaction();	
-	assertEquals(
-	    new Integer(0),
-	    dataService.getBinding("test", ScalableHashMap.class).get(null));
-	txn.commit();
-    }
-
-    @Test public void testGetNullValue() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<Integer,String> test =
-	    new ScalableHashMap<Integer,String>(16);
-	test.put(0, null);
-	assertEquals(null, test.get(0));
-	dataService.setBinding("test", test);
-	txn.commit();
-	txn = createTransaction();	
-	assertEquals(
-	    null,
-	    dataService.getBinding("test", ScalableHashMap.class).get(0));
-	txn.commit();
-    }
-
-    /*
-     * Test containsKey
-     */
-
-    @Test public void testContainsKeyNull() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<String,Integer> test =
-	    new ScalableHashMap<String,Integer>(16);
-	test.put(null, 0);
-	assertTrue(test.containsKey(null));
-	dataService.setBinding("test", test);
-	txn.commit();
-	txn = createTransaction();	
-	assertTrue(
-	    dataService.getBinding(
-		"test", ScalableHashMap.class).containsKey(null));
-	txn.commit();
-    }
-
-    @Test public void testContainsKeyNullOnEmptyMap() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<String,Integer> test =
-	    new ScalableHashMap<String,Integer>(16);
-	assertFalse(test.containsKey(null));
-	dataService.setBinding("test", test);
-	txn.commit();
-	txn = createTransaction();	
-	assertFalse(
-	    dataService.getBinding(
-		"test", ScalableHashMap.class).containsKey(null));
-	txn.commit();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testContainsKeyNotFound() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap test = new ScalableHashMap(16);
-	dataService.setBinding("test", test);
-	Bar bar = new Bar(1);
-	dataService.setBinding("bar", bar);
-	test.put(bar, 1);
-	test.put(new Bar(2), 2);
-	txn.commit();
-	txn = createTransaction();	
-	dataService.removeObject(dataService.getBinding("bar", Bar.class));
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	assertFalse(test.containsKey(new Bar(1)));
-	assertEquals(2, test.size());
-	txn.commit();
-	txn = createTransaction();
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	assertFalse(test.containsKey(new Bar(1)));
-	assertEquals(2, test.size());	
-	txn.commit();
-    }
-
-    /*
-     * Test containsValue
-     */
-
-    @SuppressWarnings("unchecked")
-    @Test public void testContainsValueNull() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<Integer,Integer> test =
-	    new ScalableHashMap<Integer,Integer>();
-	test.put(0, null);
-	dataService.setBinding("test", test);
-	assertTrue(test.containsValue(null));
-	txn.commit();
-	txn = createTransaction();	
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	assertTrue(test.containsValue(null));	
-	txn.commit();
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testContainsValueNullEmptyMap() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap<Integer,Integer> test =
-	    new ScalableHashMap<Integer,Integer>();
-	dataService.setBinding("test", test);
-	assertFalse(test.containsValue(null));
-	txn.commit();
-	txn = createTransaction();	
-	test = dataService.getBinding("test", ScalableHashMap.class);
-	assertFalse(test.containsValue(null));	
-	txn.commit();
-    }
-
-    @Test public void testContainsValueNullOnSplitMap() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
-	test.put(0, null);
-	assertTrue(test.containsValue(null));
-	txn.commit();
-    }
-
-    @Test public void testContainsKeyOnSplitTree() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,-j);
-	}
-
-	for (int i = 0; i < inputs.length; i++) {
-	    assertTrue(test.containsKey(inputs[i]));
-	}
-
-	txn.commit();
-    }
-
-    @Test public void testValues() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
-	Collection<Integer> control = new ArrayList<Integer>(50);
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,-j);
-	    control.add(-j);
-	}
-
-	assertTrue(control.containsAll(test.values()));
-
-	txn.commit();
-    }
-
-    @Test public void testValuesOnSplitTree() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
-	Collection<Integer> control = new ArrayList<Integer>(50);
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,-j);
-	    control.add(-j);
-	}
-
-	assertTrue(control.containsAll(test.values()));
-
-	txn.commit();
-    }
-
-    @Test public void testContainsValue() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,-j);
-	}
-
-	for (int i = 0; i < inputs.length; i++) {
-	    assertTrue(test.containsValue(-inputs[i]));
-	}
-
-	txn.commit();
-    }
-
-    @Test public void testContainsValueOnSplitTree() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,-j);
-	}
-
-	for (int i = 0; i < inputs.length; i++) {
-	    assertTrue(test.containsValue(-inputs[i]));
-	}
-
-	txn.commit();
-    }
-
-    @Test public void testNullRemove() throws Exception {
-	txn = createTransaction();
-	Map<String,Integer> test = new ScalableHashMap<String,Integer>(16);
-	Map<String,Integer> control = new HashMap<String,Integer>();
-
-	test.put(null, 0);
-	control.put(null, 0);
-	assertEquals(control, test);
-
-	test.remove(null);
-	control.remove(null);
-
-	assertEquals(control, test);
-
-	txn.commit();
-    }
-
-    @Test public void testClear() throws Exception {
-	txn = createTransaction();
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	int[] inputs = new int[50];
-
-	for (int i = 0; i < inputs.length; ++i) {
-	    int j = RANDOM.nextInt();
-	    inputs[i] = j;
-	    test.put(j,j);
-	    control.put(j,j);
-	}
-	assertEquals(control, test);
-
-	test.clear();
-	control.clear();
-
-	assertEquals(control, test);
-
-	txn.commit();
-    }
-
-    @Test public void testMultipleClearOperations() throws Exception {
-	txn = createTransaction(1000000);
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
-	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-
-	test.clear();
-	assertEquals(control, test);
-
-	// add just a few elements
-	for (int i = 0; i < 33; ++i) {
-	    int j = RANDOM.nextInt();
-	    test.put(j,j);
-	}
-
-	test.clear();
-	assertEquals(control, test);
-
-	// add just enough elements to force a split
-	for (int i = 0; i < 1024; ++i) {
-	    int j = RANDOM.nextInt();
-	    test.put(j,j);
-	}
-
-	test.clear();
-	assertEquals(control, test);
-
-	txn.commit();
-    }
-
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
 	txn = createTransaction();
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
@@ -1116,10 +1529,10 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] inputs = new int[50];
 
-	for (int i = 0; i < inputs.length; ++i)
+	for (int i = 0; i < inputs.length; i++)
 	    inputs[i] = RANDOM.nextInt();
 
-	for (int i = 0; i < inputs.length; ++i)	{
+	for (int i = 0; i < inputs.length; i++)	{
 	    int j = RANDOM.nextInt(inputs.length);
 	    test.put(inputs[j], inputs[j]);
 	    control.put(inputs[j], inputs[j]);
@@ -1144,12 +1557,12 @@ public class TestScalableHashMap extends TestCase {
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	// put in numbers
-	for (int i = 4000; i < 4100; ++i) {
+	for (int i = 4000; i < 4100; i++) {
 	    test.put(i, i);
 	}
 
 	// get from outside the range of the put
-	for (int i = 0; i < 100; ++i) {
+	for (int i = 0; i < 100; i++) {
 
 	    assertEquals(null,test.get(i));
 	}
@@ -1158,7 +1571,7 @@ public class TestScalableHashMap extends TestCase {
     }
 
     /*
-     * Size Tests
+     * Test size
      */
 
     @Test public void testLeafSize() throws Exception {
@@ -1166,12 +1579,14 @@ public class TestScalableHashMap extends TestCase {
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	assertEquals(0, test.size());
+	assertTrue(test.isEmpty());
 
-	for (int i = 0; i < 128; ++i) {
+	for (int i = 0; i < 128; i++) {
 	    test.put(i, i);
 	}
 
 	assertEquals(128, test.size());
+	assertFalse(test.isEmpty());
 
 	// remove the evens
 	for (int i = 0; i < 128; i += 2) {
@@ -1179,6 +1594,7 @@ public class TestScalableHashMap extends TestCase {
 	}
 
 	assertEquals(64, test.size());
+	assertFalse(test.isEmpty());
 
 	// remove the odds
 	for (int i = 1; i < 128; i += 2) {
@@ -1186,6 +1602,7 @@ public class TestScalableHashMap extends TestCase {
 	}
 
 	assertEquals(0, test.size());
+	assertTrue(test.isEmpty());
 
 	txn.commit();
     }
@@ -1200,19 +1617,19 @@ public class TestScalableHashMap extends TestCase {
 	int[] inputs2 = new int[SAMPLE_SIZE];
 	int[] inputs3 = new int[SAMPLE_SIZE];
 
-	for (int i = 0; i < inputs1.length; ++i) {
+	for (int i = 0; i < inputs1.length; i++) {
 	    inputs1[i] = RANDOM.nextInt();
 	    inputs2[i] = RANDOM.nextInt();
 	    inputs3[i] = RANDOM.nextInt();
 	}
 
-	for (int i = 0; i < inputs1.length; ++i) {
+	for (int i = 0; i < inputs1.length; i++) {
 	    test.put(inputs1[i], inputs1[i]);
 	    test.put(inputs2[i], inputs2[i]);
 	    assertEquals(test.size(), (i+1)*2);
 	}
 
-	for (int i = 0; i < inputs1.length; ++i) {
+	for (int i = 0; i < inputs1.length; i++) {
 	    int beforeSize = test.size();
 	    test.put(inputs3[i], inputs3[i]);
 	    test.remove(inputs2[i]);
@@ -1229,19 +1646,19 @@ public class TestScalableHashMap extends TestCase {
 
 	assertEquals(0, test.size());
 
-	for (int i = 0; i < 5; ++i) {
+	for (int i = 0; i < 5; i++) {
 	    test.put(i, i);
 	}
 
 	assertEquals(5, test.size());
 
-	for (int i = 5; i < 15; ++i) {
+	for (int i = 5; i < 15; i++) {
 	    test.put(i,i);
 	}
 
 	assertEquals(15, test.size());
 
-	for (int i = 15; i < 31; ++i) {
+	for (int i = 15; i < 31; i++) {
 	    test.put(i,i);
 	}
 
@@ -1260,45 +1677,45 @@ public class TestScalableHashMap extends TestCase {
 
 
 	int[] inserts = new int[128];
-	for (int i = 0; i < inserts.length; ++i) {
+	for (int i = 0; i < inserts.length; i++) {
 	    inserts[i] = RANDOM.nextInt();
 	}
 
 	// add 32
-	for (int i = 0; i < 32; ++i) {
+	for (int i = 0; i < 32; i++) {
 	    test.put(inserts[i], inserts[i]);
 	}
 
 	assertEquals(32, test.size());
 
 	// remove 10
-	for (int i = 0; i < 10; ++i) {
+	for (int i = 0; i < 10; i++) {
 	    test.remove(inserts[i]);
 	}
 
 	assertEquals(22, test.size());
 
 	// add 32
-	for (int i = 32; i < 64; ++i) {
+	for (int i = 32; i < 64; i++) {
 	    test.put(inserts[i],inserts[i]);
 	}
 
 	assertEquals(54, test.size());
 
 	// remove 10
-	for (int i = 32; i < 42; ++i) {
+	for (int i = 32; i < 42; i++) {
 	    test.remove(inserts[i]);
 	}
 
 	// add 64
-	for (int i = 64; i < 128; ++i) {
+	for (int i = 64; i < 128; i++) {
 	    test.put(inserts[i],inserts[i]);
 	}
 
 	assertEquals(108, test.size());
 
 	// remove 5
-	for (int i = 64; i < 69; ++i) {
+	for (int i = 64; i < 69; i++) {
 	    test.remove(inserts[i]);
 	}
 	assertEquals(103, test.size());
@@ -1307,8 +1724,88 @@ public class TestScalableHashMap extends TestCase {
     }
 
     /*
-     * Iterator Tests
+     * Test iterators
      */
+
+    @Test public void testIteratorRemove() throws Exception {
+	txn = createTransaction();
+	Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
+	Set<Integer> keys = test.keySet();
+	Iterator<Integer> keysIter = keys.iterator();
+	try {
+	    keysIter.remove();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	}
+	try {
+	    keysIter.next();
+	    fail("Expected NoSuchElementException");
+	} catch (NoSuchElementException e) {
+	}
+	try {
+	    keysIter.remove();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	}
+	test.put(1, new Foo(1));
+	test.put(2, new Foo(2));
+	keysIter = keys.iterator();
+	assertEquals(new Integer(1), keysIter.next());
+	keysIter.remove();
+	assertEquals(1, test.size());
+	assertTrue(test.containsKey(2));
+	try {
+	    keysIter.remove();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	}
+	assertEquals(new Integer(2), keysIter.next());
+	keysIter.remove();
+	assertTrue(test.isEmpty());
+	try {
+	    keysIter.remove();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	}
+	assertIteratorDone(keysIter);
+	txn.commit();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testIteratorNotFound() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap test = new ScalableHashMap();
+	dataService.setBinding("test", test);
+	Bar bar = new Bar(1);
+	dataService.setBinding("bar", bar);
+	test.put(1, bar);
+	test.put(2, new Bar(2));
+	for (int i = 0; i < 2; i++) {
+	    test = dataService.getBinding("test", ScalableHashMap.class);
+	    dataService.setBinding(
+		"valuesIter",
+		new ManagedSerializable(test.values().iterator()));
+	    txn.commit();
+	    txn = createTransaction();
+	    if (i == 0) {
+		dataService.removeObject(
+		    dataService.getBinding("bar", Bar.class));
+	    }
+	    Iterator valuesIter = (Iterator)
+		dataService.getBinding(
+		    "valuesIter", ManagedSerializable.class).get();
+	    int count = 0;
+	    while (valuesIter.hasNext()) {
+		count++;
+		try {
+		    assertEquals(new Bar(2), valuesIter.next());
+		} catch (ObjectNotFoundException e) {
+		}
+	    }
+	    assertEquals(2, count);
+	}
+	txn.commit();
+    }
 
     @Test public void testIteratorOnSplitTree() throws Exception {
 	txn = createTransaction();
@@ -1316,7 +1813,7 @@ public class TestScalableHashMap extends TestCase {
 	Set<Integer> control = new HashSet<Integer>();
 
 	// get from outside the range of the put
-	for (int i = 0; i < 33; ++i) {
+	for (int i = 0; i < 33; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j,j);
 	    control.add(j);
@@ -1340,12 +1837,12 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(0, test.size());
 
 	int[] inserts = new int[128];
-	for (int i = 0; i < inserts.length; ++i) {
+	for (int i = 0; i < inserts.length; i++) {
 	    inserts[i] = RANDOM.nextInt();
 	}
 
 	// add 32
-	for (int i = 0; i < 32; ++i) {
+	for (int i = 0; i < 32; i++) {
 	    test.put(inserts[i], inserts[i]);
 	    control.put(inserts[i], inserts[i]);
 	}
@@ -1353,7 +1850,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 
 	// remove 10
-	for (int i = 0; i < 10; ++i) {
+	for (int i = 0; i < 10; i++) {
 	    test.remove(inserts[i]);
 	    control.remove(inserts[i]);
 	}
@@ -1361,7 +1858,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 
 	// add 32
-	for (int i = 32; i < 64; ++i) {
+	for (int i = 32; i < 64; i++) {
 	    test.put(inserts[i],inserts[i]);
 	    control.put(inserts[i],inserts[i]);
 	}
@@ -1369,7 +1866,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 
 	// remove 10
-	for (int i = 32; i < 42; ++i) {
+	for (int i = 32; i < 42; i++) {
 	    test.remove(inserts[i]);
 	    control.remove(inserts[i]);
 	}
@@ -1377,7 +1874,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 
 	// add 64
-	for (int i = 64; i < 128; ++i) {
+	for (int i = 64; i < 128; i++) {
 	    test.put(inserts[i],inserts[i]);
 	    control.put(inserts[i],inserts[i]);
 	}
@@ -1385,7 +1882,7 @@ public class TestScalableHashMap extends TestCase {
 	assertEquals(control, test);
 
 	// remove 5
-	for (int i = 64; i < 69; ++i) {
+	for (int i = 64; i < 69; i++) {
 	    test.remove(inserts[i]);
 	    control.remove(inserts[i]);
 	}
@@ -1401,7 +1898,7 @@ public class TestScalableHashMap extends TestCase {
 	Set<Integer> control = new HashSet<Integer>();
 
 	// get from outside the range of the put
-	for (int i = 0; i < 100; ++i) {
+	for (int i = 0; i < 100; i++) {
 	    test.put(i,i);
 	    control.add(i);
 	}
@@ -1421,7 +1918,7 @@ public class TestScalableHashMap extends TestCase {
 	Set<Integer> control = new HashSet<Integer>();
 
 	// get from outside the range of the put
-	for (int i = 0; i < 33; ++i) {
+	for (int i = 0; i < 33; i++) {
 	    test.put(i,i);
 	    control.add(i);
 	}
@@ -1441,7 +1938,7 @@ public class TestScalableHashMap extends TestCase {
 	Set<Integer> control = new HashSet<Integer>();
 
 	// get from outside the range of the put
-	for (int i = 0; i < 100; ++i) {
+	for (int i = 0; i < 100; i++) {
 	    test.put(i,i);
 	    control.add(i);
 	}
@@ -1461,7 +1958,7 @@ public class TestScalableHashMap extends TestCase {
 	Set<Integer> control = new HashSet<Integer>();
 
 	// get from outside the range of the put
-	for (int i = 0; i < 33; ++i) {
+	for (int i = 0; i < 33; i++) {
 	    test.put(i,i);
 	    control.add(i);
 	}
@@ -1480,12 +1977,12 @@ public class TestScalableHashMap extends TestCase {
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
 
 	// put in numbers
-	for (int i = 4000; i < 4100; ++i) {
+	for (int i = 4000; i < 4100; i++) {
 	    test.put(i, i);
 	}
 
 	// get from outside the range of the put
-	for (int i = 0; i < 100; ++i) {
+	for (int i = 0; i < 100; i++) {
 
 	    assertEquals(null, test.remove(i));
 	}
@@ -1501,7 +1998,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[100];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1534,7 +2031,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[100];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1572,7 +2069,7 @@ public class TestScalableHashMap extends TestCase {
 	Map<Bar,Foo> test = new ScalableHashMap<Bar,Foo>();
 	Map<Bar,Foo> control = new HashMap<Bar,Foo>();
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 
 	    test.put(new Bar(i), new Foo(i));
 	    control.put(new Bar(i), new Foo(i));
@@ -1587,7 +2084,7 @@ public class TestScalableHashMap extends TestCase {
 	Map<Foo,Bar> test = new ScalableHashMap<Foo,Bar>();
 	Map<Foo,Bar> control = new HashMap<Foo,Bar>();
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 
 	    test.put(new Foo(i), new Bar(i));
 	    control.put(new Foo(i), new Bar(i));
@@ -1603,7 +2100,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMapTestable<Bar,Bar>();
 	Map<Bar,Bar> control = new HashMap<Bar,Bar>();
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 
 	    test.put(new Bar(i), new Bar(i));
 	    control.put(new Bar(i), new Bar(i));
@@ -1621,13 +2118,13 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 	    test.put(new Foo(i), new Foo(i));
 	    control.put(new Foo(i), new Foo(i));
 	    assertEquals(control, test);
 	}
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 	    test.put(new Bar(i), new Foo(i));
 	    control.put(new Bar(i), new Foo(i));
 	    assertEquals(control, test);
@@ -1644,13 +2141,13 @@ public class TestScalableHashMap extends TestCase {
 	    new ScalableHashMapTestable<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 	    test.put(new Foo(i), new Foo(i));
 	    control.put(new Foo(i), new Foo(i));
 	    assertEquals(control, test);
 	}
 
-	for (int i = 0; i < 64; ++i) {
+	for (int i = 0; i < 64; i++) {
 	    test.put(new Foo(i), new Bar(i));
 	    control.put(new Foo(i), new Bar(i));
 	    assertEquals(control, test);
@@ -1677,7 +2174,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1709,7 +2206,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[256];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1720,7 +2217,7 @@ public class TestScalableHashMap extends TestCase {
 	int entries = 0;
 
 	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
-	for (int i = 0; i < a.length / 2; ++i) {
+	for (int i = 0; i < a.length / 2; i++) {
 	    Map.Entry<Integer,Integer> e = it.next();
 	    assertTrue(entrySet.contains(e));
 	    entries++;
@@ -1736,7 +2233,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Integer,Integer>>) ois.readObject();
 
 	while(it.hasNext()) {
 	    Map.Entry<Integer,Integer> e = it.next();
@@ -1758,7 +2255,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[1024];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1787,7 +2284,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Integer,Integer>>) ois.readObject();
 
 	// ensure that the deserialized iterator reads the remaining
 	// elements
@@ -1820,7 +2317,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1836,7 +2333,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Integer,Integer>>) ois.readObject();
 
 	// ensure that the deserialized iterator reads the all the new
 	// elements
@@ -1862,7 +2359,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1873,7 +2370,7 @@ public class TestScalableHashMap extends TestCase {
 	int entries = 0;
 
 	Iterator<Map.Entry<Integer,Integer>> it = test.entrySet().iterator();
-	for (int i = 0; i < a.length / 2; ++i) {
+	for (int i = 0; i < a.length / 2; i++) {
 	    Map.Entry<Integer,Integer> e = it.next();
 	    assertTrue(entrySet.contains(e));
 	    entries++;
@@ -1889,7 +2386,7 @@ public class TestScalableHashMap extends TestCase {
 	// now repalce all th elements in the map
 	test.clear();
 	control.clear();
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(j, j);
 	    control.put(j, j);
@@ -1903,7 +2400,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Integer,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Integer,Integer>>) ois.readObject();
 
 	while(it.hasNext()) {
 	    Map.Entry<Integer,Integer> e = it.next();
@@ -1933,7 +2430,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[256];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
@@ -1941,7 +2438,7 @@ public class TestScalableHashMap extends TestCase {
 	}
 
 	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
-	for (int i = 0; i < a.length / 2; ++i) {
+	for (int i = 0; i < a.length / 2; i++) {
 	    Map.Entry<Equals,Integer> e = it.next();
 	    assertTrue(control.remove(e.getKey()) != null);
 	}
@@ -1956,7 +2453,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Equals,Integer>>) ois.readObject();
 
 	while(it.hasNext()) {
 	    Map.Entry<Equals,Integer> e = it.next();
@@ -1979,7 +2476,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
@@ -2008,7 +2505,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Equals,Integer>>) ois.readObject();
 
 	// ensure that the deserialized iterator reads the remaining
 	// elements
@@ -2042,7 +2539,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
@@ -2057,7 +2554,7 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Equals,Integer>>) ois.readObject();
 
 	// ensure that the deserialized iterator reads the all the new
 	// elements
@@ -2082,7 +2579,7 @@ public class TestScalableHashMap extends TestCase {
 
 	int[] a = new int[128];
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
@@ -2093,7 +2590,7 @@ public class TestScalableHashMap extends TestCase {
 	int entries = 0;
 
 	Iterator<Map.Entry<Equals,Integer>> it = test.entrySet().iterator();
-	for (int i = 0; i < a.length / 2; ++i) {
+	for (int i = 0; i < a.length / 2; i++) {
 	    Map.Entry<Equals,Integer> e = it.next();
 	    assertTrue(entrySet.contains(e));
 	    entries++;
@@ -2110,7 +2607,7 @@ public class TestScalableHashMap extends TestCase {
 	test.clear();
 	control.clear();
 
-	for (int i = 0; i < a.length; ++i) {
+	for (int i = 0; i < a.length; i++) {
 	    int j = RANDOM.nextInt();
 	    test.put(new Equals(j), j);
 	    control.put(new Equals(j), j);
@@ -2126,9 +2623,9 @@ public class TestScalableHashMap extends TestCase {
 	    new ByteArrayInputStream(serializedForm);
 	ObjectInputStream ois = new ObjectInputStream(bais);
 
-	it = (Iterator<Map.Entry<Equals,Integer>>)(ois.readObject());
+	it = (Iterator<Map.Entry<Equals,Integer>>) ois.readObject();
 
-	while(it.hasNext()) {
+	while (it.hasNext()) {
 	    Map.Entry<Equals,Integer> e = it.next();
 	    assertTrue(entrySet.contains(e));
 	    entries++;
@@ -2221,6 +2718,30 @@ public class TestScalableHashMap extends TestCase {
 	    if (! dir.delete())
 		throw new RuntimeException("couldn't remove: " + dir);
 	}
+    }
+
+    /** Checks that the iterator has no more entries. */
+    private static void assertIteratorDone(Iterator<?> iterator) {
+	assertFalse(iterator.hasNext());
+	try {
+	    iterator.next();
+	    fail("Expected NoSuchElementException");
+	} catch (NoSuchElementException e) {
+	}
+    }
+
+    /**
+     * Checks that the iterator returns objects equal to the contents of the
+     * collection.
+     */
+    private static void assertIteratorContains(
+	Collection<?> contents, Iterator<?> iterator)
+    {
+	Set<?> set = new HashSet<Object>(contents);
+	while (iterator.hasNext()) {
+	    assertTrue(set.remove(iterator.next()));
+	}
+	assertTrue(set.isEmpty());
     }
 
     /*
