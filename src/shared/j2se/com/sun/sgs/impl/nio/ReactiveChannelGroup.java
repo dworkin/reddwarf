@@ -26,35 +26,15 @@ class ReactiveChannelGroup
     static final Logger log =
         Logger.getLogger(ReactiveChannelGroup.class.getName());
 
-    /* Based on the Sun JDK ThreadPoolExecutor implementation. */
-
     /**
-     * runState provides the main lifecyle control, taking on values:
-     *
-     *   RUNNING:  Accept new tasks and process queued tasks
-     *   SHUTDOWN: Don't accept new tasks, but process queued tasks
-     *   STOP:     Don't accept new tasks, don't process queued tasks,
-     *             and interrupt in-progress tasks
-     *   TERMINATED: Same as STOP, plus all threads have terminated
-     *
-     * The numerical order among these values matters, to allow
-     * ordered comparisons. The runState monotonically increases over
-     * time, but need not hit each state. The transitions are:
-     *
-     * RUNNING -> SHUTDOWN
-     *    On invocation of shutdown(), perhaps implicitly in finalize()
-     * (RUNNING or SHUTDOWN) -> STOP
-     *    On invocation of shutdownNow()
-     * SHUTDOWN -> TERMINATED
-     *    When both queue and group are empty
-     * STOP -> TERMINATED
-     *    When group is empty
+     * The lifecycle state of this group.
+     * Increases monotonically.
      */
-    volatile int runState;
-    static final int RUNNING    = 0;
-    static final int SHUTDOWN   = 1;
-    static final int STOP       = 2;
-    static final int TERMINATED = 3;
+    protected volatile int lifecycleState;
+    protected static final int RUNNING      = 0;
+    protected static final int SHUTDOWN     = 1;
+    protected static final int SHUTDOWN_NOW = 2;
+    protected static final int DONE         = 3;
 
     /** Lock held on updates to runState. */
     final ReentrantLock mainLock = new ReentrantLock();
@@ -123,7 +103,7 @@ class ReactiveChannelGroup
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
-            if (runState != RUNNING)
+            if (lifecycleState != RUNNING)
                 throw new ShutdownChannelGroupException();
 
             int k = reactorBucketStrategy(ch);
@@ -196,7 +176,7 @@ class ReactiveChannelGroup
         mainLock.lock();
         try {
             for (;;) {
-                if (runState == TERMINATED)
+                if (lifecycleState == DONE   )
                     return true;
                 if (nanos <= 0)
                     return false;
@@ -212,7 +192,7 @@ class ReactiveChannelGroup
      */
     @Override
     public boolean isShutdown() {
-        return runState != RUNNING;
+        return lifecycleState != RUNNING;
     }
 
     /**
@@ -220,7 +200,7 @@ class ReactiveChannelGroup
      */
     @Override
     public boolean isTerminated() {
-        return runState == TERMINATED;
+        return lifecycleState == DONE   ;
     }
 
     /**
@@ -232,9 +212,8 @@ class ReactiveChannelGroup
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
-            int state = runState;
-            if (state < SHUTDOWN)
-                runState = SHUTDOWN;
+            if (lifecycleState < SHUTDOWN)
+                lifecycleState = SHUTDOWN;
 
             for (Reactor reactor : reactors)
                 reactor.shutdown();
@@ -256,9 +235,8 @@ class ReactiveChannelGroup
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
         try {
-            int state = runState;
-            if (state < STOP)
-                runState = STOP;
+            if (lifecycleState < SHUTDOWN_NOW)
+                lifecycleState = SHUTDOWN_NOW;
 
             for (Reactor reactor : reactors) {
                 try {
@@ -275,11 +253,13 @@ class ReactiveChannelGroup
     }
 
     private void tryTerminate() {
-        if (runState == RUNNING || runState == TERMINATED)
+        if (lifecycleState == RUNNING || lifecycleState == DONE)
             return;
 
-        if (reactors.isEmpty())
+        if (reactors.isEmpty()) {
+            lifecycleState = DONE;
             termination.signalAll();
+        }
     }
 
 }
