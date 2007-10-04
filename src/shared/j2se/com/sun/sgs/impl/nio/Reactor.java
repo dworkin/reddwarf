@@ -96,7 +96,10 @@ class Reactor {
                 // to run after waking the selector.
 
                 if (shuttingDown) {
+                    log.log(Level.FINER, "checking shutdown");
                     selector.selectNow();
+                    log.log(Level.FINER, "want shutdown; keys = {0}",
+                        selector.keys().size());
                     if (selector.keys().isEmpty()) {
                         selector.close();
                         return false;
