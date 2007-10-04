@@ -35,6 +35,9 @@ import com.sun.sgs.nio.channels.ShutdownType;
 import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
+/**
+ * TODO doc
+ */
 class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
 {
@@ -52,12 +55,23 @@ class AsyncSocketChannelImpl
     final AsyncGroupImpl group;
     final AsyncKey<SocketChannel> key;
 
+    /**
+     * TODO doc
+     * @param group 
+     * @throws IOException 
+     */
     AsyncSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
     {
         this(group, group.selectorProvider().openSocketChannel());
     }
 
+    /**
+     * TODO doc
+     * @param group 
+     * @param channel 
+     * @throws IOException 
+     */
     AsyncSocketChannelImpl(AsyncGroupImpl group,
                            SocketChannel channel)
         throws IOException
@@ -217,13 +231,19 @@ class AsyncSocketChannelImpl
     {
         final Socket socket = key.channel().socket();
         try {
-            if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
-                if (! socket.isInputShutdown())
-                    socket.shutdownInput();
-            }
-            if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
-                if (! socket.isOutputShutdown())
-                    socket.shutdownOutput();            
+            synchronized (key) {
+                if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
+                    if (! socket.isInputShutdown()) {
+                        socket.shutdownInput();
+                        key.selected(OP_READ);
+                    }
+                }
+                if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
+                    if (! socket.isOutputShutdown()) {
+                        socket.shutdownOutput();
+                        key.selected(OP_WRITE);
+                    }
+                }
             }
         } catch (SocketException e) {
             if (! socket.isConnected())

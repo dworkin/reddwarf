@@ -106,4 +106,13 @@ abstract class AsyncGroupImpl
     ExecutorService executor() {
         return executor;
     }
+
+    /**
+     * Invokes {@link AsynchronousChannelGroup#shutdown()} when this
+     * group is no longer referenced.
+     */
+    @Override
+    protected void finalize() {
+        shutdown();
+    }
 }

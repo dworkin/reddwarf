@@ -5,49 +5,95 @@ import static java.nio.channels.SelectionKey.OP_CONNECT;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
-import java.io.Closeable;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Utility methods for the asynchronous IO implementation.
+ */
 final class Util {
 
-    private Util() { }
+    private Util() { } // no instantiation
 
-    static void forceClose(Closeable c) {
-        try {
-            c.close();
-        } catch (Throwable t) {
-            // TODO send exception to the UEH
-        }
-    }
-
+    /**
+     * Returns the given exception with its cause initialized.  The
+     * original exception is returned in a typesafe way so that it
+     * can be thrown easily.
+     * 
+     * @param <T> the type of the parent exception
+     * @param exception the exception to initialize 
+     * @param cause the cause
+     * @return the exception with its cause initialized
+     * 
+     * @throws IllegalArgumentException if an attempt is made to set
+     *         an exception as its own cause
+     * @throws IllegalStateException if the exception has already had
+     *         its cause initialized.
+     * @see Throwable#initCause(Throwable)
+     */
     static <T extends Throwable> T
-    initCause(T throwable, Throwable cause) {
-        throwable.initCause(cause);
-        return throwable;
+    initCause(T exception, Throwable cause) {
+        exception.initCause(cause);
+        return exception;
     }
 
+    /**
+     * Returns a new, completed {@link Future} with the given result.
+     * 
+     * @param <V> the type of the result
+     * @param result the result for the returned {@code Future}
+     * @return a new, completed {@code Future} with the given result
+     */
     static <V> Future<V> finishedFuture(V result) {
-        return new FinishedFuture<V>(result);
+        return new ResultFuture<V>(result);
     }
 
+    /**
+     * Returns a new, completed {@link Future} that always throws the
+     * given exception when its {@code get} methods are called.
+     * 
+     * @param <V> the type of the result
+     * @param exception the exception for the returned {@code Future}
+     *        to throw
+     * @return a new, completed {@code Future} that throws the exception
+     */
     static <V> Future<V> failedFuture(Throwable exception) {
         return new FailedFuture<V>(exception);
     }
 
-    static final class FinishedFuture<V> implements Future<V> {
+    /**
+     * Base class for an already-finished Future.
+     * 
+     * @param <V> the result type
+     */
+    static abstract class DoneFuture<V> implements Future<V> {
 
-        /** The result to return from get() */
-        private final V result;
-
-        FinishedFuture(V result) {
-            this.result = result;
-        }
+        /** Allows construction by a subclass. */
+        protected DoneFuture() { }
 
         /**
          * {@inheritDoc}
+         * <p>
+         * This implementation calls {code get()}, and never thows
+         * {@code InterruptedException} or {@code TimeoutException}.
+         */
+        public V get(long timeout, TimeUnit unit) throws ExecutionException {
+            return get();
+        }
+        
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Never thows {@code InterruptedException}.
+         */
+        public abstract V get() throws ExecutionException;
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation always returns {@code false}.
          */
         public boolean cancel(boolean mayInterruptIfRunning) {
             return false;
@@ -55,20 +101,8 @@ final class Util {
 
         /**
          * {@inheritDoc}
-         */
-        public V get() {
-            return result;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public V get(long timeout, TimeUnit unit) {
-            return result;
-        }
-
-        /**
-         * {@inheritDoc}
+         * <p>
+         * This implementation always returns {@code false}.
          */
         public boolean isCancelled() {
             return false;
@@ -76,17 +110,62 @@ final class Util {
 
         /**
          * {@inheritDoc}
+         * <p>
+         * This implementation always returns {@code true}.
          */
         public boolean isDone() {
             return true;
-        }        
+        }
     }
 
-    static final class FailedFuture<V> implements Future<V> {
+    /**
+     * A future that has already completed normally.
+     * 
+     * @param <V> the result type
+     */
+    private static final class ResultFuture<V> extends DoneFuture<V> {
+
+        /** The result to return from get() */
+        private final V result;
+
+        /**
+         * Creates a new, completed {@link Future} with the given result.
+         * 
+         * @param result the result of this {@code Future}
+         */
+        ResultFuture(V result) {
+            this.result = result;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation always returns the result immediately.
+         */
+        @Override
+        public V get() {
+            return result;
+        }
+    }
+
+    /**
+     * A future that has already completed by throwing an execution
+     * exception.
+     * 
+     * @param <V> the result type
+     */
+    private static final class FailedFuture<V> extends DoneFuture<V> {
 
         /** The exception to throw from get() */
         private final Throwable exception;
 
+        /**
+         * Creates a new, completed {@link Future} with the given exception.
+         * 
+         * @param exception the exception to wrap with an
+         *        {@link ExecutionException} and throw from this
+         *        {@code Future}'s {@link Future#get() get} methods.
+         */
         FailedFuture(Throwable exception) {
             if (exception == null)
                 throw new NullPointerException("exception is null");
@@ -95,59 +174,22 @@ final class Util {
 
         /**
          * {@inheritDoc}
+         * <p>
+         * Always throws the exception this future was constructed with.
          */
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            return false;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
+        @Override
         public V get() throws ExecutionException {
             throw new ExecutionException(exception);
         }
-
-        /**
-         * {@inheritDoc}
-         */
-        public V get(long timeout, TimeUnit unit) throws ExecutionException {
-            throw new ExecutionException(exception);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public boolean isCancelled() {
-            return false;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public boolean isDone() {
-            return true;
-        }        
     }
 
-    // Methods to format SelectionKey ops.
+    // Support formatting SelectionKey ops
 
-    private static final String[] opsTable =
-        new String[OP_ACCEPT + OP_CONNECT + OP_READ + OP_WRITE + 1];
-
-    static {
-        for (int i = 0; i < 16; i++) {
-            int index = ((i & 1) != 0 ? OP_ACCEPT : 0) +
-                        ((i & 2) != 0 ? OP_CONNECT : 0) +
-                        ((i & 4) != 0 ? OP_READ : 0) +
-                        ((i & 8) != 0 ? OP_WRITE : 0);
-            StringBuilder s = new StringBuilder(4);
-            if ((i & 1) != 0) s.append('A');
-            if ((i & 2) != 0) s.append('C');
-            if ((i & 4) != 0) s.append('R');
-            if ((i & 8) != 0) s.append('W');
-            opsTable[index] = s.toString();
-        }
-    }
+    /** A table of string representations of SelectionKey op combinations. */
+    private static final String[] opsTable = new String[] {
+        "",  "C",  "R",  "CR",  "W",  "CW",  "RW",  "CRW",
+        "A", "AC", "AR", "ACR", "AW", "ACW", "ARW", "ACRW"
+    };
 
     /**
      * Returns a concise string representation of the active
@@ -160,7 +202,10 @@ final class Util {
      * @see SelectionKey
      */
     static String formatOps(int ops) {
-        return opsTable[ops];
+        return opsTable[(((ops & OP_CONNECT) != 0) ? 1 : 0) +
+                        (((ops & OP_READ)    != 0) ? 2 : 0) +
+                        (((ops & OP_WRITE)   != 0) ? 4 : 0) +
+                        (((ops & OP_ACCEPT)  != 0) ? 8 : 0)];
     }
 
 }

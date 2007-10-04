@@ -6,6 +6,8 @@ package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
@@ -42,6 +44,9 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
+/**
+ * TODO doc
+ */
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
 {
@@ -59,24 +64,45 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    private static final Set<ProtocolFamily> protocolFamilies;
+    static {
+        Set<? extends ProtocolFamily> pfs = EnumSet.of(
+            StandardProtocolFamily.INET,
+            StandardProtocolFamily.INET6);
+        protocolFamilies = Collections.unmodifiableSet(pfs);
+    }
+
+    /** The default protocol family if none is specified: {@value} */
+    static final ProtocolFamily
+        DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
+
     final AsyncGroupImpl channelGroup;
     final AsyncKey<DatagramChannel> key;
+    final ProtocolFamily protocolFamily;
 
     final ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl> mcastKeys =
         new ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl>();
 
     final AtomicBoolean connectionPending = new AtomicBoolean();
 
+    /**
+     * TODO doc
+     * @param pf 
+     * @param group 
+     * @throws IOException 
+     */
     AsyncDatagramChannelImpl(ProtocolFamily pf, AsyncGroupImpl group)
         throws IOException
     {
         super(group.provider());
         channelGroup = group;
 
-        if (! ((pf == null) || (pf == StandardProtocolFamily.INET))) {
+        if ((pf != null) && (!protocolFamilies.contains(pf))) {
             throw new UnsupportedOperationException(
-                "Only IPv4 datagrams are supported");
+                "unsupported protocol family");
         }
+
+        protocolFamily = (pf != null) ? pf : DEFAULT_PROTOCOL_FAMILY;
 
         DatagramChannel channel =
             group.selectorProvider().openDatagramChannel();
@@ -293,6 +319,16 @@ class AsyncDatagramChannelImpl
         if (! group.isMulticastAddress())
             throw new UnsupportedAddressTypeException();
 
+        if (protocolFamily == StandardProtocolFamily.INET) {
+            if (! ((group instanceof Inet4Address)
+                  || ((group instanceof Inet6Address)
+                     && ((Inet6Address)group).isIPv4CompatibleAddress())))
+                throw new UnsupportedAddressTypeException();
+        } else if (protocolFamily == StandardProtocolFamily.INET6) {
+            if (!(group instanceof Inet6Address))
+                throw new UnsupportedAddressTypeException();
+        }
+
         InetSocketAddress mcastaddr = new InetSocketAddress(group, 0);
         MembershipKeyImpl newKey = new MembershipKeyImpl(mcastaddr, interf);
 
@@ -315,7 +351,7 @@ class AsyncDatagramChannelImpl
 
     /**
      * {@inheritDoc}
-     * 
+     * <p>
      * This implementation always throws {@code UnsupportedOperationException}.
      */
     public MembershipKey join(InetAddress group, NetworkInterface interf,
@@ -369,7 +405,7 @@ class AsyncDatagramChannelImpl
 
         if (! key.channel().isOpen())
             throw new ClosedAsynchronousChannelException();
-            
+
         if (! connectionPending.compareAndSet(false, true))
             throw new ConnectionPendingException();
 

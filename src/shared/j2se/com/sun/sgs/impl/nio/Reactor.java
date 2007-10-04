@@ -8,6 +8,7 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -20,80 +21,93 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
+import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.sgs.nio.channels.AbortedByTimeoutException;
+import com.sun.sgs.nio.channels.AcceptPendingException;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.nio.channels.WritePendingException;
 
 class Reactor {
-    static final Logger log =
-        Logger.getLogger(Reactor.class.getName());
+    static final Logger log = Logger.getLogger(Reactor.class.getName());
 
     final Object selectorLock = new Object();
+    final ReactiveChannelGroup group;
     final Selector selector;
+    final Executor executor;
     final ConcurrentHashMap<AsyncOp<?>, TimeoutHandler> timeoutMap =
         new ConcurrentHashMap<AsyncOp<?>, TimeoutHandler>();
     final DelayQueue<TimeoutHandler> timeouts =
         new DelayQueue<TimeoutHandler>();
 
-    Reactor(Selector selector) {
-        this.selector = selector;
+    volatile boolean shuttingDown = false;
+
+
+    Reactor(ReactiveChannelGroup group, Executor executor) throws IOException {
+        this.group = group;
+        this.executor = executor;
+        this.selector = group.selectorProvider().openSelector();
     }
 
     void shutdown() {
-        // TODO
+        if (shuttingDown)
+            return;
+        synchronized (selectorLock) {
+            shuttingDown = true;
+            selector.wakeup();
+        }
     }
 
     void shutdownNow() throws IOException {
+        if (shuttingDown)
+            return;
         synchronized (selectorLock) {
+            shuttingDown = true;
             selector.wakeup();
             for (SelectionKey key : selector.keys()) {
                 try {
-                    Closeable channel =
+                    Closeable asyncKey =
                         (Closeable) key.attachment();
-                    if (channel != null)
-                        channel.close();
+                    if (asyncKey != null)
+                        asyncKey.close();
                 } catch (IOException ignore) { }
             }
-        }   
+        }
     }
 
     boolean run() {
         try {
-            int rc = 0;
-//          log.log(Level.FINER, "preselect");
-            // Obtain and release the guard to allow other tasks to run
-            // after waking the selector.
+
             synchronized (selectorLock) {
-                // FIXME experimenting with a selectNow to clear
-                // spurious wakeups
-//              rc = selector.selectNow();
-//              log.log(Level.FINER, "preselect returned {0}", rc);
+                // Obtain and release the guard to allow other tasks
+                // to run after waking the selector.
+            }
+
+            if (! selector.isOpen()) {
+                log.log(Level.WARNING, "selector is closed", this);
+                return false;
             }
 
             int numKeys = selector.keys().size();
 
-            if (rc == 0) {
-                log.log(Level.FINER, "select {0}", numKeys);            
-                rc = selector.select(getSelectorTimeout(timeouts));
-                if (log.isLoggable(Level.FINER)) {
-                    log.log(Level.FINER, "selected {0} / {1}",
-                        new Object[] { rc, numKeys });
-                }
+            log.log(Level.FINER, "select {0}", numKeys);            
+            int rc = selector.select(getSelectorTimeout(timeouts));
+            if (log.isLoggable(Level.FINER)) {
+                log.log(Level.FINER, "selected {0} / {1}",
+                    new Object[] { rc, numKeys });
             }
 
-            synchronized (selectorLock) {
-                if (! selector.isOpen())
-                    return false;
-                if (selector.keys().isEmpty()) {
-                    selector.close();
-                    return false;
-                }
+            if (shuttingDown && selector.keys().isEmpty()) {
+                selector.close();
+                return false;
             }
 
             Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -106,7 +120,7 @@ class Reactor {
                     (ReactiveAsyncKey<?>) key.attachment();
 
                 int readyOps;
-                synchronized (key) {
+                synchronized (asyncKey) {
                     if (! key.isValid())
                         continue;
                     readyOps = key.readyOps();
@@ -156,19 +170,8 @@ class Reactor {
     <R, A> void
     awaitReady(SelectableChannel channel,
                int op,
-               AsyncOp<R> task,
-               long timeout,
-               TimeUnit unit) {
-        if (timeout < 0)
-            throw new IllegalArgumentException("Negative timeout");
-        if (timeout > 0) {
-            TimeoutHandler timeoutHandler =
-                new TimeoutHandler(task, timeout, unit);
-            if (timeoutMap.putIfAbsent(task, timeoutHandler) != null) {
-                assert false;
-            }
-        }
-
+               AsyncOp<R> task)
+    {
         synchronized (selectorLock) {
             selector.wakeup();
             SelectionKey key = channel.keyFor(selector);
@@ -235,14 +238,99 @@ class Reactor {
         }
     }
 
-    abstract class Something {
+    class Something {
 
-        abstract void closed();
-        abstract boolean isPending();
+        /**
+         * TODO doc
+         */
+        protected final AtomicReference<AsyncOp<?>> task =
+            new AtomicReference<AsyncOp<?>>();
+
+        /**
+         * TODO doc
+         */
+        protected void pendingPolicy() {}
+
+        void selected() {
+            Runnable selectedTask = task.getAndSet(null);
+            if (selectedTask == null) {
+                log.log(Level.WARNING, "selected but nothing to do");
+                return;
+            } else {
+                selectedTask.run();
+            }
+        }
+
+        boolean isPending() {
+            return task.get() != null;
+        }
+
+        <R, A> IoFuture<R, A>
+        execute(final A attachment,
+                final CompletionHandler<R, ? super A> handler,
+                Callable<R> callable)
+        {
+            AsyncOp<R> opTask = new AsyncOp<R>(callable) {
+                @Override
+                protected void done() {
+                    group.executeCompletion(handler, attachment, this);
+                }};
+
+            if (! task.compareAndSet(null, opTask))
+                pendingPolicy();
+
+            return AttachedFuture.wrap(opTask, attachment);
+        }
     }
 
-    abstract class TimedSomething extends Something implements Delayed {
-        
+    class TimedSomething extends Something {
+
+        /** TODO doc */
+        protected volatile TimeoutHandler timeoutHandler = null;
+
+        void timedOut() {
+            AsyncOp<?> expiredTask = task.getAndSet(null);
+            if (expiredTask == null) {
+                log.log(Level.WARNING, "timed out but nothing to do");
+                return;
+            } else {
+                expiredTask.setException(new AbortedByTimeoutException());
+            }
+        }
+
+        <R, A> IoFuture<R, A>
+        execute(final A attachment,
+                final CompletionHandler<R, ? super A> handler,
+                long timeout,
+                TimeUnit unit,
+                Callable<R> callable)
+        {
+            if (timeout == 0)
+                return execute(attachment, handler, callable);
+
+            if (timeout < 0)
+                throw new IllegalArgumentException("Negative timeout");
+
+            AsyncOp<R> opTask = new AsyncOp<R>(callable) {
+                @Override
+                protected void done() {
+                    try {
+                        timeouts.remove(timeoutHandler);
+                    } catch (Throwable t) {
+                        // ignore
+                    }
+                    timeoutHandler = null;
+                    super.done();
+                }};
+
+            if (! task.compareAndSet(null, opTask))
+                pendingPolicy();
+
+            timeoutHandler = new TimeoutHandler(this, timeout, unit);
+            timeouts.add(timeoutHandler);
+
+            return AttachedFuture.wrap(opTask, attachment);
+        }
     }
 
     class ReactiveAsyncKey<T extends SelectableChannel> implements AsyncKey<T> {
@@ -250,10 +338,25 @@ class Reactor {
         final Reactor reactor;
         final SelectionKey key;
 
-        final Something acceptThing = null;
-        final Something connectThing = null;
-        final TimedSomething readThing = null;
-        final TimedSomething writeThing = null;
+        final Something acceptThing = new Something() {
+            protected void pendingPolicy() {
+                throw new AcceptPendingException();
+            }};
+
+        final Something connectThing = new Something() {
+            protected void pendingPolicy() {
+                throw new ConnectionPendingException();
+            }};
+
+        final TimedSomething readThing = new TimedSomething() {
+            protected void pendingPolicy() {
+                throw new ReadPendingException();
+            }};
+
+        final TimedSomething writeThing = new TimedSomething() {
+            protected void pendingPolicy() {
+                throw new WritePendingException();
+            }};
 
         ReactiveAsyncKey(Reactor reactor, SelectionKey key) {
             this.reactor = reactor;
@@ -269,10 +372,10 @@ class Reactor {
                     return;
                 reactor.unregister(this);
             }
-            acceptThing.closed();
-            connectThing.closed();
-            readThing.closed();
-            writeThing.closed();
+            acceptThing.selected();
+            connectThing.selected();
+            readThing.selected();
+            writeThing.selected();
             key.channel().close();
         }
 
@@ -290,7 +393,7 @@ class Reactor {
             case OP_WRITE:
                 return writeThing.isPending();
             default:
-                throw new IllegalArgumentException("unknown op");
+                throw new AssertionError("bad op " + op);
             }
         }
 
@@ -310,42 +413,71 @@ class Reactor {
          * {@inheritDoc}
          */
         public void selected(int ops) {
-            // TODO
+            if ((ops & OP_WRITE) != 0)
+                writeThing.selected();
+            if ((ops & OP_READ) != 0)
+                readThing.selected();
+            if ((ops & OP_CONNECT) != 0)
+                connectThing.selected();
+            if ((ops & OP_ACCEPT) != 0)
+                acceptThing.selected();
         }
 
         /**
          * {@inheritDoc}
          */
-        public <R, A> IoFuture<R, A> execute(int op, A attachment, CompletionHandler<R, ? super A> handler, long timeout, TimeUnit unit, Callable<R> callable) {
-            // TODO
-            return null;
+        public <R, A> IoFuture<R, A>
+        execute(int op, A attachment, CompletionHandler<R, ? super A> handler,
+                long timeout, TimeUnit unit, Callable<R> callable)
+        {
+            switch (op) {
+            case OP_READ:
+                return readThing.execute(
+                    attachment, handler, timeout, unit, callable);
+            case OP_WRITE:
+                return writeThing.execute(
+                    attachment, handler, timeout, unit, callable);
+            default:
+                throw new AssertionError("bad op " + op);
+            }
         }
 
         /**
          * {@inheritDoc}
          */
-        public <R, A> IoFuture<R, A> execute(int op, A attachment, CompletionHandler<R, ? super A> handler, Callable<R> callable) {
-            // TODO
-            return null;
+        public <R, A> IoFuture<R, A>
+        execute(int op, A attachment, CompletionHandler<R, ? super A> handler,
+                Callable<R> callable)
+        {
+            switch (op) {
+            case OP_ACCEPT:
+                return acceptThing.execute(attachment, handler, callable);
+            case OP_CONNECT:
+                return connectThing.execute(attachment, handler, callable);
+            case OP_READ:
+                return readThing.execute(attachment, handler, callable);
+            case OP_WRITE:
+                return writeThing.execute(attachment, handler, callable);
+            default:
+                throw new AssertionError("bad op " + op);
+            }
         }
 
         /**
          * {@inheritDoc}
          */
         public void execute(Runnable command) {
-            // TODO
-            
+            executor.execute(command);
         }
-
     }
 
 
     class TimeoutHandler implements Delayed, Runnable {
-        private final AsyncOp<?> task;
+        private final TimedSomething task;
         private final long timeout;
         private final TimeUnit timeUnit;
 
-        TimeoutHandler(AsyncOp<?> task, long timeout, TimeUnit unit) {
+        TimeoutHandler(TimedSomething task, long timeout, TimeUnit unit) {
             this.task = task;
             this.timeout = timeout;
             this.timeUnit = unit;
@@ -363,7 +495,7 @@ class Reactor {
 
         /** {@inheritDoc} */
         public void run() {
-            task.setException(new AbortedByTimeoutException());
-        }        
+            task.timedOut();
+        }
     }
 }

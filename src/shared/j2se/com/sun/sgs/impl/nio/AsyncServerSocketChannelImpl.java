@@ -28,6 +28,9 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
+/**
+ * TODO doc
+ */
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
 {
@@ -42,6 +45,11 @@ final class AsyncServerSocketChannelImpl
     final AsyncKey<ServerSocketChannel> key;
     final AsyncGroupImpl group;
 
+    /**
+     * TODO doc
+     * @param group 
+     * @throws IOException 
+     */
     AsyncServerSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
     {

@@ -6,15 +6,15 @@ package com.sun.sgs.impl.nio;
 
 import java.io.IOException;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 /**
@@ -23,6 +23,9 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 class ReactiveChannelGroup
     extends AsyncGroupImpl
 {
+    static final Logger log =
+        Logger.getLogger(ReactiveChannelGroup.class.getName());
+
     /* Based on the Sun JDK ThreadPoolExecutor implementation. */
 
     /**
@@ -54,7 +57,7 @@ class ReactiveChannelGroup
     static final int TERMINATED = 3;
 
     /** Lock held on updates to runState. */
-    protected final ReentrantLock mainLock = new ReentrantLock();
+    final ReentrantLock mainLock = new ReentrantLock();
 
     /** Termination condition. */
     private final Condition termination = mainLock.newCondition();
@@ -105,8 +108,7 @@ class ReactiveChannelGroup
         reactors = new ArrayList<Reactor>(n);
 
         for (int i = 0; i < n; ++i) {
-            Selector sel = selectorProvider().openSelector();
-            reactors.add(new Reactor(sel));
+            reactors.add(new Reactor(this, executor()));
         }
 
         for (Reactor reactor : reactors) {
@@ -131,8 +133,15 @@ class ReactiveChannelGroup
             return asyncKey;
         } finally {
             mainLock.unlock();
-            if (asyncKey == null)
-                Util.forceClose(ch);
+            if (asyncKey == null) {
+                try {
+                    ch.close();
+                } catch (Throwable t) {
+                    try {
+                        log.log(Level.FINE, "exception closing" + ch, t);
+                    } catch (Throwable ignore) {}
+                }
+            }
         }
     }
 
@@ -159,7 +168,8 @@ class ReactiveChannelGroup
                 while (reactor.run()) { /* empty */ }
             } finally {
                 @SuppressWarnings("hiding")
-                ReentrantLock mainLock = ReactiveChannelGroup.this.mainLock;
+                final ReentrantLock mainLock =
+                    ReactiveChannelGroup.this.mainLock;
                 mainLock.lock();
                 try {
                     reactors.remove(reactor);
@@ -270,15 +280,6 @@ class ReactiveChannelGroup
 
         if (reactors.isEmpty())
             termination.signalAll();
-    }
-
-    /**
-     * Invokes {@link AsynchronousChannelGroup#shutdown()} when this
-     * group is no longer referenced.
-     */
-    @Override
-    protected void finalize() {
-        shutdown();
     }
 
 }

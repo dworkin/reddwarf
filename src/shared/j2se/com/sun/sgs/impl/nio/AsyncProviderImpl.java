@@ -98,7 +98,6 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
                 defaultGroupInstance = openAsynchronousChannelGroup(executor);
                 defaultGroupInstance.uncaughtHandler = defaultUncaughtHandler;
                 defaultUncaughtHandler = null;
-                // TODO is a cleanup thread needed/useful? -JM
             }
             return defaultGroupInstance;
         }
@@ -161,7 +160,8 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
         synchronized (this) {
             if (defaultGroupInstance != null)
                 return defaultGroupInstance.uncaughtHandler;
-            return defaultUncaughtHandler;
+            else
+                return defaultUncaughtHandler;
         }
     }
 

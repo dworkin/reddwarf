@@ -13,27 +13,34 @@ import java.util.concurrent.TimeUnit;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 
+/**
+ * TODO doc
+ * @param <T> 
+ */
 interface AsyncKey<T extends SelectableChannel>
     extends Closeable, Executor
 {
     /**
+     * TODO doc
      * @return the channel
      */
     T channel();
     
     /**
+     * TODO doc
      * @param op
      * @return true if the operation is pending
      */
     boolean isOpPending(int op);
     
     /**
+     * TODO doc
      * @param ops
      */
     void selected(int ops);
 
-
     /**
+     * TODO doc
      * @param <R>
      * @param <A>
      * @param op
@@ -49,6 +56,7 @@ interface AsyncKey<T extends SelectableChannel>
             Callable<R> callable);
 
     /**
+     * TODO doc
      * @param <R>
      * @param <A>
      * @param op
