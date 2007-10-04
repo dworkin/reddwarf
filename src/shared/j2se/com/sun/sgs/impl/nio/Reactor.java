@@ -268,7 +268,7 @@ class Reactor {
         void selected() {
             Runnable selectedTask = task.getAndSet(null);
             if (selectedTask == null) {
-                log.log(Level.FINER,
+                log.log(Level.FINEST,
                     "selected but nothing to do {0}", asyncKey);
                 return;
             } else {
@@ -307,7 +307,7 @@ class Reactor {
         void timedOut() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
             if (expiredTask == null) {
-                log.log(Level.FINER,
+                log.log(Level.FINEST,
                     "timed out but nothing to do {0}", asyncKey);
                 return;
             } else {

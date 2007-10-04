@@ -36,11 +36,11 @@ class ReactiveChannelGroup
     protected static final int SHUTDOWN_NOW = 2;
     protected static final int DONE         = 3;
 
-    /** Lock held on updates to runState. */
-    final ReentrantLock mainLock = new ReentrantLock();
+    /** Lock held on updates to lifecycleState. */
+    final ReentrantLock stateLock = new ReentrantLock();
 
     /** Termination condition. */
-    private final Condition termination = mainLock.newCondition();
+    private final Condition terminationCondition = stateLock.newCondition();
 
     /**
      * The property to specify the number of reactors to be used by
@@ -100,8 +100,8 @@ class ReactiveChannelGroup
         ch.configureBlocking(false);
         AsyncKey asyncKey = null;
         @SuppressWarnings("hiding")
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock stateLock = this.stateLock;
+        stateLock.lock();
         try {
             if (lifecycleState != RUNNING)
                 throw new ShutdownChannelGroupException();
@@ -111,7 +111,7 @@ class ReactiveChannelGroup
             asyncKey = reactor.register(ch);
             return asyncKey;
         } finally {
-            mainLock.unlock();
+            stateLock.unlock();
             if (asyncKey == null) {
                 try {
                     ch.close();
@@ -143,20 +143,24 @@ class ReactiveChannelGroup
 
         /** {@inheritDoc} */
         public void run() {
+            Throwable exception = null;
             try {
                 while (reactor.run()) { /* empty */ }
+            } catch (Throwable t) {
+                exception = t;
+            }
+            
+            @SuppressWarnings("hiding")
+            final ReentrantLock stateLock =
+                ReactiveChannelGroup.this.stateLock;
+            stateLock.lock();
+            try {
+                reactors.remove(reactor);
+                tryTerminate();
             } finally {
-                @SuppressWarnings("hiding")
-                final ReentrantLock mainLock =
-                    ReactiveChannelGroup.this.mainLock;
-                mainLock.lock();
-                try {
-                    log.log(Level.FINER, "handling reactor shutdown");
-                    reactors.remove(reactor);
-                    tryTerminate();
-                } finally {
-                    mainLock.unlock();
-                }
+                stateLock.unlock();
+                if (exception != null)
+                    log.log(Level.WARNING, "reactor exception", exception);
             }
         }
     }
@@ -172,18 +176,18 @@ class ReactiveChannelGroup
     {
         long nanos = unit.toNanos(timeout);
         @SuppressWarnings("hiding")
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock stateLock = this.stateLock;
+        stateLock.lock();
         try {
             for (;;) {
                 if (lifecycleState == DONE   )
                     return true;
                 if (nanos <= 0)
                     return false;
-                nanos = termination.awaitNanos(nanos);
+                nanos = terminationCondition.awaitNanos(nanos);
             }
         } finally {
-            mainLock.unlock();
+            stateLock.unlock();
         }
     }
 
@@ -209,8 +213,8 @@ class ReactiveChannelGroup
     @Override
     public ReactiveChannelGroup shutdown() {
         @SuppressWarnings("hiding")
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock stateLock = this.stateLock;
+        stateLock.lock();
         try {
             if (lifecycleState < SHUTDOWN)
                 lifecycleState = SHUTDOWN;
@@ -222,7 +226,7 @@ class ReactiveChannelGroup
 
             return this;
         } finally {
-            mainLock.unlock();
+            stateLock.unlock();
         }
     }
 
@@ -232,8 +236,8 @@ class ReactiveChannelGroup
     @Override
     public ReactiveChannelGroup shutdownNow() throws IOException {
         @SuppressWarnings("hiding")
-        final ReentrantLock mainLock = this.mainLock;
-        mainLock.lock();
+        final ReentrantLock stateLock = this.stateLock;
+        stateLock.lock();
         try {
             if (lifecycleState < SHUTDOWN_NOW)
                 lifecycleState = SHUTDOWN_NOW;
@@ -248,7 +252,7 @@ class ReactiveChannelGroup
 
             return this;
         } finally {
-            mainLock.unlock();
+            stateLock.unlock();
         }
     }
 
@@ -258,7 +262,8 @@ class ReactiveChannelGroup
 
         if (reactors.isEmpty()) {
             lifecycleState = DONE;
-            termination.signalAll();
+            terminationCondition.signalAll();
+            log.log(Level.FINE, "terminated {0}", this);
         }
     }
 
