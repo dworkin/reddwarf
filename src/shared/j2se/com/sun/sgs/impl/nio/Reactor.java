@@ -386,11 +386,11 @@ class Reactor {
         public void close() throws IOException {
             log.log(Level.FINER, "closing {0}", this);
             Reactor.this.unregister(this);
-            pendingAccept.selected();
-            pendingConnect.selected();
-            pendingRead.selected();
-            pendingWrite.selected();
-            key.channel().close();
+            try {
+                key.channel().close();
+            } finally {
+                selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
+            }
         }
 
         /**
