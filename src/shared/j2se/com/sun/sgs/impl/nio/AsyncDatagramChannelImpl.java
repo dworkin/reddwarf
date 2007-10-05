@@ -51,6 +51,7 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -65,6 +66,7 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    /** The valid protocol families for this channel. */
     private static final Set<ProtocolFamily> protocolFamilies;
     static {
         Set<? extends ProtocolFamily> pfs = EnumSet.of(
@@ -77,14 +79,23 @@ class AsyncDatagramChannelImpl
     static final ProtocolFamily
         DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
 
+    /** The channel group. */
     final AsyncGroupImpl channelGroup;
+
+    /** The underlying {@code DatagramChannel}. */
     final DatagramChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
+
+    /** The {@code ProtocolFamily} for this channel. */
     final ProtocolFamily protocolFamily;
 
+    /** The set of multicast membership keys for this channel. */
     final ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl> mcastKeys =
         new ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl>();
 
+    /** Indicates whether a connect operation is pending on this channel. */
     final AtomicBoolean connectionPending = new AtomicBoolean();
 
     /**
@@ -108,6 +119,14 @@ class AsyncDatagramChannelImpl
 
         channel = group.selectorProvider().openDatagramChannel();
         key = group.register(channel);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        return super.toString() + ":" + key;
     }
 
     /**
@@ -552,11 +571,22 @@ class AsyncDatagramChannelImpl
                 }});
     }
 
-    class MembershipKeyImpl extends MembershipKey {
+    /**
+     * TODO doc
+     */
+    final class MembershipKeyImpl extends MembershipKey {
 
-        final InetSocketAddress mcastaddr;
-        final NetworkInterface netIf;
+        /** The multicast address for this group. */
+        private final InetSocketAddress mcastaddr;
 
+        /** The network interface for this group. */
+        private final NetworkInterface netIf;
+
+        /**
+         * TODO doc
+         * @param mcastaddr the multicast address
+         * @param netIf the network interface
+         */
         MembershipKeyImpl(InetSocketAddress mcastaddr,
                           NetworkInterface netIf)
         {

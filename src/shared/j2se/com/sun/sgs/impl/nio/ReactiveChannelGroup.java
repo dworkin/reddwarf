@@ -21,6 +21,7 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 class ReactiveChannelGroup
     extends AsyncGroupImpl
 {
+    /** The logger for this class. */
     static final Logger log =
         Logger.getLogger(ReactiveChannelGroup.class.getName());
 
@@ -29,9 +30,13 @@ class ReactiveChannelGroup
      * Increases monotonically.
      */
     protected volatile int lifecycleState;
+    /** State: open and running */
     protected static final int RUNNING      = 0;
+    /** State: graceful shutdown in progress */
     protected static final int SHUTDOWN     = 1;
+    /** State: forced shutdown in progress */
     protected static final int SHUTDOWN_NOW = 2;
+    /** State: terminated */
     protected static final int DONE         = 3;
 
     /**
@@ -54,8 +59,15 @@ class ReactiveChannelGroup
     public static final int DEFAULT_REACTORS = 
         Runtime.getRuntime().availableProcessors();
 
+    /** The active {@linkplain Reactor reactors} in this group. */
     final List<Reactor> reactors;
 
+    /**
+     * TODO doc
+     * @param provider
+     * @param executor
+     * @throws IOException
+     */
     ReactiveChannelGroup(ReactiveAsyncChannelProvider provider,
                          ExecutorService executor)
         throws IOException
@@ -63,7 +75,17 @@ class ReactiveChannelGroup
         this(provider, executor, 0);
     }
 
-    // if requestedReactors == 0, choose from a property
+    /**
+     * TODO doc
+     * If requestedReactors == 0, choose from a property.
+     * TODO determine how security model interacts with properties needed
+     * for group creation
+     * 
+     * @param provider
+     * @param executor
+     * @param requestedReactors
+     * @throws IOException
+     */
     ReactiveChannelGroup(ReactiveAsyncChannelProvider provider,
                          ExecutorService executor,
                          int requestedReactors)
@@ -96,6 +118,9 @@ class ReactiveChannelGroup
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     AsyncKey register(SelectableChannel ch) throws IOException {
         ch.configureBlocking(false);
         AsyncKey asyncKey = null;
@@ -130,14 +155,25 @@ class ReactiveChannelGroup
         return ch.hashCode();
     }
     
+    /**
+     * TODO doc
+     */
     class WorkerStrategy implements Runnable {
+
+        /** This worker's reactor. */
         private final Reactor reactor;
 
+        /**
+         * TODO doc
+         * @param reactor
+         */
         WorkerStrategy(Reactor reactor) {
             this.reactor = reactor;
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         */
         public void run() {
             Throwable exception = null;
             try {

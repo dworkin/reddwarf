@@ -42,6 +42,7 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -53,8 +54,13 @@ class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    /** The channel group. */
     final AsyncGroupImpl group;
+
+    /** The underlying {@code SocketChannel}. */
     final SocketChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
 
     /**
@@ -84,9 +90,12 @@ class AsyncSocketChannelImpl
         key = group.register(channel);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String toString() {
-        return "AsyncSocketChannelImpl:" + key;
+        return super.toString() + ":" + key;
     }
 
     /**

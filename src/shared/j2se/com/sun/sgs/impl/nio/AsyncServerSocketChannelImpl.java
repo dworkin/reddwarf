@@ -36,6 +36,7 @@ import static java.nio.channels.SelectionKey.OP_ACCEPT;
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -44,8 +45,13 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    /** The channel group. */
     final AsyncGroupImpl group;
+
+    /** The underlying {@code ServerSocketChannel}. */
     final ServerSocketChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
 
     /**
@@ -60,6 +66,14 @@ final class AsyncServerSocketChannelImpl
         this.group = group;
         channel = group.selectorProvider().openServerSocketChannel();
         key = group.register(channel);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        return super.toString() + ":" + key;
     }
 
     /**

@@ -15,7 +15,6 @@ import com.sun.sgs.nio.channels.IoFuture;
 
 /**
  * TODO doc
- * @param <T> 
  */
 interface AsyncKey
     extends Closeable, Executor

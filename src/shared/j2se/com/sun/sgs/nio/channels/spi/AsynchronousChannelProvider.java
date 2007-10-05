@@ -49,7 +49,10 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
  */
 public abstract class AsynchronousChannelProvider {
 
+    /** Mutex held while accessing the provider instance. */
     private static final Object lock = new Object();
+
+    /** The system-wide provider singleton instance. */
     private static AsynchronousChannelProvider provider = null;
 
     /**
@@ -67,7 +70,12 @@ public abstract class AsynchronousChannelProvider {
     }
 
     // Class loading code based on SelectorProvider implementation in Sun JDK
-    
+
+    /**
+     * Loads the system-wide provider from a property.
+     * 
+     * @return {@true} if the provider was loaded from the property
+     */
     private static boolean loadProviderFromProperty() {
         String cn = System.getProperty(
             "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");

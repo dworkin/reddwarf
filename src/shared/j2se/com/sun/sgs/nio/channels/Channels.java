@@ -35,9 +35,20 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  */
 public final class Channels {
 
-    private Channels() { }              // No instantiation
+    /** Prevents instantiation of this class. */
+    private Channels() { }
 
     // Based on code in java.nio.channels.Channels
+
+    /**
+     * Synchronously writes the contents of the buffer to the channel,
+     * blocking until the entire buffer is written.
+     * 
+     * @param ch the channel to write to
+     * @param bb the buffer to write to the channel
+     * @throws IOException if an I/O error occurs
+     * 
+     */
     private static void writeAll(AsynchronousByteChannel ch, ByteBuffer bb)
         throws IOException
     {
@@ -54,6 +65,15 @@ public final class Channels {
         }
     }
 
+    /**
+     * Unwraps an {@code ExecutionException} and throws its cause.
+     * 
+     * @param e the {@code ExecutionException} to unwrap
+     * @return a dummy int, since this function always throws an exception
+     * 
+     * @throws IOException if the cause was an {@code IOException}
+     * @throws RuntimeException otherwise
+     */
     private static int launderExecutionException(ExecutionException e)
         throws IOException
     {

@@ -9,6 +9,7 @@ import java.io.IOException;
 public class AbortedByTimeoutException
     extends IOException
 {
+    /** The version of the serialized representation of this class. */
     private static final long serialVersionUID = 1L;
 
     /**

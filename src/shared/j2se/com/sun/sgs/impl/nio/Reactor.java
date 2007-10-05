@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 package com.sun.sgs.impl.nio;
 
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
@@ -36,26 +39,51 @@ import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
 
+/**
+ * TODO doc
+ */
 class Reactor {
+    /** The logger for this class. */
     static final Logger log = Logger.getLogger(Reactor.class.getName());
 
+    /** TODO doc */
     final Object selectorLock = new Object();
+
+    /** TODO doc */
     final ReactiveChannelGroup group;
+
+    /** TODO doc */
     final Selector selector;
+
+    /** TODO doc */
     final Executor executor;
+
+    /** TODO doc */
     final ConcurrentHashMap<AsyncOp<?>, TimeoutHandler> timeoutMap =
         new ConcurrentHashMap<AsyncOp<?>, TimeoutHandler>();
+
+    /** TODO doc */
     final DelayQueue<TimeoutHandler> timeouts =
         new DelayQueue<TimeoutHandler>();
 
+    /** TODO doc */
     volatile boolean shuttingDown = false;
 
+    /**
+     * TODO doc
+     * @param group
+     * @param executor
+     * @throws IOException
+     */
     Reactor(ReactiveChannelGroup group, Executor executor) throws IOException {
         this.group = group;
         this.executor = executor;
         this.selector = group.selectorProvider().openSelector();
     }
 
+    /**
+     * TODO doc
+     */
     void shutdown() {
         if (shuttingDown)
             return;
@@ -65,6 +93,10 @@ class Reactor {
         }
     }
 
+    /**
+     * TODO doc
+     * @throws IOException 
+     */
     void shutdownNow() throws IOException {
         if (shuttingDown)
             return;
@@ -82,6 +114,12 @@ class Reactor {
         }
     }
 
+    /**
+     * TODO doc
+     * 
+     * @return {@code false} if this reactor is stopped,
+     *         otherwise {@code true}
+     */
     boolean run() {
         try {
 
@@ -111,11 +149,24 @@ class Reactor {
                 }
             }
 
-            int rc = selector.select(getSelectorTimeout(timeouts));
+            int readyCount;
+
+            final Delayed nextExpiringTask = timeouts.peek();
+            if (nextExpiringTask == null) {
+                readyCount = selector.select(getSelectorTimeout(timeouts));
+            } else {
+                long nextTimeoutMillis =
+                    nextExpiringTask.getDelay(TimeUnit.MILLISECONDS);
+                if (nextTimeoutMillis <= 0) {
+                    readyCount = selector.selectNow();
+                } else {
+                    readyCount = selector.select(nextTimeoutMillis);
+                }
+            }
 
             if (log.isLoggable(Level.FINER)) {
                 log.log(Level.FINER, "{0} selected {1} / {2}",
-                    new Object[] { this, rc, selector.keys().size() });
+                    new Object[] { this, readyCount, selector.keys().size() });
             }
 
             if (shuttingDown) {
@@ -129,7 +180,8 @@ class Reactor {
                 }
             }
 
-            Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
+            final Iterator<SelectionKey> keys =
+                selector.selectedKeys().iterator();
 
             while (keys.hasNext()) {
                 SelectionKey key = keys.next();
@@ -148,7 +200,7 @@ class Reactor {
                 asyncKey.selected(readyOps);
             }
 
-            List<TimeoutHandler> expiredHandlers =
+            final List<TimeoutHandler> expiredHandlers =
                 new ArrayList<TimeoutHandler>();
             timeouts.drainTo(expiredHandlers);
 
@@ -165,6 +217,12 @@ class Reactor {
         return true;
     }
 
+    /**
+     * TODO doc
+     * @param ch
+     * @return an {@link AsyncKey} for the given channel
+     * @throws IOException
+     */
     ReactiveAsyncKey
     register(SelectableChannel ch) throws IOException {
         synchronized (selectorLock) {
@@ -180,12 +238,24 @@ class Reactor {
         }
     }
 
+    /**
+     * TODO doc
+     * @param asyncKey
+     */
     void
     unregister(ReactiveAsyncKey asyncKey) {
         asyncKey.key.cancel();
         selector.wakeup();
     }
 
+    /**
+     * TODO doc
+     * @param <R>
+     * @param <A>
+     * @param asyncKey
+     * @param op
+     * @param task
+     */
     <R, A> void
     awaitReady(ReactiveAsyncKey asyncKey, int op, AsyncOp<R> task)
     {
@@ -226,34 +296,65 @@ class Reactor {
         }
     }
 
+    /**
+     * TODO doc
+     * @param queue
+     * @return the timeout of the next operation that will expire, or
+     *         {@code 0} if no timeouts are pending
+     */
     static int getSelectorTimeout(DelayQueue<? extends Delayed> queue) {
         final Delayed t = queue.peek();
-        return (t == null) ? 0 : (int) t.getDelay(TimeUnit.MILLISECONDS);
+        return (t == null)
+                   ? 0
+                   : (int) (t.getDelay(TimeUnit.MILLISECONDS) - 
+                            System.currentTimeMillis());
     }
 
+    /**
+     * TODO doc
+     * @param <R> the result type
+     */
     static class AsyncOp<R> extends FutureTask<R> {
 
+        /**
+         * TODO doc
+         * @param callable
+         */
         AsyncOp(Callable<R> callable) {
             super(callable);
         }
 
+        /**
+         * TODO doc
+         */
         void timeoutExpired() {
             setException(new AbortedByTimeoutException());
         }
     }
 
+    /**
+     * TODO doc
+     */
     class PendingOperation {
 
         /** TODO doc */
         protected final AtomicReference<AsyncOp<?>> task =
             new AtomicReference<AsyncOp<?>>();
 
+        /** TODO doc */
         private volatile TimeoutHandler timeoutHandler = null;
 
+        /** TODO doc */
         private final ReactiveAsyncKey asyncKey;
 
+        /** TODO doc */
         private final int op;
 
+        /**
+         * TODO doc
+         * @param asyncKey
+         * @param op
+         */
         PendingOperation(ReactiveAsyncKey asyncKey, int op) {
             this.asyncKey = asyncKey;
             this.op = op;
@@ -264,6 +365,9 @@ class Reactor {
          */
         protected void pendingPolicy() {}
 
+        /**
+         * TODO doc
+         */
         void selected() {
             Runnable selectedTask = task.getAndSet(null);
             if (selectedTask == null) {
@@ -276,10 +380,25 @@ class Reactor {
             }
         }
 
+        /**
+         * TODO doc
+         * 
+         * @return {@code true} if this operation is pending, otherwise
+         *         {@code false}
+         */
         boolean isPending() {
             return task.get() != null;
         }
 
+        /**
+         * TODO doc
+         * @param <R>
+         * @param <A>
+         * @param attachment
+         * @param handler
+         * @param callable
+         * @return an {@code IoFuture} representing the pending operation
+         */
         <R, A> IoFuture<R, A>
         execute(final A attachment,
                 final CompletionHandler<R, ? super A> handler,
@@ -304,6 +423,9 @@ class Reactor {
             return AttachedFuture.wrap(opTask, attachment);
         }
 
+        /**
+         * TODO doc
+         */
         void timeoutExpired() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
             if (expiredTask == null) {
@@ -316,6 +438,17 @@ class Reactor {
             }
         }
 
+        /**
+         * TODO doc
+         * @param <R>
+         * @param <A>
+         * @param attachment
+         * @param handler
+         * @param timeout
+         * @param unit
+         * @param callable
+         * @return an {@code IoFuture} representing the pending operation
+         */
         <R, A> IoFuture<R, A>
         execute(final A attachment,
                 final CompletionHandler<R, ? super A> handler,
@@ -350,6 +483,9 @@ class Reactor {
             return AttachedFuture.wrap(opTask, attachment);
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public String toString() {
             return String.format("PendingOp[key=%s,op=%s]",
@@ -357,34 +493,46 @@ class Reactor {
         }
     }
 
+    /**
+     * TODO doc
+     */
     class ReactiveAsyncKey implements AsyncKey {
 
+        /** TODO doc */
         final SelectionKey key;
 
+        /** TODO doc */
         final PendingOperation pendingAccept =
             new PendingOperation(this, OP_ACCEPT) {
                 protected void pendingPolicy() {
                     throw new AcceptPendingException();
                 }};
 
+        /** TODO doc */
         final PendingOperation pendingConnect =
             new PendingOperation(this, OP_CONNECT) {
                 protected void pendingPolicy() {
                     throw new ConnectionPendingException();
                 }};
 
+        /** TODO doc */
         final PendingOperation pendingRead =
             new PendingOperation(this, OP_READ) {
                 protected void pendingPolicy() {
                     throw new ReadPendingException();
                 }};
 
+        /** TODO doc */
         final PendingOperation pendingWrite = 
             new PendingOperation(this, OP_WRITE) {
                 protected void pendingPolicy() {
                     throw new WritePendingException();
                 }};
 
+        /**
+         * TODO doc
+         * @param key
+         */
         ReactiveAsyncKey(SelectionKey key) {
             this.key = key;
         }
@@ -491,6 +639,9 @@ class Reactor {
             executor.execute(command);
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public String toString() {
             return String.format(
@@ -499,26 +650,45 @@ class Reactor {
         }
     }
 
-
+    /**
+     * TODO doc
+     */
     class TimeoutHandler implements Delayed, Runnable {
-        private final PendingOperation task;
-        private final long timeout;
-        private final TimeUnit timeUnit;
 
+        /** TODO doc */
+        private final PendingOperation task;
+
+        /** TODO doc */
+        private final long deadlineMillis;
+
+        /**
+         * TODO doc
+         * @param task
+         * @param timeout
+         * @param unit
+         */
         TimeoutHandler(PendingOperation task, long timeout, TimeUnit unit) {
             this.task = task;
-            this.timeout = timeout;
-            this.timeUnit = unit;
+            this.deadlineMillis =
+                unit.toMillis(timeout) + System.currentTimeMillis();
         }
 
         /** {@inheritDoc} */
         public long getDelay(TimeUnit unit) {
-            return unit.convert(timeout, timeUnit);
+            return unit.convert(
+                deadlineMillis - System.currentTimeMillis(),
+                TimeUnit.MILLISECONDS);
         }
 
         /** {@inheritDoc} */
         public int compareTo(Delayed o) {
-            return Long.signum(timeout - o.getDelay(timeUnit));
+            if (o instanceof TimeoutHandler) {
+                return Long.signum(
+                    deadlineMillis - ((TimeoutHandler)o).deadlineMillis);
+            } else {
+                return Long.signum(getDelay(TimeUnit.MILLISECONDS) -
+                                   o.getDelay(TimeUnit.MILLISECONDS));
+            }
         }
 
         /** {@inheritDoc} */

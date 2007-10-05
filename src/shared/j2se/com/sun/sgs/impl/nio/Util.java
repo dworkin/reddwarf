@@ -15,7 +15,8 @@ import java.util.concurrent.TimeUnit;
  */
 final class Util {
 
-    private Util() { } // no instantiation
+    /** Prevents instantiation of this class. */
+    private Util() { }
 
     /**
      * Returns the given exception with its cause initialized.  The
@@ -208,6 +209,14 @@ final class Util {
                         (((ops & OP_ACCEPT)  != 0) ? 8 : 0)];
     }
 
+    /**
+     * Returns the human-readable name of the given {@link SelectionKey}
+     * operation.
+     * 
+     * @param op a {@link SelectionKey} operation
+     * @return a human-readable string, such as "OP_READ"
+     * @see SelectionKey
+     */
     static String opName(int op) {
         switch (op) {
         case OP_READ:

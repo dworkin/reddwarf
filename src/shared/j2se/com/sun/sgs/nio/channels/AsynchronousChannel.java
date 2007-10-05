@@ -78,6 +78,7 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  */
 public abstract class AsynchronousChannel implements Channel {
 
+    /** The provider that created this asynchronous channel. */
     private final AsynchronousChannelProvider provider;
 
     /**
