@@ -10,6 +10,7 @@ import static java.nio.channels.SelectionKey.OP_WRITE;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SelectableChannel;
@@ -20,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.Executor;
@@ -43,6 +43,7 @@ import com.sun.sgs.nio.channels.WritePendingException;
  * TODO doc
  */
 class Reactor {
+
     /** The logger for this class. */
     static final Logger log = Logger.getLogger(Reactor.class.getName());
 
@@ -57,10 +58,6 @@ class Reactor {
 
     /** TODO doc */
     final Executor executor;
-
-    /** TODO doc */
-    final ConcurrentHashMap<AsyncOp<?>, TimeoutHandler> timeoutMap =
-        new ConcurrentHashMap<AsyncOp<?>, TimeoutHandler>();
 
     /** TODO doc */
     final DelayQueue<TimeoutHandler> timeouts =
@@ -120,7 +117,7 @@ class Reactor {
      * @return {@code false} if this reactor is stopped,
      *         otherwise {@code true}
      */
-    boolean run() {
+    boolean performWork() {
         try {
 
             if (! selector.isOpen()) {
@@ -263,35 +260,51 @@ class Reactor {
             selector.wakeup();
             SelectionKey key = asyncKey.key;
             SelectableChannel channel = asyncKey.channel();
-            if (key == null || (! key.isValid())) {
-                log.log(Level.FINE, "awaitReady {0} : invalid ", this);
-                throw new ClosedAsynchronousChannelException();
-            }
-
             int interestOps;
             synchronized (asyncKey) {
-                interestOps = key.interestOps();
-                if (log.isLoggable(Level.FINEST)) {
-                    log.log(Level.FINEST, "awaitReady {0} : old {1} : add {2}",
-                        new Object[] { task,
-                        Util.formatOps(interestOps),
-                        Util.formatOps(op) });
-                }
-                if ((op & (OP_READ | OP_WRITE)) != 0) {
-                    if (channel instanceof SocketChannel) {
-                        if (! ((SocketChannel) channel).isConnected())
-                            throw new NotYetConnectedException();
+                if (key == null || (! key.isValid())) {
+                    if (log.isLoggable(Level.FINE)) {
+                        log.log(Level.FINE, "{0} awaitReady {1} : invalid",
+                            new Object[] { this, Util.opName(op) });
                     }
+                    throw new ClosedAsynchronousChannelException();
                 }
 
-                interestOps |= op;
-                key.interestOps(interestOps);
+                interestOps = key.interestOps();
+
+                if (log.isLoggable(Level.FINEST)) {
+                    log.log(Level.FINEST,
+                        "{0} awaitReady {1} : old {2} : add {3}",
+                        new Object[] { this,
+                                       task,
+                                       Util.formatOps(interestOps),
+                                       Util.formatOps(op) });
+                }
+
+                if (channel instanceof SocketChannel) {
+                    switch (op) {
+                    case OP_READ:
+                    case OP_WRITE:
+                        if (! ((SocketChannel) channel).isConnected())
+                            throw new NotYetConnectedException();
+                        break;
+                    case OP_CONNECT:
+                        if (((SocketChannel) channel).isConnected())
+                            throw new AlreadyConnectedException();
+                        break;
+                    default:
+                        break;
+                    }
+
+                    interestOps |= op;
+                    key.interestOps(interestOps);
+                }
+
             }
 
             if (log.isLoggable(Level.FINEST)) {
-                log.log(Level.FINEST, "awaitReady {0} : new {1} ",
-                    new Object[] { task,
-                    Util.formatOps(interestOps) });
+                log.log(Level.FINEST, "{0}, awaitReady {1} : new {2} ",
+                    new Object[] { this, task, Util.formatOps(interestOps) });
             }
         }
     }
@@ -407,6 +420,19 @@ class Reactor {
 
         /**
          * TODO doc
+         */
+        void cleanupTask() {
+            if (timeoutHandler != null) {
+                try {
+                    timeouts.remove(timeoutHandler);
+                } catch (Throwable ignore) { }
+                timeoutHandler = null;
+            }
+            task.set(null);
+        }
+
+        /**
+         * TODO doc
          * @param <R>
          * @param <A>
          * @param attachment
@@ -429,13 +455,7 @@ class Reactor {
             AsyncOp<R> opTask = new AsyncOp<R>(callable) {
                 @Override
                 protected void done() {
-                    if (timeoutHandler != null) {
-                        try {
-                            timeouts.remove(timeoutHandler);
-                        } catch (Throwable ignore) { }
-                        timeoutHandler = null;
-                    }
-                    task.set(null);
+                    cleanupTask();
                     group.executeCompletion(handler, attachment, this);
                 }};
 
@@ -445,6 +465,13 @@ class Reactor {
             if (timeout > 0) {
                 timeoutHandler = new TimeoutHandler(this, timeout, unit);
                 timeouts.add(timeoutHandler);
+            }
+
+            try {
+                Reactor.this.awaitReady(asyncKey, op, opTask);
+            } catch (RuntimeException e) {
+                cleanupTask();
+                throw e;
             }
 
             return AttachedFuture.wrap(opTask, attachment);
@@ -534,7 +561,7 @@ class Reactor {
             case OP_WRITE:
                 return pendingWrite.isPending();
             default:
-                throw new AssertionError("bad op " + op);
+                throw new IllegalArgumentException("bad op " + op);
             }
         }
 
@@ -548,14 +575,14 @@ class Reactor {
         /**
          * {@inheritDoc}
          */
-        public void selected(int ops) {
-            if ((ops & OP_WRITE) != 0)
+        public void selected(int readyOps) {
+            if ((readyOps & OP_WRITE) != 0)
                 pendingWrite.selected();
-            if ((ops & OP_READ) != 0)
+            if ((readyOps & OP_READ) != 0)
                 pendingRead.selected();
-            if ((ops & OP_CONNECT) != 0)
+            if ((readyOps & OP_CONNECT) != 0)
                 pendingConnect.selected();
-            if ((ops & OP_ACCEPT) != 0)
+            if ((readyOps & OP_ACCEPT) != 0)
                 pendingAccept.selected();
         }
 
@@ -580,7 +607,7 @@ class Reactor {
                 return pendingAccept.execute(
                     attachment, handler, timeout, unit, callable);
             default:
-                throw new AssertionError("bad op " + op);
+                throw new IllegalArgumentException("bad op " + op);
             }
         }
 
@@ -605,7 +632,7 @@ class Reactor {
     /**
      * TODO doc
      */
-    class TimeoutHandler implements Delayed, Runnable {
+    static final class TimeoutHandler implements Delayed, Runnable {
 
         /** TODO doc */
         private final PendingOperation task;
@@ -626,6 +653,11 @@ class Reactor {
         }
 
         /** {@inheritDoc} */
+        public void run() {
+            task.timeoutExpired();
+        }
+
+        /** {@inheritDoc} */
         public long getDelay(TimeUnit unit) {
             return unit.convert(
                 deadlineMillis - System.currentTimeMillis(),
@@ -634,6 +666,8 @@ class Reactor {
 
         /** {@inheritDoc} */
         public int compareTo(Delayed o) {
+            if (o == this)
+                return 0;
             if (o instanceof TimeoutHandler) {
                 return Long.signum(
                     deadlineMillis - ((TimeoutHandler)o).deadlineMillis);
@@ -644,8 +678,21 @@ class Reactor {
         }
 
         /** {@inheritDoc} */
-        public void run() {
-            task.timeoutExpired();
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this)
+                return true;
+            if (!(obj instanceof TimeoutHandler))
+                return false;
+            TimeoutHandler other = (TimeoutHandler) obj;
+            return (deadlineMillis == other.deadlineMillis) &&
+                   task.equals(other.task);
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public int hashCode() {
+            return task.hashCode() ^ Long.valueOf(deadlineMillis).hashCode();
         }
     }
 }

@@ -32,7 +32,9 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousServerSocketChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
  */
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
@@ -56,9 +58,10 @@ final class AsyncServerSocketChannelImpl
     final AsyncKey key;
 
     /**
-     * TODO doc
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * 
+     * @param group the channel group
+     * @throws IOException if an I/O error occurs
      */
     AsyncServerSocketChannelImpl(AsyncGroupImpl group)
         throws IOException

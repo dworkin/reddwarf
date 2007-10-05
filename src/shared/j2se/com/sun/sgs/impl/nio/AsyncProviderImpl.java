@@ -17,7 +17,17 @@ import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
 /**
- * TODO doc
+ * Common base implementation of {@link AsynchronousChannelProvider}.
+ * <ul>
+ * <li>
+ * Implements methods to create the default channel group and thread pool
+ * factory as specified by {@link AsynchronousChannelGroup}.
+ * <li>
+ * Checks the channel group passed in to the various channel {@code open()}
+ * methods, substituting the default group if appropriate.
+ * <li>
+ * Manages the default group's {@link UncaughtExceptionHandler}.
+ * </ul>
  */
 abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
 
@@ -80,7 +90,7 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
                             Class<?> c = Class.forName(cn, true,
                                 ClassLoader.getSystemClassLoader());
                             return (ThreadPoolFactory) c.newInstance();
-                        } catch (Exception ignore) {
+                        } catch (Throwable ignore) {
                             // Any exception will fall-thru and return
                             // the default factory.
                         }

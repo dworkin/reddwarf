@@ -37,7 +37,9 @@ import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousSocketChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
  */
 class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
@@ -64,9 +66,10 @@ class AsyncSocketChannelImpl
     final AsyncKey key;
 
     /**
-     * TODO doc
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * 
+     * @param group the channel group
+     * @throws IOException if an I/O error occurs
      */
     AsyncSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
@@ -75,10 +78,14 @@ class AsyncSocketChannelImpl
     }
 
     /**
-     * TODO doc
-     * @param group 
-     * @param channel 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group, with
+     * the given underlying {@link SocketChannel}. Used by an
+     * {@link AsyncServerSocketChannelImpl} when a new connection is
+     * accepted.
+     * 
+     * @param group the channel group
+     * @param channel the {@link SocketChannel} for this async channel
+     * @throws IOException if an I/O error occurs
      */
     AsyncSocketChannelImpl(AsyncGroupImpl group,
                            SocketChannel channel)

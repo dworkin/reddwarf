@@ -46,7 +46,12 @@ import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousDatagramChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
+ * <p>
+ * Also implements the creation and management of multicast
+ * {@link MembershipKey}s for this channel.
  */
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
@@ -99,10 +104,15 @@ class AsyncDatagramChannelImpl
     final AtomicBoolean connectionPending = new AtomicBoolean();
 
     /**
-     * TODO doc
-     * @param pf 
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * If this channel is used for multicast, the protocol family should
+     * be specified to match that of the multicast group.  If {@code null}
+     * is specified as the protocol family, the default family is used.
+     * 
+     * @param group the channel group
+     * @param pf the protocol family, or {@code null} for the default
+     *        protocol family
+     * @throws IOException if an I/O error occurs
      */
     AsyncDatagramChannelImpl(ProtocolFamily pf, AsyncGroupImpl group)
         throws IOException
@@ -572,7 +582,8 @@ class AsyncDatagramChannelImpl
     }
 
     /**
-     * TODO doc
+     * A simple multicast membership key for datagram channels.
+     * Does <strong>not</strong> support source-specific filtering.
      */
     final class MembershipKeyImpl extends MembershipKey {
 
@@ -583,9 +594,10 @@ class AsyncDatagramChannelImpl
         private final NetworkInterface netIf;
 
         /**
-         * TODO doc
-         * @param mcastaddr the multicast address
-         * @param netIf the network interface
+         * Creates a new membership key for the group.
+         * 
+         * @param mcastaddr the multicast address of the group
+         * @param netIf the network interface of the group
          */
         MembershipKeyImpl(InetSocketAddress mcastaddr,
                           NetworkInterface netIf)

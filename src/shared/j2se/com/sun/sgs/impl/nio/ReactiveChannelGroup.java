@@ -13,10 +13,30 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 
 /**
  * A select-based AsynchronousChannelGroup.
+ * <p>
+ * This class is a container for a set of {@link Reactor}s which do the
+ * actual work of registering and dispatching asynchronous operations on
+ * channels. It provides:
+ * <ul>
+ * <li>Lifecycle support: creating and configuring the {@code Reactor} set,
+ * supporting {@linkplain AsynchronousChannelGroup#shutdown() graceful} and
+ * {@linkplain AsynchronousChannelGroup#shutdownNow() immediate shutdown},
+ * and {@linkplain AsynchronousChannelGroup#awaitTermination awaiting
+ * termination}.
+ * <li>Channel registration and load balancing across multiple
+ * {@code Reactor}s: channels are assigned to one of the reactors in
+ * the set, so that multiple CPUs can be exploited even when the underlying
+ * {@code Reactor} mechanism is single-threaded.
+ * </ul>
+ * The default number of {@code Reactor}s is set as the number of
+ * {@link Runtime#availableProcessors() available processors}, but it can be
+ * changed by setting the requested number in the system property
+ * {@value ReactiveChannelGroup#REACTORS_PROPERTY}.
  */
 class ReactiveChannelGroup
     extends AsyncGroupImpl
@@ -62,11 +82,16 @@ class ReactiveChannelGroup
     /** The active {@linkplain Reactor reactors} in this group. */
     final List<Reactor> reactors;
 
+    /** The reactor load-balance strategy. */
+    final ReactorAssignmentStrategy reactorAssignmentStrategy;
+
     /**
-     * TODO doc
-     * @param provider
-     * @param executor
-     * @throws IOException
+     * Creates a new group with the default number of reactors.
+     * 
+     * @param provider the provider that created this group
+     * @param executor the executor for this group
+     * 
+     * @throws IOException if an I/O error occurs
      */
     ReactiveChannelGroup(ReactiveAsyncChannelProvider provider,
                          ExecutorService executor)
@@ -76,15 +101,18 @@ class ReactiveChannelGroup
     }
 
     /**
-     * TODO doc
-     * If requestedReactors == 0, choose from a property.
-     * TODO determine how security model interacts with properties needed
-     * for group creation
+     * Creates a new group with the requested number of reactors. If {code
+     * 0} reactors are requested, a default is chosen as the number of
+     * {@link Runtime#availableProcessors() available processors}.
      * 
-     * @param provider
-     * @param executor
-     * @param requestedReactors
-     * @throws IOException
+     * @param provider the provider that created this group
+     * @param executor the executor for this group
+     * @param requestedReactors the number of reactors to create in this
+     *        group, or {@code 0} to use the default
+     * 
+     * @throws IllegalArgumentException if a negative number of reactors is
+     *         requested
+     * @throws IOException if an I/O error occurs
      */
     ReactiveChannelGroup(ReactiveAsyncChannelProvider provider,
                          ExecutorService executor,
@@ -94,6 +122,9 @@ class ReactiveChannelGroup
         super(provider, executor);
 
         int n = requestedReactors;
+        
+        // TODO determine how security model interacts with properties needed
+        // for group creation
 
         if (n == 0) {
             try {
@@ -107,14 +138,22 @@ class ReactiveChannelGroup
             throw new IllegalArgumentException("non-positive reactor count");
         }
 
+        reactorAssignmentStrategy = new HashingReactorAssignmentStrategy();
+
         reactors = new ArrayList<Reactor>(n);
+
+        // TODO it might be interesting to provide each Reactor with its
+        // own private executor (perhaps using threads from this group's
+        // executor).
 
         for (int i = 0; i < n; ++i) {
             reactors.add(new Reactor(this, executor()));
         }
 
         for (Reactor reactor : reactors) {
-            executor.execute(new WorkerStrategy(reactor));
+            // Use the reactor's executor, in case we've set up
+            // per-reactor executors.
+            reactor.executor.execute(new Worker(reactor));
         }
     }
 
@@ -129,8 +168,7 @@ class ReactiveChannelGroup
             if (lifecycleState != RUNNING)
                 throw new ShutdownChannelGroupException();
 
-            int k = reactorBucketStrategy(ch);
-            reactor = reactors.get(Math.abs(k % reactors.size()));
+            reactor = reactorAssignmentStrategy.getReactorFor(ch);
         }
     
         try {
@@ -146,28 +184,52 @@ class ReactiveChannelGroup
     }
 
     /**
-     * Returns a reactor bucket for the given channel.
-     *
-     * @param ch a channel
-     * @return the reactor bucket for the channel
+     * Interface for {@code Reactor} load balancing strategies.
      */
-    protected int reactorBucketStrategy(SelectableChannel ch) {
-        return ch.hashCode();
+    interface ReactorAssignmentStrategy {
+
+        /**
+         * Returns the {@code Reactor} for a newly-registering channel.
+         * 
+         * @param channel a channel to assign to a {@code Reactor}
+         * @return the {@code Reactor} to use for the channel
+         */
+        Reactor getReactorFor(SelectableChannel channel);
     }
-    
+
     /**
-     * TODO doc
+     * A {@code Reactor} load balancing strategy that chooses a reactor
+     * based on the {@linkplain Object#hashCode() hash} of the channel.
      */
-    class WorkerStrategy implements Runnable {
+    final class HashingReactorAssignmentStrategy
+    implements ReactorAssignmentStrategy
+    {
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation chooses the reactor based on the hash of the
+         * channel.
+         */
+        public Reactor getReactorFor(SelectableChannel channel) {
+            return reactors.get(
+                Math.abs(channel.hashCode() % reactors.size()));
+        }
+    }
+
+    /**
+     * Worker to run a reactor and check termination when a reactor completes.
+     */
+    class Worker implements Runnable {
 
         /** This worker's reactor. */
         private final Reactor reactor;
 
         /**
-         * TODO doc
-         * @param reactor
+         * Creates a worker instance for the reactor.
+         * 
+         * @param reactor the reactor to run
          */
-        WorkerStrategy(Reactor reactor) {
+        Worker(Reactor reactor) {
             this.reactor = reactor;
         }
 
@@ -176,9 +238,20 @@ class ReactiveChannelGroup
          */
         public void run() {
             Throwable exception = null;
+
+            // TODO experiment with looping versus re-executing the
+            // task in the reactor's executor.  Requires some care to
+            // handle termination correctly.
+
             try {
-                while (reactor.run()) { /* empty */ }
-            } catch (Throwable t) {
+                for (;;) {
+                    boolean keepGoing = reactor.performWork();
+                    if (! keepGoing)
+                        break;
+                }
+            } catch (RuntimeException t) {
+                exception = t;
+            } catch (Error t) {
                 exception = t;
             }
 
@@ -189,6 +262,15 @@ class ReactiveChannelGroup
 
             if (exception != null)
                 log.log(Level.WARNING, "reactor exception", exception);
+
+            if (exception instanceof RuntimeException) {
+                throw (RuntimeException) exception;
+            } else if (exception instanceof Error) {
+                throw (Error) exception;
+            } else {
+                throw new IllegalStateException(
+                    "unexpected exception type", exception);
+            }
         }
     }
 
