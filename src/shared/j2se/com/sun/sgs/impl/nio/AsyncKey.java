@@ -45,22 +45,6 @@ interface AsyncKey
      * @param op
      * @param attachment
      * @param handler
-     * @param callable
-     * @return an IoFuture
-     */
-    <R, A> IoFuture<R, A>
-    execute(int op,
-            A attachment,
-            CompletionHandler<R, ? super A> handler,
-            Callable<R> callable);
-
-    /**
-     * TODO doc
-     * @param <R>
-     * @param <A>
-     * @param op
-     * @param attachment
-     * @param handler
      * @param timeout
      * @param unit
      * @param callable

@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
@@ -214,7 +215,8 @@ final class AsyncServerSocketChannelImpl
             A attachment,
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
-        return key.execute(OP_ACCEPT, attachment, handler,
+        return key.execute(
+            OP_ACCEPT, attachment, handler, 0, TimeUnit.MILLISECONDS,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     try {

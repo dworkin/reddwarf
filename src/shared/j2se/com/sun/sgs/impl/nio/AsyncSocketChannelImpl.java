@@ -327,17 +327,18 @@ class AsyncSocketChannelImpl
             return AttachedFuture.wrap(result, attachment);
         }
 
-        return key.execute(OP_CONNECT, attachment, handler,
-                new Callable<Void>() {
-                    public Void call() throws IOException {
-                        try {
-                            channel.finishConnect();
-                            return null;
-                        } catch (ClosedChannelException e) {
-                            throw Util.initCause(
-                                new AsynchronousCloseException(), e);
-                        }
-                    }});
+        return key.execute(
+            OP_CONNECT, attachment, handler, 0, TimeUnit.MILLISECONDS,
+            new Callable<Void>() {
+                public Void call() throws IOException {
+                    try {
+                        channel.finishConnect();
+                        return null;
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
+                }});
     }
 
     /**

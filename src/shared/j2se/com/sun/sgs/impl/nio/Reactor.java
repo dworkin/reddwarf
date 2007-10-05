@@ -392,39 +392,6 @@ class Reactor {
 
         /**
          * TODO doc
-         * @param <R>
-         * @param <A>
-         * @param attachment
-         * @param handler
-         * @param callable
-         * @return an {@code IoFuture} representing the pending operation
-         */
-        <R, A> IoFuture<R, A>
-        execute(final A attachment,
-                final CompletionHandler<R, ? super A> handler,
-                Callable<R> callable)
-        {
-            AsyncOp<R> opTask = new AsyncOp<R>(callable) {
-                @Override
-                protected void done() {
-                    group.executeCompletion(handler, attachment, this);
-                }};
-
-            if (! task.compareAndSet(null, opTask))
-                pendingPolicy();
-
-            try {
-                Reactor.this.awaitReady(asyncKey, op, opTask);
-            } catch (RuntimeException e) {
-                task.set(null);
-                throw e;
-            }
-
-            return AttachedFuture.wrap(opTask, attachment);
-        }
-
-        /**
-         * TODO doc
          */
         void timeoutExpired() {
             AsyncOp<?> expiredTask = task.getAndSet(null);
@@ -456,9 +423,6 @@ class Reactor {
                 TimeUnit unit,
                 Callable<R> callable)
         {
-            if (timeout == 0)
-                return execute(attachment, handler, callable);
-
             if (timeout < 0)
                 throw new IllegalArgumentException("Negative timeout");
 
@@ -471,14 +435,17 @@ class Reactor {
                         } catch (Throwable ignore) { }
                         timeoutHandler = null;
                     }
+                    task.set(null);
                     group.executeCompletion(handler, attachment, this);
                 }};
 
             if (! task.compareAndSet(null, opTask))
                 pendingPolicy();
 
-            timeoutHandler = new TimeoutHandler(this, timeout, unit);
-            timeouts.add(timeoutHandler);
+            if (timeout > 0) {
+                timeoutHandler = new TimeoutHandler(this, timeout, unit);
+                timeouts.add(timeoutHandler);
+            }
 
             return AttachedFuture.wrap(opTask, attachment);
         }
@@ -600,33 +567,18 @@ class Reactor {
                 long timeout, TimeUnit unit, Callable<R> callable)
         {
             switch (op) {
-            case OP_READ:
-                return pendingRead.execute(
-                    attachment, handler, timeout, unit, callable);
             case OP_WRITE:
                 return pendingWrite.execute(
                     attachment, handler, timeout, unit, callable);
-            default:
-                throw new AssertionError("bad op " + op);
-            }
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public <R, A> IoFuture<R, A>
-        execute(int op, A attachment, CompletionHandler<R, ? super A> handler,
-                Callable<R> callable)
-        {
-            switch (op) {
-            case OP_ACCEPT:
-                return pendingAccept.execute(attachment, handler, callable);
-            case OP_CONNECT:
-                return pendingConnect.execute(attachment, handler, callable);
             case OP_READ:
-                return pendingRead.execute(attachment, handler, callable);
-            case OP_WRITE:
-                return pendingWrite.execute(attachment, handler, callable);
+                return pendingRead.execute(
+                    attachment, handler, timeout, unit, callable);
+            case OP_CONNECT:
+                return pendingConnect.execute(
+                    attachment, handler, timeout, unit, callable);
+            case OP_ACCEPT:
+                return pendingAccept.execute(
+                    attachment, handler, timeout, unit, callable);
             default:
                 throw new AssertionError("bad op " + op);
             }
