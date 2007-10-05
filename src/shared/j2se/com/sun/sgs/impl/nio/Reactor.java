@@ -93,28 +93,37 @@ class Reactor {
             synchronized (selectorLock) {
                 // Obtain and release the guard to allow other tasks
                 // to run after waking the selector.
-            }
 
-            int numKeys = selector.keys().size();
-
-            if (log.isLoggable(Level.FINER)) {
-                log.log(Level.FINER, "{0} select on {1} keys",
-                    new Object[] { this, numKeys });
+                if (log.isLoggable(Level.FINER)) {
+                    int numKeys = selector.keys().size();
+                    log.log(Level.FINER, "{0} select on {1} keys",
+                        new Object[] { this, numKeys });
+                    if (numKeys <= 5) {
+                        for (SelectionKey key : selector.keys()) {
+                            log.log(Level.FINER,
+                                "{0} select interestOps {1} on {2}",
+                                new Object[] {
+                                    this,
+                                    Util.formatOps(key.interestOps()),
+                                    key.attachment() });
+                        }
+                    }
+                }
             }
 
             int rc = selector.select(getSelectorTimeout(timeouts));
+
             if (log.isLoggable(Level.FINER)) {
                 log.log(Level.FINER, "{0} selected {1} / {2}",
-                    new Object[] { this, rc, numKeys });
+                    new Object[] { this, rc, selector.keys().size() });
             }
 
             if (shuttingDown) {
-                numKeys = selector.keys().size();
                 if (log.isLoggable(Level.FINE)) {
                     log.log(Level.FINE, "{0} wants shutdown, {1} keys",
-                        new Object[] { this, numKeys });
+                        new Object[] { this, selector.keys().size() });
                 }
-                if (numKeys == 0) {
+                if (selector.keys().isEmpty()) {
                     selector.close();
                     return false;
                 }

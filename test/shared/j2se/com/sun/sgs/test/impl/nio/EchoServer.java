@@ -122,8 +122,13 @@ public class EchoServer {
             log.throwing("EchoServer", "acceptedChannel", e);
         }
         int nc = numConnections.incrementAndGet();
-        if (nc % 100 == 0)
-          log.log(Level.INFO, "Currently {0} connections", nc);
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "Currently {0} connections", nc);
+        }
+        if (log.isLoggable(Level.INFO)) {
+            if (nc % 100 == 0)
+               log.log(Level.INFO, "Currently {0} connections", nc);
+        }
 
         ByteBuffer buf = ByteBuffer.allocateDirect(BUFFER_SIZE);
         log.finest("Reading");
@@ -213,6 +218,8 @@ public class EchoServer {
         } catch (IOException e) {
             log.throwing("EchoServer", "disconnected", e);
         }
+
+        log.log(Level.FINE, "Disconnect done {0}", channel);
         
         if (nConn == 0) {
             log.info("Closing acceptor");

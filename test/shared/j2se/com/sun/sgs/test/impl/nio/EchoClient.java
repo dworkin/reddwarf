@@ -160,7 +160,7 @@ public class EchoClient {
                 log.log(Level.FINEST, "Read {0} bytes", rc);
                 if (rc < 0) {
                     log.log(Level.WARNING, "Read bailed with {0}", rc);
-                    disconnected(true);
+                    disconnected();
                     return;
                 }
                 bytesRead += rc;
@@ -172,7 +172,7 @@ public class EchoClient {
                 }
                 if (opsRemaining == 0) {
                     log.finer("Reader finished; closing");
-                    disconnected(true);
+                    disconnected();
                     return;
                 }
                 buf.clear();
@@ -180,10 +180,10 @@ public class EchoClient {
                 channel.read(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("ReadHandler", "completed", e);
-                disconnected(true);
+                disconnected();
             } catch (RuntimeException e) {
                 log.throwing("ReadHandler", "completed", e);
-                disconnected(true);
+                disconnected();
             }
         }
     }
@@ -235,28 +235,28 @@ public class EchoClient {
                 channel.write(buf, opsRemaining - 1, this);
             } catch (ExecutionException e) {
                 log.throwing("WriteHandler", "completed", e);
-                disconnected(true);
+                disconnected();
             } catch (RuntimeException e) {
                 log.throwing("WriteHandler", "completed", e);
-                disconnected(true);
+                disconnected();
             }
         }
     }
 
-    void disconnected(boolean wantClose) {
+    void disconnected() {
         if (log.isLoggable(Level.FINE)) {
             log.log(Level.FINE,
                 "Disconnected {0} read:{1} wrote:{2}",
                 new Object[] { channel, bytesRead, bytesWritten });
         }
 
-        if (wantClose) {
-            try {
-                channel.close();
-            } catch (IOException ioe) {
-                log.throwing("EchoClient", "disconnected", ioe);
-            }
+        try {
+            channel.close();
+        } catch (IOException ioe) {
+            log.throwing("EchoClient", "disconnected", ioe);
         }
+
+        log.log(Level.FINE, "Disconnect done {0}", channel);
 
         totalBytesRead.addAndGet(bytesRead);
         totalBytesWritten.addAndGet(bytesWritten);
