@@ -323,14 +323,20 @@ class AsyncSocketChannelImpl
         try {
             if (channel.connect(remote)) {
                 Future<Void> result = Util.finishedFuture(null);
-                group.executeCompletion(handler, attachment, result);
+                if (handler != null) {
+                    key.execute(group.completionRunner(
+                                    handler, attachment, result));
+                }
                 return AttachedFuture.wrap(result, attachment);
             }
         } catch (ClosedChannelException e) {
             throw Util.initCause(new ClosedAsynchronousChannelException(), e);
         } catch (IOException e) {
             Future<Void> result = Util.failedFuture(e);
-            group.executeCompletion(handler, attachment, result);
+            if (handler != null) {
+                key.execute(group.completionRunner(
+                                handler, attachment, result));
+            }
             return AttachedFuture.wrap(result, attachment);
         }
 

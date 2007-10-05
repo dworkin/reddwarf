@@ -66,28 +66,25 @@ abstract class AsyncGroupImpl
     register(SelectableChannel ch) throws IOException;
 
     /**
-     * Executes the given completion handler using this group's executor.
+     * Returns a runnable that will invoke the given completion handler.
      * Passes the handler an {@code IoFuture} constructed from the given
      * future and attachment object.
      * 
      * @param <R> the result type
      * @param <A> the attachment type
-     * @param handler the completion handler, or {@code null} to do nothing
+     * @param handler the completion handler
      * @param attachment the attachment, or {@code null}
      * @param future the result
+     * @return the completion runnable
      */
-    <R, A> void
-    executeCompletion(CompletionHandler<R, A> handler,
-                      A attachment,
-                      Future<R> future)
+    <R, A> Runnable
+    completionRunner(CompletionHandler<R, A> handler,
+                     A attachment,
+                     Future<R> future)
     {
         assert future.isDone();
 
-        if (handler == null)
-            return;
-
-        executor.execute(
-            new CompletionRunner<R, A>(handler, attachment, future));
+        return new CompletionRunner<R, A>(handler, attachment, future);
     }
 
     /**

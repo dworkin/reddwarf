@@ -50,7 +50,10 @@ class Reactor {
     /** TODO doc */
     final Object selectorLock = new Object();
 
-    /** TODO doc */
+    /**
+     * The channel group for this reactor.
+     * Used when invoking completion handlers.
+     */
     final ReactiveChannelGroup group;
 
     /** TODO doc */
@@ -455,7 +458,10 @@ class Reactor {
                 @Override
                 protected void done() {
                     cleanupTask();
-                    group.executeCompletion(handler, attachment, this);
+                    if (handler != null) {
+                        asyncKey.execute(
+                            group.completionRunner(handler, attachment, this));
+                    }
                 }};
 
             if (! task.compareAndSet(null, opTask))
@@ -629,21 +635,34 @@ class Reactor {
     }
 
     /**
-     * TODO doc
+     * Represents a timeout action for a {@code PendingOperation}.
+     * Instances are placed in the {@code timeouts} queue and run when they
+     * have expired.
+     * <p>
+     * Tasks that complete before their timeout expires should remove their
+     * {@code TimeoutHandler} from the queue, since timeouts may be much
+     * longer than the typical operation and the timeouts queue could
+     * become filled with obsolete handlers.
      */
     static final class TimeoutHandler implements Delayed, Runnable {
 
-        /** TODO doc */
+        /** The task to notify upon timeout. */
         private final PendingOperation task;
 
-        /** TODO doc */
+        /**
+         * The absolute deadline, in milliseconds, since the epoch.
+         * 
+         * @see System#currentTimeMillis()
+         */
         private final long deadlineMillis;
 
         /**
-         * TODO doc
-         * @param task
-         * @param timeout
-         * @param unit
+         * Creates a new instance that will notify the given operation when
+         * the (relative) timeout expires.
+         * 
+         * @param task the task to notify
+         * @param timeout the timeout
+         * @param unit the unit of the timout
          */
         TimeoutHandler(PendingOperation task, long timeout, TimeUnit unit) {
             this.task = task;
@@ -651,7 +670,11 @@ class Reactor {
                 unit.toMillis(timeout) + System.currentTimeMillis();
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Invokes {@code timeoutExpired} on this handler's task object.
+         */
         public void run() {
             task.timeoutExpired();
         }
@@ -691,7 +714,8 @@ class Reactor {
         /** {@inheritDoc} */
         @Override
         public int hashCode() {
-            return task.hashCode() ^ Long.valueOf(deadlineMillis).hashCode();
+            // high-order bits of deadlineMillis aren't useful for hashing
+            return task.hashCode() ^ (int)deadlineMillis;
         }
     }
 }

@@ -17,7 +17,7 @@ final class Util {
 
     /** Prevents instantiation of this class. */
     private Util() { }
-
+    
     /**
      * Returns the given exception with its cause initialized.  The
      * original exception is returned in a typesafe way so that it

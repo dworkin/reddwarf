@@ -429,7 +429,10 @@ class AsyncDatagramChannelImpl
             {
                 @Override protected void done() {
                     connectionPending.set(false);
-                    channelGroup.executeCompletion(handler, attachment, this);
+                    if (handler != null) {
+                        key.execute(channelGroup.completionRunner(
+                                        handler, attachment, this));
+                    }
                 }
             };
 
@@ -461,7 +464,10 @@ class AsyncDatagramChannelImpl
                 }})
             {
                 @Override protected void done() {
-                    channelGroup.executeCompletion(handler, attachment, this);
+                    if (handler != null) {
+                        key.execute(channelGroup.completionRunner(
+                                        handler, attachment, this));
+                    }
                 }
             };
 
