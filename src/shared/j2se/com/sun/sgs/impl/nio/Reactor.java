@@ -57,6 +57,9 @@ class Reactor {
      * <p>
      * The selector must obtain this lock <strong>and release it</strong>
      * before blocking on {@code select()}.
+     * <p>
+     * If both the {@code selectorLock} and {@link AsyncKey} need to be
+     * locked, the {@code selectorLock} must be locked <em>first</em>.
      */
     final Object selectorLock = new Object();
 
@@ -294,12 +297,47 @@ class Reactor {
     }
 
     /**
-     * TODO doc
-     * @param <R>
-     * @param <A>
-     * @param asyncKey
-     * @param op
-     * @param task
+     * Registers interest in an IO operation on the channel associated with
+     * the given {@link AsyncKey}, returning a future representing the
+     * result of the operation.
+     * <p>
+     * When the requested operation becomes ready, the given {@code task}
+     * is invoked so that it may perform the IO operation.  The selector's
+     * interest all ready operations is cleared before dispatching to the
+     * task.
+     * <p>
+     * Several checks are performed on the channel at this point to avoid
+     * race conditions where the check succeeds but the condition
+     * immediately becomes false. We lock both the {@code selectorLock} and
+     * the {@code asyncKey} to ensure that we get a proper view of the state
+     * when registering the operation, and so that if the state later
+     * changes the operation will be terminated properly.
+     * <p>
+     * If the channel is closed, {@link ClosedAsynchronousChannelException}
+     * is thrown.
+     * <p>
+     * Additional checks are performed on {@code SocketChannel}s:
+     * <ul>
+     * <li>
+     * If the requested operation is {@code OP_READ} or {@code OP_WRITE}
+     * and the channel is not connected, {@link NotYetConnectedException}
+     * is thrown.
+     * <li>
+     * If the requested operation is {@code OP_CONNECT} and the channel is
+     * already connected, {@link AlreadyConnectedException} is thrown.
+     * </ul>
+     * 
+     * @param <R> the result type
+     * @param <A> the attachment type
+     * @param asyncKey the key for async operations on the channel
+     * @param op the {@link SelectionKey} operation requested
+     * @param task the task to invoke when the operation becomes ready
+     * 
+     * @throws ClosedAsynchronousChannelException if the channel is closed
+     * @throws NotYetConnectedException if a read or write operation is
+     *         requested on an unconnected {@code SocketChannel}
+     * @throws AlreadyConnectedException if a connect operation is requested
+     *         on a connected {@code SocketChannel}
      */
     <R, A> void
     awaitReady(ReactiveAsyncKey asyncKey, int op, AsyncOp<R> task)
@@ -357,21 +395,25 @@ class Reactor {
     }
 
     /**
-     * TODO doc
+     * A FutureTask that can be cancelled by a timeout exception.
+     * 
      * @param <R> the result type
      */
     static class AsyncOp<R> extends FutureTask<R> {
 
         /**
-         * TODO doc
-         * @param callable
+         * Creates a new instance.
+         * 
+         * @param callable the work to perform when this task is run
          */
         AsyncOp(Callable<R> callable) {
             super(callable);
         }
 
         /**
-         * TODO doc
+         * Completes this future as if its {@code run()} method threw
+         * an {@code AbortedByTimeoutException}, unless this future
+         * has already completed.
          */
         void timeoutExpired() {
             setException(new AbortedByTimeoutException());
@@ -379,7 +421,7 @@ class Reactor {
     }
 
     /**
-     * TODO doc
+     * Manages a particular IO operation for an async key.
      */
     class PendingOperation {
 
