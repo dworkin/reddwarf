@@ -260,16 +260,17 @@ class ReactiveChannelGroup
                 tryTerminate();
             }
 
-            if (exception != null)
+            if (exception != null) {
                 log.log(Level.WARNING, "reactor exception", exception);
 
-            if (exception instanceof RuntimeException) {
-                throw (RuntimeException) exception;
-            } else if (exception instanceof Error) {
-                throw (Error) exception;
-            } else {
-                throw new IllegalStateException(
-                    "unexpected exception type", exception);
+                if (exception instanceof RuntimeException) {
+                    throw (RuntimeException) exception;
+                } else if (exception instanceof Error) {
+                    throw (Error) exception;
+                } else {
+                    throw new IllegalStateException(
+                        "unexpected exception type", exception);
+                }
             }
         }
     }
