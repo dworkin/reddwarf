@@ -32,6 +32,7 @@ import java.util.logging.Logger;
 
 import com.sun.sgs.nio.channels.AbortedByTimeoutException;
 import com.sun.sgs.nio.channels.AcceptPendingException;
+import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
@@ -47,33 +48,55 @@ class Reactor {
     /** The logger for this class. */
     static final Logger log = Logger.getLogger(Reactor.class.getName());
 
-    /** TODO doc */
+    /**
+     * Selector guard.  Any code that accesses selector data structures,
+     * (e.g., selection keys and their interest sets), must obtain this
+     * lock before waking the selector.  Doing so prevents the selector
+     * from blocking on {@code select()} again until the code that awakened
+     * it has released this guard.
+     * <p>
+     * The selector must obtain this lock <strong>and release it</strong>
+     * before blocking on {@code select()}.
+     */
     final Object selectorLock = new Object();
 
     /**
-     * The channel group for this reactor.
-     * Used when invoking completion handlers.
+     * The channel group for this reactor, used to obtain completion
+     * handler runners.
      */
     final ReactiveChannelGroup group;
 
-    /** TODO doc */
+    /**
+     * The {@code Selector} that waits for available IO operations on
+     * registered channels.
+     */
     final Selector selector;
 
-    /** TODO doc */
+    /**
+     * The executor for this {@code Reactor}.  Typically an executor is
+     * shared by all reactors in a group, but each reactor may have its
+     * own logical executor.
+     */
     final Executor executor;
 
-    /** TODO doc */
+    /** Operations that having pending timeouts. */
     final DelayQueue<TimeoutHandler> timeouts =
         new DelayQueue<TimeoutHandler>();
 
-    /** TODO doc */
+    /**
+     * Whether this reactor should shutdown when it has no registered keys.
+     */
     volatile boolean shuttingDown = false;
 
     /**
-     * TODO doc
-     * @param group
-     * @param executor
-     * @throws IOException
+     * Creates a new reactor instance with the given channel group and
+     * executor.
+     * 
+     * @param group the channel group for this reactor
+     * @param executor the executor for tasks in this reactor
+     * 
+     * @throws IOException if an I/O error occurs, e.g. while opening
+     *         the {@code Selector} for this reactor
      */
     Reactor(ReactiveChannelGroup group, Executor executor) throws IOException {
         this.group = group;
@@ -82,7 +105,11 @@ class Reactor {
     }
 
     /**
-     * TODO doc
+     * Notifies this reactor that it should shutdown when it has no registered
+     * channels.  If this reactor is already marked for shutdown, this
+     * method has no effect.
+     * 
+     * @see AsynchronousChannelGroup#shutdown()
      */
     void shutdown() {
         if (shuttingDown)
@@ -94,8 +121,13 @@ class Reactor {
     }
 
     /**
-     * TODO doc
-     * @throws IOException 
+     * Notifies this reactor that it should shutdown immediately, closing
+     * any open channels registered with it.  If this reactor is already
+     * marked for immediate shutdown, this method has no effect.
+     * 
+     * @throws IOException if an I/O error occurs
+     * 
+     * @see AsynchronousChannelGroup#shutdownNow()
      */
     void shutdownNow() throws IOException {
         if (shuttingDown)
@@ -115,7 +147,9 @@ class Reactor {
     }
 
     /**
-     * TODO doc
+     * Performs a single iteration of the reactor's event loop, and returns
+     * a flag indicating whether the reactor is still running.  Catches
+     * and logs any exceptions that are thrown.
      * 
      * @return {@code false} if this reactor is stopped,
      *         otherwise {@code true}
@@ -153,7 +187,7 @@ class Reactor {
 
             final Delayed nextExpiringTask = timeouts.peek();
             if (nextExpiringTask == null) {
-                readyCount = selector.select(getSelectorTimeout(timeouts));
+                readyCount = selector.select();
             } else {
                 long nextTimeoutMillis =
                     nextExpiringTask.getDelay(TimeUnit.MILLISECONDS);
@@ -218,10 +252,15 @@ class Reactor {
     }
 
     /**
-     * TODO doc
-     * @param ch
+     * Registers the given {@link SelectableChannel} with this reactor,
+     * returning an {@link AsyncKey} that can be used to initiate asynchronous
+     * operations on that channel.
+     * 
+     * @param ch the {@code SelectableChannel} to register
      * @return an {@link AsyncKey} for the given channel
-     * @throws IOException
+     * 
+     * @throws ShutdownChannelGroupException if the reactor is shutdown
+     * @throws IOException if an IO error occurs
      */
     ReactiveAsyncKey
     register(SelectableChannel ch) throws IOException {
@@ -239,12 +278,18 @@ class Reactor {
     }
 
     /**
-     * TODO doc
-     * @param asyncKey
+     * Cancel the registration of the given {@link AsyncKey} with this reactor.
+     * 
+     * @param asyncKey the key to cancel
      */
     void
     unregister(ReactiveAsyncKey asyncKey) {
+        // Note that synchronization is not required in this case, becase
+        // the cancel operation is guaranteed to block at most briefly.
         asyncKey.key.cancel();
+
+        // Wake the selector in case this was the last key registered
+        // and the reactor is shutting down.
         selector.wakeup();
     }
 
@@ -309,20 +354,6 @@ class Reactor {
                     new Object[] { this, task, Util.formatOps(interestOps) });
             }
         }
-    }
-
-    /**
-     * TODO doc
-     * @param queue
-     * @return the timeout of the next operation that will expire, or
-     *         {@code 0} if no timeouts are pending
-     */
-    static int getSelectorTimeout(DelayQueue<? extends Delayed> queue) {
-        final Delayed t = queue.peek();
-        return (t == null)
-                   ? 0
-                   : (int) (t.getDelay(TimeUnit.MILLISECONDS) - 
-                            System.currentTimeMillis());
     }
 
     /**
