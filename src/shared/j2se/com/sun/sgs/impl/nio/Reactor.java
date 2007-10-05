@@ -295,11 +295,10 @@ class Reactor {
                     default:
                         break;
                     }
-
-                    interestOps |= op;
-                    key.interestOps(interestOps);
                 }
 
+                interestOps |= op;
+                key.interestOps(interestOps);
             }
 
             if (log.isLoggable(Level.FINEST)) {
