@@ -20,6 +20,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -185,19 +186,19 @@ public interface Channel {
     boolean hasSessions();
 
     /**
-     * Returns a set containing the client sessions joined to
+     * Returns an iterator for the client sessions joined to
      * this channel.
      *
      * <p>Note: This operation may be expensive, so it should be used
      * judiciously.
      * 
-     * @return a set containing the sessions joined to this channel
+     * @return an iterator for the client sessions joined to this channel
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    Set<ClientSession> getSessions();
+    Iterator<ClientSession> getSessions();
 
     /**
      * Sends the message contained in the specified byte array to all

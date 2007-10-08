@@ -96,7 +96,7 @@ public class ChannelServiceImpl
     private static final String SESSION_PREFIX = PKG_NAME + ".session.";
     
     /** The prefix of a channel key which maps to its channel state. */
-    private static final String CHANNEL_PREFIX = PKG_NAME + ".state.";
+    private static final String CHANNEL_STATE_PREFIX = PKG_NAME + ".state.";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -146,6 +146,9 @@ public class ChannelServiceImpl
     /** The proxy for the ChannelServer. */
     private final ChannelServer serverProxy;
 
+    /** The ID for the local node. */
+    private final long localNodeId;
+
     /** Map (with weak keys) of client sessions to queues, each containing
      * tasks to forward channel messages sent by the session (the key).
      */
@@ -194,7 +197,12 @@ public class ChannelServiceImpl
 	    dataService = txnProxy.getService(DataService.class);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
-
+	    localNodeId = watchdogService.getLocalNodeId();
+	    taskOwner = txnProxy.getCurrentOwner();
+	    
+	    /*
+	     * Export the ChannelServer.
+	     */
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new ChannelServerImpl();
@@ -212,6 +220,22 @@ public class ChannelServiceImpl
 		throw e;
 	    }
 
+	    /*
+	     * Store the ChannelServer proxy in the data store.
+	     */
+	    taskScheduler.runTransactionalTask(
+		new AbstractKernelRunnable() {
+		    public void run() {
+			dataService.setServiceBinding(
+			    getChannelServerKey(localNodeId),
+			    new ChannelServerWrapper(serverProxy));
+		    }},
+		txnProxy.getCurrentOwner());
+
+	    /*
+	     * Add listeners for handling recovery and for handling
+	     * protocol messages for the channel service.
+	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
 	    sessionService.registerProtocolMessageListener(
@@ -386,6 +410,16 @@ public class ChannelServiceImpl
 		callFinished();
 	    }
 	}
+
+	/** {@inheritDoc} */
+	public void leaveAll(byte[] channelId, byte[][] sessionIds) {
+	    callStarted();
+	    try {
+		throw new AssertionError("not implemented");
+	    } finally {
+		callFinished();
+	    }
+	}
 	
 	/** {@inheritDoc} */
 	public void send(byte[] channelId, byte[][] recipients, byte[] message) {
@@ -477,14 +511,14 @@ public class ChannelServiceImpl
 
 	/** {@inheritDoc} */
 	public void disconnected(final ClientSession session) {
+	    /*
+	     * Remove session from all channels that it is currently a
+	     * member of.
+	     */
 	    nonDurableTaskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			Context context = contextFactory.joinTransaction();
-			Set<Channel> channels = context.removeSession(session);
-			for (Channel channel : channels) {
-			    channel.leave(session);
-			}
+			removeSessionFromAllChannels(session);
 		    }},
 		session.getIdentity());
 	}
@@ -637,15 +671,14 @@ public class ChannelServiceImpl
 	 * Creates a channel with the specified {@code name}, {@code
 	 * listener}, and {@code delivery} requirement.  The channel's
 	 * state is bound to a name composed of the channel service's
-	 * class name followed by ".channel." followed by the channel
-	 * name.
+	 * prefix followed by ".state." followed by the channel name.
 	 */
 	private Channel createChannel(String name,
 				      ChannelListener listener,
 				      Delivery delivery)
 	{
 	    assert name != null;
-	    String key = getChannelKey(name);
+	    String key = getChannelStateKey(name);
 	    try {
 		dataService.getServiceBinding(key, ChannelState.class);
 		throw new NameExistsException(name);
@@ -675,7 +708,7 @@ public class ChannelServiceImpl
 		try {
 		    channelState =
 		    	dataService.getServiceBinding(
-			    getChannelKey(name), ChannelState.class);
+			    getChannelStateKey(name), ChannelState.class);
 		} catch (NameNotBoundException e) {
 		    throw new NameNotBoundException(name);
 		}
@@ -798,78 +831,10 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes the channel with the specified {@code name}.  This
-	 * method is called when the {@code close} method is invoked on a
-	 * {@code ChannelImpl}.
+	 * Returns the local node ID.
 	 */
-	void removeChannel(String name) {
-	    assert name != null;
-	    try {
-		String key = getChannelKey(name);
-		ChannelState channelState =
-		    dataService.getServiceBinding(key, ChannelState.class);
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(channelState);
-		
-	    } catch (NameNotBoundException e) {
-		// already removed
-	    }
-	}
-
-	/**
-	 * Adds {@code channel} to the set of channels for the given
-	 * client {@code session}.  The {@code ChannelSet} for a
-	 * session is bound to a name composed of the channel
-	 * service's class name followed by ".session." followed by
-	 * the hex representation of the session's identifier.
-	 */
-	void joinChannel(ClientSession session, Channel channel) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.markForUpdate(set);
-		set.add(channel);
-	    } catch (NameNotBoundException e) {
-		ChannelSet set = new ChannelSet();
-		set.add(channel);
-		dataService.setServiceBinding(key, set);
-	    }
-	}
-
-	/**
-	 * Removes {@code channel} from the set of channels for the
-	 * given client {@code session}.
-	 */
-	void leaveChannel(ClientSession session, Channel channel) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.markForUpdate(set);
-		set.remove(channel);
-	    } catch (NameNotBoundException e) {
-		// ignore
-	    }
-	}
-
-	/**
-	 * Removes the given {@code session}'s channel set and binding
-	 * from the data store, returning a set containing the
-	 * channels that the session is still a member of.
-	 */
-	private Set<Channel> removeSession(ClientSession session) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		Set<Channel> channels = set.removeAll();
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(set);
-		return channels;
-	    } catch (NameNotBoundException e) {
-		return new HashSet<Channel>();
-	    }
+	long getLocalNodeId() {
+	    return localNodeId;
 	}
 
 	/**
@@ -888,91 +853,6 @@ public class ChannelServiceImpl
 	}
     }
 
-    /**
-     * Returns a session key for the given {@code session}.
-     */
-    private static String getSessionKey(ClientSession session) {
-	return SESSION_PREFIX +
-            HexDumper.toHexString(session.getSessionId().getBytes());
-    }
-
-    /**
-     * Returns a channel key for the given channel {@code name}.
-     */
-    private static String getChannelKey(String name) {
-	return CHANNEL_PREFIX + name;
-    }
-
-    /**
-     * Contains a set of channels (names) that a session is a member of.
-     */
-    private static class ChannelSet implements ManagedObject, Serializable {
-	private final static long serialVersionUID = 1L;
-
-	private final HashSet<String> set = new HashSet<String>();
-
-	ChannelSet() {
-	}
-
-	void add(Channel channel) {
-	    set.add(channel.getName());
-	}
-
-	void remove(Channel channel) {
-	    set.remove(channel.getName());
-	}
-	
-	Set<Channel> removeAll() {
-	    Set<Channel> channels = new HashSet<Channel>();
-	    Context context = getContextMap().getContext();
-	    for (String name : set) {
-		try {
-		    channels.add(context.getChannel(name));
-		} catch (NameNotBoundException e) {
-		    // ignore
-		}
-	    }
-	    set.clear();
-	    return channels;
-	}
-    }
-    
-    /**
-     * Removes all channel sets from the data store.  This method is
-     * invoked when this service is configured to remove any existing
-     * channel sets since their corresponding sessions are
-     * disconnected.
-     */
-    private void removeChannelSets() {
-	Iterator<String> iter =
-	    BoundNamesUtil.getServiceBoundNamesIterator(
-		dataService, SESSION_PREFIX);
-
-	while (iter.hasNext()) {
-	    String key = iter.next();
-	    ChannelSet set =
-		dataService.getServiceBinding(key, ChannelSet.class);
-	    dataService.removeObject(set);
-	    iter.remove();
-	}
-    }
-
-    /**
-     * Removes all sessions from all channels.  This method is invoked
-     * when this service is configured to remove all sessions (which
-     * are now disconnected) from all channels in the channel table.
-     */
-    private void removeAllSessionsFromChannels() {
-	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
- 				dataService, CHANNEL_PREFIX))
-	{
-	    ChannelState channelState =
-		dataService.getServiceBinding(key, ChannelState.class);
-	    dataService.markForUpdate(channelState);
-	    channelState.removeAllSessions();
-	}
-    }
-	
     /**
      * Task (transactional) for notifying channel listeners.
      */
@@ -1024,7 +904,7 @@ public class ChannelServiceImpl
      * Contains cached channel state, stored in the {@code channelStateCache}
      * map when a committed context is flushed.
      */
-    private static class CachedChannelState {
+    private class CachedChannelState {
 
 	private final String name;
 	private final Set<ClientSession> sessions;
@@ -1033,14 +913,96 @@ public class ChannelServiceImpl
 
 	CachedChannelState(ChannelImpl channelImpl) {
 	    this.name = channelImpl.state.name;
-	    this.sessions = channelImpl.state.getSessions();
+	    this.sessions =
+		channelImpl.state.getSessions(dataService, localNodeId);
 	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
 	    this.delivery = channelImpl.state.delivery;
 	}
 
 	boolean hasSession(ClientSession session) {
+	    // FIXME: this only works for sessions on the local node
 	    return sessions.contains(session);
 	}
+    }
+
+    /**
+     * The {@code RecoveryListener} for handling requests to recover
+     * for a failed {@code ChannelService}.
+     */
+    private class ChannelServiceRecoveryListener
+	implements RecoveryListener
+    {
+	/** {@inheritDoc} */
+	public void recover(final Node node, RecoveryCompleteFuture future) {
+	    try {
+		taskScheduler.runTransactionalTask(
+		    new RecoveryTask(node.getId()), taskOwner);
+		future.done();
+	    } catch (Exception e) {
+		logger.logThrow(
+ 		    Level.WARNING, e,
+		    "removing sessions from channels for node:{0} throws",
+		    node.getId());
+		// TBD: what should it do if it can't recover?
+	    }
+	}
+    }
+
+    /**
+     * Task to perform recovery actions for a specific node,
+     * specifically to remove all client sessions that were connected
+     * to the node from all channels that those sessions were a member
+     * of.
+     */
+    private class RecoveryTask extends AbstractKernelRunnable {
+
+	private final long nodeId;
+
+	RecoveryTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    Iterator<ClientSession> iter =
+		ChannelState.getSessionsAnyChannel(dataService, nodeId);
+	    while (iter.hasNext()) {
+		removeSessionFromAllChannels(iter.next());
+	    }
+	}
+    }
+
+    /**
+     * Removes the specified client {@code session} from all channels
+     * that it is currently a member of.
+     */
+    private void removeSessionFromAllChannels(ClientSession session) {
+	Set<String> channelNames =
+	    ChannelState.getChannelsForSession(dataService, session);
+	for (String name : channelNames) {
+	    try {
+		getChannel(name).leave(session);
+	    } catch (NameNotBoundException e) {
+		logger.logThrow(Level.FINE, e, "channel removed:{0}", name);
+	    }
+	}
+    }
+
+    /**
+     * Returns the key for accessing the {@code ChannelState} instance
+     * for the channel with the specified {@code channelName}.
+     */
+    private static String getChannelStateKey(String channelName) {
+	return PKG_NAME + ".state." + channelName;
+    }
+
+    /**
+     * Returns the key for accessing the {@code ChannelServer}
+     * instance (which is wrapped in a {@code ChannelServerWrapper})
+     * for the specified {@code nodeId}.
+     */
+    static String getChannelServerKey(long nodeId) {
+	return PKG_NAME + ".server." + nodeId;
     }
 
     /**
@@ -1065,34 +1027,5 @@ public class ChannelServiceImpl
 	    putByteArray(message);
 
         return buf.getBuffer();
-    }
-
-    /**
-     * The {@code RecoveryListener} for handling requests to recover
-     * for a failed {@code ChannelService}.
-     */
-    private class ChannelServiceRecoveryListener
-	implements RecoveryListener
-    {
-	/** {@inheritDoc} */
-	public void recover(final Node node, RecoveryCompleteFuture future) {
-	    try {
-		taskScheduler.runTransactionalTask(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    // FIXME: This is only correct for single node...
-			    removeAllSessionsFromChannels();
-			    removeChannelSets();
-			}},
-		    taskOwner);
-		future.done();
-	    } catch (Exception e) {
-		logger.logThrow(
- 		    Level.WARNING, e,
-		    "removing sessions from channels for node:{0} throws",
-		    node.getId());
-		// TBD: what should it do if it can't recover?
-	    }
-	}
     }
 }

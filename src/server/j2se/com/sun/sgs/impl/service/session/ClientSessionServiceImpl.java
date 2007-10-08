@@ -449,6 +449,13 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    getClientSessionImpl(session), message, delivery);
     }
 
+    /** {@inheritDoc} */
+    public void runTask(ClientSession session, Runnable task)
+    {
+	checkContext().addTask(getClientSessionImpl(session), task);
+    }
+
+
     /**
      * Checks if the local node is considered alive, and throws an
      * {@code IllegalStateException} if the node is no loger alive.
@@ -584,9 +591,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     final class Context extends TransactionContext {
 
 	/** Map of client sessions to an object containing a list of
-	 * updates to make upon transaction commit. */
-        private final Map<ClientSessionImpl, Updates> sessionUpdates =
-	    new HashMap<ClientSessionImpl, Updates>();
+	 * actions to make upon transaction commit. */
+        private final Map<ClientSessionImpl, CommitActions> sessionCommitActions =
+	    new HashMap<ClientSessionImpl, CommitActions>();
+
+	private final CommitActions otherCommitActions =
+	    new CommitActions(null);
 
 	/**
 	 * Constructs a context with the specified transaction.
@@ -615,6 +625,32 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    addMessage0(session, message, delivery, true);
 	}
 
+	void addTask(ClientSessionImpl session, Runnable task) {
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Context.addTask session:{0}, task:{1}",
+			session, task);
+		}
+		checkPrepared();
+
+		if (session != null) {
+		    getCommitActions(session).addTask(task);
+		} else {
+		    otherCommitActions.addTask(task);
+		}
+	    
+	    } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Context.addMessage exception");
+                }
+                throw e;
+            }
+	}
+
 	/**
 	 * Requests that the specified session be disconnected when
 	 * this transaction commits, but only after all session
@@ -629,7 +665,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		}
 		checkPrepared();
 
-		getUpdates(session).disconnect = true;
+		getCommitActions(session).setDisconnect();
 		
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -642,8 +678,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
 
 	private void addMessage0(
-	    ClientSessionImpl session, byte[] message, Delivery delivery,
-	    boolean isFirst)
+	    ClientSessionImpl session, byte[] message,
+	    Delivery delivery, boolean isFirst)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -654,12 +690,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		}
 		checkPrepared();
 
-		Updates updates = getUpdates(session);
-		if (isFirst) {
-		    updates.messages.add(0, message);
-		} else {
-		    updates.messages.add(message);
-		}
+		getCommitActions(session).addMessage(message, isFirst);
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -671,14 +702,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
             }
 	}
 
-	private Updates getUpdates(ClientSessionImpl session) {
+	private CommitActions getCommitActions(ClientSessionImpl session) {
 
-	    Updates updates = sessionUpdates.get(session);
-	    if (updates == null) {
-		updates = new Updates(session);
-		sessionUpdates.put(session, updates);
+	    CommitActions actions = sessionCommitActions.get(session);
+	    if (actions == null) {
+		actions = new CommitActions(session);
+		sessionCommitActions.put(session, actions);
 	    }
-	    return updates;
+	    return actions;
 	}
 	
 	/**
@@ -699,7 +730,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly = sessionUpdates.values().isEmpty();
+	    boolean readOnly = sessionCommitActions.values().isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
 	    }
@@ -708,7 +739,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	/**
 	 * Removes the context from the context queue containing
-	 * pending updates, and checks for flushing committed contexts.
+	 * pending actions, and checks for flushing committed contexts.
 	 */
 	public void abort(boolean retryable) {
 	    contextQueue.remove(this);
@@ -749,8 +780,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    if (shuttingDown()) {
 		return false;
 	    } else if (isCommitted) {
-		for (Updates updates : sessionUpdates.values()) {
-		    updates.flush();
+		for (CommitActions actions : sessionCommitActions.values()) {
+		    actions.flush();
 		}
 		return true;
 	    } else {
@@ -762,75 +793,175 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Contains pending changes for a given client session.
      */
-    private class Updates {
+    private class CommitActions {
 
 	/** The client session. */
 	private final ClientSessionImpl sessionImpl;
 	
 	/** List of protocol messages to send on commit. */
-	List<byte[]> messages = new ArrayList<byte[]>();
+	private List<Action> actions = new ArrayList<Action>();
 
 	/** If true, disconnect after sending messages. */
-	boolean disconnect = false;
+	private boolean disconnect = false;
 
-	Updates(ClientSessionImpl sessionImpl) {
+	CommitActions(ClientSessionImpl sessionImpl) {
 	    this.sessionImpl = sessionImpl;
 	}
 
-	private void flush() {
-
-	    ClientSessionId sessionId = sessionImpl.getSessionId();
-	    ClientSessionHandler handler = handlers.get(sessionId);
-	    /*
-	     * If a local handler exists, forward messages to local handler
-	     * to send to client session and disconnect session if requested;
-	     * otherwise obtain remote server for client session and forward
-	     * messages for delivery as well as disconnect request.
-	     */
-	    if (handler != null) {
-		for (byte[] message : messages) {
-		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
-		}
-		if (disconnect) {
-		    handler.handleDisconnect(false);
-		}
-
+	void addMessage(byte[] message, boolean isFirst) {
+	    if (sessionImpl == null) {
+		throw new UnsupportedOperationException(
+		    "addMessage not supported if sessionImpl is null");
+	    }
+	    if (isFirst) {
+		actions.add(new SendMessageAction(message));
 	    } else {
-		if (! sessionImpl.isConnected()) {
-		    logger.log(
-			Level.FINE,
-			"Discarding messages for disconnected session:{0}",
-			sessionImpl);
-		    return;
+		if (actions.isEmpty() ||
+		    ! actions.get(actions.size()-1).addMessage(message))
+		{
+		    actions.add(new SendMessageAction(message));
 		}
+	    }
+	    
+	}
+	
+	void addTask(Runnable task) {
+	    actions.add(new RunTaskAction(task));
+	}
 
-		int size = messages.size();
-		byte[][] messageData = new byte[size][];
-		Delivery[] deliveryData = new Delivery[size];
-		int i = 0;
-		for (byte[] message : messages) {
-		    messageData[i] = message;
-		    deliveryData[i] = Delivery.RELIABLE;
-		    i++;
+	void setDisconnect() {
+	    if (sessionImpl == null) {
+		throw new UnsupportedOperationException(
+		    "setDisconnect not supported if sessionImpl is null");
+	    }
+	    disconnect = true;
+	}
+
+	void flush() {
+	    for (Action action : actions) {
+		action.doAction();
+	    }
+	    if (disconnect) {
+		ClientSessionId sessionId = sessionImpl.getSessionId();
+		ClientSessionHandler handler = handlers.get(sessionId);
+		if (handler != null) {
+		    handler.handleDisconnect(false);
+		} else {
+		    // TBD: handle remote disconnect here...
+		    throw new AssertionError("not implemented");
 		}
-		
-		try {
-		    boolean connected = sessionImpl.getClientSessionServer().
-			sendProtocolMessages(sessionId.getBytes(), messageData,
-					     deliveryData, disconnect);
-		    if (! connected) {
-			sessionImpl.setDisconnected();
+	    }
+	}
+
+	private abstract class Action {
+
+	    boolean addMessage(byte[] message) {
+		return false;
+	    }
+
+	    boolean addTask(KernelRunnable task) {
+		return false;
+	    }
+
+	    abstract void doAction();
+	}
+
+	private class SendMessageAction extends Action {
+
+	    private final List<byte[]> messages = new ArrayList<byte[]>();
+
+	    SendMessageAction(byte[] message) {
+		messages.add(message);
+	    }
+	
+	    boolean addMessage(byte[] message) {
+		messages.add(message);
+		return true;
+	    }
+
+	    void doAction() {
+
+		ClientSessionId sessionId = sessionImpl.getSessionId();
+		ClientSessionHandler handler = handlers.get(sessionId);
+		/*
+		 * If a local handler exists, forward messages to
+		 * local handler to send to client session; otherwise
+		 * obtain remote server for client session and forward
+		 * messages for delivery.
+		 */
+		if (handler != null) {
+		    if (! handler.isConnected()) {
+			logger.log(
+			  Level.FINE,
+			    "Discarding messages for disconnected session:{0}",
+			handler);
 		    }
-		} catch (IOException e) {
+		    for (byte[] message : messages) {
+			handler.sendProtocolMessage(message, Delivery.RELIABLE);
+		    }
+
+		} else {
+		    if (! sessionImpl.isConnected()) {
+			logger.log(
+			  Level.FINE,
+			    "Discarding messages for disconnected session:{0}",
+			sessionImpl);
+			return;
+		    }
+
+		    int size = messages.size();
+		    byte[][] messageData = new byte[size][];
+		    Delivery[] deliveryData = new Delivery[size];
+		    int i = 0;
+		    for (byte[] message : messages) {
+			messageData[i] = message;
+			deliveryData[i] = Delivery.RELIABLE;
+			i++;
+		    }
+		
+		    try {
+			boolean connected = sessionImpl.getClientSessionServer().
+			    sendProtocolMessages(sessionId.getBytes(),
+						 messageData,
+						 deliveryData);
+			if (! connected) {
+			    sessionImpl.setDisconnected();
+			}
+		    } catch (IOException e) {
+			logger.logThrow(
+		    	    Level.FINE, e,
+			    "Sending messages to session:{0} throws",
+			    sessionImpl);
+			// TBD: set the session as disconnected?
+			// sessionImpl.setDisconnected();
+		    }
+		}
+	    }
+	}
+
+	private class RunTaskAction extends Action {
+
+	    private final Runnable task;
+
+	    RunTaskAction(Runnable task) {
+		this.task = task;
+	    }
+
+	    void doAction() {
+		try {
+		    task.run();
+		} catch (Exception e) {
 		    logger.logThrow(
-		    	Level.FINE, e,
-			"Sending messages to session:{0} throws");
-		    // TBD: set the session as disconnected?
-		    // sessionImpl.setDisconnected();
+ 			Level.WARNING, e,
+			"Running task:{0} for session:{1} throws",
+			task, sessionImpl);
 		}
 	    }
 	}
     }
+
+
+    
 
     /**
      * Thread to process the context queue, in order, to flush any
@@ -943,8 +1074,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	/** {@inheritDoc} */
 	public boolean sendProtocolMessages(byte[] sessionId,
 					    byte[][] messages,
-					    Delivery[] delivery,
-					    boolean disconnect)
+					    Delivery[] delivery)
 	{
 	    ClientSessionId id = new ClientSessionId(sessionId);
 	    ClientSessionHandler handler = handlers.get(id);
@@ -963,9 +1093,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	    for (int i = 0; i < messages.length; i++) {
 		handler.sendProtocolMessage(messages[i], delivery[i]);
-	    }
-	    if (disconnect) {
-		handler.handleDisconnect(false);
 	    }
 	    return true;
 	}

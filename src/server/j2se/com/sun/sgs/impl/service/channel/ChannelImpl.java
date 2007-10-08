@@ -37,8 +37,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -62,6 +64,9 @@ final class ChannelImpl implements Channel, Serializable {
     /** Transaction-related context information. */
     private final Context context;
 
+    /** The data service. */
+    private final DataService dataService;
+
     /** Persistent channel state. */
     final ChannelState state;
 
@@ -82,6 +87,7 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 	this.state =  state;
 	this.context = context;
+	this.dataService = context.getService(DataService.class);
     }
 
     /* -- Implement Channel -- */
@@ -116,13 +122,47 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new IllegalArgumentException("listener not serializable");
 	    }
 
-	    if (state.hasSession(session)) {
+	    /*
+	     * Add session and listener (if any) to channel state.
+	     */
+	    final long sessionNodeId = state.getNodeId(session);
+	    boolean isFirstSessionOnNode =
+		! state.hasSessionsOnNode(sessionNodeId);
+	    if (!state.addSession(dataService, session, listener)) {
+		// session already added
+		assert ! isFirstSessionOnNode;
 		return;
 	    }
-	    
-	    context.getService(DataService.class).markForUpdate(state);
-	    state.addSession(session, listener);
-	    context.joinChannel(session, this);
+	    /*
+	     * If the specified session is the first session to join
+	     * this channel on a node, then notify all non-local
+	     * channel servers so that they can update their cache.
+	     */
+	    if (isFirstSessionOnNode) {
+		final Collection<ChannelServer> nonLocalServers =
+		    state.getNonLocalChannelServers(context.getLocalNodeId());
+		if (! nonLocalServers.isEmpty()) {
+		    runTaskOnCommit(
+			session,
+			new Runnable() {
+			    public void run() {
+				for (ChannelServer server : nonLocalServers) {
+				    try {
+					server.join(state.getIdBytes(),
+						    sessionNodeId);
+				    } catch (Exception e) {
+					// skip unresponsive channel server
+					logger.logThrow(
+					    Level.WARNING, e,
+					    "Contacting channel server:{0} " +
+					    "throws", server);
+				    }
+				}}});
+		}
+	    }
+	    /*
+	     * Send 'join' message to client session.
+	     */
 	    MessageBuffer buf =
 		new MessageBuffer(3 + MessageBuffer.getSize(state.name) +
 				  state.id.getExternalFormByteCount());
@@ -133,14 +173,10 @@ final class ChannelImpl implements Channel, Serializable {
 		putBytes(state.id.getExternalForm());
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "join session:{0} returns", session);
-	    }
+	    logger.log(Level.FINEST, "join session:{0} returns", session);
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "leave throws");
-	    }
+	    logger.logThrow(Level.FINEST, e, "leave throws");
 	    throw e;
 	}
     }
@@ -153,13 +189,18 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new NullPointerException("null client session");
 	    }
 
-	    if (!state.hasSession(session)) {
+	    if (!state.hasSession(dataService, session)) {
 		return;
 	    }
+
+	    /*
+	     * Remove session from channel state.
+	     */
+	    state.removeSession(dataService, session);
 	    
-	    context.getService(DataService.class).markForUpdate(state);
-	    context.leaveChannel(session, this);
-	    state.removeSession(session);
+	    /*
+	     * Send 'leave' message to client session.
+	     */
 	    if (session.isConnected()) {
 		MessageBuffer buf =
 		    new MessageBuffer(3 + state.id.getExternalFormByteCount());
@@ -169,15 +210,40 @@ final class ChannelImpl implements Channel, Serializable {
 		    putBytes(state.id.getExternalForm());
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
-	    
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "leave session:{0} returns", session);
+	    /*
+	     * If the removed session was the last session for this
+	     * channel on a node, then notify the non-local channel
+	     * servers so that they can update their cache.
+	     */
+	    final long sessionNodeId = state.getNodeId(session);
+	    if (! state.hasSessionsOnNode(sessionNodeId)) {
+		final Collection<ChannelServer> nonLocalServers =
+		    state.getNonLocalChannelServers(context.getLocalNodeId());
+		if (! nonLocalServers.isEmpty()) {
+		    runTaskOnCommit(
+			session,
+			new Runnable() {
+			    public void run() {
+				for (ChannelServer server : nonLocalServers) {
+				    try {
+					server.leave(state.getIdBytes(),
+						     sessionNodeId);
+				    } catch (Exception e) {
+					// skip unresponsive channel server
+					logger.logThrow(
+					    Level.WARNING, e,
+					    "Contacting channel server:{0} " +
+					    "throws", server);
+				    }
+				}
+			    }});
+		}
 	    }
+	    
+	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "leave throws");
-	    }
+	    logger.logThrow(Level.FINEST, e, "leave throws");
 	    throw e;
 	}
     }
@@ -186,16 +252,15 @@ final class ChannelImpl implements Channel, Serializable {
     public void leaveAll() {
 	try {
 	    checkClosed();
-	    if (!state.hasSessions()) {
+	    if (!state.hasSessions(dataService)) {
 		return;
 	    }
-	    context.getService(DataService.class).markForUpdate(state);
-	    final Set<ClientSession> sessions = getSessions();
-	    for (ClientSession session : sessions) {
-		context.leaveChannel(session, this);
-	    }
-	    state.removeAllSessions();
 
+	    /*
+	     * Send 'leave' message to all client sessions connected
+	     * to this node.
+	     */
+	    long localNodeId = context.getLocalNodeId();
 	    MessageBuffer buf =
 		new MessageBuffer(3 + state.id.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
@@ -203,10 +268,44 @@ final class ChannelImpl implements Channel, Serializable {
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putBytes(state.id.getExternalForm());
 	    byte[] message = buf.getBuffer();
-		    
-	    for (ClientSession session : sessions) {
+	    for (ClientSession session : 
+		     state.getSessions(dataService, localNodeId))
+	    {
 		sendProtocolMessageOnCommit(session, message);
 	    }
+
+	    /*
+	     * Notify all non-local channel servers that all members
+	     * have left the channel, and, for a given channel server,
+	     * that the member sessions connected to that channel
+	     * server's node were removed from the channel and need to
+	     * be sent a 'leave' protocol message.
+	     */
+	    for (long nodeId : 
+		     state.getNonLocalChannelServerNodes(localNodeId))
+	    {
+		final byte[][] sessions =
+		    getSessionIds(state.getSessions(dataService, nodeId));
+		final ChannelServer server = state.getChannelServer(nodeId);
+		runTaskOnCommit(
+		    null,
+		    new Runnable() {
+			public void run() {
+			    try {
+				server.leaveAll(state.getIdBytes(), sessions);
+			    } catch (Exception e) {
+				// skip unresponsive channel server
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "Contacting channel server:{0} throws",
+				    server);
+			    }
+			}});
+	    }
+	    /*
+	     * Remove all client sessions from this channel.
+	     */
+	    state.removeAllSessions(dataService);
 	    logger.log(Level.FINEST, "leaveAll returns");
 	    
 	} catch (RuntimeException e) {
@@ -214,26 +313,32 @@ final class ChannelImpl implements Channel, Serializable {
 	    throw e;
 	}
     }
+
+    /**
+     * Returns an array of session IDs for the corresponding client
+     * sessions in the specified set.
+     */
+    private static byte[][] getSessionIds(Set<ClientSession> sessions) {
+	byte[][] sessionIds = new byte[sessions.size()][];
+	int i = 0;
+	for (ClientSession session : sessions) {
+	    sessionIds[i++] = session.getSessionId().getBytes();
+	}
+	return sessionIds;
+    }
     
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
-	boolean hasSessions = state.hasSessions();
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "hasSessions returns {0}", hasSessions);
-	}
+	boolean hasSessions = state.hasSessions(dataService);
+	logger.log(Level.FINEST, "hasSessions returns {0}", hasSessions);
 	return hasSessions;
     }
 
     /** {@inheritDoc} */
-    public Set<ClientSession> getSessions() {
+    public Iterator<ClientSession> getSessions() {
 	checkClosed();
-	Set<ClientSession> sessions =
-	    Collections.unmodifiableSet(state.getSessions());
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getSessions returns {0}", sessions);
-	}
-	return sessions;
+	return state.getSessionIterator(dataService);
     }
 
     /** {@inheritDoc} */
@@ -248,16 +353,14 @@ final class ChannelImpl implements Channel, Serializable {
                     "message too long: " + message.length + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
-	    sendToClients(state.getSessions(), message);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "send message:{0} returns", message);
-	    }
+	    // FIXME: not implemented!
+	    // sendToClients(state.getSessions(), message);
+	    logger.log(Level.FINEST, "send message:{0} returns", message);
+	    throw new AssertionError("not implemented");
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "send message:{0} throws", message);
-	    }
+	    logger.logThrow(
+		Level.FINEST, e, "send message:{0} throws", message);
 	    throw e;
 	}
     }
@@ -338,8 +441,7 @@ final class ChannelImpl implements Channel, Serializable {
 	checkContext();
 	if (!isClosed) {
 	    leaveAll();
-	    state.removeAll();
-	    context.removeChannel(state.name);
+	    state.removeAll(dataService);
 	    isClosed = true;
 	}
 	
@@ -459,18 +561,12 @@ final class ChannelImpl implements Channel, Serializable {
     private void sendProtocolMessageOnCommit(
 	ClientSession session, byte[] message)
     {
-        try {
-            context.getClientSessionService().sendProtocolMessage(
-		session, message, state.delivery);
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.logThrow(
-                    Level.FINEST, e,
-                    "sendProtcolMessageOnCommit session:{0} message:{1} throws",
-                    session, message);
-            }
-	    throw e;
-        }
+	context.getClientSessionService().sendProtocolMessage(
+	    session, message, state.delivery);
+    }
+
+    private void runTaskOnCommit(ClientSession session, Runnable task) {
+	context.getClientSessionService().runTask(session, task);
     }
 
     /**
@@ -483,12 +579,15 @@ final class ChannelImpl implements Channel, Serializable {
 	byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
 		state.id, SERVER_ID, message, context.nextSequenceNumber());
-	    
+	// FIXME: not implemented!
+	throw new AssertionError("not implemented");
+	/*    
 	for (ClientSession session : sessions) {
 	    // skip disconnected and non-member sessions
 	    if (state.hasSession(session) && session.isConnected()) {
 		sendProtocolMessageOnCommit(session, protocolMessage);
 	    }
 	}
+	*/
     }
 }

@@ -69,18 +69,15 @@ public interface ClientSessionServer extends Remote {
      * If a client session with the specified {@code sessionId} is
      * connected to this server, sends the specified protocol {@code
      * messages} according to the specified {@code delivery}
-     * requirements, and if {@code disconnect} is {@code true}
-     * disconnects the session, and returns {@code true}.  If a client
-     * session with the specified {@code sessionId} is not connected
-     * to this server, the messages are not sent, and {@code false} is
+     * requirements, and returns {@code true}.  If a client session
+     * with the specified {@code sessionId} is not connected to this
+     * server, the messages are not sent, and {@code false} is
      * returned.
      *
      * @param	sessionId a session ID
      * @param	messages an array of protocol messages, each contained
      *		in a byte array
      * @param	delivery an array of delivery requirements
-     * @param	disconnect if {@code true} the session should be
-     *		disconnected after sending the protocol messages
      * @return	{@code true} if the client session with the specified
      * 		{@code sessionId} is connected to this server, otherwise
      *		{@code false}
@@ -89,8 +86,7 @@ public interface ClientSessionServer extends Remote {
      */
     boolean sendProtocolMessages(byte[] sessionId,
 				 byte[][] messages,
-				 Delivery[] delivery,
-				 boolean disconnect)
+				 Delivery[] delivery)
 	throws IOException;
     
     /**

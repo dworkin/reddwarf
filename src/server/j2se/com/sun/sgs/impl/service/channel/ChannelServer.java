@@ -55,6 +55,25 @@ public interface ChannelServer extends Remote {
 	throws IOException;
 
     /**
+     * Notifies this server that all sessions have left the channel
+     * with the specified {@code channelId}, and the the client
+     * sessions with the specified {@code sessionId}s need to be sent
+     * a 'CHANNEL_LEAVE' protocol message.  The sessions with the
+     * specified {@code sessionId}s are those sessions that were
+     * members of the specified channel that are connected to this
+     * server's node.
+     *
+     * @param	channelId a channelId
+     * @param	sessionIds an array of IDs of client sessions that were
+     * 		members of the channel and are connected to this server's
+     *		node
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void leaveAll(byte[] channelId, byte[][] sessionIds)
+	throws IOException;
+
+    /**
      * For each client session recipient (specified by its
      * corresponding client session ID in the {@code recipients} array
      * of ID byte arrays), sends the specified {@code message} to the
