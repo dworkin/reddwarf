@@ -28,6 +28,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.service.Service;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.MissingResourceException;
 
 
@@ -146,7 +148,18 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * Get the service components, used for shutdown.
+     * Shut down all the service components in the reverse order that
+     * they were added.
      */
-    ComponentRegistry getServices() { return serviceComponents; }
+    void shutdownServices() {
+        // reverse the list of services
+        ArrayList<Object> list = new ArrayList<Object>();
+        for (Object service: serviceComponents) {
+            list.add(service);
+        }
+        Collections.reverse(list);
+        for (Object service: list) {
+            ((Service) service).shutdown();
+        }
+    }
 }

@@ -94,8 +94,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     protected void setUp(Properties props) throws Exception {
         nodeListenerMap = new HashMap<Long, TestListener>();
         
-        serverNode = new SgsTestNode("TestNodeMappingServiceImpl", 
-                                      null, null, props, true);
+        serverNode = new SgsTestNode("TestNodeMappingServiceImpl", null, props);
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
@@ -129,9 +128,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         additionalNodes = new SgsTestNode[NUM_NODES];
         
         for (int i = 0; i < NUM_NODES; i++) {
-            SgsTestNode node = 
-                new SgsTestNode("TestNodeMappingServiceImpl", 
-                                serverNode, null, props, false);
+            SgsTestNode node =  new SgsTestNode(serverNode, null, props);
             additionalNodes[i] = node;
         
             NodeMappingService nmap = node.getNodeMappingService();

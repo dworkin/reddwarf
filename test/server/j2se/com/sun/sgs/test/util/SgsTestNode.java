@@ -74,7 +74,7 @@ public class SgsTestNode {
             kernelProxy = kernelClass.getDeclaredField("transactionProxy");
             kernelProxy.setAccessible(true);
 
-            kernelReg = kernelClass.getDeclaredField("systemRegistry");
+            kernelReg = kernelClass.getDeclaredField("lastSystemRegistry");
             kernelReg.setAccessible(true);
 
             kernelLastOwner = kernelClass.getDeclaredField("lastOwner");
@@ -122,62 +122,98 @@ public class SgsTestNode {
     private int appPort;
     
     /**
+     * Creates the first SgsTestNode instance in this VM.  This thread's
+     * owner will be set to the owner which created this {@code SgsTestNode}.
+     *
+     * @param appName the application name
+     * @param listenerClass the class of the listener object, or null if a
+     *                     simple dummy listener should be used
+     * @param properties serverProperties to be used, or {@code null} for 
+     *                     defaults
+     */
+    public SgsTestNode(String appName,
+                       Class listenerClass,
+                       Properties properties) throws Exception
+    {
+        this(appName, null, listenerClass, properties, true);
+    }
+    
+    /**
+     * Creates additional SgsTestNode instances in this VM.
+     *
+     * @param firstNode  the first {@code SgsTestNode} created in this VM
+     * @param listenerClass the class of the listener object, or null if a
+     *                     simple dummy listener should be used
+     * @param properties serverProperties to be used, or {@code null} for 
+     *                     defaults
+     */
+    public SgsTestNode(SgsTestNode firstNode,
+                       Class listenerClass,
+                       Properties properties) throws Exception
+    {
+        this (firstNode.appName, firstNode, listenerClass, properties, false);
+    }
+    
+    /**
      * Creates a new instance of SgsTestNode.
      *   
      * 
      * @param appName the application name
      * @param serverNode  the instance which created the servers,
-     *                    {@code null} if this instance should create them
+     *                    {@code null} if this instance should create them.
+     *                    If {@code null}, this thread's owner is set to the
+     *                    owner which creates this {@code SgsTestNode}
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
      *                     defaults
      * @param clean if {@code true}, make sure the data store directory is 
-     *                     fresh and set this thread's owner to one created
-     *                     for this {@code SgsTestNode}
+     *                     fresh
      */
-    public SgsTestNode(String appName, 
-                       SgsTestNode serverNode,
-                       Class listenerClass,
-                       Properties properties,
-                       boolean clean)
+    protected SgsTestNode(String appName, 
+                SgsTestNode serverNode,
+                Class listenerClass,
+                Properties properties,
+                boolean clean) 
         throws Exception
     {
         this.appName = appName;
 	this.serverNode = serverNode;
         
-	boolean isServerNode = serverNode == null;
-	String startServer = String.valueOf(isServerNode);
 	
-	dbDirectory = System.getProperty("java.io.tmpdir") + File.separator + 
-                       appName + ".db";
-        if (clean) {
-            deleteDirectory(dbDirectory);
-            createDirectory(dbDirectory);
-        }
-        
-        int requestedDataPort =
-            isServerNode ?
-            0 :
-            getDataServerPort(serverNode.getDataService());
-        
-	int requestedWatchdogPort =
-	    isServerNode ?
-	    0 :
-            serverNode.getWatchdogService().getServer().getPort();
-        
-	int requestedNodeMapPort =
-	    isServerNode ?
-	    0 :
-	    getNodeMapServerPort(serverNode.getNodeMappingService());
+
 	
-        // The node mapping service will only work if it's running
-        // on a full stack.
+        // The node mapping service requires at least one full stack
+        // to run properly (it will not assign identities to a node
+        // without an app listener).   Most tests only require a single
+        // node, so we provide a simple app listener if the test doesn't
+        // care about one.
         if (listenerClass == null) {
             listenerClass = DummyAppListener.class;
         }
 	
-        if (properties == null) {
+        boolean isServerNode = serverNode == null;
+        if (properties == null) {      
+            String startServer = String.valueOf(isServerNode);
+
+            int requestedDataPort =
+                isServerNode ?
+                0 :
+                getDataServerPort(serverNode.getDataService());
+
+            int requestedWatchdogPort =
+                isServerNode ?
+                0 :
+                serverNode.getWatchdogService().getServer().getPort();
+
+            int requestedNodeMapPort =
+                isServerNode ?
+                0 :
+                getNodeMapServerPort(serverNode.getNodeMappingService());
+            
+            dbDirectory = System.getProperty("java.io.tmpdir") +
+                                    File.separator +  appName + ".db";
+            
             props = createProperties(
                 "com.sun.sgs.app.name", appName,
                 "com.sun.sgs.app.port", "0",
@@ -203,7 +239,16 @@ public class SgsTestNode {
                 );
         } else {
             props = properties;
+            dbDirectory = 
+                props.getProperty("com.sun.sgs.impl.service.data.store.DataStoreImpl.directory");
         }
+        
+        assert(dbDirectory != null);
+        if (clean) {
+            deleteDirectory(dbDirectory);
+            createDirectory(dbDirectory);
+        }
+        
         kernel = kernelCtor.newInstance(props);
         kernelStartupMethod.invoke(kernel, props);
         
@@ -235,7 +280,7 @@ public class SgsTestNode {
         sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
                 
-        if (!clean) {
+        if (!isServerNode) {
             // restore the old owner
             setCurrentOwnerMethod.invoke(null, oldOwner);
         }

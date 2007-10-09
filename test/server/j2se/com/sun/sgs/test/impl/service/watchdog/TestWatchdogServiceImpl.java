@@ -82,8 +82,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     protected void setUp(Properties props) throws Exception {
-        serverNode = new SgsTestNode("TestWatchdogServiceImpl",
-                                      null, null, props, true);
+        serverNode = new SgsTestNode("TestWatchdogServiceImpl", null, props);
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
@@ -109,9 +108,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         additionalNodes = new SgsTestNode[num];
         
         for (int i = 0; i < num; i++) {
-            SgsTestNode node = 
-                new SgsTestNode("TestFull", 
-                                 serverNode, null, props, false);
+            SgsTestNode node = new SgsTestNode(serverNode, null, props); 
             additionalNodes[i] = node;
             System.err.println("watchdog service id: " +
                                    node.getWatchdogService().getLocalNodeId());

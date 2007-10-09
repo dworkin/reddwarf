@@ -28,22 +28,21 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.Version;
-import com.sun.sgs.kernel.ComponentRegistry;
 
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.service.Service;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -51,7 +50,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Properties;
 
@@ -93,6 +91,10 @@ class Kernel {
     // the proxy used by all transactional components
     private static final TransactionProxyImpl transactionProxy =
         new TransactionProxyImpl();
+    
+    // NOTE: this transaction coordinator should not really be static;
+    // when we allow external transaction coordinators, we need to
+    // create a factory to create not-static instances.  
     private static TransactionCoordinator transactionCoordinator;
 
     // the registration point for producers of profiling data
@@ -115,8 +117,9 @@ class Kernel {
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
-    // the system registry used by this kernel, for testing
-    private ComponentRegistry systemRegistry = null;
+    // the last system registry used by this kernel, for testing
+    // Note that each application creates its own lastSystemRegistry
+    private ComponentRegistry lastSystemRegistry = null;
     // the last task owner created by this kernel, for testing
     private TaskOwner lastOwner = null;
     
@@ -319,14 +322,14 @@ class Kernel {
         HashSet<Object> appSystemComponents =
             new HashSet<Object>(systemComponents);
         appSystemComponents.add(appIdentityCoordinator);
-        systemRegistry =
+        lastSystemRegistry =
             new ComponentRegistryImpl(appSystemComponents);
 
         // startup the service creation in a separate thread
         ServiceConfigRunner configRunner =
-            new ServiceConfigRunner(this, systemRegistry, profileRegistrar,
+            new ServiceConfigRunner(this, lastSystemRegistry, profileRegistrar,
                                     transactionProxy, appName, properties);
-        systemRegistry.getComponent(ResourceCoordinator.class).
+        lastSystemRegistry.getComponent(ResourceCoordinator.class).
             startTask(configRunner, null);
     }
 
@@ -336,16 +339,7 @@ class Kernel {
      */
     void shutdown() {
         for (AppKernelAppContext ctx: applications) {
-            ComponentRegistry services = ctx.getServices();
-            // reverse the list of services
-            ArrayList<Object> list = new ArrayList<Object>();
-            for (Object service: services) {
-                list.add(service);
-            }
-            Collections.reverse(list);
-            for (Object service: list) {
-                ((Service) service).shutdown();
-            }
+            ctx.shutdownServices();
         }
     }
     

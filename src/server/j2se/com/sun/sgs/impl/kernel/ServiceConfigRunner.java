@@ -36,8 +36,6 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Collections;
 
 import java.util.HashSet;
 import java.util.Properties;
@@ -164,15 +162,8 @@ class ServiceConfigRunner implements Runnable {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e, "{0}: failed to create " +
                                 "services", appName);
-            // shutdown each of the created services in reverse order
-            ArrayList<Object> list = new ArrayList<Object>();
-            for (Object service: services) {
-                list.add(service);
-            }
-            Collections.reverse(list);
-            for (Object service: list) {
-                ((Service) service).shutdown();
-            }
+            
+            ctx.shutdownServices();
             return;
         }
 
@@ -202,8 +193,7 @@ class ServiceConfigRunner implements Runnable {
 		"ready",
 		appName);
 	    // shutdown all of the services
-	    for (Object s : services)
-		((Service)s).shutdown();
+	    ctx.shutdownServices();
 	    return;
 	}
 
