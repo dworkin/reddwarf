@@ -75,7 +75,7 @@ public class EchoClient {
     static CountDownLatch doneSignal;
 
     private final AsynchronousChannelGroup group;
-    AsynchronousSocketChannel channel;
+    AsynchronousSocketChannel channel = null;
 
     int bytesRead = 0;
     int bytesWritten = 0;
