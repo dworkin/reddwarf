@@ -153,8 +153,6 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
     /**
      * Returns {@code true} if {@code o} is a {@code ManagedSerializable} that
      * wraps an object that is equal to the object wrapped by this instance.
-     * If the wrapped object is {@code null}, then both instances must wrap
-     * {@code null} to be equal.
      *
      * @param o the object to compared for equality with this instance
      *

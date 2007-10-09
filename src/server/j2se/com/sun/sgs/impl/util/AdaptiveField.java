@@ -42,9 +42,9 @@ import java.io.Serializable;
  *
  * <p>
  *
- * A local {@code AdaptiveField} has its stored just like any other Java field.
- * When a {@code ManagedObject} deserializes from the data store, the field
- * will be included in its serialization graph.  For this reason a {@code
+ * A local {@code AdaptiveField} has its value stored just like any other Java
+ * field.  When a {@code ManagedObject} deserializes from the data store, the
+ * field will be included in its serialization graph.  For this reason a {@code
  * ManagedObject} <i>cannot</i> be stored in an {@code AdaptiveField}.  If the
  * developer wants to change the field so that it is stored in the data store,
  * the {@link AdaptiveField#makeManaged AdaptiveField.makeManaged} call can be
@@ -77,9 +77,9 @@ public final class AdaptiveField<T> implements Serializable {
 
     /**
      * A local cache of the object if it is being managed by the data store but
-     * has accessed during this transaction, else null.  This allows
-     * subsequence calls to return immediately instead of having to go to the
-     * {@code ManagedReference} cache.
+     * has accessed during this transaction, else null.  This allows subsequent
+     * calls to return immediately instead of having to go to the {@code
+     * ManagedReference} cache.
      */
     private transient T remoteCache;
 

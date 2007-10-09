@@ -31,7 +31,7 @@ import java.util.Iterator;
 
 /**
  * A scalable implementation of {@code Set} backed by a {@link
- * ScalableHashSet}.  The internal structure of the set is separated into
+ * ScalableHashMap}.  The internal structure of the set is separated into
  * distributed pieces, which reduces the amount of data any one operation needs
  * to access.  The distributed structure increases the concurrency and allows
  * for parallel write operations to successfully complete.

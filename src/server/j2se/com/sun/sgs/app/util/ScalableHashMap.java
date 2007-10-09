@@ -48,6 +48,9 @@ import java.util.Set;
  * TBD: Add an asynchronous version of size to avoid scaling problems.
  * -tjb@sun.com (09/26/2007)
  *
+ * TBD: Maybe use a separate top level object, to avoid repeating fields that
+ * have the same value in every node?  -tjb@sun.com (10/09/2007)
+ *
  * FIXME: Modify clear to maintain the initially requested minimum depth.
  * -tjb@sun.com (09/27/2007)
  */
@@ -149,7 +152,8 @@ import java.util.Set;
  * The iterators do not throw {@link
  * java.util.ConcurrentModificationException}.  The iterators are stable with
  * respect to the concurrent changes to the associated collection, but may
- * ignore additions and removals made to the collection during iteration.
+ * ignore additions and removals made to the collection during iteration, and
+ * may also visit more than once a key value that is removed and re-added.
  *
  * <p>
  *
@@ -400,7 +404,7 @@ public class ScalableHashMap<K,V>
      *         <li> {@code depth} is negative or greater than {@link #MAX_DEPTH}
      *	       <li> {@code minDepth} is negative or greater than {@code
      *		    MAX_DEPTH}
-     *	       <li> {@code splitThreshold} is non-positive
+     *	       <li> {@code splitThreshold} is not greater than zero
      *         <li> {@code directorySize} is less than two
      *	       </ul>
      */
@@ -444,7 +448,7 @@ public class ScalableHashMap<K,V>
 
 	this.splitThreshold = splitThreshold;
 
-	// Only the root note should ensure depth, otherwise this call causes
+	// Only the root node should ensure depth, otherwise this call causes
 	// the children to be created in depth-first fashion, which prevents
 	// the leaf references from being correctly established
 	if (depth == 0) {
@@ -472,7 +476,7 @@ public class ScalableHashMap<K,V>
      *        to support
      *
      * @throws IllegalArgumentException if {@code minConcurrency} is
-     *	       non-positive
+     *	       not greater than zero
      */
     public ScalableHashMap(int minConcurrency) {
 	this(0, findMinDepthFor(minConcurrency), DEFAULT_SPLIT_THRESHOLD,
@@ -502,7 +506,8 @@ public class ScalableHashMap<K,V>
 	this(0, findMinDepthFor(DEFAULT_MINIMUM_CONCURRENCY),
 	     DEFAULT_SPLIT_THRESHOLD, DEFAULT_DIRECTORY_SIZE);
 	if (map == null) {
-	    throw new NullPointerException("The map argument must not be null");
+	    throw new NullPointerException(
+		"The map argument must not be null");
 	}
 	putAll(map);
     }
@@ -516,19 +521,21 @@ public class ScalableHashMap<K,V>
      *
      * @return the necessary minimum depth to the tree
      *
-     * @throws IllegalArgumentException if minConcurrency is non-positive
+     * @throws IllegalArgumentException if minConcurrency is not greater than
+     *	       zero
      */
     static int findMinDepthFor(int minConcurrency) {
 	if (minConcurrency <= 0) {
 	    throw new IllegalArgumentException(
-		"Non-positive minimum concurrency: " + minConcurrency);
+		"Minimum concurrency must be greater than zero: " +
+		minConcurrency);
 	}
 	return Math.min(MAX_DEPTH, requiredNumBits(minConcurrency));
     }
 
     /**
      * Ensures that this node has children of at least the provided minimum
-     * depth.  Nodes the above the minimum depth will be added to the nearest
+     * depth.  Nodes above the minimum depth will be added to the nearest
      * directory node.
      *
      * <p>
@@ -552,7 +559,7 @@ public class ScalableHashMap<K,V>
 	// rather than split repeatedly, this method inlines all splits at once
 	// and links the children together.  This is much more efficient.
 
-	table = null; // this node is no longer a leaf
+	setLeafNode(); // this node is no longer a leaf
 	nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
 	// decide how many leaves to make based on the required depth.  Note
@@ -609,6 +616,14 @@ public class ScalableHashMap<K,V>
     }
 
     /**
+     * Mark this node as a leaf node by setting its entry table to {@code
+     * null}.
+     */
+    private void setLeafNode() {
+	table = null;
+    }
+
+    /**
      * Returns the number of bits of the hash code that are used for looking up
      * children of this node in the node directory.
      *
@@ -631,7 +646,7 @@ public class ScalableHashMap<K,V>
 	DataManager dm = AppContext.getDataManager();
 	dm.markForUpdate(this);
 	modifications++;
-	if (table != null) { // this is a leaf node
+	if (isLeafNode()) {
 	    for (PrefixEntry e : table) {
 		while (e != null) {
 		    PrefixEntry next = e.next;
@@ -657,6 +672,15 @@ public class ScalableHashMap<K,V>
 	    table = new PrefixEntry[leafCapacity];
 	    size = 0;
 	}
+    }
+
+    /**
+     * Checks if this is a leaf node.
+     *
+     * @return whether this is a leaf node.
+     */
+    private boolean isLeafNode() {
+	return table != null;
     }
 
     /**
@@ -810,7 +834,7 @@ public class ScalableHashMap<K,V>
      * @see #addEntry addEntry
      */
     private void split() {
-	assert table != null : "Can't split an directory node";
+	assert isLeafNode() : "Can't split an directory node";
 	assert depth < MAX_DEPTH : "Can't split at maximum depth";
 
 	DataManager dataManager = AppContext.getDataManager();
@@ -850,7 +874,7 @@ public class ScalableHashMap<K,V>
 	}
 
 	// null out the intermediate node's table
-	table = null;
+	setLeafNode();
 	size = 0;
 
 	// create the references to the new children
@@ -896,7 +920,7 @@ public class ScalableHashMap<K,V>
 	//    created at a minimum depth.  When one of these leaves needs to
 	//    split, it should not be added to its parent directory, in order
 	//    to provide the requested concurrency.
-	if (parentRef == null ||
+	if (isRootNode() ||
 	    depth % maxDirBits == 0 ||
 	    depth == minDepth) {
 
@@ -905,7 +929,7 @@ public class ScalableHashMap<K,V>
 	    rightChild.parentRef = thisRef;
 	    leftChild.parentRef = thisRef;
 
-	    table = null;
+	    setLeafNode();
 	    nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
 	    int firstRightIndex = nodeDirectory.length / 2;
@@ -927,6 +951,15 @@ public class ScalableHashMap<K,V>
     }
 
     /**
+     * Checks if this is the root node.
+     *
+     * @return whether this is the root node.
+     */
+    private boolean isRootNode() {
+	return parentRef == null;
+    }
+
+    /**
      * Locates the leaf node that is associated with the provided prefix.
      *
      * @param prefix the initial prefix for which to search
@@ -936,7 +969,7 @@ public class ScalableHashMap<K,V>
      */
     ScalableHashMap<K,V> lookup(int prefix) {
 	ScalableHashMap<K,V> node = this;
-	while (node.table == null) {
+	while (!node.isLeafNode()) {
 	    int index = highBits(prefix << node.depth, node.getNodeDirBits());
 	    node = node.getChildNode(index);
 	}
@@ -1096,7 +1129,8 @@ public class ScalableHashMap<K,V>
     /**
      * Like put, but does not check if arguments are serializable, and only
      * returns the old value if requested, to avoid an exception if the old
-     * value is not found.
+     * value is not found.  Note that this method needs to keep entries ordered
+     * by object ID if they have the same hash code, to support iteration.
      *     
      * @param key the key
      * @param value the value to be mapped to the key
@@ -1269,7 +1303,7 @@ public class ScalableHashMap<K,V>
      * @return {@code true} if this map contains no mappings
      */
     public boolean isEmpty() {
-	if (table != null && size == 0) {
+	if (isLeafNode() && size == 0) {
 	    return true;
 	} else {
 	    ScalableHashMap cur = leftMost();
@@ -1295,7 +1329,7 @@ public class ScalableHashMap<K,V>
      */
     public int size() {
 	// root is leaf node, short-circuit case
-	if (table != null) {
+	if (isLeafNode()) {
 	    return size;
 	}
 	int totalSize = 0;
@@ -2351,10 +2385,10 @@ public class ScalableHashMap<K,V>
 	s.defaultWriteObject();
 
 	// write out whether this node was a leaf
-	s.writeBoolean(table != null);
+	s.writeBoolean(isLeafNode());
 
 	// if this was a leaf node, write out all the elements in it
-	if (table != null) {
+	if (isLeafNode()) {
 	    // iterate over all the table, stopping when all the entries have
 	    // been seen
 	    int elements = 0;
