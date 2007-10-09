@@ -12,6 +12,7 @@
 #   cd ..
 #   find . -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-server {} \;
 #   find src/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
+#   find example/c-client -name '*.[ch]' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
 #   find test/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
 #   find example/tutorial/src/com/sun/sgs/tutorial/client -name '*.java' -exec etc/update_copyrights etc/COPYRIGHT-client {} \;
 
