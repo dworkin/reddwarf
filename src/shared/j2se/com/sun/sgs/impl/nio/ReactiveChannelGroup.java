@@ -30,13 +30,13 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
  * termination}.
  * <li>Channel registration and load balancing across multiple
  * {@code Reactor}s: channels are assigned to one of the reactors in
- * the set, so that multiple CPUs can be exploited even when the underlying
- * {@code Reactor} mechanism is single-threaded.
+ * the set.  Since reactors are single-threaded, the reactor set allows
+ * multiple CPUs to be utilized by having multiple separate reactors.
  * </ul>
  * The default number of {@code Reactor}s is set as the number of
- * {@link Runtime#availableProcessors() available processors}, but it can be
- * changed by setting the requested number in the system property
- * {@value ReactiveChannelGroup#REACTORS_PROPERTY}.
+ * {@linkplain Runtime#availableProcessors() available processors}, but it
+ * can be changed by setting the requested number in the system property
+ * {@value #REACTORS_PROPERTY}.
  */
 class ReactiveChannelGroup
     extends AsyncGroupImpl
@@ -46,10 +46,16 @@ class ReactiveChannelGroup
         Logger.getLogger(ReactiveChannelGroup.class.getName());
 
     /**
-     * The lifecycle state of this group.
-     * Increases monotonically.
+     * Lock held on updates to lifecycleState and reactors list,
+     * and the condition variable for awaiting group termination.
      */
-    protected volatile int lifecycleState;
+    final Object stateLock = new Object();
+
+    /**
+     * The lifecycle state of this group.  Increases monotonically.
+     * It may only be accessed with stateLock held.
+     */
+    protected int lifecycleState;
     /** State: open and running */
     protected static final int RUNNING      = 0;
     /** State: graceful shutdown in progress */
@@ -60,10 +66,10 @@ class ReactiveChannelGroup
     protected static final int DONE         = 3;
 
     /**
-     * Lock held on updates to lifecycleState, and condition variable
-     * for awaiting group termination.
+     * The active {@linkplain Reactor reactors} in this group.
+     * It may only be accessed with stateLock held.
      */
-    final Object stateLock = new Object();
+    final List<Reactor> reactors;
 
     /**
      * The property to specify the number of reactors to be used by
@@ -79,8 +85,6 @@ class ReactiveChannelGroup
     public static final int DEFAULT_REACTORS = 
         Runtime.getRuntime().availableProcessors();
 
-    /** The active {@linkplain Reactor reactors} in this group. */
-    final List<Reactor> reactors;
 
     /** The reactor load-balance strategy. */
     final ReactorAssignmentStrategy reactorAssignmentStrategy;
@@ -178,7 +182,7 @@ class ReactiveChannelGroup
             if (asyncKey == null) {
                 try {
                     ch.close();
-                } catch (Throwable ignore) {}
+                } catch (IOException ignore) {}
             }
         }
     }
@@ -268,8 +272,7 @@ class ReactiveChannelGroup
                 } else if (exception instanceof Error) {
                     throw (Error) exception;
                 } else {
-                    throw new IllegalStateException(
-                        "unexpected exception type", exception);
+                    throw Util.unexpected(exception);
                 }
             }
         }
@@ -284,20 +287,17 @@ class ReactiveChannelGroup
     public boolean awaitTermination(long timeout, TimeUnit unit)
         throws InterruptedException
     {
-        long nanos = unit.toNanos(timeout);
-        final long deadline =
-            TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis()) + nanos;
+        long millis = unit.toMillis(timeout);
+        final long deadline = System.currentTimeMillis() + millis;
 
         synchronized (stateLock) {
             for (;;) {
                 if (lifecycleState == DONE)
                     return true;
-                if (nanos <= 0)
+                if (millis <= 0)
                     return false;
-                long millis = TimeUnit.NANOSECONDS.toMillis(nanos);
-                stateLock.wait(millis, (int) (nanos % 1000000));
-                nanos = deadline -
-                    TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis());
+                stateLock.wait(millis);
+                millis = deadline - System.currentTimeMillis();
             }
         }
     }
@@ -307,7 +307,9 @@ class ReactiveChannelGroup
      */
     @Override
     public boolean isShutdown() {
-        return lifecycleState != RUNNING;
+        synchronized (stateLock) {
+            return lifecycleState != RUNNING;
+        }
     }
 
     /**
@@ -315,7 +317,9 @@ class ReactiveChannelGroup
      */
     @Override
     public boolean isTerminated() {
-        return lifecycleState == DONE   ;
+        synchronized (stateLock) {
+            return lifecycleState == DONE;
+        }
     }
 
     /**
@@ -324,13 +328,14 @@ class ReactiveChannelGroup
     @Override
     public ReactiveChannelGroup shutdown() {
         synchronized (stateLock) {
-            if (lifecycleState < SHUTDOWN)
+            if (lifecycleState < SHUTDOWN) {
                 lifecycleState = SHUTDOWN;
 
-            for (Reactor reactor : reactors)
-                reactor.shutdown();
+                for (Reactor reactor : reactors)
+                    reactor.shutdown();
 
-            tryTerminate();
+                tryTerminate();
+            }
 
             return this;
         }
@@ -341,18 +346,35 @@ class ReactiveChannelGroup
      */
     @Override
     public ReactiveChannelGroup shutdownNow() throws IOException {
+        Throwable exception = null;
+
         synchronized (stateLock) {
-            if (lifecycleState < SHUTDOWN_NOW)
+            if (lifecycleState < SHUTDOWN_NOW) {
                 lifecycleState = SHUTDOWN_NOW;
 
-            for (Reactor reactor : reactors) {
-                try {
-                    reactor.shutdownNow();
-                } catch (Throwable ignore) { }
+                for (Reactor reactor : reactors) {
+                    try {
+                        reactor.shutdownNow();
+                    } catch (IOException e) {
+                        exception = e;
+                    }
+                }
+
+                tryTerminate();
             }
 
-            tryTerminate();
-
+            if (exception != null) {
+                if (exception instanceof RuntimeException) {
+                    throw (RuntimeException) exception;
+                } else if (exception instanceof Error) {
+                    throw (Error) exception;
+                } else if (exception instanceof IOException) {
+                    throw (IOException) exception;
+                } else {
+                    throw Util.unexpected(exception);
+                }
+            }
+            
             return this;
         }
     }
@@ -362,21 +384,18 @@ class ReactiveChannelGroup
      * have shutdown.  If they have, mark this group as done and wake
      * anyone blocked on awaitTermination.
      * 
-     * NOTE: Must be called with stateLock held!
+     * NOTE: Must be called with {@code stateLock} held.
      */
     private void tryTerminate() {
+
+        assert Thread.holdsLock(stateLock);
+
         if (lifecycleState == RUNNING || lifecycleState == DONE)
             return;
-
-        if (log.isLoggable(Level.FINER)) {
-            log.log(Level.FINER, " {0} tryTerminate: {1} reactors",
-                new Object[] { this, reactors.size() });
-        }
 
         if (reactors.isEmpty()) {
             lifecycleState = DONE;
             stateLock.notifyAll();
-            log.log(Level.FINE, "{0} terminated", this);
         }
     }
 

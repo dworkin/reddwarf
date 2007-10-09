@@ -25,6 +25,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -558,10 +559,7 @@ class Reactor {
                     // Clear the timeout and pending flag
                     cleanupTask();
                     // Invoke the completion handler, if any
-                    if (handler != null) {
-                        asyncKey.execute(
-                            group.completionRunner(handler, attachment, this));
-                    }
+                    asyncKey.runCompletion(handler, attachment, this);
                 }};
 
             // Indicate that a task is pending
@@ -668,12 +666,11 @@ class Reactor {
             if (! key.isValid()) {
                 log.log(Level.FINE, "key is already invalid {0}", this);
             }
-            // TODO currently we call unregister() to cancel the selection
-            // key before closing the channel, but is this neccessary? -JM
-            Reactor.this.unregister(this);
+
             try {
                 key.channel().close();
             } finally {
+                selector.wakeup();
                 selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
             }
         }
@@ -748,6 +745,27 @@ class Reactor {
          */
         public void execute(Runnable command) {
             executor.execute(command);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public <R, A> void
+        runCompletion(CompletionHandler<R, A> handler,
+                      A attachment,
+                      Future<R> future)
+        {
+            if (handler == null)
+                return;
+
+            // TODO the spec indicates that we can run the
+            // completion handler in the current thread, but
+            // we should decide whether to run it via the
+            // executor anyway.
+            
+            // Delegate to the group so that the uncaught exception handler
+            // for the group can be used, if one is set.
+            group.completionRunner(handler, attachment, future).run();
         }
 
         /**

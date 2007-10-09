@@ -41,6 +41,22 @@ final class Util {
     }
 
     /**
+     * Returns an {@link IllegalStateException} indicating that the
+     * given exception was not expected, and setting the cause to
+     * that exception.
+     * 
+     * @param exception the unexpected exception
+     * @return an IllegalStateException
+     */
+    static IllegalStateException unexpected(Throwable exception) {
+        return new IllegalStateException("unexpected exception" +
+            (exception.getMessage() == null
+                 ? ""
+                 : ": " + exception.getMessage()),
+            exception);
+    }
+
+    /**
      * Returns a new, completed {@link Future} with the given result.
      * 
      * @param <V> the type of the result

@@ -255,18 +255,16 @@ class AsyncSocketChannelImpl
     {
         final Socket socket = channel.socket();
         try {
-            synchronized (key) {
-                if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
-                    if (! socket.isInputShutdown()) {
-                        socket.shutdownInput();
-                        key.selected(OP_READ);
-                    }
+            if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
+                if (! socket.isInputShutdown()) {
+                    socket.shutdownInput();
+                    key.selected(OP_READ);
                 }
-                if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
-                    if (! socket.isOutputShutdown()) {
-                        socket.shutdownOutput();
-                        key.selected(OP_WRITE);
-                    }
+            }
+            if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
+                if (! socket.isOutputShutdown()) {
+                    socket.shutdownOutput();
+                    key.selected(OP_WRITE);
                 }
             }
         } catch (SocketException e) {
@@ -323,20 +321,14 @@ class AsyncSocketChannelImpl
         try {
             if (channel.connect(remote)) {
                 Future<Void> result = Util.finishedFuture(null);
-                if (handler != null) {
-                    key.execute(group.completionRunner(
-                                    handler, attachment, result));
-                }
+                key.runCompletion(handler, attachment, result);
                 return AttachedFuture.wrap(result, attachment);
             }
         } catch (ClosedChannelException e) {
             throw Util.initCause(new ClosedAsynchronousChannelException(), e);
         } catch (IOException e) {
             Future<Void> result = Util.failedFuture(e);
-            if (handler != null) {
-                key.execute(group.completionRunner(
-                                handler, attachment, result));
-            }
+            key.runCompletion(handler, attachment, result);
             return AttachedFuture.wrap(result, attachment);
         }
 

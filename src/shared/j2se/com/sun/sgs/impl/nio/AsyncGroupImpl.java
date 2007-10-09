@@ -87,6 +87,28 @@ abstract class AsyncGroupImpl
         return new CompletionRunner<R, A>(handler, attachment, future);
     }
 
+
+    /**
+     * Invokes the uncaught exception handler of the current thread, if
+     * one is present.  Does not re-throw the exception.
+     * 
+     * @param <T> the type of the exception
+     * @param exception the exception
+     */
+    private <T extends Throwable> void
+    uncaught(T exception) {
+        try {
+            final Thread.UncaughtExceptionHandler ueh = uncaughtHandler;                
+
+            if (ueh != null)
+                ueh.uncaughtException(Thread.currentThread(), exception);
+
+        } catch (Throwable ignore) {
+            // Ignore all throwables here, even Errors, as specified
+            // by Thread#UncaughtExceptionHandler#uncaughtException
+        }
+    }
+
     /**
      * A Runnable that invokes its completion handler with the given
      * {@code IoFuture} result.
@@ -122,15 +144,9 @@ abstract class AsyncGroupImpl
             try {
                 handler.completed(result);
             } catch (RuntimeException e) {
-                final UncaughtExceptionHandler eh = uncaughtHandler;
-                if (eh != null)
-                    eh.uncaughtException(Thread.currentThread(), e);
-                throw e;
+                uncaught(e);
             } catch (Error e) {
-                final UncaughtExceptionHandler eh = uncaughtHandler;
-                if (eh != null)
-                    eh.uncaughtException(Thread.currentThread(), e);
-                throw e;
+                uncaught(e);
             }
         }
     }

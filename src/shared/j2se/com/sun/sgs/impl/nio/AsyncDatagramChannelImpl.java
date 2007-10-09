@@ -80,7 +80,10 @@ class AsyncDatagramChannelImpl
         protocolFamilies = Collections.unmodifiableSet(pfs);
     }
 
-    /** The default protocol family if none is specified: {@value} */
+    /**
+     * The default protocol family if none is specified:
+     * {@link StandardProtocolFamily#INET}
+     */
     static final ProtocolFamily
         DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
 
@@ -429,10 +432,7 @@ class AsyncDatagramChannelImpl
             {
                 @Override protected void done() {
                     connectionPending.set(false);
-                    if (handler != null) {
-                        key.execute(channelGroup.completionRunner(
-                                        handler, attachment, this));
-                    }
+                    key.runCompletion(handler, attachment, this);
                 }
             };
 
@@ -464,10 +464,7 @@ class AsyncDatagramChannelImpl
                 }})
             {
                 @Override protected void done() {
-                    if (handler != null) {
-                        key.execute(channelGroup.completionRunner(
-                                        handler, attachment, this));
-                    }
+                    key.runCompletion(handler, attachment, this);
                 }
             };
 

@@ -14,6 +14,7 @@ import java.nio.channels.SelectionKey;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AcceptPendingException;
@@ -42,7 +43,9 @@ interface AsyncKey
     SelectableChannel channel();
     
     /**
-     * Returns whether the given operation is pending.
+     * Returns whether the given operation is pending.  An operation
+     * is marked as finished (i.e., no longer pending) just before its
+     * completion handler is invoked.
      * 
      * @param op a {@link SelectionKey} opcode
      * @return {@code true} if the operation is pending
@@ -60,16 +63,35 @@ interface AsyncKey
 
     /**
      * Executes the given command according to the execution policy
-     * determined by this key and channel group.
+     * determined by this key and channel group.  This method supports
+     * asynchronous channel operations that cannot be awaited using
+     * {@code select()}.
      * 
-     * @param command {@inheritDoc}
+     * @param command the command to run, possibly in another thread
      */
     void execute(Runnable command);
 
     /**
+     * Invokes the given completion handler, if it is not {@code null};
+     * otherwise does nothing.
+     * Passes the handler an {@code IoFuture} constructed from the given
+     * future and attachment object.
+     * 
+     * @param <R> the result type
+     * @param <A> the attachment type
+     * @param handler the completion handler
+     * @param attachment the attachment, or {@code null}
+     * @param future the result
+     */
+    <R, A> void
+    runCompletion(CompletionHandler<R, A> handler,
+                  A attachment,
+                  Future<R> future);
+
+    /**
      * Initiates the given operation asynchronously on the underlying
      * channel, and returns a future representing the result.  An appropriate
-     * execption is thrown if the channel is closed or the requested operation
+     * exception is thrown if the channel is closed or the requested operation
      * is already pending.  If a non-{@code null} completion handler is
      * provided, it will be invoked when the operation completes.
      * 
@@ -78,7 +100,7 @@ interface AsyncKey
      * @param op a {@link SelectionKey} opcode
      * @param attachment the attachment for the {@code IoFuture}; may be
      *        {@code null}
-     * @param handler the completion handler; may be {@null}
+     * @param handler the completion handler; may be {@code null}
      * @param timeout the timeout for this operation, or {@code 0} to wait
      *        indefinitely
      * @param unit the unit of the timeout
