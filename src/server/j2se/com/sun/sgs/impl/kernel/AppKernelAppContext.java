@@ -38,6 +38,9 @@ import java.util.MissingResourceException;
  * the kernel to manage the context of a single application. It knows
  * the name of an application, its available managers, and its backing
  * services.
+ *
+ * FIXME:  the context should check that it isn't shutdown before
+ *  handing out services and managers
  */
 class AppKernelAppContext extends AbstractKernelAppContext {
 

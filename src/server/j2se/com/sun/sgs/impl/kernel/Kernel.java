@@ -117,10 +117,11 @@ class Kernel {
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
-    // the last system registry used by this kernel, for testing
-    // Note that each application creates its own lastSystemRegistry
+    // The last system registry used by this kernel, for testing only.
+    // Note that each time an application is started, a new registry will
+    // be created, which reassigned lastSystemRegistry.
     private ComponentRegistry lastSystemRegistry = null;
-    // the last task owner created by this kernel, for testing
+    // the last task owner created by this kernel, for testing only
     private TaskOwner lastOwner = null;
     
     /**
