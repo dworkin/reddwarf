@@ -56,9 +56,6 @@ class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    /** The channel group. */
-    final AsyncGroupImpl group;
-
     /** The underlying {@code SocketChannel}. */
     final SocketChannel channel;
 
@@ -92,7 +89,6 @@ class AsyncSocketChannelImpl
         throws IOException
     {
         super(group.provider());
-        this.group = group;
         this.channel = channel;
         key = group.register(channel);
     }

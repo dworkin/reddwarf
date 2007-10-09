@@ -87,9 +87,6 @@ class AsyncDatagramChannelImpl
     static final ProtocolFamily
         DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
 
-    /** The channel group. */
-    final AsyncGroupImpl channelGroup;
-
     /** The underlying {@code DatagramChannel}. */
     final DatagramChannel channel;
 
@@ -121,7 +118,6 @@ class AsyncDatagramChannelImpl
         throws IOException
     {
         super(group.provider());
-        channelGroup = group;
 
         if ((pf != null) && (!protocolFamilies.contains(pf))) {
             throw new UnsupportedOperationException(

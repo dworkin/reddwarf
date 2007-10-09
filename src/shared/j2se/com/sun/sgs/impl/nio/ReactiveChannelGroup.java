@@ -355,7 +355,7 @@ class ReactiveChannelGroup
                 for (Reactor reactor : reactors) {
                     try {
                         reactor.shutdownNow();
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         exception = e;
                     }
                 }
@@ -366,8 +366,6 @@ class ReactiveChannelGroup
             if (exception != null) {
                 if (exception instanceof RuntimeException) {
                     throw (RuntimeException) exception;
-                } else if (exception instanceof Error) {
-                    throw (Error) exception;
                 } else if (exception instanceof IOException) {
                     throw (IOException) exception;
                 } else {
