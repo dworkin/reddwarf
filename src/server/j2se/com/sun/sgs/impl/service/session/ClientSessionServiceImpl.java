@@ -25,7 +25,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
@@ -163,7 +163,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     final DataService dataService;
 
     /** The identity manager. */
-    final IdentityManager identityManager;
+    final IdentityCoordinator identityManager;
 
     /** The ID block size for the IdGenerator. */
     private final int idBlockSize;
@@ -232,7 +232,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    identityManager =
-		systemRegistry.getComponent(IdentityManager.class);
+		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
 
 	    synchronized (ClientSessionServiceImpl.class) {

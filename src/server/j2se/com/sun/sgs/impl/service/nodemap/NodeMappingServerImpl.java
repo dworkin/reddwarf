@@ -407,15 +407,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 CheckTask checkTask = new CheckTask(identity, serviceName);
                 runTransactionally(checkTask);
 
-                if (checkTask.isAssignedToLiveNode()) {
+                if (checkTask.idFound() && checkTask.isAssignedToLiveNode()) {
                     return;
                 } else {
                     // The node is dead.  We need to map to a new node.
                     node = checkTask.getNode();
                 }
-            } catch (NameNotBoundException nnbe) {
-                // Do nothing.  We expect this exception if the id isn't in
-                // the map yet.
             } catch (Exception ex) {
                 // Log the failure, but continue on - treat it as though the
                 // identity wasn't found.
@@ -449,8 +446,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         private final String idkey;
         private final String serviceName;
         private final Identity id;
+        /** return value, was the identity found? */
+        private boolean found = false;
         /** return value, was node alive? */
-        boolean isAlive = false;
+        private boolean isAlive = false;
         /** return value, node assignment */
         private Node node;
         CheckTask(Identity id, String serviceName) {
@@ -459,26 +458,35 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             this.id = id;
         }
         public void run() {
-            IdentityMO idmo = 
-                dataService.getServiceBinding(idkey, IdentityMO.class);
-            long nodeId = idmo.getNodeId();
-            
-            isAlive = watchdogService.getNode(nodeId).isAlive();
-            if (!isAlive) {
-                // Caller can get result from getNodeId()
-                node = watchdogService.getNode(nodeId);
-                return;
+            try {
+                IdentityMO idmo = 
+                    dataService.getServiceBinding(idkey, IdentityMO.class);
+
+                found = true;
+                long nodeId = idmo.getNodeId();
+
+                isAlive = watchdogService.getNode(nodeId).isAlive();
+                if (!isAlive) {
+                    // Caller can get result from getNodeId()
+                    node = watchdogService.getNode(nodeId);
+                    return;
+                }
+                // The identity already has an assignment but we still 
+                // need to update the status.  TODO functionality still
+                // required?  Should assignNode not set the status?
+                final String statuskey = 
+                        NodeMapUtil.getStatusKey(id, nodeId, serviceName);
+                dataService.setServiceBinding(statuskey, idmo);
+                logger.log(Level.FINEST, "assignNode id:{0} already on {1}", 
+                           id, nodeId);
+            } catch (NameNotBoundException nnbe) {
+                // Do nothing.  We expect this exception if the id isn't in
+                // the map yet.   Found is already set to false.
+                found = false;
             }
-            // The identity already has an assignment but we still 
-            // need to update the status.  TODO functionality still
-            // required?  Should assignNode not set the status?
-            final String statuskey = 
-                    NodeMapUtil.getStatusKey(id, nodeId, serviceName);
-            dataService.setServiceBinding(statuskey, idmo);
-            logger.log(Level.FINEST, "assignNode id:{0} already on {1}", 
-                       id, nodeId);
         }
         
+        public boolean idFound()                { return found;   }
         public boolean isAssignedToLiveNode()   { return isAlive; }
         public Node getNode()                   { return node;    }
     }
