@@ -1,3 +1,6 @@
+Version 0.9.4:
+- Add example C client source 
+
 Version 0.9.3:
 - Document the network protocol
 - Modify the client API to call leftChannel on all channels before

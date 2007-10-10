@@ -265,6 +265,19 @@ sub check_diff_fail {
 }
 
 
+# Returns bash commands to check that the exit status was zero and that
+# the output to standard error of the test matches the text provided by
+# the first argument.
+sub check_diff_pass {
+    my ($compare) = @_;
+    return
+	"if [ \"\$message\" == '' ]; then\n" .
+	"    if [ \$status != 0 ]; then message='Exit status was non-zero'\n" .
+	"    fi\n" .
+	"fi &&\n" .
+	check_diff($compare);
+}
+
 # Returns bash commands to check that the output to standard error of
 # the test matches the text provided by the first argument.
 sub check_diff {
