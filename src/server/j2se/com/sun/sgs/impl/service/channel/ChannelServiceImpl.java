@@ -913,8 +913,12 @@ public class ChannelServiceImpl
 
 	CachedChannelState(ChannelImpl channelImpl) {
 	    this.name = channelImpl.state.name;
+	    // FIXME: the current getSessions needs a transaction...
+	    this.sessions = null;
+	    /*
 	    this.sessions =
 		channelImpl.state.getSessions(dataService, localNodeId);
+	    */
 	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
 	    this.delivery = channelImpl.state.delivery;
 	}

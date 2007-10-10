@@ -238,7 +238,9 @@ final class ChannelState implements ManagedObject, Serializable {
      * Returns {@code true} if this channel has any members.
      */
     boolean hasSessions(DataService dataService) {
-	return dataService.nextServiceBoundName(getSessionPrefix()) != null;
+	String sessionPrefix = getSessionPrefix();
+	return dataService.nextServiceBoundName(getSessionPrefix()).
+	    startsWith(sessionPrefix);
     }
 
     /**
@@ -247,7 +249,8 @@ final class ChannelState implements ManagedObject, Serializable {
      */
     boolean hasSessionsOnNode(DataService dataService, long nodeId) {
 	String keyPrefix = getSessionNodePrefix(nodeId);
-	return dataService.nextServiceBoundName(keyPrefix) != null;
+	return dataService.nextServiceBoundName(keyPrefix).
+	    startsWith(keyPrefix);
     }
 
     /**

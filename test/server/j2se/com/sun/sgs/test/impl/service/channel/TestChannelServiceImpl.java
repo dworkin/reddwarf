@@ -55,6 +55,7 @@ import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
@@ -82,6 +83,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -142,6 +144,9 @@ public class TestChannelServiceImpl extends TestCase {
     
     /** The listen port for the client session service. */
     private int port;
+
+    /** The node ID for the local node. */
+    private long localNodeId;
 
     /** True if test passes. */
     private boolean passed;
@@ -232,6 +237,8 @@ public class TestChannelServiceImpl extends TestCase {
 	taskService.ready();
 	sessionService.ready();
 	channelService.ready();
+
+	localNodeId = watchdogService.getLocalNodeId();
 
 	createTransaction(1000);
     }
@@ -615,73 +622,66 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelJoin() throws Exception {
+	commitTransaction();
 	String channelName = "joinTest";
-	Channel channel = createChannel(channelName);
-	String[] names = new String[] { "a", "b", "c" };
-	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
-
-	for (String name : names) {
-	    ClientSession session = new DummyClientSession(name);
-	    savedSessions.add(session);
-	    channel.join(session, new DummyChannelListener(channel));
+	String[] users = new String[] { "foo", "bar", "baz" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, null);
 	}
 	commitTransaction();
 	createTransaction();
-	try {
-	    channel = channelService.getChannel(channelName);
-	    Set<ClientSession> sessions = channel.getSessions();
-	    if (sessions.size() != names.length) {
-		fail("Expected " + names.length + " sessions, got " +
-		     sessions.size());
-	    }
-	    
-	    for (ClientSession session : savedSessions) {
-		if (!sessions.contains(session)) {
-		    fail("Expected session: " + session);
-		}
-	    }
-
-	    System.err.println("All sessions joined");
-
-	} finally {
-	    channel.close();
-	    commitTransaction();
+	channel = channelService.getChannel(channelName);
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
 	}
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
+	}
+	
+	System.err.println("All sessions joined");
+	channel.close();
     }
 
     public void testChannelJoinWithListenerReferringToChannel() throws Exception {
-	String channelName = "joinWithListenerReferringToChannelTest";
-	Channel channel = createChannel(channelName);
-	String[] names = new String[] { "foo", "bar", "baz" };
-	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
-
-	for (String name : names) {
-	    ClientSession session = new DummyClientSession(name);
-	    savedSessions.add(session);
-	    channel.join(session, new DummyChannelListener());
-	}
 	commitTransaction();
+	String channelName = "joinTest";
+	String[] users = new String[] { "foo", "bar", "baz" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
 	createTransaction();
-	try {
-	    channel = channelService.getChannel(channelName);
-	    Set<ClientSession> sessions = channel.getSessions();
-	    if (sessions.size() != names.length) {
-		fail("Expected " + names.length + " sessions, got " +
-		     sessions.size());
-	    }
-	    
-	    for (ClientSession session : savedSessions) {
-		if (!sessions.contains(session)) {
-		    fail("Expected session: " + session);
-		}
-	    }
-
-	    System.err.println("All sessions joined");
-
-	} finally {
-	    channel.close();
-	    commitTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, new DummyChannelListener(channel));
 	}
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
+	}
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
+	}
+	
+	System.err.println("All sessions joined");
+	channel.close();
     }
 
     /* -- Test Channel.leave -- */
@@ -697,9 +697,16 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelLeaveClosedChannel() {
-	Channel channel = createChannel();
-	ClientSession session = new DummyClientSession("dummy");
+    public void testChannelLeaveClosedChannel() throws Exception {
+	commitTransaction();
+	String channelName = "testChannel";
+	String user = "daffy";
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, user);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	ClientSession session =
+	    dataService.getBinding(user, ClientSession.class);
 	channel.join(session, null);
 	channel.close();
 	try {
@@ -720,53 +727,84 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelLeaveSessionNotJoined() {
-	Channel channel = createChannel();
-	channel.leave(new DummyClientSession("dummy"));
-	System.err.println("Leave of non-joined session successful");
+    public void testChannelLeaveSessionNotJoined() throws Exception {
+	commitTransaction();
+	String channelName = "leaveTest";
+	String[] users = new String[] { "foo", "bar" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	
+	ClientSession foo =
+	    dataService.getBinding("foo", ClientSession.class);
+	channel.join(foo, new DummyChannelListener(channel));
+
+	try {
+	    ClientSession bar =
+		dataService.getBinding("bar", ClientSession.class);
+	    channel.leave(bar);
+	    System.err.println("leave of non-member session returned");
+	} catch (Exception e) {
+	    System.err.println(e);
+	    fail("test failed with exception: " + e);
+	}
+	
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != 1) {
+	    fail("Expected 1 session, got " +
+		sessions.size());
+	}
+
+	if (! sessions.contains(foo)) {
+	    fail("Expected session: " + foo);
+	}
+	channel.close();
     }
     
     public void testChannelLeave() throws Exception {
+	commitTransaction();
 	String channelName = "leaveTest";
-	Channel channel = createChannel(channelName);
-	String[] names = new String[] { "foo", "bar", "baz" };
-	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
-
-	for (String name : names) {
-	    ClientSession session = new DummyClientSession(name);
-	    savedSessions.add(session);
-	    channel.join(session, new DummyChannelListener());
+	String[] users = new String[] { "foo", "bar", "baz" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, null);
 	}
 	commitTransaction();
 	createTransaction();
-	try {
-	    channel = channelService.getChannel(channelName);
-	    Set<ClientSession> sessions = channel.getSessions();
-	    if (sessions.size() != names.length) {
-		fail("Expected " + names.length + " sessions, got " +
-		     sessions.size());
-	    }
-	    
-	    for (ClientSession session : savedSessions) {
-		if (!sessions.contains(session)) {
-		    fail("Expected session: " + session);
-		}
-		channel.leave(session);
-		if (channel.getSessions().contains(session)) {
-		    fail("Failed to remove session: " + session);
-		}
-	    }
-
-	    if (channel.getSessions().size() != 0) {
-		fail("Expected no sessions, got " + channel.getSessions().size());
-	    }
-
-	    System.err.println("All sessions left");
-
-	} finally {
-	    channel.close();
-	    commitTransaction();
+	channel = channelService.getChannel(channelName);
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
 	}
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
+	}
+
+	for (ClientSession session : sessions) {
+	    channel.leave(session);
+	    if (getSessions(channel).contains(session)) {
+		fail("Failed to remove session: " + session);
+	    }
+	}
+	
+	if (getSessions(channel).size() != 0) {
+	    fail("Expected no sessions, got " + getSessions(channel).size());
+	}
+	System.err.println("All sessions left");
+
+	channel.close();
     }
 
     /* -- Test Channel.leaveAll -- */
@@ -800,44 +838,42 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testChannelLeaveAll() throws Exception {
+	commitTransaction();
 	String channelName = "leaveAllTest";
-	Channel channel = createChannel(channelName);
-	String[] names = new String[] { "foo", "bar", "baz" };
-	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
-
-	for (String name : names) {
-	    ClientSession session = new DummyClientSession(name);
-	    savedSessions.add(session);
-	    channel.join(session, new DummyChannelListener());
+	String[] users = new String[] { "foo", "bar", "baz" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, null);
 	}
 	commitTransaction();
 	createTransaction();
-	try {
-	    channel = channelService.getChannel(channelName);
-	    Set<ClientSession> sessions = channel.getSessions();
-	    if (sessions.size() != names.length) {
-		fail("Expected " + names.length + " sessions, got " +
-		     sessions.size());
-	    }
-	    
-	    for (ClientSession session : savedSessions) {
-		if (!sessions.contains(session)) {
-		    fail("Expected session: " + session);
-		}
-	    }
-
-	    channel.leaveAll();
-
-	    if (channel.getSessions().size() != 0) {
-		fail("Expected no sessions, got " + channel.getSessions().size());
-	    }
-
-	    System.err.println("All sessions left");
-
-	} finally {
-	    channel.close();
-	    commitTransaction();
+	channel = channelService.getChannel(channelName);
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
 	}
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
+	}
+
+	channel.leaveAll();
+	
+	if (getSessions(channel).size() != 0) {
+	    fail("Expected no sessions, got " + getSessions(channel).size());
+	}
+	System.err.println("All sessions left");
+
+	channel.close();
     }
 
     /* -- Test Channel.hasSessions -- */
@@ -864,6 +900,15 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    private void printServiceBindings() {
+	Iterator<String> iter =
+	    BoundNamesUtil.getServiceBoundNamesIterator(
+		dataService, "");
+	while (iter.hasNext()) {
+	    System.err.println(iter.next());
+	}
+    }
+
     public void testChannelHasSessionsNoSessionsJoined() {
 	Channel channel = createChannel();
 	if (channel.hasSessions()) {
@@ -872,13 +917,40 @@ public class TestChannelServiceImpl extends TestCase {
 	System.err.println("hasSessions returned false");
     }
     
-    public void testChannelHasSessionsSessionsJoined() {
-	Channel channel = createChannel();
-	channel.join(new DummyClientSession("dummy"), null);
+    public void testChannelHasSessionsSessionsJoined() throws Exception {
+	commitTransaction();
+	String channelName = "hasSessionsTest";
+	String[] users = new String[] { "foo", "bar", "baz" };
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, null);
+	}
+	commitTransaction();
+	createTransaction();
+	channel = channelService.getChannel(channelName);
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
+	}
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
+	}
+
 	if (!channel.hasSessions()) {
 	    fail("Expected hasSessions to return true");
 	}
 	System.err.println("hasSessions returned true");
+	channel.close();
     }
 
     /* -- Test Channel.getSessions -- */
@@ -887,7 +959,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = createChannel();
 	commitTransaction();
 	try {
-	    channel.getSessions();
+	    getSessions(channel);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -898,7 +970,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = createChannel();
 	channel.close();
 	try {
-	    channel.getSessions();
+	    getSessions(channel);
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
@@ -907,27 +979,48 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetSessionsNoSessionsJoined() {
 	Channel channel = createChannel();
-	if (!channel.getSessions().isEmpty()) {
+	if (!getSessions(channel).isEmpty()) {
 	    fail("Expected no sessions");
 	}
 	System.err.println("No sessions joined");
     }
     
-    public void testChannelGetSessionsSessionsJoined() {
-	Channel channel = createChannel();
-	ClientSession savedSession = new DummyClientSession("getSessionTest");
-	channel.join(savedSession,  null);
-	Set<ClientSession> sessions = channel.getSessions();
-	if (sessions.isEmpty()) {
-	    fail("Expected non-empty collection");
+    public void testChannelGetSessionsSessionsJoined() throws Exception {
+	commitTransaction();
+	String channelName = "getSessionsTest";
+	String[] users = new String[] { "foo", "bar", "baz", "zig"};
+	List<String> usersList = Arrays.asList(users);
+	ClientGroup group =
+	    createChannelAndClientGroup(channelName, users);
+	createTransaction();
+	Channel channel = channelService.getChannel(channelName);
+	for (String user : users) {
+	    ClientSession session =
+		dataService.getBinding(user, ClientSession.class);
+	    channel.join(session, null);
 	}
-	if (sessions.size() != 1) {
-	    fail("Expected 1 session, got " + sessions.size());
+	commitTransaction();
+	createTransaction();
+	channel = channelService.getChannel(channelName);
+	Set<ClientSession> sessions = getSessions(channel);
+	if (sessions.size() != users.length) {
+	    fail("Expected " + users.length + " sessions, got " +
+		sessions.size());
 	}
-	if (!sessions.contains(savedSession)) {
-	    fail("Sessions does not contain session: " + savedSession);
+	
+	for (ClientSession session : sessions) {
+	    if (!usersList.contains(session.getName())) {
+		fail("Expected session: " + session);
+	    }
 	}
-	System.err.println("getSessions returned the correct session");
+
+	channel.leaveAll();
+	
+	if (getSessions(channel).size() != 0) {
+	    fail("Expected no sessions, got " + getSessions(channel).size());
+	}
+
+	channel.close();
     }
 
     /* -- Test Channel.send (to all) -- */
@@ -1152,7 +1245,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testSessionsRemovedOnCrash() throws Exception {
+    public void testSessionsRemovedOnRecovery() throws Exception {
 	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
@@ -1355,10 +1448,8 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
     
-    public void testChannelSetsRemovedOnCrash() throws Exception {
-		/*
+    public void testChannelSetsRemovedOnRecovery() throws Exception {
 	fail("this test needs to be implemented");
-		*/
     }
 
     private class ClientGroup {
@@ -1392,7 +1483,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void checkMembership(String name, boolean isMember) throws Exception {
 	    createTransaction();
 	    Channel channel = channelService.getChannel(name);
-	    Set<ClientSession> sessions = channel.getSessions();
+	    Set<ClientSession> sessions = getSessions(channel);
 	    for (DummyClient client : clients.values()) {
 
 		ClientSession session =
@@ -1417,7 +1508,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void checkChannelSets(boolean exists) throws Exception {
 	    createTransaction();
 	    for (DummyClient client : clients.values()) {
-		String sessionKey = getSessionKey(client.getSessionId());
+		String sessionKey = getChannelSetKey(localNodeId, client.getSessionId());
 		try {
 		    dataService.getServiceBinding(
 			sessionKey, ManagedObject.class);
@@ -1452,11 +1543,11 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- other methods -- */
 
-    private static final String SESSION_PREFIX =
-	"com.sun.sgs.impl.service.channel.session.";
+    private static final String CHANNEL_SET_PREFIX =
+	"com.sun.sgs.impl.service.channel.set.";
     
-    private static String getSessionKey(byte[] sessionId) {
-	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
+    private static String getChannelSetKey(long nodeId, byte[] sessionId) {
+	return CHANNEL_SET_PREFIX + nodeId + "." + HexDumper.toHexString(sessionId);
     }
 
     /** Deletes the specified directory, if it exists. */
@@ -1543,6 +1634,15 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 	return new DataServiceImpl(serviceProps, registry, txnProxy);
+    }
+
+    private Set<ClientSession> getSessions(Channel channel) {
+	Set<ClientSession> sessions = new HashSet<ClientSession>();
+	Iterator<ClientSession> iter = channel.getSessions();
+	while (iter.hasNext()) {
+	    sessions.add(iter.next());
+	}
+	return sessions;
     }
     
     /* -- other classes -- */
@@ -2178,7 +2278,9 @@ public class TestChannelServiceImpl extends TestCase {
 			joinAck = true;
 			channelIdToName.put(channelId, channelName);
 			channelNameToId.put(channelName, channelId);
-			System.err.println("join succeeded: " + channelName);
+			System.err.println(
+			    name + ": got join protocol message, channel: " +
+			    channelName);
 			lock.notifyAll();
 		    }
 		    break;
@@ -2190,7 +2292,9 @@ public class TestChannelServiceImpl extends TestCase {
 			leaveAck = true;
 			String channelName = channelIdToName.remove(channelId);
 			channelNameToId.remove(channelName);
-			System.err.println("leave succeeded: " + channelName);
+			System.err.println(
+			    name + ": got leave protocol message, channel: " +
+			    channelName);
 			lock.notifyAll();
 		    }
 		    break;
@@ -2279,7 +2383,7 @@ public class TestChannelServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
-	    
+
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
@@ -2287,6 +2391,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    ManagedReference listenerRef =
 		dataManager.createReference(listener);
 	    sessions.put(session, listenerRef);
+	    dataManager.setBinding(session.getName(), (ManagedObject) session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}

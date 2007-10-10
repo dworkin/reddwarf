@@ -452,7 +452,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** {@inheritDoc} */
     public void runTask(ClientSession session, Runnable task)
     {
-	checkContext().addTask(getClientSessionImpl(session), task);
+	checkContext().addTask(
+	    (session == null ? null : getClientSessionImpl(session)),
+	    task);
     }
 
 
