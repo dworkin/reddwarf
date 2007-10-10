@@ -220,6 +220,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Whether the transaction has already started aborting. */
 	private boolean aborting;
 
+	/** Whether the transaction has been committed or aborted. */
+	private boolean inactive;
+
 	/**
 	 * The exception that caused the transaction to be aborted, or null if
 	 * no cause was provided or if no abort occurred.
@@ -286,6 +289,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    assert success;
 	}
 
+	/**
+	 * Marks the transaction as inactive.  This method should only be
+	 * called when the transaction is in use.
+	 */
+	void setInactive() {
+	    assert (state.get() & IN_USE) != 0;
+	    inactive = true;
+	}
+
 	/* -- Implement Transaction -- */
 
 	public byte[] getId() {
@@ -301,6 +313,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void checkTimeout() {
+	    if (inactive) {
+		throw new TransactionNotActiveException(
+		    "The transaction is not active");
+	    } else if ((state.get() & PREPARED) != 0) {
+		return;
+	    }
 	    long runningTime = System.currentTimeMillis() - getCreationTime();
 	    if (runningTime > getTimeout()) {
 		throw new TransactionTimeoutException(
@@ -798,6 +816,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.commit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -808,6 +827,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid);
 	try {
 	    store.prepareAndCommit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -818,6 +838,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.abort(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
