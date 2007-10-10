@@ -44,7 +44,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     private static final long TIMEOUT = 50;
 
     /** Long enough for a transaction to timeout. */
-    private static final long TIMED_OUT = 55;
+    private static final long TIMED_OUT = TIMEOUT + 5;
 
     /** Transaction coordinator properties. */
     private static final Properties coordinatorProps = new Properties();
