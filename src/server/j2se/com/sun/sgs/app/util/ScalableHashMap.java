@@ -151,9 +151,9 @@ import java.util.Set;
  *
  * The iterators do not throw {@link
  * java.util.ConcurrentModificationException}.  The iterators are stable with
- * respect to the concurrent changes to the associated collection, but may
- * ignore additions and removals made to the collection during iteration, and
- * may also visit more than once a key value that is removed and re-added.
+ * respect to concurrent changes to the associated collection, but may ignore
+ * additions and removals made to the collection during iteration, and may also
+ * visit more than once a key value that is removed and re-added.
  *
  * <p>
  *
@@ -376,7 +376,7 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
-    final int depth;
+    private final int depth;
 
     /**
      * The maximum number of bits used in the node directory.  This is
@@ -524,7 +524,7 @@ public class ScalableHashMap<K,V>
      * @throws IllegalArgumentException if minConcurrency is not greater than
      *	       zero
      */
-    static int findMinDepthFor(int minConcurrency) {
+    private static int findMinDepthFor(int minConcurrency) {
 	if (minConcurrency <= 0) {
 	    throw new IllegalArgumentException(
 		"Minimum concurrency must be greater than zero: " +
@@ -1323,7 +1323,12 @@ public class ScalableHashMap<K,V>
     /**
      * Returns the size of the tree.  Note that this implementation runs in
      * {@code O(n*log(n))} time.  Developers should be cautious of calling this
-     * method on large maps, as the execution time grows significantly.
+     * method on large maps, as the execution time grows significantly. <p>
+     *
+     * Developers can avoid possible scaling problems by using an iterator to
+     * count the number of elements in the tree, but counting only a few
+     * elements before scheduling the rest of the job as a task to be performed
+     * by the task scheduler.
      *
      * @return the size of the tree
      */
@@ -1865,9 +1870,10 @@ public class ScalableHashMap<K,V>
 
     /**
      * A concurrent, persistable {@code Iterator} implementation for the {@code
-     * ScalableHashMap}.  This implementation is stable with respect to the
+     * ScalableHashMap}.  This implementation is stable with respect to
      * concurrent changes to the associated collection, but may ignore
-     * additions and removals made during to the collection during iteration.
+     * additions and removals made to the collection during iteration, and may
+     * also visit more than once a key value that is removed and re-added.
      */
     abstract static class ConcurrentIterator<E>
 	implements Iterator<E>, Serializable {
@@ -1885,15 +1891,14 @@ public class ScalableHashMap<K,V>
 
 	/**
 	 * A reference to the leaf containing the current position of the
-	 * iterator, or null if the iteration has not started or has been
-	 * completed.
+	 * iterator, or null if the iteration has not returned any items.
 	 *
 	 * @serial
 	 */
 	private ManagedReference currentLeafRef = null;
 
 	/**
-	 * The hash code of the current entry.
+	 * The hash code of the current entry, if any.
 	 *
 	 * @serial
 	 */
@@ -1901,8 +1906,7 @@ public class ScalableHashMap<K,V>
 
 	/**
 	 * A reference to the managed object for the key of the current entry,
-	 * null if the iteration has not started, or the same value as rootRef
-	 * if the iteration has been completed.
+	 * or null if the iteration has not returned any items.
 	 *
 	 * @serial
 	 */
@@ -1953,27 +1957,20 @@ public class ScalableHashMap<K,V>
 	 * Computes the next entry.
 	 */
 	private void getNext() {
-	    if (currentKeyRef == rootRef) {
-		/* No more entries */
-		nextLeaf = rootRef.get(ScalableHashMap.class);
-		nextEntry = null;
+	    if (currentLeafRef == null) {
+		/* Find first entry */
+		nextLeaf = rootRef.get(ScalableHashMap.class).leftMost();
+		nextEntry = nextLeaf.firstEntry();
 	    } else {
-		if (currentLeafRef == null) {
-		    /* Find first entry */
-		    nextLeaf =
-			rootRef.get(ScalableHashMap.class).leftMost();
-		    nextEntry = nextLeaf.firstEntry();
-		} else {
-		    /* Find next entry */
-		    nextLeaf = getCurrentLeaf();
-		    nextEntry = nextLeaf.nextEntry(currentHash, currentKeyRef);
-		}
-		/* Find an entry in later leaves, if needed */
-		while (nextEntry == null && nextLeaf.rightLeafRef != null) {
-		    nextLeaf = nextLeaf.rightLeafRef.get(
-			ScalableHashMap.class);
-		    nextEntry = nextLeaf.firstEntry();
-		}
+		/* Find next entry */
+		nextLeaf = getCurrentLeaf();
+		nextEntry = nextLeaf.nextEntry(currentHash, currentKeyRef);
+	    }
+	    /* Find an entry in later leaves, if needed */
+	    while (nextEntry == null && nextLeaf.rightLeafRef != null) {
+		nextLeaf = nextLeaf.rightLeafRef.get(
+		    ScalableHashMap.class);
+		nextEntry = nextLeaf.firstEntry();
 	    }
 	    nextLeafModifications = nextLeaf.modifications;
 	}
@@ -2024,13 +2021,8 @@ public class ScalableHashMap<K,V>
 	    }
 	    currentLeafRef =
 		AppContext.getDataManager().createReference(nextLeaf);
-	    if (nextEntry == null) {
-		currentLeafRef = null;
-		currentKeyRef = rootRef;
-	    } else {
-		currentHash = nextEntry.hash;
-		currentKeyRef = nextEntry.keyRef();
-	    }
+	    currentHash = nextEntry.hash;
+	    currentKeyRef = nextEntry.keyRef();
 	    currentRemoved = false;
 	    Entry result = nextEntry;
 	    getNext();
@@ -2049,6 +2041,17 @@ public class ScalableHashMap<K,V>
 	    }
 	    getCurrentLeaf().remove(currentHash, currentKeyRef);
 	    currentRemoved = true;
+	}
+
+	/**
+	 * Clear transient fields so that they will be recomputed if an attempt
+	 * is made to use the iterator in another transaction.
+	 */
+	private void writeObject(ObjectOutputStream out) throws IOException {
+	    out.defaultWriteObject();
+	    nextLeaf = null;
+	    nextEntry = null;
+	    nextLeafModifications = 0;
 	}
     }
 
@@ -2430,5 +2433,62 @@ public class ScalableHashMap<K,V>
 		i++;
 	    }
 	}
+    }
+
+    /**
+     * Returns the minimum depth for any leaf node in the map's backing tree.
+     * The root node has a depth of {@code 1}.  This method is used for
+     * testing.
+     *
+     * @return the minimum depth
+     */
+    @SuppressWarnings("unchecked")
+    private int getMinTreeDepth() {
+	ScalableHashMap<K,V> cur = leftMost();
+	int minDepth = cur.depth;
+	while (cur.rightLeafRef != null) {
+	    cur = cur.rightLeafRef.get(ScalableHashMap.class);
+	    minDepth = Math.min(minDepth, cur.depth);
+	}
+	return minDepth + 1;
+    }
+
+
+    /**
+     * Returns the maximum depth for any leaf node in the map's backing tree.
+     * The root node has a depth of {@code 1}.  This method is used for
+     * testing.
+     *
+     * @return the maximum depth
+     */
+    @SuppressWarnings("unchecked")
+    private int getMaxTreeDepth() {
+	ScalableHashMap<K,V> cur = leftMost();
+	int maxDepth = cur.depth;
+	while (cur.rightLeafRef != null) {
+	    cur = cur.rightLeafRef.get(ScalableHashMap.class);
+	    maxDepth = Math.max(maxDepth, cur.depth);
+	}
+	return maxDepth + 1;
+    }
+
+    /**
+     * Returns the average of all depth for the leaf nodes in the map's backing
+     * tree.  The root node has a depth of {@code 1}.  This method is used for
+     * testing.
+     *
+     * @return the average depth
+     */
+    @SuppressWarnings("unchecked")
+    private double getAvgTreeDepth() {
+	ScalableHashMap<K,V> cur = leftMost();
+	int maxDepth = cur.depth;
+	int leaves = 1;
+	while (cur.rightLeafRef != null) {
+	    cur = cur.rightLeafRef.get(ScalableHashMap.class);
+	    maxDepth = Math.max(maxDepth, cur.depth);
+	    leaves++;
+	}
+	return (maxDepth / (double) leaves) + 1;
     }
 }

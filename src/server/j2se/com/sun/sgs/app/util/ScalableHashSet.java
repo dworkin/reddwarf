@@ -193,7 +193,7 @@ public class ScalableHashSet<E>
      *	      to support
      *
      * @throws IllegalArgumentException if {@code minConcurrency} is
-     *	       non-positive
+     *	       not greater than zero
      *
      * @see ScalableHashMap#ScalableHashMap(int)
      */
@@ -293,6 +293,37 @@ public class ScalableHashSet<E>
      */
     public int size() {
 	return map.get(ScalableHashMap.class).size();
+    }
+
+    /**
+     * Retains only the elements in this collection that are contained in the
+     * specified collection.  In other words, removes from this collection all
+     * of its elements that are not contained in the specified collection. <p>
+     *
+     * This implementation iterates over this collection, checking each element
+     * returned by the iterator in turn to see if it's contained in the
+     * specified collection.  If it's not so contained, it's removed from this
+     * collection with the iterator's {@code remove} method.
+     *
+     * @param c elements to be retained in this collection.
+     *
+     * @return {@code true} if this collection changed as a result of the
+     *         call
+     * @throws NullPointerException if the specified collection is {@code null}
+     *
+     * @see #remove
+     * @see #contains
+     */
+    @Override
+    public boolean retainAll(Collection<?> c) {
+	/*
+	 * The AbstractCollection method doesn't currently do this check.
+	 * -tjb@sun.com (10/10/2007)
+	 */
+	if (c == null) {
+	    throw new NullPointerException("The argument must not be null");
+	}
+	return super.retainAll(c);
     }
 
     /**

@@ -23,7 +23,6 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
-import com.sun.sgs.app.util.ScalableHashMapTestable;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -41,6 +40,9 @@ import java.io.File;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -75,7 +77,29 @@ public class TestScalableHashMap extends TestCase {
     private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
+    /** A fixed random number generator for use in the test. */
     private static final Random RANDOM = new Random(1337);
+
+    /** The four argument constructor. */
+    private static final Constructor<ScalableHashMap>
+	scalableHashMapConstructor = getConstructor(
+	    ScalableHashMap.class, int.class, int.class, int.class, int.class);
+
+    /** The findMinDepthFor method. */
+    private static final Method findMinDepthFor =
+	getMethod(ScalableHashMap.class, "findMinDepthFor", int.class);
+
+    /** The getMinTreeDepth method. */
+    private static final Method getMinTreeDepth =
+	getMethod(ScalableHashMap.class, "getMinTreeDepth");
+
+    /** The getMaxTreeDepth method. */
+    private static final Method getMaxTreeDepth =
+	getMethod(ScalableHashMap.class, "getMaxTreeDepth");
+
+    /** The getAvgTreeDepth method. */
+    private static final Method getAvgTreeDepth =
+	getMethod(ScalableHashMap.class, "getAvgTreeDepth");
 
     private DummyAbstractKernelAppContext appContext;
     private DataServiceImpl dataService;
@@ -127,16 +151,15 @@ public class TestScalableHashMap extends TestCase {
 
     @Test public void testConstructorNoArg() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable test =
-	    new ScalableHashMapTestable<Integer,Integer>();
-	assertEquals(6, test.getMaxTreeDepth());
-	assertEquals(6, test.getMinTreeDepth());
+	ScalableHashMap test = new ScalableHashMap<Integer,Integer>();
+	assertEquals(6, getMaxTreeDepth(test));
+	assertEquals(6, getMaxTreeDepth(test));
 	dataService.setBinding("test", test);
 	txn.commit();
 	txn = createTransaction();
-	test = dataService.getBinding("test", ScalableHashMapTestable.class);
-	assertEquals(6, test.getMaxTreeDepth());
-	assertEquals(6, test.getMinTreeDepth());
+	test = dataService.getBinding("test", ScalableHashMap.class);
+	assertEquals(6, getMaxTreeDepth(test));
+	assertEquals(6, getMinTreeDepth(test));
 	txn.commit();
     }
 
@@ -146,28 +169,28 @@ public class TestScalableHashMap extends TestCase {
 
     @Test public void testConstructorOneArgDepth() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(1);
-	assertEquals(1, test.getMaxTreeDepth());
-	assertEquals(1, test.getMinTreeDepth());
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(1);
+	assertEquals(1, getMaxTreeDepth(test));
+	assertEquals(1, getMinTreeDepth(test));
 	txn.commit();
     }
 
     @Test public void testConstructorOneArgDepth3() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(3);
-	assertEquals(3, test.getMaxTreeDepth());
-	assertEquals(3, test.getMinTreeDepth());
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(3);
+	assertEquals(3, getMaxTreeDepth(test));
+	assertEquals(3, getMinTreeDepth(test));
 	txn.commit();
     }
 
     @Test public void testConstructorOneArgDepth4() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(5);
-	assertEquals(4, test.getMaxTreeDepth());
-	assertEquals(4, test.getMinTreeDepth());
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(5);
+	assertEquals(4, getMaxTreeDepth(test));
+	assertEquals(4, getMinTreeDepth(test));
 	txn.commit();
     }
 
@@ -222,8 +245,8 @@ public class TestScalableHashMap extends TestCase {
 
     @Test public void testMultiParamConstructor() throws Exception {
 	txn = createTransaction();
-	new ScalableHashMapTestable<Integer,Integer>(1, 32, 5);
-	new ScalableHashMapTestable<Integer,Integer>(1, 32, 4);
+	createScalableHashMap(Integer.class, Integer.class, 1, 32, 5);
+	createScalableHashMap(Integer.class, Integer.class, 1, 32, 4);
 	txn.commit();
     }
 
@@ -232,7 +255,7 @@ public class TestScalableHashMap extends TestCase {
     {
 	txn = createTransaction();
 	try {
-	    new ScalableHashMapTestable<Integer,Integer>(0, 1, 5);
+	    createScalableHashMap(Integer.class, Integer.class, 0, 1, 5);
 	    fail("Expected IllegalArgumentException");
 	} catch(IllegalArgumentException iae) {
 	}
@@ -244,7 +267,7 @@ public class TestScalableHashMap extends TestCase {
     {
 	txn = createTransaction();
 	try {
-	    new ScalableHashMapTestable<Integer,Integer>(1, 0, 5);
+	    createScalableHashMap(Integer.class, Integer.class, 1, 0, 5);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException iae) {
 	}
@@ -257,7 +280,7 @@ public class TestScalableHashMap extends TestCase {
     {
 	txn = createTransaction();
 	try {
-	    new ScalableHashMapTestable<Integer,Integer>(1, 32, -1);
+	    createScalableHashMap(Integer.class, Integer.class, 1, 32, -1);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException iae) {
 	}
@@ -941,6 +964,20 @@ public class TestScalableHashMap extends TestCase {
     }
 
     /*
+     * Test toString
+     */
+
+    @Test public void testToString() throws Exception {
+	txn = createTransaction();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
+	assertEquals("{}", test.toString());
+	test.put(1, 2);
+	assertEquals("{1=2}", test.toString());
+	txn.commit();
+    }
+
+    /*
      * Test remove
      */
 
@@ -1344,7 +1381,7 @@ public class TestScalableHashMap extends TestCase {
 
 	txn = createTransaction(100000);
 	Map<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 2);
+	    createScalableHashMap(Integer.class, Integer.class, 1, 8, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -1371,7 +1408,7 @@ public class TestScalableHashMap extends TestCase {
 
 	txn = createTransaction(100000);
 	Map<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(1, 8, 4);
+	    createScalableHashMap(Integer.class, Integer.class, 1, 8, 4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -1437,7 +1474,7 @@ public class TestScalableHashMap extends TestCase {
 
 	txn = createTransaction(100000);
 	Map<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(1,32, 2);
+	    createScalableHashMap(Integer.class, Integer.class, 1,32, 2);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[1024];
@@ -1484,7 +1521,7 @@ public class TestScalableHashMap extends TestCase {
 
 	txn = createTransaction(100000);
 	Map<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(1,32,4);
+	    createScalableHashMap(Integer.class, Integer.class, 1,32,4);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[400];
@@ -2096,8 +2133,7 @@ public class TestScalableHashMap extends TestCase {
 
     @Test public void testOnManagedObjectKeysAndValues() throws Exception {
 	txn = createTransaction();
-	Map<Bar,Bar> test =
-	    new ScalableHashMapTestable<Bar,Bar>();
+	Map<Bar,Bar> test = new ScalableHashMap<Bar,Bar>();
 	Map<Bar,Bar> control = new HashMap<Bar,Bar>();
 
 	for (int i = 0; i < 64; i++) {
@@ -2114,8 +2150,7 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception {
 
 	txn = createTransaction();
-	Map<Foo,Foo> test =
-	    new ScalableHashMapTestable<Foo,Foo>();
+	Map<Foo,Foo> test = new ScalableHashMap<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 	for (int i = 0; i < 64; i++) {
@@ -2137,8 +2172,7 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception {
 
 	txn = createTransaction();
-	Map<Foo,Foo> test =
-	    new ScalableHashMapTestable<Foo,Foo>();
+	Map<Foo,Foo> test = new ScalableHashMap<Foo,Foo>();
 	Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 	for (int i = 0; i < 64; i++) {
@@ -2168,8 +2202,8 @@ public class TestScalableHashMap extends TestCase {
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIterator() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[128];
@@ -2200,8 +2234,8 @@ public class TestScalableHashMap extends TestCase {
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorSerialization() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[256];
@@ -2249,8 +2283,8 @@ public class TestScalableHashMap extends TestCase {
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithRemovals() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[1024];
@@ -2303,8 +2337,8 @@ public class TestScalableHashMap extends TestCase {
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithAdditions() throws Exception {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	// immediately get the iterator while the map size is zero
@@ -2353,8 +2387,8 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception
     {
 	txn = createTransaction();
-	ScalableHashMapTestable<Integer,Integer> test =
-	    new ScalableHashMapTestable<Integer,Integer>(16);
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>(16);
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] a = new int[128];
@@ -2424,8 +2458,8 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception
     {
 	txn = createTransaction();
-	ScalableHashMapTestable<Equals,Integer> test =
-	    new ScalableHashMapTestable<Equals,Integer>(16);
+	ScalableHashMap<Equals,Integer> test =
+	    new ScalableHashMap<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	int[] a = new int[256];
@@ -2470,8 +2504,8 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception
     {
 	txn = createTransaction();
-	ScalableHashMapTestable<Equals,Integer> test =
-	    new ScalableHashMapTestable<Equals,Integer>(16);
+	ScalableHashMap<Equals,Integer> test =
+	    new ScalableHashMap<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	int[] a = new int[128];
@@ -2525,8 +2559,8 @@ public class TestScalableHashMap extends TestCase {
 	throws Exception {
 
 	txn = createTransaction();
-	ScalableHashMapTestable<Equals,Integer> test =
-	    new ScalableHashMapTestable<Equals,Integer>(16);
+	ScalableHashMap<Equals,Integer> test =
+	    new ScalableHashMap<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	// immediately get the iterator while the map size is zero
@@ -2573,8 +2607,8 @@ public class TestScalableHashMap extends TestCase {
 	 throws Exception {
 
 	txn = createTransaction();
-	ScalableHashMapTestable<Equals,Integer> test =
-	    new ScalableHashMapTestable<Equals,Integer>(16);
+	ScalableHashMap<Equals,Integer> test =
+	    new ScalableHashMap<Equals,Integer>(16);
 	Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 	int[] a = new int[128];
@@ -2706,6 +2740,8 @@ public class TestScalableHashMap extends TestCase {
 	    DB_DIRECTORY);
 	properties.setProperty(StandardProperties.APP_NAME,
 			       "TestScalableHashMap");
+	/* Allow overrides from the command line. */
+	properties.putAll(System.getProperties());
 	dataService = new DataServiceImpl(properties, registry, txnProxy);
     }
 
@@ -2717,6 +2753,103 @@ public class TestScalableHashMap extends TestCase {
 		    throw new RuntimeException("couldn't delete: " + file);
 	    if (! dir.delete())
 		throw new RuntimeException("couldn't remove: " + dir);
+	}
+    }
+
+    /**
+     * Constructs an empty {@code ScalableHashMap} by calling the private
+     * constructor to supply additional parameters.
+     */
+    @SuppressWarnings("unchecked")
+    private static <K,V> ScalableHashMap<K,V> createScalableHashMap(
+	Class<K> keyClass, Class<V> valueClass,
+	int minConcurrency, int splitThreshold, int directorySize)
+    {
+	int minDepth = findMinDepthFor(minConcurrency);
+	try {
+	    return (ScalableHashMap<K,V>)
+		scalableHashMapConstructor.newInstance(
+		    0, minDepth, splitThreshold, directorySize);
+	} catch (InvocationTargetException e) {
+	    throw (RuntimeException) e.getCause();
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /**
+     * Returns the minimum depth of the tree necessary to support the requested
+     * minimum number of concurrent write operations.
+     */
+    private static int findMinDepthFor(int minConcurrency) {
+	try {
+	    return (Integer) findMinDepthFor.invoke(null, minConcurrency);
+	} catch (InvocationTargetException e) {
+	    throw (RuntimeException) e.getCause();
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /**
+     * Returns the minimum depth for any leaf node in the map's backing tree.
+     * The root node has a depth of 1.
+     */
+    private int getMinTreeDepth(ScalableHashMap map) {
+	try {
+	    return (Integer) getMinTreeDepth.invoke(map);
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /**
+     * Returns the maximum depth for any leaf node in the map's backing tree.
+     * The root node has a depth of 1.
+     */
+    private int getMaxTreeDepth(ScalableHashMap map) {
+	try {
+	    return (Integer) getMaxTreeDepth.invoke(map);
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /**
+     * Returns the average of all depth for the leaf nodes in the map's backing
+     * tree.  The root node has a depth of 1.
+     */
+    private double getAvgTreeDepth(ScalableHashMap map) {
+	try {
+	    return (Integer) getAvgTreeDepth.invoke(map);
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /** Returns the specified declared constructor. */
+    private static <T> Constructor<T> getConstructor(
+	Class<T> cl, Class<?>... params)
+    {
+	try {
+	    Constructor<T> result = cl.getDeclaredConstructor(params);
+	    result.setAccessible(true);
+	    return result;
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /** Returns the specified declared method. */
+    private static Method getMethod(
+	Class<?> cl, String methodName, Class<?>... params)
+    {
+	try {
+	    Method result = cl.getDeclaredMethod(methodName, params);
+	    result.setAccessible(true);
+	    return result;
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}
     }
 
@@ -2756,7 +2889,7 @@ public class TestScalableHashMap extends TestCase {
 	private static final long serialVersionUID = 1L;
 	private final int i;
 
-	public Foo(int i) {
+	Foo(int i) {
 	    this.i = i;
 	}
 
@@ -2778,7 +2911,7 @@ public class TestScalableHashMap extends TestCase {
     static class Bar extends Foo implements ManagedObject {
 	private static final long serialVersionUID = 1L;
 
-	public Bar(int i) {
+	Bar(int i) {
 	    super(i);
 	}
     }
@@ -2790,7 +2923,7 @@ public class TestScalableHashMap extends TestCase {
     static class Equals extends Foo {
 	private static final long serialVersionUID = 1L;
 
-	public Equals(int i) {
+	Equals(int i) {
 	    super(i);
 	}
 
