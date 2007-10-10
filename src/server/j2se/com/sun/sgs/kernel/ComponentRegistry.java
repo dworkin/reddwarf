@@ -27,7 +27,7 @@ import java.util.MissingResourceException;
  * of components by type. It is used by the kernel during startup to
  * configure system components and <code>Service</code>s.
  */
-public interface ComponentRegistry
+public interface ComponentRegistry extends Iterable<Object>
 {
 
     /**
