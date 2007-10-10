@@ -74,6 +74,7 @@ public interface Transaction {
      * Checks if this <code>Transaction</code> has timed out, throwing a
      * <code>TransactionTimeoutException</code> if it has.
      *
+     * @throws TransactionNotActiveException if the transaction is not active
      * @throws TransactionTimeoutException if the transaction has timed out
      */
     public void checkTimeout();

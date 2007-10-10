@@ -946,7 +946,7 @@ public final class DataStoreClient
 	    if (txnInfo != null) {
 		txnInfo.serverAborted = true;
 	    }
-	    if (txn != null) {
+	    if (txn != null && !txn.isAborted()) {
 		txn.abort(re);
 	    }
 	}
