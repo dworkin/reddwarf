@@ -72,6 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase;
 
@@ -333,6 +334,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(port);
 	    client.login(name, "password");
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
+        } catch (RuntimeException e) {
+            fail("unexpected login failure: " + e);
 	} finally {
             client.disconnect(false);
 	}
@@ -351,6 +356,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
+        } catch (RuntimeException e) {
+            fail("unexpected login failure: " + e);
 	} finally {
             client.disconnect(false);
 	}
@@ -365,6 +374,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(NON_SERIALIZABLE, "password");
 	    fail("expected login failure");
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
@@ -390,6 +401,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(RETURN_NULL, "bar");
 	    fail("expected login failure");	
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
@@ -415,6 +428,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(THROW_RUNTIME_EXCEPTION, "bar");
 	    fail("expected login failure");	
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
@@ -457,6 +472,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 		System.err.println("Logout successful");
 	    }
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} catch (InterruptedException e) {
 	    e.printStackTrace();
 	    fail("testLogout interrupted");
@@ -485,6 +502,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else {
 		fail("notifyLoggedOut not invoked for identity: " + name);
 	    }
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} finally {
             client.disconnect(false);
 	}
@@ -535,6 +554,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    if (!getClientSessionListenerKeys().isEmpty()) {
 		fail("listener key not removed!");
 	    }
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} finally {
 	    client.disconnect(false);
 	}
@@ -593,6 +614,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    fail("expected a connected session");
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} finally {
 	    client.disconnect(false);
 	}
@@ -622,6 +645,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    fail("expected d connected session");
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} finally {
 	    client.disconnect(false);
 	}
@@ -651,6 +676,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    fail("expected a connected session");
+        } catch (TimeoutException e) {
+            fail(e.getMessage());
 	} finally {
 	    client.disconnect(false);
 	}
@@ -978,7 +1005,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return new ClientSessionId(sessionId.getId());
 	}
 
-	void connect(int port) {
+	void connect(int port) throws TimeoutException {
 	    connected = false;
 	    listener = new Listener();
 	    try {
@@ -999,18 +1026,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (connected != true) {
-			throw new RuntimeException(
+			throw new TimeoutException(
  			    "DummyClient.connect timed out");
 		    }
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.connect timed out", e);
+                    throw new RuntimeException(
+			"DummyClient.connect interrupted", e);
 		}
 	    }
 	    
 	}
 
-	void disconnect(boolean graceful) {
+	void disconnect(boolean graceful) throws TimeoutException {
             System.err.println("DummyClient.disconnect: " + graceful);
 
             if (graceful) {
@@ -1033,7 +1060,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
 	}
 
-	void login(String name, String password) {
+	void login(String name, String password) throws TimeoutException {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(
@@ -1063,7 +1090,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (loginAck != true) {
-			throw new RuntimeException(
+			throw new TimeoutException(
 			    "DummyClient.login timed out");
 		    }
 		    if (!loginSuccess) {
@@ -1071,7 +1098,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.login timed out", e);
+			"DummyClient.login interrupted", e);
 		}
 	    }
 	}
@@ -1116,7 +1143,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
-	void logout() {
+	void logout() throws TimeoutException {
             synchronized (lock) {
                 if (connected == false) {
                     return;
@@ -1138,12 +1165,12 @@ public class TestClientSessionServiceImpl extends TestCase {
                             lock.wait(WAIT_TIME);
                         }
                         if (logoutAck != true) {
-                            throw new RuntimeException(
+                            throw new TimeoutException(
                                 "DummyClient.disconnect timed out");
                         }
                     } catch (InterruptedException e) {
                         throw new RuntimeException(
-                            "DummyClient.disconnect timed out", e);
+                            "DummyClient.disconnect interrupted", e);
                     }
                 }
             }
@@ -1285,7 +1312,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
-	    
+            System.err.println(
+                "DummyAppListener.loggedIn with name " + session.getName());
+
 	    if (session.getName().equals(RETURN_NULL)) {
 		return null;
 	    } else if (session.getName().equals(NON_SERIALIZABLE)) {
