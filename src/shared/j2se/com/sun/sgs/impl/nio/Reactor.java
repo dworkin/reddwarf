@@ -75,6 +75,20 @@ class Reactor {
     final Object selectorLock = new Object();
 
     /**
+     * The lifecycle state of this reactor.  Increases monotonically.
+     * It may only be accessed with selectorLock held.
+     */
+    protected int lifecycleState = RUNNING;
+    /** State: open and running */
+    protected static final int RUNNING      = 0;
+    /** State: graceful shutdown in progress */
+    protected static final int SHUTDOWN     = 1;
+    /** State: forced shutdown in progress */
+    protected static final int SHUTDOWN_NOW = 2;
+    /** State: terminated */
+    protected static final int DONE         = 3;
+
+    /**
      * The channel group for this reactor, used to obtain completion
      * handler runners.
      */
@@ -96,11 +110,6 @@ class Reactor {
     /** Operations that having pending timeouts. */
     final DelayQueue<TimeoutHandler> timeouts =
         new DelayQueue<TimeoutHandler>();
-
-    /**
-     * Whether this reactor should shutdown when it has no registered keys.
-     */
-    volatile boolean shuttingDown = false;
 
     /**
      * Creates a new reactor instance with the given channel group and
@@ -126,11 +135,12 @@ class Reactor {
      * @see AsynchronousChannelGroup#shutdown()
      */
     void shutdown() {
-        if (shuttingDown)
-            return;
         synchronized (selectorLock) {
-            shuttingDown = true;
-            selector.wakeup();
+            if (lifecycleState < SHUTDOWN) {
+                lifecycleState = SHUTDOWN;
+                
+                selector.wakeup();
+            }
         }
     }
 
@@ -144,123 +154,135 @@ class Reactor {
      * @see AsynchronousChannelGroup#shutdownNow()
      */
     void shutdownNow() throws IOException {
-        if (shuttingDown)
-            return;
         synchronized (selectorLock) {
-            shuttingDown = true;
-            selector.wakeup();
-            for (SelectionKey key : selector.keys()) {
-                try {
-                    Closeable asyncKey =
-                        (Closeable) key.attachment();
-                    if (asyncKey != null)
-                        asyncKey.close();
-                } catch (IOException ignore) { }
+            if (lifecycleState < SHUTDOWN_NOW) {
+                lifecycleState = SHUTDOWN_NOW;
+
+                for (SelectionKey key : selector.keys()) {
+                    try {
+                        Closeable asyncKey =
+                            (Closeable) key.attachment();
+                        if (asyncKey != null)
+                            asyncKey.close();
+                    } catch (IOException ignore) { }
+                }
+
+                selector.wakeup();
             }
         }
     }
 
     /**
      * Performs a single iteration of the reactor's event loop, and returns
-     * a flag indicating whether the reactor is still running.  Catches
-     * and logs any exceptions that are thrown.
+     * a flag indicating whether the reactor is still running.  Only one
+     * call may be active on a Reactor instance at a time.
      * 
      * @return {@code false} if this reactor is stopped,
      *         otherwise {@code true}
+     * @throws IOException if an I/O error occurs
      */
-    boolean performWork() {
-        try {
+    boolean performWork() throws IOException {
 
-            if (! selector.isOpen()) {
-                log.log(Level.WARNING, "{0} selector is closed", this);
-                return false;
-            }
+        if (! selector.isOpen()) {
+            log.log(Level.WARNING, "{0} selector is closed", this);
+            return false;
+        }
 
-            synchronized (selectorLock) {
-                // Obtain and release the guard to allow other tasks
-                // to run after waking the selector.
+        synchronized (selectorLock) {
+            // Obtain and release the guard to allow other tasks
+            // to run after waking the selector.
+        }
 
-                if (log.isLoggable(Level.FINER)) {
-                    int numKeys = selector.keys().size();
-                    log.log(Level.FINER, "{0} select on {1} keys",
-                        new Object[] { this, numKeys });
-                    if (numKeys <= 5) {
-                        for (SelectionKey key : selector.keys()) {
-                            log.log(Level.FINER,
-                                "{0} select interestOps {1} on {2}",
-                                new Object[] {
-                                    this,
-                                    Util.formatOps(key.interestOps()),
-                                    key.attachment() });
-                        }
-                    }
+        if (log.isLoggable(Level.FINER)) {
+            int numKeys = selector.keys().size();
+            log.log(Level.FINER, "{0} select on {1} keys",
+                new Object[] { this, numKeys });
+            if (numKeys <= 5) {
+                for (SelectionKey key : selector.keys()) {
+                    log.log(Level.FINER,
+                        "{0} select interestOps {1} on {2}",
+                        new Object[] {
+                        this,
+                        Util.formatOps(key.interestOps()),
+                        key.attachment() });
                 }
             }
+        }
 
-            int readyCount;
+        int readyCount;
 
-            final Delayed nextExpiringTask = timeouts.peek();
-            if (nextExpiringTask == null) {
-                readyCount = selector.select();
+        // If there are any pending timeouts, block no longer than
+        // the earliest.  Otherwise, block indefinitely.
+        final Delayed nextExpiringTask = timeouts.peek();
+        if (nextExpiringTask == null) {
+            readyCount = selector.select();
+        } else {
+            long nextTimeoutMillis =
+                nextExpiringTask.getDelay(TimeUnit.MILLISECONDS);
+            if (nextTimeoutMillis <= 0) {
+                readyCount = selector.selectNow();
             } else {
-                long nextTimeoutMillis =
-                    nextExpiringTask.getDelay(TimeUnit.MILLISECONDS);
-                if (nextTimeoutMillis <= 0) {
-                    readyCount = selector.selectNow();
-                } else {
-                    readyCount = selector.select(nextTimeoutMillis);
-                }
+                readyCount = selector.select(nextTimeoutMillis);
             }
+        }
 
-            if (log.isLoggable(Level.FINER)) {
-                log.log(Level.FINER, "{0} selected {1} / {2}",
-                    new Object[] { this, readyCount, selector.keys().size() });
-            }
+        if (log.isLoggable(Level.FINER)) {
+            log.log(Level.FINER, "{0} selected {1} / {2}",
+                new Object[] { this, readyCount, selector.keys().size() });
+        }
 
-            if (shuttingDown) {
-                if (log.isLoggable(Level.FINE)) {
-                    log.log(Level.FINE, "{0} wants shutdown, {1} keys",
+        if (log.isLoggable(Level.FINE)) {
+            synchronized (selectorLock) {
+                if (lifecycleState != RUNNING) {
+                    log.log(Level.FINE,
+                        "{0} wants shutdown, {1} keys",
                         new Object[] { this, selector.keys().size() });
                 }
+            }
+        }
+
+        // Check for shutdown *after* calling select(), so that cancelled
+        // keys will have been removed from the selector's key set.
+        synchronized (selectorLock) {
+            if (lifecycleState != RUNNING) {
                 if (selector.keys().isEmpty()) {
+                    lifecycleState = DONE;
                     selector.close();
                     return false;
                 }
             }
-
-            final Iterator<SelectionKey> keys =
-                selector.selectedKeys().iterator();
-
-            while (keys.hasNext()) {
-                SelectionKey key = keys.next();
-                keys.remove();
-
-                ReactiveAsyncKey asyncKey =
-                    (ReactiveAsyncKey) key.attachment();
-
-                int readyOps;
-                synchronized (asyncKey) {
-                    if (! key.isValid())
-                        continue;
-                    readyOps = key.readyOps();
-                    key.interestOps(key.interestOps() & (~ readyOps));
-                }
-                asyncKey.selected(readyOps);
-            }
-
-            final List<TimeoutHandler> expiredHandlers =
-                new ArrayList<TimeoutHandler>();
-            timeouts.drainTo(expiredHandlers);
-
-            for (TimeoutHandler expired : expiredHandlers)
-                expired.run();
-
-            expiredHandlers.clear();
-
-        } catch (Throwable t) {
-            log.log(Level.WARNING, this.toString(), t);
-            return false;
         }
+
+        final Iterator<SelectionKey> keys =
+            selector.selectedKeys().iterator();
+
+        // Dispatch the ready keys to their handlers
+        while (keys.hasNext()) {
+            SelectionKey key = keys.next();
+            keys.remove();
+
+            ReactiveAsyncKey asyncKey =
+                (ReactiveAsyncKey) key.attachment();
+
+            int readyOps;
+            synchronized (asyncKey) {
+                if (! key.isValid())
+                    continue;
+                readyOps = key.readyOps();
+                key.interestOps(key.interestOps() & (~ readyOps));
+            }
+            asyncKey.selected(readyOps);
+        }
+
+        // Expire timed-out operations
+        final List<TimeoutHandler> expiredHandlers =
+            new ArrayList<TimeoutHandler>();
+        timeouts.drainTo(expiredHandlers);
+
+        for (TimeoutHandler expired : expiredHandlers)
+            expired.run();
+
+        expiredHandlers.clear();
 
         return true;
     }
@@ -279,7 +301,7 @@ class Reactor {
     ReactiveAsyncKey
     register(SelectableChannel ch) throws IOException {
         synchronized (selectorLock) {
-            if (shuttingDown)
+            if (lifecycleState != RUNNING)
                 throw new ShutdownChannelGroupException();
 
             selector.wakeup();
@@ -292,29 +314,13 @@ class Reactor {
     }
 
     /**
-     * Cancel the registration of the given {@link AsyncKey} with this reactor.
-     * 
-     * @param asyncKey the key to cancel
-     */
-    void
-    unregister(ReactiveAsyncKey asyncKey) {
-        // Note that synchronization is not required in this case, becase
-        // the cancel operation is guaranteed to block at most briefly.
-        asyncKey.key.cancel();
-
-        // Wake the selector in case this was the last key registered
-        // and the reactor is shutting down.
-        selector.wakeup();
-    }
-
-    /**
      * Registers interest in an IO operation on the channel associated with
      * the given {@link AsyncKey}, returning a future representing the
      * result of the operation.
      * <p>
      * When the requested operation becomes ready, the given {@code task}
      * is invoked so that it may perform the IO operation.  The selector's
-     * interest all ready operations is cleared before dispatching to the
+     * interest in all ready operations is cleared before dispatching to the
      * task.
      * <p>
      * Several checks are performed on the channel at this point to avoid
@@ -339,7 +345,6 @@ class Reactor {
      * </ul>
      * 
      * @param <R> the result type
-     * @param <A> the attachment type
      * @param asyncKey the key for async operations on the channel
      * @param op the {@link SelectionKey} operation requested
      * @param task the task to invoke when the operation becomes ready
@@ -350,7 +355,7 @@ class Reactor {
      * @throws AlreadyConnectedException if a connect operation is requested
      *         on a connected {@code SocketChannel}
      */
-    <R, A> void
+    <R> void
     awaitReady(ReactiveAsyncKey asyncKey, int op, AsyncOp<R> task)
     {
         synchronized (selectorLock) {
@@ -359,25 +364,17 @@ class Reactor {
             SelectableChannel channel = asyncKey.channel();
             int interestOps;
             synchronized (asyncKey) {
-                if (key == null || (! key.isValid())) {
-                    if (log.isLoggable(Level.FINE)) {
-                        log.log(Level.FINE, "{0} awaitReady {1} : invalid",
-                            new Object[] { this, Util.opName(op) });
-                    }
+                if (key == null || (! key.isValid()))
                     throw new ClosedAsynchronousChannelException();
-                }
 
                 interestOps = key.interestOps();
 
-                if (log.isLoggable(Level.FINEST)) {
-                    log.log(Level.FINEST,
-                        "{0} awaitReady {1} : old {2} : add {3}",
-                        new Object[] { this,
-                                       task,
-                                       Util.formatOps(interestOps),
-                                       Util.formatOps(op) });
-                }
-
+                // These precondition checks don't belong here; they
+                // should be refactored to AsyncSocketChannelImpl.
+                // However, they need to occur inside the asyncKey
+                // lock after we know the interest ops won't change,
+                // so here they are.
+                // Only SocketChannel has any extra checks to do.
                 if (channel instanceof SocketChannel) {
                     switch (op) {
                     case OP_READ:
@@ -394,13 +391,20 @@ class Reactor {
                     }
                 }
 
+                // Check that op isn't already in the interest set
+                assert (interestOps & op) == 0;
+
                 interestOps |= op;
                 key.interestOps(interestOps);
             }
 
             if (log.isLoggable(Level.FINEST)) {
-                log.log(Level.FINEST, "{0}, awaitReady {1} : new {2} ",
-                    new Object[] { this, task, Util.formatOps(interestOps) });
+                log.log(Level.FINEST,
+                    "{0} awaitReady {1} : old {2} : add {3}",
+                    new Object[] { this,
+                                   task,
+                                   Util.formatOps(interestOps),
+                                   Util.formatOps(op) });
             }
         }
     }
@@ -447,7 +451,7 @@ class Reactor {
             new AtomicReference<AsyncOp<?>>();
 
         /**
-         * The timeout token for the pending task, or {@code null} if
+         * The timeout action for the pending task, or {@code null} if
          * there is no pending timeout.
          */
         private volatile TimeoutHandler timeoutHandler = null;
@@ -474,6 +478,9 @@ class Reactor {
          * Overridden by subclasses to take the appropriate action when an
          * attempt is made to invoke this operation while it is already
          * pending.
+         * <p>
+         * This method <strong>must always</strong> throw an unchecked
+         * exception.
          */
         protected abstract void pendingPolicy();
 
@@ -508,15 +515,14 @@ class Reactor {
         }
 
         /**
-         * Cancels the timeout for the pending task, if any, 
+         * Marks the operation as no-longer-pending, and cancels the timeout
+         * expiration action for the task, if any.
          */
         void cleanupTask() {
             assert task.get() != null;
 
             if (timeoutHandler != null) {
-                try {
-                    timeouts.remove(timeoutHandler);
-                } catch (Throwable ignore) { }
+                timeouts.remove(timeoutHandler);
                 timeoutHandler = null;
             }
 
@@ -576,7 +582,8 @@ class Reactor {
                 // Schedule this task for execution when it is ready
                 Reactor.this.awaitReady(asyncKey, op, opTask);
             } catch (RuntimeException e) {
-                // If a problem occurs, cancel the timeout and pending task
+                // If a problem occurs, cancel the timeout and pending task,
+                // and throw the exception to the caller as JSR-203 specs
                 cleanupTask();
                 throw e;
             }
@@ -596,7 +603,7 @@ class Reactor {
 
     /**
      * Provides support for initiating asynchronous IO operations on
-     * an underlying reactive channel registered with some {@link Reactor}.
+     * an underlying reactive channel registered with this {@link Reactor}.
      * 
      * @see AsyncKey
      */
@@ -609,28 +616,28 @@ class Reactor {
         final SelectionKey key;
 
         /** The handler for an asynchronous {@code accept} operation. */
-        final PendingOperation pendingAccept =
+        private final PendingOperation pendingAccept =
             new PendingOperation(this, OP_ACCEPT) {
                 protected void pendingPolicy() {
                     throw new AcceptPendingException();
                 }};
 
         /** The handler for an asynchronous {@code connect} operation. */
-        final PendingOperation pendingConnect =
+        private final PendingOperation pendingConnect =
             new PendingOperation(this, OP_CONNECT) {
                 protected void pendingPolicy() {
                     throw new ConnectionPendingException();
                 }};
 
         /** The handler for an asynchronous {@code read} operation. */
-        final PendingOperation pendingRead =
+        private final PendingOperation pendingRead =
             new PendingOperation(this, OP_READ) {
                 protected void pendingPolicy() {
                     throw new ReadPendingException();
                 }};
 
         /** The handler for an asynchronous {@code write} operation. */
-        final PendingOperation pendingWrite = 
+        private final PendingOperation pendingWrite = 
             new PendingOperation(this, OP_WRITE) {
                 protected void pendingPolicy() {
                     throw new WritePendingException();
@@ -668,9 +675,19 @@ class Reactor {
             }
 
             try {
+                // Closing a channel does not require the selectorLock,
+                // because it does not touch the selector key set directly.
+                // (It does so indirectly via the cancelled key set, which
+                // is guaranteed to block only briefly at most).
                 key.channel().close();
             } finally {
+                // Wake up the selector to give it a chance to process our
+                // removal, if it's waiting for shutdown.  We don't obtain
+                // the selectorLock here because we don't have any work
+                // to do that touches the selector's data structures.
                 selector.wakeup();
+
+                // Awaken any and all pending operations
                 selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
             }
         }
@@ -762,7 +779,7 @@ class Reactor {
             // completion handler in the current thread, but
             // we should decide whether to run it via the
             // executor anyway.
-            
+
             // Delegate to the group so that the uncaught exception handler
             // for the group can be used, if one is set.
             group.completionRunner(handler, attachment, future).run();
@@ -789,7 +806,7 @@ class Reactor {
      * longer than the typical operation and the timeouts queue could
      * become filled with obsolete handlers.
      */
-    static final class TimeoutHandler implements Delayed, Runnable {
+    private static final class TimeoutHandler implements Delayed, Runnable {
 
         /** The task to notify upon timeout. */
         private final AsyncOp<?> task;

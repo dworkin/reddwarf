@@ -55,7 +55,7 @@ class ReactiveChannelGroup
      * The lifecycle state of this group.  Increases monotonically.
      * It may only be accessed with stateLock held.
      */
-    protected int lifecycleState;
+    protected int lifecycleState = RUNNING;
     /** State: open and running */
     protected static final int RUNNING      = 0;
     /** State: graceful shutdown in progress */
@@ -253,6 +253,8 @@ class ReactiveChannelGroup
                     if (! keepGoing)
                         break;
                 }
+            } catch (IOException  t) {
+                exception = t;
             } catch (RuntimeException t) {
                 exception = t;
             } catch (Error t) {
@@ -264,13 +266,23 @@ class ReactiveChannelGroup
                 tryTerminate();
             }
 
-            if (exception != null) {
-                log.log(Level.WARNING, "reactor exception", exception);
+            try {
+                // Make sure the reactor has shutdown
+                reactor.shutdownNow();
+            } catch (IOException e) {
+                log.log(Level.WARNING, "exception closing reactor", e);
+            }
 
-                if (exception instanceof RuntimeException) {
-                    throw (RuntimeException) exception;
-                } else if (exception instanceof Error) {
+            if (exception != null) {
+                log.log(Level.SEVERE, "reactor exception", exception);
+
+                if (exception instanceof Error) {
                     throw (Error) exception;
+                } else if (exception instanceof RuntimeException) {
+                    throw (RuntimeException) exception;
+                } else if (exception instanceof IOException) {
+                    throw new RuntimeException(
+                        exception.getMessage(), exception);
                 } else {
                     throw Util.unexpected(exception);
                 }
