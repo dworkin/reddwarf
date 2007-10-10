@@ -16,6 +16,19 @@ import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ThreadPoolFactory;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
+/**
+ * Common base implementation of {@link AsynchronousChannelProvider}.
+ * <ul>
+ * <li>
+ * Implements methods to create the default channel group and thread pool
+ * factory as specified by {@link AsynchronousChannelGroup}.
+ * <li>
+ * Checks the channel group passed in to the various channel {@code open()}
+ * methods, substituting the default group if appropriate.
+ * <li>
+ * Manages the default group's {@link UncaughtExceptionHandler}.
+ * </ul>
+ */
 abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
 
     /** The SelectorProvider. */
@@ -56,9 +69,16 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
         return selectorProvider;
     }
 
-
     // Methods related to default thread pools and channel groups.
 
+    /**
+     * Returns the default thread pool factory as specified by the
+     * class documentation for {@link AsynchronousChannelGroup}.
+     * Delegates to {@link #createDefaultThreadPoolFactory()} if the
+     * other factory creation mechanisms fail.
+     * 
+     * @return the default {@code ThreadPoolFactory}
+     */
     private ThreadPoolFactory getThreadPoolFactory() {
         return AccessController.doPrivileged(
             new PrivilegedAction<ThreadPoolFactory>() {
@@ -70,7 +90,7 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
                             Class<?> c = Class.forName(cn, true,
                                 ClassLoader.getSystemClassLoader());
                             return (ThreadPoolFactory) c.newInstance();
-                        } catch (Exception ignore) {
+                        } catch (Throwable ignore) {
                             // Any exception will fall-thru and return
                             // the default factory.
                         }
@@ -90,6 +110,14 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
         return DefaultThreadPoolFactory.create();
     }
 
+    /**
+     * Returns the default {@link AsynchronousChannelGroup} for this
+     * provider, creating one if necessary.
+     * 
+     * @return the default channel group for this provider
+     * 
+     * @throws IOException if an I/O error occurs
+     */
     private AsyncGroupImpl defaultGroup() throws IOException {
         synchronized (this) {
             if (defaultGroupInstance == null) {
@@ -103,6 +131,20 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
         }
     }
 
+    /**
+     * Checks that the given channel group was created by this provider,
+     * throwing an exception if it was not.
+     * 
+     * @param group a channel group, or {@code null} to return the default
+     *        group for this provider
+     * @return the given group, if it was created by this provider, or
+     *         the default group if {@code null} was given
+     * 
+     * @throws IllegalArgumentException if the group was not created
+     *         by this provider
+     * @throws IOException if an IO error occurs while constructing
+     *         the default group
+     */
     private AsyncGroupImpl checkGroup(AsynchronousChannelGroup group)
         throws IOException
     {

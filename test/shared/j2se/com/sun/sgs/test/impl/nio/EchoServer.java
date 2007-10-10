@@ -63,7 +63,7 @@ public class EchoServer {
     static final Logger log = Logger.getAnonymousLogger();
 
     private final AsynchronousChannelGroup group;
-    AsynchronousServerSocketChannel acceptor;
+    AsynchronousServerSocketChannel acceptor = null;
     private AtomicInteger numConnections = new AtomicInteger();
 
     /**
@@ -225,7 +225,9 @@ public class EchoServer {
             log.info("Closing acceptor");
             try {
                 acceptor.close();
-            } catch (IOException ignore) { }
+            } catch (IOException e) {
+                log.log(Level.WARNING, "on acceptor close", e);
+            }
             log.info("Shutting down group");
             group.shutdown();
         }

@@ -14,13 +14,16 @@ import com.sun.sgs.nio.channels.ThreadPoolFactory;
  */
 class DefaultThreadPoolFactory implements ThreadPoolFactory {
 
+    /** A lazily-initialized singleton holder. */
     static class LazyInstanceHolder {
+        /** The lazily-initialized singleton instance. */
         static DefaultThreadPoolFactory instance =
             new DefaultThreadPoolFactory();
     }
 
     /**
      * Returns the default {@code ThreadPoolFactory}.
+     * 
      * @return the default {@code ThreadPoolFactory}
      */
     static DefaultThreadPoolFactory create() {

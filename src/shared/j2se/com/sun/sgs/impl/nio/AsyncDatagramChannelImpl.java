@@ -46,11 +46,17 @@ import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.channels.SelectionKey.OP_WRITE;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousDatagramChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
+ * <p>
+ * Also implements the creation and management of multicast
+ * {@link MembershipKey}s for this channel.
  */
 class AsyncDatagramChannelImpl
     extends AsynchronousDatagramChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -65,6 +71,7 @@ class AsyncDatagramChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    /** The valid protocol families for this channel. */
     private static final Set<ProtocolFamily> protocolFamilies;
     static {
         Set<? extends ProtocolFamily> pfs = EnumSet.of(
@@ -73,31 +80,44 @@ class AsyncDatagramChannelImpl
         protocolFamilies = Collections.unmodifiableSet(pfs);
     }
 
-    /** The default protocol family if none is specified: {@value} */
+    /**
+     * The default protocol family if none is specified:
+     * {@link StandardProtocolFamily#INET}
+     */
     static final ProtocolFamily
         DEFAULT_PROTOCOL_FAMILY = StandardProtocolFamily.INET;
 
-    final AsyncGroupImpl channelGroup;
+    /** The underlying {@code DatagramChannel}. */
     final DatagramChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
+
+    /** The {@code ProtocolFamily} for this channel. */
     final ProtocolFamily protocolFamily;
 
+    /** The set of multicast membership keys for this channel. */
     final ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl> mcastKeys =
         new ConcurrentHashMap<MembershipKeyImpl, MembershipKeyImpl>();
 
+    /** Indicates whether a connect operation is pending on this channel. */
     final AtomicBoolean connectionPending = new AtomicBoolean();
 
     /**
-     * TODO doc
-     * @param pf 
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * If this channel is used for multicast, the protocol family should
+     * be specified to match that of the multicast group.  If {@code null}
+     * is specified as the protocol family, the default family is used.
+     * 
+     * @param group the channel group
+     * @param pf the protocol family, or {@code null} for the default
+     *        protocol family
+     * @throws IOException if an I/O error occurs
      */
     AsyncDatagramChannelImpl(ProtocolFamily pf, AsyncGroupImpl group)
         throws IOException
     {
         super(group.provider());
-        channelGroup = group;
 
         if ((pf != null) && (!protocolFamilies.contains(pf))) {
             throw new UnsupportedOperationException(
@@ -108,6 +128,14 @@ class AsyncDatagramChannelImpl
 
         channel = group.selectorProvider().openDatagramChannel();
         key = group.register(channel);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        return super.toString() + ":" + key;
     }
 
     /**
@@ -400,7 +428,7 @@ class AsyncDatagramChannelImpl
             {
                 @Override protected void done() {
                     connectionPending.set(false);
-                    channelGroup.executeCompletion(handler, attachment, this);
+                    key.runCompletion(handler, attachment, this);
                 }
             };
 
@@ -432,7 +460,7 @@ class AsyncDatagramChannelImpl
                 }})
             {
                 @Override protected void done() {
-                    channelGroup.executeCompletion(handler, attachment, this);
+                    key.runCompletion(handler, attachment, this);
                 }
             };
 
@@ -552,11 +580,24 @@ class AsyncDatagramChannelImpl
                 }});
     }
 
-    class MembershipKeyImpl extends MembershipKey {
+    /**
+     * A simple multicast membership key for datagram channels.
+     * Does <strong>not</strong> support source-specific filtering.
+     */
+    final class MembershipKeyImpl extends MembershipKey {
 
-        final InetSocketAddress mcastaddr;
-        final NetworkInterface netIf;
+        /** The multicast address for this group. */
+        private final InetSocketAddress mcastaddr;
 
+        /** The network interface for this group. */
+        private final NetworkInterface netIf;
+
+        /**
+         * Creates a new membership key for the group.
+         * 
+         * @param mcastaddr the multicast address of the group
+         * @param netIf the network interface of the group
+         */
         MembershipKeyImpl(InetSocketAddress mcastaddr,
                           NetworkInterface netIf)
         {

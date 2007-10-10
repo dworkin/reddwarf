@@ -37,11 +37,14 @@ import com.sun.sgs.nio.channels.SocketOption;
 import com.sun.sgs.nio.channels.StandardSocketOption;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousSocketChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
  */
 class AsyncSocketChannelImpl
     extends AsynchronousSocketChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -53,14 +56,17 @@ class AsyncSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
-    final AsyncGroupImpl group;
+    /** The underlying {@code SocketChannel}. */
     final SocketChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
 
     /**
-     * TODO doc
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * 
+     * @param group the channel group
+     * @throws IOException if an I/O error occurs
      */
     AsyncSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
@@ -69,24 +75,30 @@ class AsyncSocketChannelImpl
     }
 
     /**
-     * TODO doc
-     * @param group 
-     * @param channel 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group, with
+     * the given underlying {@link SocketChannel}. Used by an
+     * {@link AsyncServerSocketChannelImpl} when a new connection is
+     * accepted.
+     * 
+     * @param group the channel group
+     * @param channel the {@link SocketChannel} for this async channel
+     * @throws IOException if an I/O error occurs
      */
     AsyncSocketChannelImpl(AsyncGroupImpl group,
                            SocketChannel channel)
         throws IOException
     {
         super(group.provider());
-        this.group = group;
         this.channel = channel;
         key = group.register(channel);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String toString() {
-        return "AsyncSocketChannelImpl:" + key;
+        return super.toString() + ":" + key;
     }
 
     /**
@@ -239,18 +251,16 @@ class AsyncSocketChannelImpl
     {
         final Socket socket = channel.socket();
         try {
-            synchronized (key) {
-                if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
-                    if (! socket.isInputShutdown()) {
-                        socket.shutdownInput();
-                        key.selected(OP_READ);
-                    }
+            if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
+                if (! socket.isInputShutdown()) {
+                    socket.shutdownInput();
+                    key.selected(OP_READ);
                 }
-                if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
-                    if (! socket.isOutputShutdown()) {
-                        socket.shutdownOutput();
-                        key.selected(OP_WRITE);
-                    }
+            }
+            if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
+                if (! socket.isOutputShutdown()) {
+                    socket.shutdownOutput();
+                    key.selected(OP_WRITE);
                 }
             }
         } catch (SocketException e) {
@@ -307,28 +317,29 @@ class AsyncSocketChannelImpl
         try {
             if (channel.connect(remote)) {
                 Future<Void> result = Util.finishedFuture(null);
-                group.executeCompletion(handler, attachment, result);
+                key.runCompletion(handler, attachment, result);
                 return AttachedFuture.wrap(result, attachment);
             }
         } catch (ClosedChannelException e) {
             throw Util.initCause(new ClosedAsynchronousChannelException(), e);
         } catch (IOException e) {
             Future<Void> result = Util.failedFuture(e);
-            group.executeCompletion(handler, attachment, result);
+            key.runCompletion(handler, attachment, result);
             return AttachedFuture.wrap(result, attachment);
         }
 
-        return key.execute(OP_CONNECT, attachment, handler,
-                new Callable<Void>() {
-                    public Void call() throws IOException {
-                        try {
-                            channel.finishConnect();
-                            return null;
-                        } catch (ClosedChannelException e) {
-                            throw Util.initCause(
-                                new AsynchronousCloseException(), e);
-                        }
-                    }});
+        return key.execute(
+            OP_CONNECT, attachment, handler, 0, TimeUnit.MILLISECONDS,
+            new Callable<Void>() {
+                public Void call() throws IOException {
+                    try {
+                        channel.finishConnect();
+                        return null;
+                    } catch (ClosedChannelException e) {
+                        throw Util.initCause(
+                            new AsynchronousCloseException(), e);
+                    }
+                }});
     }
 
     /**

@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 import com.sun.sgs.nio.channels.AlreadyBoundException;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
@@ -31,11 +32,14 @@ import com.sun.sgs.nio.channels.StandardSocketOption;
 import static java.nio.channels.SelectionKey.OP_ACCEPT;
 
 /**
- * TODO doc
+ * An implementation of {@link AsynchronousServerSocketChannel}.
+ * Most interesting methods are delegated to the {@link AsyncKey}
+ * returned by this channel's channel group.
  */
 final class AsyncServerSocketChannelImpl
     extends AsynchronousServerSocketChannel
 {
+    /** The valid socket options for this channel. */
     private static final Set<SocketOption> socketOptions;
     static {
         Set<? extends SocketOption> es = EnumSet.of(
@@ -44,14 +48,20 @@ final class AsyncServerSocketChannelImpl
         socketOptions = Collections.unmodifiableSet(es);
     }
 
+    /** The channel group. */
     final AsyncGroupImpl group;
+
+    /** The underlying {@code ServerSocketChannel}. */
     final ServerSocketChannel channel;
+
+    /** The {@code AsyncKey} for the underlying channel. */
     final AsyncKey key;
 
     /**
-     * TODO doc
-     * @param group 
-     * @throws IOException 
+     * Creates a new instance registered with the given channel group.
+     * 
+     * @param group the channel group
+     * @throws IOException if an I/O error occurs
      */
     AsyncServerSocketChannelImpl(AsyncGroupImpl group)
         throws IOException
@@ -60,6 +70,14 @@ final class AsyncServerSocketChannelImpl
         this.group = group;
         channel = group.selectorProvider().openServerSocketChannel();
         key = group.register(channel);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        return super.toString() + ":" + key;
     }
 
     /**
@@ -200,7 +218,8 @@ final class AsyncServerSocketChannelImpl
             A attachment,
             CompletionHandler<AsynchronousSocketChannel, ? super A> handler)
     {
-        return key.execute(OP_ACCEPT, attachment, handler,
+        return key.execute(
+            OP_ACCEPT, attachment, handler, 0, TimeUnit.MILLISECONDS,
             new Callable<AsynchronousSocketChannel>() {
                 public AsynchronousSocketChannel call() throws IOException {
                     try {

@@ -7,6 +7,7 @@ package com.sun.sgs.nio.channels;
 public class WritePendingException
     extends IllegalStateException
 {
+    /** The version of the serialized representation of this class. */
     private static final long serialVersionUID = 1L;
 
     /**
