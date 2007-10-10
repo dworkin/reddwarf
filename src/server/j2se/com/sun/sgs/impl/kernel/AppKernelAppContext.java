@@ -28,6 +28,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.service.Service;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.MissingResourceException;
 
 
@@ -36,6 +38,9 @@ import java.util.MissingResourceException;
  * the kernel to manage the context of a single application. It knows
  * the name of an application, its available managers, and its backing
  * services.
+ *
+ * FIXME:  the context should check that it isn't shutdown before
+ *  handing out services and managers
  */
 class AppKernelAppContext extends AbstractKernelAppContext {
 
@@ -145,4 +150,19 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         return serviceComponents.getComponent(type);
     }
 
+    /**
+     * Shut down all the service components in the reverse order that
+     * they were added.
+     */
+    void shutdownServices() {
+        // reverse the list of services
+        ArrayList<Object> list = new ArrayList<Object>();
+        for (Object service: serviceComponents) {
+            list.add(service);
+        }
+        Collections.reverse(list);
+        for (Object service: list) {
+            ((Service) service).shutdown();
+        }
+    }
 }

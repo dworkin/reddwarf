@@ -19,38 +19,26 @@
 
 package com.sun.sgs.impl.profile.listener;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-
 import com.sun.sgs.impl.profile.util.Histogram;
-import com.sun.sgs.impl.profile.util.LinearHistogram;
 import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
-
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
-
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
-import java.io.IOException;
-
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * A text-output listener that displays the distribution for all
- * {@link com.sun.sgs.kernel.ProfileSample}s updated during a
+ * {@link com.sun.sgs.profile.ProfileSample}s updated during a
  * fixed-size window of tasks as well as the lifetime of the program.
  * This class uses a {@link PowerOfTwoHistogram} to display the
  * distribution for each sample
