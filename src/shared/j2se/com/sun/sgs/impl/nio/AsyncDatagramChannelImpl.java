@@ -183,9 +183,10 @@ class AsyncDatagramChannelImpl
             socket.bind(inetLocal);
         } catch (SocketException e) {
             if (socket.isBound())
-                throw new AlreadyBoundException();
+                throw Util.initCause(new AlreadyBoundException(), e);
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
+            throw e;
         }
 
         return this;
@@ -261,7 +262,7 @@ class AsyncDatagramChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
         return this;
@@ -316,7 +317,7 @@ class AsyncDatagramChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
     }
@@ -350,8 +351,8 @@ class AsyncDatagramChannelImpl
 
         if (protocolFamily == StandardProtocolFamily.INET) {
             if (! ((group instanceof Inet4Address)
-                  || ((group instanceof Inet6Address)
-                     && ((Inet6Address)group).isIPv4CompatibleAddress())))
+                   || ((group instanceof Inet6Address)
+                       && ((Inet6Address)group).isIPv4CompatibleAddress())))
                 throw new UnsupportedAddressTypeException();
         } else if (protocolFamily == StandardProtocolFamily.INET6) {
             if (!(group instanceof Inet6Address))

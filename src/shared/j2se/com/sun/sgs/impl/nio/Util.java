@@ -31,7 +31,7 @@ final class Util {
      * @throws IllegalArgumentException if an attempt is made to set
      *         an exception as its own cause
      * @throws IllegalStateException if the exception has already had
-     *         its cause initialized.
+     *         its cause initialized
      * @see Throwable#initCause(Throwable)
      */
     static <T extends Throwable> T
@@ -93,7 +93,7 @@ final class Util {
         /**
          * {@inheritDoc}
          * <p>
-         * This implementation calls {code get()}, and never thows
+         * This implementation calls {@code get()}, and never throws
          * {@code InterruptedException} or {@code TimeoutException}.
          */
         public V get(long timeout, TimeUnit unit) throws ExecutionException {
@@ -103,7 +103,7 @@ final class Util {
         /**
          * {@inheritDoc}
          * <p>
-         * Never thows {@code InterruptedException}.
+         * Never throws {@code InterruptedException}.
          */
         public abstract V get() throws ExecutionException;
 
@@ -210,7 +210,7 @@ final class Util {
 
     /**
      * Returns a concise string representation of the active
-     * {@link SelectionKey} operations set in the parameter{@literal ops}.
+     * {@link SelectionKey} operations set in the parameter {@literal ops}.
      * For example, if {@literal ops} is {@code OP_READ | OP_WRITE}, this
      * method returns the string "RW".
      * 
@@ -231,6 +231,8 @@ final class Util {
      * 
      * @param op a {@link SelectionKey} operation
      * @return a human-readable string, such as "OP_READ"
+     * @throws IllegalArgumentException if the op is not one of
+     *         the operation constants defined by {@link SelectionKey}
      * @see SelectionKey
      */
     static String opName(int op) {
@@ -244,7 +246,7 @@ final class Util {
         case OP_ACCEPT:
             return "OP_ACCEPT";
         default:
-            return "unknownOp";
+            throw new IllegalArgumentException("Unknown opcode " + op);
         }
     }
 }

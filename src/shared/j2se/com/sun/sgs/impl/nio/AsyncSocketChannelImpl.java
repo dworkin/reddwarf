@@ -135,9 +135,10 @@ class AsyncSocketChannelImpl
             socket.bind(inetLocal);
         } catch (SocketException e) {
             if (socket.isBound())
-                throw new AlreadyBoundException();
+                throw Util.initCause(new AlreadyBoundException(), e);
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
+            throw e;
         }
         return this;
     }
@@ -193,7 +194,7 @@ class AsyncSocketChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
         return this;
@@ -230,7 +231,7 @@ class AsyncSocketChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
     }
@@ -265,9 +266,9 @@ class AsyncSocketChannelImpl
             }
         } catch (SocketException e) {
             if (! socket.isConnected())
-                throw new NotYetConnectedException();
+                throw Util.initCause(new NotYetConnectedException(), e);
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
         return this;

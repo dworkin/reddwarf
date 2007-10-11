@@ -116,7 +116,7 @@ abstract class AsyncGroupImpl
      * @param <R> the result type
      * @param <A> the attachment type
      */
-    class CompletionRunner<R, A> implements Runnable {
+    private class CompletionRunner<R, A> implements Runnable {
 
         /** The completion handler to invoke. */
         private final CompletionHandler<R, A> handler;

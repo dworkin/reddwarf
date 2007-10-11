@@ -38,8 +38,10 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
     private AsyncGroupImpl defaultGroupInstance = null;
 
     /**
-     * The default uncaught exception handler until the default group
-     * is created, at which point this field becomes {@code null}.
+     * The default uncaught exception handler (or {@code null} if no handler
+     * is set), until the default group is created.  After the default group
+     * has been created, this field is set to {@code null} to avoid pinning
+     * the handler in memory.
      */
     private UncaughtExceptionHandler defaultUncaughtHandler = null;
 
