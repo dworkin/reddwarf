@@ -55,12 +55,6 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  * all open channels in the group as if by invoking the
  * {@link AsynchronousChannel#close close} method. A group will typically
  * terminate quickly after the {@code shutdownNow} method has been invoked.
- * <p>
- * NOT IMPLEMENTED:
- * <ul>
- * <li>{@code getDefaultUncaughtExceptionHandler}
- * <li>{@code setDefaultUncaughtExceptionHandler}
- * </ul>
  * 
  * @see AsynchronousSocketChannel#open(AsynchronousChannelGroup)
  * @see AsynchronousServerSocketChannel#open(AsynchronousChannelGroup)

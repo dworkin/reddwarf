@@ -26,7 +26,7 @@ public class ReactiveAsyncChannelProvider extends AsyncProviderImpl {
 
     /**
      * Creates an asynchronous channel provider using the given
-     * {@link SelectorProvider}. If the parameter is {code null}, the
+     * {@link SelectorProvider}. If the parameter is {@code null}, the
      * system default {@code SelectorProvider} will be used.
      * 
      * @param selProvider the {@code SelectorProvider}, or {@code null} to

@@ -116,9 +116,10 @@ final class AsyncServerSocketChannelImpl
             socket.bind(local, backlog);
         } catch (SocketException e) {
             if (socket.isBound())
-                throw new AlreadyBoundException();
+                throw Util.initCause(new AlreadyBoundException(), e);
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
+            throw e;
         }
         return this;
     }
@@ -161,7 +162,7 @@ final class AsyncServerSocketChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
         return this;
@@ -190,7 +191,7 @@ final class AsyncServerSocketChannelImpl
             }
         } catch (SocketException e) {
             if (socket.isClosed())
-                throw new ClosedChannelException();
+                throw Util.initCause(new ClosedChannelException(), e);
             throw e;
         }
     }
@@ -225,6 +226,7 @@ final class AsyncServerSocketChannelImpl
                     try {
                         SocketChannel newChannel = channel.accept();
                         if (newChannel == null) {
+                            // TODO re-execute on the key somehow? -JM
                             throw new IOException("accept failed");
                         }
                         return new AsyncSocketChannelImpl(group, newChannel);
