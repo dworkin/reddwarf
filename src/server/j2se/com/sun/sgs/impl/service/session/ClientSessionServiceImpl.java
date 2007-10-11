@@ -465,20 +465,16 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
-	void addMessage(
-	    ClientSessionImpl session, byte[] message, Delivery delivery)
-	{
-	    addMessage0(session, message, delivery, false);
+	void addReservation(ClientSessionImpl session, Object reservation) {
+	    addReservation0(session, reservation, false);
 	}
 
 	/**
 	 * Adds to the head of the list a message to be sent to the
 	 * specified session after this transaction commits.
 	 */
-	void addMessageFirst(
-	    ClientSessionImpl session, byte[] message, Delivery delivery)
-	{
-	    addMessage0(session, message, delivery, true);
+	void addReservationFirst(ClientSessionImpl session, Object reservation) {
+	    addReservation0(session, reservation, true);
 	}
 
 	/**
@@ -507,24 +503,23 @@ public class ClientSessionServiceImpl implements ClientSessionService {
             }
 	}
 
-	private void addMessage0(
-	    ClientSessionImpl session, byte[] message, Delivery delivery,
-	    boolean isFirst)
+	private void addReservation0(
+	    ClientSessionImpl session, Object reservation, boolean isFirst)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addMessage first:{0} session:{1}, message:{2}",
-			isFirst, session, message);
+			"Context.addMessage first:{0} session:{1}, rsvp:{2}",
+			isFirst, session, reservation);
 		}
 		checkPrepared();
 
 		Updates updates = getUpdates(session);
 		if (isFirst) {
-		    updates.messages.add(0, message);
+		    updates.reservations.add(0, reservation);
 		} else {
-		    updates.messages.add(message);
+		    updates.reservations.add(reservation);
 		}
 	    
 	    } catch (RuntimeException e) {
@@ -578,6 +573,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 */
 	public void abort(boolean retryable) {
 	    contextQueue.remove(this);
+            if (! retryable) {
+                for (Updates updates : sessionUpdates.values())
+                    updates.cancel();
+            }
 	    checkFlush();
 	}
 
@@ -634,7 +633,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	private final ClientSessionImpl session;
 	
 	/** List of protocol messages to send on commit. */
-	List<byte[]> messages = new ArrayList<byte[]>();
+	List<Object> reservations = new ArrayList<Object>();
 
 	/** If true, disconnect after sending messages. */
 	boolean disconnect = false;
@@ -643,9 +642,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    this.session = session;
 	}
 
-	private void flush() {
-	    for (byte[] message : messages) {
-		session.sendProtocolMessage(message, Delivery.RELIABLE);
+        private void cancel() {
+            for (Object rsvp : reservations)
+                session.cancelReservation(rsvp);
+        }
+
+        private void flush() {
+	    for (Object rsvp : reservations) {
+		session.invokeReservation(rsvp);
 	    }
 	    if (disconnect) {
 		session.handleDisconnect(false);
