@@ -283,15 +283,22 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 buf.put(message);
                 buf.flip();
 
-                // TODO completion handler
-		IoFuture<Void, Void> writeFuture =
-                    sessionConnection.write(buf, null);
-
-                // FIXME don't wait synchronously!!!
-                try {
-                    writeFuture.get();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                /*
+                 * FIXME: don't wait synchronously!!!
+                 * XXX: this is horribly broken, if the write never finishes,
+                 * we'll never make progress and the system will grind to
+                 * a halt! -JM
+                 * It's just here to test a quick & dirty Async IO integration.
+                 */
+                synchronized (sessionConnection) {
+                    try {
+                    // TODO completion handler
+		      IoFuture<Void, Void> writeFuture =
+                      sessionConnection.write(buf, null);
+                       writeFuture.get();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 }
                 
             } else {
@@ -597,9 +604,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                     logger.log(Level.SEVERE,
                         "Message length mismatch; expect {0} but have {1}",
                         new Object[] { len, message.remaining() });
+                    disconnected();
                 }
 
-                byte[] bytes = new byte[message.remaining()];
+                final byte[] bytes = new byte[message.remaining()];
                 message.get(bytes);
 
                 if (logger.isLoggable(Level.FINEST)) {
@@ -609,7 +617,24 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                         sessionConnection, HexDumper.format(bytes));
                 }
 
-                bytesReceived(bytes);
+                /*
+                 * FIXME: This doesn't have to be in a new task, unless it's
+                 * going to perform blocking IO.  Right now, I've hacked in
+                 * blocking writes until I refactor things to use async IO
+                 * properly, so this *does* have to be in a new task until
+                 * then. -JM
+                 */
+                scheduleNonTransactionalTask(new KernelRunnable() {
+                    /** {@inheritDoc} */
+                    public String getBaseTaskType() {
+                        return "ClientSession.bytesReceived";
+                    }
+
+                    /** {@inheritDoc} */
+                    public void run() throws Exception {
+                        bytesReceived(bytes);
+                    }                    
+                });
 
                 // Keep reading
                 sessionConnection.read(readBuffer, this);

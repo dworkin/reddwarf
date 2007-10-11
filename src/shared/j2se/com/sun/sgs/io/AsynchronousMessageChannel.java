@@ -16,6 +16,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.sgs.impl.nio.AttachedFuture;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
@@ -276,6 +277,7 @@ public class AsynchronousMessageChannel implements Channel {
                 return this;
             }
         }
+
         /**
          * @param attachment
          * @return the new future, or {@code} null if finished
@@ -301,9 +303,7 @@ public class AsynchronousMessageChannel implements Channel {
                 }
                 
                 try {
-                    IoFuture<R, A> nextFuture = implCompleted(result);
-                    if (nextFuture != null)
-                        currentFuture = nextFuture;
+                    currentFuture = implCompleted(result);
                 } catch (ExecutionException e) {
                     setException(e.getCause());
                 } catch (Throwable t) {
@@ -322,6 +322,7 @@ public class AsynchronousMessageChannel implements Channel {
         @Override
         protected void done() {
             log.log(Level.FINE, "{0} done, calling completion", this);
+            currentFuture = null;
             if (completionRunner != null)
                 completionRunner.run(this);
         }
@@ -330,8 +331,19 @@ public class AsynchronousMessageChannel implements Channel {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             synchronized (lock) {
-                return currentFuture.cancel(mayInterruptIfRunning) &&
-                       super.cancel(false); // always succeeds
+                if (isDone())
+                    return false;
+
+                boolean success = currentFuture.cancel(mayInterruptIfRunning);
+                if (success) {
+                    // Cancel this wrapper, too
+                    success = super.cancel(false);
+
+                    // Wrapper should always be cancellable if it's not done
+                    assert success;
+                }
+
+                return success;
             }
         }
     }
@@ -378,7 +390,7 @@ public class AsynchronousMessageChannel implements Channel {
             ByteBuffer readBuf = dst.asReadOnlyBuffer();
 
             if (messageLen < 0) {
-                messageLen = completeMessageLength(readBuf);
+                messageLen = completeMessageLength(dst);
 
                 if (messageLen >= 0) {
                     // Ensure that the buffer will hold the complete message
@@ -393,9 +405,11 @@ public class AsynchronousMessageChannel implements Channel {
             }
 
             if (dst.position() >= messageLen) {
-                readBuf.rewind().limit(messageLen);
-                dst.position(messageLen + 1);
-                set(readBuf);
+                readBuf.position(messageLen).flip();
+                set(readBuf); // Invokes the completion handler
+                int newPos = dst.position() - messageLen;
+                dst.position(messageLen);
+                dst.compact().position(newPos);
                 return null;
             }
 
@@ -436,7 +450,7 @@ public class AsynchronousMessageChannel implements Channel {
             result.getNow();
             if (src.hasRemaining()) {
                 // Write some more
-                return channel.read(src, src, this);
+                return channel.write(src, src, this);
             } else {
                 // Finished
                 set(null);
