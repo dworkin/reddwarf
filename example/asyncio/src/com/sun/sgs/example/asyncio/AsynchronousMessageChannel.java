@@ -12,6 +12,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
@@ -25,6 +27,10 @@ import com.sun.sgs.nio.channels.WritePendingException;
  */
 public class AsynchronousMessageChannel implements Channel {
 
+    /** The logger for this class. */
+    static final Logger log =
+        Logger.getLogger(AsynchronousMessageChannel.class.getName());
+
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...)
@@ -35,6 +41,18 @@ public class AsynchronousMessageChannel implements Channel {
     final AtomicBoolean writePending = new AtomicBoolean();
 
     private final CompleteMessageDetector detector;
+
+    /**
+     * Creates a new instance of this class with the given channel.
+     * Uses a PrefixMessageDetector on a 4-byte length field to
+     * determine when a message is complete.
+     * 
+     * @param channel a channel
+     */
+    public AsynchronousMessageChannel(AsynchronousByteChannel channel)
+    {
+        this(channel, new PrefixMessageLengthDetector(4));
+    }
 
     /**
      * Creates a new instance of this class with the given channel.
@@ -54,7 +72,7 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO
+     * TODO doc
      */
     public interface CompleteMessageDetector {
         /**
@@ -69,7 +87,7 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO
+     * TODO doc
      */
     public static class PartialMessageDetector
         implements CompleteMessageDetector
@@ -82,7 +100,7 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO
+     * TODO doc
      */
     public static class PrefixMessageLengthDetector
         implements CompleteMessageDetector
@@ -146,7 +164,7 @@ public class AsynchronousMessageChannel implements Channel {
             throw new ReadPendingException();
 
         return AttachedFuture.wrap(
-            new Reader<A>(dst, attachment, handler), attachment);
+            new Reader<A>(attachment, handler).start(dst), attachment);
     }
 
     /**
@@ -177,7 +195,7 @@ public class AsynchronousMessageChannel implements Channel {
             throw new WritePendingException();
 
         return AttachedFuture.wrap(
-            new Writer<A>(src, attachment, handler), attachment);
+            new Writer<A>(attachment, handler).start(src), attachment);
     }
 
     /**
@@ -236,22 +254,26 @@ public class AsynchronousMessageChannel implements Channel {
         extends FutureTask<V>
         implements CompletionHandler<R, A>
     {
-        private final Object lock = new Object();
+        private final Object lock;
         private final Completer<V, ?> completionRunner;
 
         // @GuardedBy("lock")
         private IoFuture<R, A> currentFuture;
 
-        <B> Wrapper(A x,
-                    B attachment,
+        <B> Wrapper(B attachment,
                     CompletionHandler<V, ? super B> handler)
         {
             super(emptyRunner, null);
 
+            lock = new Object();
             completionRunner = getCompleter(handler, attachment);
+        }
 
+        Wrapper<V, R, A> start(A x) {
             synchronized (lock) {
+                log.log(Level.FINE, "{0}, Calling implStart", this);
                 currentFuture = implStart(x);
+                return this;
             }
         }
 
@@ -273,14 +295,24 @@ public class AsynchronousMessageChannel implements Channel {
         /** {@inheritDoc} */
         public void completed(IoFuture<R, A> result) {
             synchronized (lock) {
+                if (log.isLoggable(Level.FINE)) {
+                    log.log(Level.FINE,
+                        "{0} pre currentFuture is {1} ",
+                        new Object[] { this, currentFuture });
+                }
+                
                 try {
-                    IoFuture<R, A> nextFuture = implCompleted(result);
-                    if (nextFuture != null)
-                        currentFuture = nextFuture;
+                    currentFuture = implCompleted(result);
                 } catch (ExecutionException e) {
                     setException(e.getCause());
                 } catch (Throwable t) {
                     setException(t);
+                }
+                
+                if (log.isLoggable(Level.FINE)) {
+                    log.log(Level.FINE,
+                        "{0} post currentFuture is {1} ",
+                        new Object[] { this, currentFuture });
                 }
             }
         }
@@ -288,6 +320,8 @@ public class AsynchronousMessageChannel implements Channel {
         /** {@inheritDoc} */
         @Override
         protected void done() {
+            log.log(Level.FINE, "{0} done, calling completion", this);
+            currentFuture = null;
             if (completionRunner != null)
                 completionRunner.run(this);
         }
@@ -296,8 +330,19 @@ public class AsynchronousMessageChannel implements Channel {
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             synchronized (lock) {
-                return currentFuture.cancel(mayInterruptIfRunning) &&
-                       super.cancel(false); // always succeeds
+                if (isDone())
+                    return false;
+
+                boolean success = currentFuture.cancel(mayInterruptIfRunning);
+                if (success) {
+                    // Cancel this wrapper, too
+                    success = super.cancel(false);
+
+                    // Wrapper should always be cancellable if it's not done
+                    assert success;
+                }
+
+                return success;
             }
         }
     }
@@ -307,11 +352,10 @@ public class AsynchronousMessageChannel implements Channel {
     {
         private int messageLen = -1;
 
-        Reader(ByteBuffer dst,
-               A attachment,
+        Reader(A attachment,
                CompletionHandler<ByteBuffer, ? super A> handler)
         {
-            super(dst, attachment, handler);
+            super(attachment, handler);
         }
 
         /** {@inheritDoc} */
@@ -341,11 +385,11 @@ public class AsynchronousMessageChannel implements Channel {
                 set(null);
                 return null;
             }
-            
+
             ByteBuffer readBuf = dst.asReadOnlyBuffer();
 
             if (messageLen < 0) {
-                messageLen = completeMessageLength(readBuf);
+                messageLen = completeMessageLength(dst);
 
                 if (messageLen >= 0) {
                     // Ensure that the buffer will hold the complete message
@@ -360,9 +404,11 @@ public class AsynchronousMessageChannel implements Channel {
             }
 
             if (dst.position() >= messageLen) {
-                readBuf.rewind().limit(messageLen);
-                dst.position(messageLen + 1);
-                set(readBuf);
+                readBuf.position(messageLen).flip();
+                set(readBuf); // Invokes the completion handler
+                int newPos = dst.position() - messageLen;
+                dst.position(messageLen);
+                dst.compact().position(newPos);
                 return null;
             }
 
@@ -373,22 +419,17 @@ public class AsynchronousMessageChannel implements Channel {
     final class Writer<A>
         extends Wrapper<Void, Integer, ByteBuffer>
     {
-        Writer(ByteBuffer src,
-               A attachment,
+        Writer(A attachment,
                CompletionHandler<Void, ? super A> handler)
         {
-            super(src, attachment, handler);
+            super(attachment, handler);
         }
 
         /** {@inheritDoc} */
         @Override
         protected void done() {
-            try {
-                assert writePending.get();
-                writePending.set(false);
-            } finally {
-                super.done();
-            }
+            writePending.set(false);
+            super.done();
         }
 
         /** {@inheritDoc} */
@@ -408,7 +449,7 @@ public class AsynchronousMessageChannel implements Channel {
             result.getNow();
             if (src.hasRemaining()) {
                 // Write some more
-                return channel.read(src, src, this);
+                return channel.write(src, src, this);
             } else {
                 // Finished
                 set(null);

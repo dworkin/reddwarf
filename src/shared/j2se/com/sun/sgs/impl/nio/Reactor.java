@@ -400,7 +400,7 @@ class Reactor {
 
             if (log.isLoggable(Level.FINEST)) {
                 log.log(Level.FINEST,
-                    "{0} awaitReady {1} : old {2} : add {3}",
+                    "{0} awaitReady {1} : new {2} : added {3}",
                     new Object[] { this,
                                    task,
                                    Util.formatOps(interestOps),
