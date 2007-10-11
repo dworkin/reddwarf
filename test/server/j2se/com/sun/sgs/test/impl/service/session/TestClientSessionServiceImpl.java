@@ -33,7 +33,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -131,7 +131,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private static DummyIdentityManager identityManager;
+    private static DummyIdentityCoordinator identityCoordinator;
 
     /** The listen port for the client session service. */
     private int port;
@@ -168,9 +168,9 @@ public class TestClientSessionServiceImpl extends TestCase {
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-	// create identity manager
-	identityManager = new DummyIdentityManager();
-	systemRegistry.setComponent(IdentityManager.class, identityManager);
+	// create identity coordinator
+	identityCoordinator = new DummyIdentityCoordinator();
+	systemRegistry.setComponent(IdentityCoordinator.class, identityCoordinator);
 
 	// create task service
 	taskService = new TaskServiceImpl(
@@ -345,7 +345,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(port);
 	    client.login(name, "password");
-	    if (identityManager.getNotifyLoggedIn(name)) {
+	    if (identityCoordinator.getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
@@ -368,7 +368,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		if (identityCoordinator.getNotifyLoggedIn(NON_SERIALIZABLE)) {
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
 			 NON_SERIALIZABLE);
 		}
@@ -393,7 +393,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		if (identityCoordinator.getNotifyLoggedIn(NON_SERIALIZABLE)) {
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
 			 NON_SERIALIZABLE);
 		}
@@ -418,7 +418,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		if (identityCoordinator.getNotifyLoggedIn(NON_SERIALIZABLE)) {
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
 			 NON_SERIALIZABLE);
 		}
@@ -473,13 +473,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(name, "password");
 	    client.logout();
-	    if (identityManager.getNotifyLoggedIn(name)) {
+	    if (identityCoordinator.getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
-	    if (identityManager.getNotifyLoggedOut(name)) {
+	    if (identityCoordinator.getNotifyLoggedOut(name)) {
 		System.err.println(
 		    "notifyLoggedOut invoked for identity: " + name);
 	    } else {
@@ -836,9 +836,11 @@ public class TestClientSessionServiceImpl extends TestCase {
     
 
     /**
-     * Dummy identity manager for testing purposes.
+     * Dummy identity coordinator for testing purposes.
      */
-    private static class DummyIdentityManager implements IdentityManager {
+    private static class DummyIdentityCoordinator 
+            implements IdentityCoordinator 
+    {
 	private final Map<String, IdentityInfo> identities =
 	    Collections.synchronizedMap(new HashMap<String, IdentityInfo>());
 	
@@ -905,7 +907,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
     
     /**
-     * Identity returned by the DummyIdentityManager.
+     * Identity returned by the DummyIdentityCoordinator.
      */
     private static class DummyIdentity implements Identity, Serializable {
 
@@ -926,12 +928,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         public void notifyLoggedIn() {
 	    //System.err.println("notifyLoggedIn: " + name);
-	    identityManager.notifyLoggedIn(name);
+	    identityCoordinator.notifyLoggedIn(name);
 	}
 
         public void notifyLoggedOut() {
 	    //System.err.println("notifyLoggedOut: " + name);
-	    identityManager.notifyLoggedOut(name);
+	    identityCoordinator.notifyLoggedOut(name);
 	}
         
         @Override

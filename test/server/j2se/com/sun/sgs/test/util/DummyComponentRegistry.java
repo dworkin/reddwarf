@@ -22,6 +22,7 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.kernel.ComponentRegistry;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.MissingResourceException;
 
@@ -68,4 +69,10 @@ public class DummyComponentRegistry implements ComponentRegistry {
     public void registerAppContext() {
 	new DummyAbstractKernelAppContext(this);
     }
+
+    /** Returns an iterator over the components */
+    public Iterator<Object> iterator() {
+        return components.values().iterator();
+    }
+    
 }

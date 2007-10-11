@@ -102,7 +102,7 @@ public final class TransactionCoordinatorImpl
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  No properties are currently supported.
+     * properties.
      *
      * @param	properties the properties for configuring this service
      * @param	collector the <code>ProfileCollector</code> used to report
