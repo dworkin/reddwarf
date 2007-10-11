@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.sharedutil;
 
+import java.nio.ByteBuffer;
+
 /**
  * Utility class for converting a byte array to a hex-formatted string.
  */
@@ -30,8 +32,8 @@ public final class HexDumper {
      * in square brackets, and the octets are separated by a single
      * space character.
      *
-     * @param bytes a byte array to convert
-     * @return the converted byte array as a hex-formatted string
+     * @param bytes a byte array to format
+     * @return the contents of the byte array as a hex-formatted string
      */
     public static String format(byte[] bytes) {
         if (bytes.length == 0) {
@@ -48,6 +50,33 @@ public final class HexDumper {
         }
         buf.append(']');
         return buf.toString();
+    }
+
+    /**
+     * Returns a string constructed with the contents of the ByteBuffer
+     * converted to hex format.  The entire string is enclosed
+     * in square brackets, and the octets are separated by a single
+     * space character.
+     *
+     * @param buf a buffer to format
+     * @return the contents of the buffer as a hex-formatted string
+     */
+    public static String format(ByteBuffer buf) {
+        if (! buf.hasRemaining())
+            return "[]";
+
+        ByteBuffer readBuf = buf.asReadOnlyBuffer();
+
+        StringBuilder s = new StringBuilder((3 * readBuf.remaining()) + 1);
+        s.append('[');
+        // First element
+        s.append(String.format("%02x", readBuf.get()));
+        // Remaining elements
+        while (readBuf.hasRemaining()) {
+            s.append(String.format(" %02x", readBuf.get()));
+        }
+        s.append(']');
+        return s.toString();
     }
 
     /**
