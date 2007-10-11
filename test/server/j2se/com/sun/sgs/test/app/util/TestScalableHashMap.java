@@ -55,8 +55,9 @@ import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import junit.framework.TestCase;
+import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,7 +66,7 @@ import org.junit.runner.RunWith;
  * Test the {@link ScalableHashMap} class.
  */
 @RunWith(NameRunner.class)
-public class TestScalableHashMap extends TestCase {
+public class TestScalableHashMap extends Assert {
 
     // the location for the database files
     private static final String DB_DIRECTORY =
@@ -112,10 +113,6 @@ public class TestScalableHashMap extends TestCase {
      * Test management.
      */
 
-    public TestScalableHashMap(String name) {
-	super(name);
-    }
-
     @Before public void setUp() throws Exception {
 	appContext = MinimalTestKernel.createContext();
 	DummyComponentRegistry serviceRegistry =
@@ -135,7 +132,7 @@ public class TestScalableHashMap extends TestCase {
 
     @After public void tearDown() {
 	if (txn != null && txn.getState() == DummyTransaction.State.ACTIVE) {
-	    System.err.println("had to abort txn for test: " + getName());
+	    System.err.println("had to abort txn");
 	    txn.abort(null);
 	}
 	if (dataService != null) {
@@ -2930,5 +2927,12 @@ public class TestScalableHashMap extends TestCase {
 	public int hashCode() {
 	    return 0;
 	}
+    }
+
+    /**
+     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
+     */
+    public static junit.framework.Test suite() {
+        return new JUnit4TestAdapter(TestScalableHashMap.class);
     }
 }

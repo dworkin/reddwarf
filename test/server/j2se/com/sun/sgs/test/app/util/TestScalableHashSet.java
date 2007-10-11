@@ -42,15 +42,16 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import junit.framework.TestCase;
+import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Test the {@link ScalableHashSet} class. */
 @RunWith(NameRunner.class)
-public class TestScalableHashSet extends TestCase {
+public class TestScalableHashSet extends Assert {
 
     /** A fixed random number generator. */
     private static final Random random = new Random(1111961);
@@ -87,11 +88,6 @@ public class TestScalableHashSet extends TestCase {
 
     /** An object to use in tests. */
     private Int one;
-
-    /** Creates the test. */
-    public TestScalableHashSet(String name) {
-	super(name);
-    }
 
     /** Setup. */
     @Before public void setUp() throws Exception {
@@ -655,5 +651,12 @@ public class TestScalableHashSet extends TestCase {
 	public boolean equals(Object o) {
 	    return o instanceof Int && i == ((Int) o).i;
 	}
+    }
+
+    /**
+     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
+     */
+    public static junit.framework.Test suite() {
+        return new JUnit4TestAdapter(TestScalableHashSet.class);
     }
 }

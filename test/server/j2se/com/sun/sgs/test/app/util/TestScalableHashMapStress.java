@@ -48,7 +48,8 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
-import junit.framework.TestCase;
+import junit.framework.JUnit4TestAdapter;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,7 +58,7 @@ import org.junit.runner.RunWith;
  * A stress test for the {@link ScalableHashMap} class.
  */
 @RunWith(NameRunner.class)
-public class TestScalableHashMapStress extends TestCase {
+public class TestScalableHashMapStress extends Assert {
 
     /**
      * The seed for the random number generator.  This number depends on the
@@ -482,9 +483,8 @@ public class TestScalableHashMapStress extends TestCase {
 	}
     }
 
-    /** Creates the test. */
-    public TestScalableHashMapStress(String name) {
-	super(name);
+    /** Setup. */
+    @Before public void setUp() throws Exception {
 	/* Register the operations. */
 	new Get(1);
 	/* Do more puts to make up for the different kinds of removes. */
@@ -496,10 +496,7 @@ public class TestScalableHashMapStress extends TestCase {
 	new ValuesNextRemove(1);
 	new EntrySetNext(1);
 	new EntrySetNextRemove(1);
-    }
 
-    /** Setup. */
-    @Before public void setUp() throws Exception {
 	componentRegistry.setComponent(
 	    TaskScheduler.class, 
 	    MinimalTestKernel.getSystemRegistry(
@@ -608,7 +605,8 @@ public class TestScalableHashMapStress extends TestCase {
 	if (directory != null) {
 	    new File(directory).mkdir();
 	} else {
-	    File dir = File.createTempFile(getName(), "dbdir");
+	    File dir = File.createTempFile(
+		"TestScalableHashMapStress", "dbdir");
 	    if (!dir.delete()) {
 		throw new RuntimeException("Problem deleting file: " + dir);
 	    }
@@ -670,5 +668,12 @@ public class TestScalableHashMapStress extends TestCase {
 	if (object instanceof ManagedObject) {
 	    AppContext.getDataManager().removeObject((ManagedObject) object);
 	}
+    }
+
+    /**
+     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
+     */
+    public static junit.framework.Test suite() {
+        return new JUnit4TestAdapter(TestScalableHashMapStress.class);
     }
 }
