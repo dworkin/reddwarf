@@ -28,4 +28,4 @@
  * case, callers need to restart the application or create new instances of
  * these classes.
  */
-package com.sun.sgs.impl.service.data.store.db.bdbje;
+package com.sun.sgs.impl.service.data.store.db.je;

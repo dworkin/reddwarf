@@ -17,66 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db.bdbje;
+package com.sun.sgs.impl.service.data.store.db.bdb;
 
-import com.sleepycat.je.DatabaseException;
-import com.sleepycat.je.Transaction;
-import com.sleepycat.je.XAEnvironment;
+import com.sleepycat.db.DatabaseException;
+import com.sleepycat.db.Environment;
+import com.sleepycat.db.Transaction;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import java.util.Arrays;
-import javax.transaction.xa.XAException;
-import javax.transaction.xa.Xid;
 
-/** Provides a transaction implementation using Berkeley DB, Java Edition. */
-class BdbJeTransaction implements DbTransaction {
-
-    /** The Berkeley DB environment. */
-    private final XAEnvironment env;
+/** Provides a transaction implementation using Berkeley DB. */
+class BdbTransaction implements DbTransaction {
 
     /** The Berkeley DB transaction. */
     private final Transaction txn;
-
-    /**
-     * Implement an Xid whose format is 1, and whose branch qualifier is null.
-     */
-    private static final class SimpleXid implements Xid {
-	/** The global transaction ID. */
-	private final byte[] gid;
-
-	/** Creates an instance with the specified global transaction ID. */
-	SimpleXid(byte[] gid) {
-	    this.gid = gid;
-	}
-
-	/* -- Implement Xid -- */
-
-	public int getFormatId() {
-	    return 1;
-	}
-
-	public byte[] getGlobalTransactionId() {
-	    return gid;
-	}
-
-	public byte[] getBranchQualifier() {
-	    return null;
-	}
-
-	public int hashCode() {
-	    return Arrays.hashCode(gid);
-	}
-
-	public boolean equals(Object object) {
-	    if (object instanceof Xid) {
-		Xid xid = (Xid) object;
-		return xid.getFormatId() == 1 &&
-		    Arrays.equals(xid.getGlobalTransactionId(), gid) &&
-		    xid.getBranchQualifier() == null;
-	    } else {
-		return false;
-	    }
-	}
-    }
 
     /**
      * Creates an instance of this class.
@@ -87,8 +39,7 @@ class BdbJeTransaction implements DbTransaction {
      * @throws	IllegalArgumentException if timeout is less than {@code 1}
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    BdbJeTransaction(XAEnvironment env, long timeout) {
-	this.env = env;
+    BdbTransaction(Environment env, long timeout) {
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
 		"Timeout must be greater than 0");
@@ -103,17 +54,17 @@ class BdbJeTransaction implements DbTransaction {
 	    txn.setLockTimeout(timeoutMicros);
 	    txn.setTxnTimeout(timeoutMicros);
 	} catch (DatabaseException e) {
-	    throw BdbJeEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 
     /** Converts the argument to a Berkeley DB transaction. */
     static Transaction getBdbTxn(DbTransaction dbTxn) {
-	if (dbTxn instanceof BdbJeTransaction) {
-	    return ((BdbJeTransaction) dbTxn).txn;
+	if (dbTxn instanceof BdbTransaction) {
+	    return ((BdbTransaction) dbTxn).txn;
 	} else {
 	    throw new IllegalArgumentException(
-		"Transaction must be an instance of BdbJeTransaction");
+		"Transaction must be an instance of BdbTransaction");
 	}
     }
 
@@ -122,13 +73,9 @@ class BdbJeTransaction implements DbTransaction {
     /** {@inheritDoc} */
     public void prepare(byte[] gid) {
 	try {
-	    Xid xid = new SimpleXid(gid);
-	    env.setXATransaction(xid, txn);
- 	    env.prepare(xid);
+	    txn.prepare(gid);
 	} catch (DatabaseException e) {
-	    throw BdbJeEnvironment.convertException(e, false);
-	} catch (XAException e) {
-	    throw BdbJeEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 
@@ -137,7 +84,7 @@ class BdbJeTransaction implements DbTransaction {
 	try {
 	    txn.commit();
 	} catch (DatabaseException e) {
-	    throw BdbJeEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 
@@ -146,7 +93,7 @@ class BdbJeTransaction implements DbTransaction {
 	try {
 	    txn.abort();
 	} catch (DatabaseException e) {
-	    throw BdbJeEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 }

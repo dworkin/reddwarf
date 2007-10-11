@@ -32,7 +32,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import com.sun.sgs.impl.service.data.store.db.bdbdb.BdbDbEnvironment;
+import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -83,9 +83,7 @@ import java.util.logging.Logger;
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	{@value #ALLOCATION_BLOCK_SIZE_PROPERTY}
- *	</b></code> <br>
+ * <dt> <i>Property:</i> <b>{@value #ALLOCATION_BLOCK_SIZE_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #DEFAULT_ALLOCATION_BLOCK_SIZE}
  *
  * <dd style="padding-top: .5em">The number of object IDs to allocate at a
@@ -99,7 +97,7 @@ import java.util.logging.Logger;
  *
  * </dl> <p>
  *
- * The constructor also passes the properties to the {@link BdbDbEnvironment}
+ * The constructor also passes the properties to the {@link BdbEnvironment}
  * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
@@ -120,7 +118,8 @@ public class DataStoreImpl
     implements DataStore, TransactionParticipant, ProfileProducer
 {
     /** The name of this class. */
-    private static final String CLASSNAME = DataStoreImpl.class.getName();
+    private static final String CLASSNAME =
+	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
     /**
      * The property that specifies the directory in which to store database
@@ -136,7 +135,7 @@ public class DataStoreImpl
      * time.
      */
     public static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	"com.sun.sgs.impl.service.data.store.allocation.block.size";
+	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
     public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;

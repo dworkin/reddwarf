@@ -17,22 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db.bdbdb;
+package com.sun.sgs.impl.service.data.store.db.je;
 
-import com.sleepycat.db.Cursor;
-import com.sleepycat.db.Database;
-import com.sleepycat.db.DatabaseEntry;
-import com.sleepycat.db.DatabaseException;
-import com.sleepycat.db.OperationStatus;
-import static com.sleepycat.db.OperationStatus.KEYEXIST;
-import static com.sleepycat.db.OperationStatus.NOTFOUND;
-import static com.sleepycat.db.OperationStatus.SUCCESS;
-import com.sleepycat.db.Transaction;
+import com.sleepycat.je.Cursor;
+import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
+import com.sleepycat.je.DatabaseException;
+import com.sleepycat.je.OperationStatus;
+import static com.sleepycat.je.OperationStatus.KEYEXIST;
+import static com.sleepycat.je.OperationStatus.NOTFOUND;
+import static com.sleepycat.je.OperationStatus.SUCCESS;
+import com.sleepycat.je.Transaction;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 
-/** Provides a cursor implementation using Berkeley DB. */
-public class BdbDbCursor implements DbCursor {
+/** Provides a cursor implementation using Berkeley DB, Java Edition. */
+public class JeCursor implements DbCursor {
 
     /** The Berkeley DB cursor. */
     private final Cursor cursor;
@@ -55,24 +55,24 @@ public class BdbDbCursor implements DbCursor {
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    BdbDbCursor(Database db, Transaction txn) {
+    JeCursor(Database db, Transaction txn) {
 	try {
 	    cursor = db.openCursor(txn, null);
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 
     /** {@inheritDoc} */
     public byte[] getKey() {
 	return isCurrent
-	    ? BdbDbDatabase.convertData(keyEntry.getData()) : null;
+	    ? JeDatabase.convertData(keyEntry.getData()) : null;
     }
 
     /** {@inheritDoc} */
     public byte[] getValue() {
 	return isCurrent
-	    ? BdbDbDatabase.convertData(valueEntry.getData()) : null;
+	    ? JeDatabase.convertData(valueEntry.getData()) : null;
     }
 
     /** {@inheritDoc} */
@@ -89,7 +89,7 @@ public class BdbDbCursor implements DbCursor {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 
@@ -107,7 +107,7 @@ public class BdbDbCursor implements DbCursor {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 
@@ -127,7 +127,7 @@ public class BdbDbCursor implements DbCursor {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 
@@ -145,7 +145,7 @@ public class BdbDbCursor implements DbCursor {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 
@@ -167,7 +167,7 @@ public class BdbDbCursor implements DbCursor {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }	    
 
@@ -176,7 +176,7 @@ public class BdbDbCursor implements DbCursor {
 	try {
 	    cursor.close();
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw JeEnvironment.convertException(e, true);
 	}
     }
 }

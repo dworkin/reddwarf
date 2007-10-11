@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db.bdbje;
+package com.sun.sgs.impl.service.data.store.db.je;
 
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.DeadlockException;
@@ -72,14 +72,12 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * <code>prepareAndCommit</code> on durable participants, so the inability to
  * resolve prepared transactions should have no effect at present. <p>
  *
- * The {@link #BdbJeEnvironment constructor} supports the following
+ * The {@link #JeEnvironment constructor} supports the following
  * configuration properties: <p>
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.db.bdbje.flush.to.disk
- *	</b></code> <br>
+ * <dt> <i>Property:</i> <b>{@value #FLUSH_TO_DISK_PROPERTY}</b> <br>
  *	<i>Default:</i> <code>false</code>
  *
  * <dd style="padding-top: .5em">Whether to flush changes to disk when a
@@ -88,9 +86,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * data integrity will be maintained.  Flushing changes to disk avoids data
  * loss but introduces a significant reduction in performance. <p>
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.db.bdbje.stats
- *	</b></code> <br>
+ * <dt> <i>Property:</i> <b>{@value #STATS_PROPERTY}</b> <br>
  *	<i>Default:</i> <code>-1</code>
  *
  * <dd style="padding-top: .5em">The interval in milliseconds between calls to
@@ -124,7 +120,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * </dl> <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.db.bdbje</code> to log information at
+ * <code>com.sun.sgs.impl.service.data.db.je</code> to log information at
  * the following logging levels: <p>
  *
  * <ul>
@@ -135,11 +131,11 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
  * </ul>
  */
-public class BdbJeEnvironment implements DbEnvironment {
+public class JeEnvironment implements DbEnvironment {
 
     /** The package name. */
     private static final String PACKAGE =
-	"com.sun.sgs.impl.service.data.store.db.bdbje";
+	"com.sun.sgs.impl.service.data.store.db.je";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -151,7 +147,7 @@ public class BdbJeEnvironment implements DbEnvironment {
      * false, some recent transactions may be lost in the event of a crash,
      * although integrity will be maintained.
      */
-    private static final String FLUSH_TO_DISK_PROPERTY =
+    public static final String FLUSH_TO_DISK_PROPERTY =
 	PACKAGE + ".flush.to.disk";
 
     /**
@@ -159,7 +155,7 @@ public class BdbJeEnvironment implements DbEnvironment {
      * to log database statistics, or a negative value to disable logging.  The
      * property is set to -1 by default.
      */
-    private static final String STATS_PROPERTY = PACKAGE + ".stats";
+    public static final String STATS_PROPERTY = PACKAGE + ".stats";
     
     /**
      * Default values for Berkeley DB Java Edition properties that are
@@ -227,12 +223,12 @@ public class BdbJeEnvironment implements DbEnvironment {
      * @param	scheduler the scheduler for running periodic tasks
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public BdbJeEnvironment(
+    public JeEnvironment(
 	String directory, Properties properties, Scheduler scheduler)
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
-		       "BdbJeEnvironment directory:{0}, properties:{1}, " +
+		       "JeEnvironment directory:{0}, properties:{1}, " +
 		       "scheduler:{2}",
 		       directory, properties, scheduler);
 	}
@@ -241,7 +237,11 @@ public class BdbJeEnvironment implements DbEnvironment {
 	     names.hasMoreElements(); )
 	{
 	    Object key = names.nextElement();
-	    propertiesWithDefaults.put(key, properties.get(key));
+	    if (key instanceof String){
+		String property = (String) key;
+		propertiesWithDefaults.setProperty(
+		    property, properties.getProperty(property));
+	    }
 	}
 	properties = propertiesWithDefaults;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -271,7 +271,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 	    throw convertException(e, false);
 	} catch (Error e) {
 	    logger.logThrow(
-		Level.SEVERE, e, "BdbJeEnvironment initialization failed");
+		Level.SEVERE, e, "JeEnvironment initialization failed");
 	    throw e;
 	}
 	if (stats >= 0) {
@@ -329,7 +329,7 @@ public class BdbJeEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public DbTransaction beginTransaction(long timeout) {
-	return new BdbJeTransaction(env, timeout);
+	return new JeTransaction(env, timeout);
     }
 
     /** {@inheritDoc} */
@@ -337,8 +337,8 @@ public class BdbJeEnvironment implements DbEnvironment {
 	DbTransaction txn, String fileName, boolean create)
 	throws FileNotFoundException
     {
-	return new BdbJeDatabase(
-	    env, BdbJeTransaction.getBdbTxn(txn), fileName, create);
+	return new JeDatabase(
+	    env, JeTransaction.getJeTxn(txn), fileName, create);
     }
 
     /** {@inheritDoc} */

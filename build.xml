@@ -53,7 +53,7 @@
   <!-- Versions of referenced software, for creating subdirectories in
        the server binary distribution -->
   <property name="bdb.version" value="4.5.20"/>
-  <property name="bdbje.version" value="3.2.23"/>
+  <property name="bdb.je.version" value="3.2.23"/>
   <property name="mina.version" value="1.1"/>
   <property name="slf4j.version" value="1.4.0"/>
 
@@ -64,12 +64,12 @@
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
-  <!-- Set test.use.bdbje to true to test with BDB Java Edition -->
+  <!-- Set test.use.je to true to test with BDB Java Edition -->
   <condition
      property="test.bdb.env"
-     value="com.sun.sgs.impl.service.data.store.db.bdbje.BdbJeEnvironment"
-     else="com.sun.sgs.impl.service.data.store.db.bdbdb.BdbDbEnvironment">
-    <istrue value="${test.use.bdbje}"/>
+     value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+     else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+    <istrue value="${test.use.je}"/>
   </condition>
 
   <!-- Properties for Berkeley DB libraries -->
@@ -79,7 +79,7 @@
   <!-- The caller should set the bdb.builds.dir property to a directory
        containing builds of Berkeley DB for all platforms if building
        the server binary distribution -->
-  <property name="bdb.je.jar" location="lib/je-${bdbje.version}.jar"/>
+  <property name="bdb.je.jar" location="lib/je-${bdb.je.version}.jar"/>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db.bdbdb;
+package com.sun.sgs.impl.service.data.store.db.bdb;
 
 import com.sleepycat.db.CheckpointConfig;
 import com.sleepycat.db.DatabaseException;
@@ -65,12 +65,12 @@ import java.util.logging.Logger;
  * <code>prepareAndCommit</code> on durable participants, so the inability to
  * resolve prepared transactions should have no effect at present. <p>
  *
- * The {@link #BdbDbEnvironment constructor} supports these public <a
- * href="../../../../../../app/doc-files/config-properties.html#BdbDb">
+ * The {@link #BdbEnvironment constructor} supports these public <a
+ * href="../../../../../../app/doc-files/config-properties.html#Bdb">
  * properties</a>. <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.db.bdbdb</code> to log information at
+ * <code>com.sun.sgs.impl.service.data.db.bdb</code> to log information at
  * the following logging levels: <p>
  *
  * <ul>
@@ -81,11 +81,11 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINE FINE} - Berkeley DB messages
  * </ul>
  */
-public class BdbDbEnvironment implements DbEnvironment {
+public class BdbEnvironment implements DbEnvironment {
 
     /** The package name. */
     private static final String PACKAGE =
-	"com.sun.sgs.impl.service.data.store.db.bdbdb";
+	"com.sun.sgs.impl.service.data.store.db.bdb";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -94,34 +94,34 @@ public class BdbDbEnvironment implements DbEnvironment {
     /**
      * The property that specifies the size in bytes of the Berkeley DB cache.
      */
-    private static final String CACHE_SIZE_PROPERTY =
+    public static final String CACHE_SIZE_PROPERTY =
 	PACKAGE + ".cache.size";
 
     /** The minimum cache size, as specified by Berkeley DB */
-    private static final long MIN_CACHE_SIZE = 20000;
+    public static final long MIN_CACHE_SIZE = 20000;
 
     /** The default cache size. */
-    private static final long DEFAULT_CACHE_SIZE = 1000000L;
+    public static final long DEFAULT_CACHE_SIZE = 1000000L;
 
     /**
      * The property that specifies the time in milliseconds between
      * checkpoints.
      */
-    private static final String CHECKPOINT_INTERVAL_PROPERTY =
+    public static final String CHECKPOINT_INTERVAL_PROPERTY =
 	PACKAGE + ".checkpoint.interval";
 
     /** The default checkpoint interval. */
-    private static final long DEFAULT_CHECKPOINT_INTERVAL = 60000;
+    public static final long DEFAULT_CHECKPOINT_INTERVAL = 60000;
 
     /**
      * The property that specifies how many bytes need to be modified before
      * performing a checkpoint.
      */
-    private static final String CHECKPOINT_SIZE_PROPERTY =
+    public static final String CHECKPOINT_SIZE_PROPERTY =
 	PACKAGE + ".checkpoint.size";
 
     /** The default checkpoint size. */
-    private static final long DEFAULT_CHECKPOINT_SIZE = 100000;
+    public static final long DEFAULT_CHECKPOINT_SIZE = 100000;
 
     /**
      * The property that specifies whether to flush changes to disk on
@@ -129,13 +129,13 @@ public class BdbDbEnvironment implements DbEnvironment {
      * false, some recent transactions may be lost in the event of a crash,
      * although integrity will be maintained.
      */
-    private static final String FLUSH_TO_DISK_PROPERTY =
+    public static final String FLUSH_TO_DISK_PROPERTY =
 	PACKAGE + ".flush.to.disk";
 
     /**
      * The property that specifies whether to automatically remove log files.
      */
-    private static final String REMOVE_LOGS_PROPERTY =
+    public static final String REMOVE_LOGS_PROPERTY =
 	PACKAGE + ".remove.logs";
 
     /** The Berkeley DB environment. */
@@ -195,12 +195,12 @@ public class BdbDbEnvironment implements DbEnvironment {
      * @param	scheduler the scheduler for running periodic tasks
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    public BdbDbEnvironment(
+    public BdbEnvironment(
 	String directory, Properties properties, Scheduler scheduler)
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
-		       "BdbDbEnvironment directory:{0}, properties:{1}, " +
+		       "BdbEnvironment directory:{0}, properties:{1}, " +
 		       "scheduler:{2}",
 		       directory, properties, scheduler);
 	}
@@ -284,7 +284,7 @@ public class BdbDbEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public DbTransaction beginTransaction(long timeout) {
-	return new BdbDbTransaction(env, timeout);
+	return new BdbTransaction(env, timeout);
     }
 
     /** {@inheritDoc} */
@@ -292,8 +292,8 @@ public class BdbDbEnvironment implements DbEnvironment {
 	DbTransaction txn, String fileName, boolean create)
 	throws FileNotFoundException
     {
-	return new BdbDbDatabase(
-	    env, BdbDbTransaction.getBdbTxn(txn), fileName, create);
+	return new BdbDatabase(
+	    env, BdbTransaction.getBdbTxn(txn), fileName, create);
     }
 
     /** {@inheritDoc} */

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db.bdbdb;
+package com.sun.sgs.impl.service.data.store.db.bdb;
 
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -38,7 +38,7 @@ import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import java.io.FileNotFoundException;
 
 /** Provides a database implementation using Berkeley DB. */
-public class BdbDbDatabase implements DbDatabase {
+public class BdbDatabase implements DbDatabase {
 
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
@@ -63,7 +63,7 @@ public class BdbDbDatabase implements DbDatabase {
      * @throws	FileNotFoundException if the database file is not found
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    BdbDbDatabase(
+    BdbDatabase(
 	Environment env, Transaction txn, String fileName, boolean create)
 	throws FileNotFoundException
     {
@@ -71,7 +71,7 @@ public class BdbDbDatabase implements DbDatabase {
 	    db = env.openDatabase(
 		txn, fileName, null, create ? createConfig : null);
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 
@@ -90,7 +90,7 @@ public class BdbDbDatabase implements DbDatabase {
 	try {
 	    DatabaseEntry valueEntry = new DatabaseEntry();
 	    OperationStatus status = db.get(
-		BdbDbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+		BdbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
 		valueEntry, forUpdate ? LockMode.RMW : null);
 	    if (status == SUCCESS) {
 		return convertData(valueEntry.getData());
@@ -100,7 +100,7 @@ public class BdbDbDatabase implements DbDatabase {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw BdbEnvironment.convertException(e, true);
 	}
     }
 
@@ -108,13 +108,13 @@ public class BdbDbDatabase implements DbDatabase {
     public void put(DbTransaction txn, byte[] key, byte[] value) {
 	try {
 	    OperationStatus status = db.put(
-		BdbDbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+		BdbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
 		new DatabaseEntry(value));
 	    if (status != SUCCESS) {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw BdbEnvironment.convertException(e, true);
 	}
     }
 
@@ -124,7 +124,7 @@ public class BdbDbDatabase implements DbDatabase {
     {
 	try {
 	    OperationStatus status = db.putNoOverwrite(
-		BdbDbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
+		BdbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
 		new DatabaseEntry(value));
 	    if (status == SUCCESS) {
 		return true;
@@ -134,7 +134,7 @@ public class BdbDbDatabase implements DbDatabase {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw BdbEnvironment.convertException(e, true);
 	}
     }
 
@@ -142,7 +142,7 @@ public class BdbDbDatabase implements DbDatabase {
     public boolean delete(DbTransaction txn, byte[] key) {
 	try {
 	    OperationStatus status = db.delete(
-		BdbDbTransaction.getBdbTxn(txn), new DatabaseEntry(key));
+		BdbTransaction.getBdbTxn(txn), new DatabaseEntry(key));
 	    if (status == SUCCESS) {
 		return true;
 	    } else if (status == NOTFOUND) {
@@ -151,13 +151,13 @@ public class BdbDbDatabase implements DbDatabase {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, true);
+	    throw BdbEnvironment.convertException(e, true);
 	}
     }
 
     /** {@inheritDoc} */
     public DbCursor openCursor(DbTransaction txn) {
-	return new BdbDbCursor(db, BdbDbTransaction.getBdbTxn(txn));
+	return new BdbCursor(db, BdbTransaction.getBdbTxn(txn));
     }
 
     /** {@inheritDoc} */
@@ -165,7 +165,7 @@ public class BdbDbDatabase implements DbDatabase {
 	try {
 	    db.close();
 	} catch (DatabaseException e) {
-	    throw BdbDbEnvironment.convertException(e, false);
+	    throw BdbEnvironment.convertException(e, false);
 	}
     }
 }
