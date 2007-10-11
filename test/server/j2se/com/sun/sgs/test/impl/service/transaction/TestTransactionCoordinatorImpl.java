@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.transaction;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -40,9 +41,23 @@ import junit.framework.TestCase;
 @SuppressWarnings("hiding")
 public class TestTransactionCoordinatorImpl extends TestCase {
 
+    /** The default transaction timeout. */
+    private static final long TIMEOUT = 50;
+
+    /** Long enough for a transaction to timeout. */
+    private static final long TIMED_OUT = TIMEOUT + 5;
+
+    /** Transaction coordinator properties. */
+    private static final Properties coordinatorProps = new Properties();
+    static {
+	coordinatorProps.setProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+	    String.valueOf(TIMEOUT));
+    }
+
     /** The instance to test. */
     private final TransactionCoordinator coordinator =
-	new TransactionCoordinatorImpl(new Properties(), null);
+	new TransactionCoordinatorImpl(coordinatorProps, null);
     
     /** The handle to test. */
     private TransactionHandle handle;
@@ -58,7 +73,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /** Prints the test case, sets handle and txn */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	handle = coordinator.createTransaction(true);
+	handle = coordinator.createTransaction(false);
 	txn = handle.getTransaction();
     }
 
@@ -644,7 +659,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testGetId() {
 	txn.abort(null);
-	Transaction txn2 = coordinator.createTransaction(true).
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertNotNull(txn.getId());
 	assertNotNull(txn2.getId());
@@ -656,10 +671,10 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     public void testGetCreationTime() throws Exception {
 	long now = System.currentTimeMillis();
 	Thread.sleep(50);
-	Transaction txn1 = coordinator.createTransaction(true).
+	Transaction txn1 = coordinator.createTransaction(false).
 	    getTransaction();
 	Thread.sleep(50);
-	Transaction txn2 = coordinator.createTransaction(true).
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertTrue("Transaction creation time is too early: " +
             txn1.getCreationTime(),
@@ -1327,10 +1342,234 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertAborted(null);
     }
 
+    /* -- Test checkTimeout -- */
+
+    public void testCheckTimeoutActive() throws Exception {
+	txn.checkTimeout();
+	Thread.sleep(TIMED_OUT);
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertTrue(txn.isAborted());
+	}
+    }
+
+    public void testCheckTimeoutAborting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	txn.abort(null);
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutAbortingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	txn.abort(null);
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutAborted() throws Exception {
+	txn.abort(null);
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	handle = coordinator.createTransaction(false);
+	txn = handle.getTransaction();
+	Thread.sleep(TIMED_OUT);
+	txn.abort(null);
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCheckTimeoutPreparing() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			txn.checkTimeout();
+			return super.prepare(txn);
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (DummyTransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutPreparingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			txn.checkTimeout();
+			return super.prepare(txn);
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (DummyTransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	Thread.sleep(TIMED_OUT);
+	try {
+	    handle.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
+	}
+    }
+
+    public void testCheckTimeoutPrepareAndCommitting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void prepareAndCommit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutPrepareAndCommittingTimedOut()
+	throws Exception
+    {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void prepareAndCommit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	try {
+	    handle.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
+	}
+    }
+
+    public void testCheckTimeoutCommitting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void commit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutCommittingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void commit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutCommitted() throws Exception {
+	handle.commit();
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	handle = coordinator.createTransaction(false);
+	txn = handle.getTransaction();
+	Thread.sleep(TIMED_OUT);
+	handle.commit();
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test equals -- */
 
     public void testEquals() throws Exception {
-	Transaction txn2 = coordinator.createTransaction(true).
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));

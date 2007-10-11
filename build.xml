@@ -26,7 +26,7 @@
   <property name="ruby" location="/usr/bin/ruby"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9.3"/>
+  <property name="project.release" value="0.9.4"/>
   <!-- Set to true when building an external release -->
   <property name="external.release" value="false"/>
 
@@ -312,6 +312,7 @@
       <fileset dir="."
 	       excludes="**/.svn"
 	       includes="doc/ClientTutorial.*,
+			 example/c-client/**,
 			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
 			 src/client/**,
 			 src/shared/**,

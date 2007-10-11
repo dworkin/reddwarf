@@ -29,17 +29,17 @@ import javax.security.auth.login.LoginException;
  * of this interface use <code>IdentityAuthenticator</code>s to actually
  * perform authentication.
  * <p>
- * Note that the <code>IdentityManager</code> provided to
+ * Note that the <code>IdentityCoordinator</code> provided to
  * <code>Service</code>s via the <code>ComponentRegistry</code> field of
  * their constructor will only be able to authenticate identities within
  * that <code>Service</code>'s context. It is safe, however, to use
- * that <code>IdentityManager</code> in any context and outside of a
+ * that <code>IdentityCoordinator</code> in any context and outside of a
  * running transaction. <code>Service</code>s must not, however, use
- * their <code>IdentityManager</code> until <code>configure</code> is
+ * their <code>IdentityCoordinator</code> until <code>ready</code> is
  * called, because before this point the underlying context is not
- * valid and available to the <code>IdentityManager</code>.
+ * valid and available to the <code>IdentityCoordinator</code>.
  */
-public interface IdentityManager
+public interface IdentityCoordinator
 {
 
     /**

@@ -37,7 +37,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -133,7 +133,7 @@ public class TestChannelServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private DummyIdentityManager identityManager;
+    private DummyIdentityCoordinator identityCoordinator;
     
     /** The listen port for the client session service. */
     private int port;
@@ -180,9 +180,9 @@ public class TestChannelServiceImpl extends TestCase {
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
 	//serviceRegistry.registerAppContext();
 
-	// create identity manager
-	identityManager = new DummyIdentityManager();
-	systemRegistry.setComponent(IdentityManager.class, identityManager);
+	// create identity coordinator
+	identityCoordinator = new DummyIdentityCoordinator();
+	systemRegistry.setComponent(IdentityCoordinator.class, identityCoordinator);
 
 	// create client session service
 	sessionService = new ClientSessionServiceImpl(
@@ -1653,16 +1653,16 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     /**
-     * Dummy identity manager for testing purposes.
+     * Dummy identity coordinator for testing purposes.
      */
-    private static class DummyIdentityManager implements IdentityManager {
+    private static class DummyIdentityCoordinator implements IdentityCoordinator {
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
 	    return new DummyIdentity(credentials);
 	}
     }
     
     /**
-     * Identity returned by the DummyIdentityManager.
+     * Identity returned by the DummyIdentityCoordinator.
      */
     private static class DummyIdentity implements Identity, Serializable {
 
