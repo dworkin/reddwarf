@@ -47,14 +47,14 @@ public class TestDataEncoding extends TestCase {
     /* -- Test encodeShort -- */
 
     public void testEncodeShort() {
-	verifyEncodeShort((short) 0, b(0x80), zero);
-	verifyEncodeShort((short) -1, b(0x7f), ff);
-	verifyEncodeShort(Short.MIN_VALUE, zero, zero);
-	verifyEncodeShort(Short.MAX_VALUE, ff, ff);
-	verifyEncodeShort((short) 0x1234, b(0x92), b(0x34));
+	verifyEncodeDecodeShort((short) 0, b(0x80), zero);
+	verifyEncodeDecodeShort((short) -1, b(0x7f), ff);
+	verifyEncodeDecodeShort(Short.MIN_VALUE, zero, zero);
+	verifyEncodeDecodeShort(Short.MAX_VALUE, ff, ff);
+	verifyEncodeDecodeShort((short) 0x1234, b(0x92), b(0x34));
     }
 
-    private static void verifyEncodeShort(short n, byte... b) {
+    private static void verifyEncodeDecodeShort(short n, byte... b) {
 	assertEquals(2, b.length);
 	byte[] bytes = DataEncoding.encodeShort(n);
 	assertEquals(2, bytes.length);
@@ -95,14 +95,14 @@ public class TestDataEncoding extends TestCase {
     /* -- Test encodeInt -- */
 
     public void testEncodeInt() {
-	verifyEncodeInt(0, b(0x80), zero, zero, zero);
-	verifyEncodeInt(-1, b(0x7f), ff, ff, ff);
-	verifyEncodeInt(Integer.MIN_VALUE, zero, zero, zero, zero);
-	verifyEncodeInt(Integer.MAX_VALUE, ff, ff, ff, ff);
-	verifyEncodeInt(0x12345678, b(0x92), b(0x34), b(0x56), b(0x78));
+	verifyEncodeDecodeInt(0, b(0x80), zero, zero, zero);
+	verifyEncodeDecodeInt(-1, b(0x7f), ff, ff, ff);
+	verifyEncodeDecodeInt(Integer.MIN_VALUE, zero, zero, zero, zero);
+	verifyEncodeDecodeInt(Integer.MAX_VALUE, ff, ff, ff, ff);
+	verifyEncodeDecodeInt(0x12345678, b(0x92), b(0x34), b(0x56), b(0x78));
     }
 
-    private static void verifyEncodeInt(int n, byte... b) {
+    private static void verifyEncodeDecodeInt(int n, byte... b) {
 	assertEquals(4, b.length);
 	byte[] bytes = DataEncoding.encodeInt(n);
 	assertEquals(4, bytes.length);
@@ -198,16 +198,17 @@ public class TestDataEncoding extends TestCase {
     /* -- Test encodeLong -- */
 
     public void testEncodeLong() {
-	verifyEncodeLong(0, b(0x80), zero, zero, zero, zero, zero, zero, zero);
-	verifyEncodeLong(-1, b(0x7f), ff, ff, ff, ff, ff, ff, ff);
-	verifyEncodeLong(
+	verifyEncodeDecodeLong(
+	    0, b(0x80), zero, zero, zero, zero, zero, zero, zero);
+	verifyEncodeDecodeLong(-1, b(0x7f), ff, ff, ff, ff, ff, ff, ff);
+	verifyEncodeDecodeLong(
 	    Long.MIN_VALUE, zero, zero, zero, zero, zero, zero, zero, zero);
-	verifyEncodeLong(Long.MAX_VALUE, ff, ff, ff, ff, ff, ff, ff, ff);
-	verifyEncodeLong(0x123456789abcdef0l, b(0x92), b(0x34), b(0x56),
+	verifyEncodeDecodeLong(Long.MAX_VALUE, ff, ff, ff, ff, ff, ff, ff, ff);
+	verifyEncodeDecodeLong(0x123456789abcdef0l, b(0x92), b(0x34), b(0x56),
 			 b(0x78), b(0x9a), b(0xbc), b(0xde), b(0xf0));
     }
 
-    private static void verifyEncodeLong(long n, byte... b) {
+    private static void verifyEncodeDecodeLong(long n, byte... b) {
 	assertEquals(8, b.length);
 	byte[] bytes = DataEncoding.encodeLong(n);
 	assertEquals(8, bytes.length);
@@ -258,7 +259,7 @@ public class TestDataEncoding extends TestCase {
 	byte[] bytes = new byte[1<<16];
 	Arrays.fill(bytes, (byte) 'a');
 	bytes[bytes.length - 1] = 0;
-	verifyEncodeString(new String(chars), bytes);
+	verifyEncodeDecodeString(new String(chars), bytes);
 	chars[0] = '\u1234';
 	String longString = new String(chars);
 	try {
@@ -276,9 +277,9 @@ public class TestDataEncoding extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	verifyEncodeString("", zero);
-	verifyEncodeString("hi", b('h'), b('i'), zero);
-	verifyEncodeString(
+	verifyEncodeDecodeString("", zero);
+	verifyEncodeDecodeString("hi", b('h'), b('i'), zero);
+	verifyEncodeDecodeString(
 	    "Some weird stuff: \u0123\u1234\u3456",
 	    b('S'), b('o'), b('m'), b('e'), b(' '), b('w'), b('e'), b('i'),
 	    b('r'), b('d'), b(' '), b('s'), b('t'), b('u'), b('f'), b('f'),
@@ -287,10 +288,10 @@ public class TestDataEncoding extends TestCase {
 	    b(0xe1), b(0x88), b(0xb4),	/* \u1234 */
 	    b(0xe3), b(0x91), b(0x96),  /* \u3456 */
 	    zero);
-	verifyEncodeString("\u0000", b(0xc0), b(0x80), zero);
+	verifyEncodeDecodeString("\u0000", b(0xc0), b(0x80), zero);
     }
 
-    private static void verifyEncodeString(String string, byte... b) {
+    private static void verifyEncodeDecodeString(String string, byte... b) {
 	byte[] bytes = DataEncoding.encodeString(string);
 	assertEquals(b.length, bytes.length);
 	assertEquals(Arrays.toString(b), Arrays.toString(bytes));

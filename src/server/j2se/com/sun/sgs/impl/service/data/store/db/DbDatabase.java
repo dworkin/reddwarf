@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store.db;
 
+import com.sun.sgs.app.TransactionAbortedException;
+
 /**
  * The interface to a database.  Databases are associated with a single
  * database environment, and must be closed before the environment is closed.

@@ -84,9 +84,9 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
+ *	{@value #ALLOCATION_BLOCK_SIZE_PROPERTY}
  *	</b></code> <br>
- *	<i>Default:</i> <code>100</code>
+ *	<i>Default:</i> {@value #DEFAULT_ALLOCATION_BLOCK_SIZE}
  *
  * <dd style="padding-top: .5em">The number of object IDs to allocate at a
  *	time.  This value must be greater than <code>0</code>.  Object IDs are
@@ -126,7 +126,7 @@ public class DataStoreImpl
      * The property that specifies the directory in which to store database
      * files.
      */
-    private static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
+    public static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
 
     /** The default directory for database files from the app root. */
     private static final String DEFAULT_DIRECTORY = "dsdb";
@@ -135,11 +135,11 @@ public class DataStoreImpl
      * The property that specifies the number of object IDs to allocate at one
      * time.
      */
-    private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocation.block.size";
+    public static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
+	"com.sun.sgs.impl.service.data.store.allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
-    private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
+    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -352,9 +352,6 @@ public class DataStoreImpl
 	/**
 	 * The currently open database cursor or null.  The cursor must be
 	 * closed before the transaction is prepared, committed, or aborted.
-	 * Note that the Berkeley DB documentation for prepare doesn't say you
-	 * need to close cursors, but my testing shows that you do.
-	 * -tjb@sun.com (12/14/2006)
 	 */
 	private DbCursor cursor;
 
@@ -1448,7 +1445,7 @@ public class DataStoreImpl
     /**
      * Returns the next available ID stored under the specified key, and
      * increments the stored value by the specified amount.  Uses the specified
-     * timeout when creating a BDB transaction.
+     * timeout when creating a DB transaction.
      */
     private long getNextId(long key, int blockSize, long timeout) {
 	assert blockSize > 0;

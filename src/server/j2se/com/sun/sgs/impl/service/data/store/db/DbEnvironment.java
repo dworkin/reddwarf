@@ -41,7 +41,8 @@ public interface DbEnvironment {
 
     /**
      * Opens a database.  Relative database filenames will be interpreted
-     * relative to the {@code directory} argument passed to {@link
+     * relative to whatever root directory was specified when this environment
+     * was created, typically the {@code directory} argument passed to {@link
      * DbEnvironmentFactory#getEnvironment
      * DbEnvironmentFactory.getEnvironment}.
      *

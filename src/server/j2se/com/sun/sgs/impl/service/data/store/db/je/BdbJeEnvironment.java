@@ -43,6 +43,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Enumeration;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -235,9 +236,13 @@ public class BdbJeEnvironment implements DbEnvironment {
 		       "scheduler:{2}",
 		       directory, properties, scheduler);
 	}
-	Properties propertiesWithDefaults = new Properties();
-	propertiesWithDefaults.putAll(defaultProperties);
-	propertiesWithDefaults.putAll(properties);
+	Properties propertiesWithDefaults = new Properties(defaultProperties);
+	for (Enumeration<?> names = properties.propertyNames();
+	     names.hasMoreElements(); )
+	{
+	    Object key = names.nextElement();
+	    propertiesWithDefaults.put(key, properties.get(key));
+	}
 	properties = propertiesWithDefaults;
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
@@ -248,7 +253,10 @@ public class BdbJeEnvironment implements DbEnvironment {
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
 	config.setTxnWriteNoSync(!flushToDisk);
-	for (Object key : properties.keySet()) {
+	for (Enumeration<?> names = properties.propertyNames();
+	     names.hasMoreElements(); )
+	{
+	    Object key = names.nextElement();
 	    if (key instanceof String) {
 		String property = (String) key;
 		if (property.startsWith("je.")) {

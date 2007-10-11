@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store.db;
 
+import com.sun.sgs.app.TransactionAbortedException;
+
 /**
  * The interface to a cursor for iterating over the contents of a database.  A
  * newly created cursor has no current key or value.  Cursors are associated
@@ -119,7 +121,11 @@ public interface DbCursor {
      * Closes this cursor, releasing any associated resources.  This cursor
      * should not be used after this method is called.  This method should be
      * called before preparing, committing, or aborting the associated
-     * transaction.
+     * transaction. <p>
+     *
+     * Note that the Berkeley DB documentation for prepare doesn't say you need
+     * to close cursors, but my testing shows that you do.  -tjb@sun.com
+     * (12/14/2006)
      *
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict

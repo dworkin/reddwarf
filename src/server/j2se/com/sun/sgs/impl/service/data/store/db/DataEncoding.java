@@ -236,6 +236,7 @@ public final class DataEncoding {
 	} catch (UTFDataFormatException e) {
 	    throw new IllegalArgumentException(e.getMessage(), e);
 	} catch (IOException e) {
+	    /* Should be no I/O errors to an in-memory output stream. */
 	    throw new AssertionError(e);
 	}
 	return baos.toByteArray();
