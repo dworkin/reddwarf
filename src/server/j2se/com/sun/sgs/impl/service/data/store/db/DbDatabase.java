@@ -77,7 +77,7 @@ public interface DbDatabase {
     boolean putNoOverwrite(DbTransaction txn, byte[] key, byte[] value);
 
     /**
-     * Removes the value associated with a key in this database
+     * Removes the value associated with a key in this database.
      *
      * @param	txn the transaction for this operation
      * @param	key the key
@@ -95,6 +95,7 @@ public interface DbDatabase {
      * Returns a cursor for iterating over the contents of this database.  The
      * cursor needs to be closed before the associated transaction ends.
      *
+     * @param	txn the transaction for this operation
      * @return	the cursor
      * @throws	IllegalArgumentException if {@code txn} was not created by the
      *		associated environment

@@ -82,6 +82,7 @@ public interface DbCursor {
      * specified key.  If the result is {@code true}, then sets the current key
      * and value to the key found and its associated value.
      *
+     * @param	key the key at which to start searching
      * @return	{@code true} if the next key was found, else {@code false}
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict

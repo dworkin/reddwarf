@@ -97,7 +97,7 @@ public class BdbEnvironment implements DbEnvironment {
     public static final String CACHE_SIZE_PROPERTY =
 	PACKAGE + ".cache.size";
 
-    /** The minimum cache size, as specified by Berkeley DB */
+    /** The minimum cache size, as specified by Berkeley DB. */
     public static final long MIN_CACHE_SIZE = 20000;
 
     /** The default cache size. */
