@@ -36,7 +36,7 @@ import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -157,7 +157,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    MinimalTestKernel.getSystemRegistry(
 		MinimalTestKernel.createContext())
 	    .getComponent(TaskScheduler.class));
-	props = UtilMisc.createProperties(
+	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
     }

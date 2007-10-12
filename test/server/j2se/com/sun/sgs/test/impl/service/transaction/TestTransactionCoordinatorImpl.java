@@ -31,7 +31,7 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
@@ -90,17 +90,17 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testConstructorIllegalPropertyValues() {
 	Properties[] allProperties = {
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "foo"),
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0"),
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "-33"),
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "foo"),
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "0"),
-	    UtilMisc.createProperties(
+	    createProperties(
 		TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY, "-200")
 	};
 	for (Properties props : allProperties) {

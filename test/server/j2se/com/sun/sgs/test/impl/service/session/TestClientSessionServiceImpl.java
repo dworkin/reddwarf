@@ -57,7 +57,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -94,12 +94,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static int PORT = 2468;
 
     /** Properties for the session service. */
-    private static Properties serviceProps = UtilMisc.createProperties(
+    private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
 	StandardProperties.APP_PORT, Integer.toString(0));
 
     /** Properties for creating the shared database. */
-    private static Properties dbProps = UtilMisc.createProperties(
+    private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
@@ -296,9 +296,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testConstructorNoPort() throws Exception {
 	try {
-	    Properties props =
-		UtilMisc.createProperties(StandardProperties.APP_NAME,
-					  "TestClientSessionServiceImpl");
+	    Properties props = createProperties(
+		StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
 	    new ClientSessionServiceImpl(
 		props, new DummyComponentRegistry(),
 		new DummyTransactionProxy());

@@ -22,8 +22,8 @@ package com.sun.sgs.test.util;
 import java.util.Enumeration;
 import java.util.Properties;
 
-/** Provides miscellaneous utilities for writing tests. */
-public class UtilMisc {
+/** Provides properties utilities for writing tests. */
+public class UtilProperties {
 
     /**
      * Creates a property list with the specified keys and values, and

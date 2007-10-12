@@ -37,7 +37,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.util.Properties;
 import junit.framework.TestCase;
@@ -58,7 +58,7 @@ public class TestIdGenerator extends TestCase {
 	"TestClientSessionServiceImpl.db";
 
     /** Properties for creating the shared database. */
-    private static Properties dbProps = UtilMisc.createProperties(
+    private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");

@@ -24,7 +24,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -102,7 +102,7 @@ public class TestDataStoreServerImpl extends TestCase {
     /** Prints the test case. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	props = UtilMisc.createProperties(
+	props = createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();

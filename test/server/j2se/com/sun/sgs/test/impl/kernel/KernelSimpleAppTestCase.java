@@ -19,7 +19,7 @@
 
 package com.sun.sgs.test.impl.kernel;
 
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -68,7 +68,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	/* Create the DataStore subdirectory */
 	new File(dir, "dsdb").mkdir();
 	/* Create application configuration properties */
-	config = UtilMisc.createProperties(
+	config = createProperties(
 	    "com.sun.sgs.app.listener",
 	    "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    "com.sun.sgs.app.name", "SimpleApp",
@@ -77,14 +77,14 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
 	    "com.sun.sgs.impl.service.watchdog.server.start", "true");
 	/* Create logging properties to log at WARNING or higher */
-	logging = UtilMisc.createProperties(
+	logging = createProperties(
 	    ".level", "WARNING",
 	    "handlers", "java.util.logging.ConsoleHandler",
 	    "java.util.logging.ConsoleHandler.formatter",
 	    "java.util.logging.SimpleFormatter",
 	    "java.util.logging.ConsoleHandler.level", "WARNING");
 	/* Create system properties */
-	system = UtilMisc.createProperties();
+	system = createProperties();
     }
 
     /** Returns the port to use for this application. */

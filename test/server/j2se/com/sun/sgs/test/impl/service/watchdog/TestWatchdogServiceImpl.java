@@ -31,7 +31,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -182,7 +182,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
         WatchdogServiceImpl watchdog = null;
-	Properties properties = UtilMisc.createProperties(
+	Properties properties = createProperties(
 	    WatchdogServerPropertyPrefix + ".port", "0");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
@@ -194,7 +194,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     
     public void testConstructorZeroPort() throws Exception {
         WatchdogServiceImpl watchdog = null;
-	Properties properties = UtilMisc.createProperties(
+	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
 	try {
@@ -210,7 +210,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorPortTooLarge() throws Exception {
         WatchdogServiceImpl watchdog = null;
-	Properties properties = UtilMisc.createProperties(
+	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
@@ -228,7 +228,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	throws Exception
     {
         WatchdogServiceImpl watchdog = null;
-	Properties properties = UtilMisc.createProperties(
+	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
@@ -248,7 +248,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	throws Exception
     {
         WatchdogServiceImpl watchdog = null;
-	Properties properties = UtilMisc.createProperties(
+	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
@@ -272,7 +272,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    fail("Expected id 1, got " + id);
 	}
 	int port = watchdogService.getServer().getPort();
-	Properties props = UtilMisc.createProperties(
+	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -312,7 +312,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         }, taskOwner);
 
 	int port = watchdogService.getServer().getPort();
-	Properties props = UtilMisc.createProperties(
+	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
@@ -375,7 +375,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
 
 	int port = watchdogService.getServer().getPort();
-	Properties props = UtilMisc.createProperties(
+	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -646,7 +646,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Map<WatchdogServiceImpl, DummyNodeListener> watchdogMap =
 	    new HashMap<WatchdogServiceImpl, DummyNodeListener>();
 	int port = watchdogService.getServer().getPort();
-	Properties props = UtilMisc.createProperties(
+	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 

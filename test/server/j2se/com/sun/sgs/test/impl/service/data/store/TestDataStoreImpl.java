@@ -34,7 +34,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -149,7 +149,7 @@ public class TestDataStoreImpl extends TestCase {
         if (!dataDir.mkdir()) {
             throw new RuntimeException("Failed to create sub-dir: " + dataDir);
         }
-        Properties props = UtilMisc.createProperties(
+        Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
         DataStore testStore = createDataStore(props);
@@ -1686,7 +1686,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /** Returns the default properties to use for creating data stores. */
     protected Properties getProperties() throws Exception {
-	return UtilMisc.createProperties(
+	return createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory);
     }
 

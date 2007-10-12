@@ -24,7 +24,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -105,7 +105,7 @@ public class TestDataStorePerformance extends TestCase {
 			   "\n  test.item.size=" + itemSize +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
-	props = UtilMisc.createProperties(
+	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory());
     }
 

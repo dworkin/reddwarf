@@ -44,7 +44,7 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.UtilMisc;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -2571,7 +2571,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** Returns the default properties to use for creating data services. */
     protected Properties getProperties() throws Exception {
-	return UtilMisc.createProperties(
+	return createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    StandardProperties.APP_NAME, "TestDataServiceImpl",
 	    DataServiceImplClassName + ".debug.check.interval", "0");
