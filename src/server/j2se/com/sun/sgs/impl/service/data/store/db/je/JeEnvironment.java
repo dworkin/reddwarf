@@ -232,19 +232,21 @@ public class JeEnvironment implements DbEnvironment {
 		       "scheduler:{2}",
 		       directory, properties, scheduler);
 	}
-	Properties propertiesWithDefaults = new Properties(defaultProperties);
-	for (Enumeration<?> names = properties.propertyNames();
+	Properties propertiesWithDefaults = new Properties(properties);
+	for (Enumeration<?> names = defaultProperties.propertyNames();
 	     names.hasMoreElements(); )
 	{
 	    Object key = names.nextElement();
-	    if (key instanceof String){
+	    if (key instanceof String) {
 		String property = (String) key;
-		propertiesWithDefaults.setProperty(
-		    property, properties.getProperty(property));
+		if (propertiesWithDefaults.getProperty(property) == null) {
+		    propertiesWithDefaults.setProperty(
+			property, defaultProperties.getProperty(property));
+		}
 	    }
 	}
-	properties = propertiesWithDefaults;
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(
+	    propertiesWithDefaults);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
@@ -253,7 +255,7 @@ public class JeEnvironment implements DbEnvironment {
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
 	config.setTxnWriteNoSync(!flushToDisk);
-	for (Enumeration<?> names = properties.propertyNames();
+	for (Enumeration<?> names = propertiesWithDefaults.propertyNames();
 	     names.hasMoreElements(); )
 	{
 	    Object key = names.nextElement();
@@ -261,7 +263,8 @@ public class JeEnvironment implements DbEnvironment {
 		String property = (String) key;
 		if (property.startsWith("je.")) {
 		    config.setConfigParam(
-			property, properties.getProperty(property));
+			property,
+			propertiesWithDefaults.getProperty(property));
 		}
 	    }
 	}
