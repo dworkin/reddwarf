@@ -50,13 +50,27 @@
   <property name="apidoc.client.zip"
             location="${build.dir}/sgs-client-apidoc.zip"/>
 
+  <!-- Versions of referenced software, for creating subdirectories in
+       the server binary distribution -->
+  <property name="bdb.version" value="4.5.20"/>
+  <property name="bdb.je.version" value="3.2.23"/>
+  <property name="mina.version" value="1.1"/>
+  <property name="slf4j.version" value="1.4.0"/>
+
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.assertions" value="-enableassertions"/>
+  <property name="test.assertions" value="-ea:com.sun.sgs..."/>
   <property name="test.jvm.args" value="${test.assertions}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
+  <!-- Set test.use.je to true to test with BDB Java Edition -->
+  <condition
+     property="test.bdb.env"
+     value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+     else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+    <istrue value="${test.use.je}"/>
+  </condition>
 
   <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
@@ -65,12 +79,7 @@
   <!-- The caller should set the bdb.builds.dir property to a directory
        containing builds of Berkeley DB for all platforms if building
        the server binary distribution -->
-
-  <!-- Versions of referenced software, for creating subdirectories in
-       the server binary distribution -->
-  <property name="bdb.version" value="4.5.20"/>
-  <property name="mina.version" value="1.1"/>
-  <property name="slf4j.version" value="1.4.0"/>
+  <property name="bdb.je.jar" location="lib/je-${bdb.je.version}.jar"/>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
@@ -84,6 +93,7 @@
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${bdb.je.jar}"/>
     <path refid="shared.classpath"/>
   </path>
 
@@ -661,7 +671,7 @@
   <target name="findbugs-client" depends="build-client, -findbugs.init"
 	  description="Checks for bugs in the client">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/client/j2se"/>
       <class location="${build.dir}/classes/client"/>
       <auxClasspath>
@@ -674,12 +684,13 @@
   <target name="findbugs-server" depends="build-server, -findbugs.init"
 	  description="Checks for bugs in the server">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/server/j2se"/>
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
 	<path refid="shared.classpath"/>
 	<pathelement location="${bdb.lib.dir}/db.jar"/>
+	<pathelement location="${bdb.je.jar}"/>
       </auxClasspath>
     </findbugs>
   </target>
@@ -688,7 +699,7 @@
   <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
 	  description="Checks for bugs in shared code">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs">
       <sourcePath path="src/shared/j2se"/>
       <class location="${build.dir}/classes/shared"/>
       <auxClasspath>
@@ -725,7 +736,6 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
@@ -767,6 +777,9 @@
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
@@ -777,6 +790,7 @@
       <syspropertyset>
 	<propertyref prefix="test."/>
 	<propertyref prefix="com.sun.sgs."/>
+	<propertyref prefix="je."/>
       </syspropertyset>
       <!-- XXX: This doesn't work in Ant 1.6.1,
 	   either. -tjb@sun.com (01/13/2006) -->
@@ -792,7 +806,7 @@
     <fail if="tests.failed" message="Some tests failed"/>
   </target>
 
-  <!-- Compile and run shared tests -->
+  <!-- Compiles and runs client tests -->
   <target name="test-client" depends="-test-client.classes"
 	  description="Compiles and runs client tests">
     <mkdir dir="${build.dir}/test"/>
@@ -807,7 +821,6 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
@@ -891,7 +904,6 @@
     <java classname="com.sun.sgs.test.impl.io.ServerTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -907,7 +919,6 @@
     <java classname="com.sun.sgs.test.impl.io.ClientTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -923,7 +934,6 @@
     <java classname="com.sun.sgs.test.client.simple.SimpleServer"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -939,7 +949,6 @@
     <java classname="com.sun.sgs.test.client.simple.ClientTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -955,7 +964,6 @@
     <java classname="com.sun.sgs.test.client.simple.SimpleClientTestUI"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -996,6 +1004,9 @@
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -1036,6 +1047,9 @@
       <sysproperty key="com.sun.sgs.config.file"
            file="example/hack/System.properties"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -1137,6 +1151,9 @@
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.server.dir}/logging.config"/>
       <!-- Set the java.rmi.server.hostname property to use a

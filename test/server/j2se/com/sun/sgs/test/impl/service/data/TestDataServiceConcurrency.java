@@ -36,6 +36,7 @@ import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -219,12 +220,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	}
 	/* Warm up */
 	if (repeat != 1) {
-	    System.err.println("Warmup:");
 	    runOperations(1);
 	}
 	/* Test */
 	for (int t = threads; t <= maxThreads; t++) {
-	    System.err.println("Threads: " + t);
 	    for (int r = 0; r < repeat; r++) {
 		runOperations(t);
 	    }
@@ -261,9 +260,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	long ms = stop - start;
 	double s = (stop - start) / 1000.0d;
 	System.err.println(
-	    "Time: " + ms + " ms\n" +
-	    "Aborts: " + aborts + "\n" +
-	    "Ops per second: " + Math.round((threads * operations) / s));
+	    "Threads: " + threads + ", " +
+	    "time: " + ms + " ms, " +
+	    "aborts: " + aborts + ", " +
+	    "ops/sec: " + Math.round((threads * operations) / s));
     }
 
     /**
@@ -302,8 +302,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	    try {
 		createTxn();
 		for (int i = 0; i < operations; i++) {
-		    if (i % 1000 == 0) {
-			System.err.println(this + ": Operation " + i);
+		    if (i % 1000 == 0 && logger.isLoggable(Level.FINE)) {
+			logger.log(Level.FINE, "Operation {0}", i);
 		    }
 		    while (true) {
 			try {
@@ -405,20 +405,6 @@ public class TestDataServiceConcurrency extends TestCase {
 		    "Failed to delete directory: " + dir);
 	    }
 	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	/* Include system properties and allow them to override */
-	props.putAll(System.getProperties());
-	return props;
     }
 
     /** Returns the data service to test. */

@@ -27,8 +27,8 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl.Scheduler;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl.TaskHandle;
+import com.sun.sgs.impl.service.data.store.Scheduler;
+import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -414,6 +414,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    }),
 		taskOwner, true);
 	} catch (RuntimeException e) {
+	    logger.logThrow(
+		Level.SEVERE, e, "DataService initialization failed");
+	    throw e;
+	} catch (Error e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;

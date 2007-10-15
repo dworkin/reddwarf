@@ -34,6 +34,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -1288,6 +1289,7 @@ public class TestDataStoreImpl extends TestCase {
 			    Thread.sleep(2000);
 			    participant.commit(txn);
 			} catch (Exception e) {
+			    e.printStackTrace();
 			    fail("Unexpected exception: " + e);
 			}
 		    }
@@ -1670,18 +1672,6 @@ public class TestDataStoreImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 
     /** Creates a DataStore using the default properties. */
