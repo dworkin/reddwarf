@@ -24,8 +24,8 @@ java.util.logging.FileHandler.pattern = /tmp/log/sgs%u.log
 # can be overriden by a facility specific level
 # Note that the ConsoleHandler also has a separate level
 # setting to limit messages printed to the console.
-.level = INFO
-#.level = ALL
+#.level = INFO
+.level = ALL
 #.level = FINE
 
 # Limit the messages that are printed on the console to at least this level:
@@ -44,8 +44,9 @@ java.util.logging.FileHandler.count = 100
 # Facility specific properties.
 ############################################################
 
-com.sun.sgs.level = INFO
+#com.sun.sgs.level = INFO
 #com.sun.sgs.level = FINE
+#com.sun.sgs.level = FINEST
 #com.sun.sgs.impl.io.level = FINEST
 #com.sun.sgs.impl.kernel.level = FINE
 #com.sun.sgs.impl.kernel.TaskHandler.level = FINE
