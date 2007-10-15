@@ -44,6 +44,7 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -317,16 +318,22 @@ public class TestDataServiceImpl extends TestCase {
 	    DataStoreConstructorFails.class.getName());
 	try {
 	    createDataServiceImpl(props, componentRegistry, txnProxy);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
+	    fail("Expected DataStoreConstructorException");
+	} catch (DataStoreConstructorException e) {
 	    System.err.println(e);
 	}
     }
 
     public static class DataStoreConstructorFails extends DummyDataStore {
 	public DataStoreConstructorFails(Properties props) {
-	    throw new RuntimeException("Constructor fails");
+	    throw new DataStoreConstructorException();
 	}
+    }
+
+    private static class DataStoreConstructorException
+	extends RuntimeException
+    {
+	private static final long serialVersionUID = 1;
     }
 
     /* -- Test getName -- */
@@ -1454,7 +1461,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
@@ -1958,7 +1965,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
@@ -2532,18 +2539,6 @@ public class TestDataServiceImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 
     /**
