@@ -58,6 +58,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.BufferOverflowException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -465,14 +466,35 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		cachedState.name, HexDumper.format(channelMessage));
 	}
 
-        // TODO make this use the RSVP mechanism
+        Map<ClientSessionImpl, Object> sendReservations =
+            new HashMap<ClientSessionImpl, Object>();
+
 	ClientSessionId senderId = sender.getSessionId();
 	for (ClientSession session : recipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
-		((SgsClientSession) session).sendProtocolMessage(
-		    protocolMessage, cachedState.delivery);
+                ClientSessionImpl sgsSession = (ClientSessionImpl) session;
+                try {
+                    Object reservation = sgsSession.reserveProtocolMessage(
+                        protocolMessage, cachedState.delivery);
+                    sendReservations.put(sgsSession, reservation);
+                } catch (BufferOverflowException e) {
+                    // Can't get the reservation for this session.
+                    // TODO use a policy here
+                    // For now, forcibly disconnect the slow recipient
+                    sgsSession.disconnected();
+
+                    // TODO for this disconnect-recipient policy, it might
+                    // be better to check whether *all* recipients are full
+                    // and in that case disconnect the sender.
+                }
 	    }
+        }
+
+        for (Map.Entry<ClientSessionImpl, Object> entry :
+                    sendReservations.entrySet())
+        {
+            entry.getKey().invokeReservation(entry.getValue());
         }
 
 	if (cachedState.hasChannelListeners) {
@@ -487,6 +509,10 @@ public class ChannelServiceImpl implements ChannelManager, Service {
             return true;
 	}
 
+        // If there are no listeners, resume reading immediately.
+        //
+        // TODO this needs to depend on the policy (to be defined above)
+        // regarding recipients that cannot grant a send reservation.
         return true;
     }
     
@@ -861,7 +887,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    channelState.removeAllSessions();
 	}
     }
-	
+
     /**
      * Task (transactional) for notifying channel listeners.
      */

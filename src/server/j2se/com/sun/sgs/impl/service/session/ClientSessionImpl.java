@@ -315,7 +315,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
 		        Level.FINER,
-			"sendProtocolMessage session:{0} " +
+			"invokeReservation session:{0} " +
 			"session is disconnected", this);
 		}
 	    }
@@ -324,7 +324,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} throws", this);
+		    "invokeReservation session:{0} throws", this);
 	    }
 	}
     }
@@ -586,7 +586,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     }
 
-    void disconnected() {
+    public void disconnected() {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER,
                 "Listener.disconnected {0}", sessionConnection);
