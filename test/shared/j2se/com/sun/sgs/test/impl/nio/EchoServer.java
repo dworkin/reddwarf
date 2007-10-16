@@ -58,7 +58,8 @@ public class EchoServer {
         Integer.valueOf(System.getProperty("maxthreads",
             String.valueOf(DEFAULT_MAX_THREADS)));
     private static final boolean DISABLE_NAGLE =
-        Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
+        Boolean.valueOf(System.getProperty("tcp_nodelay",
+            DEFAULT_DISABLE_NAGLE));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -80,16 +81,18 @@ public class EchoServer {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
-        int backlog = Integer.valueOf(System.getProperty("accept_backlog", DEFAULT_BACKLOG));
+        int backlog = Integer.valueOf(
+            System.getProperty("accept_backlog", DEFAULT_BACKLOG));
         try {
-            acceptor = group.provider().openAsynchronousServerSocketChannel(group);
+            acceptor =
+                group.provider().openAsynchronousServerSocketChannel(group);
             acceptor.bind(new InetSocketAddress(host, port), backlog);
             acceptor.accept(new AcceptHandler());
         } catch (IOException e) {
             log.throwing("EchoServer", "start", e);
             throw e;
         }
-        log.log(Level.INFO, "Listening on {0}", acceptor.getLocalAddress());
+        System.out.format("Listening on %s\n", acceptor.getLocalAddress());
     }
     
     final class AcceptHandler
@@ -98,7 +101,8 @@ public class EchoServer {
         /**
          * {@inheritDoc}
          */
-        public void completed(IoFuture<AsynchronousSocketChannel, Object> result) {
+        public void
+        completed(IoFuture<AsynchronousSocketChannel, Object> result) {
             try {
                 acceptedChannel(result.getNow());
                 //try {
