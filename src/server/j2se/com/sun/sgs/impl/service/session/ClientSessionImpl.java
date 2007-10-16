@@ -104,19 +104,17 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** The IO channel for sending messages to the client. */
     private AsynchronousMessageChannel sessionConnection = null;
-    
-    /** The read completion handler for IO. */
-    private final ReadHandler readHandler;
-    
-    IoFuture<?, ?> readFuture = null;
-    
-    /** The write completion handler for IO. */
-    private final WriteHandler writeHandler;
-
-    IoFuture<?, ?> writeFuture = null;
 
     public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     public static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+    
+    /** The read completion handler for IO. */
+    private final ReadHandler readHandler =
+        new ReadHandler(DEFAULT_READ_BUFFER_SIZE);
+    
+    /** The write completion handler for IO. */
+    private final WriteHandler writeHandler =
+        new WriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
 
     /** The session id. */
     private final CompactId sessionId;
@@ -161,8 +159,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
-        this.readHandler = new ReadHandler(DEFAULT_READ_BUFFER_SIZE);
-        this.writeHandler = new WriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
 	this.sessionId = new CompactId(id);
 	this.reconnectionKey = sessionId; // not used yet
     }
@@ -184,8 +180,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.sessionService =
 	    (ClientSessionServiceImpl) ClientSessionServiceImpl.getInstance();
 	this.dataService = sessionService.dataService;
-        this.readHandler = null;
-        this.writeHandler = null;
 	this.sessionId = sessionId;
         this.identity = identity;
 	this.reconnectionKey = sessionId; // not used yet
@@ -614,12 +608,15 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      * Write completion handler for the session's connection.
-     * TODO probably needs a reset method when re-connected
+     * TODO needs a reset method when the session becomes connected
+     * TODO clear things when disconnected
      */
     private class WriteHandler implements CompletionHandler<Void, Integer> {
 
         private int availableToReserve;
         private Deque<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
+
+        private IoFuture<Void, ?> writeFuture = null;
 
         WriteHandler(int bufferSize) {
             availableToReserve = bufferSize;
@@ -744,10 +741,13 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      * Read completion handler for the session's connection.
+     * TODO needs a reset method when the session becomes connected
+     * TODO clear things when disconnected
      */
     private class ReadHandler implements CompletionHandler<ByteBuffer, Void> {
 
         private ByteBuffer readBuffer; // not final so we can null it (TODO)
+        private IoFuture<ByteBuffer, ?> readFuture = null;
 
         ReadHandler(int bufferSize) {
             readBuffer = ByteBuffer.allocateDirect(bufferSize);

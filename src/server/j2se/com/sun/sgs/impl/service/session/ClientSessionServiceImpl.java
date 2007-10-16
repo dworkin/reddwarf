@@ -256,7 +256,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
                 provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
             try {
                 acceptor.bind(endpoint, 0);
-                acceptFuture = acceptor.accept(new Listener());
+                acceptFuture = acceptor.accept(new AcceptorListener());
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(
                         Level.CONFIG,
@@ -373,9 +373,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	return sessions.get(new ClientSessionId(sessionId));
     }
 
-    /* -- Implement AcceptorListener -- */
+    /* -- Implement accept() handler -- */
 
-    private class Listener
+    private class AcceptorListener
         implements CompletionHandler<AsynchronousSocketChannel, Void>
     {
         /**
