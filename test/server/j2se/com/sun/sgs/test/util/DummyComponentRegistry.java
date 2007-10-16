@@ -74,5 +74,11 @@ public class DummyComponentRegistry implements ComponentRegistry {
     public Iterator<Object> iterator() {
         return components.values().iterator();
     }
-    
+
+    /**
+     * Clears all components from the registry.
+     */
+    public void clearComponents() {
+	components.clear();
+    }
 }

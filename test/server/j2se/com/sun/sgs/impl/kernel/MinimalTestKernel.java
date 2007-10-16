@@ -139,6 +139,9 @@ public final class MinimalTestKernel
             rc.shutdown();
         }
 
+	contextState.systemRegistry.clearComponents();
+	contextState.serviceRegistry.clearComponents();
+
         // NOTE: we could also do service shutdown here if we wanted
     }
 

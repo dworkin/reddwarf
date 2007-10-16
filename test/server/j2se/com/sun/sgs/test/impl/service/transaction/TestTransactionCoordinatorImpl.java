@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
@@ -1603,17 +1604,5 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     private static boolean retryable(Throwable t) {
 	return t instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 }

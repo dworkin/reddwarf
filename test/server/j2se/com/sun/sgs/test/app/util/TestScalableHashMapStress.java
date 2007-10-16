@@ -37,6 +37,7 @@ import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.NameRunner;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -617,20 +618,6 @@ public class TestScalableHashMapStress extends Assert {
 	    directory = dir.getPath();
 	}
 	return directory;
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	/* Include system properties and allow them to override */
-	props.putAll(System.getProperties());
-	return props;
     }
 
     /** Notes that the key for the specified object number has been removed. */
