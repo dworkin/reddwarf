@@ -594,7 +594,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * This thread informs all currently known clients of node status
      * changes (either nodes started or failed) as they occur.  This
-     * thread is notified by {@link #registerNode registerNode) when
+     * thread is notified by {@link #registerNode registerNode} when
      * nodes are registered, or by the {@code CheckExpirationThread}
      * when nodes fail to renew before their expiration time has
      * lapsed.

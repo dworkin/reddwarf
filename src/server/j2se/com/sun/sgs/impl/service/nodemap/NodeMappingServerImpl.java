@@ -512,7 +512,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * put in the removeQueue (which allows the system some settling time, 
      * so we don't thrash removing and adding an identity), the data store
      * is checked to see if the identity can still be removed.  A service
-     * could have called {@link #NodeMappingService.setStatus setStatus}
+     * could have called {@link NodeMappingService#setStatus setStatus}
      * during our waiting time, marking the identity as active, during the
      * waiting time.  If it is still appropriate to remove the identity,
      * all traces of it are removed from the data store.

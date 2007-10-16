@@ -337,7 +337,7 @@ class NodeImpl
      * Returns the key to access from the data service the {@code
      * Node} instance with the specified {@code nodeId}.
      *
-     * @param	a node ID
+     * @param	nodeId a node ID
      * @return	a key for acessing the {@code Node} instance
      */
     private static String getNodeKey(long nodeId) {
