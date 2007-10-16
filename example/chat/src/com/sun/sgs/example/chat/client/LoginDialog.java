@@ -293,7 +293,7 @@ public class LoginDialog extends JDialog
          * Creates a new {@code CancelWindowListener} for the given
          * {@code LoginDialog}.
          *
-         * @param dialog the dialog to notify on windowClosing
+         * @param client the client to notify on windowClosing
          */
         CancelWindowListener(LoginDialog dialog) {
             this.dialog = dialog;

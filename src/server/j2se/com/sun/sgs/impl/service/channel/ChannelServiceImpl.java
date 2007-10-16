@@ -352,25 +352,64 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	implements ProtocolMessageListener
     {
 	/** {@inheritDoc} */
-	public boolean receivedMessage(
-            SgsClientSession session, byte opcode, byte[] message)
-        {
-	    MessageBuffer buf = new MessageBuffer(message);
+	public void receivedMessage(SgsClientSession session, byte[] message) {
+	    try {
+		MessageBuffer buf = new MessageBuffer(message);
+	    
+		buf.getByte(); // discard version
+		
+		/*
+		 * Handle service id.
+		 */
+		byte serviceId = buf.getByte();
 
-	    switch (opcode) {
+		if (serviceId != SimpleSgsProtocol.CHANNEL_SERVICE) {
+		    if (logger.isLoggable(Level.SEVERE)) {
+			logger.log(
+                            Level.SEVERE,
+			    "expected channel service ID, got: {0}",
+			    serviceId);
+		    }
+		    return;
+		}
 
-	    case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
-	        return handleChannelSendRequest(session, buf);
+		/*
+		 * Handle op code.
+		 */
+		byte opcode = buf.getByte();
 
-	    default:
-	        if (logger.isLoggable(Level.SEVERE)) {
-	            logger.log(
-	                Level.SEVERE,
-	                "receivedMessage session:{0} message:{1} " +
-	                "unknown opcode:{2}",
-	                session, HexDumper.format(message), opcode);
-	        }
-	        throw new RuntimeException("bad channel opcode: " + opcode);
+		switch (opcode) {
+		    
+		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
+
+		    handleChannelSendRequest(session, buf);
+		    break;
+		    
+		default:
+		    if (logger.isLoggable(Level.SEVERE)) {
+			logger.log(
+			    Level.SEVERE,
+			    "receivedMessage session:{0} message:{1} " +
+			    "unknown opcode:{2}",
+			    session, HexDumper.format(message), opcode);
+		    }
+		    break;
+		}
+
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"receivedMessage session:{0} message:{1} returns",
+			session, HexDumper.format(message));
+		}
+		
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.logThrow(
+			Level.SEVERE, e,
+			"receivedMessage session:{0} message:{1} throws",
+			session, HexDumper.format(message));
+		}
 	    }
 	}
 
@@ -398,7 +437,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * channel ID in the protocol message.  The operation code has
      * already been processed by the caller.
      */
-    private boolean handleChannelSendRequest(
+    private void handleChannelSendRequest(
 	SgsClientSession sender, MessageBuffer buf)
     {
 	CompactId channelId = CompactId.getCompactId(buf);
@@ -408,7 +447,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    logger.log(
 		Level.WARNING,
 		"non-existent channel:{0}, dropping message", channelId);
-	    return true;
+	    return;
 	}
 
 	// Ensure that sender is a channel member before continuing.
@@ -419,7 +458,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		    "send attempt on channel:{0} by non-member session:{1}, " +
 		    "dropping message", channelId, sender);
 	    }
-            return true;
+	    return;
 	}
 	
 	long seq = buf.getLong(); // TODO Check sequence num
@@ -433,7 +472,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		    "numRecipents:{0} session:{1}",
 		    numRecipients, sender);
 	    }
-            return true;
+	    return;
 	}
 
 	Set<ClientSession> recipients = new HashSet<ClientSession>();
@@ -465,7 +504,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		cachedState.name, HexDumper.format(channelMessage));
 	}
 
-        // TODO make this use the RSVP mechanism
 	ClientSessionId senderId = sender.getSessionId();
 	for (ClientSession session : recipients) {
 	    // Send channel protocol message, skipping the sender
@@ -481,13 +519,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    queue.addTask(
 		new NotifyTask(cachedState.name, channelId,
 			       senderId, channelMessage));
-
-            // TODO make read-resume part of the NotifyTask activity,
-            // and return false here.
-            return true;
 	}
-
-        return true;
     }
     
     /**
@@ -623,6 +655,16 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
 
 	/* -- transaction participant methods -- */
+
+	/**
+	 * Throws a {@code TransactionNotActiveException} if this
+	 * transaction is prepared.
+	 */
+	private void checkPrepared() {
+	    if (isPrepared) {
+		throw new TransactionNotActiveException("Already prepared");
+	    }
+	}
 	
 	/**
 	 * Marks this transaction as prepared, and if there are

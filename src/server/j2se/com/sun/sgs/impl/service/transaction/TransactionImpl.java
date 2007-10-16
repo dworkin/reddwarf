@@ -156,8 +156,6 @@ final class TransactionImpl implements Transaction {
 	    TransactionTimeoutException exception =
 		new TransactionTimeoutException(
 		    "transaction timed out: " + runningTime + " ms");
-            logger.logThrow(Level.WARNING, exception,
-                "transaction {0} timed out: {1} ms", tid, runningTime);
 	    abort(exception);
 	    throw exception;
 	}

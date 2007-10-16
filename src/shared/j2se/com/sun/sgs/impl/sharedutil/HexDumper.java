@@ -19,8 +19,6 @@
 
 package com.sun.sgs.impl.sharedutil;
 
-import java.nio.ByteBuffer;
-
 /**
  * Utility class for converting a byte array to a hex-formatted string.
  */
@@ -32,55 +30,24 @@ public final class HexDumper {
      * in square brackets, and the octets are separated by a single
      * space character.
      *
-     * @param bytes a byte array to format
-     * @return the contents of the byte array as a hex-formatted string
+     * @param bytes a byte array to convert
+     * @return the converted byte array as a hex-formatted string
      */
     public static String format(byte[] bytes) {
-        return format(ByteBuffer.wrap(bytes));
-    }
-
-    /**
-     * Returns a string constructed with the contents of the ByteBuffer
-     * converted to hex format.  The entire string is enclosed
-     * in square brackets, and the octets are separated by a single
-     * space character.
-     *
-     * @param buf a buffer to format
-     * @return the contents of the buffer as a hex-formatted string
-     */
-    public static String format(ByteBuffer buf) {
-        return format(buf, 0);
-    }
-
-    /**
-     * Returns a string constructed with the contents of the ByteBuffer
-     * converted to hex format.  The entire string is enclosed
-     * in square brackets, and the octets are separated by a single
-     * space character.
-     *
-     * @param buf a buffer to format
-     * @param limit the maximum number of bytes to format, or {@code 0}
-     *              meaning unlimited
-     * @return the contents of the buffer as a hex-formatted string
-     */
-    public static String format(ByteBuffer buf, int limit) {
-        if (! buf.hasRemaining())
+        if (bytes.length == 0) {
             return "[]";
-
-        ByteBuffer readBuf = buf.slice();
-        if (limit > 0)
-            readBuf.limit(limit);
-
-        StringBuilder s = new StringBuilder((3 * readBuf.remaining()) + 1);
-        s.append('[');
-        // First element
-        s.append(String.format("%02x", readBuf.get()));
-        // Remaining elements
-        while (readBuf.hasRemaining()) {
-            s.append(String.format(" %02x", readBuf.get()));
         }
-        s.append(']');
-        return s.toString();
+        int i = 0;
+        StringBuilder buf = new StringBuilder((3 * bytes.length) + 1);
+        buf.append('[');
+        // First element
+        buf.append(String.format("%02x", bytes[i++]));
+        // Remaining elements
+        while (i < bytes.length) {
+            buf.append(String.format(" %02x", bytes[i++]));
+        }
+        buf.append(']');
+        return buf.toString();
     }
 
     /**

@@ -36,11 +36,9 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
-import com.sun.sgs.io.AsynchronousMessageChannel;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -51,14 +49,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.nio.BufferOverflowException;
-import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.util.Deque;
-import java.util.LinkedList;
 import java.util.Random;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -102,25 +94,17 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The data service. */
     private final DataService dataService;
     
-    /** The IO channel for sending messages to the client. */
-    private AsynchronousMessageChannel sessionConnection = null;
-
-    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
-    public static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
-    
-    /** The read completion handler for IO. */
-    private final ReadHandler readHandler =
-        new ReadHandler(DEFAULT_READ_BUFFER_SIZE);
-    
-    /** The write completion handler for IO. */
-    private final WriteHandler writeHandler =
-        new WriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
+    /** The Connection for sending messages to the client. */
+    private Connection sessionConnection;
 
     /** The session id. */
     private final CompactId sessionId;
 
     /** The reconnection key. */
     private final CompactId reconnectionKey;
+
+    /** The ConnectionListener for receiving messages from the client. */
+    private final ConnectionListener connectionListener;
 
     /** The identity for this session. */
     private Identity identity;
@@ -159,6 +143,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
+	this.connectionListener = new Listener();
 	this.sessionId = new CompactId(id);
 	this.reconnectionKey = sessionId; // not used yet
     }
@@ -183,6 +168,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.sessionId = sessionId;
         this.identity = identity;
 	this.reconnectionKey = sessionId; // not used yet
+	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
 	this.disconnectHandled = true;
 	this.shutdown = true;
@@ -286,32 +272,11 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
-        // TBI: ignore delivery for now...
-        invokeReservation(reserveProtocolMessage(message, delivery));
-    }
-
-    public Object reserveProtocolMessage(byte[] message, Delivery delivery) {
-        // TODO this is not elegant...
-        int len = message.length + 4;
-
-        ByteBuffer buf = ByteBuffer.allocateDirect(len);
-        buf.putInt(message.length);
-        buf.put(message);
-        buf.flip();
-
-        return writeHandler.reserve(buf);
-    }
-
-    public void cancelReservation(Object reservation) {
-        writeHandler.cancelReservation(reservation);
-    }
-
-    public void invokeReservation(Object reservation) {
+	// TBI: ignore delivery for now...
 	try {
 	    if (getCurrentState() != State.DISCONNECTED) {
-	        writeHandler.write(reservation);
-            } else {
-                writeHandler.cancelReservation(reservation);
+		sessionConnection.sendBytes(message);
+	    } else {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
 		        Level.FINER,
@@ -319,20 +284,27 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			"session is disconnected", this);
 		}
 	    }
-
-	} catch (RuntimeException e) {
+		    
+	} catch (IOException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "sendProtocolMessage session:{0} throws", this);
 	    }
 	}
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"sendProtocolMessage session:{0} message:{1} returns",
+		this, HexDumper.format(message));
+	}
     }
 
     /** {@inheritDoc} */
     public void sendProtocolMessageOnCommit(byte[] message, Delivery delivery) {
 	if (getCurrentState() != State.DISCONNECTED) {
-	    getContext().addReservation(this, reserveProtocolMessage(message, delivery));
+	    getContext().addMessage(this, message, delivery);
 	}
     }
 
@@ -496,7 +468,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    try {
-                // TODO set this up to wait until pending writes are done
 		sessionConnection.close();
 	    } catch (IOException e) {
 		if (logger.isLoggable(Level.WARNING)) {
@@ -537,304 +508,129 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
     }
+    
+    /** Returns the ConnectionListener for this session. */
+    ConnectionListener getConnectionListener() {
+	return connectionListener;
+    }
 
     /** Returns a random seed to use in generating session ids. */
     private static long getSeed() {
-        byte[] seedArray = SecureRandom.getSeed(8);
-        long seed = 0;
-        for (long b : seedArray) {
-            seed <<= 8;
-            seed += b & 0xff;
-        }
-        return seed;
-    }
-    
-    /** Returns the ConnectionListener for this session. */
-    void connected(AsynchronousMessageChannel conn) {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(
-                Level.FINER, "Handler.connected handle:{0}", conn);
-        }
-
-        synchronized (lock) {
-            // check if there is already a handle set
-            if (sessionConnection != null) {
-                logger.log(Level.WARNING,
-                    "session already connected to {0}", sessionConnection);
-                try {
-                    conn.close();
-                } catch (IOException e) {
-                    // ignore
-                }
-                return;
-            }
-
-            sessionConnection = conn;
-
-            switch (state) {
-
-            case CONNECTING:
-            case RECONNECTING:
-                state = State.CONNECTED;
-                break;
-            default:
-                break;
-            }
-
-            readHandler.read();
-        }
-
+	byte[] seedArray = SecureRandom.getSeed(8);
+	long seed = 0;
+	for (long b : seedArray) {
+	    seed <<= 8;
+	    seed += b & 0xff;
+	}
+	return seed;
     }
 
-    void disconnected() {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER,
-                "Listener.disconnected {0}", sessionConnection);
-        }
-
-        synchronized (lock) {
-            if (!disconnectHandled) {
-                scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-                    public void run() {
-                        handleDisconnect(false);
-                    }});
-            }
-
-            state = State.DISCONNECTED;
-        }
-    }
-
-    /* -- IO completion handlers -- */
+    /* -- ConnectionListener implementation -- */
 
     /**
-     * Write completion handler for the session's connection.
-     * TODO needs a reset method when the session becomes connected
-     * TODO clear things when disconnected
+     * Listener for connection-related events for this session's
+     * Connection.
      */
-    private class WriteHandler implements CompletionHandler<Void, Integer> {
+    private class Listener implements ConnectionListener {
 
-        private int availableToReserve;
-        private Deque<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
+	/** {@inheritDoc} */
+	public void connected(Connection conn) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(
+		    Level.FINER, "Handler.connected handle:{0}", conn);
+	    }
 
-        private IoFuture<Void, ?> writeFuture = null;
+	    synchronized (lock) {
+		// check if there is already a handle set
+		if (sessionConnection != null) {
+		    return;
+		}
 
-        WriteHandler(int bufferSize) {
-            availableToReserve = bufferSize;
-        }
+		sessionConnection = conn;
+		
+		switch (state) {
+		    
+		case CONNECTING:
+		case RECONNECTING:
+		    state = State.CONNECTED;
+		    break;
+		default:
+		    break;
+		}
+	    }
+	}
 
-        Object reserve(ByteBuffer message) {
-            int size = message.remaining();
+	/** {@inheritDoc} */
+	public void disconnected(Connection conn) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(
+		    Level.FINER, "Handler.disconnected handle:{0}", conn);
+	    }
 
-            if (size <= 0)
-                throw new IllegalArgumentException(
-                    "reservation size must be positive");
+	    synchronized (lock) {
+		if (conn != sessionConnection) {
+		    return;
+		}
 
-            int prevAvailable;
-            synchronized (lock) {
-                prevAvailable = availableToReserve;
-                if (prevAvailable < size)
-                    throw new BufferOverflowException();
+		if (!disconnectHandled) {
+		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+			public void run() {
+			    handleDisconnect(false);
+			}});
+		}
 
-                availableToReserve = prevAvailable - size;
-            }
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST,
-                    "reserved {0} out of {1} ({2} remain)",
-                    size, prevAvailable, (prevAvailable - size));
-            }
+		state = State.DISCONNECTED;
+	    }
+	}
 
-            return message.slice().asReadOnlyBuffer();
-        }
+	/** {@inheritDoc} */
+	public void exceptionThrown(Connection conn, Throwable exception) {
 
-        void cancelReservation(Object reservation) {
-            ByteBuffer rsvp = (ByteBuffer) reservation;
-            if (! rsvp.hasRemaining())
-                throw new IllegalArgumentException("bad reservation");
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, exception,
+		    "Handler.exceptionThrown handle:{0}", conn);
+	    }
+	}
 
-            int reserved = rsvp.capacity();
-            // Invalidate the reservation
-            rsvp.position(rsvp.limit());
-            synchronized (lock) {
-                availableToReserve += reserved;
-            }
-        }
-
-        void write(Object reservation) {
-            ByteBuffer rsvp = (ByteBuffer) reservation;
-            if (! rsvp.hasRemaining())
-                throw new IllegalArgumentException("bad reservation");
-
-            // Invalidate the reservation, but get a private buffer view first
-            ByteBuffer buf = rsvp.slice();
-            rsvp.position(rsvp.limit());
-
+	/** {@inheritDoc} */
+	public void bytesReceived(Connection conn, byte[] buffer) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
                     Level.FINEST,
-                    "WriteHandler.write session:{0} adding message:{1}",
-                    ClientSessionImpl.this, HexDumper.format(buf));
+                    "Handler.messageReceived handle:{0}, buffer:{1}",
+                    conn, buffer);
             }
-
-            boolean first;
-            synchronized (lock) {
-                first = pendingWrites.isEmpty();
-                pendingWrites.add(buf);
-            }       
-
-            if (first)
-                processQueue();
-        }
-
-        private void processQueue() {
-            synchronized (lock) {
-                if (writeFuture != null)
-                    return;
-
-                ByteBuffer buf = pendingWrites.peek();
-                if (buf == null)
-                    return;
-
-                writeFuture =
-                    sessionConnection.write(buf, buf.remaining(), this);
-            }
-        }
-
-        public void completed(IoFuture<Void, Integer> result) {
-            int len = result.attach(null);
-
-            int nowAvailable;
-            synchronized (lock) {
-                nowAvailable = availableToReserve + len;
-                availableToReserve = nowAvailable;
-                pendingWrites.pop();
-                writeFuture = null;
-            }
-
-            try {
-                result.getNow();
-
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "Write completed on {0}, len:{1}, avail:{2}",
-                        sessionConnection, len, nowAvailable);
-                }
-
-                // Keep writing
-                processQueue();
-
-            } catch (ExecutionException e) {
-
-                // TODO if we're expecting the channel to close,
-                // don't complain.
-
-                if (logger.isLoggable(Level.WARNING)) {
-                    logger.logThrow(
-                        Level.WARNING, e,
-                        "Write completion exception {0}, len:{1}",
-                        sessionConnection, len);
-                }
-                disconnected();
-            }
-        }
-    }
-
-    /**
-     * Read completion handler for the session's connection.
-     * TODO needs a reset method when the session becomes connected
-     * TODO clear things when disconnected
-     */
-    private class ReadHandler implements CompletionHandler<ByteBuffer, Void> {
-
-        private ByteBuffer readBuffer; // not final so we can null it (TODO)
-        private IoFuture<ByteBuffer, ?> readFuture = null;
-
-        ReadHandler(int bufferSize) {
-            readBuffer = ByteBuffer.allocateDirect(bufferSize);
-        }
-
-        void read() {
-            synchronized (lock) {
-                if (readFuture != null) {
-                    throw new ReadPendingException();
-                }
-
-                readFuture = sessionConnection.read(readBuffer, this);
-            }
-        }
-
-        public void completed(IoFuture<ByteBuffer, Void> result) {
-            synchronized (lock) {
-                readFuture = null;
-            }
-
-            try {
-                ByteBuffer message = result.getNow();
-                if (message == null) {
-                    disconnected();
-                    return;
-                }
-
-                int len = message.getInt();
-                
-                if (len != message.remaining()) {
-                    logger.log(Level.SEVERE,
-                        "Message length mismatch; expect {0} but have {1}",
-                        new Object[] { len, message.remaining() });
-                    disconnected();
-                }
-
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "Read completed on {0}, buffer:{1}",
-                        sessionConnection, HexDumper.format(message));
-                }
-
-                if (len < 3) {
-                    if (logger.isLoggable(Level.SEVERE)) {
+	    
+	    synchronized (lock) {
+		if (conn != sessionConnection) {
+                    if (logger.isLoggable(Level.FINE)) {
                         logger.log(
-                            Level.SEVERE,
-                            "Handler.messageReceived malformed protocol message:{0}",
-                            HexDumper.format(message));
+                            Level.FINE, 
+                            "Handle mismatch: expected: {0}, got: {1}",
+                            sessionConnection, conn);
                     }
-                    disconnected();
-                }
+		    return;
+		}
+	    }
+	    
+	    if (buffer.length < 3) {
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+		        Level.SEVERE,
+			"Handler.messageReceived malformed protocol message:{0}",
+			buffer);
+		}
+		// TBD: should the connection be disconnected?
+		return;
+	    }
 
-                byte version = message.get();
-                byte serviceId = message.get();
-                byte opcode = message.get();
-                byte[] payload = new byte[message.remaining()];
-                message.get(payload);
-
-                // Dispatch
-                boolean keepReading =
-                    bytesReceived(version, serviceId, opcode, payload);
-
-                if (keepReading)
-                    read();
-
-            } catch (Exception e) {
-
-                // TODO if we're expecting the channel to close,
-                // don't complain.
-
-                if (logger.isLoggable(Level.WARNING)) {
-                    logger.logThrow(
-                        Level.WARNING, e,
-                        "Read completion exception {0}", sessionConnection);
-                }
-                disconnected();
-            }
-        }
-
-	private boolean bytesReceived(
-            byte version, byte serviceId, byte opcode, byte[] buffer)
-        {
-
+	    MessageBuffer msg = new MessageBuffer(buffer);
+		
 	    /*
 	     * Handle version.
 	     */
+	    byte version = msg.getByte();
 	    if (version != SimpleSgsProtocol.VERSION) {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
@@ -842,15 +638,17 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			"Handler.messageReceived protocol version:{0}, " +
 			"expected {1}", version, SimpleSgsProtocol.VERSION);
 		}
-		// TBD: should the connection be disconnected?
-                return true;
+		    // TBD: should the connection be disconnected?
+		return;
 	    }
 
 	    /*
 	     * Dispatch message to service.
 	     */
+	    byte serviceId = msg.getByte();
+
 	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
-		return handleApplicationServiceMessage(opcode, buffer);
+		handleApplicationServiceMessage(msg);
 	    } else {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
@@ -862,22 +660,20 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 				"session:{0} received message for " +
 				"service ID:{1} before successful login",
 				this, serviceId);
-                            return true;
+			    return;
 			}
 		    }
 		    
-		    return serviceListener.receivedMessage(
-			ClientSessionImpl.this, opcode, buffer);
-
-                } else {
+		    serviceListener.receivedMessage(
+			ClientSessionImpl.this, buffer);
+		    
+		} else {
 		    if (logger.isLoggable(Level.SEVERE)) {
 		    	logger.log(
 			    Level.SEVERE,
 			    "session:{0} unknown service ID:{1}",
 			    this, serviceId);
 		    }
-
-                    return true;
 		}
 	    }
 	}
@@ -890,9 +686,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	 * version and service ID have already been processed by the
 	 * caller.
 	 */
-	private boolean handleApplicationServiceMessage(byte opcode, byte[] payload) {
-
-            MessageBuffer msg = new MessageBuffer(payload);
+	private void handleApplicationServiceMessage(MessageBuffer msg) {
+	    byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -914,7 +709,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			identity = authenticatedIdentity;
 			taskQueue =
 			    new NonDurableTaskQueue(
-				ClientSessionServiceImpl.txnProxy,
+				sessionService.txnProxy,
 				sessionService.nonDurableTaskScheduler,
 				identity);
 		    }
@@ -927,17 +722,17 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			    handleDisconnect(false);
 			}});
 		}
-                return false;
+		break;
 		
 	    case SimpleSgsProtocol.RECONNECT_REQUEST:
-                return true;
+		break;
 
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		if (getIdentity() == null) {
 		    logger.log(
 		    	Level.WARNING,
 			"session message received before login:{0}", this);
-		    return true;
+		    break;
 		}
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
@@ -946,17 +741,16 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
-                            readHandler.read();
 			}
 		    }});
-                return false;
+		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 	        scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	            public void run() {
 	                handleDisconnect(isConnected());
 	            }});
-                return true; // TODO handle graceful
+		break;
 		
 	    default:
 		if (logger.isLoggable(Level.SEVERE)) {
@@ -970,10 +764,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    public void run() {
 			handleDisconnect(false);
 		    }});
-                return false;
+		break;
 	    }
 	}
-
     }
 
     /**
@@ -1134,9 +927,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    putBytes(sessionId.getExternalForm()).
 		    putBytes(reconnectionKey.getExternalForm());
 		
-		getContext().addReservationFirst(
-		    ClientSessionImpl.this,
-                    reserveProtocolMessage(ack.getBuffer(), Delivery.RELIABLE));
+		getContext().addMessageFirst(
+		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
 
 		final Identity thisIdentity = getIdentity();
 		sessionService.scheduleTaskOnCommit(new AbstractKernelRunnable() {
@@ -1150,9 +942,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			// the time of notification.
 			thisIdentity.notifyLoggedIn();
 		    }});
-                
-                // Re-enable reads
-                readHandler.read();
 		
 	    } else {
 		if (ex == null) {
@@ -1171,10 +960,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		} else {
 		    throw ex;
 		}
-                getContext().addReservationFirst(
-                    ClientSessionImpl.this,
-                    reserveProtocolMessage(
-                        getLoginNackMessage(), Delivery.RELIABLE));
+		getContext().addMessageFirst(
+		    ClientSessionImpl.this, getLoginNackMessage(),
+		    Delivery.RELIABLE);
 		getContext().requestDisconnect(ClientSessionImpl.this);
 	    }
 	}

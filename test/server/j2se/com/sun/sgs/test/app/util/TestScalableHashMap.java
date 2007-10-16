@@ -57,17 +57,16 @@ import java.util.Random;
 import java.util.Set;
 import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import static org.junit.Assert.*;
 
 /**
  * Test the {@link ScalableHashMap} class.
  */
 @RunWith(NameRunner.class)
-public class TestScalableHashMap {
+public class TestScalableHashMap extends Assert {
 
     // the location for the database files
     private static final String DB_DIRECTORY =
@@ -336,6 +335,7 @@ public class TestScalableHashMap {
     @Test public void testPutAllNullItems() throws Exception {
 	txn = createTransaction();
 	Map<Object,Object> test = new ScalableHashMap<Object,Object>();
+	Object nonSerializable = Thread.currentThread();
 	Map<Object,Object> control = new HashMap<Object,Object>();
 	test.put(0, null);
 	control.put(0, null);
@@ -656,6 +656,7 @@ public class TestScalableHashMap {
     @Test public void testContainsKeyOnSplitTree() throws Exception {
 	txn = createTransaction();
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
 
@@ -773,6 +774,7 @@ public class TestScalableHashMap {
     @Test public void testContainsValue() throws Exception {
 	txn = createTransaction();
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
 
@@ -792,6 +794,7 @@ public class TestScalableHashMap {
     @Test public void testContainsValueOnSplitTree() throws Exception {
 	txn = createTransaction();
 	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>(16);
+	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
 	int[] inputs = new int[50];
 
@@ -2573,6 +2576,8 @@ public class TestScalableHashMap {
 	    control.put(new Equals(j), j);
 	    a[i] = j;
 	}
+
+	int entries = 0;
 
 	byte[] serializedForm = baos.toByteArray();
 

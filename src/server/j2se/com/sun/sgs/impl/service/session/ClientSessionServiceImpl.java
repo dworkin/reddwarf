@@ -26,6 +26,8 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
@@ -37,16 +39,12 @@ import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
-import com.sun.sgs.io.AsynchronousMessageChannel;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
-import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
@@ -55,9 +53,8 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
-
-import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -67,9 +64,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -109,19 +103,18 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The transaction proxy for this class. */
     static TransactionProxy txnProxy;
 
+    /** Provides transaction and other information for the current thread. */
+    private static final ThreadLocal<Context> currentContext =
+        new ThreadLocal<Context>();
+
     /** The application name. */
     private final String appName;
 
     /** The port number for accepting connections. */
     private final int port;
 
-    /** The async channel group for this service. */
-    private final AsynchronousChannelGroup asyncChannelGroup;
-
-    /** The acceptor for listening for new connections. */
-    private final AsynchronousServerSocketChannel acceptor;
-
-    volatile IoFuture<?, ?> acceptFuture;
+    /** The listener for accepted connections. */
+    private final AcceptorListener acceptorListener = new Listener();
 
     /** The registered service listeners. */
     private final Map<Byte, ProtocolMessageListener> serviceListeners =
@@ -142,6 +135,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** Lock for notifying the thread that flushes commmitted contexts. */
     private final Object flushContextsLock = new Object();
+
+    /** The Acceptor for listening for new connections. */
+    private final Acceptor<SocketAddress> acceptor;
 
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
@@ -243,32 +239,24 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				idBlockSize,
 				txnProxy,
 				taskScheduler);
-
-            InetSocketAddress endpoint = new InetSocketAddress(port);
-            AsynchronousChannelProvider provider =
-                // TODO fetch from config
-                AsynchronousChannelProvider.provider();
-            asyncChannelGroup =
-                // TODO fetch from config
-                provider.openAsynchronousChannelGroup(
-                    Executors.newCachedThreadPool());
-            acceptor =
-                provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
-            try {
-                acceptor.bind(endpoint, 0);
-                acceptFuture = acceptor.accept(new AcceptorListener());
-                if (logger.isLoggable(Level.CONFIG)) {
-                    logger.log(
-                        Level.CONFIG,
-                        "configure: listen successful. port:{0,number,#}",
-                        getListenPort());
-                }
-            } catch (Exception e) {
-                acceptFuture.cancel(true);
-                acceptor.close();
-                throw e;
-            }
-
+	    ServerSocketEndpoint endpoint =
+		new ServerSocketEndpoint(
+		    new InetSocketAddress(port), TransportType.RELIABLE);
+	    acceptor = endpoint.createAcceptor();
+	    try {
+		acceptor.listen(acceptorListener);
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(
+			Level.CONFIG, "listen successful. port:{0,number,#}",
+			getListenPort());
+		}
+	    } catch (Exception e) {
+		try {
+		    acceptor.shutdown();
+		} catch (RuntimeException re) {
+		}
+		throw e;
+	    }
 	    // TBD: listen for UNRELIABLE connections as well?
 
 	} catch (Exception e) {
@@ -311,8 +299,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      *
      * @return the port this service is listening on
      */
-    public int getListenPort() throws IOException {
-	return ((InetSocketAddress) acceptor.getLocalAddress()).getPort();
+    public int getListenPort() {
+	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
+	    getPort();
     }
 
     /**
@@ -330,24 +319,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		return false;
 	    }
 	    shuttingDown = true;
+	}
 
-	    try {
-                acceptFuture.cancel(true);
-	        acceptor.close();
-                asyncChannelGroup.shutdown();
-                if (! asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS)) {
-                    logger.log(Level.WARNING, "forcing async group shutdown");
-                    asyncChannelGroup.shutdownNow();
-                }
-	        logger.log(Level.FINEST, "acceptor shutdown");
-	    } catch (IOException e) {
-	        logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
-	        // swallow exception
-	    } catch (InterruptedException e) {
-                logger.logThrow(Level.FINEST, e, "shutdown interrupted");
-                // TODO: re-interrupt the thread?
-            }
-        }
+	try {
+	    acceptor.shutdown();
+	    logger.log(Level.FINEST, "acceptor shutdown");
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
+	    // swallow exception
+	}
 
 	for (ClientSessionImpl session : sessions.values()) {
 	    session.shutdown();
@@ -373,56 +353,42 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	return sessions.get(new ClientSessionId(sessionId));
     }
 
-    /* -- Implement accept() handler -- */
+    /* -- Implement AcceptorListener -- */
 
-    private class AcceptorListener
-        implements CompletionHandler<AsynchronousSocketChannel, Void>
-    {
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Creates a new client session with the specified handle,
-         * and adds the session to the internal session map.
-         */
-        public void
-        completed(IoFuture<AsynchronousSocketChannel, Void> result)
-        {
-            try {
-                AsynchronousSocketChannel newChannel = result.getNow();
-                logger.log(Level.FINER, "Accepted {0}", newChannel);
+    private class Listener implements AcceptorListener {
 
-                byte[] nextId;
-                try {
-                    nextId = idGenerator.nextBytes();
-                } catch (Exception e) {
-                    logger.logThrow(
-                        Level.SEVERE, e,
-                        "Failed to obtain client session ID, throws");
-                    try {
-                        newChannel.close();
-                    } catch (IOException ioe) {
-                        // ignore
-                    }
-                    acceptFuture = acceptor.accept(this);
-                    return;
-                }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>Creates a new client session with the specified handle,
+	 * and adds the session to the internal session map.
+	 */
+	public ConnectionListener newConnection() {
+	    if (shuttingDown()) {
+		return null;
+	    }
+	    byte[] nextId;
+	    try {
+		nextId = idGenerator.nextBytes();
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Failed to obtain client session ID, throws");
+		return null;
+	    }
+	    ClientSessionImpl session =
+		new ClientSessionImpl(ClientSessionServiceImpl.this, nextId);
+	    sessions.put(session.getSessionId(), session);
+	    return session.getConnectionListener();
+	}
 
-                ClientSessionImpl session =
-                    new ClientSessionImpl(
-                        ClientSessionServiceImpl.this,
-                        nextId);
-                sessions.put(session.getSessionId(), session);
-                session.connected(new AsynchronousMessageChannel(newChannel));
-
-                acceptFuture = acceptor.accept(this);
-
-            } catch (ExecutionException e) {
-                logger.logThrow(
-                    Level.SEVERE, e.getCause(),
-                    "acceptor error on port: {0}", port);
-                // TBD: take other actions, such as restarting acceptor?
-            }
-        }
+        /** {@inheritDoc} */
+	public void disconnected() {
+	    logger.log(
+	        Level.SEVERE,
+		"The acceptor has become disconnected from port: {0}", port);
+	    // TBD: take other actions, such as restarting acceptor?
+	}
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -458,16 +424,20 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
-	void addReservation(ClientSessionImpl session, Object reservation) {
-	    addReservation0(session, reservation, false);
+	void addMessage(
+	    ClientSessionImpl session, byte[] message, Delivery delivery)
+	{
+	    addMessage0(session, message, delivery, false);
 	}
 
 	/**
 	 * Adds to the head of the list a message to be sent to the
 	 * specified session after this transaction commits.
 	 */
-	void addReservationFirst(ClientSessionImpl session, Object reservation) {
-	    addReservation0(session, reservation, true);
+	void addMessageFirst(
+	    ClientSessionImpl session, byte[] message, Delivery delivery)
+	{
+	    addMessage0(session, message, delivery, true);
 	}
 
 	/**
@@ -496,23 +466,24 @@ public class ClientSessionServiceImpl implements ClientSessionService {
             }
 	}
 
-	private void addReservation0(
-	    ClientSessionImpl session, Object reservation, boolean isFirst)
+	private void addMessage0(
+	    ClientSessionImpl session, byte[] message, Delivery delivery,
+	    boolean isFirst)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addMessage first:{0} session:{1}, rsvp:{2}",
-			isFirst, session, reservation);
+			"Context.addMessage first:{0} session:{1}, message:{2}",
+			isFirst, session, message);
 		}
 		checkPrepared();
 
 		Updates updates = getUpdates(session);
 		if (isFirst) {
-		    updates.reservations.add(0, reservation);
+		    updates.messages.add(0, message);
 		} else {
-		    updates.reservations.add(reservation);
+		    updates.messages.add(message);
 		}
 	    
 	    } catch (RuntimeException e) {
@@ -566,10 +537,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 */
 	public void abort(boolean retryable) {
 	    contextQueue.remove(this);
-            if (! retryable) {
-                for (Updates updates : sessionUpdates.values())
-                    updates.cancel();
-            }
 	    checkFlush();
 	}
 
@@ -626,7 +593,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	private final ClientSessionImpl session;
 	
 	/** List of protocol messages to send on commit. */
-	List<Object> reservations = new ArrayList<Object>();
+	List<byte[]> messages = new ArrayList<byte[]>();
 
 	/** If true, disconnect after sending messages. */
 	boolean disconnect = false;
@@ -635,14 +602,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    this.session = session;
 	}
 
-        private void cancel() {
-            for (Object rsvp : reservations)
-                session.cancelReservation(rsvp);
-        }
-
-        private void flush() {
-	    for (Object rsvp : reservations) {
-		session.invokeReservation(rsvp);
+	private void flush() {
+	    for (byte[] message : messages) {
+		session.sendProtocolMessage(message, Delivery.RELIABLE);
 	    }
 	    if (disconnect) {
 		session.handleDisconnect(false);

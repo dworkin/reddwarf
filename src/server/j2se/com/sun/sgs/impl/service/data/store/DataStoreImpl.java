@@ -850,6 +850,7 @@ public class DataStoreImpl
 	    logger.log(
 		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	}
+	Exception exception;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
@@ -1013,6 +1014,7 @@ public class DataStoreImpl
 		       txn, classId);
 	}
 	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
+	Exception exception;
 	try {
 	    checkTxn(txn, getClassInfoOp);
 	    if (classId < 1) {

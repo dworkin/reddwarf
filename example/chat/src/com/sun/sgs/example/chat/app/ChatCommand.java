@@ -57,7 +57,7 @@ public enum ChatCommand {
     DISCONNECT,
 
     /**
-     * Shuts down the server.
+     * Join this session to the named channel.
      * <pre>
      *    /shutdown
      * </pre>
