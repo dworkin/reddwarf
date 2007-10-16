@@ -63,6 +63,16 @@ public final class Channels {
         }
     }
 
+    /**
+     * Checks that the given offset and length are appropriate for the
+     * array, otherwise throws {@link IndexOutOfBoundsException}.
+     * 
+     * @param b the array
+     * @param off the offset
+     * @param len the length
+     * @throws IndexOutOfBoundsException if the offset and length are
+     *         out of the array bounds.
+     */
     private static void checkBounds(byte[] b, int off, int len) {
         if ((off < 0) || (off > b.length) || (len < 0) ||
                 ((off + len) > b.length) || ((off + len) < 0)) {
