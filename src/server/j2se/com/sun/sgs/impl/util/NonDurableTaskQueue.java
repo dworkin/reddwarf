@@ -117,7 +117,11 @@ public class NonDurableTaskQueue {
 	ContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
-	
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public Context createContext(Transaction txn) {
 	    return new Context(txn);
 	}
@@ -147,6 +151,7 @@ public class NonDurableTaskQueue {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public void commit() {
 	    if (task != null) {
 		removeTask(task);
@@ -155,6 +160,7 @@ public class NonDurableTaskQueue {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public void abort(boolean isRetryable) {
 	    if (! isRetryable) {
 		if (task != null) {

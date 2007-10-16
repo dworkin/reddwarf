@@ -19,6 +19,8 @@
 
 package com.sun.sgs.service;
 
+import java.util.MissingResourceException;
+
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 

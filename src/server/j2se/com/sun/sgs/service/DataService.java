@@ -45,9 +45,10 @@ public interface DataService extends DataManager, Service {
     /**
      * Obtains the object associated with the service binding of a name.
      * Callers need to notify the system before modifying the object or any of
-     * the non-managed objects it refers to by calling {@link #markForUpdate
-     * markForUpdate} or {@link ManagedReference#getForUpdate
-     * ManagedReference.getForUpdate} before making the modifications.
+     * the non-managed objects it refers to by calling
+     * {@link DataManager#markForUpdate markForUpdate} or
+     * {@link ManagedReference#getForUpdate ManagedReference.getForUpdate}
+     * before making the modifications.
      *
      * @param	<T> the type of the object
      * @param	name the name
@@ -89,13 +90,13 @@ public interface DataService extends DataManager, Service {
      * Removes the service binding for a name.  Note that the object previously
      * bound to the name, if any, is not removed; only the binding between the
      * name and the object is removed.  To remove the object, use the {@link
-     * #removeObject removeObject} method.
+     * DataManager#removeObject removeObject} method.
      *
      * @param	name the name
      * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
-     * @see	#removeObject removeObject
+     * @see	DataManager#removeObject removeObject
      */
     void removeServiceBinding(String name);
 

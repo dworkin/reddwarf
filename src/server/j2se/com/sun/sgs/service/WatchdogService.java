@@ -21,6 +21,8 @@ package com.sun.sgs.service;
 
 import java.util.Iterator;
 
+import com.sun.sgs.app.TransactionException;
+
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
  * notifies registered listeners of node status change events.

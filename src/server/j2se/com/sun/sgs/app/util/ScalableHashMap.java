@@ -37,7 +37,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -644,6 +643,7 @@ public class ScalableHashMap<K,V>
      * clearing, all non-{@code ManagedObject} key and values persisted by this
      * map will be removed from the {@code DataManager}
      */
+    @Override
     public void clear() {
 	DataManager dm = AppContext.getDataManager();
 	dm.markForUpdate(this);
@@ -688,6 +688,7 @@ public class ScalableHashMap<K,V>
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean containsKey(Object key) {
 	return getEntry(key) != null;
     }
@@ -810,6 +811,7 @@ public class ScalableHashMap<K,V>
      * Note that the execution time of this method grows substantially as the
      * map size increases due to the cost of accessing the data manager.
      */
+    @Override
     public boolean containsValue(Object value) {
 	for (Iterator<V> i = values().iterator(); i.hasNext(); ) {
 	    V v;
@@ -1083,6 +1085,7 @@ public class ScalableHashMap<K,V>
      * @throws ObjectNotFoundException if the value associated with the key has
      *	       been removed from the {@link DataManager}
      */
+    @Override
     public V get(Object key) {
 	PrefixEntry<K,V> entry = getEntry(key);
 	return (entry == null) ? null : entry.getValue();
@@ -1124,6 +1127,7 @@ public class ScalableHashMap<K,V>
      * @throws ObjectNotFoundException if the previous value associated with
      *	       the key has been removed from the {@link DataManager}
      */
+    @Override
     public V put(K key, V value) {
 	checkSerializable(key, "key");
 	checkSerializable(value, "value");
@@ -1241,6 +1245,7 @@ public class ScalableHashMap<K,V>
      *	       Serializable}.  If this exception is thrown, some of the entries
      *	       from the argument may have already been added to this map.
      */
+    @Override
     public void putAll(Map<? extends K, ? extends V> m) {
 	for (Entry<? extends K,? extends V> e : m.entrySet()) {
 	    K key = e.getKey();
@@ -1306,6 +1311,7 @@ public class ScalableHashMap<K,V>
      *
      * @return {@code true} if this map contains no mappings
      */
+    @Override
     public boolean isEmpty() {
 	if (isLeafNode() && size == 0) {
 	    return true;
@@ -1336,6 +1342,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the size of the tree
      */
+    @Override
     public int size() {
 	// root is leaf node, short-circuit case
 	if (isLeafNode()) {
@@ -1369,6 +1376,7 @@ public class ScalableHashMap<K,V>
      * @throws ObjectNotFoundException if the value associated with the key has
      *	       been removed from the {@link DataManager}
      */
+    @Override
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	ScalableHashMap<K,V> leaf = lookup(hash);
@@ -1774,7 +1782,10 @@ public class ScalableHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+        @Override
 	public final boolean equals(Object o) {
+            if (o == this)
+                return true;
 	    if (o instanceof Entry) {
 		Entry e = (Entry) o;
 		if (safeEquals(getKey(), e.getKey()) &&
@@ -1789,6 +1800,7 @@ public class ScalableHashMap<K,V>
 	/**
 	 * {@inheritDoc}
 	 */
+        @Override
 	public final int hashCode() {
 	    K key = getKey();
 	    V value = getValue();
@@ -1799,7 +1811,10 @@ public class ScalableHashMap<K,V>
 	/**
 	 * Returns the string form of this entry as {@code entry}={@code
 	 * value}.
+         * 
+         * @return the string form of this entry
 	 */
+        @Override
 	public String toString() {
 	    return getKey() + "=" + getValue();
 	}
@@ -1807,8 +1822,9 @@ public class ScalableHashMap<K,V>
 	/**
 	 * Removes any {@code Serializable} managed by this entry from the data
 	 * manager.  This should only be called from {@link
-	 * ScalableHashMap#clear ScalableHashMap.clear}, {@link
-	 * ScalableHashMap#remove ScalableHashMap.remove}, or {@link #remove
+	 * ScalableHashMap#clear ScalableHashMap.clear},
+         * {@link ScalableHashMap#remove(int, ManagedReference) 
+         * ScalableHashMap.remove}, or {@link ScalableHashMap#remove(Object)
 	 * remove} under the condition that this entry's map-managed object
 	 * will never be referenced again by the map.
 	 */
@@ -2117,7 +2133,7 @@ public class ScalableHashMap<K,V>
     private static final class ValueIterator<K,V>
 	extends ConcurrentIterator<V> {
 
-	public static final long serialVersionUID = 0x1L;
+	private static final long serialVersionUID = 0x1L;
 
 	/**
 	 * Constructs the iterator
@@ -2151,6 +2167,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the set of all mappings contained in this map
      */
+    @Override
     public Set<Entry<K,V>> entrySet() {
 	return new EntrySet<K,V>(this);
     }
@@ -2190,21 +2207,37 @@ public class ScalableHashMap<K,V>
 	    }
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+	@Override
 	public Iterator<Entry<K,V>> iterator() {
 	    checkCache();
 	    return new EntryIterator<K,V>(root);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean isEmpty() {
 	    checkCache();
 	    return root.isEmpty();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public int size() {
 	    checkCache();
 	    return root.size();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean contains(Object o) {
 	    checkCache();
 	    if (!(o instanceof Entry)) {
@@ -2216,6 +2249,10 @@ public class ScalableHashMap<K,V>
 	    return pe != null && pe.equals(e);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public void clear() {
 	    checkCache();
 	    root.clear();
@@ -2236,6 +2273,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the set of all keys contained in this map
      */
+    @Override
     public Set<K> keySet() {
 	return new KeySet<K,V>(this);
     }
@@ -2273,26 +2311,46 @@ public class ScalableHashMap<K,V>
 	    }
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public Iterator<K> iterator() {
 	    checkCache();
 	    return new KeyIterator<K,V>(root);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean isEmpty() {
 	    checkCache();
 	    return root.isEmpty();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public int size() {
 	    checkCache();
 	    return root.size();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean contains(Object o) {
 	    checkCache();
 	    return root.containsKey(o);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public void clear() {
 	    checkCache();
 	    root.clear();
@@ -2313,6 +2371,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the collection of all values contained in this map
      */
+    @Override
     public Collection<V> values() {
 	return new Values<K,V>(this);
     }
@@ -2350,26 +2409,46 @@ public class ScalableHashMap<K,V>
 	    }
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public Iterator<V> iterator() {
 	    checkCache();
 	    return new ValueIterator<K,V>(root);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean isEmpty() {
 	    checkCache();
 	    return root.isEmpty();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public int size() {
 	    checkCache();
 	    return root.size();
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public boolean contains(Object o) {
 	    checkCache();
 	    return root.containsValue(o);
 	}
 
+        /**
+         * {@inheritDoc}
+         */
+        @Override
 	public void clear() {
 	    checkCache();
 	    root.clear();

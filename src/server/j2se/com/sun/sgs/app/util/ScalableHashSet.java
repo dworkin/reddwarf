@@ -230,6 +230,7 @@ public class ScalableHashSet<E>
      *	       does not implement {@code Serializable}
      */
     @SuppressWarnings("unchecked")
+    @Override
     public boolean add(E e) {
 	return map.get(ScalableHashMap.class).put(e, PRESENT) == null;
     }
@@ -239,6 +240,7 @@ public class ScalableHashSet<E>
      * this operation is <i>not</i> constant time.  Clearing a set takes {@code
      * O(n*log(n))} time.
      */
+    @Override
     public void clear() {
 	map.get(ScalableHashMap.class).clear();
     }
@@ -250,6 +252,7 @@ public class ScalableHashSet<E>
      *
      * @return {@code true} if this set contains the specified element
      */
+    @Override
     public boolean contains(Object o) {
 	return map.get(ScalableHashMap.class).containsKey(o);
     }
@@ -259,6 +262,7 @@ public class ScalableHashSet<E>
      *
      * @return {@code true} if this set contains no elements
      */
+    @Override
     public boolean isEmpty() {
 	return map.get(ScalableHashMap.class).isEmpty();
     }
@@ -270,6 +274,7 @@ public class ScalableHashSet<E>
      * @return an iterator over the elements in this set
      */
     @SuppressWarnings("unchecked")
+    @Override
     public Iterator<E> iterator() {
 	return map.get(ScalableHashMap.class).keySet().iterator();
     }
@@ -281,6 +286,7 @@ public class ScalableHashSet<E>
      *
      * @return {@code true} if the element was initially present in this set
      */
+    @Override
     public boolean remove(Object o) {
 	return map.get(ScalableHashMap.class).remove(o) == PRESENT;
     }
@@ -292,6 +298,7 @@ public class ScalableHashSet<E>
      *
      * @return the number of elements in this set
      */
+    @Override
     public int size() {
 	return map.get(ScalableHashMap.class).size();
     }
@@ -335,11 +342,13 @@ public class ScalableHashSet<E>
     private static final class Marker implements Serializable {
 	private static final long serialVersionUID = 1;
 
+        /** {@inheritDoc} */
         @Override
 	public int hashCode() {
 	    return 0;
 	}
 
+        /** {@inheritDoc} */
         @Override
 	public boolean equals(Object o) {
 	    return o instanceof Marker;
