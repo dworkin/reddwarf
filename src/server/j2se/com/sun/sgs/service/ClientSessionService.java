@@ -67,6 +67,18 @@ public interface ClientSessionService extends ClientSessionManager, Service {
     ClientSession getClientSession(byte[] sessionId);
 
     /**
+     * Returns the local client session corresponding to the specified
+     * session ID, or (@code null} if there is no local client session
+     * for the specified ID.  This method should be called outside of
+     * a transaction.
+     *
+     * @param	sessionId a session ID
+     *
+     * @return	a client session, or <code>null</code>
+     */
+    ClientSession getLocalClientSession(byte[] sessionId);
+
+    /**
      * Sends the specified protocol {@code message} to the specified
      * client {@code session} with the specified {@code delivery}
      * guarantee.  This method must be called within a transaction.
@@ -103,9 +115,11 @@ public interface ClientSessionService extends ClientSessionManager, Service {
 
     /**
      * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method is non-transactional, and therefore
-     * this message send cannot be aborted.
+     * <i>local</i> client {@code session} with the specified {@code
+     * delivery} guarantee.  If the specified client session is not
+     * connected to the local node, the message is dropped.  This
+     * method is non-transactional, and therefore this message send
+     * cannot be aborted.
      *
      * @param	session	a client session
      * @param	message a complete protocol message

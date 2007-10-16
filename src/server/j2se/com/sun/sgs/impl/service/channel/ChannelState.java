@@ -70,7 +70,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final String name;
 
     /** The ID from a managed reference to this instance. */
-    private final byte[] idBytes;
+    final byte[] idBytes;
 
     /** The channel ID for this instance, constructed from {@code idBytes}. */
     transient CompactId id;
@@ -154,16 +154,6 @@ final class ChannelState implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns {@code true} if this channel has at least one channel listener,
-     * either a global channel listener or a per-session channel
-     * listener for any member session.
-     */
-    boolean hasChannelListeners() {
-	// FIXME: this should apply to per-session listeners as well.
-	return channelListener != null;
-    }
-
-    /**
      * Returns {@code true} if the specified client {@code session}
      * would be the first session to join this channel on a new node,
      * otherwise returns {@code false}.
@@ -173,25 +163,10 @@ final class ChannelState implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns a collection of channel servers with sessions that are
-     * members of this channel, excluding the channel server for the
-     * specified {@code localNodeId}.
+     * Returns a set of node ID for channel servers with sessions that
+     * are members of this channel.
      */
-    Collection<ChannelServer> getNonLocalChannelServers(long localNodeId) {
-	if (! servers.containsKey(localNodeId)) {
-	    return servers.values();
-	} else {
-	    Set<ChannelServer> nonLocalServers = new HashSet<ChannelServer>();
-	    for (long nodeId : servers.keySet()) {
-		if (nodeId != localNodeId) {
-		    nonLocalServers.add(servers.get(nodeId));
-		}
-	    }
-	    return nonLocalServers;
-	}
-    }
-
-    Set<Long> getNonLocalChannelServerNodes(long localNodeId) {
+    Set<Long> getChannelServerNodeIds() {
 	return servers.keySet();
     }
     
@@ -293,6 +268,7 @@ final class ChannelState implements ManagedObject, Serializable {
 			channelServerKey, ChannelServerWrapper.class).get();
 		dataService.markForUpdate(this);
 		servers.put(nodeId, server);
+		    
 	    } catch (NameNotBoundException e) {
 		logger.logThrow(
 		    Level.SEVERE, e,
@@ -332,10 +308,6 @@ final class ChannelState implements ManagedObject, Serializable {
 	return true;
     }
 
-    /**
-     * Note: This method should be invoked on the node that the session is
-     * connected to.
-     */
     boolean removeSession(DataService dataService, ClientSession session) {
 	// Remove session binding.
 	String sessionKey = getSessionKey(session);
@@ -430,17 +402,21 @@ final class ChannelState implements ManagedObject, Serializable {
 	    null;
     }
 
-    ChannelListener getListener(ClientSession session) {
-	// FIXME: not implemented
-	throw new AssertionError("not implemented");
-	/*
-	WrappedSerializable<ChannelListener> listener =
-	    listeners.get(session);
-	return
-	    listener != null ?
-	    listener.get(ChannelListener.class) :
-	    null;
-	*/
+    ChannelListener getListener(
+	DataService dataService, ClientSession session)
+    {
+	String listenerKey = getListenerKey(session);
+	try {
+	    ManagedObject obj =
+		dataService.getServiceBinding(listenerKey, ManagedObject.class);
+	    return 
+		(obj instanceof ListenerWrapper) ?
+		((ListenerWrapper) obj).get() :
+		(ChannelListener) obj;
+	    
+	} catch (NameNotBoundException e) {
+	    return null;
+	}
     }
 
     /**
@@ -693,4 +669,5 @@ final class ChannelState implements ManagedObject, Serializable {
     {
 	return new ClientSessionOnNodeIterator(dataService, nodeId);
     }
+
 }

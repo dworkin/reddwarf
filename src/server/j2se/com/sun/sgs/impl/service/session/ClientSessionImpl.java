@@ -283,7 +283,7 @@ public class ClientSessionImpl
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
 	    ClientSessionImpl sessionImpl =
-		sessionService.getLocalClientSession(idBytes);
+		sessionService.getLocalClientSessionImpl(idBytes);
 	    if (sessionImpl == null) {
 		CompactId compactId = new CompactId(idBytes);
 		sessionImpl = new ClientSessionImpl(

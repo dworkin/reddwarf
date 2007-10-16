@@ -63,6 +63,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -157,12 +158,6 @@ public class ChannelServiceImpl
     
     /** The sequence number for channel messages originating from the server. */
     private final AtomicLong sequenceNumber = new AtomicLong(0);
-
-    /** A map of channel ID to cached channel state, valid as of the
-     * last transaction commit. */
-    private Map<CompactId, CachedChannelState> channelStateCache =
-	Collections.synchronizedMap(
-	    new HashMap<CompactId, CachedChannelState>());
 
     /**
      * Constructs an instance of this class with the specified {@code
@@ -412,20 +407,22 @@ public class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc} */
-	public void leaveAll(byte[] channelId, byte[][] sessionIds) {
+	public void send(byte[] channelId,
+			 byte[][] recipients,
+			 byte[] protocolMessage,
+			 Delivery delivery)
+	{
 	    callStarted();
 	    try {
-		throw new AssertionError("not implemented");
-	    } finally {
-		callFinished();
-	    }
-	}
-	
-	/** {@inheritDoc} */
-	public void send(byte[] channelId, byte[][] recipients, byte[] message) {
-	    callStarted();
-	    try {
-		throw new AssertionError("not implemented");
+		for (int i = 0; i < recipients.length; i++) {
+		    ClientSession session =
+			sessionService.getLocalClientSession(recipients[i]);
+		    if (session != null && session.isConnected()) {
+			sessionService.sendProtocolMessageNonTransactional(
+			    session, protocolMessage, delivery);
+		    }
+		}
+			
 	    } finally {
 		callFinished();
 	    }
@@ -448,9 +445,9 @@ public class ChannelServiceImpl
 	implements ProtocolMessageListener
     {
 	/** {@inheritDoc} */
-	public void receivedMessage(ClientSession session, byte[] message) {
+	public void receivedMessage(final ClientSession session, byte[] message) {
 	    try {
-		MessageBuffer buf = new MessageBuffer(message);
+		final MessageBuffer buf = new MessageBuffer(message);
 	    
 		buf.getByte(); // discard version
 		
@@ -478,7 +475,20 @@ public class ChannelServiceImpl
 		    
 		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
 
-		    handleChannelSendRequest(session, buf);
+		    try {
+			taskScheduler.runTransactionalTask(
+			    new AbstractKernelRunnable() {
+				public void run() {
+				    handleChannelSendRequest(session, buf);
+				}},
+			    txnProxy.getCurrentOwner());
+		    } catch (Exception e) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Processing CHANNEL_SEND_REQUEST throws " +
+			    "exception; dropping request:{0}",
+			    HexDumper.format(message));
+		    }
 		    break;
 		    
 		default:
@@ -537,22 +547,24 @@ public class ChannelServiceImpl
 	ClientSession sender, MessageBuffer buf)
     {
 	CompactId channelId = CompactId.getCompactId(buf);
-	CachedChannelState cachedState = channelStateCache.get(channelId);
-	if (cachedState == null) {
-	    // TBD: is this the right logging level?
+	Context context = contextFactory.joinTransaction();
+	final ChannelState channelState =
+	    context.getChannelState(channelId.getId());
+	if (channelState == null) {
 	    logger.log(
 		Level.WARNING,
-		"non-existent channel:{0}, dropping message", channelId);
+		"send attempt on non-existent channel:{0} " +
+		"by session:{1}; dropping message",  channelId, sender);
 	    return;
 	}
-
+	
 	// Ensure that sender is a channel member before continuing.
-	if (!cachedState.hasSession(sender)) {
+	if (! channelState.hasSession(dataService, sender)) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.log(
 		    Level.WARNING,
-		    "send attempt on channel:{0} by non-member session:{1}, " +
-		    "dropping message", channelId, sender);
+		    "send attempt on channel:{0} by non-member session:{1}; " +
+		    "dropping message", channelState.name, sender);
 	    }
 	    return;
 	}
@@ -571,23 +583,36 @@ public class ChannelServiceImpl
 	    return;
 	}
 
-	Set<ClientSession> recipients = new HashSet<ClientSession>();
-	if (numRecipients == 0) {
-	    // Recipients are all member sessions
-	    recipients = cachedState.sessions;
-	} else {
-	    // Look up recipient sessions and check for channel membership
-	    for (int i = 0; i < numRecipients; i++) {
-		CompactId recipientId = CompactId.getCompactId(buf);
-		ClientSession recipient =
-		    sessionService.getClientSession(recipientId.getId());
-		if (recipient != null && cachedState.hasSession(recipient)) {
-		    recipients.add(recipient);
+	Set<ClientSession> localRecipients =
+	    (numRecipients == 0) ?
+	    channelState.getSessions(dataService, localNodeId) :
+	    new HashSet<ClientSession>();
+	
+	List<byte[]> nonLocalRecipientsIds = new ArrayList<byte[]>();
+
+	/*
+	 * For each specified recipient: if the recipient is a local
+	 * session, add to list of local sessions (and drop if local
+	 * session is not a channel member); if the recipient is a
+	 * non-local session, add the session's ID to the list of
+	 * non-local recipients.
+	 */
+	for (int i = 0; i < numRecipients; i++) {
+	    CompactId recipientId = CompactId.getCompactId(buf);
+	    byte[] idBytes = recipientId.getId();
+	    ClientSession recipient =
+		sessionService.getLocalClientSession(idBytes);
+	    if (recipient != null) {
+		// only add local recipient if it is a channel member
+		if (channelState.hasSession(dataService, recipient)) {
+		    localRecipients.add(recipient);
 		}
+	    } else {
+		nonLocalRecipientsIds.add(idBytes);
 	    }
 	}
 
-	byte[] channelMessage = buf.getByteArray();
+	final byte[] channelMessage = buf.getByteArray();
 	byte[] protocolMessage =
 	    getChannelMessage(
 		channelId, ((ClientSessionImpl) sender).getCompactSessionId(),
@@ -597,25 +622,73 @@ public class ChannelServiceImpl
 	    logger.log(
 		Level.FINEST,
 		"name:{0}, message:{1}",
-		cachedState.name, HexDumper.format(channelMessage));
+		channelState.name, HexDumper.format(channelMessage));
 	}
 
+	/*
+	 * Send to local recipients.
+	 */
 	ClientSessionId senderId = sender.getSessionId();
-	for (ClientSession session : recipients) {
+	for (ClientSession session : localRecipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
-		sessionService.sendProtocolMessageNonTransactional(
-		    session, protocolMessage, cachedState.delivery);
+		sessionService.sendProtocolMessage(
+		    session, protocolMessage, channelState.delivery);
 	    }
-        }
-
-	if (cachedState.hasChannelListeners) {
-	    NonDurableTaskQueue queue = getTaskQueue(sender);
-	    // Notify listeners in the app in a transaction
-	    queue.addTask(
-		new NotifyTask(cachedState.name, channelId,
-			       senderId, channelMessage));
 	}
+
+	/*
+	 * If the channel send request is to all channel members or to
+	 * specific non-local recipients, forward the request to all
+	 * non-local channel servers so that they can deliver the
+	 * channel message to their locally-attached recipients as
+	 * appropriate.
+	 */
+	if (numRecipients == 0 || ! nonLocalRecipientsIds.isEmpty()) {
+
+	    final byte[][] recipientIds = new byte[nonLocalRecipientsIds.size()][];
+	    int i = 0;
+	    for (byte[] idBytes : nonLocalRecipientsIds) {
+		recipientIds[i++] = idBytes;
+	    }
+
+	    final byte[] channelIdBytes = channelId.getId();
+	    for (final long nodeId : channelState.getChannelServerNodeIds()) {
+		if (nodeId != localNodeId) {
+
+		    // run task on transaction commit...
+		    final ChannelServer server =
+			channelState.getChannelServer(nodeId);
+		    sessionService.runTask(
+			null,
+			new Runnable() {
+			    public void run() {
+				try {
+				    server.send(channelIdBytes, recipientIds,
+						channelMessage,
+						channelState.delivery);
+				} catch (Exception e) {
+				    // skip unresponsive channel server
+				    logger.logThrow(
+					Level.WARNING, e,
+					"Contacting channel server:{0} on " +
+					" node:{1} throws ", server, nodeId);
+				}
+			    }});
+		}
+	    }
+	}
+	
+	/*
+	 * Add task to notify channel listeners of message. The
+	 * notification happens in a transaction.
+	 *
+	 * FIXME: this notification task needs to be durable
+	 */
+	NonDurableTaskQueue queue = getTaskQueue(sender);
+	queue.addTask(
+	    new NotifyTask(channelState.name, channelId,
+			   senderId, channelMessage));
     }
     
     /**
@@ -641,12 +714,11 @@ public class ChannelServiceImpl
      * channels.
      *
      * <p>This context maintains an internal table that maps (for the
-     * channels used in the context's associated transaction) channel name
-     * to channel implementation.  To create, obtain, or remove a channel
-     * within a transaction, the {@code createChannel},
-     * {@code getChannel}, or {@code removeChannel} methods
-     * (respectively) must be called on the context so that the proper
-     * channel instances are used.
+     * channels used in the context's associated transaction) channel
+     * name to channel implementation.  To create or obtain a channel
+     * within a transaction, the {@code createChannel} or {@code
+     * getChannel} methods (respectively) must be called on the
+     * context so that the proper channel instances are used.
      */
     final class Context extends TransactionContext {
 
@@ -673,9 +745,9 @@ public class ChannelServiceImpl
 	 * state is bound to a name composed of the channel service's
 	 * prefix followed by ".state." followed by the channel name.
 	 */
-	private Channel createChannel(String name,
-				      ChannelListener listener,
-				      Delivery delivery)
+	Channel createChannel(String name,
+			      ChannelListener listener,
+			      Delivery delivery)
 	{
 	    assert name != null;
 	    String key = getChannelStateKey(name);
@@ -699,8 +771,12 @@ public class ChannelServiceImpl
 	 * for this transaction, then the channel is returned;
 	 * otherwise, this method gets the channel's state by looking
 	 * up the service binding for the channel.
+	 *
+	 * @param   name a channel name
+	 * @return  the channel with the specified {@code name}
+	 * @throws  NameNotBoundException if the channel does not exist
 	 */
-	private Channel getChannel(String name) {
+	Channel getChannel(String name) {
 	    assert name != null;
 	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
@@ -727,18 +803,20 @@ public class ChannelServiceImpl
 	 * channel is returned; otherwise, this method uses the {@code
 	 * channelId} as a {@code ManagedReference} ID to the
 	 * channel's state.
+	 *
+	 * @param   name a channel name
+	 * @param   channelId a channel ID
+	 * @return  the channel with the specified {@code name} and
+	 *	    {@code channelId}
+	 * @throws  NameNotBoundException if the channel does not exist
 	 */
-	private Channel getChannel(String name, CompactId channelId) {
+	Channel getChannel(String name, CompactId channelId) {
+	    assert name != null;
 	    assert channelId != null;
 	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
-		ChannelState channelState;
-		try {
-		    BigInteger refId = new BigInteger(1, channelId.getId());
-		    ManagedReference stateRef =
-			dataService.createReferenceForId(refId);
-		    channelState = stateRef.get(ChannelState.class);
-		} catch (ObjectNotFoundException e) {
+		ChannelState channelState = getChannelState(channelId.getId());
+		if (channelState == null) {
 		    throw new NameNotBoundException(name);
 		}
 		channel = new ChannelImpl(this, channelState);
@@ -749,6 +827,29 @@ public class ChannelServiceImpl
 	    return channel;
 	}
 
+	/**
+	 * Returns a channel state for the channel with the specified
+	 * {@code channelId}, or {@code null} if the channel doesn't
+	 * exist.  This method uses the {@code channelId} as a {@code
+	 * ManagedReference} ID to the channel's state.
+	 *
+	 * @param   channelId a channel ID
+	 * @return  the channel state for the channel with the specified
+	 *	    {@code channelId}, or {@code null} if the channel
+	 *	    doesn't exist
+	 */
+	ChannelState getChannelState(byte[] channelIdBytes) {
+	    assert channelIdBytes != null;
+	    try {
+		BigInteger refId = new BigInteger(1, channelIdBytes);
+		ManagedReference stateRef =
+		    dataService.createReferenceForId(refId);
+		return stateRef.get(ChannelState.class);
+	    } catch (ObjectNotFoundException e) {
+		return null;
+	    }
+	}
+	
 	/* -- transaction participant methods -- */
 
 	/**
@@ -806,15 +907,6 @@ public class ChannelServiceImpl
 	 */
 	private boolean flush() {
 	    if (isCommitted) {
-		for (ChannelImpl channel : internalTable.values()) {
-		    if (channel.isClosed) {
-			channelStateCache.remove(channel.state.id);
-		    } else {
-			channelStateCache.put(
-			    channel.state.id,
-			    new CachedChannelState(channel));
-		    }
-		}
 		return true;
 	    } else {
 		return false;
@@ -900,35 +992,6 @@ public class ChannelServiceImpl
 	}
     }
     
-    /**
-     * Contains cached channel state, stored in the {@code channelStateCache}
-     * map when a committed context is flushed.
-     */
-    private class CachedChannelState {
-
-	private final String name;
-	private final Set<ClientSession> sessions;
-	private final boolean hasChannelListeners;
-	private final Delivery delivery;
-
-	CachedChannelState(ChannelImpl channelImpl) {
-	    this.name = channelImpl.state.name;
-	    // FIXME: the current getSessions needs a transaction...
-	    this.sessions = null;
-	    /*
-	    this.sessions =
-		channelImpl.state.getSessions(dataService, localNodeId);
-	    */
-	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
-	    this.delivery = channelImpl.state.delivery;
-	}
-
-	boolean hasSession(ClientSession session) {
-	    // FIXME: this only works for sessions on the local node
-	    return sessions.contains(session);
-	}
-    }
-
     /**
      * The {@code RecoveryListener} for handling requests to recover
      * for a failed {@code ChannelService}.

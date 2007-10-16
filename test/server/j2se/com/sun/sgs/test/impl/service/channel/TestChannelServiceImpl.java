@@ -1048,7 +1048,56 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    public void testChannelSendAll() throws Exception {
+	commitTransaction();
+	ClientGroup group =
+	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry", "curly");
+
+	try {
+	    boolean failed = false;
+	    group.join(CHANNEL_NAME);
+	    String messageString = "from server";
+	    MessageBuffer buf =
+		new MessageBuffer(MessageBuffer.getSize(messageString) + 4);
+	    buf.putString(messageString).
+		putInt(0);
+
+	    createTransaction();
+	    Channel channel = channelService.getChannel(CHANNEL_NAME);
+	    channel.send(buf.getBuffer());
+	    commitTransaction();
+
+	    for (DummyClient client : group.getClients()) {
+		MessageInfo info = client.nextChannelMessage();
+		if (info == null) {
+		    failed = true;
+		    System.err.println(
+ 			"member:" + client.name + " did not get message");
+		} else {
+		    buf = new MessageBuffer(info.message);
+		    String message = buf.getString();
+		    if (!message.equals(messageString)) {
+			fail("Got message: " + message + ", Expected: " +
+			     messageString);
+		    }
+		    System.err.println(
+			client.name + " got channel message: " + message);
+		}
+	    }
+
+	    if (failed) {
+		fail("test failed");
+	    }
+	    
+	} catch (RuntimeException e) {
+	    System.err.println("unexpected failure");
+	    e.printStackTrace();
+	    fail("unexpected failure: " + e);
+	} finally {
+	    group.disconnect(false);
+	}
+    }
     
     /* -- Test Channel.send (one recipient) -- */
 
@@ -1275,7 +1324,7 @@ public class TestChannelServiceImpl extends TestCase {
 	
     }
 
-    public void testSendFromSessionToSession() throws Exception {
+    public void testChannelSendRequestWithSingleRecipient() throws Exception {
 	commitTransaction();
 	String name = CHANNEL_NAME;
 	ClientGroup group =
@@ -1339,7 +1388,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
     
-    public void testSendtoAllChannelMembers() throws Exception {
+    public void testChannelSendRequestToAllChannelMembers() throws Exception {
 	commitTransaction();
 	ClientGroup group =
 	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry", "curly");
@@ -1397,7 +1446,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
     
-    public void testSendFromNonMemberSession() throws Exception {
+    public void testChannelSendRequestFromNonMemberSession() throws Exception {
 	commitTransaction();
 	ClientGroup group =
 	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry");

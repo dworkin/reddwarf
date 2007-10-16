@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -55,40 +56,24 @@ public interface ChannelServer extends Remote {
 	throws IOException;
 
     /**
-     * Notifies this server that all sessions have left the channel
-     * with the specified {@code channelId}, and the the client
-     * sessions with the specified {@code sessionId}s need to be sent
-     * a 'CHANNEL_LEAVE' protocol message.  The sessions with the
-     * specified {@code sessionId}s are those sessions that were
-     * members of the specified channel that are connected to this
-     * server's node.
-     *
-     * @param	channelId a channelId
-     * @param	sessionIds an array of IDs of client sessions that were
-     * 		members of the channel and are connected to this server's
-     *		node
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    void leaveAll(byte[] channelId, byte[][] sessionIds)
-	throws IOException;
-
-    /**
      * For each client session recipient (specified by its
      * corresponding client session ID in the {@code recipients} array
-     * of ID byte arrays), sends the specified {@code message} to the
-     * recipient iff: the recipient is a member of the channel and is
-     * connected to the local node.
+     * of ID byte arrays), sends the specified {@code protocolMessage}
+     * to the recipient if the recipient is connected to the local
+     * node.
      *
      * @param	channelId a channel ID
-     * @param	recipients a byte array containing a number of
-     *		client session ID byte array (an emtpy array means
-     *		send to all local sessions on the channel)
-     * @param	message a channel message
+     * @param	recipients an array containing client session ID
+     *		byte arrays
+     * @param	protocolMessage a protocol message
+     * @param	delivery the delivery guarantee
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(byte[] channelId, byte[][] recipients, byte[] message)
+    void send(byte[] channelId,
+	      byte[][] recipients,
+	      byte[] message,
+	      Delivery delivery)
 	throws IOException;
 
     /**

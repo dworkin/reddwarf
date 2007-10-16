@@ -432,13 +432,24 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	if (sessionId == null) {
 	    throw new NullPointerException("null sessionId");
 	}
-	// TBD: this method needs to be rethought.
-	//checkLocalNodeAlive();
+	// TBD: is this method necessary?
+	checkLocalNodeAlive();
+	ClientSession session = getLocalClientSession(sessionId);
+	return
+	    (session != null) ?
+	    session :
+	    ClientSessionImpl.getSession(dataService, sessionId);
+    }
+
+    public ClientSession getLocalClientSession(byte[] sessionId) {
+	if (sessionId == null) {
+	    throw new NullPointerException("null sessionId");
+	}
 	ClientSessionHandler handler = getHandler(sessionId);
 	return
 	    (handler != null) ?
 	    handler.getClientSession() :
-	    ClientSessionImpl.getSession(dataService, sessionId);
+	    null;
     }
 
     /** {@inheritDoc} */
@@ -500,33 +511,16 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	ClientSessionHandler handler = handlers.get(sessionId);
 	/*
 	 * If a local handler exists, forward message to local handler
-	 * to send to client session, otherwise obtain remote server
-	 * for client session and forward message for delivery.
+	 * to send to client session.
 	 */
 	if (handler != null) {
 	    handler.sendProtocolMessage(message, delivery);
 	} else {
-	    ClientSessionImpl sessionImpl = getClientSessionImpl(session);
-	    if (! sessionImpl.isConnected()) {
-		logger.log(
-		    Level.FINE,
-		    "Discarding messages for disconnected session:{0}",
-		    sessionImpl);
+	    logger.log(
+		Level.FINE,
+		"Discarding messages for unknown session:{0}",
+		session);
 		return;
-	    }
-	    try {
-		boolean connected = sessionImpl.getClientSessionServer().
-		    sendProtocolMessage(sessionId.getBytes(), message,
-					delivery);
-		if (! connected) {
-		    sessionImpl.setDisconnected();
-		}
-	    } catch (IOException e) {
-		logger.logThrow(
-		    Level.FINE, e, "Sending message to session:{0} throws");
-		// TBD: set the session as disconnected?
-		// sessionImpl.setDisconnected();
-	    }
 	}
     }
 
@@ -1128,7 +1122,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * @param	idBytes a session ID
      * @return	a client session impl
      */
-    ClientSessionImpl getLocalClientSession(byte[] idBytes) {
+    ClientSessionImpl getLocalClientSessionImpl(byte[] idBytes) {
 	ClientSessionHandler handler = getHandler(idBytes);
 	return (handler != null) ? handler.getClientSession() : null;
     }

@@ -39,8 +39,10 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -125,40 +127,9 @@ final class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Add session and listener (if any) to channel state.
 	     */
-	    final long sessionNodeId = state.getNodeId(session);
-	    boolean isFirstSessionOnNode =
-		! state.hasSessionsOnNode(sessionNodeId);
 	    if (!state.addSession(dataService, session, listener)) {
 		// session already added
-		assert ! isFirstSessionOnNode;
 		return;
-	    }
-	    /*
-	     * If the specified session is the first session to join
-	     * this channel on a node, then notify all non-local
-	     * channel servers so that they can update their cache.
-	     */
-	    if (isFirstSessionOnNode) {
-		final Collection<ChannelServer> nonLocalServers =
-		    state.getNonLocalChannelServers(context.getLocalNodeId());
-		if (! nonLocalServers.isEmpty()) {
-		    runTaskOnCommit(
-			session,
-			new Runnable() {
-			    public void run() {
-				for (ChannelServer server : nonLocalServers) {
-				    try {
-					server.join(state.getIdBytes(),
-						    sessionNodeId);
-				    } catch (Exception e) {
-					// skip unresponsive channel server
-					logger.logThrow(
-					    Level.WARNING, e,
-					    "Contacting channel server:{0} " +
-					    "throws", server);
-				    }
-				}}});
-		}
 	    }
 	    /*
 	     * Send 'join' message to client session.
@@ -210,35 +181,6 @@ final class ChannelImpl implements Channel, Serializable {
 		    putBytes(state.id.getExternalForm());
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
-	    /*
-	     * If the removed session was the last session for this
-	     * channel on a node, then notify the non-local channel
-	     * servers so that they can update their cache.
-	     */
-	    final long sessionNodeId = state.getNodeId(session);
-	    if (! state.hasSessionsOnNode(sessionNodeId)) {
-		final Collection<ChannelServer> nonLocalServers =
-		    state.getNonLocalChannelServers(context.getLocalNodeId());
-		if (! nonLocalServers.isEmpty()) {
-		    runTaskOnCommit(
-			session,
-			new Runnable() {
-			    public void run() {
-				for (ChannelServer server : nonLocalServers) {
-				    try {
-					server.leave(state.getIdBytes(),
-						     sessionNodeId);
-				    } catch (Exception e) {
-					// skip unresponsive channel server
-					logger.logThrow(
-					    Level.WARNING, e,
-					    "Contacting channel server:{0} " +
-					    "throws", server);
-				    }
-				}
-			    }});
-		}
-	    }
 	    
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 	    
@@ -267,7 +209,7 @@ final class ChannelImpl implements Channel, Serializable {
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putBytes(state.id.getExternalForm());
-	    byte[] message = buf.getBuffer();
+	    final byte[] message = buf.getBuffer();
 	    for (ClientSession session : 
 		     state.getSessions(dataService, localNodeId))
 	    {
@@ -281,26 +223,29 @@ final class ChannelImpl implements Channel, Serializable {
 	     * server's node were removed from the channel and need to
 	     * be sent a 'leave' protocol message.
 	     */
-	    for (long nodeId : 
-		     state.getNonLocalChannelServerNodes(localNodeId))
-	    {
-		final byte[][] sessions =
-		    getSessionIds(state.getSessions(dataService, nodeId));
-		final ChannelServer server = state.getChannelServer(nodeId);
-		runTaskOnCommit(
-		    null,
-		    new Runnable() {
-			public void run() {
-			    try {
-				server.leaveAll(state.getIdBytes(), sessions);
-			    } catch (Exception e) {
-				// skip unresponsive channel server
-				logger.logThrow(
-				    Level.WARNING, e,
-				    "Contacting channel server:{0} throws",
-				    server);
-			    }
-			}});
+	    final byte[] channelId = state.getIdBytes();
+	    for (long nodeId : state.getChannelServerNodeIds()) {
+		if (nodeId != localNodeId) {
+
+		    final ChannelServer server = state.getChannelServer(nodeId);
+		    final byte[][] sessions =
+			getSessionIds(state.getSessions(dataService, nodeId));
+		    runTaskOnCommit(
+			null,
+			new Runnable() {
+			    public void run() {
+				try {
+				    server.send(channelId, sessions, message,
+						state.delivery);
+				} catch (Exception e) {
+				    // skip unresponsive channel server
+				    logger.logThrow(
+				        Level.WARNING, e,
+					"Contacting channel server:{0} throws",
+					server);
+				}
+			    }});
+		}
 	    }
 	    /*
 	     * Remove all client sessions from this channel.
@@ -353,10 +298,8 @@ final class ChannelImpl implements Channel, Serializable {
                     "message too long: " + message.length + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
-	    // FIXME: not implemented!
-	    // sendToClients(state.getSessions(), message);
+	    sendToAllMembers(message);
 	    logger.log(Level.FINEST, "send message:{0} returns", message);
-	    throw new AssertionError("not implemented");
 	    
 	} catch (RuntimeException e) {
 	    logger.logThrow(
@@ -382,7 +325,7 @@ final class ChannelImpl implements Channel, Serializable {
 	
 	    Set<ClientSession> sessions = new HashSet<ClientSession>();
 	    sessions.add(recipient);
-	    sendToClients(sessions, message);
+	    sendToMembers(sessions, message);
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -418,7 +361,7 @@ final class ChannelImpl implements Channel, Serializable {
             }
 
 	    if (!recipients.isEmpty()) {
-		sendToClients(recipients, message);
+		sendToMembers(recipients, message);
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -547,7 +490,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    // Notify per-session listener.
-	    listener = state.getListener(senderSession);
+	    listener = state.getListener(dataService, senderSession);
 	    if (listener != null) {
 		listener.receivedMessage(this, senderSession, message);
 	    }
@@ -570,24 +513,122 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * When this transaction commits, sends the given {@code message}
-     * from this channel's server to the specified set of client
-     * {@code sessions}.
+     * When this transaction commits, sends the given {@code
+     * channelMessage} from this channel's server to all channel members.
      */
-    private void sendToClients(Set<ClientSession> sessions, byte[] message) {
-
-	byte[] protocolMessage =
+    private void sendToAllMembers(final byte[] channelMessage) {
+	long localNodeId = context.getLocalNodeId();
+	final byte[] channelIdBytes = state.idBytes;
+	final byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
-		state.id, SERVER_ID, message, context.nextSequenceNumber());
-	// FIXME: not implemented!
-	throw new AssertionError("not implemented");
-	/*    
-	for (ClientSession session : sessions) {
-	    // skip disconnected and non-member sessions
-	    if (state.hasSession(session) && session.isConnected()) {
-		sendProtocolMessageOnCommit(session, protocolMessage);
+		state.id, SERVER_ID, channelMessage,
+		context.nextSequenceNumber());
+	for (final long nodeId : state.getChannelServerNodeIds()) {
+	    Set<ClientSession> recipients =
+		state.getSessions(dataService, nodeId);
+	    if (nodeId == localNodeId) {
+		
+		/*
+		 * Send channel message to local recipients.
+		 */
+		for (ClientSession session : recipients) {
+		    context.getClientSessionService().sendProtocolMessage(
+			session, protocolMessage, state.delivery);
+		}
+		    
+	    } else {
+		final ChannelServer server = state.getChannelServer(nodeId);
+		final byte[][] recipientIds = new byte[recipients.size()][];
+		int i = 0;
+		for (ClientSession session : recipients) {
+		    recipientIds[i++] = session.getSessionId().getBytes();
+		}
+		    
+		context.getClientSessionService().runTask(
+		    null,
+		    new Runnable() {
+			public void run() {
+			    try {
+				server.send(channelIdBytes, recipientIds,
+					    protocolMessage, state.delivery);
+			    } catch (Exception e) {
+				// skip unresponsive channel server
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "Contacting channel server:{0} on " +
+				    " node:{1} throws ", server, nodeId);
+			    }
+			}});
 	    }
 	}
-	*/
+    }
+
+    /**
+     * When this transaction commits, sends the given {@code
+     * channelMessage} from this channel's server to the specified
+     * recipient {@code sessions}.
+     */
+    private void sendToMembers(Set<ClientSession> sessions,
+			       final byte[] channelMessage)
+    {
+	final byte[] channelIdBytes = state.idBytes;
+	Map<Long, Set<ClientSession>> recipientsPerNode =
+	    new HashMap<Long, Set<ClientSession>>();
+	for (ClientSession session : sessions) {
+	    long nodeId = ChannelState.getNodeId(session);
+	    Set<ClientSession> recipients =
+		recipientsPerNode.get(nodeId);
+	    if (recipients == null) {
+		recipients = new HashSet<ClientSession>();
+		recipientsPerNode.put(nodeId, recipients);
+	    }
+	    recipients.add(session);
+	}
+	
+	long localNodeId = context.getLocalNodeId();
+	for (final long nodeId : state.getChannelServerNodeIds()) {
+	    Set<ClientSession> recipients = recipientsPerNode.get(nodeId);
+	    if (recipients == null) {
+		continue;
+	    }
+	    if (nodeId == localNodeId) {
+		
+		byte[] protocolMessage =
+		    ChannelServiceImpl.getChannelMessage(
+			state.id, SERVER_ID, channelMessage,
+			context.nextSequenceNumber());
+		/*
+		 * Send channel message to local recipients.
+		 */
+		for (ClientSession session : recipients) {
+		    context.getClientSessionService().sendProtocolMessage(
+			session, protocolMessage, state.delivery);
+		}
+		    
+	    } else {
+		final ChannelServer server = state.getChannelServer(nodeId);
+		final byte[][] recipientIds = new byte[recipients.size()][];
+		int i = 0;
+		for (ClientSession session : recipients) {
+		    recipientIds[i++] = session.getSessionId().getBytes();
+		}
+		    
+		context.getClientSessionService().runTask(
+		    null,
+		    new Runnable() {
+			public void run() {
+			    try {
+				server.send(channelIdBytes, recipientIds,
+					    channelMessage, state.delivery);
+			    } catch (Exception e) {
+				// skip unresponsive channel server
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "Contacting channel server:{0} on " +
+				    " node:{1} throws ", server, nodeId);
+			    }
+			}});
+	    }
+	}
     }
 }
