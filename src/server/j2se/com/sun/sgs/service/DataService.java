@@ -151,8 +151,8 @@ public interface DataService extends DataManager, Service {
      * removed. <p>
      *
      * The object identifiers accepted and returned by this method are the same
-     * as those returned by the {@link ManagedReference#getObjectId
-     * ManagedReference.getObjectId} method. <p>
+     * as those returned by the {@link ManagedReference#getId
+     * ManagedReference.getId} method. <p>
      *
      * Applications should not assume that objects associated with the
      * identifiers returned by this method, but which cannot be reached by

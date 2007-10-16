@@ -140,9 +140,9 @@ public interface DataManager {
      * throwing {@link ObjectNotFoundException}, although this behavior is not
      * guaranteed. <p>
      *
-     * If {@code object} implements {@link ManagedObjectRemoval}, then first
-     * calls the {@link ManagedObjectRemoval#removingObject
-     * ManagedObjectRemoval.removingObject} method on it, to notify the object
+     * If {@code object} implements {@link ManagedObjectRemoval}, then this
+     * method first calls the {@link ManagedObjectRemoval#removingObject
+     * ManagedObjectRemoval.removingObject} method on the object, to notify it
      * that it is being removed.
      *
      * @param	object the object

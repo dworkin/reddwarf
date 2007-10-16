@@ -463,16 +463,16 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    "The object must be serializable");
 	    }
 	    Context context = getContext();
-	    if (object instanceof ManagedObjectRemoval) {
-		((ManagedObjectRemoval) object).removingObject();
-		/*
-		 * Get the context again in case something changed as a result
-		 * of the call to removingObject.
-		 */
-		context = getContext();
-	    }
 	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
+		if (object instanceof ManagedObjectRemoval) {
+		    ((ManagedObjectRemoval) object).removingObject();
+		    /*
+		     * Get the context again in case something changed as a
+		     * result of the call to removingObject.
+		     */
+		    context = getContext();
+		}
 		ref.removeObject();
 	    }
 	    logger.log(
