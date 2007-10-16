@@ -38,33 +38,6 @@ public final class Channels {
     /** Prevents instantiation of this class. */
     private Channels() { }
 
-    // Based on code in java.nio.channels.Channels
-
-    /**
-     * Synchronously writes the contents of the buffer to the channel,
-     * blocking until the entire buffer is written.
-     * 
-     * @param ch the channel to write to
-     * @param bb the buffer to write to the channel
-     * @throws IOException if an I/O error occurs
-     * 
-     */
-    private static void writeAll(AsynchronousByteChannel ch, ByteBuffer bb)
-        throws IOException
-    {
-        try {
-            while (bb.hasRemaining()) {
-                ch.write(bb, null).get();
-            }
-        } catch (InterruptedException e) {
-            ch.close();
-            Thread.currentThread().interrupt();
-            throw new ClosedByInterruptException();
-        } catch (ExecutionException e) {
-            launderExecutionException(e);
-        }
-    }
-
     /**
      * Unwraps an {@code ExecutionException} and throws its cause.
      * 
@@ -90,6 +63,13 @@ public final class Channels {
         }
     }
 
+    private static void checkBounds(byte[] b, int off, int len) {
+        if ((off < 0) || (off > b.length) || (len < 0) ||
+                ((off + len) > b.length) || ((off + len) < 0)) {
+            throw new IndexOutOfBoundsException();
+        }
+    }
+
     /**
      * Constructs a stream that reads bytes from the given channel.
      * <p>
@@ -101,44 +81,32 @@ public final class Channels {
      * @param ch the channel from which bytes will be read
      * @return a new input stream
      */
-    public static InputStream newInputStream(final AsynchronousByteChannel ch)
+    public static InputStream
+    newInputStream(final AsynchronousByteChannel ch)
     {
-        // Based on code in java.nio.channels.Channels
-
         return new InputStream() {
-
-            private ByteBuffer buf = null;
-            private byte[] prevBytes = null;       // Invoker's previous array
-            private byte[] oneByte = null;
 
             @Override
             public synchronized int read() throws IOException {
-               if (oneByte == null)
-                    oneByte = new byte[1];
-               if (this.read(oneByte) == -1)
-                   return -1;
-               return oneByte[0];
+               byte[] oneByte = new byte[1];
+               int rc = this.read(oneByte);
+               return (rc == -1) ? -1 : oneByte[0];
             }
 
             @Override
-            public synchronized int read(byte[] bs, int off, int len)
+            public synchronized int read(byte[] b, int off, int len)
                 throws IOException
             {
-                if ((off < 0) || (off > bs.length) || (len < 0) ||
-                        ((off + len) > bs.length) || ((off + len) < 0)) {
-                    throw new IndexOutOfBoundsException();
-                } else if (len == 0) {
+                checkBounds(b, off, len);
+
+                if (len == 0)
                     return 0;
-                }
-                ByteBuffer bb = ((this.prevBytes == bs)
-                                 ? this.buf
-                                 : ByteBuffer.wrap(bs));
-                bb.limit(Math.min(off + len, bb.capacity()));
-                bb.position(off);
-                this.buf = bb;
-                this.prevBytes = bs;
+
+                ByteBuffer buf = ByteBuffer.wrap(b);
+                buf.position(off).limit(off + len);
+
                 try {
-                    return ch.read(bb, null).get();
+                    return ch.read(buf, null).get();
                 } catch (InterruptedException e) {
                     ch.close();
                     Thread.currentThread().interrupt();
@@ -165,43 +133,41 @@ public final class Channels {
      * @param ch the channel to which bytes will be written
      * @return a new output stream
      */
-    public static OutputStream newOutputStream(
-                                    final AsynchronousByteChannel ch)
+    public static OutputStream 
+    newOutputStream(final AsynchronousByteChannel ch)
     {
         return new OutputStream() {
 
-            // Based on code in java.nio.channels.Channels
-
-            private ByteBuffer buf = null;
-            private byte[] prevBytes = null;       // Invoker's previous array
-            private byte[] b1 = null;
-
             @Override
             public synchronized void write(int b) throws IOException {
-               if (b1 == null)
-                    b1 = new byte[1];
-                b1[0] = (byte)b;
-                this.write(b1);
+                byte[] oneByte = new byte[1];
+                oneByte[0] = (byte)b;
+                write(oneByte);
             }
 
             @Override
-            public synchronized void write(byte[] bs, int off, int len)
+            public synchronized void write(byte[] b, int off, int len)
                 throws IOException
             {
-                if ((off < 0) || (off > bs.length) || (len < 0) ||
-                    ((off + len) > bs.length) || ((off + len) < 0)) {
-                    throw new IndexOutOfBoundsException();
-                } else if (len == 0) {
+                checkBounds(b, off, len);
+
+                if (len == 0)
                     return;
+
+                ByteBuffer buf = ByteBuffer.wrap(b);
+                buf.position(off).limit(off + len);
+
+                try {
+                    while (buf.hasRemaining()) {
+                        ch.write(buf, null).get();
+                    }
+                } catch (InterruptedException e) {
+                    ch.close();
+                    Thread.currentThread().interrupt();
+                    throw new ClosedByInterruptException();
+                } catch (ExecutionException e) {
+                    launderExecutionException(e);
                 }
-                ByteBuffer bb = ((this.prevBytes == bs)
-                                 ? this.buf
-                                 : ByteBuffer.wrap(bs));
-                bb.limit(Math.min(off + len, bb.capacity()));
-                bb.position(off);
-                this.buf = bb;
-                this.prevBytes = bs;
-                Channels.writeAll(ch, bb);
             }
 
             @Override
