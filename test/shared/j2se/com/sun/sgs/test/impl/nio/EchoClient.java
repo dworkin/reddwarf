@@ -67,7 +67,8 @@ public class EchoClient {
         Integer.valueOf(System.getProperty("maxthreads",
             String.valueOf(DEFAULT_MAX_THREADS)));
     private static final boolean DISABLE_NAGLE =
-        Boolean.valueOf(System.getProperty("tcp_nodelay", DEFAULT_DISABLE_NAGLE));
+        Boolean.valueOf(System.getProperty("tcp_nodelay",
+            DEFAULT_DISABLE_NAGLE));
 
     static final Logger log = Logger.getAnonymousLogger();
 
@@ -105,7 +106,8 @@ public class EchoClient {
             log.throwing("EchoClient", "connect", e);
             throw e;
         }
-        channel.connect(new InetSocketAddress(host, port), new ConnectHandler()).get();
+        channel.connect(new InetSocketAddress(host, port),
+            new ConnectHandler()).get();
     }
  
     void start() throws Exception {
@@ -298,8 +300,7 @@ public class EchoClient {
         startSignal = new CountDownLatch(NUM_CLIENTS);
         doneSignal = new CountDownLatch(NUM_CLIENTS);
 
-        log.log(Level.INFO,
-            "Connecting {0,number,integer} clients", NUM_CLIENTS);
+        System.out.format("Connecting %d clients\n", NUM_CLIENTS);
 
         Set<EchoClient> clients = new HashSet<EchoClient>(NUM_CLIENTS);
 
@@ -311,7 +312,7 @@ public class EchoClient {
 
         startSignal.await();
 
-        log.info("Starting test");
+        System.out.println("Starting test");
         startTime = System.nanoTime();
 
         for (EchoClient client : clients)
@@ -326,12 +327,11 @@ public class EchoClient {
                 totalBytesRead.get(),
                 totalBytesWritten.get()
             });
-        log.log(Level.INFO, "{0} ops in {1} seconds = {2} ops/sec",
-            new Object[] {
+        System.out.format("%d ops in %d seconds = %d ops/sec\n",
                 ops,
                 TimeUnit.NANOSECONDS.toSeconds(elapsed),
                 TimeUnit.SECONDS.toNanos(ops) / elapsed
-            });
+            );
 
         group.shutdown();
         log.info("Awaiting group termination");        

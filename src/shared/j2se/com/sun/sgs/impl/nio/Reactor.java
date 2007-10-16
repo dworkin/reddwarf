@@ -519,8 +519,6 @@ class Reactor {
          * expiration action for the task, if any.
          */
         void cleanupTask() {
-            assert task.get() != null;
-
             if (timeoutHandler != null) {
                 timeouts.remove(timeoutHandler);
                 timeoutHandler = null;
