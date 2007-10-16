@@ -105,7 +105,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The IO channel for sending messages to the client. */
     private AsynchronousMessageChannel sessionConnection = null;
 
-    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    public static final int DEFAULT_READ_BUFFER_SIZE  =  64 * 1024;
     public static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
     
     /** The read completion handler for IO. */
@@ -290,7 +290,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         invokeReservation(reserveProtocolMessage(message, delivery));
     }
 
-    public Object reserveProtocolMessage(byte[] message, Delivery delivery) {
+    public Object reserveProtocolMessage(
+        byte[] message,
+        @SuppressWarnings("unused") Delivery delivery)
+    {
         // TODO this is not elegant...
         int len = message.length + 4;
 
