@@ -14,7 +14,6 @@ import java.nio.channels.spi.SelectorProvider;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -27,7 +26,7 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  * This class defines:
  * <ul>
  * <li>Static methods that support the interoperation of the stream
- *     classes of the java.io package with the channel classes of
+ *     classes of the {@link java.io} package with the channel classes of
  *     this package.
  * <li>Method to get the management interfaces for pools of channels
  *     in the the Java virtual machine.
@@ -42,24 +41,23 @@ public final class Channels {
      * Unwraps an {@code ExecutionException} and throws its cause.
      * 
      * @param e the {@code ExecutionException} to unwrap
-     * @return a dummy int, since this function always throws an exception
      * 
      * @throws IOException if the cause was an {@code IOException}
+     * @throws Error if the cause was an {@code Error}
      * @throws RuntimeException otherwise
      */
-    private static int launderExecutionException(ExecutionException e)
+    private static void launderExecutionException(ExecutionException e)
         throws IOException
     {
         Throwable t = e.getCause();
         if (t instanceof IOException) {
             throw (IOException) t;
+        } else if (t instanceof Error) {
+            throw (Error) t;
         } else if (t instanceof RuntimeException) {
             throw (RuntimeException) t;
         } else {
-            // TODO is there something more appropriate to throw? -JM
-            IOException ex = new IOException();
-            ex.initCause(t);
-            throw ex;
+            throw new RuntimeException(t.getMessage(), t);
         }
     }
 
@@ -71,7 +69,7 @@ public final class Channels {
      * @param off the offset
      * @param len the length
      * @throws IndexOutOfBoundsException if the offset and length are
-     *         out of the array bounds.
+     *         out of the array bounds
      */
     private static void checkBounds(byte[] b, int off, int len) {
         if ((off < 0) || (off > b.length) || (len < 0) ||
@@ -122,7 +120,8 @@ public final class Channels {
                     Thread.currentThread().interrupt();
                     throw new ClosedByInterruptException();
                 } catch (ExecutionException e) {
-                    return launderExecutionException(e);
+                    launderExecutionException(e); // always throws
+                    throw new AssertionError("unreachable");
                 }
             }
 
@@ -176,7 +175,8 @@ public final class Channels {
                     Thread.currentThread().interrupt();
                     throw new ClosedByInterruptException();
                 } catch (ExecutionException e) {
-                    launderExecutionException(e);
+                    launderExecutionException(e); // always throws
+                    throw new AssertionError("unreachable");
                 }
             }
 
@@ -209,10 +209,10 @@ public final class Channels {
     public static List<ChannelPoolMXBean> getChannelPoolMXBeans() {
         List<ChannelPoolMXBean> result = new LinkedList<ChannelPoolMXBean>();
 
-        List<Object> providers = Arrays.asList(new Object[] {
+        Object[] providers = new Object[] {
             SelectorProvider.provider(),
             AsynchronousChannelProvider.provider()
-        });
+        };
 
         for (Object provider : providers) {
             if (provider instanceof ManagedChannelFactory) {
