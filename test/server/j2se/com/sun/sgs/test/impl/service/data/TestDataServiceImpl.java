@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
@@ -1365,6 +1366,20 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	createTransaction();
 	service.removeObject(dummy);
+    }
+
+    public void testRemoveObjectRemoval() throws Exception {
+	int count = getObjectCount();
+	txn.commit();
+	createTransaction();
+	service.setBinding("removal", new ObjectWithRemoval());
+	txn.commit();
+	createTransaction();
+	service.removeObject(
+	    service.getBinding("removal", ObjectWithRemoval.class));
+	txn.commit();
+	createTransaction();
+	assertEquals(count, getObjectCount());
     }
 
     /* -- Test markForUpdate -- */
@@ -3027,5 +3042,52 @@ public class TestDataServiceImpl extends TestCase {
 	public byte[] getClassInfo(Transaction txn, int classId) {
 	    return null;
 	}
+	public long nextObjectId(Transaction txn, long oid) { return -1; }
+    }
+
+    /**
+     * A managed object with subobjects that it removes during removingObject.
+     */
+    static class ObjectWithRemoval
+	implements ManagedObjectRemoval, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	private final ManagedReference left;
+	private final ManagedReference right;
+	ObjectWithRemoval() {
+	    this(3);
+	}
+	ObjectWithRemoval(int depth) {
+	    if (--depth <= 0) {
+		left = null;
+		right = null;
+		return;
+	    }
+	    left = service.createReference(new ObjectWithRemoval(depth));
+	    right = service.createReference(new ObjectWithRemoval(depth));
+	}
+	public void removingObject() {
+	    if (left != null) {
+		service.removeObject(left.get(ObjectWithRemoval.class));
+	    }
+	    if (right != null) {
+		service.removeObject(right.get(ObjectWithRemoval.class));
+	    }
+	}
+    }
+
+    /** Returns the current number of objects. */
+    private int getObjectCount() {
+	int count = 0;
+	BigInteger last = null;
+	while (true) {
+	    BigInteger next = service.nextObjectId(last);
+	    if (next == null) {
+		break;
+	    }
+	    last = next;
+	    count++;
+	}
+	return count;
     }
 }

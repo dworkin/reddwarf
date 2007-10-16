@@ -511,6 +511,19 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     }
 
     /**
+     * Returns the next object ID after the one specified, or -1 if there are
+     * none.  Supplying -1 for the object ID requests the first ID.
+     */
+    static long nextObjectId(Context context, long oid) {
+	long result = context.store.nextObjectId(context.txn, oid);
+	if (result == -1) {
+	    /* Check for newly created objects */
+	    result = context.refs.nextObjectId(oid);
+	}
+	return result;
+    }
+
+    /**
      * Returns any modifications that need to be stored to the data store, or
      * null if there are none, and changes the state to FLUSHED.
      */

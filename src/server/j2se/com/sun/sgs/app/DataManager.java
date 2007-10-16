@@ -138,7 +138,12 @@ public interface DataManager {
      * make an effort to flag subsequent references to the removed object
      * through {@link #getBinding getBinding} or {@link ManagedReference} by
      * throwing {@link ObjectNotFoundException}, although this behavior is not
-     * guaranteed.
+     * guaranteed. <p>
+     *
+     * If {@code object} implements {@link ManagedObjectRemoval}, then first
+     * calls the {@link ManagedObjectRemoval#removingObject
+     * ManagedObjectRemoval.removingObject} method on it, to notify the object
+     * that it is being removed.
      *
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
@@ -146,6 +151,7 @@ public interface DataManager {
      * @throws	ObjectNotFoundException if the object has already been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
+     * @see	ManagedObjectRemoval
      */
     void removeObject(ManagedObject object);
 

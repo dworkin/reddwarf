@@ -139,4 +139,35 @@ public interface DataService extends DataManager, Service {
      *		problem with the current transaction
      */
     ManagedReference createReferenceForId(BigInteger id);
+
+    /**
+     * Returns a unique identifier for the next object after the object with
+     * the specified identifier, or {@code null} if there are no more objects.
+     * If {@code objectId} is {@code null}, then returns the identifier of the
+     * first object.  This method will not return identifiers for objects that
+     * have already been removed, and may not include identifiers for objects
+     * that are created after an iteration has begun.  It is not an error for
+     * the object associated with the specified identifier to have already been
+     * removed. <p>
+     *
+     * The object identifiers accepted and returned by this method are the same
+     * as those returned by the {@link ManagedReference#getObjectId
+     * ManagedReference.getObjectId} method. <p>
+     *
+     * Applications should not assume that objects associated with the
+     * identifiers returned by this method, but which cannot be reached by
+     * traversing object field references starting with an object associated
+     * with a name binding, will continue to be retained by the data service.
+     *
+     * @param	objectId the identifier of the object to search after, or
+     *		{@code null} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code objectId}, or {@code null} if there are no
+     *		more objects
+     * @throws	IllegalArgumentException if the implementation can determine
+     *		that {@code objectId} is not a valid object identifier
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    BigInteger nextObjectId(BigInteger objectId);
 }

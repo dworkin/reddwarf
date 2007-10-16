@@ -23,6 +23,8 @@ import com.sun.sgs.app.ManagedObject;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.Map.Entry;
 
 /**
@@ -32,8 +34,8 @@ import java.util.Map.Entry;
 final class ReferenceTable {
 
     /** Maps object IDs to managed references. */
-    private final Map<Long, ManagedReferenceImpl> oids =
-	new HashMap<Long, ManagedReferenceImpl>();
+    private final SortedMap<Long, ManagedReferenceImpl> oids =
+	new TreeMap<Long, ManagedReferenceImpl>();
 
     /**
      * Maps managed objects to managed references.  The objects are compared by
@@ -109,6 +111,20 @@ final class ReferenceTable {
 	    assert existing == ref
 		: "Found duplicate reference for oid:" + ref.oid;
 	}
+    }
+
+    /**
+     * Returns the next object ID after the one specified for managed
+     * references stored in this table, or -1 if there are none.  Supplying -1
+     * for the object ID requests the first ID.
+     */
+    long nextObjectId(long oid) {
+	for (long key : oids.tailMap(oid).keySet()) {
+	    if (key > oid) {
+		return key;
+	    }
+	}
+	return -1;
     }
 
     /**

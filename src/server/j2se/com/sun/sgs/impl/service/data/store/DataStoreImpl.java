@@ -305,6 +305,7 @@ public class DataStoreImpl
     private ProfileOperation nextBoundNameOp = null;
     private ProfileOperation getClassIdOp = null;
     private ProfileOperation getClassInfoOp = null;
+    private ProfileOperation nextObjectIdOp = null;
 
     /**
      * The counters and samples used for profile reporting, which track the
@@ -432,58 +433,65 @@ public class DataStoreImpl
 	boolean modified;
 
 	/**
-	 * The currently open Berkeley DB cursor or null.  The cursor must be
-	 * closed before the transaction is prepared, committed, or aborted.
-	 * Note that the Berkeley DB documentation for prepare doesn't say you
-	 * need to close cursors, but my testing shows that you do.
-	 * -tjb@sun.com (12/14/2006)
+	 * The currently open cursor over the names database, or null.  The
+	 * cursor must be closed before the transaction is prepared, committed,
+	 * or aborted.  Note that the Berkeley DB documentation for prepare
+	 * doesn't say you need to close cursors, but my testing shows that you
+	 * do.  -tjb@sun.com (12/14/2006)
 	 */
-	private Cursor cursor;
+	private Cursor namesCursor;
 
-	/** The last key returned by the cursor or null. */
-	private String lastCursorKey;
+	/** The last key returned by the namesCursor or null. */
+	private String lastNamesCursorKey;
+
+	/** The currently open cursor over the oids database, or null. */
+	private Cursor oidsCursor;
+
+	/** The last key returned by the oidsCursor or -1. */
+	private long lastOidsCursorKey = -1;
 
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
 	    bdbTxn = createBdbTxn(env, txn.getTimeout());
 	}
 
-	/** Prepares the transaction, first closing the cursor, if present. */
+	/** Prepares the transaction, first closing the cursors, if present. */
 	void prepare(byte[] gid) throws DatabaseException {
-	    maybeCloseCursor();
+	    maybeCloseCursors();
 	    bdbTxn.prepare(gid);
 	}
 
 	/**
-	 * Commits the transaction, first closing the cursor, if present, and
+	 * Commits the transaction, first closing the cursors, if present, and
 	 * returning the operations count for this transaction.
 	 */
 	void commit() throws DatabaseException {
-	    maybeCloseCursor();
+	    maybeCloseCursors();
 	    bdbTxn.commit();
 	}
 
 	/**
-	 * Aborts the transaction, first closing the cursor, if present, and
+	 * Aborts the transaction, first closing the cursors, if present, and
 	 * returning the operations count for this transaction.
 	 */
 	void abort() throws DatabaseException {
-	    maybeCloseCursor();
+	    maybeCloseCursors();
 	    bdbTxn.abort();
 	}
 
 	/** Returns the next name in the names database. */
 	String nextName(String name, Database names) throws DatabaseException {
-	    if (cursor == null) {
-		cursor = names.openCursor(bdbTxn, null);
+	    if (namesCursor == null) {
+		namesCursor = names.openCursor(bdbTxn, null);
 	    }
 	    DatabaseEntry key = new DatabaseEntry();
 	    DatabaseEntry value = new DatabaseEntry();
 	    if (name == null) {
-		OperationStatus status = cursor.getFirst(key, value, null);
-		lastCursorKey = getNextBoundNameResult(null, status, key);
+		OperationStatus status =
+		    namesCursor.getFirst(key, value, null);
+		lastNamesCursorKey = getNextBoundNameResult(null, status, key);
 	    } else {
-		boolean matchesLast = name.equals(lastCursorKey);
+		boolean matchesLast = name.equals(lastNamesCursorKey);
 		if (!matchesLast) {
 		    /*
 		     * The name specified was not the last key returned, so
@@ -491,29 +499,89 @@ public class DataStoreImpl
 		     */
 		    StringBinding.stringToEntry(name, key);
 		    OperationStatus status =
-			cursor.getSearchKeyRange(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(name, status, key);
+			namesCursor.getSearchKeyRange(key, value, null);
+		    lastNamesCursorKey =
+			getNextBoundNameResult(name, status, key);
 		    /* Record if we found an exact match */
-		    matchesLast = name.equals(lastCursorKey);
+		    matchesLast = name.equals(lastNamesCursorKey);
 		}
 		if (matchesLast) {
 		    /* The last key was an exact match, so find the next one */
-		    OperationStatus status = cursor.getNext(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(name, status, key);
+		    OperationStatus status =
+			namesCursor.getNext(key, value, null);
+		    lastNamesCursorKey =
+			getNextBoundNameResult(name, status, key);
 		}
 	    }
-	    return lastCursorKey;
+	    return lastNamesCursorKey;
+	}
+
+	/** Returns the next object ID in the oids database. */
+	long nextObjectId(long oid, Database oids) throws DatabaseException {
+	    if (oidsCursor == null) {
+		oidsCursor = oids.openCursor(bdbTxn, null);
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    DatabaseEntry value = new DatabaseEntry();
+	    if (oid == -1) {
+		OperationStatus status = oidsCursor.getFirst(key, value, null);
+		if (status == OperationStatus.NOTFOUND) {
+		    lastOidsCursorKey = -1;
+		} else if (status == OperationStatus.SUCCESS) {
+		    lastOidsCursorKey = LongBinding.entryToLong(key);
+		} else {
+		    throw new DataStoreException("");
+		}
+	    } else {
+		boolean matchesLast = (oid == lastOidsCursorKey);
+		if (!matchesLast) {
+		    /*
+		     * The OID specified was not the last key returned, so
+		     * search for the specified OID
+		     */
+		    LongBinding.longToEntry(oid, key);
+		    OperationStatus status =
+			oidsCursor.getSearchKeyRange(key, value, null);
+		    if (status == OperationStatus.NOTFOUND) {
+			lastOidsCursorKey = -1;
+		    } else if (status == OperationStatus.SUCCESS) {
+			lastOidsCursorKey = LongBinding.entryToLong(key);
+		    } else {
+			throw new DataStoreException("");
+		    }
+		    /* Record if we found an exact match */
+		    matchesLast = (oid == lastOidsCursorKey);
+		}
+		if (matchesLast) {
+		    /* The last key was an exact match, so find the next one */
+		    OperationStatus status =
+			oidsCursor.getNext(key, value, null);
+		    if (status == OperationStatus.NOTFOUND) {
+			lastOidsCursorKey = -1;
+		    } else if (status == OperationStatus.SUCCESS) {
+			lastOidsCursorKey = LongBinding.entryToLong(key);
+		    } else {
+			throw new DataStoreException("");
+		    }
+		}
+	    }
+	    return lastOidsCursorKey;
 	}
 
 	/**
-	 * Close the cursor if it is open.  Always null the cursor field, since
-	 * the Berkeley DB API doesn't permit closing a cursor after an attempt
-	 * to close it.
+	 * Close the cursors if they are open.  Always null the cursor fields,
+	 * since the Berkeley DB API doesn't permit closing a cursor after an
+	 * attempt to close it.
 	 */
-	private void maybeCloseCursor() throws DatabaseException {
-	    if (cursor != null) {
-		Cursor c = cursor;
-		cursor = null;
+	private void maybeCloseCursors() throws DatabaseException {
+	    if (namesCursor != null) {
+		Cursor c = namesCursor;
+		namesCursor = null;
+		c.close();
+	    }
+	    if (oidsCursor != null) {
+		Cursor c = oidsCursor;
+		oidsCursor = null;
 		c.close();
 	    }
 	}
@@ -1386,6 +1454,36 @@ public class DataStoreImpl
 	    exception = e;
 	}
 	throw convertException(txn, Level.FINER, exception, operation);
+    }
+
+    /** {@inheritDoc} */
+    public long nextObjectId(Transaction txn, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
+	Exception exception;
+	try {
+	    if (oid < -1) {
+		throw new IllegalArgumentException(
+		    "Invalid object ID: " + oid);
+	    }
+	    TxnInfo txnInfo = checkTxn(txn, nextObjectIdOp);
+	    long result = txnInfo.nextObjectId(oid, oidsDb);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "nextObjectId txn:{0}, oid:{1,number,#} " +
+			   "returns:{2,number,#}",
+			   txn, oid, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(txn, Level.FINEST, exception,
+			       "nextObjectId txn:" + txn + ", oid:" + oid);
     }
 
     /* -- Implement TransactionParticipant -- */

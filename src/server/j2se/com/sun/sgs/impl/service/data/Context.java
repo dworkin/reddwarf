@@ -225,6 +225,13 @@ final class Context extends TransactionContext {
 	return store.nextBoundName(txn, internalName);
     }
 
+    /* -- Methods for object IDs -- */
+
+    /** Returns the next object ID. */
+    long nextObjectId(long oid) {
+	return ManagedReferenceImpl.nextObjectId(this, oid);
+    }
+
     /* -- Methods for TransactionContext -- */
 
     @Override
