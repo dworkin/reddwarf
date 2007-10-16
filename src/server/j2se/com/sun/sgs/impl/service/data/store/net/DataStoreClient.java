@@ -149,6 +149,7 @@ public final class DataStoreClient
      * The number of milliseconds to wait between attempts to obtain the
      * server.
      */
+    // TODO this field is not presently used -JM
     private static final long GET_SERVER_WAIT = 10000;
 
     /**
@@ -576,7 +577,6 @@ public final class DataStoreClient
     /** {@inheritDoc} */
     public boolean shutdown() {
 	logger.log(Level.FINER, "shutdown");
-	Exception exception;
 	try {
 	    synchronized (txnCountLock) {
 		while (txnCount > 0) {

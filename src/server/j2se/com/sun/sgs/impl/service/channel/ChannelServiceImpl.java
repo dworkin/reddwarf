@@ -623,16 +623,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
 
 	/* -- transaction participant methods -- */
-
-	/**
-	 * Throws a {@code TransactionNotActiveException} if this
-	 * transaction is prepared.
-	 */
-	private void checkPrepared() {
-	    if (isPrepared) {
-		throw new TransactionNotActiveException("Already prepared");
-	    }
-	}
 	
 	/**
 	 * Marks this transaction as prepared, and if there are

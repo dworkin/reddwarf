@@ -165,6 +165,7 @@ public class ScalableHashSet<E>
      *
      * @serial
      */
+    @SuppressWarnings("unused")
     private final short minorVersion = 1;
 
     /**
@@ -334,10 +335,12 @@ public class ScalableHashSet<E>
     private static final class Marker implements Serializable {
 	private static final long serialVersionUID = 1;
 
+        @Override
 	public int hashCode() {
 	    return 0;
 	}
 
+        @Override
 	public boolean equals(Object o) {
 	    return o instanceof Marker;
 	}

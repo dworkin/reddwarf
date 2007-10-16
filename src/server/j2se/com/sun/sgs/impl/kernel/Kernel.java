@@ -122,6 +122,7 @@ class Kernel {
     // be created, which reassigned lastSystemRegistry.
     private ComponentRegistry lastSystemRegistry = null;
     // the last task owner created by this kernel, for testing only
+    @SuppressWarnings("unused")
     private TaskOwner lastOwner = null;
     
     /**

@@ -914,7 +914,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			identity = authenticatedIdentity;
 			taskQueue =
 			    new NonDurableTaskQueue(
-				sessionService.txnProxy,
+				ClientSessionServiceImpl.txnProxy,
 				sessionService.nonDurableTaskScheduler,
 				identity);
 		    }

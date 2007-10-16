@@ -561,7 +561,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    renewInterval :
 		    expirationSet.first().getExpiration() - now;
 		try {
-		    Thread.currentThread().sleep(sleepTime);
+		    Thread.sleep(sleepTime);
 		} catch (InterruptedException e) {
 		}
 	    }

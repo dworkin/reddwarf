@@ -109,13 +109,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The transaction proxy for this class. */
     static TransactionProxy txnProxy;
 
-    /**
-     * Provides transaction and other information for the current thread.
-     * TODO: this is now unused; should it be removed? -JM
-     */
-    private static final ThreadLocal<Context> currentContext =
-        new ThreadLocal<Context>();
-
     /** The application name. */
     private final String appName;
 

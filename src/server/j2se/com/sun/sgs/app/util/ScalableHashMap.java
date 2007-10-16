@@ -277,6 +277,7 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
+    @SuppressWarnings("unused")
     private final short minorVersion = 1;
 
     /**
@@ -551,6 +552,7 @@ public class ScalableHashMap<K,V>
     // NOTE: if this were to be called in a depth-first fashion, with split
     // being called repeatedly, the leaves of the tree of the tree would have
     // their left and right reference improperly initialized.
+    @SuppressWarnings("unchecked")
     private void initDepth(int minDepth) {
 
 	if (depth >= minDepth) {
@@ -833,6 +835,7 @@ public class ScalableHashMap<K,V>
      *
      * @see #addEntry addEntry
      */
+    @SuppressWarnings("unchecked")
     private void split() {
 	assert isLeafNode() : "Can't split an directory node";
 	assert depth < MAX_DEPTH : "Can't split at maximum depth";
@@ -1011,6 +1014,7 @@ public class ScalableHashMap<K,V>
      * @param leftChildRef the left child of the node that will be replaced
      * @param rightChildRef the right child of the node that will be replaced
      */
+    @SuppressWarnings("unchecked")
     private void addLeavesToDirectory(int prefix,
 				      ManagedReference leftChildRef,
 				      ManagedReference rightChildRef) {
@@ -2442,7 +2446,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the minimum depth
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "unused" })
     private int getMinTreeDepth() {
 	ScalableHashMap<K,V> cur = leftMost();
 	int minDepth = cur.depth;
@@ -2453,7 +2457,6 @@ public class ScalableHashMap<K,V>
 	return minDepth + 1;
     }
 
-
     /**
      * Returns the maximum depth for any leaf node in the map's backing tree.
      * The root node has a depth of {@code 1}.  This method is used for
@@ -2461,7 +2464,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the maximum depth
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "unused" })
     private int getMaxTreeDepth() {
 	ScalableHashMap<K,V> cur = leftMost();
 	int maxDepth = cur.depth;
@@ -2479,7 +2482,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the average depth
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({ "unchecked", "unused" })
     private double getAvgTreeDepth() {
 	ScalableHashMap<K,V> cur = leftMost();
 	int maxDepth = cur.depth;

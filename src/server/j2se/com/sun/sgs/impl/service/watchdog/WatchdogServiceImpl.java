@@ -414,7 +414,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    while (getIsAlive() == true && ! shuttingDown()) {
 
 		try {
-		    Thread.currentThread().sleep(nextRenewInterval);
+		    Thread.sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
 		    return;
 		}
