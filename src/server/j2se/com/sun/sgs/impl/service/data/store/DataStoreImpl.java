@@ -1058,7 +1058,7 @@ public class DataStoreImpl
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    txn.checkTimeout();
+            // TODO I don't think we should abort due to timeout here. -JM
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1138,7 +1138,8 @@ public class DataStoreImpl
 	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    txn.checkTimeout();
+            // TODO I don't think we should abort due to timeout here. -JM
+            //txn.checkTimeout();
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
