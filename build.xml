@@ -75,6 +75,18 @@
     <istrue value="${test.use.je}"/>
   </condition>
 
+  <!-- Values for benchmark -->
+  <property name="benchmark.args" value=""/>
+  <property name="benchmark.jvm.args" value="-server -d64"/>
+  <property name="benchmark.logging" location="logging.properties"/>
+  <property name="benchmark.use.je" value="false"/>
+  <condition
+     property="benchmark.bdb.env"
+     value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+     else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+    <istrue value="${benchmark.use.je}"/>
+  </condition>
+
   <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
        containing the full set of JAR and native library files for
@@ -87,6 +99,11 @@
   <!-- Shared code class path -->
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
+  </path>
+
+  <!-- Shared code class path (for building - has MINA) -->
+  <path id="build.shared.classpath">
+    <path refid="shared.classpath"/>
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
     <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
     <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
@@ -100,10 +117,21 @@
     <path refid="shared.classpath"/>
   </path>
 
-  <!-- Client class path -->
+  <!-- Testing server class path (with MINA) -->
+  <path id="test.server.classpath">
+    <path refid="server.classpath"/>
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
+  </path>
+
+  <!-- Client class path (with MINA) -->
   <path id="client.classpath">
     <pathelement location="${build.dir}/classes/client"/>
     <path refid="shared.classpath"/>
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -125,7 +153,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/shared/j2se" destdir="${build.dir}/classes/shared"
-           classpathref="shared.classpath" source="${javac.source}">
+           classpathref="build.shared.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -788,7 +816,7 @@
 		   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/test/classes/server"/>
-        <path refid="server.classpath"/>
+        <path refid="test.server.classpath"/>
       </classpath>
       <syspropertyset>
 	<propertyref prefix="test."/>
@@ -878,7 +906,7 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpathref="server.classpath"
+	   classpathref="test.server.classpath"
 	   includes="**/*.java">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
@@ -1218,6 +1246,119 @@
 	<propertyref prefix="com.sun.sgs."/>
 	<propertyref prefix="java.rmi."/>
       </syspropertyset>
+    </java>
+  </target>
+
+  <target name="build-benchmark" depends="build">
+    <mkdir dir="${build.dir}/benchmark/classes"/>
+    <depend srcdir="benchmark/src"
+	    destdir="${build.dir}/benchmark/classes"
+	    cache="${build.dir}/benchmark/depend"
+	    closure="true"/>
+    <javac srcdir="benchmark/src"
+	   destdir="${build.dir}/benchmark/classes"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   includes="**/*.java">
+      <classpath>
+        <path refid="server.classpath"/>
+        <path refid="client.classpath"/>
+      </classpath>
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Runs the benchmark app (server) -->
+  <target name="benchmark-app" depends="build-benchmark"
+          description="Runs the benchmark app (server)">
+    <delete dir="/tmp/sgs-benchmark"/>
+    <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel" fork="true">
+      <jvmarg line="${benchmark.jvm.args}"/>
+      <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
+      <jvmarg line="-XX:+UseParallelGC"/>
+      <jvmarg line="-XX:+HeapDumpOnOutOfMemoryError"/>
+      <jvmarg line="-XX:+UseFastAccessorMethods"/>
+      <jvmarg line="-XX:+AggressiveOpts"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
+      <jvmarg line="-XX:NewSize=512m"/>
+      <jvmarg line="-Xmx750m"/>
+      <jvmarg line="-XX:+PrintClassHistogram"/>
+      <!--jvmarg line="-XX:+PrintCompilation"/-->
+      <sysproperty key="com.sun.sgs.config.file"
+                   file="benchmark/System.properties"/>
+      <sysproperty key="com.sun.sgs.benchmark.app"
+                   file="benchmark/DefaultApplication.properties"/>
+      <sysproperty
+          key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
+          value="true"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${benchmark.bdb.env}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${benchmark.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="benchmark/Benchmark.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the benchmark client -->
+  <target name="benchmark-client" depends="build-benchmark"
+          description="Runs the benchmark client">
+    <java classname="com.sun.sgs.benchmark.client.BenchmarkClient" fork="true">
+      <jvmarg line="${benchmark.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${benchmark.logging}"/>
+      <sysproperty key="BenchmarkClient.host" value="localhost"/>
+      <sysproperty key="BenchmarkClient.port" value="6168"/>
+      <arg line="${benchmark.args}"/>
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Runs the benchmark channel-monitor client -->
+  <target name="benchmark-channel-monitor" depends="build-benchmark"
+          description="Runs the benchmark channel-monitor client">
+    <java classname="com.sun.sgs.benchmark.client.ChannelMonitor" fork="true">
+      <jvmarg line="${benchmark.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${benchmark.logging}"/>
+      <sysproperty key="BenchmarkClient.host" value="localhost"/>
+      <sysproperty key="BenchmarkClient.port" value="6168"/>
+      <arg line="${benchmark.args}"/>
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Runs the benchmark stresstest client -->
+  <target name="benchmark-client-stresstest" depends="build-benchmark"
+          description="Runs the benchmark client">
+    <java classname="com.sun.sgs.benchmark.scripts.ChannelMessageSend"
+            fork="true">
+      <jvmarg line="${benchmark.jvm.args}"/>
+      <jvmarg line="-XX:+UseParallelGC"/>
+      <jvmarg line="-Xmx2g"/>
+      <jvmarg line="-XX:+MaxFDLimit"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${benchmark.logging}"/>
+      <sysproperty key="BenchmarkClient.host" value="localhost"/>
+      <sysproperty key="BenchmarkClient.port" value="6168"/>
+      <arg line="${benchmark.args}"/>
+      <classpath>
+        <pathelement location="${build.dir}/benchmark/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
     </java>
   </target>
 

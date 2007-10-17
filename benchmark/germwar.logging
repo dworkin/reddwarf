@@ -1,0 +1,11 @@
+.level = WARNING
+handlers = java.util.logging.ConsoleHandler
+java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
+java.util.logging.ConsoleHandler.level = FINEST
+
+com.sun.sgs.germwar.level = INFO
+com.sun.sgs.germwar.client.GermWarClient.level = FINEST
+com.sun.sgs.germwar.server.GermWarApp.level = INFO
+com.sun.sgs.germwar.server.impl.GermWarClientSessionListener.level = INFO
+
+#com.sun.sgs.example.chat.app.ChatClientSessionListener.level = FINE
