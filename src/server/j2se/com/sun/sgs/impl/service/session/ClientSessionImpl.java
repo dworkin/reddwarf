@@ -631,6 +631,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
         private int availableToReserve;
         private Deque<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
+        
+        // TODO provide our own, allocated-on-connect backing DirectBuffer
+        // for the pendingWrites, which can be view buffers into the
+        // backing buffer.
 
         private IoFuture<Void, ?> writeFuture = null;
 
