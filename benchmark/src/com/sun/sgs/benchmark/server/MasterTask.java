@@ -9,7 +9,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 
-import com.sun.sgs.benchmark.shared.Formatter;
 
 import java.io.FileInputStream;
 import java.io.FileReader;

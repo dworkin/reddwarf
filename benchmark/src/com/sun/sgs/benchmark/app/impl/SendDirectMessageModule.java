@@ -16,7 +16,7 @@ import com.sun.sgs.app.ClientSession;
 
 import com.sun.sgs.benchmark.app.BehaviorModule;
 import com.sun.sgs.benchmark.app.BehaviorException;
-import com.sun.sgs.benchmark.shared.Formatter;
+import com.sun.sgs.benchmark.server.Formatter;
 
 /**
  * TODO

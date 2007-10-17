@@ -10,7 +10,6 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
 import com.sun.sgs.benchmark.app.BehaviorException;
-import com.sun.sgs.benchmark.shared.Formatter;
 import com.sun.sgs.benchmark.shared.MethodRequest;
 
 import java.io.ByteArrayInputStream;

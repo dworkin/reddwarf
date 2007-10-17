@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.benchmark.shared;
+package com.sun.sgs.benchmark.server;
 
 import com.sun.sgs.app.ClientSession;
 
