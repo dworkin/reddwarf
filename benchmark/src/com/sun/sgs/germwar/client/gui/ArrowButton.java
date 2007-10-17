@@ -13,6 +13,8 @@ import javax.swing.JButton;
  * problems with sizing objects of type javax.swing.plaf.basic.BasicArrowButton)
  */
 public class ArrowButton extends JButton {
+    private static final long serialVersionUID = 1L;
+
     public final static String IMG_DIR = MainFrame.IMAGE_ROOT;
 
     private final static Icon upArrow =

@@ -61,6 +61,8 @@ import com.sun.sgs.germwar.shared.Location;
  * and such for users to control their bacteria.
  */
 public class MainFrame extends JFrame implements GameGui {
+    private static final long serialVersionUID = 1L;
+
     /** Directory where all image files for all GUI components are kept. */
     public static final String IMAGE_ROOT = "benchmark/GermWarData/images";
 
@@ -259,36 +261,46 @@ public class MainFrame extends JFrame implements GameGui {
 
         ActionMap actionMap = rootPane.getActionMap();
         actionMap.put("esc key", new AbstractAction() {
-                public void actionPerformed(ActionEvent ignored) {
-                    mainMapPanel.setSelected(null);
-                }});
+            private static final long serialVersionUID = 1L;
+
+            public void actionPerformed(ActionEvent ignored) {
+                mainMapPanel.setSelected(null);
+            }});
 
         actionMap.put("c key", new AbstractAction() {
-                public void actionPerformed(ActionEvent ignored) {
-                    Coordinate selected = mainMapPanel.getSelected();
-                    if (selected != null)
-                        mainMapPanel.setFocus(selected);
-                    else
-                        Toolkit.getDefaultToolkit().beep();
-                }});
+            private static final long serialVersionUID = 1L;
+
+            public void actionPerformed(ActionEvent ignored) {
+                Coordinate selected = mainMapPanel.getSelected();
+                if (selected != null)
+                    mainMapPanel.setFocus(selected);
+                else
+                    Toolkit.getDefaultToolkit().beep();
+            }});
 
         actionMap.put("d key", new AbstractAction() {
-                public void actionPerformed(ActionEvent ignored) {
-                    // todo - "done"
-                }});
+            private static final long serialVersionUID = 1L;
+
+            public void actionPerformed(ActionEvent ignored) {
+                // todo - "done"
+            }});
 
         actionMap.put("m key", new AbstractAction() {
-                public void actionPerformed(ActionEvent ignored) {
-                    if (mainMapPanel.getSelected() != null)
-                        enableMove(true);
-                    else
-                        Toolkit.getDefaultToolkit().beep();
-                }});
+            private static final long serialVersionUID = 1L;
+
+            public void actionPerformed(ActionEvent ignored) {
+                if (mainMapPanel.getSelected() != null)
+                    enableMove(true);
+                else
+                    Toolkit.getDefaultToolkit().beep();
+            }});
 
         actionMap.put("w key", new AbstractAction() {
-                public void actionPerformed(ActionEvent ignored) {
-                    // todo - "wait"
-                }});
+            private static final long serialVersionUID = 1L;
+
+            public void actionPerformed(ActionEvent ignored) {
+                // todo - "wait"
+            }});
     }
 
     private void setupLayout() {

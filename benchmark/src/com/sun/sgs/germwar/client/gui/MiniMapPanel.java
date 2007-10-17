@@ -18,6 +18,8 @@ import javax.swing.JPanel;
  * TODO - currently unimplemented
  */
 public class MiniMapPanel extends JPanel {
+    private static final long serialVersionUID = 1L;
+
     // Constructor
 
     /**

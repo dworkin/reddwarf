@@ -11,6 +11,8 @@ package com.sun.sgs.germwar.shared;
  * themselves, but this is not always possible.
  */
 public class InvalidMoveException extends Exception {
+    private static final long serialVersionUID = 1L;
+
     /** The bacterium on which the move was attempted. */
     private final Bacterium bacterium;
 

@@ -8,6 +8,8 @@ package com.sun.sgs.germwar.shared;
  * Thrown when a bacterium attempts a split that is not legal.
  */
 public class InvalidSplitException extends Exception {
+    private static final long serialVersionUID = 1L;
+
     /** The bacterium on which the move was attempted. */
     private final Bacterium bacterium;
 

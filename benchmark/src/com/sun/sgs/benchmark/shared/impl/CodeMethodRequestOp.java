@@ -70,7 +70,7 @@ public enum CodeMethodRequestOp {
         
         if (ord > 255)
             throw new IllegalStateException("Too many enums declared (" +
-                this.values().length + ") - should be <= 256.");
+                CodeMethodRequestOp.values().length + ") - should be <= 256.");
         
         return (byte)ord;
     }

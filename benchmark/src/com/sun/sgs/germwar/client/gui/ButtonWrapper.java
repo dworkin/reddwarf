@@ -16,6 +16,8 @@ import javax.swing.JPanel;
  * otherwise be ignored (for example, in a GridLayout).
  */
 public class ButtonWrapper extends JPanel {
+    private static final long serialVersionUID = 1L;
+
     /** Creates a new {@code ButtonWrapper}. */
     public ButtonWrapper(JButton button, int size) {
         this(button, size, size);

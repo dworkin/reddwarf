@@ -19,6 +19,8 @@ import com.sun.sgs.germwar.shared.Location;
  * Bacterium Bacteria}
  */
 public class InfoBox extends JLabel {
+    private static final long serialVersionUID = 1L;
+
     /** Used to print floating point numbers in the gui. */
     private final static NumberFormat decFormatter = new DecimalFormat(".##");
 

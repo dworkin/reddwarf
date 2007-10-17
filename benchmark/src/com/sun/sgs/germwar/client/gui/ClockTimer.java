@@ -20,6 +20,8 @@ import javax.swing.JLabel;
  * and fires an ActionEvent when it reaches 0.
  */
 public class ClockTimer extends JLabel {
+    private static final long serialVersionUID = 1L;
+
     /** Command string of the ActionEvents fired when the timer expires. */
     public static final String TIMER_EXPIRED_ACTION = "timer";
 

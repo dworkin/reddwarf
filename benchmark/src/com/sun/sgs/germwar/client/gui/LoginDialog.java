@@ -38,6 +38,8 @@ import javax.swing.WindowConstants;
  * Simple GUI component to accept a username and password from a user.
  */
 public class LoginDialog extends JDialog implements ActionListener {
+    private static final long serialVersionUID = 1L;
+
     /** The text field to accept the user name. */
     private final JTextField nameField;
 
