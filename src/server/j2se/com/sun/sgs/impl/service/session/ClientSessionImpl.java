@@ -38,6 +38,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.AsynchronousMessageChannel;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
@@ -294,10 +295,14 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         byte[] message,
         @SuppressWarnings("unused") Delivery delivery)
     {
+        if (! sessionConnection.isOpen()) {
+            throw new ClosedAsynchronousChannelException();
+        }
+
         // TODO this is not elegant...
         int len = message.length + 4;
 
-        ByteBuffer buf = ByteBuffer.allocateDirect(len);
+        ByteBuffer buf = ByteBuffer.allocate(len);
         buf.putInt(message.length);
         buf.put(message);
         buf.flip();
@@ -489,19 +494,28 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
-	    if (graceful) {
-		MessageBuffer buf = new MessageBuffer(3);
-		buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
-	    
-		sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
-	    }
+	    if (graceful && sessionConnection.isOpen()) {
+	        try {
+                    MessageBuffer buf = new MessageBuffer(3);
+                    buf.putByte(SimpleSgsProtocol.VERSION).
+                    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
+
+                    sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
+	        } catch (Exception e) {
+	            if (logger.isLoggable(Level.WARNING)) {
+	                    logger.logThrow(
+                                Level.WARNING, e,
+                                "handleDisconnect (graceful) handle:{0} throws",
+                                sessionConnection);
+	            }
+	        }
+            }
 
 	    try {
                 // TODO set this up to wait until pending writes are done
 		sessionConnection.close();
-	    } catch (IOException e) {
+	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 		    	Level.WARNING, e,
@@ -597,13 +611,12 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
         synchronized (lock) {
             if (!disconnectHandled) {
+                state = State.DISCONNECTED;
                 scheduleNonTransactionalTask(new AbstractKernelRunnable() {
                     public void run() {
                         handleDisconnect(false);
                     }});
             }
-
-            state = State.DISCONNECTED;
         }
     }
 
@@ -930,7 +943,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			    handleDisconnect(false);
 			}});
 		}
-                return false;
+                return true;
 		
 	    case SimpleSgsProtocol.RECONNECT_REQUEST:
                 return true;
@@ -949,9 +962,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
-                            readHandler.read();
-			}
-		    }});
+                        }
+                    }});
+                enqueueReadResume();
                 return false;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
@@ -977,6 +990,16 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
 
+
+    }
+
+    void enqueueReadResume() {
+        taskQueue.addTask(new AbstractKernelRunnable() {
+            public void run() {
+                if (isConnected()) {
+                    readHandler.read();
+                }
+            }});    
     }
 
     /**
@@ -1153,9 +1176,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			// the time of notification.
 			thisIdentity.notifyLoggedIn();
 		    }});
-                
-                // Re-enable reads
-                readHandler.read();
 		
 	    } else {
 		if (ex == null) {

@@ -475,6 +475,9 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    if (! senderId.equals(session.getSessionId())) {
                 ClientSessionImpl sgsSession = (ClientSessionImpl) session;
                 try {
+                    if (! sgsSession.isConnected())
+                        continue;
+
                     Object reservation = sgsSession.reserveProtocolMessage(
                         protocolMessage, cachedState.delivery);
                     sendReservations.put(sgsSession, reservation);
