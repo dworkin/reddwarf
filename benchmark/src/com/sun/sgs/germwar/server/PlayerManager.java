@@ -267,9 +267,9 @@ public class PlayerManager {
         /**
          * {@inheritDoc}
          */
-        public Bacterium createBacterium(Coordinate coord) {
+        public BacteriumRecord createBacterium(Coordinate coord) {
             DataManager dm = AppContext.getDataManager();
-            BacteriumImpl bact = new BacteriumRecord(id, coord);
+            BacteriumRecord bact = new BacteriumRecord(id, coord);
             getBacteriaMap().put(bact.getId(), dm.createReference(bact));
             bacteriaCount++;
             return bact;
@@ -278,9 +278,11 @@ public class PlayerManager {
         /**
          * {@inheritDoc}
          */
-        public Bacterium createBacterium(Coordinate coord, float initialHealth) {
+        public BacteriumRecord createBacterium(Coordinate coord,
+                                               float initialHealth) 
+        {
             DataManager dm = AppContext.getDataManager();
-            BacteriumImpl bact = new BacteriumRecord(id, coord, initialHealth);
+            BacteriumRecord bact = new BacteriumRecord(id, coord, initialHealth);
             getBacteriaMap().put(bact.getId(), dm.createReference(bact));
             bacteriaCount++;
             return bact;
@@ -323,7 +325,7 @@ public class PlayerManager {
                 loc = world.getLocation(coord);
             } while (loc.isOccupied());
 
-            Bacterium bact = createBacterium(coord);
+            BacteriumRecord bact = createBacterium(coord);
 
             /** Write this new bacterium into its location in the world. */
             loc.setOccupant(bact);

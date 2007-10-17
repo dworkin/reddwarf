@@ -354,7 +354,7 @@ public class NormalWorld implements Serializable, World {
             if (bacterium == null)
                 occupantRef = null;
             else
-                occupantRef = dm.createReference(bacterium);
+                occupantRef = dm.createReference((ManagedObject)bacterium);
 
             return old;
         }

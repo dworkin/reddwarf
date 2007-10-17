@@ -116,6 +116,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
 
     private static class NoOpTimingTask implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	public NoOpTimingTask() { }
 
@@ -125,6 +126,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
     }
 
     private static class BaseCaseGetTimingTask implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	ManagedReference ref;
 	
@@ -138,6 +140,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     private static class BaseCaseGetForUpdateTimingTask
 	implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	ManagedReference ref;
 	
@@ -151,6 +154,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     private static class BaseCaseGetAndMarkForUpdateTimingTask
 	implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	ManagedReference ref;
 	
@@ -165,7 +169,6 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
 
     private static class Empty implements ManagedObject, Serializable {
-
 	private static final long serialVersionUID = 0;
 
 	public Empty() {
@@ -176,6 +179,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class PrefixHashMapPut implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference map;
 
@@ -210,6 +214,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class PrefixHashMapRemove implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference map;
 
@@ -234,6 +239,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class PrefixHashMapGet implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference map;
 
@@ -257,6 +263,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class PrefixHashMapSize implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference map;
 
@@ -276,6 +283,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
     
     @SuppressWarnings({"unchecked"})
     private static class HashMapPut implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference mapWrapper;
 
@@ -297,6 +305,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class DatastoreAccessChunk implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference arrRef;
 
@@ -311,6 +320,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class DatastoreAccessSegments implements Task, Serializable {
+        private static final long serialVersionUID = 1L;
 
 	private final ManagedReference[] refs;
 
@@ -327,6 +337,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
 
     private static class ManagedLong implements Serializable, ManagedObject {
+        private static final long serialVersionUID = 1L;
 
 	private long val;
 
@@ -342,6 +353,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
     }
 
     private static class ManagedArray implements Serializable, ManagedObject {
+        private static final long serialVersionUID = 1L;
 
 	private final byte[] arr;
 
@@ -353,6 +365,7 @@ public class TestPrefixHashMapTask implements AppListener, Serializable {
 
     @SuppressWarnings({"unchecked"})
     private static class MapWrapper implements Serializable, ManagedObject {
+        private static final long serialVersionUID = 1L;
 
 	private final Map m;
 

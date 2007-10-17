@@ -216,6 +216,7 @@ class CustomClientTask implements Serializable, Task {
  * task class)
  */
 class CustomClientTask2 extends CustomClientTask {
+    private static final long serialVersionUID = 1L;
 
     public CustomClientTask2(ClientSession session, MethodRequest command,
         CustomTaskType type)
