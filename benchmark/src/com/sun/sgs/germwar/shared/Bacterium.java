@@ -4,8 +4,6 @@
 
 package com.sun.sgs.germwar.shared;
 
-import com.sun.sgs.app.ManagedObject;
-
 import com.sun.sgs.germwar.shared.Coordinate;
 import com.sun.sgs.germwar.shared.InvalidMoveException;
 import com.sun.sgs.germwar.shared.Location;
@@ -13,7 +11,7 @@ import com.sun.sgs.germwar.shared.Location;
 /**
  * Represents a single bacterium.
  */
-public interface Bacterium extends ManagedObject {
+public interface Bacterium {
     /** The health cost to performing a move. */
     public static final float MOVE_HEALTH_COST = 5f;
 
