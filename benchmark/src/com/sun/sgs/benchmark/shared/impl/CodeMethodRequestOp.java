@@ -15,7 +15,9 @@ package com.sun.sgs.benchmark.shared.impl;
  * @see com.sun.sgs.benchmark.shared.MethodRequest
  */
 public enum CodeMethodRequestOp {
-    /** Enum types */
+
+    // Note: at most 256 ops are allowed, since the opcode is a byte.
+
     CPU               ("cpu"),
     CREATE_CHANNEL    ("createChannel"),
     DATASTORE_CREATE  ("datastoreCreate"),
@@ -27,51 +29,25 @@ public enum CodeMethodRequestOp {
     SEND_CHANNEL      ("sendChannelMessage"),
     SEND_DIRECT       ("sendDirectMessage"),
     START_TASK        ("startTask");
-    
-    /** Member variables */
-    
-    private String methodName;
-    
-    private static CodeMethodRequestOp[] ordinalIndex;
-    
-    static {
-        CodeMethodRequestOp[] vals = CodeMethodRequestOp.values();
-        ordinalIndex = new CodeMethodRequestOp[vals.length];
         
-        for (CodeMethodRequestOp cmro : vals)
-            ordinalIndex[cmro.ordinal()] = cmro;
-    }
-    
-    /** Constructors */
-    
+    private String methodName;
+
     CodeMethodRequestOp(String methodName) {
         this.methodName = methodName;
     }
     
-    /** Public Methods */
-    
     /**
-     * Slightly kludgy, but Enum doesn't give us a method to return an Enum
-     * instance from a given ordinal value, so we do our best to replicate it.
+     * Return the Enum for the given ordinal value.
      */
     public static CodeMethodRequestOp fromOpCode(byte opcode) {
-        if (opcode >= ordinalIndex.length)
-            throw new IllegalArgumentException("Unknown opcode: " + opcode);
-        
-        return ordinalIndex[opcode];
+        return CodeMethodRequestOp.values()[opcode];
     }
     
     public String getMethodName() {
         return methodName;
     }
     
-    public byte getOpCode() {
-        int ord = ordinal();
-        
-        if (ord > 255)
-            throw new IllegalStateException("Too many enums declared (" +
-                CodeMethodRequestOp.values().length + ") - should be <= 256.");
-        
-        return (byte)ord;
+    public byte getOpCode() {        
+        return (byte)ordinal();
     }
 }
