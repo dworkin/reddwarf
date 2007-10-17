@@ -515,12 +515,20 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * none.  Supplying -1 for the object ID requests the first ID.
      */
     static long nextObjectId(Context context, long oid) {
-	long result = context.store.nextObjectId(context.txn, oid);
-	if (result == -1) {
-	    /* Check for newly created objects */
-	    result = context.refs.nextObjectId(oid);
+	long last = oid;
+	while (true) {
+	    long result = context.store.nextObjectId(context.txn, last);
+	    if (result == -1) {
+		break;
+	    }
+	    last = result;
+	    ManagedReferenceImpl ref = context.refs.find(last);
+	    if (ref == null || !ref.isRemoved()) {
+		return result;
+	    }
 	}
-	return result;
+	/* Check for newly created objects */
+	return context.refs.nextObjectId(last);
     }
 
     /**

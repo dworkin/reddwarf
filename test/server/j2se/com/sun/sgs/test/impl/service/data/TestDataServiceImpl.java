@@ -1377,16 +1377,86 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testRemoveObjectRemoval() throws Exception {
 	int count = getObjectCount();
+	ObjectWithRemoval removal = new ObjectWithRemoval();
+	service.removeObject(removal);
+	assertFalse(removal.removingCalled);
+	service.setBinding("removal", removal);
 	txn.commit();
 	createTransaction();
-	service.setBinding("removal", new ObjectWithRemoval());
-	txn.commit();
-	createTransaction();
-	service.removeObject(
-	    service.getBinding("removal", ObjectWithRemoval.class));
-	txn.commit();
-	createTransaction();
+	removal = service.getBinding("removal", ObjectWithRemoval.class);
+	service.removeObject(removal);
+	assertTrue(removal.removingCalled);
 	assertEquals(count, getObjectCount());
+	try {
+	    service.removeObject(removal);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	try {
+	    service.getBinding("removal", ObjectWithRemoval.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+    }
+
+    public void testRemoveObjectRemovalRecurse() throws Exception {
+	ObjectWithRemoval x = new ObjectWithRemovalRecurse();
+	ObjectWithRemoval y = new ObjectWithRemovalRecurse();
+	ObjectWithRemoval z = new ObjectWithRemovalRecurse();
+	x.setNext(y);
+	y.setNext(z);
+	z.setNext(x);
+	service.setBinding("x", x);
+	txn.commit();
+	createTransaction();
+	x = service.getBinding("x", ObjectWithRemoval.class);
+	try {
+	    service.removeObject(x);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    private static class ObjectWithRemovalRecurse extends ObjectWithRemoval {
+	private static final long serialVersionUID = 1;
+	ObjectWithRemovalRecurse() {
+	    super(1);
+	}
+	public void removingObject() {
+	    super.removingObject();
+	    DummyManagedObject next = getNext();
+	    if (next != null) {
+		service.removeObject(next);
+	    }
+	}
+    }
+
+    public void testRemoveObjectRemovalThrows() throws Exception {
+	ObjectWithRemoval x = new ObjectWithRemovalThrows();
+	service.setBinding("x", x);
+	try {
+	    service.removeObject(x);
+	    fail("Expected ObjectWithRemovalThrows.E");
+	} catch (ObjectWithRemovalThrows.E e) {
+	    System.err.println(e);
+	}
+    }
+
+    private static class ObjectWithRemovalThrows extends ObjectWithRemoval {
+	private static final long serialVersionUID = 1;
+	ObjectWithRemovalThrows() {
+	    super(1);
+	}
+	public void removingObject() {
+	    throw new E();
+	}
+	static class E extends RuntimeException {
+	    private static final long serialVersionUID = 1;
+	}
     }
 
     /* -- Test markForUpdate -- */
@@ -3043,12 +3113,13 @@ public class TestDataServiceImpl extends TestCase {
     /**
      * A managed object with subobjects that it removes during removingObject.
      */
-    static class ObjectWithRemoval
-	implements ManagedObjectRemoval, Serializable
+    static class ObjectWithRemoval extends DummyManagedObject
+	implements ManagedObjectRemoval
     {
 	private static final long serialVersionUID = 1;
 	private final ManagedReference left;
 	private final ManagedReference right;
+	transient boolean removingCalled;
 	ObjectWithRemoval() {
 	    this(3);
 	}
@@ -3062,6 +3133,7 @@ public class TestDataServiceImpl extends TestCase {
 	    right = service.createReference(new ObjectWithRemoval(depth));
 	}
 	public void removingObject() {
+	    removingCalled = true;
 	    if (left != null) {
 		service.removeObject(left.get(ObjectWithRemoval.class));
 	    }

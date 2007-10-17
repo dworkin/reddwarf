@@ -143,14 +143,28 @@ public interface DataManager {
      * If {@code object} implements {@link ManagedObjectRemoval}, then this
      * method first calls the {@link ManagedObjectRemoval#removingObject
      * ManagedObjectRemoval.removingObject} method on the object, to notify it
-     * that it is being removed.
+     * that it is being removed.  If the call to {@code removingObject} throws
+     * a {@link RuntimeException}, then this method will throw that exception
+     * without removing the object.  A call to {@code removingObject} that
+     * causes {@code removeObject} to be called recursively on the same object
+     * will result in an {@code IllegalStateException} being thrown.
      *
      * @param	object the object
-     * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     * @throws	IllegalArgumentException if {@code object} does not implement
+     *		{@link Serializable}
+     * @throws	IllegalStateException if {@code object} implements {@code
+     *		ManagedObjectRemoval} and {@code removeObject} is called
+     *		recursively on the object through a call to {@link
+     *		ManagedObjectRemoval#removingObject
+     *		ManagedObjectRemoval.removingObject}
      * @throws	ObjectNotFoundException if the object has already been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
+     * @throws	RuntimeException if {@code object} implements {@code
+     *		ManagedObjectRemoval} and calling {@link
+     *		ManagedObjectRemoval#removingObject
+     *		ManagedObjectRemoval.removingObject} on the object throws an
+     *		exception
      * @see	ManagedObjectRemoval
      */
     void removeObject(ManagedObject object);

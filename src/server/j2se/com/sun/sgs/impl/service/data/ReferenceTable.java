@@ -119,8 +119,11 @@ final class ReferenceTable {
      * for the object ID requests the first ID.
      */
     long nextObjectId(long oid) {
-	for (long key : oids.tailMap(oid).keySet()) {
-	    if (key > oid) {
+	for (Entry<Long, ManagedReferenceImpl> entry :
+		 oids.tailMap(oid).entrySet())
+	{
+	    long key = entry.getKey();
+	    if (key > oid && !entry.getValue().isRemoved()) {
 		return key;
 	    }
 	}

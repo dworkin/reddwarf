@@ -398,7 +398,7 @@ public class DataStoreImpl
 	    }
 	    if (name == null) {
 		lastNamesCursorKey = namesCursor.findFirst()
-		    ? DataEncoding.decodeString(cursor.getKey()) : null;
+		    ? DataEncoding.decodeString(namesCursor.getKey()) : null;
 	    } else {
 		boolean matchesLast = name.equals(lastNamesCursorKey);
 		if (!matchesLast) {
@@ -408,7 +408,8 @@ public class DataStoreImpl
 		     */
 		    lastNamesCursorKey =
 			namesCursor.findNext(DataEncoding.encodeString(name))
-			? DataEncoding.decodeString(cursor.getKey()) : null;
+			? DataEncoding.decodeString(namesCursor.getKey())
+			: null;
 		    /* Record if we found an exact match */
 		    matchesLast = name.equals(lastNamesCursorKey);
 		}
@@ -429,7 +430,7 @@ public class DataStoreImpl
 	    }
 	    if (oid == -1) {
 		lastOidsCursorKey = oidsCursor.findFirst()
-		    ? DataEncoding.decodeLong(namesCursor.getKey()) : -1;
+		    ? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
 	    } else {
 		boolean matchesLast = (oid == lastOidsCursorKey);
 		if (!matchesLast) {
@@ -439,7 +440,7 @@ public class DataStoreImpl
 		     */
 		    lastOidsCursorKey =
 			oidsCursor.findNext(DataEncoding.encodeLong(oid))
-			? DataEncoding.decodeLong(namesCursor.getKey()) : -1;
+			? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
 		    /* Record if we found an exact match */
 		    matchesLast = (oid == lastOidsCursorKey);
 		}
@@ -457,7 +458,7 @@ public class DataStoreImpl
 	 * since the Berkeley DB API doesn't permit closing a cursor after an
 	 * attempt to close it.
 	 */
-	private void maybeCloseCursors() throws DatabaseException {
+	private void maybeCloseCursors() {
 	    if (namesCursor != null) {
 		DbCursor c = namesCursor;
 		namesCursor = null;
@@ -1101,7 +1102,6 @@ public class DataStoreImpl
 	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	Exception exception;
 	try {
 	    if (oid < -1) {
 		throw new IllegalArgumentException(
@@ -1116,13 +1116,10 @@ public class DataStoreImpl
 			   txn, oid, result);
 	    }
 	    return result;
-	} catch (DatabaseException e) {
-	    exception = e;
 	} catch (RuntimeException e) {
-	    exception = e;
+	    throw convertException(txn, Level.FINEST, e,
+				   "nextObjectId txn:" + txn + ", oid:" + oid);
 	}
-	throw convertException(txn, Level.FINEST, exception,
-			       "nextObjectId txn:" + txn + ", oid:" + oid);
     }
 
     /* -- Implement TransactionParticipant -- */

@@ -470,7 +470,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
 		if (object instanceof ManagedObjectRemoval) {
-		    ((ManagedObjectRemoval) object).removingObject();
+		    context.removingObject((ManagedObjectRemoval) object);
 		    /*
 		     * Get the context again in case something changed as a
 		     * result of the call to removingObject.
