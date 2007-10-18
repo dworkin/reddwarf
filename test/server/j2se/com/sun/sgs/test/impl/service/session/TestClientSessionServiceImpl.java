@@ -35,24 +35,25 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.SgsTestStack;
+import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,7 +66,7 @@ import junit.framework.TestCase;
 public class TestClientSessionServiceImpl extends TestCase {
 
     private static final String APP_NAME = "TestClientSessionServiceImpl";
-    
+
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
     private static final int WAIT_TIME = 5000;
@@ -82,16 +83,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final String SESSION_NODE_PREFIX =
 	"com.sun.sgs.impl.service.session.node";
-    
+
     private static final String LISTENER_PREFIX =
 	"com.sun.sgs.impl.service.session.listener";
 
     private static final String NODE_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.node";
 
-    /** The SGS server stack. */
-    private SgsTestStack serverStack;
-    
+    /** The node that creates the servers. */
+    private SgsTestNode serverNode;
+
+    /** Any additional nodes, for tests needing more than one node */
+    private SgsTestNode additionalNodes[];
+
+    /** The task scheduler. */
+    private TaskScheduler taskScheduler;
+
+    /** The owner for tasks I initiate. */
+    private TaskOwner taskOwner;
+
     /** The shared data service. */
     private DataServiceImpl dataService;
 
@@ -104,17 +114,48 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Constructs a test instance. */
     public TestClientSessionServiceImpl(String name) throws Exception {
 	super(name);
-	serverStack = new SgsTestStack(APP_NAME, null);
+    }
+
+    protected void setUp() throws Exception {
+        passed = false;
+        dummyClients = new HashMap<String, DummyClient>();
+        System.err.println("Testcase: " + getName());
+        setUp(true);
     }
 
     /** Creates and configures the session service. */
-    protected void setUp() throws Exception {
-        passed = false;
-        System.err.println("Testcase: " + getName());
-	dummyClients = new HashMap<String, DummyClient>();
-	serverStack.setUp(true);
-	dataService = serverStack.getDataService();
-	serverStack.createTransaction();
+    protected void setUp(boolean clean) throws Exception {
+        Properties props = 
+            SgsTestNode.getDefaultProperties(APP_NAME, null, 
+                                             DummyAppListener.class);
+        props.setProperty(StandardProperties.AUTHENTICATORS, 
+                      "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	serverNode = 
+                new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
+
+        taskScheduler = 
+            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
+
+        dataService = serverNode.getDataService();
+    }
+
+    /** 
+     * Add additional nodes.  We only do this as required by the tests. 
+     *
+     * @param props properties for node creation, or {@code null} if default
+     *     properties should be used
+     * @parm num the number of nodes to add
+     */
+    private void addNodes(Properties props, int num) throws Exception {
+        // Create the other nodes
+        additionalNodes = new SgsTestNode[num];
+
+        for (int i = 0; i < num; i++) {
+            SgsTestNode node = 
+                    new SgsTestNode(serverNode, DummyAppListener.class, props); 
+            additionalNodes[i] = node;
+        }
     }
 
     /** Sets passed if the test passes. */
@@ -123,14 +164,21 @@ public class TestClientSessionServiceImpl extends TestCase {
         Thread.sleep(100);
 	passed = true;
     }
-    
-    /** Cleans up the transaction. */
+
     protected void tearDown() throws Exception {
         tearDown(true);
     }
 
     protected void tearDown(boolean clean) throws Exception {
-	serverStack.tearDown(clean);
+	if (additionalNodes != null) {
+            for (SgsTestNode node : additionalNodes) {
+                node.shutdown(false);
+            }
+            additionalNodes = null;
+        }
+        serverNode.shutdown(clean);
+        serverNode = null;
+
     }
 
     /* -- Test constructor -- */
@@ -205,7 +253,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient("foo");
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	} catch (Exception e) {
 	    System.err.println("Exception: " + e);
 	    Throwable t = e.getCause();
@@ -219,24 +267,23 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testLoginSuccess() throws Exception {
-	registerAppListener();
 	DummyClient client = new DummyClient("success");
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 	} finally {
             client.disconnect(false);
 	}
     }
-    
+
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
-	registerAppListener();
 	String name = "success";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("password");
-	    if (serverStack.getIdentityManager().getNotifyLoggedIn(name)) {
+	    if (SimpleTestIdentityAuthenticator.allIdentities.
+                    getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
@@ -250,16 +297,15 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoggedInReturningNonSerializableClientSessionListener()
 	throws Exception
     {
-	registerAppListener();
 	DummyClient client = new DummyClient(NON_SERIALIZABLE);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 	    fail("expected login failure");
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (serverStack.getIdentityManager().
+		if (SimpleTestIdentityAuthenticator.allIdentities.
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -277,16 +323,15 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoggedInReturningNullClientSessionListener()
 	throws Exception
     {
-	registerAppListener();
 	DummyClient client = new DummyClient(RETURN_NULL);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (serverStack.getIdentityManager().
+		if (SimpleTestIdentityAuthenticator.allIdentities.
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -300,20 +345,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
     }
-    
+
     public void testLoggedInThrowingRuntimeException()
 	throws Exception
     {
-	registerAppListener();
 	DummyClient client = new DummyClient(THROW_RUNTIME_EXCEPTION);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
-		if (serverStack.getIdentityManager().
+		if (SimpleTestIdentityAuthenticator.allIdentities.
 		        getNotifyLoggedIn(NON_SERIALIZABLE))
 		{
 		    fail("unexpected notifyLoggedIn invoked on identity: " +
@@ -327,12 +371,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
     }
-    
+
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
-	registerAppListener();
 	DummyClient client = new DummyClient("logout");
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("test");
 	    client.logout();
 	    client.checkDisconnected(true);
@@ -345,20 +388,21 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
-	registerAppListener();
 	String name = "logout";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 	    client.logout();
-	    if (serverStack.getIdentityManager().getNotifyLoggedIn(name)) {
+	    if (SimpleTestIdentityAuthenticator.allIdentities.
+                    getNotifyLoggedIn(name)) {
 		System.err.println(
 		    "notifyLoggedIn invoked for identity: " + name);
 	    } else {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
-	    if (serverStack.getIdentityManager().getNotifyLoggedOut(name)) {
+	    if (SimpleTestIdentityAuthenticator.allIdentities.
+                    getNotifyLoggedOut(name)) {
 		System.err.println(
 		    "notifyLoggedOut invoked for identity: " + name);
 	    } else {
@@ -371,10 +415,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
-	registerAppListener();
 	String name = "testRemoveListener";
 	DummyClient client = new DummyClient(name);
-	SgsTestStack stack1 = null;
 	try {
 	    List<String> nodeKeys = getServiceBindingKeys(NODE_PREFIX);
 	    System.err.println("Node keys: " + nodeKeys);
@@ -384,7 +426,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("more than one node key");
 	    }
 	    
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 
 	    List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
@@ -415,13 +457,12 @@ public class TestClientSessionServiceImpl extends TestCase {
             // Simulate "crash"
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
-            serverStack.setUp(false);
-	    dataService = serverStack.getDataService();
+            setUp(false);
+	    dataService = serverNode.getDataService();
 	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
 		fail("Failed node key prematurely removed: " + failedNodeKey);
 	    }
-	    stack1 = new SgsTestStack(APP_NAME, serverStack);
-	    stack1.setUp(false);
+            addNodes(null, 1);
 	    client.checkDisconnected(false);
 
 	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
@@ -450,111 +491,121 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
 	} finally {
 	    client.disconnect(false);
-	    if (stack1 != null) {
-		stack1.tearDown(false);
-	    }
 	}
     }
 
     private List<String> getServiceBindingKeys(String prefix) throws Exception {
-	serverStack.createTransaction();
-	List<String> keys = new ArrayList<String>();
-	String key = prefix;
-	for (;;) {
-	    key = dataService.nextServiceBoundName(key);
-	    if (key == null ||
-		! key.regionMatches(
-		      0, prefix, 0, prefix.length()))
-	    {
-		break;
-	    }
-	    keys.add(key);
-	}
-	serverStack.commitTransaction();
-	return keys;
+        GetKeysTask task = new GetKeysTask(prefix);
+        taskScheduler.runTransactionalTask(task, taskOwner);
+        return task.getKeys();
+    }
+
+    private class GetKeysTask extends AbstractKernelRunnable {
+        private List<String> keys = new ArrayList<String>();
+        private final String prefix;
+        GetKeysTask(String prefix) {
+            this.prefix = prefix;
+        }
+        public void run() throws Exception {
+            String key = prefix;
+            for (;;) {
+                key = dataService.nextServiceBoundName(key);
+                if (key == null ||
+                    ! key.regionMatches(
+                          0, prefix, 0, prefix.length()))
+                {
+                    break;
+                }
+                keys.add(key);
+            }
+        }
+        public List<String> getKeys() { return keys;}
     }
 
     /* -- test ClientSession -- */
 
     public void testClientSessionIsConnected() throws Exception {
-	registerAppListener();
 	DummyClient client = new DummyClient("clientname");
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-	    serverStack.createTransaction();
-	    DummyAppListener appListener = getAppListener();
-	    Set<ClientSession> sessions = appListener.getSessions();
-	    if (sessions.isEmpty()) {
-		fail("appListener contains no client sessions!");
-	    }
-	    for (ClientSession session : appListener.getSessions()) {
-		if (session.isConnected() == true) {
-		    System.err.println("session is connected");
-		    serverStack.commitTransaction();
-		    return;
-		} else {
-		    fail("Expected connected session: " + session);
-		}
-	    }
-	    fail("expected a connected session");
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() {
+                    DummyAppListener appListener = getAppListener();
+                    Set<ClientSession> sessions = appListener.getSessions();
+                    if (sessions.isEmpty()) {
+                        fail("appListener contains no client sessions!");
+                    }
+                    for (ClientSession session : appListener.getSessions()) {
+                        if (session.isConnected() == true) {
+                            System.err.println("session is connected");
+                            return;
+                        } else {
+                            fail("Expected connected session: " + session);
+                        }
+                    }
+                    fail("expected a connected session");
+                }
+            }, taskOwner);
 	} finally {
 	    client.disconnect(false);
 	}
     }
-    
+
     public void testClientSessionGetName() throws Exception {
-	registerAppListener();
-	String name = "clientname";
+	final String name = "clientname";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-	    serverStack.createTransaction();
-	    DummyAppListener appListener = getAppListener();
-	    Set<ClientSession> sessions = appListener.getSessions();
-	    if (sessions.isEmpty()) {
-		fail("appListener contains no client sessions!");
-	    }
-	    for (ClientSession session : appListener.getSessions()) {
-		if (session.getName().equals(name)) {
-		    System.err.println("names match");
-		    serverStack.commitTransaction();
-		    return;
-		} else {
-		    fail("Expected session name: " + name +
-			 ", got: " + session.getName());
-		}
-	    }
-	    fail("expected d connected session");
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() {
+                    DummyAppListener appListener = getAppListener();
+                    Set<ClientSession> sessions = appListener.getSessions();
+                    if (sessions.isEmpty()) {
+                        fail("appListener contains no client sessions!");
+                    }
+                    for (ClientSession session : appListener.getSessions()) {
+                        if (session.getName().equals(name)) {
+                            System.err.println("names match");
+                            return;
+                        } else {
+                            fail("Expected session name: " + name +
+                                 ", got: " + session.getName());
+                        }
+                    }
+                    fail("expected disconnected session");
+                }
+             }, taskOwner);
 	} finally {
 	    client.disconnect(false);
 	}
     }
 
     public void testClientSessionGetSessionId() throws Exception {
-	registerAppListener();
-	DummyClient client = new DummyClient("clientname");
+	final DummyClient client = new DummyClient("clientname");
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-	    serverStack.createTransaction();
-	    DummyAppListener appListener = getAppListener();
-	    Set<ClientSession> sessions = appListener.getSessions();
-	    if (sessions.isEmpty()) {
-		fail("appListener contains no client sessions!");
-	    }
-	    for (ClientSession session : appListener.getSessions()) {
-		if (session.getSessionId().equals(client.getSessionId())) {
-		    System.err.println("session IDs match");
-		    serverStack.commitTransaction();
-		    return;
-		} else {
-		    fail("Expected session id: " + client.getSessionId() +
-			 ", got: " + session.getSessionId());
-		}
-	    }
-	    fail("expected a connected session");
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() {
+                    DummyAppListener appListener = getAppListener();
+                    Set<ClientSession> sessions = appListener.getSessions();
+                    if (sessions.isEmpty()) {
+                        fail("appListener contains no client sessions!");
+                    }
+                    for (ClientSession session : appListener.getSessions()) {
+                        if (session.getSessionId().equals(client.getSessionId())) {
+                            System.err.println("session IDs match");
+                            return;
+                        } else {
+                            fail("Expected session id: " + client.getSessionId() +
+                                 ", got: " + session.getSessionId());
+                        }
+                    }
+                    fail("expected a connected session");
+                }
+            }, taskOwner);
 	} finally {
 	    client.disconnect(false);
 	}
@@ -583,11 +634,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int numMessages, int expectedMessages, RuntimeException exception)
 	throws Exception
     {
-	registerAppListener();
 	String name = "clientname";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverStack.getAppPort());
+	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
 	    client.sendMessages(numMessages, expectedMessages, exception);
 	} finally {
@@ -608,25 +658,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	return props;
     }
- 
-    /**
-     * Registers an AppListener within a transaction.
-     */
-    private void registerAppListener() throws Exception {
-	
-	// TODO: this needs to be retried if it fails.
-	serverStack.createTransaction();
-	DummyAppListener appListener = new DummyAppListener();
-	dataService.setServiceBinding(
-	    StandardProperties.APP_LISTENER, appListener);
-	serverStack.commitTransaction();
-    }
-    
+
+    /** Find the app listener */
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
 	    StandardProperties.APP_LISTENER, AppListener.class);
     }
-    
+
     /**
      * Dummy client code for testing purposes.
      */
@@ -1024,7 +1062,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    private static class DummyAppListener implements AppListener, Serializable {
+    public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
 

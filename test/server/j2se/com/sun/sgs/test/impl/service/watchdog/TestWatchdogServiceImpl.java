@@ -19,26 +19,21 @@
 
 package com.sun.sgs.test.impl.service.watchdog;
 
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
-import com.sun.sgs.service.DataService;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
-import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.test.util.SgsTestNode;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,51 +49,34 @@ import java.util.concurrent.ConcurrentHashMap;
 import junit.framework.TestCase;
 
 public class TestWatchdogServiceImpl extends TestCase {
-    /** The name of the DataStoreImpl class. */
-    private static final String DataStoreImplClassName =
-	DataStoreImpl.class.getName();
-
     /** The name of the WatchdogServerImpl class. */
     private static final String WatchdogServerPropertyPrefix =
 	"com.sun.sgs.impl.service.watchdog.server";
-    
-    /** Directory used for database shared across multiple tests. */
-    private static final String DB_DIRECTORY =
-        System.getProperty("java.io.tmpdir") + File.separator +
-	"TestWatchdogServiceImpl.db";
 
-    /** The port for the watchdog server. */
-    private static int WATCHDOG_PORT = 0;
+    /* The number of additional nodes to create if tests need them */
+    private static final int NUM_WATCHDOGS = 5;
 
-    /** The renew interval for the watchdog server. */
-    private static long RENEW_INTERVAL = 500;
+    /** The node that creates the servers */
+    private SgsTestNode serverNode;
+    /** Any additional nodes, for tests needing more than one node */
+    private SgsTestNode additionalNodes[];
 
-    /** Properties for the watchdog server and data service. */
-    private static Properties serviceProps = createProperties(
-	StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	WatchdogServerPropertyPrefix + ".start", "true",
-	WatchdogServerPropertyPrefix + ".port", Integer.toString(WATCHDOG_PORT),
-	WatchdogServerPropertyPrefix + ".renew.interval",
-	    Long.toString(RENEW_INTERVAL));
+    /** System components found from the serverNode */
+    private TransactionProxy txnProxy;
+    private ComponentRegistry systemRegistry;
+    private Properties serviceProps;
 
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory",
-	DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestWatchdogServiceImpl");
+    /** A specific property we started with */
+    private int renewTime;
 
-    private static DummyTransactionProxy txnProxy =
-	MinimalTestKernel.getTransactionProxy();
+    /** The task scheduler. */
+    private TaskScheduler taskScheduler;
 
-    private DummyAbstractKernelAppContext appContext;
-    private DummyComponentRegistry systemRegistry;
-    private DummyComponentRegistry serviceRegistry;
-    private DummyTransaction txn;
-    private DataServiceImpl dataService;
+    /** The owner for tasks I initiate. */
+    private TaskOwner taskOwner;
+
+    /** The watchdog service for serverNode */
     private WatchdogServiceImpl watchdogService;
-
-    /** True if test passes. */
-    private boolean passed;
 
     /** Constructs a test instance. */
     public TestWatchdogServiceImpl(String name) {
@@ -108,120 +86,112 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** Test setup. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-        setUp(true);
+        setUp(null, true);
     }
 
-    protected void setUp(boolean clean) throws Exception {
-        if (clean) {
-            deleteDirectory(DB_DIRECTORY);
+    protected void setUp(Properties props, boolean clean) throws Exception {
+        serverNode = new SgsTestNode("TestWatchdogServiceImpl", 
+                                      null, props, clean);
+        txnProxy = serverNode.getProxy();
+        systemRegistry = serverNode.getSystemRegistry();
+        serviceProps = serverNode.getServiceProperties();
+        renewTime = Integer.valueOf(
+            serviceProps.getProperty(
+                "com.sun.sgs.impl.service.watchdog.renew.interval"));
+
+        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        taskOwner = txnProxy.getCurrentOwner();
+
+        watchdogService = serverNode.getWatchdogService();
+    }
+
+    /** 
+     * Add additional nodes.  We only do this as required by the tests. 
+     *
+     * @param props properties for node creation, or {@code null} if default
+     *     properties should be used
+     * @parm num the number of nodes to add
+     */
+    private void addNodes(Properties props, int num) throws Exception {
+        // Create the other nodes
+        additionalNodes = new SgsTestNode[num];
+
+        for (int i = 0; i < num; i++) {
+            SgsTestNode node = new SgsTestNode(serverNode, null, props); 
+            additionalNodes[i] = node;
+            System.err.println("watchdog service id: " +
+                                   node.getWatchdogService().getLocalNodeId());
+
         }
-	createDirectory(DB_DIRECTORY);
-        MinimalTestKernel.useMasterScheduler(serviceProps);
-	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-	    
-	// create services
-
-	//identityManager = new DummyIdentityManager();
-	//systemRegistry.setComponent(IdentityManager.class, identityManager);
-
-	// create data service
-	dataService = createDataService(systemRegistry);
-        txnProxy.setComponent(DataService.class, dataService);
-        txnProxy.setComponent(DataServiceImpl.class, dataService);
-        serviceRegistry.setComponent(DataManager.class, dataService);
-        serviceRegistry.setComponent(DataService.class, dataService);
-        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-
-	// create watchdog service
-	watchdogService = new WatchdogServiceImpl(
-	    serviceProps, systemRegistry, txnProxy);
-	txnProxy.setComponent(WatchdogService.class, watchdogService);
-	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
-	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
-	serviceRegistry.setComponent(
-	    WatchdogServiceImpl.class, watchdogService);
-
-	// services ready
-	dataService.ready();
-	watchdogService.ready();
     }
 
-    /** Sets passed if the test passes. */
-    protected void runTest() throws Throwable {
-	super.runTest();
-	passed = true;
-    }
-    
-    /** Cleans up the transaction. */
-    protected void tearDown() throws Exception {
-        tearDown(true);
-    }
-
+    /** Shut down the nodes. */
     protected void tearDown(boolean clean) throws Exception {
-        if (txn != null) {
-            try {
-                txn.abort(null);
-            } catch (IllegalStateException e) {
+        if (additionalNodes != null) {
+            for (SgsTestNode node : additionalNodes) {
+                node.shutdown(false);
             }
-            txn = null;
+            additionalNodes = null;
         }
-	if (watchdogService != null) {
-	    watchdogService.shutdown();
-	    watchdogService = null;
-	}
-        if (dataService != null) {
-            dataService.shutdown();
-            dataService = null;
-        }
-        if (clean) {
-            deleteDirectory(DB_DIRECTORY);
-        }
-        MinimalTestKernel.destroyContext(appContext);
+        serverNode.shutdown(clean);
     }
 
     /* -- Test constructor -- */
-    
+
     public void testConstructor() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
-	WatchdogServerImpl server = watchdog.getServer();
-	System.err.println("watchdog server: " + server);
-	server.shutdown();
+        WatchdogServiceImpl watchdog = null;
+        try {
+            watchdog =
+                new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+            WatchdogServerImpl server = watchdog.getServer();
+            System.err.println("watchdog server: " + server);
+            server.shutdown();
+        } finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorNullProperties() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	try {
-	    new WatchdogServiceImpl(null, systemRegistry, txnProxy);
+	    watchdog = new WatchdogServiceImpl(null, systemRegistry, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorNullRegistry() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	try {
-	    new WatchdogServiceImpl(serviceProps, null, txnProxy);
+	    watchdog = new WatchdogServiceImpl(serviceProps, null, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorNullProxy() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	try {
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, null);
+	    watchdog =
+                    new WatchdogServiceImpl(serviceProps, systemRegistry, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorNoAppName() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
-	    WatchdogServerPropertyPrefix + ".port",
-	    Integer.toString(WATCHDOG_PORT));
+	    WatchdogServerPropertyPrefix + ".port", "0");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
@@ -229,61 +199,77 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
     public void testConstructorNegativePort() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+	    watchdog = 
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorPortTooLarge() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+	    watchdog =
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
-    
+
     public void testConstructorStartServerRenewIntervalTooSmall()
 	throws Exception
     {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+	    watchdog =
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     public void testConstructorStartServerRenewIntervalTooLarge()
 	throws Exception
     {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+	    watchdog =
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	}
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
     }
 
     /* -- Test getLocalNodeId -- */
@@ -324,32 +310,43 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test isLocalNodeAlive -- */
 
     public void testIsLocalNodeAlive() throws Exception {
-	createTransaction();
-	if (! watchdogService.isLocalNodeAlive()) {
-	    fail("Expected watchdogService.isLocalNodeAlive() to return true");
-	}
-	commitTransaction();
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+                if (! watchdogService.isLocalNodeAlive()) {
+                    fail("Expected watchdogService.isLocalNodeAlive() " +
+                          "to return true");
+                }
+            }
+        }, taskOwner);
 
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	WatchdogServiceImpl watchdog =
+	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-	    createTransaction();
-	    if (! watchdog.isLocalNodeAlive()) {
-		fail("Expected watchdog.isLocalNodeAlive() to return true");
-	    }
-	    commitTransaction();
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    if (! watchdogService.isLocalNodeAlive()) {
+                        fail("Expected watchdogService.isLocalNodeAlive() " +
+                          "to return true");
+                    }
+                }
+            }, taskOwner);
+
 	    watchdogService.shutdown();
 	    // wait for watchdog's renew to fail...
-	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
-	    createTransaction();
-	    if (watchdog.isLocalNodeAlive()) {
-		fail("Expected watchdog.isLocalNodeAlive() to return false");
-	    }
-	    commitTransaction();
+	    Thread.currentThread().sleep(renewTime * 4);
+
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    if (watchdog.isLocalNodeAlive()) {
+                        fail("Expected watchdogService.isLocalNodeAlive() " +
+                          "to return false");
+                    }
+                }
+            }, taskOwner);
 	    
 	} finally {
 	    watchdog.shutdown();
@@ -398,7 +395,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	    watchdogService.shutdown();
 	    // wait for watchdog's renew to fail...
-	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+	    Thread.currentThread().sleep(renewTime * 4);
 	    if (watchdog.isLocalNodeAliveNonTransactional()) {
 		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
 		     "to return false");
@@ -436,54 +433,51 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test getNodes -- */
 
     public void testGetNodes() throws Exception {
-	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
-	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	try {
-	    for (int i = 0; i < 5; i++) {
-		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
-		watchdogs.add(watchdog);
-		System.err.println("watchdog service id: " +
-				   watchdog.getLocalNodeId());
-	    }
-	    // ensure that watchdogs have a chance to register
-	    Thread.currentThread().sleep(RENEW_INTERVAL);
-	    createTransaction();
-	    Iterator<Node> iter = watchdogService.getNodes();
-	    int numNodes = 0;
-	    while (iter.hasNext()) {
-		Node node = iter.next();
-		System.err.println(node);
-		numNodes++;
-	    }
-	    commitTransaction();
-	    int expectedNodes = watchdogs.size() + 1;
-	    if (numNodes != expectedNodes) {
-		fail("Expected " + expectedNodes +
-		     " watchdogs, got " + numNodes);
-	    }
-	} finally {
+        addNodes(null, NUM_WATCHDOGS);
+        Thread.currentThread().sleep(renewTime);
+        CountNodesTask task = new CountNodesTask();
+        taskScheduler.runTransactionalTask(task, taskOwner);
+        int numNodes = task.numNodes;
 
-	    for (WatchdogServiceImpl watchdog : watchdogs) {
-		watchdog.shutdown();
-	    }
-	}
+        int expectedNodes = NUM_WATCHDOGS + 1;
+        if (numNodes != expectedNodes) {
+            fail("Expected " + expectedNodes +
+                 " watchdogs, got " + numNodes);
+        }
     }
 
+    /** 
+     * Task to count the number of nodes.
+     */
+    private class CountNodesTask extends AbstractKernelRunnable {
+        int numNodes;
+        public void run() {
+            Iterator<Node> iter = watchdogService.getNodes();
+            numNodes = 0;
+            while (iter.hasNext()) {
+                Node node = iter.next();
+                System.err.println(node);
+                numNodes++;
+            }
+        }
+    }
+
+
     public void testGetNodesServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
+	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-	createTransaction();
-	try {
-	    watchdog.getNodes();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    try {
+                        watchdog.getNodes();
+                        fail("Expected IllegalStateException");
+                    } catch (IllegalStateException e) {
+                        System.err.println(e);
+                    }
+                }
+            }, taskOwner);
     }
 
     public void testGetNodesNoTransaction() throws Exception {
@@ -498,52 +492,43 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test getNode -- */
 
     public void testGetNode() throws Exception {
-	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
-	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	try {
-	    for (int i = 0; i < 5; i++) {
-		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
-		watchdogs.add(watchdog);
-	    }
-	    for (WatchdogServiceImpl watchdog : watchdogs) {
-		long id = watchdog.getLocalNodeId();
-		createTransaction();
-		Node node = watchdogService.getNode(id);
-		if (node == null) {
-		    fail("Expected node for ID " + id + " got " +  node);
-		}
-		System.err.println(node);
-		if (id != node.getId()) {
-		    fail("Expected node ID " + id + " got, " + node.getId());
-		} else if (! node.isAlive()) {
-		    fail("Node " + id + " is not alive!");
-		}
-		commitTransaction();
-	    }
-	    
-	} finally {
+        addNodes(null, NUM_WATCHDOGS);
 
-	    for (WatchdogServiceImpl watchdog : watchdogs) {
-		watchdog.shutdown();
-	    }
-	}
+        for (SgsTestNode node : additionalNodes) {
+            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            final long id  = watchdog.getLocalNodeId();
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Node node = watchdogService.getNode(id);
+                    if (node == null) {
+                        fail("Expected node for ID " + id + " got " +  node);
+                    }
+                    System.err.println(node);
+                    if (id != node.getId()) {
+                        fail("Expected node ID " + id + 
+                                " got, " + node.getId());
+                    } else if (! node.isAlive()) {
+                        fail("Node " + id + " is not alive!");
+                    }
+                }
+            }, taskOwner);
+        }
     }
 
     public void testGetNodeServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
+	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-	createTransaction();
-	try {
-	    watchdog.getNode(0);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    try {
+                        watchdog.getNode(0);
+                        fail("Expected IllegalStateException");
+                    } catch (IllegalStateException e) {
+                        System.err.println(e);
+                    }
+                }
+            }, taskOwner);
     }
 
     public void testGetNodeNoTransaction() throws Exception {
@@ -556,26 +541,33 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testGetNodeNonexistentNode() throws Exception {
-	createTransaction();
-	Node node = watchdogService.getNode(29);
-	System.err.println(node);
-	if (node != null) {
-	    fail("Expected null node, got " + node);
-	}
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+                Node node = watchdogService.getNode(29);
+                System.err.println(node);
+                if (node != null) {
+                    fail("Expected null node, got " + node);
+                }
+            }
+        }, taskOwner);
     }
 
     /* -- Test addNodeListener -- */
-    
+
     public void testAddNodeListenerServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
+	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-	try {
-	    watchdog.addNodeListener(new DummyNodeListener());
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+                try {
+                    watchdog.addNodeListener(new DummyNodeListener());
+                    fail("Expected IllegalStateException");
+                } catch (IllegalStateException e) {
+                    System.err.println(e);
+                }
+            }
+        }, taskOwner);
     }
 
     public void testAddNodeListenerNullListener() throws Exception {
@@ -588,79 +580,60 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testAddNodeListenerNodeStarted() throws Exception {
-	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
- 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	DummyNodeListener listener = new DummyNodeListener();
+        DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
+        addNodes(null, NUM_WATCHDOGS);
 
-	try {
-	    for (int i = 0; i < 5; i++) {
-		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
-		watchdogs.add(watchdog);
-	    }
-	    // wait for all nodes to get notified...
-	    Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+        // wait for all nodes to get notified...
+        Thread.currentThread().sleep(renewTime * 4);
 
-	    Set<Node> nodes = listener.getStartedNodes();
-	    System.err.println("startedNodes: " + nodes);
-	    if (nodes.size() != 5) {
-		fail("Expected 5 started nodes, got " + nodes.size());
-	    }
-	    for (Node node : nodes) {
-		System.err.println(node);
-		if (!node.isAlive()) {
-		    fail("Node " + node.getId() + " is not alive!");
-		}
-	    }
-	    
-	} finally {
-	    // shutdown nodes...
-	    for (WatchdogServiceImpl watchdog : watchdogs) {
-		watchdog.shutdown();
-	    }
-	}
+        Set<Node> nodes = listener.getStartedNodes();
+        System.err.println("startedNodes: " + nodes);
+        if (nodes.size() != NUM_WATCHDOGS) {
+            fail("Expected " + NUM_WATCHDOGS + " started nodes, got " + 
+                    nodes.size());
+        }
+        for (Node node : nodes) {
+            System.err.println(node);
+            if (!node.isAlive()) {
+                fail("Node " + node.getId() + " is not alive!");
+            }
+        }
     }
 
     public void testAddNodeListenerNodeFailed() throws Exception {
-	Set<WatchdogServiceImpl> watchdogs = new HashSet<WatchdogServiceImpl>();
-	int port = watchdogService.getServer().getPort();
-	Properties props = createProperties(
- 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
-	DummyNodeListener listener = new DummyNodeListener();
+        DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
-	
-	for (int i = 0; i < 5; i++) {
-	    WatchdogServiceImpl watchdog =
-		new WatchdogServiceImpl(props, systemRegistry, txnProxy);
-	    watchdogs.add(watchdog);
-	}
-	for (WatchdogServiceImpl watchdog : watchdogs) {
-	    long id = watchdog.getLocalNodeId();
-	    createTransaction();
-	    Node node = watchdogService.getNode(id);
-	    if (node == null) {
-		fail("Expected node for ID " + id + " got " +  node);
-	    }
-	    System.err.println(node);
-	    if (id != node.getId()) {
-		fail("Expected node ID " + id + " got, " + node.getId());
-	    } else if (! node.isAlive()) {
-		fail("Node " + id + " is not alive!");
-	    }
-	    commitTransaction();
-	}
-	// shutdown nodes...
-	for (WatchdogServiceImpl watchdog : watchdogs) {
-	    watchdog.shutdown();
-	}
+        addNodes(null, NUM_WATCHDOGS);
+        for (SgsTestNode node : additionalNodes) {
+            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            final long id  = watchdog.getLocalNodeId();
+            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Node node = watchdogService.getNode(id);
+                    if (node == null) {
+                        fail("Expected node for ID " + id + " got " +  node);
+                    }
+                    System.err.println(node);
+                    if (id != node.getId()) {
+                        fail("Expected node ID " + id + 
+                                " got, " + node.getId());
+                    } else if (! node.isAlive()) {
+                        fail("Node " + id + " is not alive!");
+                    }
+                }
+            }, taskOwner);
+        }
+        // shutdown nodes...
+	if (additionalNodes != null) {
+            for (SgsTestNode node : additionalNodes) {
+                node.shutdown(false);
+            }
+            additionalNodes = null;
+        }
 
 	// wait for all nodes to fail...
-	Thread.currentThread().sleep(RENEW_INTERVAL * 4);
+	Thread.currentThread().sleep(renewTime * 4);
 
 	Set<Node> nodes = listener.getFailedNodes();
 	System.err.println("failedNodes: " + nodes);
@@ -721,7 +694,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /* -- test addRecoveryListener -- */
-    
+
     public void testAddRecoveryListenerServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
@@ -775,7 +748,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    // pause for watchdog server to detect failure and
 	    // send notifications
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    checkNodesFailed(shutdownIds, true);
 	    listener.notifyFutures();
@@ -818,7 +791,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    // pause for watchdog server to detect failure and
 	    // send notifications
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    Set<Node> backups = checkNodesFailed(shutdownIds, true);
 
@@ -834,7 +807,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		}
 	    }
 
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    listener.notifyFutures();
 	    checkNodesRemoved(shutdownIds);
@@ -846,7 +819,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
     public void testRecoveryWithDelayedBackupAssignment() throws Exception {
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -872,7 +845,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    // pause for watchdog server to detect failure and
 	    // reassign backups.
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 
 	    checkNodesFailed(shutdownIds, false);
 
@@ -884,7 +857,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // pause for watchdog server to reassign new node as
 	    // backup to exising nodes.
 	    
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size());
 	    listener.notifyFutures();
 	    checkNodesRemoved(shutdownIds);
@@ -896,7 +869,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
     public void testRecoveryAfterServerCrash() throws Exception {
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -914,7 +887,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // simulate crash
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
-	    setUp(false);
+	    setUp(null, false);
 
 	    checkNodesFailed(watchdogs.keySet(), false);
 	    
@@ -925,7 +898,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // pause for watchdog server to reassign new node as
 	    // backup to exising nodes.
 	    
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(totalWatchdogs + 1);
 	    listener.notifyFutures();
 	    checkNodesRemoved(watchdogs.keySet());
@@ -939,7 +912,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
     public void testRecoveryAfterAllNodesAndServerCrash() throws Exception {
 	Map<Long, WatchdogServiceImpl> watchdogs =
 	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
@@ -966,11 +939,11 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // simulate crash
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
-	    setUp(false);
+	    setUp(null, false);
 
 	    // pause for watchdog server to detect failure and
 	    // reassign backups.
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 
 	    checkNodesFailed(shutdownIds, false);
 
@@ -982,7 +955,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // pause for watchdog server to reassign new node as
 	    // backup to exising nodes.
 	    
-	    Thread.sleep(3 * RENEW_INTERVAL);
+	    Thread.sleep(3 * renewTime);
 	    listener.checkRecoveryNotifications(shutdownIds.size() + 1);
 	    listener.notifyFutures();
 
@@ -1015,66 +988,81 @@ public class TestWatchdogServiceImpl extends TestCase {
     private Set<Node> checkNodesFailed(Collection<Long> ids, boolean hasBackup)
 	throws Exception
     {
+        CheckNodesFailedTask task = new CheckNodesFailedTask(ids, hasBackup);
+        taskScheduler.runTransactionalTask(task, taskOwner);
+        return task.backups;
+    }
+
+    private class CheckNodesFailedTask extends AbstractKernelRunnable {
 	Set<Node> backups = new HashSet<Node>();
-	
-	createTransaction();
-	System.err.println("Get shutdown nodes (should be marked failed)");
-	for (Long longId : ids) {
-	    long id = longId.longValue();
-	    Node node = watchdogService.getNode(id);
-	    System.err.println("node (" + id + "):" +
-			       (node == null ? "(removed)" : node));
-	    if (node == null) {
-		fail("Node removed before recovery complete: " + id);
+        Collection<Long> ids;
+        boolean hasBackup;
+
+        CheckNodesFailedTask(Collection<Long> ids, boolean hasBackup) {
+            this.ids = ids;
+            this.hasBackup = hasBackup;
+        }
+        public void run() {
+	    System.err.println("Get shutdown nodes (should be marked failed)");
+	    for (Long longId : ids) {
+	        long id = longId.longValue();
+	        Node node = watchdogService.getNode(id);
+	        System.err.println("node (" + id + "):" +
+			           (node == null ? "(removed)" : node));
+	        if (node == null) {
+		    fail("Node removed before recovery complete: " + id);
+	        }
+	        if (node.isAlive()) {
+		    fail("Node not marked as failed: " + id);
+	        }
+	        Node backup = watchdogService.getBackup(id);
+	        if (hasBackup) {
+		    if (backup == null) {
+		        fail("failed node (" + id + ") has no backup");
+		    } else {
+		        backups.add(backup);
+		    }
+	        } else if (!hasBackup && backup != null) {
+		    fail("failed node (" + id + ") assigned backup: " +
+		         backup);
+	        }
 	    }
-	    if (node.isAlive()) {
-		fail("Node not marked as failed: " + id);
-	    }
-	    Node backup = watchdogService.getBackup(id);
-	    if (hasBackup) {
-		if (backup == null) {
-		    fail("failed node (" + id + ") has no backup");
-		} else {
-		    backups.add(backup);
-		}
-	    } else if (!hasBackup && backup != null) {
-		fail("failed node (" + id + ") assigned backup: " +
-		     backup);
-	    }
-	}
-	commitTransaction();
-	return backups;
+        }
     }
 
-    private void checkNodesRemoved(Collection<Long> ids) throws Exception {
-	createTransaction();
+    private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
 	System.err.println("Get shutdown nodes (should be removed)...");
-	for (Long longId : ids) {
-	    long id = longId.longValue();
-	    Node node = watchdogService.getNode(id);
-	    System.err.println("node (" + id + "):" +
-			       (node == null ? "(removed)" : node));
-	    if (node != null) {
-		fail("Expected node to be removed: " + node);
-	    }
-	}
-	commitTransaction();
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+	        for (Long longId : ids) {
+	            long id = longId.longValue();
+	            Node node = watchdogService.getNode(id);
+	            System.err.println("node (" + id + "):" +
+			               (node == null ? "(removed)" : node));
+	            if (node != null) {
+		        fail("Expected node to be removed: " + node);
+	            }
+	        }
+            }
+        }, taskOwner);
     }
 
-    private void checkNodesAlive(Collection<Long> ids) throws Exception {
+    private void checkNodesAlive(final Collection<Long> ids) throws Exception {
 	System.err.println("Get live nodes...");
-	createTransaction();
-	for (Long longId : ids) {
-	    long id = longId.longValue();
-	    Node node = watchdogService.getNode(id);
-	    System.err.println("node (" + id + "): " + node);
-	    if (node == null || !node.isAlive()) {
-		fail("Expected alive node");
-	    }
-	}
-	commitTransaction();
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+	        for (Long longId : ids) {
+	            long id = longId.longValue();
+	            Node node = watchdogService.getNode(id);
+	            System.err.println("node (" + id + "): " + node);
+	            if (node == null || !node.isAlive()) {
+		        fail("Expected alive node");
+	            }
+	        }
+            }
+        }, taskOwner);
     }
-    
+
     private static class DummyRecoveryListener implements RecoveryListener {
 
 	private final Map<Node, RecoveryCompleteFuture> nodes =
@@ -1120,9 +1108,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    nodes.get(node).done();
 	}
     }
-    
+
     /* -- other methods -- */
-    
+
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
 	Properties props = new Properties();
@@ -1133,95 +1121,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    props.setProperty(args[i], args[i + 1]);
 	}
 	return props;
-    }
-
-    /** Creates the specified directory, if it does not already exist. */
-    private static void createDirectory(String directory) {
-	File dir = new File(directory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-    }
-    
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /**
-     * Creates a new data service.  If the database directory does
-     * not exist, one is created.
-     */
-    private DataServiceImpl createDataService(
-	DummyComponentRegistry registry)
-	throws Exception
-    {
-	File dir = new File(DB_DIRECTORY);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-	return new DataServiceImpl(dbProps, registry, txnProxy);
-    }
-
-    /**
-     * Creates a new transaction, and sets transaction proxy's
-     * current transaction.
-     */
-    private DummyTransaction createTransaction() {
-	if (txn == null) {
-	    txn = new DummyTransaction();
-	    txnProxy.setCurrentTransaction(txn);
-	}
-	return txn;
-    }
-
-    /**
-     * Creates a new transaction with the specified timeout, and sets
-     * transaction proxy's current transaction.
-     */
-    private DummyTransaction createTransaction(long timeout) {
-	if (txn == null) {
-	    txn = new DummyTransaction(timeout);
-	    txnProxy.setCurrentTransaction(txn);
-	}
-	return txn;
-    }
-
-    private void abortTransaction(Exception e) {
-	if (txn != null) {
-	    txn.abort(e);
-	    txn = null;
-	    txnProxy.setCurrentTransaction(null);
-	} else {
-	    throw new TransactionNotActiveException("txn:" + txn);
-	}
-    }
-
-    private void commitTransaction() throws Exception {
-	if (txn != null) {
-	    txn.commit();
-	    txn = null;
-	    txnProxy.setCurrentTransaction(null);
-	} else {
-	    throw new TransactionNotActiveException("txn:" + txn);
-	}
     }
 
     private static class DummyNodeListener implements NodeListener {

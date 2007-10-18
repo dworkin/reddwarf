@@ -135,10 +135,30 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void checkTimeout() {
+	assert Thread.currentThread() == owner : "Wrong thread";
+	logger.log(Level.FINEST, "checkTimeout {0}", this);
+	switch (state) {
+	case ABORTED:
+	case COMMITTED:
+	    throw new TransactionNotActiveException(
+		"Transaction is not active: " + state);
+	case ABORTING:
+	case COMMITTING:
+	    return;
+	case ACTIVE:
+	case PREPARING:
+	    break;
+	default:
+	    throw new AssertionError();
+	}
 	long runningTime = System.currentTimeMillis() - getCreationTime();
-	if (runningTime > getTimeout())
-	    throw new TransactionTimeoutException("transaction timed out: " +
-						  runningTime + " ms");
+	if (runningTime > getTimeout()) {
+	    TransactionTimeoutException exception =
+		new TransactionTimeoutException(
+		    "transaction timed out: " + runningTime + " ms");
+	    abort(exception);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */
@@ -247,7 +267,10 @@ final class TransactionImpl implements Transaction {
      * @return	a string representation of this instance
      */
     public String toString() {
-	return "TransactionImpl[tid:" + tid + "]";
+	return "TransactionImpl[tid:" + tid +
+	    ", creationTime:" + creationTime +
+	    ", timeout:" + timeout +
+	    ", state:" + state + "]";
     }
 
     /**
