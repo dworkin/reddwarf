@@ -475,7 +475,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		     * Get the context again in case something changed as a
 		     * result of the call to removingObject.
 		     */
-		    context = getContext();
+		    getContext();
 		}
 		ref.removeObject();
 	    }

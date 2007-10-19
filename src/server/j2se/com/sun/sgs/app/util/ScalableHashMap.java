@@ -22,8 +22,11 @@ package com.sun.sgs.app.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -40,19 +43,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.Stack;
 
 /*
- * TBD: Modify clear to remove the objects associated with the children nodes
- * in a separate task, to avoid scaling problems.  -tjb@sun.com (09/26/2007)
- *
  * TBD: Add an asynchronous version of size to avoid scaling problems.
  * -tjb@sun.com (09/26/2007)
  *
  * TBD: Maybe use a separate top level object, to avoid repeating fields that
  * have the same value in every node?  -tjb@sun.com (10/09/2007)
- *
- * FIXME: Modify clear to maintain the initially requested minimum depth.
- * -tjb@sun.com (09/27/2007)
  */
 
 /**
@@ -180,7 +178,7 @@ import java.util.Set;
  */
 public class ScalableHashMap<K,V>
     extends AbstractMap<K,V>
-    implements Serializable, ManagedObject {
+    implements Serializable, ManagedObjectRemoval {
 
     /*
      * This class's implementation is based on the paper "Extendible hashing -
@@ -269,6 +267,19 @@ public class ScalableHashMap<K,V>
      * for choosing the child node.
      */
     private static final int MAX_DEPTH = INT_SIZE - 1;
+
+    /**
+     * The maximum number of entries to remove in a single run of tasks that
+     * asynchronously remove nodes and entries.
+     */
+    private static final int MAX_REMOVE_ENTRIES = 100;
+
+    /**
+     * If non-null, a runnable to call when a task that asynchronously removes
+     * nodes is done -- used for testing.  Note that this method is called
+     * during the transaction that completes the removal.
+     */
+    private static volatile Runnable noteDoneRemoving = null;
 
     /**
      * The minor version number, which can be modified to note a compatible
@@ -638,39 +649,18 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Clears the map of all entries in {@code O(n*log(n))} time.  When
-     * clearing, all non-{@code ManagedObject} key and values persisted by this
-     * map will be removed from the {@code DataManager}
+     * Clears the map of all entries by performing the work in a separate task.
+     * When clearing, all non-{@code ManagedObject} keys and values persisted
+     * by this map will be removed from the {@code DataManager}.
      */
     public void clear() {
-	DataManager dm = AppContext.getDataManager();
-	dm.markForUpdate(this);
-	modifications++;
-	if (isLeafNode()) {
-	    for (PrefixEntry e : table) {
-		while (e != null) {
-		    PrefixEntry next = e.next;
-		    e.unmanage();
-		    e = next;
-		}
-	    }
-	} else { // this is a directory node
-	    ManagedReference prevNodeRef = null;
-	    for (ManagedReference ref : nodeDirectory) {
-		// skip re-clearing duplicate nodes in the directory
-		if (ref != prevNodeRef) {
-		    prevNodeRef = ref;
-		    ScalableHashMap node = ref.get(ScalableHashMap.class);
-		    node.clear();
-		    dm.removeObject(node);
-		}
-	    }
-	}
-
-	if (depth == 0) { // special case for root node;
-	    nodeDirectory = null;
-	    table = new PrefixEntry[leafCapacity];
-	    size = 0;
+	removeChildrenAndEntries();
+	size = 0;
+	leftLeafRef = null;
+	rightLeafRef = null;
+	table = new PrefixEntry[leafCapacity];
+	if (depth == 0) {
+	    initDepth(minDepth);
 	}
     }
 
@@ -1482,6 +1472,266 @@ public class ScalableHashMap<K,V>
     }
 
     /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation removes from the {@code DataManager} all non-{@code
+     * ManagedObject} keys and values persisted by this map, as well as objects
+     * that make up the internal structure of the map itself.
+     */
+    public void removingObject() {
+	/*
+	 * Only operate on the top-level node.  Don't check the parentRef field
+	 * to determine if the node is a top-level node since we'll be clearing
+	 * that field on the children on the root node.
+	 */
+	if (depth == 0) {
+	    removeChildrenAndEntries();
+	}
+    }
+
+    /**
+     * Recursively removes the children and entries of this node, performing
+     * the actual removal in a separate task to avoid scaling problems.
+     */
+    private void removeChildrenAndEntries() {
+	AppContext.getDataManager().markForUpdate(this);
+	modifications++;
+	TaskManager taskManager = AppContext.getTaskManager();
+	if (isLeafNode()) {
+	    taskManager.scheduleTask(new RemoveNodeEntriesTask(this));
+	    table = null;
+	} else {
+	    taskManager.scheduleTask(new RemoveNodesTask(this));
+	    nodeDirectory = null;
+	}
+    }
+
+    /**
+     * Removes up to MAX_REMOVE_ENTRIES entries from this leaf node, returning
+     * true if they were all removed.
+     */
+    boolean removeSomeLeafEntries() {
+	assert isLeafNode();
+	AppContext.getDataManager().markForUpdate(this);
+	modifications++;
+	int count = removeSomeLeafEntriesInternal(table);
+	if (count == -1) {
+	    size = 0;
+	    return true;
+	} else {
+	    size -= count;
+	    return false;
+	}
+    }
+
+    /**
+     * Removes up to MAX_REMOVE_ENTRIES entries from the specified array of
+     * entries, returning true if they were all removed.
+     */
+    static boolean removeSomeLeafEntries(PrefixEntry[] table) {
+	return removeSomeLeafEntriesInternal(table) == -1;
+    }
+
+    /**
+     * An internal method for removing entries.  Returns the number of entries
+     * removed, or -1 if they were all removed.
+     */
+    private static int removeSomeLeafEntriesInternal(PrefixEntry[] table) {
+	int count = 0;
+	for (int i = 0; i < table.length; i++) {
+	    while (table[i] != null) {
+		PrefixEntry next = table[i].next;
+		table[i].unmanage();
+		table[i] = next;
+		if (++count >= MAX_REMOVE_ENTRIES) {
+		    return count;
+		}
+	    }
+	}
+	return -1;
+    }
+
+    /**
+     * A task that removes the entries in a leaf node, performing a limited
+     * amount of work each time it runs, and rescheduling itself if there is
+     * more work to do.  The entries are copied from the node so that the node
+     * can continue to be used.
+     */
+    private static final class RemoveNodeEntriesTask
+	implements ManagedObject, Serializable, Task
+    {
+	/** The version of the serialized form. */
+	private static final long serialVersionUID = 1;
+
+	/** The entries to remove. */ 
+	private PrefixEntry[] table;
+
+	/** Creates an instance for the specified leaf node. */
+	RemoveNodeEntriesTask(ScalableHashMap node) {
+	    assert node.isLeafNode();
+	    table = removeNulls(node.table);
+	}
+
+	/** Returns an array with the nulls removed. */
+	private static PrefixEntry[] removeNulls(PrefixEntry[] table) {
+	    int count = 0;
+	    for (PrefixEntry e : table) {
+		if (e != null) {
+		    count++;
+		}
+	    }
+	    PrefixEntry[] result = new PrefixEntry[count];
+	    int i = 0;
+	    for (PrefixEntry e : table) {
+		if (e != null) {
+		    result[i++] = e;
+		}
+	    }
+	    return result;
+	}
+
+	/**
+	 * Removes some entries, scheduling the task again if there are more,
+	 * and otherwise removing this task object.
+	 */
+	public void run() {
+	    if (!removeSomeLeafEntries(table)) {
+		AppContext.getTaskManager().scheduleTask(this);
+	    } else {
+		AppContext.getDataManager().removeObject(this);
+		Runnable r = noteDoneRemoving;
+		if (r != null) {
+		    r.run();
+		}
+	    }
+	}
+    }
+
+    /**
+     * A task that recursively removes the children and entries of a directory
+     * node by depth-first recursion.  Does not remove the node itself, and
+     * makes a copy of the node's children so that the node can continue to be
+     * used.
+     *
+     * Each time the task is run it moves to the next non-empty leaf node,
+     * removes a limited number of entries and just emptied nodes, and if
+     * needed walks up the node graph to the next non-empty directory node.  If
+     * there is more work to do, it reschedules the task, otherwise it removes
+     * it.  This scheme insures that the number of nodes visited per run is the
+     * same as the number needed to perform a lookup, and limits the number of
+     * entries visited, all in an attempt to keep the work small enough to fit
+     * within the transaction timeout.
+     */
+    private static final class RemoveNodesTask
+	implements ManagedObject, Serializable, Task
+    {
+	/** The version of the serialized form. */
+	private static final long serialVersionUID = 1;
+
+	/** A reference to the current node. */
+	private ManagedReference currentNodeRef;
+
+	/** A collection of references to more nodes to remove. */
+	private final Stack<ManagedReference> nodeRefs =
+	    new Stack<ManagedReference>();
+
+	/**
+	 * A stack of values for each directory node at or above the current
+	 * node that represent the offset of the child within that node to
+	 * traverse to the find a non-empty leaf.
+	 */
+	private final Stack<Integer> offsets = new Stack<Integer>();
+
+	/** Creates an instance for the specified directory node. */
+	private RemoveNodesTask(ScalableHashMap node) {
+	    assert !node.isLeafNode();
+	    ManagedReference lastRef = null;
+	    for (ManagedReference ref : node.nodeDirectory) {
+		if (ref != lastRef) {
+		    ScalableHashMap child = ref.get(ScalableHashMap.class);
+		    /*
+		     * Clear the parent reference so we don't walk up to the
+		     * root node, which is being reused.
+		     */
+		    child.parentRef = null;
+		    if (lastRef == null) {
+			currentNodeRef = ref;
+		    } else {
+			nodeRefs.add(ref);
+		    }
+		    lastRef = ref;
+		}
+	    }
+	    offsets.push(0);
+	}
+
+	/**
+	 * Removes some entries, rescheduling the task if there is more work to
+	 * do, or else removing the task if it is done.
+	 */
+	public void run() {
+	    TaskManager taskManager = AppContext.getTaskManager();
+	    if (doWork()) {
+		taskManager.scheduleTask(this);
+	    } else {
+		AppContext.getDataManager().removeObject(this);
+		Runnable r = noteDoneRemoving;
+		if (r != null) {
+		    r.run();
+		}
+	    }
+	}
+
+	/** Removes some entries, returning true if there is more to do. */
+	private boolean doWork() {
+	    DataManager dataManager = AppContext.getDataManager();
+	    ScalableHashMap node = currentNodeRef.get(ScalableHashMap.class);
+	    /* Find the leaf node */
+	    if (!node.isLeafNode()) {
+		while (true) {
+		    currentNodeRef = node.nodeDirectory[offsets.peek()];
+		    node = currentNodeRef.get(ScalableHashMap.class);
+		    if (node.isLeafNode()) {
+			break;
+		    }
+		    offsets.push(0);
+		}
+	    }
+	    if (!node.removeSomeLeafEntries()) {
+		/* More entries in this node */
+		return true;
+	    }
+	    /* Search parents for non-empty node, removing empty ones */
+	    while (true) {
+		currentNodeRef = node.parentRef;
+		dataManager.removeObject(node);
+		if (currentNodeRef == null) {
+		    break;
+		}
+		int offset = offsets.pop();
+		node = currentNodeRef.get(ScalableHashMap.class);
+		ManagedReference childRef = node.nodeDirectory[offset];
+		while (++offset < node.nodeDirectory.length) {
+		    if (childRef != node.nodeDirectory[offset]) {
+			offsets.push(offset);
+			/* More work under this node */
+			return true;
+		    }
+		}
+	    }
+	    if (nodeRefs.isEmpty()) {
+		/* No more top-level nodes */
+		return false;
+	    }
+	    /* Select the next top-level node */
+	    currentNodeRef = nodeRefs.pop();
+	    offsets.clear();
+	    offsets.push(0);
+	    return true;
+	}
+    }
+
+    /**
      * An implementation of {@code Entry} that incorporates information about
      * the prefix at which it is stored, as well as whether the {@link
      * ScalableHashMap} is responsible for the persistent lifetime of the key
@@ -1879,7 +2129,7 @@ public class ScalableHashMap<K,V>
 	implements Iterator<E>, Serializable {
 
 	/** The version of the serialized form. */
-	private static final long serialVersionUID = 0x1L;
+	private static final long serialVersionUID = 2;
 
 	/**
 	 * A reference to the root node of the table, used to look up the
@@ -1919,6 +2169,14 @@ public class ScalableHashMap<K,V>
 	 */
 	private boolean currentRemoved = false;
 
+	/**
+	 * The value of the root node's modification count when currentLeafRef
+	 * was obtained.  Need to get a fresh leaf ref if the count changes, in
+	 * case the map was cleared or removed, and the leaf is no longer part
+	 * of the map.
+	 */
+	private int rootModifications;
+
 	/** The leaf containing the next entry, or null if not computed. */
 	private transient ScalableHashMap nextLeaf = null;
 
@@ -1933,6 +2191,12 @@ public class ScalableHashMap<K,V>
 	 * nextEntry fields were computed.
 	 */
 	private transient int nextLeafModifications = 0;
+
+	/**
+	 * Whether currentLeafRef is known to be up-to-date with modifications
+	 * to the root node.
+	 */
+	private transient boolean checkedRootModifications = false;
 
 	/**
 	 * Constructs a new {@code ConcurrentIterator}.
@@ -1977,17 +2241,32 @@ public class ScalableHashMap<K,V>
 
 	/** Returns the current leaf. */
 	private ScalableHashMap getCurrentLeaf() {
-	    try {
-		ScalableHashMap leaf =
-		    currentLeafRef.get(ScalableHashMap.class);
-		/* Make sure the leaf was not converted to a directory node */
-		if (leaf.nodeDirectory == null) {
-		    return leaf;
+	    boolean rootChanged = false;
+	    if (!checkedRootModifications) {
+		int currentRootModifications =
+		    rootRef.get(ScalableHashMap.class).modifications;
+		if (rootModifications != currentRootModifications) {
+		    rootChanged = true;
+		    rootModifications = currentRootModifications;
 		}
-	    } catch (ObjectNotFoundException e) {
-		/* The leaf was removed */
+		checkedRootModifications = true;
 	    }
-	    return rootRef.get(ScalableHashMap.class).lookup(currentHash);
+	    if (!rootChanged) {
+		try {
+		    ScalableHashMap leaf =
+			currentLeafRef.get(ScalableHashMap.class);
+		    /* Check that leaf was not converted to a directory node */
+		    if (leaf.nodeDirectory == null) {
+			return leaf;
+		    }
+		} catch (ObjectNotFoundException e) {
+		    /* The leaf was removed */
+		}
+	    }
+	    ScalableHashMap leaf =
+		rootRef.get(ScalableHashMap.class).lookup(currentHash);
+	    currentLeafRef = AppContext.getDataManager().createReference(leaf);
+	    return leaf;
 	}
 
 	/**
@@ -2052,6 +2331,7 @@ public class ScalableHashMap<K,V>
 	    nextLeaf = null;
 	    nextEntry = null;
 	    nextLeafModifications = 0;
+	    checkedRootModifications = false;
 	}
     }
 

@@ -237,7 +237,11 @@ final class Context extends TransactionContext {
 
     /* -- Methods for object IDs -- */
 
-    /** Returns the next object ID. */
+    /**
+     * Returns the next object ID, or -1 if there are no more objects.  Does
+     * not return IDs for removed objects.  Specifying -1 requests the first
+     * ID.
+     */
     long nextObjectId(long oid) {
 	return ManagedReferenceImpl.nextObjectId(this, oid);
     }

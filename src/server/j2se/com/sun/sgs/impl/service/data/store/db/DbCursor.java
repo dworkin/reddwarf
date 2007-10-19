@@ -95,12 +95,13 @@ public interface DbCursor {
      * true}, then sets the current key and value to the last key and its
      * associated value.
      *
+     * @param	forUpdate whether to lock the cursor for update
      * @return	{@code true} if the last key was found, else {@code false}
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    boolean findLast();
+    boolean findLast(boolean forUpdate);
 
     /**
      * Uses the cursor to set the value associated with a key in the database,

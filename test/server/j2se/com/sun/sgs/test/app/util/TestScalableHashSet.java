@@ -22,15 +22,18 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -47,6 +50,7 @@ import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -62,16 +66,15 @@ public class TestScalableHashSet extends Assert {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestScalableHashSet.db";
 
-    /** The component registry. */
-    private static final DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
-
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
     /** The data service. */
     private static DataService dataService;
+
+    /** The task service. */
+    private static TaskService taskService;
 
     /**
      * Delete the database directory at the start of the test run, but not for
@@ -90,23 +93,30 @@ public class TestScalableHashSet extends Assert {
     /** An object to use in tests. */
     private Int one;
 
-    /** Setup. */
-    @Before public void setUp() throws Exception {
-	componentRegistry.setComponent(
-	    TaskScheduler.class, 
-	    MinimalTestKernel.getSystemRegistry(
-		MinimalTestKernel.createContext())
-	    .getComponent(TaskScheduler.class));
-	if (dataService == null) {
-	    dataService = new DataServiceImpl(
-		createProperties(
-		    DataStoreImpl.class.getName() + ".directory",
-		    dbDirectory, StandardProperties.APP_NAME,
-		    "TestScalableHashMapStress"),
-		componentRegistry, txnProxy);
-	    componentRegistry.setComponent(DataManager.class, dataService);
-	}
-	componentRegistry.registerAppContext();
+    /** Initial setup */
+    @BeforeClass public static void setUpClass() throws Exception {
+	DummyAbstractKernelAppContext appContext =
+	    MinimalTestKernel.createContext();
+	DummyComponentRegistry systemRegistry =
+	    MinimalTestKernel.getSystemRegistry(appContext);
+	DummyComponentRegistry serviceRegistry =
+	    MinimalTestKernel.getServiceRegistry(appContext);
+	dataService = new DataServiceImpl(
+	    createProperties(
+		DataStoreImpl.class.getName() + ".directory",
+		dbDirectory, StandardProperties.APP_NAME,
+		"TestScalableHashMapStress"),
+	    systemRegistry, txnProxy);
+	txnProxy.setComponent(DataService.class, dataService);
+	serviceRegistry.setComponent(DataManager.class, dataService);
+	serviceRegistry.setComponent(DataService.class, dataService);
+	taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
+	serviceRegistry.setComponent(TaskManager.class, taskService);
+    }
+
+    /** Per-test setup */
+    @Before public void setUpTest() throws Exception {
 	txn = createTransaction();
 	set = new ScalableHashSet<Object>();
 	dataService.setBinding("set", set);
@@ -213,25 +223,36 @@ public class TestScalableHashSet extends Assert {
     @Test public void testClear() throws Exception {
 	set.add(1);
 	set.add(null);
+	DoneRemoving.init();
 	set.clear();
 	assertTrue(set.isEmpty());
+	endTransaction();
+	DoneRemoving.await(1);
+	startTransaction();
 	set.clear();
 	assertTrue(set.isEmpty());
+	endTransaction();
+	DoneRemoving.await(1);
     }
 
     @Test public void testClearObjectNotFound() throws Exception {
 	set.add(one);
 	newTransaction();
 	dataService.removeObject(one);
+	DoneRemoving.init();
 	set.clear();
 	assertTrue(set.isEmpty());
 	one = new Int(1);
 	set.add(one);
-	newTransaction();
+	endTransaction();
+	DoneRemoving.await(1);
+	startTransaction();
 	dataService.removeObject(one);
 	newTransaction();
 	set.clear();
 	assertTrue(set.isEmpty());
+	endTransaction();
+	DoneRemoving.await(1);
     }
 
     /* Test contains */
@@ -419,8 +440,11 @@ public class TestScalableHashSet extends Assert {
 	assertEquals(2, set.size());
 	set.add(2);
 	assertEquals(2, set.size());
+	DoneRemoving.init();
 	set.clear();
 	assertEquals(0, set.size());
+	endTransaction();
+	DoneRemoving.await(1);
     }
 
     @Test public void testSizeObjectNotFound() throws Exception {
@@ -520,8 +544,11 @@ public class TestScalableHashSet extends Assert {
 	set.add(null);
 	set.add(1);
 	assertTrue(set.containsAll(other));
+	DoneRemoving.init();
 	set.clear();
 	assertFalse(set.containsAll(other));
+	endTransaction();
+	DoneRemoving.await(1);
     }
 
     /* Test retainAll */
@@ -571,17 +598,38 @@ public class TestScalableHashSet extends Assert {
      * new transaction, and updates fields from bindings.  Sets the fields to
      * null if the objects are not found.
      */
-    @SuppressWarnings("unchecked")
     private void newTransaction() throws Exception {
-	try {
-	    dataService.setBinding("set", set);
-	} catch (ObjectNotFoundException e) {
+	endTransaction();
+	startTransaction();
+    }
+    
+    /**
+     * Stores fields, if they are not null, into bindings and commits the
+     * current transaction.
+     */
+    private void endTransaction() throws Exception {
+	if (set != null) {
+	    try {
+		dataService.setBinding("set", set);
+	    } catch (ObjectNotFoundException e) {
+	    }
 	}
-	try {
-	    dataService.setBinding("one", one);
-	} catch (ObjectNotFoundException e) {
+	if (one != null) {
+	    try {
+		dataService.setBinding("one", one);
+	    } catch (ObjectNotFoundException e) {
+	    }
 	}
 	txn.commit();
+	txn = null;
+    }
+
+    /**
+     * Starts a new transaction and updates fields from bindings, setting the
+     * fields to null if the objects are not found.
+     */
+    @SuppressWarnings("unchecked")
+    private void startTransaction() throws Exception {
 	txn = createTransaction();
 	try {
 	    set = dataService.getBinding("set", ScalableHashSet.class);

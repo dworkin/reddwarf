@@ -1011,7 +1011,7 @@ public class DataStoreImpl
 		} else {
 		    DbCursor cursor = classesDb.openCursor(dbTxn);
 		    try {
-			result = cursor.findLast()
+			result = cursor.findLast(true)
 			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
 			byte[] idKey = getKeyFromClassId(result);
 			boolean success =
@@ -1280,6 +1280,7 @@ public class DataStoreImpl
 	nextBoundNameOp = consumer.registerOperation("nextBoundName");
 	getClassIdOp = consumer.registerOperation("getClassId");
 	getClassInfoOp = consumer.registerOperation("getClassInfo");
+	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp");
 
 	readBytesCounter = consumer.registerCounter("readBytes", true);
 	readObjectsCounter = consumer.registerCounter("readObjects", true);

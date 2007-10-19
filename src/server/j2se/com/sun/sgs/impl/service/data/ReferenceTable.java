@@ -114,9 +114,9 @@ final class ReferenceTable {
     }
 
     /**
-     * Returns the next object ID after the one specified for managed
-     * references stored in this table, or -1 if there are none.  Supplying -1
-     * for the object ID requests the first ID.
+     * Returns the next object ID in the reference table, or -1 if there are no
+     * more objects.  Does not return IDs for removed objects.  Specifying -1
+     * requests the first ID.
      */
     long nextObjectId(long oid) {
 	for (Entry<Long, ManagedReferenceImpl> entry :
