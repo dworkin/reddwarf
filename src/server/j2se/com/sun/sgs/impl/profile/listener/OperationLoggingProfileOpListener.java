@@ -47,7 +47,7 @@ import java.util.logging.Logger;
  * data when that number of operations have been reported, and then clears
  * its state and starts aggregating again.
  * <p>
- * This listener logs its findings at level {@value #LOG_LEVEL_NAME} to the
+ * This listener logs its findings at level {@value #LOG_LEVEL_STRING} to the
  * logger named {@value #LOGGER_NAME}.
  * <p>
  * The {@value #PROP_BASE} root is used for all properties in this class:
@@ -59,14 +59,16 @@ import java.util.logging.Logger;
  */
 public class OperationLoggingProfileOpListener implements ProfileListener {
 
-    // the name of the logger
+    /** The name of the logger: {@value #LOGGER_NAME} */
     public static final String LOGGER_NAME =
         "com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener";
-    
-    // the log level
-    public static final String LOG_LEVEL_NAME = "FINE";
 
-    // the base name for properties
+    /** The log level: {@value #LOG_LEVEL_STRING} */
+    public static final String LOG_LEVEL_STRING = "FINE";
+
+    private static final Level LOG_LEVEL = Level.parse(LOG_LEVEL_STRING);
+
+    /** The root for all properties in this class: {@value #PROP_BASE} */
     public static final String PROP_BASE =
         "com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener.";
 
@@ -75,7 +77,14 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
         new LoggerWrapper(Logger.getLogger(LOGGER_NAME));
 
     // the supported properties and their default values
+
+    /**
+     * The property key to specify the reporting interval:
+     * {@value #LOG_OPS_PROPERTY_KEY}
+     */
     public static final String LOG_OPS_PROPERTY_KEY = "logOps";
+
+    /** The default reporting interval: {@value #DEFAULT_LOG_OPS} tasks. */
     public static final int DEFAULT_LOG_OPS = 100000;
 
     // the number of threads reported as running in the scheduler
@@ -98,9 +107,6 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
     // the number set as the window size for aggregation
     private int logOps;
 
-    // the level at which to log ops
-    private final Level LOG_LEVEL;
-
     // a mapping from local counters to their aggregated counts for the
     // current snapshot
     private Map<String,Long> localCounters;
@@ -115,17 +121,12 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
      *                      running short-lived or recurring tasks
      * @param resourceCoord the <code>ResourceCoordinator</code> used to
      *                      run any long-lived tasks
-     * 
-     * @throws IllegalArgumentException if the configuration properties
-     *         are invalid
      */
     public OperationLoggingProfileOpListener(Properties properties,
                                              TaskOwner owner,
                                              TaskScheduler taskScheduler,
                                              ResourceCoordinator resourceCoord)
     {
-        LOG_LEVEL = Level.parse(LOG_LEVEL_NAME);
-
         logOps = (new PropertiesWrapper(properties)).getIntProperty(
                 PROP_BASE + LOG_OPS_PROPERTY_KEY, DEFAULT_LOG_OPS);
 	localCounters = new HashMap<String,Long>();
@@ -174,7 +175,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 	}
 
         if ((commitCount + abortCount) >= logOps) {
-            if (logger.isLoggable(Level.FINE)) {
+            if (logger.isLoggable(LOG_LEVEL)) {
                 long now = System.currentTimeMillis();
                 String opCountTally = "";
                 for (int i = 0; i <= maxOp; i++) {
@@ -193,7 +194,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 			    entry.getValue() + "\n";
 		}
 
-                logger.log(Level.FINE, "Operations [logOps=" + logOps +"]:\n" +
+                logger.log(LOG_LEVEL, "Operations [logOps=" + logOps +"]:\n" +
                            "  succeeded: " + commitCount +
                            "  failed:" + abortCount + "\n" +
                            "  elapsed time: " + (now - lastReport) + " ms\n" +

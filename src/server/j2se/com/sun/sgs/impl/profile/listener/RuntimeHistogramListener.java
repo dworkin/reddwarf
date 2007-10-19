@@ -69,7 +69,7 @@ public class RuntimeHistogramListener implements ProfileListener {
      * The window of tasks that are aggregated before the next text
      * output when none is provided
      */
-    public final int DEFAULT_WINDOW_SIZE = 5000;
+    public static final int DEFAULT_WINDOW_SIZE = 5000;
     
     /**
      * The current number of tasks seen

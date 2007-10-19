@@ -98,14 +98,25 @@ public class AggregateProfileListener implements ProfileListener {
     // the handle for the recurring reporting task
     private RecurringTaskHandle handle;
 
-    // the base name for properties
+    /** The root for all properties in this class: {@value #PROP_BASE} */
     public static final String PROP_BASE =
         "com.sun.sgs.impl.profile.listener.AggregateProfileListener.";
 
     // the supported properties and their default values
+
+    /** The property key to specify the port: {@value #PORT_PROPERTY_KEY} */
     public static final String PORT_PROPERTY_KEY = "report.port";
+
+    /** The default port: {@value #DEFAULT_PORT} */
     public static final int DEFAULT_PORT = 43005;
+
+    /**
+     * The property key to specify the period, in milliseconds:
+     * {@value #PERIOD_PROPERTY_KEY}
+     */
     public static final String PERIOD_PROPERTY_KEY = "report.period";
+
+    /** The default period: {@value #DEFAULT_PERIOD} milliseconds. */
     public static final long DEFAULT_PERIOD = 5000;
 
     /**
