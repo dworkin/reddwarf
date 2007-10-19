@@ -158,6 +158,11 @@ class Reactor {
             if (lifecycleState < SHUTDOWN_NOW) {
                 lifecycleState = SHUTDOWN_NOW;
 
+                // FIXME this is unsafe -- the selector keys() set may
+                // change while we are iterating.  Need a better strategy,
+                // maybe one that will interrupt the dispatching of
+                // existing keys. -JM
+
                 for (SelectionKey key : selector.keys()) {
                     try {
                         Closeable asyncKey =
