@@ -75,6 +75,7 @@ import java.util.Set;
 import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Logger;
 import junit.framework.TestCase;
 
 public class TestClientSessionServiceImpl extends TestCase {
@@ -149,6 +150,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Creates and configures the session service. */
     protected void setUp() throws Exception {
         passed = false;
+        Logger.getAnonymousLogger().info("Testcase: " + getName());
         System.err.println("Testcase: " + getName());
         setUp(true);
     }
