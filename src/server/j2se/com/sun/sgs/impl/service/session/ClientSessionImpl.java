@@ -195,13 +195,13 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     public String getName() {
 	Identity thisIdentity = getIdentity();
         String name = (thisIdentity == null) ? null : thisIdentity.getName();
-	logger.log(Level.FINEST, "getName returns {0}", name);
+	//logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
     }
     
     /** {@inheritDoc} */
     public ClientSessionId getSessionId() {
-	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
+	//logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
         return new ClientSessionId(sessionId.getId());
     }
 
@@ -281,7 +281,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	synchronized (lock) {
 	    thisIdentity = identity;
 	}
-        logger.log(Level.FINEST, "getIdentity returns {0}", thisIdentity);
+        //logger.log(Level.FINEST, "getIdentity returns {0}", thisIdentity);
 	return thisIdentity;
     }
 
