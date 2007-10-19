@@ -649,9 +649,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    channelSet =
 		dataService.getServiceBinding(channelSetKey, ChannelSet.class);
 	} catch (NameNotBoundException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"Channel set for session:{0} prematurely removed", session);
+	    // ignore; session may not be a member of any channel
 	}
 
 	return

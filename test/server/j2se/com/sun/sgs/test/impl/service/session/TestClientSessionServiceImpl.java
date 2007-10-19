@@ -54,12 +54,14 @@ import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import junit.framework.TestCase;
 
@@ -93,8 +95,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
-    /** Any additional nodes, for tests needing more than one node */
-    private SgsTestNode additionalNodes[];
+    /** Any additional nodes, keyed by node hostname (for tests
+     * needing more than one node). */
+    private Map<String,SgsTestNode> additionalNodes;
 
     /** The task scheduler. */
     private TaskScheduler taskScheduler;
@@ -143,18 +146,19 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
-     * @param props properties for node creation, or {@code null} if default
-     *     properties should be used
-     * @parm num the number of nodes to add
+     * @param hosts contains a host name for each additional node
      */
-    private void addNodes(Properties props, int num) throws Exception {
+    private void addNodes(String... hosts) throws Exception {
         // Create the other nodes
-        additionalNodes = new SgsTestNode[num];
+        additionalNodes = new HashMap<String, SgsTestNode>();
 
-        for (int i = 0; i < num; i++) {
+        for (String host : hosts) {
+	    Properties props = SgsTestNode.getDefaultProperties(
+	        APP_NAME, serverNode, DummyAppListener.class);
+	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
-                    new SgsTestNode(serverNode, DummyAppListener.class, props); 
-            additionalNodes[i] = node;
+                    new SgsTestNode(serverNode, DummyAppListener.class, props);
+	    additionalNodes.put(host, node);
         }
     }
 
@@ -171,7 +175,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     protected void tearDown(boolean clean) throws Exception {
 	if (additionalNodes != null) {
-            for (SgsTestNode node : additionalNodes) {
+            for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
             }
             additionalNodes = null;
@@ -274,6 +278,51 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} finally {
             client.disconnect(false);
 	}
+    }
+
+    public void testLoginRedirect() throws Exception {
+	int serverAppPort = serverNode.getAppPort();
+	String[] hosts = new String[] { "one", "two", "three"};
+	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
+	Set<DummyClient> clients = new HashSet<DummyClient>();
+	addNodes(hosts);
+	boolean failed = false;
+	int redirectCount = 0;
+	for (String user : users) {
+	    DummyClient client = new DummyClient(user);
+	    client.connect(serverAppPort);
+	    if (! client.login("password")) {
+		// login redirected
+		redirectCount++;
+		int redirectPort =
+		    (additionalNodes.get(client.redirectHost)).getAppPort();
+		client = new DummyClient(user);
+		client.connect(redirectPort);
+		if (!client.login("password")) {
+		    failed = true;
+		    System.err.println("login for user: " + user +
+				       " redirected twice");
+		}
+	    }
+	    clients.add(client);
+	}
+	if (redirectCount != hosts.length) {
+	    failed = true;
+	    System.err.println("Expected " + hosts.length + " redirects, got " +
+			       redirectCount);
+	}
+			       
+	for (DummyClient client : clients) {
+	    try {
+		client.disconnect(false);
+	    } catch (Exception e) {
+		System.err.println("Exception disconnecting client: " + client);
+	    }
+	}
+	if (failed) {
+	    fail("test failed (see output)");
+	}
+	
     }
 
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
@@ -462,7 +511,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
 		fail("Failed node key prematurely removed: " + failedNodeKey);
 	    }
-            addNodes(null, 1);
+            addNodes("one");
 	    client.checkDisconnected(false);
 
 	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
