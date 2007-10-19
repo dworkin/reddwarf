@@ -45,8 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * This implementation of <code>ProfileListener</code> takes
  * snapshots at fixed intervals. It provides a very simple view of what
- * the system has done over the last interval. By default the time
- * interval is 10 seconds.
+ * the system has done over the last interval.
+ * It reports its findings on a TCP server socket. Any number of
+ * users may connect to that socket to watch the reports.
  * <p>
  * Note that this is still a work in progress. It doesn't report anything
  * except the number of threads and the succeeded/total number of tasks. To
@@ -54,16 +55,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * threads are waiting for tasks, the size of the queues, etc., but those
  * haven't been added to the interfaces yet.
  * <p>
- * This listener reports its findings on a server socket. Any number of
- * users may connect to that socket to watch the reports. The default
- * port used is 43007.
- * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
- * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
- * time, in milliseconds, between reports.
- *
+ * The {@value #PROP_BASE} root is used for all properties in this class:
+ * <ul>
+ * <li>The {@value #PERIOD_PROPERTY_KEY} key is used to set the the
+ * reporting time interval, in milliseconds.
+ * By default, it is {@value #DEFAULT_PERIOD} milliseconds.
+ * <li>
+ * The {@value #PORT_PROPERTY_KEY} key is used to specify an alternate TCP
+ * port on which to report profiling data.
+ * Port {@value #DEFAULT_PORT} is used by default.
+ * </ul>
+ * 
  * @see AggregateTaskListener
  */
 public class SnapshotProfileListener implements ProfileListener {
@@ -89,14 +91,14 @@ public class SnapshotProfileListener implements ProfileListener {
     private AtomicBoolean flag;
 
     // the base name for properties
-    private static final String PROP_BASE =
-        SnapshotProfileListener.class.getName();
+    public static final String PROP_BASE =
+        "com.sun.sgs.impl.profile.listener.SnapshotProfileListener.";
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
-    private static final int DEFAULT_PORT = 43007;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
-    private static final long DEFAULT_PERIOD = 10000;
+    public static final String PORT_PROPERTY_KEY = "report.port";
+    public static final int DEFAULT_PORT = 43007;
+    public static final String PERIOD_PROPERTY_KEY = "report.period";
+    public static final long DEFAULT_PERIOD = 10000;
 
     /**
      * Creates an instance of <code>SnapshotProfileListener</code>.
@@ -120,11 +122,12 @@ public class SnapshotProfileListener implements ProfileListener {
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
+        int port = wrappedProps.getIntProperty(
+                PROP_BASE + PORT_PROPERTY_KEY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port, resourceCoord);
 
-        long reportPeriod =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        long reportPeriod = wrappedProps.getLongProperty(
+                PROP_BASE + PERIOD_PROPERTY_KEY, DEFAULT_PERIOD);
         handle = taskScheduler.
             scheduleRecurringTask(new SnapshotRunnable(reportPeriod), owner, 
                                   System.currentTimeMillis() + reportPeriod,

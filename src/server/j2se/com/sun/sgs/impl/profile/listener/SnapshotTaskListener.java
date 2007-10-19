@@ -48,18 +48,20 @@ import java.util.Properties;
 /**
  * This implementation of <code>ProfileListener</code> takes
  * snapshots at fixed intervals. It provides a very simple view of what
- * tasks have run over the last interval. By default the time
- * interval is 5 seconds.
+ * tasks have run over the last interval.
+ * It reports its findings on a TCP server socket. Any number of
+ * users may connect to that socket to watch the reports.
  * <p>
- * This listener reports its findings on a server socket. Any number of
- * users may connect to that socket to watch the reports. The default
- * port used is 43010.
- * <p>
- * The <code>com.sun.sgs.impl.profile.listener.SnapshotTaskListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
- * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
- * time, in milliseconds, between reports.
+ * The {@value #PROP_BASE} root is used for all properties in this class:
+ * <ul>
+ * <li>The {@value #PERIOD_PROPERTY_KEY} key is used to set the the
+ * reporting time interval, in milliseconds.
+ * By default, it is {@value #DEFAULT_PERIOD} milliseconds.
+ * <li>
+ * The {@value #PORT_PROPERTY_KEY} key is used to specify an alternate TCP
+ * port on which to report profiling data.
+ * Port {@value #DEFAULT_PORT} is used by default.
+ * </ul>
  */
 public class SnapshotTaskListener implements ProfileListener {
 
@@ -70,14 +72,14 @@ public class SnapshotTaskListener implements ProfileListener {
     private RecurringTaskHandle handle;
 
     // the base name for properties
-    private static final String PROP_BASE =
-        SnapshotTaskListener.class.getName();
+    public static final String PROP_BASE =
+        "com.sun.sgs.impl.profile.listener.SnapshotTaskListener.";
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
-    private static final int DEFAULT_PORT = 43010;
-    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
-    private static final long DEFAULT_PERIOD = 5000;
+    public static final String PORT_PROPERTY_KEY = "report.port";
+    public static final int DEFAULT_PORT = 43010;
+    public static final String PERIOD_PROPERTY_KEY = "report.period";
+    public static final long DEFAULT_PERIOD = 5000;
 
     private HashMap<String,TaskDetail> map;
 
@@ -108,11 +110,12 @@ public class SnapshotTaskListener implements ProfileListener {
 
         map = new HashMap<String,TaskDetail>();
 
-        int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
+        int port = wrappedProps.getIntProperty(
+                PROP_BASE + PORT_PROPERTY_KEY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port, resourceCoord);
 
-        long reportPeriod =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        long reportPeriod = wrappedProps.getLongProperty(
+                PROP_BASE + PERIOD_PROPERTY_KEY, DEFAULT_PERIOD);
         handle = taskScheduler.
             scheduleRecurringTask(new TaskRunnable(), owner, 
                                   System.currentTimeMillis() + reportPeriod,

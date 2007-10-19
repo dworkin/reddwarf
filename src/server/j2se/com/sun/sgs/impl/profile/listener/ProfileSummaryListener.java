@@ -46,13 +46,15 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * A text-output listener that generates task-periodic summary reports
  * about the performance of tasks being exexcuted by a server.  Each
- * report summaries a fixed number of tasks.  The number of tasks
- * summarized can be modified by setting the {@code
- * com.sun.sgs.kernel.profile.summary.window} property in the system
- * properties.  The default number of tasks is {@code 5000}.
- *
+ * report summaries a fixed number of tasks.
  * <p>
- * 
+ * Note that this class uses a fixed number of tasks between outputs,
+ * rather than a period of time.  The number of tasks can be
+ * comfigured by defining the
+ * {@value com.sun.sgs.profile.ProfileProperties#WINDOW_SIZE} property in the
+ * application properties file.  The default window size for this
+ * class is {@value #DEFAULT_WINDOW_SIZE}.
+ * <p>
  * Each report is structed like the following example:
  * <p><pre>
  * past 5000 tasks:
@@ -64,15 +66,6 @@ import java.util.concurrent.atomic.AtomicLong;
  *   mean ready count: 3.98,  mean lag time: 9.75ms
  * </pre>
  *
- * <p>
- *
- * Note that this class uses a fixed number of tasks between outputs,
- * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.profile.listener.window.size} property in the
- * application properties file.  The default window size for this
- * class is {@code 5000}.
- *
  * @see ProfileProperties
  */
 public class ProfileSummaryListener implements ProfileListener {
@@ -81,7 +74,7 @@ public class ProfileSummaryListener implements ProfileListener {
      * The window of tasks that are aggregated before the next text
      * output when none is provided
      */
-    private static final int DEFAULT_WINDOW_SIZE = 5000;
+    public static final int DEFAULT_WINDOW_SIZE = 5000;
 
     /**
      * How many tasks are aggregated between status updates.  Note

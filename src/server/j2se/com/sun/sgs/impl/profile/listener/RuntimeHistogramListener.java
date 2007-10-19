@@ -53,15 +53,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * and the lifetime of the application.  This class uses a {@link
  * PowerOfTwoHistogram} to display the distribution of execution
  * times.
- *
  * <p>
- *
  * Note that this class uses a fixed number of tasks between outputs,
  * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * comfigured by defining the
+ * {@value com.sun.sgs.profile.ProfileProperties#WINDOW_SIZE} property in the
  * application properties file.  The default window size for this
- * class is {@code 5000}.
+ * class is {@value #DEFAULT_WINDOW_SIZE}.
  *
  * @see ProfileProperties
  */
@@ -71,7 +69,7 @@ public class RuntimeHistogramListener implements ProfileListener {
      * The window of tasks that are aggregated before the next text
      * output when none is provided
      */
-    private static final int DEFAULT_WINDOW_SIZE = 5000;
+    public final int DEFAULT_WINDOW_SIZE = 5000;
     
     /**
      * The current number of tasks seen

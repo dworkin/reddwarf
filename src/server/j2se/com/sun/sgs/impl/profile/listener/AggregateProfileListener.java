@@ -49,18 +49,19 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * This implementation of <code>ProfileListener</code> aggregates
  * profiling data over the lifetime of the system, and reports at fixed
- * intervals. By default the time interval is 5 seconds.
+ * intervals.  It reports its findings on a TCP server socket. Any number of
+ * users may connect to that socket to watch the reports.
  * <p>
- * This listener reports its findings on a server socket. Any number of
- * users may connect to that socket to watch the reports. The default
- * port used is 43005.
- * <p>
- * The
- * <code>com.sun.sgs.impl.profile.listener.AggregateProfileListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
- * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
- * time, in milliseconds, between reports.
+ * The {@value #PROP_BASE} root is used for all properties in this class:
+ * <ul>
+ * <li>The {@value #PERIOD_PROPERTY_KEY} key is used to set the the
+ * reporting time interval, in milliseconds.
+ * By default, it is {@value #DEFAULT_PERIOD} milliseconds.
+ * <li>
+ * The {@value #PORT_PROPERTY_KEY} key is used to specify an alternate TCP
+ * port on which to report profiling data.
+ * Port {@value #DEFAULT_PORT} is used by default.
+ * </ul>
  */
 public class AggregateProfileListener implements ProfileListener {
 
@@ -98,14 +99,14 @@ public class AggregateProfileListener implements ProfileListener {
     private RecurringTaskHandle handle;
 
     // the base name for properties
-    private static final String PROP_BASE =
-        AggregateProfileListener.class.getName();
+    public static final String PROP_BASE =
+        "com.sun.sgs.impl.profile.listener.AggregateProfileListener.";
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
-    private static final int DEFAULT_PORT = 43005;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
-    private static final long DEFAULT_PERIOD = 5000;
+    public static final String PORT_PROPERTY_KEY = "report.port";
+    public static final int DEFAULT_PORT = 43005;
+    public static final String PERIOD_PROPERTY_KEY = "report.period";
+    public static final long DEFAULT_PERIOD = 5000;
 
     /**
      * Creates an instance of <code>AggregateProfileListener</code>.
@@ -130,11 +131,12 @@ public class AggregateProfileListener implements ProfileListener {
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
+        int port = wrappedProps.getIntProperty(
+                PROP_BASE + PORT_PROPERTY_KEY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port, resourceCoord);
 
-        long reportPeriod =
-            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
+        long reportPeriod = wrappedProps.getLongProperty(
+                PROP_BASE + PERIOD_PROPERTY_KEY, DEFAULT_PERIOD);
         handle = taskScheduler.
             scheduleRecurringTask(new AggregatingRunnable(), owner, 
                                   System.currentTimeMillis() + reportPeriod,

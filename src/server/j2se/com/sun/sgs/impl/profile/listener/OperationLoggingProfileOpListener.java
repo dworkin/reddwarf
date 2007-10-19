@@ -45,30 +45,38 @@ import java.util.logging.Logger;
  * This implementation of <code>ProfileListener</code> aggregates
  * profiling data over a set number of operations, reports the aggregated
  * data when that number of operations have been reported, and then clears
- * its state and starts aggregating again. By default the interval is
- * 100000 tasks.
+ * its state and starts aggregating again.
  * <p>
- * This listener logs its findings at level <code>FINE</code> to the
- * logger named <code>
- * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener</code>.
+ * This listener logs its findings at level {@value #LOG_LEVEL_NAME} to the
+ * logger named {@value #LOGGER_NAME}.
  * <p>
- * The <code>
- * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
- * </code> property may be used to set the interval between reports.
+ * The {@value #PROP_BASE} root is used for all properties in this class:
+ * <ul>
+ * <li>The {@value #LOG_OPS_PROPERTY_KEY} key may be used to set the
+ * interval (in number of tasks) between reports.  By default, it is
+ * {@value #DEFAULT_LOG_OPS} tasks.
+ * </ul>
  */
 public class OperationLoggingProfileOpListener implements ProfileListener {
 
-    // the name of the class
-    private static final String CLASSNAME =
-        OperationLoggingProfileOpListener.class.getName();
+    // the name of the logger
+    public static final String LOGGER_NAME =
+        "com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener";
+    
+    // the log level
+    public static final String LOG_LEVEL_NAME = "FINE";
+
+    // the base name for properties
+    public static final String PROP_BASE =
+        "com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener.";
 
     // the logger where all data is reported
     static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(CLASSNAME));
+        new LoggerWrapper(Logger.getLogger(LOGGER_NAME));
 
-    // the property for setting the operation window, and its default
-    private static final String LOG_OPS_PROPERTY = CLASSNAME + ".logOps";
-    private static final int DEFAULT_LOG_OPS = 100000;
+    // the supported properties and their default values
+    public static final String LOG_OPS_PROPERTY_KEY = "logOps";
+    public static final int DEFAULT_LOG_OPS = 100000;
 
     // the number of threads reported as running in the scheduler
     private long threadCount = 0;
@@ -90,6 +98,9 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
     // the number set as the window size for aggregation
     private int logOps;
 
+    // the level at which to log ops
+    private final Level LOG_LEVEL;
+
     // a mapping from local counters to their aggregated counts for the
     // current snapshot
     private Map<String,Long> localCounters;
@@ -104,14 +115,19 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
      *                      running short-lived or recurring tasks
      * @param resourceCoord the <code>ResourceCoordinator</code> used to
      *                      run any long-lived tasks
+     * 
+     * @throws IllegalArgumentException if the configuration properties
+     *         are invalid
      */
     public OperationLoggingProfileOpListener(Properties properties,
                                              TaskOwner owner,
                                              TaskScheduler taskScheduler,
                                              ResourceCoordinator resourceCoord)
     {
-        logOps = (new PropertiesWrapper(properties)).
-            getIntProperty(LOG_OPS_PROPERTY, DEFAULT_LOG_OPS);
+        LOG_LEVEL = Level.parse(LOG_LEVEL_NAME);
+
+        logOps = (new PropertiesWrapper(properties)).getIntProperty(
+                PROP_BASE + LOG_OPS_PROPERTY_KEY, DEFAULT_LOG_OPS);
 	localCounters = new HashMap<String,Long>();
     }
 
