@@ -282,45 +282,55 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
-	String[] hosts = new String[] { "one", "two", "three"};
+	String[] hosts = new String[] { "one", "two", "three", "four"};
 	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
 	Set<DummyClient> clients = new HashSet<DummyClient>();
 	addNodes(hosts);
 	boolean failed = false;
 	int redirectCount = 0;
-	for (String user : users) {
-	    DummyClient client = new DummyClient(user);
-	    client.connect(serverAppPort);
-	    if (! client.login("password")) {
-		// login redirected
-		redirectCount++;
-		int redirectPort =
-		    (additionalNodes.get(client.redirectHost)).getAppPort();
-		client = new DummyClient(user);
-		client.connect(redirectPort);
-		if (!client.login("password")) {
-		    failed = true;
-		    System.err.println("login for user: " + user +
-				       " redirected twice");
+	try {
+	    for (String user : users) {
+		DummyClient client = new DummyClient(user);
+		client.connect(serverAppPort);
+		if (! client.login("password")) {
+		    // login redirected
+		    redirectCount++;
+		    int redirectPort =
+			(additionalNodes.get(client.redirectHost)).getAppPort();
+		    client = new DummyClient(user);
+		    client.connect(redirectPort);
+		    if (!client.login("password")) {
+			failed = true;
+			System.err.println("login for user: " + user +
+					   " redirected twice");
+		    }
+		}
+		clients.add(client);
+	    }
+	    
+	    int expectedRedirects = users.length - 1;
+	    if (redirectCount != expectedRedirects) {
+		failed = true;
+		System.err.println("Expected " + expectedRedirects +
+				   " redirects, got " + redirectCount);
+	    } else {
+		System.err.println(
+		    "Number of redirected users: " + redirectCount);
+	    }
+	    
+	    if (failed) {
+		fail("test failed (see output)");
+	    }
+	    
+	} finally {
+	    for (DummyClient client : clients) {
+		try {
+		    client.disconnect(false);
+		} catch (Exception e) {
+		    System.err.println(
+			"Exception disconnecting client: " + client);
 		}
 	    }
-	    clients.add(client);
-	}
-	if (redirectCount != hosts.length) {
-	    failed = true;
-	    System.err.println("Expected " + hosts.length + " redirects, got " +
-			       redirectCount);
-	}
-			       
-	for (DummyClient client : clients) {
-	    try {
-		client.disconnect(false);
-	    } catch (Exception e) {
-		System.err.println("Exception disconnecting client: " + client);
-	    }
-	}
-	if (failed) {
-	    fail("test failed (see output)");
 	}
 	
     }
