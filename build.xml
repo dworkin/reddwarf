@@ -1276,16 +1276,23 @@
     <mkdir dir="/tmp/sgs-benchmark/dsdb"/>
     <java classname="com.sun.sgs.impl.kernel.Kernel" fork="true">
       <jvmarg line="${benchmark.jvm.args}"/>
-      <!-- <jvmarg line="-XX:+ExtendedDTraceProbes"/> -->
-      <jvmarg line="-XX:+UseParallelGC"/>
-      <jvmarg line="-XX:+HeapDumpOnOutOfMemoryError"/>
-      <jvmarg line="-XX:+UseFastAccessorMethods"/>
-      <jvmarg line="-XX:+AggressiveOpts"/>
-      <jvmarg line="-XX:+MaxFDLimit"/>
-      <jvmarg line="-XX:NewSize=512m"/>
-      <jvmarg line="-Xmx750m"/>
-      <jvmarg line="-XX:+PrintClassHistogram"/>
-      <!--jvmarg line="-XX:+PrintCompilation"/-->
+      <jvmarg value="-Xms1024m"/>
+      <jvmarg value="-Xmx1024m"/>
+      <!-- <jvmarg value="-XX:+UseParallelGC"/> -->
+      <jvmarg value="-XX:+UseConcMarkSweepGC"/>
+      <jvmarg value="-XX:+CMSIncrementalMode"/>
+      <jvmarg value="-XX:NewSize=512m"/>
+      <jvmarg value="-XX:PermSize=20m"/>
+      <jvmarg value="-XX:MaxPermSize=128m"/>
+      <jvmarg value="-Xverify:none"/>
+      <jvmarg value="-XX:+AggressiveOpts"/>
+      <jvmarg value="-XX:+UseFastAccessorMethods"/>
+      <jvmarg value="-Djava.net.preferIPv4Stack=true"/>
+      <jvmarg value="-XX:+MaxFDLimit"/>
+      <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
+      <jvmarg value="-XX:+PrintClassHistogram"/>
+      <!--jvmarg value="-XX:+PrintCompilation"/-->
+      <!-- <jvmarg value="-XX:+ExtendedDTraceProbes"/> -->
       <sysproperty key="com.sun.sgs.config.file"
                    file="benchmark/System.properties"/>
       <sysproperty key="com.sun.sgs.benchmark.app"
