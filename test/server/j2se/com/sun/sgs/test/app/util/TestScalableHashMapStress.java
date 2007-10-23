@@ -579,7 +579,6 @@ public class TestScalableHashMapStress extends Assert {
 	txn.commit();
 	DoneRemoving.await(1);
 	txn = createTransaction();
-	printObjects(null);
 	assertEquals(initialObjectCount, getObjectCount());
 	txn.abort(null);
     }
