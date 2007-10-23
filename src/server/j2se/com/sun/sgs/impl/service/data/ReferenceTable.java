@@ -114,16 +114,16 @@ final class ReferenceTable {
     }
 
     /**
-     * Returns the next object ID in the reference table, or -1 if there are no
-     * more objects.  Does not return IDs for removed objects.  Specifying -1
-     * requests the first ID.
+     * Returns the next object ID in the reference table of a newly created
+     * object, or -1 if there are no more objects.  Does not return IDs for
+     * removed objects.  Specifying -1 requests the first ID.
      */
     long nextObjectId(long oid) {
 	for (Entry<Long, ManagedReferenceImpl> entry :
 		 oids.tailMap(oid).entrySet())
 	{
 	    long key = entry.getKey();
-	    if (key > oid && !entry.getValue().isRemoved()) {
+	    if (key > oid && entry.getValue().isNew()) {
 		return key;
 	    }
 	}

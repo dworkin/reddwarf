@@ -41,6 +41,7 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -49,6 +50,22 @@ import junit.framework.TestCase;
 
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataStoreImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataStoreImpl(testMethod));
+	return suite;
+    }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -1567,6 +1584,137 @@ public class TestDataStoreImpl extends TestCase {
     }
     public void testGetClassInfoShutdown() throws Exception {
 	testShutdown(getClassInfo);
+    }
+
+    /* -- Test nextObjectId -- */
+
+    public void testNextObjectIdIllegalIds() {
+	long id = Long.MIN_VALUE;
+	try {
+	    store.nextObjectId(txn, id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(id);
+	}
+	id = -2;
+	try {
+	    store.nextObjectId(txn, id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(id);
+	}
+    }
+
+    public void testNextObjectIdBoundaryIds() {
+	long first = store.nextObjectId(txn, -1);
+	assertEquals(first, store.nextObjectId(txn, -1));
+	assertEquals(first, store.nextObjectId(txn, 0));
+	long last = -1;
+	while (true) {
+	    long id = store.nextObjectId(txn, last);
+	    if (id == -1) {
+		break;
+	    }
+	    last = id;
+	}
+	assertEquals(-1, store.nextObjectId(txn, last));
+	assertEquals(-1, store.nextObjectId(txn, Long.MAX_VALUE));
+    }
+
+    public void testNextObjectIdRemoved() throws Exception {
+	long x = -1;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    if (x == -1) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID that has been created but not set",
+			x == id);
+	}
+	store.setObject(txn, id, new byte[] { 1, 2, 3 });
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	long id2 = store.createObject(txn);
+	store.setObject(txn, id2, new byte[] { 4, 5, 6, 7 });
+	if (id > id2) {
+	    long tmp = id;
+	    id = id2;
+	    id2 = tmp;
+	}
+	x = id;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    assertFalse("Didn't find id2 after id", x == -1);
+	    if (x == id2) {
+		break;
+	    }
+	}
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	store.removeObject(txn, id);
+	x = -1;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    if (x == -1) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in this txn", x == id);
+	}
+	x = id;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    assertFalse("Didn't find id2 after removed id", x == -1);
+	    if (x == id2) {
+		break;
+	    }
+	}
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	x = -1;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    if (x == -1) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in last txn", x == id);
+	}
+	x = id;
+	while (true) {
+	    x = store.nextObjectId(txn, x);
+	    assertFalse("Didn't find id2 after removed id", x == -1);
+	    if (x == id2) {
+		break;
+	    }
+	}
+    }
+
+    /* -- Unusual states: nextObjectId -- */
+    private final Action nextObjectId = new Action() {
+	void run() throws Exception { store.nextObjectId(txn, -1); };
+    };
+    public void testNextObjectIdAborted() throws Exception {
+	testAborted(nextObjectId);
+    }
+    public void testNextObjectIdPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(nextObjectId);
+    }
+    public void testNextObjectIdPreparedModified() throws Exception {
+	testPreparedModified(nextObjectId);
+    }
+    public void testNextObjectIdCommitted() throws Exception {
+	testCommitted(nextObjectId);
+    }
+    public void testNextObjectIdWrongTxn() throws Exception {
+	testWrongTxn(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextObjectId);
+    }
+    public void testNextObjectIdShutdown() throws Exception {
+	testShutdown(nextObjectId);
     }
 
     /* -- Test deadlock -- */

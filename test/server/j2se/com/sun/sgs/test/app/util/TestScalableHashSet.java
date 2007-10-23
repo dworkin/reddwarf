@@ -41,6 +41,7 @@ import com.sun.sgs.test.util.NameRunner;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
@@ -320,6 +321,41 @@ public class TestScalableHashSet extends Assert {
     }
 
     @SuppressWarnings("unchecked")
+    @Test public void testIteratorCollectionNotFound() throws Exception {
+	set.add(one);
+	Iterator<Object> iter = set.iterator();
+	dataService.setBinding("iter", new ManagedSerializable(iter));
+	newTransaction();
+	DoneRemoving.init();
+	dataService.removeObject(set);
+	endTransaction();
+	DoneRemoving.await(1);
+	startTransaction();
+	iter = (Iterator<Object>)
+	    dataService.getBinding("iter", ManagedSerializable.class).get();
+	try {
+	    iter.next();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	try {
+	    iter.hasNext();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	try {
+	    iter.remove();
+	    fail("Expected an exception");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @SuppressWarnings("unchecked")
     @Test public void testIteratorObjectNotFound() throws Exception {
 	set.add(one);
 	set.add(new Int(2));
@@ -591,6 +627,30 @@ public class TestScalableHashSet extends Assert {
 	assertEquals("[1]", set.toString());
     }
 
+    /* Test calling DataManager.removeObject on the set */
+
+    @Test public void testRemoveObjectSet() throws Exception {
+	DoneRemoving.init();
+	dataService.removeObject(set);
+	set = null;
+	endTransaction();
+	DoneRemoving.await(1);
+	startTransaction();
+	int count = getObjectCount();
+	set = new ScalableHashSet<Object>();
+	newTransaction();
+	for (int i = 0; i < 50; i++) {
+	    set.add(random.nextInt());
+	}
+	newTransaction();
+	dataService.removeObject(set);
+	set = null;
+	endTransaction();
+	DoneRemoving.await(1);
+	startTransaction();
+	assertEquals(count, getObjectCount());
+    }
+
     /* -- Utilities -- */
 
     /**
@@ -685,6 +745,39 @@ public class TestScalableHashSet extends Assert {
 	}
 	public boolean equals(Object o) {
 	    return o instanceof Int && i == ((Int) o).i;
+	}
+    }
+
+    /** Returns the current number of objects. */
+    private int getObjectCount() {
+	int count = 0;
+	BigInteger last = null;
+	while (true) {
+	    BigInteger next = dataService.nextObjectId(last);
+	    if (next == null) {
+		break;
+	    }
+	    last = next;
+	    count++;
+	}
+	return count;
+    }
+
+    /** Prints the current objects above the specified value, for debugging. */
+    private void printObjects(BigInteger id) {
+	while (true) {
+	    id = dataService.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    try {
+		ManagedObject obj = dataService.createReferenceForId(id).get(
+		    ManagedObject.class);
+		System.err.println(id + ": (" + obj.getClass().getName() +
+				   ") " + obj);
+	    } catch (Exception e) {
+		System.err.println(id + ": " + e);
+	    }
 	}
     }
 

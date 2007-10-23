@@ -584,6 +584,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	return state == State.REMOVED_EMPTY || state == State.REMOVED_FETCHED;
     }
 
+    /**
+     * Checks if the object has been created in the current transaction and not
+     * removed.
+     */
+    boolean isNew() {
+	return state == State.NEW;
+    }
+
     /** Returns the object currently associated with this reference or null. */
     ManagedObject getObject() {
 	return object;

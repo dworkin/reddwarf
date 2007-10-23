@@ -1379,7 +1379,8 @@ public class TestDataServiceImpl extends TestCase {
 	int count = getObjectCount();
 	ObjectWithRemoval removal = new ObjectWithRemoval();
 	service.removeObject(removal);
-	assertFalse(removal.removingCalled);
+	assertFalse("Shouldn't call removingObject for transient objects",
+		    removal.removingCalled);
 	service.setBinding("removal", removal);
 	txn.commit();
 	createTransaction();
@@ -1421,6 +1422,10 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * A managed object whose removingObject method calls removeObject on its
+     * next field.
+     */
     private static class ObjectWithRemovalRecurse extends ObjectWithRemoval {
 	private static final long serialVersionUID = 1;
 	ObjectWithRemovalRecurse() {
@@ -1446,6 +1451,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /** A managed object whose removingObject method throws an exception. */
     private static class ObjectWithRemovalThrows extends ObjectWithRemoval {
 	private static final long serialVersionUID = 1;
 	ObjectWithRemovalThrows() {
@@ -1767,6 +1773,177 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (ObjectNotFoundException e) {
 	    System.err.println(e);
 	}
+    }
+
+    /* -- Test getNextId -- */
+
+    public void testNextObjectIdIllegalIds() {
+	BigInteger id =
+	    BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	id = BigInteger.valueOf(-1);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	id = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }	
+
+    public void testNextObjectIdBoundaryIds() {
+	BigInteger first = service.nextObjectId(null);
+	assertEquals(first, service.nextObjectId(null));
+	assertEquals(first, service.nextObjectId(BigInteger.ZERO));
+	BigInteger last = null;
+	while (true) {
+	    BigInteger id = service.nextObjectId(last);
+	    if (id == null) {
+		break;
+	    }
+	    last = id;
+	}
+	assertEquals(null, service.nextObjectId(last));
+	assertEquals(
+	    null, service.nextObjectId(BigInteger.valueOf(Long.MAX_VALUE)));
+    }
+
+    public void testNextObjectIdRemoved() throws Exception {
+	DummyManagedObject dummy2 = new DummyManagedObject();
+	BigInteger dummyId = service.createReference(dummy).getId();
+	BigInteger dummy2Id = service.createReference(dummy2).getId();
+	/* Make sure dummyId is smaller than dummy2Id */
+	if (dummyId.compareTo(dummy2Id) > 0) {
+	    BigInteger temp = dummyId;
+	    dummyId = dummy2Id;
+	    dummy2Id = dummyId;
+	}
+	BigInteger id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	service.removeObject(dummy);
+	id = null;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in this txn",
+			dummyId.equals(id));
+	}
+	id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+	txn.commit();
+	createTransaction();
+	id = null;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in last txn",
+			dummyId.equals(id));
+	}
+
+	id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+    }
+
+    /**
+     * Test that producing a reference to an object removed in another
+     * transaction doesn't cause that object's ID to be returned.
+     */
+    public void testNextObjectIdRemovedIgnoreRef() throws Exception {
+	DummyManagedObject dummy2 = new DummyManagedObject();
+	BigInteger dummyId = service.createReference(dummy).getId();
+	BigInteger dummy2Id = service.createReference(dummy2).getId();
+	/* Make sure dummyId is smaller than dummy2Id */
+	if (dummyId.compareTo(dummy2Id) > 0) {
+	    DummyManagedObject obj = dummy;
+	    dummy = dummy2;
+	    dummy2 = obj;
+	    service.setBinding("dummy", dummy);
+	    BigInteger id = dummyId;
+	    dummyId = dummy2Id;
+	    dummy2Id = id;
+	}
+	dummy.setNext(dummy2);
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	service.removeObject(dummy.getNext());
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	BigInteger id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't get removed dummy2 ID",
+			id.equals(dummy2Id));
+	}
+    }	    
+
+    /* -- Unusual states -- */
+    private final Action nextObjectId = new Action() {
+	void run() { service.nextObjectId(null); }
+    };
+    public void testNextObjectIdAborting() throws Exception {
+	testAborting(nextObjectId);
+    }
+    public void testNextObjectIdAborted() throws Exception {
+	testAborted(nextObjectId);
+    }
+    public void testNextObjectIdPreparing() throws Exception {
+	testPreparing(nextObjectId);
+    }
+    public void testNextObjectIdCommitting() throws Exception {
+	testCommitting(nextObjectId);
+    }
+    public void testNextObjectIdCommitted() throws Exception {
+	testCommitted(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextObjectId);
+    }
+    public void testNextObjectIdShutdown() throws Exception {
+	testShutdown(nextObjectId);
     }
 
     /* -- Test ManagedReference.get -- */
