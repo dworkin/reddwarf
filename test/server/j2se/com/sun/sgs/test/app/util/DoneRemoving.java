@@ -30,11 +30,12 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A runnable that can be used to count the completions of asynchronous removal
- * from ScalableHashMap.
+ * A runnable that can be used to count the completions of asynchronous
+ * removals from ScalableHashMap.
  */
 class DoneRemoving implements Runnable {
 
+    /** The ScalableHashMap.noteDoneRemoving field. */
     private static Field noteDoneRemoving =
 	getField(ScalableHashMap.class, "noteDoneRemoving");
 
@@ -50,7 +51,7 @@ class DoneRemoving implements Runnable {
      */
     private final Set<Integer> seen = new HashSet<Integer>();
 
-    /** The number of completions seen since the last await call. */
+    /** The number of completions seen since the last await or init call. */
     private int count = 0;
 
     /** The next completion value. */
@@ -78,17 +79,12 @@ class DoneRemoving implements Runnable {
 	} catch (Exception e) {
 	    throw new RuntimeException(e.getMessage(), e);
 	}
-	INSTANCE.clear();
+	INSTANCE.count = 0;
     }
 
     /** Wait for the specified number of completions. */
     static void await(int value) throws InterruptedException {
 	INSTANCE.awaitInternal(value);
-    }
-
-    /** Clear the count. */
-    private void clear() {
-	count = 0;
     }
 
     /** Note that the specified completion committed. */
@@ -103,16 +99,18 @@ class DoneRemoving implements Runnable {
     private synchronized void awaitInternal(int value)
 	throws InterruptedException
     {
-	long deadline = System.currentTimeMillis() + WAIT;
-	while (count < value) {
-	    long wait = deadline - System.currentTimeMillis();
-	    if (wait <= 0) {
-		count = 0;
-		throw new RuntimeException("Failed waiting for count");
+	try {
+	    long deadline = System.currentTimeMillis() + WAIT;
+	    while (count < value) {
+		long wait = deadline - System.currentTimeMillis();
+		if (wait <= 0) {
+		    throw new RuntimeException("Failed waiting for count");
+		}
+		wait(wait);
 	    }
-	    wait(wait);
+	} finally {
+	    count = 0;
 	}
-	count = 0;
     }
 
     /**

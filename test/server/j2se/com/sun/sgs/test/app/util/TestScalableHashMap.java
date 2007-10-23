@@ -110,7 +110,6 @@ public class TestScalableHashMap extends Assert {
     private static DataServiceImpl dataService;
 
     /** The task service. */
-
     private static TaskService taskService;
 
     // the transaction used, which is class state so that it can be aborted
@@ -2433,7 +2432,7 @@ public class TestScalableHashMap extends Assert {
 	ObjectOutputStream oos = new ObjectOutputStream(baos);
 	oos.writeObject(it);
 
-	// now repalce all th elements in the map
+	// now replace all the elements in the map
 	DoneRemoving.init();
 	test.clear();
 	control.clear();

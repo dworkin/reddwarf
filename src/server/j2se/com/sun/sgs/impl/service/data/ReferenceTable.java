@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.SortedMap;
@@ -115,10 +114,10 @@ final class ReferenceTable {
 
     /**
      * Returns the next object ID in the reference table of a newly created
-     * object, or -1 if there are no more objects.  Does not return IDs for
-     * removed objects.  Specifying -1 requests the first ID.
+     * object, or -1 if none is found.  Does not return IDs for removed
+     * objects.  Specifying -1 requests the first ID.
      */
-    long nextObjectId(long oid) {
+    long nextNewObjectId(long oid) {
 	for (Entry<Long, ManagedReferenceImpl> entry :
 		 oids.tailMap(oid).entrySet())
 	{

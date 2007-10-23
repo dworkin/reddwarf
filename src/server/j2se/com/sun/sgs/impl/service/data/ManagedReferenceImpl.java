@@ -532,7 +532,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	 * Check for newly created objects that don't appear in the data store
 	 * but are recorded in the reference table.
 	 */
-	return context.refs.nextObjectId(lastFound);
+	return context.refs.nextNewObjectId(lastFound);
     }
 
     /**

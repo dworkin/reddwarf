@@ -144,7 +144,7 @@ public interface DataManager {
      * method first calls the {@link ManagedObjectRemoval#removingObject
      * ManagedObjectRemoval.removingObject} method on the object, to notify it
      * that it is being removed.  If the call to {@code removingObject} throws
-     * a {@link RuntimeException}, then this method will throw that exception
+     * a {@code RuntimeException}, then this method will throw that exception
      * without removing the object.  A call to {@code removingObject} that
      * causes {@code removeObject} to be called recursively on the same object
      * will result in an {@code IllegalStateException} being thrown.

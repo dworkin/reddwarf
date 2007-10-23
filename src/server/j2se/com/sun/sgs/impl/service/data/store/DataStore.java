@@ -269,7 +269,7 @@ public interface DataStore {
      * Applications should not assume that objects associated with the IDs
      * returned by this method, but which cannot be reached by traversing
      * object field references starting with an object associated with a name
-     * binding, will continue to be retained by the data service.
+     * binding, will continue to be retained by the data store.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the identifier of the object to search after, or

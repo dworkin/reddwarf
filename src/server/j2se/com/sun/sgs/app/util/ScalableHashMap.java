@@ -649,9 +649,10 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Clears the map of all entries by performing the work in a separate task.
-     * When clearing, all non-{@code ManagedObject} keys and values persisted
-     * by this map will be removed from the {@code DataManager}.
+     * Clears the map of all entries, performing the actual work in a separate
+     * task to avoid scaling problems.  When clearing, all non-{@code
+     * ManagedObject} keys and values persisted by this map will be removed
+     * from the {@code DataManager}.
      */
     public void clear() {
 	removeChildrenAndEntries();
@@ -1564,7 +1565,7 @@ public class ScalableHashMap<K,V>
 	private static final long serialVersionUID = 1;
 
 	/** The entries to remove. */ 
-	private PrefixEntry[] table;
+	private final PrefixEntry[] table;
 
 	/** Creates an instance for the specified leaf node. */
 	RemoveNodeEntriesTask(ScalableHashMap node) {
@@ -1638,7 +1639,7 @@ public class ScalableHashMap<K,V>
 	/**
 	 * A stack of values for each directory node at or above the current
 	 * node that represent the offset of the child within that node to
-	 * traverse to the find a non-empty leaf.
+	 * traverse in order to the find a non-empty leaf.
 	 */
 	private final Stack<Integer> offsets = new Stack<Integer>();
 
@@ -1670,9 +1671,8 @@ public class ScalableHashMap<K,V>
 	 * do, or else removing the task if it is done.
 	 */
 	public void run() {
-	    TaskManager taskManager = AppContext.getTaskManager();
 	    if (doWork()) {
-		taskManager.scheduleTask(this);
+		AppContext.getTaskManager().scheduleTask(this);
 	    } else {
 		AppContext.getDataManager().removeObject(this);
 		Runnable r = noteDoneRemoving;
@@ -1701,7 +1701,7 @@ public class ScalableHashMap<K,V>
 		/* More entries in this node */
 		return true;
 	    }
-	    /* Search parents for non-empty node, removing empty ones */
+	    /* Search the parents for a non-empty node, removing empty ones */
 	    while (true) {
 		currentNodeRef = node.parentRef;
 		dataManager.removeObject(node);
@@ -2171,9 +2171,9 @@ public class ScalableHashMap<K,V>
 
 	/**
 	 * The value of the root node's modification count when currentLeafRef
-	 * was obtained.  Need to get a fresh leaf ref if the count changes, in
-	 * case the map was cleared or removed, and the leaf is no longer part
-	 * of the map.
+	 * was obtained.  Need to get a fresh leaf ref if the count changes in
+	 * case the map was cleared or removed, since then the leaf is no
+	 * longer part of the map.
 	 */
 	private int rootModifications;
 

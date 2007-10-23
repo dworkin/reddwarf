@@ -349,9 +349,7 @@ public class DataStoreImpl
 	/** Whether any changes have been made in this transaction. */
 	boolean modified;
 
-	/**
-	 * The currently open cursor over the names database, or null.
-	 */
+	/** The currently open cursor over the names database, or null. */
 	private DbCursor namesCursor;
 
 	/** The last key returned by the namesCursor or null. */
@@ -1112,7 +1110,7 @@ public class DataStoreImpl
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "nextObjectId txn:{0}, oid:{1,number,#} " +
-			   "returns:{2,number,#}",
+			   "returns oid:{2,number,#}",
 			   txn, oid, result);
 	    }
 	    return result;

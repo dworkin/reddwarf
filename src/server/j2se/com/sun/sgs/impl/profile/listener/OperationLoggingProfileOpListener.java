@@ -50,10 +50,10 @@ import java.util.logging.Logger;
  * <p>
  * This listener logs its findings at level <code>FINE</code> to the
  * logger named <code>
- * com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener</code>.
+ * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener</code>.
  * <p>
  * The <code>
- * com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener.logOps
+ * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
  * </code> property may be used to set the interval between reports.
  */
 public class OperationLoggingProfileOpListener implements ProfileListener {

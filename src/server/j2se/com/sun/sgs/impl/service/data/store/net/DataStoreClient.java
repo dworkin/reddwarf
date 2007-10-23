@@ -679,7 +679,7 @@ public final class DataStoreClient
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "nextObjectId txn:{0}, oid:{1,number,#} " +
-			   "returns {2,number,#}",
+			   "returns oid:{2,number,#}",
 			   txn, oid, result);
 	    }
 	    return result;

@@ -32,7 +32,6 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
