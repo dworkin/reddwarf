@@ -637,6 +637,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         // backing buffer.
 
         private IoFuture<Void, ?> writeFuture = null;
+        private boolean isWriting = false;
 
         WriteHandler(int bufferSize) {
             availableToReserve = bufferSize;
@@ -706,17 +707,20 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         }
 
         private void processQueue() {
+            ByteBuffer buf;
+
             synchronized (lock) {
-                if (writeFuture != null)
+                if (isWriting)
                     return;
 
-                ByteBuffer buf = pendingWrites.peek();
+                buf = pendingWrites.peek();
                 if (buf == null)
                     return;
 
-                writeFuture =
-                    sessionConnection.write(buf, buf.remaining(), this);
+                isWriting = true;
             }
+
+            writeFuture = sessionConnection.write(buf, buf.remaining(), this);
         }
 
         public void completed(IoFuture<Void, Integer> result) {
@@ -727,8 +731,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 nowAvailable = availableToReserve + len;
                 availableToReserve = nowAvailable;
                 pendingWrites.pop();
-                writeFuture = null;
+                isWriting = false;
             }
+            writeFuture = null;
 
             try {
                 result.getNow();
@@ -745,7 +750,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
             } catch (ExecutionException e) {
 
-                // TODO if we're expecting the channel to close,
+                // TODO if we're expecting the session to close,
                 // don't complain.
 
                 if (logger.isLoggable(Level.WARNING)) {
@@ -768,6 +773,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
         private ByteBuffer readBuffer; // not final so we can null it (TODO)
         private IoFuture<ByteBuffer, ?> readFuture = null;
+        private boolean isReading = false;
 
         ReadHandler(int bufferSize) {
             readBuffer = ByteBuffer.allocateDirect(bufferSize);
@@ -775,18 +781,19 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
         void read() {
             synchronized (lock) {
-                if (readFuture != null) {
+                if (isReading)
                     throw new ReadPendingException();
-                }
-
-                readFuture = sessionConnection.read(readBuffer, this);
+                isReading = true;
             }
+
+            readFuture = sessionConnection.read(readBuffer, this);
         }
 
         public void completed(IoFuture<ByteBuffer, Void> result) {
             synchronized (lock) {
-                readFuture = null;
+                isReading = false;
             }
+            readFuture = null;
 
             try {
                 ByteBuffer message = result.getNow();
@@ -923,7 +930,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST:
+	    case SimpleSgsProtocol.LOGIN_REQUEST: {
 		String name = msg.getString();
 		String password = msg.getString();
 
@@ -948,11 +955,12 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			}});
 		}
                 return true;
+            }
 		
 	    case SimpleSgsProtocol.RECONNECT_REQUEST:
                 return true;
 
-	    case SimpleSgsProtocol.SESSION_MESSAGE:
+	    case SimpleSgsProtocol.SESSION_MESSAGE: {
 		if (getIdentity() == null) {
 		    logger.log(
 		    	Level.WARNING,
@@ -968,8 +976,11 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			    listener.get().receivedMessage(clientMessage);
                         }
                     }});
+
+                // wait for the task above to finish before resuming reads
                 enqueueReadResume();
                 return false;
+            }
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 	        scheduleNonTransactionalTask(new AbstractKernelRunnable() {
@@ -993,17 +1004,18 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 return false;
 	    }
 	}
-
-
     }
 
     void enqueueReadResume() {
         taskQueue.addTask(new AbstractKernelRunnable() {
             public void run() {
+                logger.log(
+                    Level.FINER,
+                    "session {0} resuming reads", this);
                 if (isConnected()) {
                     readHandler.read();
                 }
-            }});    
+            }});
     }
 
     /**

@@ -253,7 +253,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         MinimalTestKernel.destroyContext(appContext);
     }
 
-    /* -- Test constructor -- */
+    // Test constructor
 
     public void testConstructorNullProperties() throws Exception {
 	try {
@@ -311,7 +311,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /* -- Test connecting, logging in, logging out with server -- */
+    // Test connecting, logging in, logging out with server
 
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient();
@@ -563,35 +563,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    private Set<String> getClientSessionListenerKeys() throws Exception {
-	createTransaction();
-	Set<String> listenerKeys = new HashSet<String>();
-	String key = LISTENER_PREFIX;
-	for (;;) {
-	    key = dataService.nextServiceBoundName(key);
-	    if (key == null ||
-		! key.regionMatches(
-		      0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length()))
-	    {
-		break;
-	    }
-	    listenerKeys.add(key);
-	}
-	commitTransaction();
-	return listenerKeys;
-    }
-
-    private DummyClientSessionListener getClientSessionListener(String name)
-	throws Exception
-    {
-	createTransaction();
-	DummyClientSessionListener sessionListener =
-	    getAppListener().getClientSessionListener(name);
-	commitTransaction();
-	return sessionListener;
-    }
-
-    /* -- test ClientSession -- */
+    // Test ClientSession
 
     public void testClientSessionIsConnected() throws Exception {
 	registerAppListener();
@@ -687,7 +659,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testClientSend() throws Exception {
-	sendMessagesAndCheck(5, 5, null);
+        sendMessagesAndCheck(5, 5, null);
     }
 
     public void testClientSendWithListenerThrowingRetryableException()
@@ -749,11 +721,45 @@ public class TestClientSessionServiceImpl extends TestCase {
 		
 	} finally {
 	    client.disconnect(false);
+
+            // Give the database a chance to catch up
+            System.err.println("test ended, sleeping 500ms");
+            Thread.sleep(500);
 	}
     }
     
+    // helper methods
 
-    /* -- other methods -- */
+    private Set<String> getClientSessionListenerKeys() throws Exception {
+	createTransaction();
+	Set<String> listenerKeys = new HashSet<String>();
+	String key = LISTENER_PREFIX;
+	for (;;) {
+	    key = dataService.nextServiceBoundName(key);
+	    if (key == null ||
+		! key.regionMatches(
+		      0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length()))
+	    {
+		break;
+	    }
+	    listenerKeys.add(key);
+	}
+	commitTransaction();
+	return listenerKeys;
+    }
+
+    private DummyClientSessionListener getClientSessionListener(String name)
+	throws Exception
+    {
+	createTransaction();
+	DummyClientSessionListener sessionListener =
+	    getAppListener().getClientSessionListener(name);
+	commitTransaction();
+	return sessionListener;
+    }
+
+
+    // other methods
 
     /** Deletes the specified directory, if it exists. */
     static void deleteDirectory(String directory) {

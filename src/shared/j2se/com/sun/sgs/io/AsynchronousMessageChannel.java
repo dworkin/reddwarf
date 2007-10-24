@@ -67,7 +67,7 @@ public class AsynchronousMessageChannel implements Channel {
         this.detector = detector;
     }
 
-    int completeMessageLength(ByteBuffer buf) throws IOException {
+    int completeMessageLength(ByteBuffer buf) {
         return detector.completeMessageLength(buf);
     }
 
@@ -79,11 +79,8 @@ public class AsynchronousMessageChannel implements Channel {
          * 
          * @param buf the buffer
          * @return the length, or -1
-         * 
-         * @throws IOException if a problem is found while attempting to
-         *                     determine the message length.
          */
-        int completeMessageLength(ByteBuffer buf) throws IOException;
+        int completeMessageLength(ByteBuffer buf);
     }
 
     /**
@@ -369,14 +366,14 @@ public class AsynchronousMessageChannel implements Channel {
         @Override
         protected IoFuture<Integer, ByteBuffer>
         implStart(ByteBuffer dst) {
-            return channel.read(dst, dst, this);
+            return processBuffer(dst);
         }
 
         /** {@inheritDoc} */
         @Override
         protected IoFuture<Integer, ByteBuffer>
         implCompleted(IoFuture<Integer, ByteBuffer> result)
-            throws ExecutionException, IOException
+            throws ExecutionException 
         {
             ByteBuffer dst = result.attach(null);
             int bytesRead = result.getNow();
@@ -386,6 +383,11 @@ public class AsynchronousMessageChannel implements Channel {
                 return null;
             }
 
+            return processBuffer(dst);
+        }
+
+        private IoFuture<Integer, ByteBuffer>
+        processBuffer(ByteBuffer dst) {
             ByteBuffer readBuf = dst.asReadOnlyBuffer();
 
             if (messageLen < 0) {
@@ -403,15 +405,32 @@ public class AsynchronousMessageChannel implements Channel {
                 }
             }
 
-            if (dst.position() >= messageLen) {
-                readBuf.position(messageLen).flip();
-                set(readBuf); // Invokes the completion handler
+            if (messageLen >= 0 && dst.position() >= messageLen) {
+                if (log.isLoggable(Level.FINER)) {
+                    log.log(Level.FINER,
+                            "{0} read complete {1}:{2}",
+                            new Object[] {
+                                this, messageLen, dst.position()
+                            });
+                }
+                byte[] msg = new byte[messageLen];
                 int newPos = dst.position() - messageLen;
-                dst.position(messageLen);
-                dst.compact().position(newPos);
+                dst.rewind();
+                dst.get(msg);
+                dst.compact();
+                dst.position(newPos);
+                readBuf = ByteBuffer.wrap(msg);
+                set(readBuf); // Invokes the completion handler
                 return null;
             }
 
+            if (log.isLoggable(Level.FINER)) {
+                log.log(Level.FINER,
+                        "{0} read incomplete {1}:{2}",
+                        new Object[] {
+                            this, messageLen, dst.position()
+                        });
+            }
             return channel.read(dst, dst, this);
         }
     }
@@ -443,7 +462,7 @@ public class AsynchronousMessageChannel implements Channel {
         @Override
         protected IoFuture<Integer, ByteBuffer>
         implCompleted(IoFuture<Integer, ByteBuffer> result)
-            throws ExecutionException, IOException
+            throws ExecutionException
         {
             ByteBuffer src = result.attach(null);
             result.getNow();

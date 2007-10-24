@@ -12,6 +12,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.AlreadyConnectedException;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ConnectionPendingException;
 import java.nio.channels.NotYetConnectedException;
 import java.nio.channels.SelectableChannel;
@@ -196,20 +197,28 @@ class Reactor {
         synchronized (selectorLock) {
             // Obtain and release the guard to allow other tasks
             // to run after waking the selector.
-        }
 
-        if (log.isLoggable(Level.FINER)) {
-            int numKeys = selector.keys().size();
-            log.log(Level.FINER, "{0} select on {1} keys",
-                new Object[] { this, numKeys });
-            if (numKeys <= 5) {
-                for (SelectionKey key : selector.keys()) {
-                    log.log(Level.FINER,
-                        "{0} select interestOps {1} on {2}",
-                        new Object[] {
-                        this,
-                        Util.formatOps(key.interestOps()),
-                        key.attachment() });
+            if (log.isLoggable(Level.FINER)) {
+                int numKeys = selector.keys().size();
+                log.log(Level.FINER, "{0} select on {1} keys",
+                    new Object[] { this, numKeys });
+                if (numKeys <= 5) {
+                    for (SelectionKey key : selector.keys()) {
+                        try {
+                            log.log(Level.FINER,
+                                " - {0} select interestOps {1} on {2}",
+                                new Object[] {
+                                this,
+                                Util.formatOps(key.interestOps()),
+                                key.attachment() });
+                        } catch (CancelledKeyException e) {
+                            log.log(Level.FINER,
+                                " - {0} select cancelled key {1}",
+                                new Object[] {
+                                this,
+                                key.attachment() });
+                        }
+                    }
                 }
             }
         }
@@ -273,8 +282,13 @@ class Reactor {
             synchronized (asyncKey) {
                 if (! key.isValid())
                     continue;
-                readyOps = key.readyOps();
-                key.interestOps(key.interestOps() & (~ readyOps));
+                try {
+                    readyOps = key.readyOps();
+                    key.interestOps(key.interestOps() & (~ readyOps));
+                } catch (CancelledKeyException e) {
+                    // swallow exception
+                    continue;
+                }
             }
             asyncKey.selected(readyOps);
         }
