@@ -413,13 +413,7 @@ public class AsynchronousMessageChannel implements Channel {
                                 this, messageLen, dst.position()
                             });
                 }
-                byte[] msg = new byte[messageLen];
-                int newPos = dst.position() - messageLen;
-                dst.rewind();
-                dst.get(msg);
-                dst.compact();
-                dst.position(newPos);
-                readBuf = ByteBuffer.wrap(msg);
+                readBuf.limit(messageLen).flip();
                 set(readBuf); // Invokes the completion handler
                 return null;
             }

@@ -834,6 +834,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 byte[] payload = new byte[message.remaining()];
                 message.get(payload);
 
+                // Compact the read buffer
+                compactReadBuffer(message.limit());
+
                 // Dispatch
                 boolean keepReading =
                     bytesReceived(version, serviceId, opcode, payload);
@@ -853,6 +856,13 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 }
                 disconnected();
             }
+        }
+
+        private void compactReadBuffer(int consumed) {
+            int newPos = readBuffer.position() - consumed;
+            readBuffer.position(consumed);
+            readBuffer.compact();
+            readBuffer.position(newPos);
         }
 
 	private boolean bytesReceived(
