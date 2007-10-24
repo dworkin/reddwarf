@@ -3,8 +3,8 @@ This distribution contains the following subdirectories:
 - sgs-@VERSION@
   Project Darkstar Server
 
-- bdb-@BDB.VERSION@
-  Berkeley DB
+- je-@BDBJE.VERSION@
+  Berkeley DB Java Edition
 
 - mina-@MINA.VERSION@
   Apache MINA

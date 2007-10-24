@@ -55,7 +55,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
 
 /**
  * Provides a database implementation based on <a href=
- * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB, Java
+ * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB Java
  * Edition</a>. <p>
  * 
  * Operations on classes in this package will throw an {@link Error} if the
@@ -72,19 +72,11 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * <code>prepareAndCommit</code> on durable participants, so the inability to
  * resolve prepared transactions should have no effect at present. <p>
  *
- * The {@link #JeEnvironment constructor} supports the following
- * configuration properties: <p>
+ * The {@link #JeEnvironment constructor} supports these public <a
+ * href="../../../../app/doc-files/config-properties.html#Je"> properties</a>,
+ * and the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">
- *
- * <dt> <i>Property:</i> <b>{@value #FLUSH_TO_DISK_PROPERTY}</b> <br>
- *	<i>Default:</i> <code>false</code>
- *
- * <dd style="padding-top: .5em">Whether to flush changes to disk when a
- * transaction commits.  If <code>false</code>, the modifications made in some
- * of the most recent transactions may be lost if the host crashes, although
- * data integrity will be maintained.  Flushing changes to disk avoids data
- * loss but introduces a significant reduction in performance. <p>
  *
  * <dt> <i>Property:</i> <b>{@value #STATS_PROPERTY}</b> <br>
  *	<i>Default:</i> <code>-1</code>
@@ -168,8 +160,8 @@ public class JeEnvironment implements DbEnvironment {
 	defaultProperties.setProperty("je.env.sharedLatches", "true");
     }
 
-    /** The Berkeley DB environment. */
-    private final XAEnvironment env;
+    /** The Berkeley DB environment or null if closed. */
+    private XAEnvironment env;
 
     /** The stats task or null. */
     private StatsRunnable statsTask = null;
@@ -328,10 +320,18 @@ public class JeEnvironment implements DbEnvironment {
 	    "Unexpected database exception: " + e, e);
     }
 
+    /** Checks that the environment is currently open. */
+    private void checkOpen() {
+	if (env == null) {
+	    throw new DbDatabaseException("The environment is closed");
+	}
+    }
+
     /* -- Implement DbEnvironment -- */
 
     /** {@inheritDoc} */
     public DbTransaction beginTransaction(long timeout) {
+	checkOpen();
 	return new JeTransaction(env, timeout);
     }
 
@@ -340,12 +340,14 @@ public class JeEnvironment implements DbEnvironment {
 	DbTransaction txn, String fileName, boolean create)
 	throws FileNotFoundException
     {
+	checkOpen();
 	return new JeDatabase(
 	    env, JeTransaction.getJeTxn(txn), fileName, create);
     }
 
     /** {@inheritDoc} */
     public void close() {
+	checkOpen();
 	if (statsTaskHandle != null) {
 	    statsTask.cancel();
 	    statsTaskHandle.cancel();
@@ -353,6 +355,7 @@ public class JeEnvironment implements DbEnvironment {
 	}
 	try {
 	    env.close();
+	    env = null;
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
 	}

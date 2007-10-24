@@ -50,6 +50,7 @@ import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.UtilProperties;
 
 import java.io.File;
 import java.io.Serializable;
@@ -149,9 +150,12 @@ public class TestTaskServiceImpl extends TestCase {
         // FIXME: This should move into the Minimal Kernel, where Services
         // can all be shutdown correctly, but since we're not really
         // supporting shutdown yet, the call is here for now
-        if (dataService != null)
+        if (dataService != null) {
             dataService.shutdown();
+	    dataService = null;
+	}
         deleteDirectory(DB_DIRECTORY);
+	taskService = null;
 
         // clean up after this app
         MinimalTestKernel.destroyContext(appContext);
@@ -759,11 +763,11 @@ public class TestTaskServiceImpl extends TestCase {
             }
         }
 
-        Properties properties = new Properties();
-        properties.setProperty("com.sun.sgs.impl.service.data.store." +
-                               "DataStoreImpl.directory", directory);
-        properties.setProperty(StandardProperties.APP_NAME,
-                               "TestTaskServiceImpl");
+        Properties properties =
+	    UtilProperties.createProperties(
+		"com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+		directory,
+		StandardProperties.APP_NAME, "TestTaskServiceImpl");
         return new DataServiceImpl(properties, systemRegistry, txnProxy);
     }
 

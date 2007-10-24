@@ -65,9 +65,49 @@ import java.util.logging.Logger;
  * <code>prepareAndCommit</code> on durable participants, so the inability to
  * resolve prepared transactions should have no effect at present. <p>
  *
- * The {@link #BdbEnvironment constructor} supports these public <a
- * href="../../../../../../app/doc-files/config-properties.html#Bdb">
- * properties</a>. <p>
+ * The {@link #BdbEnvironment constructor} supports the following configuration
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <b>{@value #CACHE_SIZE_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_CACHE_SIZE}
+ *
+ * <dd style="padding-top: .5em">The size in bytes of the Berkeley DB cache.
+ * The value must not be less than {@code 20000}.
+ *
+ * <dt> <i>Property:</i> <b>{@value #CHECKPOINT_INTERVAL_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_CHECKPOINT_INTERVAL}
+ *
+ * <dd style="padding-top: .5em">The interval in milliseconds between
+ * checkpoint operations that flush changes from the database log to the
+ * database.
+ *
+ * <dt> <i>Property:</i> <b>{@value #CHECKPOINT_SIZE_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_CHECKPOINT_SIZE}
+ *
+ * <dd style="padding-top: .5em">The number of bytes that needs to have been
+ * written since the last checkpoint operation was performed to require another
+ * checkpoint.
+ *
+ * <dt> <i>Property:</i> <b>{@value #FLUSH_TO_DISK_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@code false}
+ *
+ * <dd style="padding-top: .5em">Whether to flush changes to disk when a
+ * transaction commits.  If {@code false}, the modifications made in some of
+ * the most recent transactions may be lost if the host crashes, although data
+ * integrity will be maintained.  Flushing changes to disk avoids data loss but
+ * introduces a significant reduction in performance.
+ *
+ * <dt> <i>Property:</i> <b>{@value #REMOVE_LOGS_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@code false}
+ *
+ * <dd style="padding-top: .5em">Whether to automatically remove database log
+ * files that are no longer needed.  Note that automatic log file removal is
+ * likely to make catastrophic recovery of the database impossible, because log
+ * files that may be needed will not have been backed up.
+ *
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.db.bdb</code> to log information at

@@ -17,7 +17,7 @@ set -f
 
 # Specify a find pattern for JAR files whose contents should not be
 # checked
-dont_check_jars='( -path ./lib/bdb/db.jar -or
+dont_check_jars='( -path ./lib/je-*.jar -or
 		   -path ./lib/mina-*.jar -or
 		   -path ./lib/slf4j-*.jar )'
 

@@ -56,8 +56,8 @@ public class JeDatabase implements DbDatabase {
 	createConfig.setAllowCreate(true);
     }
 
-    /** The Berkeley DB database. */
-    private final Database db;
+    /** The Berkeley DB database or null if closed. */
+    private Database db;
 
     /**
      * Creates an instance of this class.
@@ -92,11 +92,19 @@ public class JeDatabase implements DbDatabase {
 	return bytes != null ? bytes : NO_BYTES;
     }
 
+    /** Checks that the database is currently open. */
+    private void checkOpen() {
+	if (db == null) {
+	    throw new DbDatabaseException("The database is closed");
+	}
+    }
+
     /* -- Implement DbDatabase -- */
 
     /** {@inheritDoc} */
     public byte[] get(DbTransaction txn, byte[] key, boolean forUpdate) {
 	try {
+	    checkOpen();
 	    DatabaseEntry valueEntry = new DatabaseEntry();
 	    OperationStatus status = db.get(
 		JeTransaction.getJeTxn(txn), new DatabaseEntry(key),
@@ -116,6 +124,7 @@ public class JeDatabase implements DbDatabase {
     /** {@inheritDoc} */
     public void put(DbTransaction txn, byte[] key, byte[] value) {
 	try {
+	    checkOpen();
 	    OperationStatus status = db.put(
 		JeTransaction.getJeTxn(txn), new DatabaseEntry(key),
 		new DatabaseEntry(value));
@@ -132,6 +141,7 @@ public class JeDatabase implements DbDatabase {
 	DbTransaction txn, byte[] key, byte[] value)
     {
 	try {
+	    checkOpen();
 	    OperationStatus status = db.putNoOverwrite(
 		JeTransaction.getJeTxn(txn), new DatabaseEntry(key),
 		new DatabaseEntry(value));
@@ -150,6 +160,7 @@ public class JeDatabase implements DbDatabase {
     /** {@inheritDoc} */
     public boolean delete(DbTransaction txn, byte[] key) {
 	try {
+	    checkOpen();
 	    OperationStatus status = db.delete(
 		JeTransaction.getJeTxn(txn), new DatabaseEntry(key));
 	    if (status == SUCCESS) {
@@ -166,13 +177,16 @@ public class JeDatabase implements DbDatabase {
 
     /** {@inheritDoc} */
     public DbCursor openCursor(DbTransaction txn) {
+	checkOpen();
 	return new JeCursor(db, JeTransaction.getJeTxn(txn));
     }
 
     /** {@inheritDoc} */
     public void close() {
+	checkOpen();
 	try {
 	    db.close();
+	    db = null;
 	} catch (DatabaseException e) {
 	    throw JeEnvironment.convertException(e, false);
 	}

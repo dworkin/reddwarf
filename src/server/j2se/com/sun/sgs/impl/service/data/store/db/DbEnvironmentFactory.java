@@ -20,7 +20,7 @@
 package com.sun.sgs.impl.service.data.store.db;
 
 import com.sun.sgs.impl.service.data.store.Scheduler;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
+import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.util.Properties;
 
@@ -47,7 +47,7 @@ public final class DbEnvironmentFactory {
      * {@link Scheduler}, which the implementation can use to run asynchronous,
      * periodic tasks.  If the property is present, the results of calling the
      * constructor with the arguments passed to this method will be returned.
-     * Otherwise, an instance of {@link BdbEnvironment}, constructed with the
+     * Otherwise, an instance of {@link JeEnvironment}, constructed with the
      * arguments, will be returned.
      *
      * @param	directory the directory containing database files
@@ -67,6 +67,6 @@ public final class DbEnvironmentFactory {
 	    new Class<?>[] { String.class, Properties.class, Scheduler.class },
 	    directory, properties, scheduler);
 	return (result != null)
-	    ? result : new BdbEnvironment(directory, properties, scheduler);
+	    ? result : new JeEnvironment(directory, properties, scheduler);
     };
 }

@@ -53,7 +53,7 @@
   <!-- Versions of referenced software, for creating subdirectories in
        the server binary distribution -->
   <property name="bdb.version" value="4.5.20"/>
-  <property name="bdb.je.version" value="3.2.23"/>
+  <property name="bdb.je.version" value="3.2.44"/>
   <property name="mina.version" value="1.1"/>
   <property name="slf4j.version" value="1.4.0"/>
 
@@ -64,7 +64,10 @@
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
-  <!-- Set test.use.je to true to test with BDB Java Edition -->
+  <property name="test.use.je" value="true"/>
+  <condition property="test.use.je.if.set">
+    <istrue value="${test.use.je}"/>
+  </condition>
   <condition
      property="test.bdb.env"
      value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
@@ -72,14 +75,21 @@
     <istrue value="${test.use.je}"/>
   </condition>
 
-  <!-- Properties for Berkeley DB libraries -->
-  <!-- The caller should set the bdb.lib.dir property to a directory
-       containing the full set of JAR and native library files for
-       Berkeley DB for the current platform if building the server -->
-  <!-- The caller should set the bdb.builds.dir property to a directory
-       containing builds of Berkeley DB for all platforms if building
-       the server binary distribution -->
-  <property name="bdb.je.jar" location="lib/je-${bdb.je.version}.jar"/>
+  <!-- Properties for Berkeley DB -->
+  <!-- The directory containing the full set of JAR and native library
+       files for Berkeley DB, standard edition, for the current
+       platform, or an empty value if not being used. -->
+  <property name="bdb.lib.dir" value=""/>
+  <!-- Whether a non-empty value was supplied for bdb.lib.dir -->
+  <condition property="bdb.lib.dir.supplied">
+    <length string="${bdb.lib.dir}" length="0" when="greater"/>
+  </condition>
+  <!-- JAR file for Berkeley DB, Java edition. -->
+  <property name="bdb.je.jar.name" value="je-${bdb.je.version}.jar"/>
+  <property name="bdb.je.jar" location="lib/${bdb.je.jar.name}"/>
+  <!-- Files in the database layer for Berkeley DB, standard edition -->
+  <property name="bdb.db.files"
+	    value="com/sun/sgs/impl/service/data/store/db/bdb/*.java"/>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
@@ -89,11 +99,23 @@
     <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
   </path>
 
+  <!-- Class path entry for Berkeley DB, standard edition -->
+  <condition property="bdb.path.entry"
+	     value="${bdb.lib.dir}/db.jar"
+	     else="">
+    <isset property="bdb.lib.dir.supplied"/>
+  </condition>
+
+  <!-- Class path for Berkeley DB -->
+  <path id="bdb.classpath">
+    <pathelement location="${bdb.je.jar}"/>
+    <pathelement path="${bdb.path.entry}"/>
+  </path>
+
   <!-- Server class path -->
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
-    <pathelement location="${bdb.lib.dir}/db.jar"/>
-    <pathelement location="${bdb.je.jar}"/>
+    <path refid="bdb.classpath"/>
     <path refid="shared.classpath"/>
   </path>
 
@@ -130,16 +152,34 @@
   <!-- Builds the server -->
   <target name="build-server" depends="-build-shared"
       description="Builds server code">
-    <fail unless="bdb.lib.dir"
-	  message="The bdb.lib.dir property must be set"/>
     <mkdir dir="${build.dir}/classes/server"/>
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/server"
+	    cache="${build.dir}/depend"
+	    closure="true">
+      <exclude name="${bdb.db.files}"/>
+    </depend>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
+           classpathref="server.classpath" source="${javac.source}"
+	   excludes="${bdb.db.files}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Builds database layer for Berkeley DB, standard edition -->
+  <target name="build-bdb-db" depends="build-server"
+	  description="Builds database layer for Berkeley DB, standard edition">
+    <fail unless="bdb.lib.dir.supplied"
+	  message="Need to supply a value for bdb.lib.dir property"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/server"
 	    cache="${build.dir}/depend"
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpathref="server.classpath" source="${javac.source}">
+           classpathref="server.classpath" source="${javac.source}"
+	   includes="${bdb.db.files}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -432,8 +472,7 @@
   <!-- Creates server binary distribution -->
   <target name="dist-server-binary"
 	  depends="-dist-server-binary-clean, dist-server-binary-tutorial,
-		   dist-server-binary-bdb, jar-server, javadoc-api-server,
-		   project-version"
+		   jar-server, javadoc-api-server, project-version"
 	  description="Creates server binary distribution">
     <copy todir="${build.dir}/sgs">
       <fileset dir="etc"
@@ -449,7 +488,8 @@
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy file="${build.dir}/lib/sgs.jar" todir="${build.dir}/sgs/lib"/>
-    <mkdir dir="${build.dir}/sgs/lib/bdb"/>
+    <copy file="${bdb.je.jar}" todir="${build.dir}/je"/>
+    <copy file="etc/LICENSE-je" tofile="${build.dir}/je/LICENSE"/>
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"/>
     </copy>
@@ -475,13 +515,8 @@
 		  includes="sgs.sh"
 		  filemode="755"
 		  prefix="sgs-${project.version}"/>
-      <zipfileset dir="${build.dir}/bdb" includes="**"
-		  excludes="win32-x86/*"
-		  prefix="bdb-${bdb.version}"/>
-      <zipfileset dir="${build.dir}/bdb"
-		  includes="win32-x86/*"
-		  filemode="755"
-		  prefix="bdb-${bdb.version}"/>
+      <zipfileset dir="${build.dir}/je" includes="**"
+		  prefix="je-${bdb.je.version}"/>
       <zipfileset dir="${build.dir}/mina" includes="**"
 		  prefix="mina-${mina.version}"/>
       <zipfileset dir="${build.dir}/slf4j" includes="**"
@@ -492,50 +527,6 @@
   <!-- Cleans the server binary distribution directory -->
   <target name="-dist-server-binary-clean">
     <delete dir="${build.dir}/sgs"/>
-  </target>
-
-  <!-- Builds files for distributing Berkeley DB -->
-  <target name="dist-server-binary-bdb"
-	  description="Builds files for distributing Berkeley DB">
-    <fail unless="bdb.builds.dir"
-	  message="The bdb.builds.dir property must be set"/>
-    <copy file="etc/LICENSE-bdb" tofile="${build.dir}/bdb/LICENSE"/>
-    <copy todir="${build.dir}/bdb"
-	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
-    <copy todir="${build.dir}/bdb/macosx-ppc">
-      <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
-	       includes="libdb-?.?.dylib,
-			 libdb_java-?.?.jnilib"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/macosx-x86">
-      <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
-	       includes="libdb-?.?.dylib,
-			 libdb_java-?.?.jnilib"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/solaris-x86">
-      <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
-	       includes="libdb-?.?.so,
-			 libdb_java-?.?.so"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/solaris-sparc">
-      <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
-	       includes="libdb-?.?.so,
-			 libdb_java-?.?.so"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/linux-x86">
-      <fileset dir="${bdb.builds.dir}/linux-x86/lib"
-	       includes="libdb-?.?.so,
-			 libdb_java-?.?.so"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/linux-x86_64">
-      <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
-	       includes="libdb-?.?.so,
-			 libdb_java-?.?.so"/>
-    </copy>
-    <copy todir="${build.dir}/bdb/win32-x86/">
-      <fileset dir="${bdb.builds.dir}/win32-x86/Release"
-	       includes="libdb_java??.dll"/>
-    </copy>
   </target>
 
   <!-- Builds the jar files for the project classes -->
@@ -559,7 +550,8 @@
   </target>
 
   <!-- Builds the server JAR file -->
-  <target name="jar-server" depends="build-server, project-version"
+  <target name="jar-server"
+	  depends="build-server, build-bdb-db, project-version"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <echo file="${build.dir}/classes/server/com/sun/sgs/sgs.version"
@@ -570,7 +562,7 @@
       <manifest>
         <attribute name="Main-Class" value="com.sun.sgs.impl.kernel.Kernel"/>
         <attribute name="Class-Path"
-                   value="bdb/db.jar
+                   value="${bdb.je.jar.name}
                           mina-core-1.1.jar
                           slf4j-jdk14-1.4.0.jar
 			  slf4j-api-1.4.0.jar"/>
@@ -603,6 +595,7 @@
     <filterset id="versions">
       <filter token="VERSION" value="${project.version}"/>
       <filter token="BDB.VERSION" value="${bdb.version}"/>
+      <filter token="BDBJE.VERSION" value="${bdb.je.version}"/>
       <filter token="MINA.VERSION" value="${mina.version}"/>
       <filter token="SLF4J.VERSION" value="${slf4j.version}"/>
     </filterset>
@@ -689,8 +682,7 @@
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
 	<path refid="shared.classpath"/>
-	<pathelement location="${bdb.lib.dir}/db.jar"/>
-	<pathelement location="${bdb.je.jar}"/>
+	<path refid="bdb.classpath"/>
       </auxClasspath>
     </findbugs>
   </target>
@@ -864,7 +856,8 @@
     </javac>
   </target>
 
-  <target name="-test-server.classes" depends="build-server">
+  <target name="-test-server.classes"
+	  depends="build-server, -test-maybe-build-bdb-db">
     <mkdir dir="${build.dir}/test/classes/server"/>
     <depend srcdir="test/server/j2se"
 	    destdir="${build.dir}/test/classes/server"
@@ -879,6 +872,10 @@
 	   includes="**/*.java">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
+  </target>
+
+  <target name="-test-maybe-build-bdb-db" unless="test.use.je.if.set">
+    <antcall target="build-bdb-db"/>
   </target>
 
   <target name="-test-client.classes" depends="build-client">

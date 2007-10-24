@@ -20,7 +20,7 @@
 /**
  * Provides an implementation of the interfaces in the {@link
  * com.sun.sgs.impl.service.data.store.db} package based on <a href=
- * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB, Java
+ * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB Java
  * Edition</a>. <p>
  *
  * Operations on classes in this package will throw an {@link java.lang.Error
