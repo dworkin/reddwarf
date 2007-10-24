@@ -25,6 +25,7 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -584,18 +585,6 @@ public class TestNodeMappingServerImpl extends TestCase {
         assertTrue(firstNodeId != secondNodeId);
     }
      
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-        Properties props = new Properties();
-        if (args.length % 2 != 0) {
-            throw new RuntimeException("Odd number of arguments");
-        }
-        for (int i = 0; i < args.length; i += 2) {
-            props.setProperty(args[i], args[i + 1]);
-        }
-        return props;
-    }
-
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
         File dir = new File(directory);

@@ -21,7 +21,7 @@ This distribution contains the following subdirectories:
   Documentation for the client tutorial
 
 - example
-  Source code for the client tutorial
+  Source code for the client tutorial and the example C client
 
 - src
   Source code for the client implementation
