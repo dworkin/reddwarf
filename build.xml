@@ -62,9 +62,11 @@
   <property name="test.assertions" value="-ea:com.sun.sgs..."/>
   <property name="test.jvm.args" value="${test.assertions}"/>
   <property name="test.formatter.type" value="plain"/>
-  <property name="test.showoutput" value="false"/>
+  <!-- <property name="test.showoutput" value="false"/> -->
+  <property name="test.showoutput" value="true"/>
   <property name="test.include" value="**/session/Test*.java"/>
 <!--
+  <property name="test.include" value="**/session/Test*.java"/>
   <property name="test.include" value="**/Test*.java"/>
 -->
   <!-- Set test.use.je to true to test with BDB Java Edition -->

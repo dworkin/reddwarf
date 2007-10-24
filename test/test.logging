@@ -16,7 +16,7 @@
 handlers = java.util.logging.ConsoleHandler
 #handlers = java.util.logging.FileHandler, java.util.logging.ConsoleHandler
 #handlers = java.util.logging.FileHandler
-java.util.logging.FileHandler.pattern = /tmp/log/sgs%u.log
+#java.util.logging.FileHandler.pattern = /tmp/log/sgs%u.log
 
 # Default global logging level.
 # This specifies which kinds of events are logged across
@@ -24,21 +24,21 @@ java.util.logging.FileHandler.pattern = /tmp/log/sgs%u.log
 # can be overriden by a facility specific level
 # Note that the ConsoleHandler also has a separate level
 # setting to limit messages printed to the console.
-#.level = INFO
-.level = ALL
+.level = INFO
+#.level = ALL
 #.level = FINE
 
 # Limit the messages that are printed on the console to at least this level:
-#java.util.logging.ConsoleHandler.level = INFO
+java.util.logging.ConsoleHandler.level = INFO
 #java.util.logging.ConsoleHandler.level = FINE
-java.util.logging.ConsoleHandler.level = ALL
-java.util.logging.FileHandler.level = ALL
+#java.util.logging.ConsoleHandler.level = ALL
+#java.util.logging.FileHandler.level = ALL
 
 # Specify the console log formatter:
 #java.util.logging.ConsoleHandler.formatter = com.sun.gi.utils.OneLineFormatter
 
-java.util.logging.FileHandler.limit = 1000000
-java.util.logging.FileHandler.count = 100
+#java.util.logging.FileHandler.limit = 1000000
+#java.util.logging.FileHandler.count = 100
 
 ############################################################
 # Facility specific properties.
@@ -48,6 +48,7 @@ java.util.logging.FileHandler.count = 100
 #com.sun.sgs.level = FINE
 #com.sun.sgs.level = FINEST
 #com.sun.sgs.impl.io.level = FINEST
+#com.sun.sgs.impl.nio.level = FINEST
 #com.sun.sgs.impl.kernel.level = FINE
 #com.sun.sgs.impl.kernel.TaskHandler.level = FINE
 #com.sun.sgs.impl.service.level = FINE
