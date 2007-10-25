@@ -37,9 +37,13 @@ public interface ProtocolMessageListener {
      * message has been received by the specified client session.
      *
      * @param	session a client session
+     * @param   opcode the opcode for this message
      * @param	message a protocol messge
+     * @return  {@code true} if IO reads should resume immediately,
+     *          {@code false} if they will be resumed by the listener
      */
-    void receivedMessage(SgsClientSession session, byte[] message);
+    boolean receivedMessage(
+        SgsClientSession session, byte opcode, byte[] message);
 
     /**
      * Notifies this listener that the specified client session has

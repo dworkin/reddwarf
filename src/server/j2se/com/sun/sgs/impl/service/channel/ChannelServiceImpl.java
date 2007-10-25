@@ -58,6 +58,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.BufferOverflowException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -352,64 +353,25 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	implements ProtocolMessageListener
     {
 	/** {@inheritDoc} */
-	public void receivedMessage(SgsClientSession session, byte[] message) {
-	    try {
-		MessageBuffer buf = new MessageBuffer(message);
-	    
-		buf.getByte(); // discard version
-		
-		/*
-		 * Handle service id.
-		 */
-		byte serviceId = buf.getByte();
+	public boolean receivedMessage(
+            SgsClientSession session, byte opcode, byte[] message)
+        {
+	    MessageBuffer buf = new MessageBuffer(message);
 
-		if (serviceId != SimpleSgsProtocol.CHANNEL_SERVICE) {
-		    if (logger.isLoggable(Level.SEVERE)) {
-			logger.log(
-                            Level.SEVERE,
-			    "expected channel service ID, got: {0}",
-			    serviceId);
-		    }
-		    return;
-		}
+	    switch (opcode) {
 
-		/*
-		 * Handle op code.
-		 */
-		byte opcode = buf.getByte();
+	    case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
+	        return handleChannelSendRequest(session, buf);
 
-		switch (opcode) {
-		    
-		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
-
-		    handleChannelSendRequest(session, buf);
-		    break;
-		    
-		default:
-		    if (logger.isLoggable(Level.SEVERE)) {
-			logger.log(
-			    Level.SEVERE,
-			    "receivedMessage session:{0} message:{1} " +
-			    "unknown opcode:{2}",
-			    session, HexDumper.format(message), opcode);
-		    }
-		    break;
-		}
-
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"receivedMessage session:{0} message:{1} returns",
-			session, HexDumper.format(message));
-		}
-		
-	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.logThrow(
-			Level.SEVERE, e,
-			"receivedMessage session:{0} message:{1} throws",
-			session, HexDumper.format(message));
-		}
+	    default:
+	        if (logger.isLoggable(Level.SEVERE)) {
+	            logger.log(
+	                Level.SEVERE,
+	                "receivedMessage session:{0} message:{1} " +
+	                "unknown opcode:{2}",
+	                session, HexDumper.format(message), opcode);
+	        }
+	        throw new RuntimeException("bad channel opcode: " + opcode);
 	    }
 	}
 
@@ -437,7 +399,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * channel ID in the protocol message.  The operation code has
      * already been processed by the caller.
      */
-    private void handleChannelSendRequest(
+    private boolean handleChannelSendRequest(
 	SgsClientSession sender, MessageBuffer buf)
     {
 	CompactId channelId = CompactId.getCompactId(buf);
@@ -447,7 +409,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    logger.log(
 		Level.WARNING,
 		"non-existent channel:{0}, dropping message", channelId);
-	    return;
+	    return true;
 	}
 
 	// Ensure that sender is a channel member before continuing.
@@ -458,7 +420,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		    "send attempt on channel:{0} by non-member session:{1}, " +
 		    "dropping message", channelId, sender);
 	    }
-	    return;
+            return true;
 	}
 	
 	long seq = buf.getLong(); // TODO Check sequence num
@@ -472,7 +434,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		    "numRecipents:{0} session:{1}",
 		    numRecipients, sender);
 	    }
-	    return;
+            return true;
 	}
 
 	Set<ClientSession> recipients = new HashSet<ClientSession>();
@@ -504,13 +466,38 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		cachedState.name, HexDumper.format(channelMessage));
 	}
 
+        Map<ClientSessionImpl, Object> sendReservations =
+            new HashMap<ClientSessionImpl, Object>();
+
 	ClientSessionId senderId = sender.getSessionId();
 	for (ClientSession session : recipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
-		((SgsClientSession) session).sendProtocolMessage(
-		    protocolMessage, cachedState.delivery);
+                ClientSessionImpl sgsSession = (ClientSessionImpl) session;
+                try {
+                    if (! sgsSession.isConnected())
+                        continue;
+
+                    Object reservation = sgsSession.reserveProtocolMessage(
+                        protocolMessage, cachedState.delivery);
+                    sendReservations.put(sgsSession, reservation);
+                } catch (BufferOverflowException e) {
+                    // Can't get the reservation for this session.
+                    // TODO use a policy here
+                    // For now, forcibly disconnect the slow recipient
+                    sgsSession.disconnected();
+
+                    // TODO for this disconnect-recipient policy, it might
+                    // be better to check whether *all* recipients are full
+                    // and in that case disconnect the sender.
+                }
 	    }
+        }
+
+        for (Map.Entry<ClientSessionImpl, Object> entry :
+                    sendReservations.entrySet())
+        {
+            entry.getKey().invokeReservation(entry.getValue());
         }
 
 	if (cachedState.hasChannelListeners) {
@@ -519,7 +506,17 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    queue.addTask(
 		new NotifyTask(cachedState.name, channelId,
 			       senderId, channelMessage));
+
+            // TODO make read-resume part of the NotifyTask activity,
+            // and return false here.
+            return true;
 	}
+
+        // If there are no listeners, resume reading immediately.
+        //
+        // TODO this needs to depend on the policy (to be defined above)
+        // regarding recipients that cannot grant a send reservation.
+        return true;
     }
     
     /**
@@ -655,16 +652,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
 
 	/* -- transaction participant methods -- */
-
-	/**
-	 * Throws a {@code TransactionNotActiveException} if this
-	 * transaction is prepared.
-	 */
-	private void checkPrepared() {
-	    if (isPrepared) {
-		throw new TransactionNotActiveException("Already prepared");
-	    }
-	}
 	
 	/**
 	 * Marks this transaction as prepared, and if there are
@@ -903,7 +890,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    channelState.removeAllSessions();
 	}
     }
-	
+
     /**
      * Task (transactional) for notifying channel listeners.
      */
