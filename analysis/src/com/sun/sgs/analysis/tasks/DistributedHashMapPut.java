@@ -1,37 +1,29 @@
 package com.sun.sgs.analysis.task;
 
-import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TaskManager;
-
-import com.sun.sgs.app.util.DistributedHashMap;
-
 import java.io.Serializable;
-
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  *
  */
-@SuppressWarnings({"unchecked"})
 public class DistributedHashMapPut implements Task, Serializable {
-	    
+    private static final long serialVersionUID = 1;
+
+    private static final Random random = new Random();
+
     private final ManagedReference map;
 
     public DistributedHashMapPut(ManagedReference map) {
 	this.map = map;
     }
-    
+
     public void run() {
-	try {
-	    Map m = map.get(Map.class);	    
-	    int i = (Math.random() >= .5) 
-		? (int)(Integer.MAX_VALUE * Math.random())
-		: (int)(Integer.MIN_VALUE * Math.random());
-		m.put(i,i);	   
-	} catch (Throwable te ) { }
+	@SuppressWarnings("unchecked")
+	Map<Object, Object> m = map.get(Map.class);
+	int i = random.nextInt();
+	m.put(i, i);
     }
 }

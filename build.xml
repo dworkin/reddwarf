@@ -1126,14 +1126,16 @@
      <jvmarg line="-XX:+AggressiveOpts"/>
      <jvmarg line="-XX:+MaxFDLimit"/>
      <jvmarg line="-XX:NewSize=512m"/>
-     <jvmarg line="-Xmx2g"/>     
+     <jvmarg line="-Xms700m"/>
+     <jvmarg line="-Xmx2g"/>
 
      <sysproperty key="com.sun.sgs.config.file"
 		  file="analysis/System.properties"/>
      <sysproperty key="java.library.path" 
 		  file="${bdb.lib.dir}"/>
+<!--
      <sysproperty key="java.util.logging.config.file"
-		  file="logging.properties"/>
+		  file="logging.properties"/> -->
      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
 		  value="true"/>
 

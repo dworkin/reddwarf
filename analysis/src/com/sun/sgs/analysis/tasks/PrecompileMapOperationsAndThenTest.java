@@ -2,24 +2,22 @@ package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Task;
-
-import com.sun.sgs.app.util.DistributedHashMap;
-
+import com.sun.sgs.app.util.ScalableHashMap;
 import java.io.Serializable;
-
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Runs operations to kick-in native compilation and then enqueues a
  * {@link MapComparisonTask}.
  */
-@SuppressWarnings({"unchecked"})	    
 public class PrecompileMapOperationsAndThenTest implements Task, Serializable {
+    private static final Random random = new Random();
 
     private static final long serialVersionUID = 0;
     
-    int count;
+    private final int count;
     
     public PrecompileMapOperationsAndThenTest() {
 	this(0);
@@ -33,13 +31,12 @@ public class PrecompileMapOperationsAndThenTest implements Task, Serializable {
 	try {
 	    if (count + 1 < 500) {
 		
-		Map m = new HashMap<Integer,Integer>();
-		Map m2 = new DistributedHashMap<Integer,Integer>();
+		Map<Integer, Integer> m = new HashMap<Integer, Integer>();
+		Map<Integer, Integer> m2 =
+		    new ScalableHashMap<Integer, Integer>();
 		
 		for (int j = 0; j < 1024; ++j) {
-		    int i = (Math.random() >= .5) 
-			? (int)(Integer.MAX_VALUE * Math.random())
-			: (int)(Integer.MIN_VALUE * Math.random());
+		    int i = random.nextInt();
 		    m.put(i,i);	   
 		    m2.put(i,i);
 		    m.get(i);
@@ -47,14 +44,14 @@ public class PrecompileMapOperationsAndThenTest implements Task, Serializable {
 		}		    
 		
 		AppContext.getTaskManager().
-		    scheduleTask(new PrecompileMapOperationsAndThenTest(count+1));
-	    }
-	    else {
+		    scheduleTask(
+			new PrecompileMapOperationsAndThenTest(count+1));
+	    } else {
 		AppContext.getTaskManager().
 		    scheduleTask(new MapComparisonTask());
 	    }
-	} catch (Throwable t) { 
-	    t.printStackTrace();
+	} catch (Exception e) { 
+	    e.printStackTrace();
 	}
     }    
 }
