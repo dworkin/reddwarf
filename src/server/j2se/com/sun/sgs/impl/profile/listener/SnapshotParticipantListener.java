@@ -57,9 +57,9 @@ import java.util.Properties;
  * <p>
  * The
  * <code>com.sun.sgs.impl.profile.listener.SnapshotParticipantListener</code>
- * root is used for all properties in this class. The <code>report.port</code>
+ * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
- * data. The <code>report.period</code> key is used to specify the length of
+ * data. The <code>reportPeriod</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
 public class SnapshotParticipantListener implements ProfileListener {
@@ -75,9 +75,9 @@ public class SnapshotParticipantListener implements ProfileListener {
         SnapshotParticipantListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
+    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
     private static final int DEFAULT_PORT = 43012;
-    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".reportPeriod";
     private static final long DEFAULT_PERIOD = 5000;
 
     // the map of all participants in the current snapshot window

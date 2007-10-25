@@ -75,9 +75,9 @@ public class AggregateTaskListener implements ProfileListener {
         AggregateTaskListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
+    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
     private static final int DEFAULT_PORT = 43009;
-    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".reportPeriod";
     private static final long DEFAULT_PERIOD = 10000;
 
     private HashMap<String,TaskDetail> map;

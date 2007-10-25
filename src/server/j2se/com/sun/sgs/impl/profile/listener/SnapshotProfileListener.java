@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * users may connect to that socket to watch the reports. The default
  * port used is 43007.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileListener.</code>
+ * The <code>com.sun.sgs.impl.profile.listener.SnapshotProfileListener.</code>
  * root is used for all properties in this class. The <code>reportPort</code>
  * key is used to specify an alternate port on which to report profiling
  * data. The <code>reportPeriod</code> key is used to specify the length of
@@ -95,7 +95,7 @@ public class SnapshotProfileListener implements ProfileListener {
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
     private static final int DEFAULT_PORT = 43007;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".reportPeriod";
     private static final long DEFAULT_PERIOD = 10000;
 
     /**

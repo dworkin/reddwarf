@@ -74,9 +74,9 @@ public class SnapshotTaskListener implements ProfileListener {
         SnapshotTaskListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
+    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
     private static final int DEFAULT_PORT = 43010;
-    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".reportPeriod";
     private static final long DEFAULT_PERIOD = 5000;
 
     private HashMap<String,TaskDetail> map;
