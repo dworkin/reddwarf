@@ -25,6 +25,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -360,6 +361,11 @@ public class ClientSessionImpl
 	    sessionImpl =
 		dataService.getServiceBinding(key, ClientSessionImpl.class);
 	} catch (NameNotBoundException e) {
+	} catch (ObjectNotFoundException e) {
+	    logger.logThrow(
+		Level.SEVERE, e,
+		"ClientSessionImpl binding:{0} exists, but object removed",
+		key);
 	}
 	return sessionImpl;
     }

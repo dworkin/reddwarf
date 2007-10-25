@@ -27,9 +27,7 @@ import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
@@ -62,7 +60,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -549,7 +546,7 @@ public class ChannelServiceImpl
 	CompactId channelId = CompactId.getCompactId(buf);
 	Context context = contextFactory.joinTransaction();
 	final ChannelState channelState =
-	    context.getChannelState(channelId.getId());
+	    ChannelState.getInstance(dataService, channelId.getId());
 	if (channelState == null) {
 	    logger.log(
 		Level.WARNING,
@@ -749,18 +746,11 @@ public class ChannelServiceImpl
 			      ChannelListener listener,
 			      Delivery delivery)
 	{
-	    assert name != null;
-	    String key = getChannelStateKey(name);
-	    try {
-		dataService.getServiceBinding(key, ChannelState.class);
-		throw new NameExistsException(name);
-	    } catch (NameNotBoundException e) {
-	    }
-	    
-	    ChannelState channelState =
-		new ChannelState(name, listener, delivery, dataService);
-	    dataService.setServiceBinding(key, channelState);
-	    ChannelImpl channel = new ChannelImpl(this, channelState);
+	    ChannelImpl channel =
+		new ChannelImpl(
+		    this, 
+		    ChannelState.newInstance(
+			dataService, name, listener, delivery));
 	    internalTable.put(name, channel);
 	    return channel;
 	}
@@ -777,18 +767,12 @@ public class ChannelServiceImpl
 	 * @throws  NameNotBoundException if the channel does not exist
 	 */
 	Channel getChannel(String name) {
-	    assert name != null;
 	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
-		ChannelState channelState;
-		try {
-		    channelState =
-		    	dataService.getServiceBinding(
-			    getChannelStateKey(name), ChannelState.class);
-		} catch (NameNotBoundException e) {
-		    throw new NameNotBoundException(name);
-		}
-		channel =  new ChannelImpl(this, channelState);
+		channel =
+		    new ChannelImpl(
+			this,
+			ChannelState.getInstance(dataService, name));
 		internalTable.put(name, channel);
 	    } else if (channel.isClosed) {
 		throw new NameNotBoundException(name);
@@ -815,7 +799,8 @@ public class ChannelServiceImpl
 	    assert channelId != null;
 	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
-		ChannelState channelState = getChannelState(channelId.getId());
+		ChannelState channelState =
+		    ChannelState.getInstance(dataService, channelId.getId());
 		if (channelState == null) {
 		    throw new NameNotBoundException(name);
 		}
@@ -827,29 +812,6 @@ public class ChannelServiceImpl
 	    return channel;
 	}
 
-	/**
-	 * Returns a channel state for the channel with the specified
-	 * {@code channelId}, or {@code null} if the channel doesn't
-	 * exist.  This method uses the {@code channelId} as a {@code
-	 * ManagedReference} ID to the channel's state.
-	 *
-	 * @param   channelId a channel ID
-	 * @return  the channel state for the channel with the specified
-	 *	    {@code channelId}, or {@code null} if the channel
-	 *	    doesn't exist
-	 */
-	ChannelState getChannelState(byte[] channelIdBytes) {
-	    assert channelIdBytes != null;
-	    try {
-		BigInteger refId = new BigInteger(1, channelIdBytes);
-		ManagedReference stateRef =
-		    dataService.createReferenceForId(refId);
-		return stateRef.get(ChannelState.class);
-	    } catch (ObjectNotFoundException e) {
-		return null;
-	    }
-	}
-	
 	/* -- transaction participant methods -- */
 
 	/**
@@ -1024,45 +986,58 @@ public class ChannelServiceImpl
     private class RecoveryTask extends AbstractKernelRunnable {
 
 	private final long nodeId;
-
+	
 	RecoveryTask(long nodeId) {
 	    this.nodeId = nodeId;
 	}
 
 	/** {@inheritDoc} */
 	public void run() {
+	    /*
 	    Iterator<ClientSession> iter =
-		ChannelState.getSessionsAnyChannel(dataService, nodeId);
+		ChannelState.getSessionIdsAnyChannel(dataService, nodeId);
 	    while (iter.hasNext()) {
-		removeSessionFromAllChannels(iter.next());
+		removeSessionFromAllChannels(nodeId, iter.next());
 	    }
+	    // FIXME: need to remove channel server for failed node.
+	    */
 	}
     }
 
+    private void removeSessionFromAllChannels(ClientSession session) {
+	long nodeId = ChannelState.getNodeId(session);
+	byte[] idBytes = session.getSessionId().getBytes();
+	removeSessionFromAllChannels(session, nodeId, idBytes);
+    }
+				     
     /**
      * Removes the specified client {@code session} from all channels
      * that it is currently a member of.
      */
-    private void removeSessionFromAllChannels(ClientSession session) {
+    private void removeSessionFromAllChannels(
+	ClientSession session, long nodeId, byte[] idBytes)
+    {
+	/*
+	if (session == null) {
+	    session = sessionService.getClientSession(idBytes);
+	}
 	Set<String> channelNames =
-	    ChannelState.getChannelsForSession(dataService, session);
+	    ChannelState.getChannelsForSession(dataService, nodeId, idBytes);
 	for (String name : channelNames) {
 	    try {
-		getChannel(name).leave(session);
+		ChannelImpl channel = (ChannelImpl) getChannel(name);
+		if (session != null) {
+		    channel.leave(session);
+		} else {
+		    channel.state.remove(...);
+		}
+		    
 	    } catch (NameNotBoundException e) {
 		logger.logThrow(Level.FINE, e, "channel removed:{0}", name);
 	    }
 	}
+	*/
     }
-
-    /**
-     * Returns the key for accessing the {@code ChannelState} instance
-     * for the channel with the specified {@code channelName}.
-     */
-    private static String getChannelStateKey(String channelName) {
-	return PKG_NAME + ".state." + channelName;
-    }
-
     /**
      * Returns the key for accessing the {@code ChannelServer}
      * instance (which is wrapped in a {@code ChannelServerWrapper})

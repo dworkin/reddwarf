@@ -384,7 +384,7 @@ final class ChannelImpl implements Channel, Serializable {
 	checkContext();
 	if (!isClosed) {
 	    leaveAll();
-	    state.removeAll(dataService);
+	    state.closeAndRemoveState(dataService);
 	    isClosed = true;
 	}
 	
@@ -518,7 +518,7 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void sendToAllMembers(final byte[] channelMessage) {
 	long localNodeId = context.getLocalNodeId();
-	final byte[] channelIdBytes = state.idBytes;
+	final byte[] channelIdBytes = state.channelIdBytes;
 	final byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
 		state.id, SERVER_ID, channelMessage,
@@ -571,7 +571,7 @@ final class ChannelImpl implements Channel, Serializable {
     private void sendToMembers(Set<ClientSession> sessions,
 			       final byte[] channelMessage)
     {
-	final byte[] channelIdBytes = state.idBytes;
+	final byte[] channelIdBytes = state.channelIdBytes;
 	Map<Long, Set<ClientSession>> recipientsPerNode =
 	    new HashMap<Long, Set<ClientSession>>();
 	for (ClientSession session : sessions) {

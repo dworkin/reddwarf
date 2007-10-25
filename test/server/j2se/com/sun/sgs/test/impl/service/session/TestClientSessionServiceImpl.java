@@ -182,7 +182,6 @@ public class TestClientSessionServiceImpl extends TestCase {
         }
         serverNode.shutdown(clean);
         serverNode = null;
-
     }
 
     /* -- Test constructor -- */

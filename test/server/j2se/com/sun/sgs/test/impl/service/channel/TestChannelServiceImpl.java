@@ -49,28 +49,25 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.SgsTestNode;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -94,28 +91,8 @@ import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
     
-    /** The name of the DataServiceImpl class. */
-    private static final String DataStoreImplClassName =
-	DataStoreImpl.class.getName();
-
-    /** Directory used for database shared across multiple tests. */
-    private static final String DB_DIRECTORY =
-        System.getProperty("java.io.tmpdir") + File.separator +
-	"TestChannelServiceImpl.db";
-
-    /** Properties for the channel service and client session service. */
-    private static Properties serviceProps = createProperties(
-	    "com.sun.sgs.app.name", "TestChannelServiceImpl",
-	    "com.sun.sgs.app.port", "0",
-            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    	DB_DIRECTORY,
-            "com.sun.sgs.impl.service.watchdog.server.start", "true",
-	    "com.sun.sgs.impl.service.watchdog.server.port", "0",
-	    "com.sun.sgs.impl.service.watchdog.renew.interval", "1000",
-	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
-	    "com.sun.sgs.impl.service.nodemap.server.port", "0"
-	    );
-
+    private static final String APP_NAME = "TestChannelServiceImpl";
+    
     private static final String CHANNEL_NAME = "three stooges";
     
     private static final int WAIT_TIME = 2000;
@@ -126,31 +103,39 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static Object disconnectedCallbackLock = new Object();
 
-    /** Kernel/transaction-related test components. */
-    private static DummyTransactionProxy txnProxy =
-	MinimalTestKernel.getTransactionProxy();
-    private DummyAbstractKernelAppContext appContext;
-    private DummyComponentRegistry systemRegistry;
-    private DummyComponentRegistry serviceRegistry;
-    private DummyTransaction txn;
+    /** The node that creates the servers. */
+    private SgsTestNode serverNode;
 
-    /** Services. */
+    /** Any additional nodes, keyed by node hostname (for tests
+     * needing more than one node). */
+    private Map<String,SgsTestNode> additionalNodes;
+
+    /** The task scheduler. */
+    private TaskScheduler taskScheduler;
+
+    /** The owner for tasks I initiate. */
+    private TaskOwner taskOwner;
+
+    /** The shared data service. */
     private DataServiceImpl dataService;
-    private WatchdogServiceImpl watchdogService;
-    private NodeMappingServiceImpl nodeMappingService;
-    private TaskServiceImpl taskService;
+
+    /** The channel service on the server node. */
     private ChannelServiceImpl channelService;
+
+    /** The client session service on the server node. */
     private ClientSessionServiceImpl sessionService;
-    private DummyIdentityCoordinator identityCoordinator;
-    
+
+    /** True if test passes. */
+    private boolean passed;
+
+    /** The test clients, keyed by user name. */
+    private static Map<String, DummyClient> dummyClients;
+
     /** The listen port for the client session service. */
     private int port;
 
     /** The node ID for the local node. */
     private long localNodeId;
-
-    /** True if test passes. */
-    private boolean passed;
 
     /** Constructs a test instance. */
     public TestChannelServiceImpl(String name) {
@@ -160,88 +145,30 @@ public class TestChannelServiceImpl extends TestCase {
     /** Creates and configures the channel service. */
     protected void setUp() throws Exception {
 	passed = false;
+        dummyClients = new HashMap<String, DummyClient>();
 	System.err.println("Testcase: " + getName());
         setUp(true);
     }
 
     protected void setUp(boolean clean) throws Exception {
-        if (clean) {
-            deleteDirectory(DB_DIRECTORY);
-        }
+        Properties props = 
+            SgsTestNode.getDefaultProperties(APP_NAME, null, 
+                                             DummyAppListener.class);
+        props.setProperty(StandardProperties.AUTHENTICATORS, 
+                      "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	serverNode = 
+                new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
+	port = serverNode.getAppPort();
 
-	MinimalTestKernel.useMasterScheduler(serviceProps);
-        appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+        taskScheduler = 
+            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
 
-	// create data service
-	dataService = createDataService(systemRegistry);
-        txnProxy.setComponent(DataService.class, dataService);
-        txnProxy.setComponent(DataServiceImpl.class, dataService);
-        serviceRegistry.setComponent(DataManager.class, dataService);
-        serviceRegistry.setComponent(DataService.class, dataService);
-        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-
-	// create watchdog service
-	watchdogService =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
-	txnProxy.setComponent(WatchdogService.class, watchdogService);
-	txnProxy.setComponent(WatchdogServiceImpl.class, watchdogService);
-	serviceRegistry.setComponent(WatchdogService.class, watchdogService);
-	serviceRegistry.setComponent(
-	    WatchdogServiceImpl.class, watchdogService);
-
-	// create node mapping service
-        nodeMappingService = new NodeMappingServiceImpl(
-	    serviceProps, systemRegistry, txnProxy);
-        txnProxy.setComponent(NodeMappingService.class, nodeMappingService);
-        txnProxy.setComponent(
-	    NodeMappingServiceImpl.class, nodeMappingService);
-        serviceRegistry.setComponent(
-	    NodeMappingService.class, nodeMappingService);
-        serviceRegistry.setComponent(
-	    NodeMappingServiceImpl.class, nodeMappingService);
+        dataService = serverNode.getDataService();
+	sessionService = serverNode.getClientSessionService();
+	channelService = serverNode.getChannelService();
 	
-	// create task service
-	taskService = new TaskServiceImpl(
-	    new Properties(), systemRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-
-	// create identity coordinator
-	identityCoordinator = new DummyIdentityCoordinator();
-	systemRegistry.setComponent(IdentityCoordinator.class, identityCoordinator);
-
-	// create client session service
-	sessionService = new ClientSessionServiceImpl(
-	    serviceProps, systemRegistry, txnProxy);
-	serviceRegistry.setComponent(
-	    ClientSessionService.class, sessionService);
-	txnProxy.setComponent(
-	    ClientSessionService.class, sessionService);
-	port = sessionService.getListenPort();
-	
-	// create channel service
-	channelService = new ChannelServiceImpl(
-	    serviceProps, systemRegistry, txnProxy);
-	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
-	serviceRegistry.setComponent(ChannelManager.class, channelService);
-	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
-	
-	// services ready
-	dataService.ready();
-	watchdogService.ready();
-	nodeMappingService.ready();
-	taskService.ready();
-	sessionService.ready();
-	channelService.ready();
-
-	localNodeId = watchdogService.getLocalNodeId();
-
-	createTransaction(1000);
+	localNodeId = serverNode.getWatchdogService().getLocalNodeId();
     }
 
     /** Sets passed if the test passes. */
@@ -257,47 +184,33 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
-        if (txn != null) {
-            try {
-                txn.abort(null);
-            } catch (RuntimeException e) {
-                if ((! clean) || passed) {
-                    // ignore
-                } else {
-                    e.printStackTrace();
-                }
-            } finally {
-                txn = null;
+	if (additionalNodes != null) {
+            for (SgsTestNode node : additionalNodes.values()) {
+                node.shutdown(false);
             }
+            additionalNodes = null;
         }
-        if (channelService != null) {
-            channelService.shutdown();
-            channelService = null;
+        serverNode.shutdown(clean);
+        serverNode = null;
+    }
+
+    /** 
+     * Add additional nodes.  We only do this as required by the tests. 
+     *
+     * @param hosts contains a host name for each additional node
+     */
+    private void addNodes(String... hosts) throws Exception {
+        // Create the other nodes
+        additionalNodes = new HashMap<String, SgsTestNode>();
+
+        for (String host : hosts) {
+	    Properties props = SgsTestNode.getDefaultProperties(
+	        APP_NAME, serverNode, DummyAppListener.class);
+	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+            SgsTestNode node = 
+                    new SgsTestNode(serverNode, DummyAppListener.class, props);
+	    additionalNodes.put(host, node);
         }
-        if (sessionService != null) {
-            sessionService.shutdown();
-            sessionService = null;
-        }
-        if (taskService != null) {
-            taskService.shutdown();
-            taskService = null;
-        }
-	if (nodeMappingService != null) {
-	    nodeMappingService.shutdown();
-	    nodeMappingService = null;
-	}
-	if (watchdogService != null) {
-	    watchdogService.shutdown();
-	    watchdogService = null;
-	}
-        if (dataService != null) {
-            dataService.shutdown();
-            dataService = null;
-        }
-        if (clean) {
-            deleteDirectory(DB_DIRECTORY);
-        }
-        MinimalTestKernel.destroyContext(appContext);
     }
 
     /* -- Test constructor -- */
@@ -314,7 +227,9 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
-	    new ChannelServiceImpl(serviceProps, null,
+	    Properties props =
+		createProperties("com.sun.sgs.app.name", APP_NAME);
+	    new ChannelServiceImpl(props, null,
 				   new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -324,7 +239,9 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
-	    new ChannelServiceImpl(serviceProps, new DummyComponentRegistry(),
+	    Properties props =
+		createProperties("com.sun.sgs.app.name", APP_NAME);
+	    new ChannelServiceImpl(props, new DummyComponentRegistry(),
 				   null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -345,46 +262,60 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- Test createChannel -- */
 
-    public void testCreateChannelNullName() {
-	try {
-	    channelService.createChannel(
-		null, new DummyChannelListener(), Delivery.RELIABLE);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
+    public void testCreateChannelNullName() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.createChannel(
+			null, new DummyChannelListener(), Delivery.RELIABLE);
+		    fail("Expected NullPointerException");
+		} catch (NullPointerException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testCreateChannelNullListener() {
-	try {
-	    channelService.createChannel(
-		"foo", null, Delivery.RELIABLE);
-	    System.err.println("channel created");
-	} catch (NullPointerException e) {
-	    fail("Got NullPointerException");
-	}
+    public void testCreateChannelNullListener() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.createChannel(
+			"foo", null, Delivery.RELIABLE);
+		    System.err.println("channel created");
+		} catch (NullPointerException e) {
+		    fail("Got NullPointerException");
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testCreateChannelNonSerializableListener() {
-	try {
-	    channelService.createChannel(
-		"foo", new NonSerializableChannelListener(), Delivery.RELIABLE);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
+    public void testCreateChannelNonSerializableListener() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.createChannel(
+			"foo", new NonSerializableChannelListener(),
+			Delivery.RELIABLE);
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testCreateChannelNoTxn() throws Exception { 
-	commitTransaction();
 	try {
-	    createChannel();
+	    channelService.createChannel(
+		"noTxn", new DummyChannelListener(), Delivery.RELIABLE);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
 
+    /* TBD: how is this test implemented?
     public void testCreateChannelAndAbort() {
 	createChannel("foo");
 	txn.abort(null);
@@ -396,98 +327,127 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
+    */
 
-    public void testCreateChannelExistentChannel() {
-	createChannel("exist");
-	try {
-	    channelService.createChannel(
-		"exist", new DummyChannelListener(), Delivery.RELIABLE);
-	    fail("Expected NameExistsException");
-	} catch (NameExistsException e) {
-	    System.err.println(e);
-	}
+    public void testCreateChannelExistentChannel() throws Exception {
+	final String channelName = "exist"; 
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.createChannel(
+			channelName, new DummyChannelListener(), Delivery.RELIABLE);
+		    fail("Expected NameExistsException");
+		} catch (NameExistsException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     /* -- Test getChannel -- */
 
-    public void testGetChannelNullName() {
-	try {
-	    channelService.getChannel(null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
+    public void testGetChannelNullName() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.getChannel(null);
+		    fail("Expected NullPointerException");
+		} catch (NullPointerException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testGetChannelNonExistentName() {
-	try {
-	    channelService.getChannel("qwerty");
-	    fail("Expected NameNotBoundException");
-	} catch (NameNotBoundException e) {
-	    System.err.println(e);
-	}
+    public void testGetChannelNonExistentName() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channelService.getChannel("non-existent");
+		    fail("Expected NameNotBoundException");
+		} catch (NameNotBoundException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testGetChannelNoTxn() throws Exception {
-	commitTransaction();
 	try {
-	    channelService.getChannel("foo");
+	    channelService.getChannel("noTxn");
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testCreateAndGetChannelSameTxn() {
-	Channel channel1 = createChannel("foo");
-	try {
-	    Channel channel2 = channelService.getChannel("foo");
-	    if (channel1 != channel2) {
-		fail("channels are not equal");
+    public void testCreateAndGetChannelSameTxn() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		String channelName = "foo";
+		Channel channel1 =
+		    channelService.createChannel(
+			channelName, new DummyChannelListener(),
+			Delivery.RELIABLE);
+		Channel channel2 =
+		    channelService.getChannel(channelName);
+		if (channel1 != channel2) {
+		    fail("channels are not equal");
+		}
+		System.err.println("Channels are equal");
 	    }
-	    System.err.println("Channels are equal");
-	} catch (RuntimeException e) {
-	    System.err.println(e);
-	    throw e;
-	}
+	}, taskOwner);
     }
 	
     public void testCreateAndGetChannelDifferentTxn() throws Exception {
-	Channel channel1 = createChannel("testy");
-	commitTransaction();
-	createTransaction();
-	Channel channel2 = channelService.getChannel("testy");
-	if (channel1 == channel2) {
-	    fail("channels are equal");
-	}
-	System.err.println("Channels are not equal");
+	final String channelName = "testy";
+	final Channel channel1 = createChannel(channelName);
+	
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel2 = channelService.getChannel(channelName);
+		if (channel1 == channel2) {
+		    fail("channels are equal");
+		}
+		System.err.println("Channels are not equal");
+	    }
+	}, taskOwner);
     }
 
     /* -- Test Channel serialization -- */
 
     public void testChannelWriteReadObject() throws Exception {
-	Channel savedChannel = createChannel();
-	ByteArrayOutputStream bout = new ByteArrayOutputStream();
-	ObjectOutputStream out = new ObjectOutputStream(bout);
-	out.writeObject(savedChannel);
-	out.flush();
-	out.close();
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		Channel savedChannel =
+		    channelService.createChannel(
+			"readWriteTest", new DummyChannelListener(),
+			Delivery.RELIABLE);
+		ByteArrayOutputStream bout = new ByteArrayOutputStream();
+		ObjectOutputStream out = new ObjectOutputStream(bout);
+		out.writeObject(savedChannel);
+		out.flush();
+		out.close();
+		
+		ByteArrayInputStream bin =
+		    new ByteArrayInputStream(bout.toByteArray());
+		ObjectInputStream in = new ObjectInputStream(bin);
+		Channel channel = (Channel) in.readObject();
 
-	ByteArrayInputStream bin = new ByteArrayInputStream(bout.toByteArray());
-	ObjectInputStream in = new ObjectInputStream(bin);
-	Channel channel = (Channel) in.readObject();
-
-	if (!savedChannel.equals(channel)) {
-	    fail("Expected channel: " + savedChannel + ", got " + channel);
-	}
-	System.err.println("Channel writeObject/readObject successful");
+		if (!savedChannel.equals(channel)) {
+		    fail("Expected channel: " + savedChannel +
+			 ", got " + channel);
+		}
+		System.err.println("Channel {write,read}Object successful");
+	    }
+	}, taskOwner);
     }
 
     /* -- Test Channel.getName -- */
 
     public void testChannelGetNameNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.getName();
 	    fail("Expected TransactionNotActiveException");
@@ -497,41 +457,56 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetNameMismatchedTxn() throws Exception {
-	Channel channel = createChannel();
-	commitTransaction();
-	createTransaction();
-	try {
-	    channel.getName();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
+	final Channel channel = createChannel();
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channel.getName();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
     
-    public void testChannelGetName() {
-	String name = "name";
-	Channel channel = createChannel(name);
-	if (!name.equals(channel.getName())) {
-	    fail("Expected: " + name + ", got: " + channel.getName());
-	}
-	System.err.println("Channel names are equal");
+    public void testChannelGetName() throws Exception {
+	final String channelName = "name";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		String nameAfterCreation = channel.getName();
+		if (! channelName.equals(nameAfterCreation)) {
+		    fail("Expected: " + channelName + ", got: " +
+			 nameAfterCreation);
+		}
+		System.err.println("Channel names are equal");
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelGetNameClosedChannel() {
-	String name = "foo";
-	Channel channel = createChannel(name);
-	channel.close();
-	if (!name.equals(channel.getName())) {
-	    fail("Expected: " + name + ", got: " + channel.getName());
-	}
-	System.err.println("Got channel name on closed channel");
+    public void testChannelGetNameClosedChannel() throws Exception {
+	final String channelName = "name";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		String nameAfterCreation = channel.getName();
+		if (!channelName.equals(nameAfterCreation)) {
+		    fail("Expected: " + channelName + ", got: " +
+			 nameAfterCreation);
+		}
+		System.err.println("Got channel name on closed channel");
+	    }
+	}, taskOwner);
     }
 
     /* -- Test Channel.getDeliveryRequirement -- */
 
     public void testChannelGetDeliveryNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.getDeliveryRequirement();
 	    fail("Expected TransactionNotActiveException");
@@ -541,47 +516,58 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetDeliveryMismatchedTxn() throws Exception {
-	Channel channel = createChannel();
-	commitTransaction();
-	createTransaction();
-	try {
-	    channel.getDeliveryRequirement();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
+	final Channel channel = createChannel();
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channel.getDeliveryRequirement();
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelGetDelivery() {
-	for (Delivery delivery : Delivery.values()) {
-	    Channel channel = channelService.createChannel(
-		delivery.toString(), new DummyChannelListener(), delivery);
-	    if (!delivery.equals(channel.getDeliveryRequirement())) {
-		fail("Expected: " + delivery + ", got: " +
-		     channel.getDeliveryRequirement());
+    public void testChannelGetDelivery() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		for (Delivery delivery : Delivery.values()) {
+		    Channel channel = channelService.createChannel(
+			delivery.toString(), new DummyChannelListener(),
+			delivery);
+		    if (!delivery.equals(channel.getDeliveryRequirement())) {
+			fail("Expected: " + delivery + ", got: " +
+			     channel.getDeliveryRequirement());
+		    }
+		}
+		System.err.println("Delivery requirements are equal");
 	    }
-	}
-	System.err.println("Delivery requirements are equal");
+	}, taskOwner);
     }
 
-    public void testChannelGetDeliveryClosedChannel() {
-	for (Delivery delivery : Delivery.values()) {
-	    Channel channel = channelService.createChannel(
-		delivery.toString(), new DummyChannelListener(), delivery);
-	    channel.close();
-	    if (!delivery.equals(channel.getDeliveryRequirement())) {
-		fail("Expected: " + delivery + ", got: " +
-		     channel.getDeliveryRequirement());
+    public void testChannelGetDeliveryClosedChannel() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		for (Delivery delivery : Delivery.values()) {
+		    Channel channel = channelService.createChannel(
+			delivery.toString(), new DummyChannelListener(),
+			delivery);
+		    channel.close();
+		    if (!delivery.equals(channel.getDeliveryRequirement())) {
+			fail("Expected: " + delivery + ", got: " +
+			     channel.getDeliveryRequirement());
+		    }
+		}
+		System.err.println("Got delivery requirement on close channel");
 	    }
-	}
-	System.err.println("Got delivery requirement on close channel");
+	}, taskOwner);
     }
 
     /* -- Test Channel.join -- */
 
     public void testChannelJoinNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.join(new DummyClientSession("dummy"), null);
 	    fail("Expected TransactionNotActiveException");
@@ -590,106 +576,142 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelJoinClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    channel.join(new DummyClientSession("dummy"), null);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelJoinClosedChannel() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		channel.close();
+		try {
+		    channel.join(new DummyClientSession("dummy"), null);
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelJoinNullClientSession() {
-	Channel channel = createChannel();
-	try {
-	    channel.join(null, new DummyChannelListener());
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
+    public void testChannelJoinNullClientSession() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		try {
+		    channel.join(null, new DummyChannelListener());
+		    fail("Expected NullPointerException");
+		} catch (NullPointerException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelJoinNonSerializableListener() {
-	Channel channel = createChannel();
-	try {
-	    channel.join(new DummyClientSession("dummy"),
-			 new NonSerializableChannelListener());
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
+    public void testChannelJoinNonSerializableListener() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		try {
+		    channel.join(new DummyClientSession("dummy"),
+				 new NonSerializableChannelListener());
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testChannelJoin() throws Exception {
-	commitTransaction();
 	String channelName = "joinTest";
-	String[] users = new String[] { "foo", "bar", "baz" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, null);
-	}
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(channelName);
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
+	List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
-	    }
+	try {
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
+
+	} finally {
+	    group.disconnect(false);
 	}
-	
-	System.err.println("All sessions joined");
-	channel.close();
     }
 
-    public void testChannelJoinWithListenerReferringToChannel() throws Exception {
-	commitTransaction();
-	String channelName = "joinTest";
-	String[] users = new String[] { "foo", "bar", "baz" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, new DummyChannelListener(channel));
-	}
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
+    public void testChannelJoinWithListenerReferringToChannel()
+	throws Exception
+    {
+	final String channelName = "joinTest";
+	final List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
+	try {
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    for (String user : users) {
+			ClientSession session =
+			    dataService.getBinding(user, ClientSession.class);
+			channel.join(session, new DummyChannelListener(channel));
+		    }
+		}
+	    }, taskOwner);
+
+	    checkUsersJoined(channelName, users);
+		    
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    private void joinUsers(
+	final String channelName, final List<String> users)
+	throws Exception
+    {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		for (String user : users) {
+		    ClientSession session =
+			dataService.getBinding(user, ClientSession.class);
+		    channel.join(session, null);
+		}
 	    }
-	}
-	
-	System.err.println("All sessions joined");
-	channel.close();
+	}, taskOwner);
+    }
+    
+    private void checkUsersJoined(
+	final String channelName, final List<String> users)
+	throws Exception
+    {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		Set<ClientSession> sessions = getSessions(channel);
+		if (sessions.size() != users.size()) {
+		    fail("Expected " + users.size() + " sessions, got " +
+			 sessions.size());
+		}
+		for (ClientSession session : sessions) {
+		    if (!users.contains(session.getName())) {
+			fail("Expected session: " + session);
+		    }
+		}
+		System.err.println("All sessions joined");
+	    }
+	}, taskOwner);
     }
 
     /* -- Test Channel.leave -- */
 
     public void testChannelLeaveNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.leave(new DummyClientSession("dummy"));
 	    fail("Expected TransactionNotActiveException");
@@ -698,121 +720,154 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    public void testChannelLeaveMismatchedTxn() throws Exception {
+	final String channelName = "test";
+	final Channel channel = createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    channel.leave(new DummyClientSession("dummy"));
+		    fail("Expected TransactionNotActiveException");
+		} catch (TransactionNotActiveException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
+    }
+
     public void testChannelLeaveClosedChannel() throws Exception {
-	commitTransaction();
-	String channelName = "testChannel";
-	String user = "daffy";
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, user);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	ClientSession session =
-	    dataService.getBinding(user, ClientSession.class);
-	channel.join(session, null);
-	channel.close();
+	final String channelName = "leaveClosedChannelTest";
+	final String user = "daffy";
+	final List<String> users = Arrays.asList(new String[] { user });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
+
 	try {
-	    channel.leave(session);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    ClientSession session =
+			dataService.getBinding(user, ClientSession.class);
+		    channel.join(session, null);
+		    channel.close();
+		    try {
+			channel.leave(session);
+			fail("Expected IllegalStateException");
+		    } catch (IllegalStateException e) {
+			System.err.println(e);
+		    }
+		}
+	    }, taskOwner);
+	
+	} finally {
+	    group.disconnect(false);
 	}
     }
 
-    public void testChannelLeaveNullClientSession() {
-	Channel channel =  createChannel();
-	try {
-	    channel.leave(null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
+    public void testChannelLeaveNullClientSession() throws Exception {
+	
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		try {
+		    channel.leave(null);
+		    fail("Expected NullPointerException");
+		} catch (NullPointerException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testChannelLeaveSessionNotJoined() throws Exception {
-	commitTransaction();
-	String channelName = "leaveTest";
-	String[] users = new String[] { "foo", "bar" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
+	final String channelName = "leaveTest";
+	List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	ClientSession foo =
-	    dataService.getBinding("foo", ClientSession.class);
-	channel.join(foo, new DummyChannelListener(channel));
-
 	try {
-	    ClientSession bar =
-		dataService.getBinding("bar", ClientSession.class);
-	    channel.leave(bar);
-	    System.err.println("leave of non-member session returned");
-	} catch (Exception e) {
-	    System.err.println(e);
-	    fail("test failed with exception: " + e);
-	}
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
 	
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != 1) {
-	    fail("Expected 1 session, got " +
-		sessions.size());
-	}
+		    ClientSession foo =
+			dataService.getBinding("foo", ClientSession.class);
+		    channel.join(foo, new DummyChannelListener(channel));
 
-	if (! sessions.contains(foo)) {
-	    fail("Expected session: " + foo);
+		    try {
+			ClientSession bar =
+			    dataService.getBinding("bar", ClientSession.class);
+			channel.leave(bar);
+			System.err.println("leave of non-member session returned");
+			
+		    } catch (Exception e) {
+			System.err.println(e);
+			fail("test failed with exception: " + e);
+		    }
+		    
+		    Set<ClientSession> sessions = getSessions(channel);
+		    if (sessions.size() != 1) {
+			fail("Expected 1 session, got " +
+			     sessions.size());
+		    }
+
+		    if (! sessions.contains(foo)) {
+			fail("Expected session: " + foo);
+		    }
+		    channel.close();
+		}
+ 	    }, taskOwner);
+	    
+	} finally {
+	    group.disconnect(false);
 	}
-	channel.close();
     }
     
     public void testChannelLeave() throws Exception {
-	commitTransaction();
-	String channelName = "leaveTest";
-	String[] users = new String[] { "foo", "bar", "baz" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, null);
-	}
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(channelName);
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
+	final String channelName = "leaveTest";
+	List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
-	    }
+	try {
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
+
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    for (ClientSession session : getSessions(channel)) {
+			channel.leave(session);
+			if (getSessions(channel).contains(session)) {
+			    fail("Failed to remove session: " + session);
+			}
+		    }
+
+		    int numJoinedSessions = getSessions(channel).size();
+		    if (numJoinedSessions != 0) {
+			fail("Expected no sessions, got " + numJoinedSessions);
+		    }
+		    System.err.println("All sessions left");
+		    
+		    channel.close();
+		}
+	    }, taskOwner);
+			
+
+	} finally {
+	    group.disconnect(false);
 	}
 
-	for (ClientSession session : sessions) {
-	    channel.leave(session);
-	    if (getSessions(channel).contains(session)) {
-		fail("Failed to remove session: " + session);
-	    }
-	}
-	
-	if (getSessions(channel).size() != 0) {
-	    fail("Expected no sessions, got " + getSessions(channel).size());
-	}
-	System.err.println("All sessions left");
-
-	channel.close();
     }
 
     /* -- Test Channel.leaveAll -- */
 
     public void testChannelLeaveAllNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.leaveAll();
 	    fail("Expected TransactionNotActiveException");
@@ -821,67 +876,69 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelLeaveAllClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    channel.leaveAll();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelLeaveAllClosedChannel() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		channel.close();
+		try {
+		    channel.leaveAll();
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelLeaveAllNoSessionsJoined() {
-	Channel channel = createChannel();
-	channel.leaveAll();
-	System.err.println("LeaveAll with no sessions joined is successful");
+    public void testChannelLeaveAllNoSessionsJoined() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel =
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE);
+		channel.leaveAll();
+		System.err.println(
+		    "leaveAll succeeded with no sessions joined");
+	    }
+	}, taskOwner);
     }
     
     public void testChannelLeaveAll() throws Exception {
-	commitTransaction();
-	String channelName = "leaveAllTest";
-	String[] users = new String[] { "foo", "bar", "baz" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, null);
-	}
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(channelName);
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
+	final String channelName = "leaveAllTest";
+	List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
-	    }
-	}
+	try {
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
 
-	channel.leaveAll();
-	
-	if (getSessions(channel).size() != 0) {
-	    fail("Expected no sessions, got " + getSessions(channel).size());
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    channel.leaveAll();
+		    int numJoinedSessions = getSessions(channel).size();
+		    if (numJoinedSessions != 0) {
+			fail("Expected no sessions, got " + numJoinedSessions);
+		    }
+		    System.err.println("All sessions left");
+		    channel.close();
+		}
+	    }, taskOwner);
+	    
+	} finally {
+	    group.disconnect(false);
 	}
-	System.err.println("All sessions left");
-
-	channel.close();
     }
 
     /* -- Test Channel.hasSessions -- */
 
     public void testChannelHasSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.hasSessions();
 	    fail("Expected TransactionNotActiveException");
@@ -890,75 +947,83 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelHasSessionsClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    channel.hasSessions();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelHasSessionsClosedChannel() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    channel.hasSessions();
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    private void printServiceBindings() {
-	Iterator<String> iter =
-	    BoundNamesUtil.getServiceBoundNamesIterator(
-		dataService, "");
-	while (iter.hasNext()) {
-	    System.err.println(iter.next());
-	}
+    private void printServiceBindings() throws Exception {
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		System.err.println("Service bindings----------");
+		Iterator<String> iter =
+		    BoundNamesUtil.getServiceBoundNamesIterator(
+			dataService, "com.sun.sgs.impl.service.channel.");
+		while (iter.hasNext()) {
+		    System.err.println(iter.next());
+		}
+		System.err.println("--------------------------");
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelHasSessionsNoSessionsJoined() {
-	Channel channel = createChannel();
-	if (channel.hasSessions()) {
-	    fail("Expected hasSessions to return false");
-	}
-	System.err.println("hasSessions returned false");
+    public void testChannelHasSessionsNoSessionsJoined() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		if (channel.hasSessions()) {
+		    fail("Expected hasSessions to return false");
+		}
+		System.err.println("hasSessions returned false");
+	    }
+	}, taskOwner);
     }
     
     public void testChannelHasSessionsSessionsJoined() throws Exception {
-	commitTransaction();
-	String channelName = "hasSessionsTest";
-	String[] users = new String[] { "foo", "bar", "baz" };
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, null);
-	}
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(channelName);
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
+	final String channelName = "leaveTest";
+	List<String> users =
+	    Arrays.asList(new String[] { "foo", "bar", "baz" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
 	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
-	    }
-	}
+	try {
+	    joinUsers(channelName, users);
+	    checkUsersJoined(channelName, users);
 
-	if (!channel.hasSessions()) {
-	    fail("Expected hasSessions to return true");
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    if (!channel.hasSessions()) {
+			fail("Expected hasSessions to return true");
+		    }
+		    System.err.println("hasSessions returned true");
+		    channel.close();
+		}
+	    }, taskOwner);
+
+	} finally {
+	    group.disconnect(false);
 	}
-	System.err.println("hasSessions returned true");
-	channel.close();
     }
 
     /* -- Test Channel.getSessions -- */
 
     public void testChannelGetSessionsNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    getSessions(channel);
 	    fail("Expected TransactionNotActiveException");
@@ -967,61 +1032,40 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelGetSessionsClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    getSessions(channel);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelGetSessionsClosedChannel() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    getSessions(channel);
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
-    public void testChannelGetSessionsNoSessionsJoined() {
-	Channel channel = createChannel();
-	if (!getSessions(channel).isEmpty()) {
-	    fail("Expected no sessions");
-	}
-	System.err.println("No sessions joined");
+    public void testChannelGetSessionsNoSessionsJoined() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+
+		if (!getSessions(channel).isEmpty()) {
+		    fail("Expected no sessions");
+		}
+		System.err.println("No sessions joined");
+	    }
+	}, taskOwner);
     }
     
     public void testChannelGetSessionsSessionsJoined() throws Exception {
-	commitTransaction();
-	String channelName = "getSessionsTest";
-	String[] users = new String[] { "foo", "bar", "baz", "zig"};
-	List<String> usersList = Arrays.asList(users);
-	ClientGroup group =
-	    createChannelAndClientGroup(channelName, users);
-	createTransaction();
-	Channel channel = channelService.getChannel(channelName);
-	for (String user : users) {
-	    ClientSession session =
-		dataService.getBinding(user, ClientSession.class);
-	    channel.join(session, null);
-	}
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(channelName);
-	Set<ClientSession> sessions = getSessions(channel);
-	if (sessions.size() != users.length) {
-	    fail("Expected " + users.length + " sessions, got " +
-		sessions.size());
-	}
-	
-	for (ClientSession session : sessions) {
-	    if (!usersList.contains(session.getName())) {
-		fail("Expected session: " + session);
-	    }
-	}
-
-	channel.leaveAll();
-	
-	if (getSessions(channel).size() != 0) {
-	    fail("Expected no sessions, got " + getSessions(channel).size());
-	}
-
-	channel.close();
+	testChannelJoin();
     }
 
     /* -- Test Channel.send (to all) -- */
@@ -1030,7 +1074,6 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.send(testMessage);
 	    fail("Expected TransactionNotActiveException");
@@ -1039,35 +1082,45 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelSendAllClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    channel.send(testMessage);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelSendAllClosedChannel() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    channel.send(testMessage);
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testChannelSendAll() throws Exception {
-	commitTransaction();
-	ClientGroup group =
-	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry", "curly");
-
+	final String channelName = "test";
+	List<String> users =
+	    Arrays.asList(new String[] { "moe", "larry", "curly" });
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup(users);
+	
 	try {
 	    boolean failed = false;
-	    group.join(CHANNEL_NAME);
+	    group.join(channelName);
 	    String messageString = "from server";
-	    MessageBuffer buf =
+	    final MessageBuffer buf =
 		new MessageBuffer(MessageBuffer.getSize(messageString) + 4);
 	    buf.putString(messageString).
 		putInt(0);
 
-	    createTransaction();
-	    Channel channel = channelService.getChannel(CHANNEL_NAME);
-	    channel.send(buf.getBuffer());
-	    commitTransaction();
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    channel.send(buf.getBuffer());
+		}
+	    }, taskOwner);
 
 	    for (DummyClient client : group.getClients()) {
 		MessageInfo info = client.nextChannelMessage();
@@ -1076,9 +1129,9 @@ public class TestChannelServiceImpl extends TestCase {
 		    System.err.println(
  			"member:" + client.name + " did not get message");
 		} else {
-		    buf = new MessageBuffer(info.message);
-		    String message = buf.getString();
-		    if (!message.equals(messageString)) {
+		    MessageBuffer infoBuf = new MessageBuffer(info.message);
+		    String message = infoBuf.getString();
+		    if (! message.equals(messageString)) {
 			fail("Got message: " + message + ", Expected: " +
 			     messageString);
 		    }
@@ -1094,6 +1147,7 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
@@ -1104,7 +1158,6 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendToOneNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.send(new DummyClientSession("dummy"), testMessage);
 	    fail("Expected TransactionNotActiveException");
@@ -1113,50 +1166,59 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelSendToOneClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	try {
-	    channel.send(new DummyClientSession("dummy"), testMessage);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelSendToOneClosedChannel() throws Exception {
+	final String channelName = "test";
+	createChannel("test");
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    channel.send(new DummyClientSession("dummy"), testMessage);
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
     
     /* -- Test Channel.send (multiple recipients) -- */
 
     public void testChannelSendToMultiplelNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
-	Set<ClientSession> sessions = new HashSet<ClientSession>();
-	sessions.add(new DummyClientSession("dummy"));
 	try {
-	    channel.send(sessions, testMessage);
+	    channel.send(new HashSet<ClientSession>(), testMessage);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testChannelSendToMultipleClosedChannel() {
-	Channel channel = createChannel();
-	channel.close();
-	Set<ClientSession> sessions = new HashSet<ClientSession>();
-	sessions.add(new DummyClientSession("dummy"));
-	try {
-	    channel.send(sessions, testMessage);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+    public void testChannelSendToMultipleClosedChannel() throws Exception {
+	final String channelName = "test";
+	createChannel(channelName);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		Set<ClientSession> sessions = new HashSet<ClientSession>();
+		sessions.add(new DummyClientSession("dummy"));
+		try {
+		    channel.send(sessions, testMessage);
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
+
 
     /* -- Test Channel.close -- */
 
     public void testChannelCloseNoTxn() throws Exception {
 	Channel channel = createChannel();
-	commitTransaction();
 	try {
 	    channel.close();
 	    fail("Expected TransactionNotActiveException");
@@ -1164,85 +1226,78 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-
+    
     public void testChannelClose() throws Exception {
-	String name = "closeTest";
-	Channel channel = createChannel(name);
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(name);
-	channel.close();
-	try {
-	    channelService.getChannel(name);
-	    fail("Expected NameNotBoundException");
-	} catch (NameNotBoundException e) {
-	    System.err.println(e);
-	}
-	commitTransaction();
+	final String channelName = "closeTest";
+	createChannel(channelName);
+	
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    channelService.getChannel(channelName);
+		    fail("Expected NameNotBoundException");
+		} catch (NameNotBoundException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
     }
 
     public void testChannelCloseTwice() throws Exception {
-	String name = "closeTest";
-	Channel channel = createChannel(name);
-	commitTransaction();
-	createTransaction();
-	channel = channelService.getChannel(name);
-	channel.close();
-	try {
-	    channelService.getChannel(name);
-	    fail("Expected NameNotBoundException");
-	} catch (NameNotBoundException e) {
-	    System.err.println(e);
-	}
-	channel.close();
-	System.err.println("Channel closed twice");
-	commitTransaction();
+	final String channelName = "closeTest";
+	createChannel(channelName);
+	
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(channelName);
+		channel.close();
+		try {
+		    channelService.getChannel(channelName);
+		    fail("Expected NameNotBoundException");
+		} catch (NameNotBoundException e) {
+		    System.err.println(e);
+		}
+		channel.close();
+		System.err.println("Channel closed twice");
+	    }
+	}, taskOwner);
     }
-
+    
     public void testChannelJoinReceivedByClient() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name,
-					"moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+
 	try {
-	    group.join(name);
+	    group.join(channelName);
 	    group.disconnect(true);
 	    
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
 	}
     }
-
-    private ClientGroup createChannelAndClientGroup(
-	String name, String... users)
-	throws Exception
-    {
-	createTransaction();
-	createChannel(name);
-	commitTransaction();
-	registerAppListener();
-	return new ClientGroup(users);
-    }
-
+    
     public void testChannelLeaveReceivedByClient() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name,
-					"moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+
 	try {
-	    group.join(name);
-	    group.leave(name);
+	    group.join(channelName);
+	    group.leave(channelName);
 	    group.disconnect(true);
 	    
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
@@ -1250,45 +1305,45 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name,
-					"moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+
 	try {
-	    group.join(name);
-	    group.checkMembership(name, true);
+	    group.join(channelName);
+	    group.checkMembership(channelName, true);
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
-	    group.checkMembership(name, false);
+	    group.checkMembership(channelName, false);
 	    
-	} catch (RuntimeException e) {
+	} catch (Throwable e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
 	}
     }
-    
+
     public void testChannelSetsRemovedOnLogout() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name,
-					"moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+	
 	try {
-	    group.join(name);
-	    group.checkMembership(name, true);
+	    group.join(channelName);
+	    group.checkMembership(channelName, true);
 	    group.checkChannelSets(true);
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
-	    group.checkMembership(name, false);
+	    group.checkMembership(channelName, false);
 	    group.checkChannelSets(false);
 	    
-	} catch (RuntimeException e) {
+	} catch (Throwable e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
@@ -1296,35 +1351,38 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionsRemovedOnRecovery() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name,
-					"moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+	
 	try {
-	    group.join(name);
-	    group.checkMembership(name, true);
+	    group.join(channelName);
+	    group.checkMembership(channelName, true);
 	    group.checkChannelSets(true);
+	    printServiceBindings();
 
-            // Simulate "crash"
-            tearDown(false);
-            System.err.println("simulated crash");
-            setUp(false);
+	    // simulate crash
+	    System.err.println("simulate watchdog server crash...");
+	    tearDown(false);
+	    setUp(false);
+	    addNodes("recoveryNode");
 
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
-	    group.checkMembership(name, false);
+	    group.checkMembership(channelName, false);
 	    group.checkChannelSets(false);
+	    printServiceBindings();
 
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
+	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
 	}
 	
     }
-
+    /*
     public void testChannelSendRequestWithSingleRecipient() throws Exception {
 	commitTransaction();
 	String name = CHANNEL_NAME;
@@ -1388,7 +1446,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
     }
-    
+    /*
     public void testChannelSendRequestToAllChannelMembers() throws Exception {
 	commitTransaction();
 	ClientGroup group =
@@ -1501,14 +1559,19 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSetsRemovedOnRecovery() throws Exception {
 	fail("this test needs to be implemented");
     }
+    */
 
     private class ClientGroup {
 
-	final String[] users;
+	final List<String> users;
 	final Map<String, DummyClient> clients =
 	    new HashMap<String, DummyClient>();
 
 	ClientGroup(String... users) {
+	    this(Arrays.asList(users));
+	}
+	
+	ClientGroup(List<String> users) {
 	    this.users = users;
 	    for (String user : users) {
 		DummyClient client = new DummyClient();
@@ -1530,50 +1593,58 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
-	void checkMembership(String name, boolean isMember) throws Exception {
-	    createTransaction();
-	    Channel channel = channelService.getChannel(name);
-	    Set<ClientSession> sessions = getSessions(channel);
-	    for (DummyClient client : clients.values()) {
+	void checkMembership(final String name, final boolean isMember)
+	    throws Exception
+	{
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(name);
+		    Set<ClientSession> sessions = getSessions(channel);
+		    for (DummyClient client : clients.values()) {
 
-		ClientSession session =
-		    sessionService.getClientSession(client.getSessionId());
+			ClientSession session =
+			    sessionService.getClientSession(
+				client.getSessionId());
 
-		if (session != null && sessions.contains(session)) {
-		    if (!isMember) {
-			fail("ClientGroup.checkMembership session: " +
-			     session.getName() + " is a member of " + name);
+			if (session != null && sessions.contains(session)) {
+			    if (!isMember) {
+				fail("ClientGroup.checkMembership session: " +
+				     session.getName() + " is a member of " +
+				     name);
+			    }
+			} else if (isMember) {
+			    String sessionName =
+				(session == null) ? "null" : session.getName();
+			    fail("ClientGroup.checkMembership session: " +
+				 sessionName + " is not a member of " + name);
+			}
 		    }
-		} else if (isMember) {
-                    String sessionName =
-                        (session == null) ? "null" : session.getName();
-                    fail("ClientGroup.checkMembership session: " +
-                        sessionName + " is not a member of " + name);
 		}
-	    }
-
-	    commitTransaction();
+	    }, taskOwner);
 	}
 
-	void checkChannelSets(boolean exists) throws Exception {
-	    createTransaction();
-	    for (DummyClient client : clients.values()) {
-		String sessionKey = getChannelSetKey(localNodeId, client.getSessionId());
-		try {
-		    dataService.getServiceBinding(
-			sessionKey, ManagedObject.class);
-		    if (!exists) {
-			fail("ClientGroup.checkChannelSets set exists: " +
-			     client.name);
-		    }
-		} catch (NameNotBoundException e) {
-		    if (exists) {
-			fail("ClientGroup.checkChannelSets no channel set: " +
-			     client.name);
+	void checkChannelSets(final boolean exists) throws Exception {
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    for (DummyClient client : clients.values()) {
+			String sessionKey =
+			    getChannelSetKey(localNodeId, client.getSessionId());
+			try {
+			    dataService.getServiceBinding(
+ 				sessionKey, ManagedObject.class);
+			    if (!exists) {
+				fail("checkChannelSets: set exists: " +
+				     client.name);
+			    }
+			} catch (NameNotBoundException e) {
+			    if (exists) {
+				fail("checkChannelSets no channel set: " +
+				     client.name);
+			    }
+			}
 		    }
 		}
-	    }
-	    commitTransaction();
+	    }, taskOwner);
 	}
 
 	DummyClient getClient(String name) {
@@ -1600,78 +1671,38 @@ public class TestChannelServiceImpl extends TestCase {
 	return CHANNEL_SET_PREFIX + nodeId + "." + HexDumper.toHexString(sessionId);
     }
 
-    /** Deletes the specified directory, if it exists. */
-    static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
     /**
      * Returns a newly created channel
      */
-    private Channel createChannel() {
+    private Channel createChannel() throws Exception {
 	return createChannel("test");
     }
 
-    private Channel createChannel(String name) {
-	return channelService.createChannel(
-	    name,
-	    new DummyChannelListener(),
-	    Delivery.RELIABLE);
+    private Channel createChannel(String name) throws Exception {
+	CreateChannelTask createChannelTask =
+	    new CreateChannelTask(name, new DummyChannelListener());
+	taskScheduler.runTransactionalTask(createChannelTask, taskOwner);
+	return createChannelTask.getChannel();
     }
 
-    /**
-     * Creates a new transaction, and sets transaction proxy's
-     * current transaction.
-     */
-    private DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
-    
-    /**
-     * Creates a new transaction with the specified timeout, and sets
-     * transaction proxy's current transaction.
-     */
-    private DummyTransaction createTransaction(long timeout) {
-	txn = new DummyTransaction(timeout);
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
-
-    private void commitTransaction() throws Exception {
-	txn.commit();
-	txnProxy.setCurrentTransaction(null);
-	txn = null;
-    }
-    
-    /**
-     * Creates a new data service.  If the database directory does
-     * not exist, one is created.
-     */
-    private DataServiceImpl createDataService(
-	DummyComponentRegistry registry)
-	throws Exception
-    {
-	File dir = new File(DB_DIRECTORY);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
+    private class CreateChannelTask extends AbstractKernelRunnable {
+	private final String name;
+	private final ChannelListener listener;
+	private Channel channel;
+	
+	CreateChannelTask(String name, ChannelListener listener) {
+	    this.name = name;
+	    this.listener = listener;
 	}
-	return new DataServiceImpl(serviceProps, registry, txnProxy);
+	
+	public void run() throws Exception {
+	    channel =
+		channelService.createChannel(name, listener, Delivery.RELIABLE);
+	}
+
+	Channel getChannel() {
+	    return channel;
+	}
     }
 
     private Set<ClientSession> getSessions(Channel channel) {
@@ -1822,19 +1853,6 @@ public class TestChannelServiceImpl extends TestCase {
 		id[i] = in.readByte();
 	    }
 	}
-    }
-
-    private void registerAppListener() throws Exception {
-	createTransaction();
-	DummyAppListener appListener = new DummyAppListener();
-	dataService.setServiceBinding(
-	    StandardProperties.APP_LISTENER, appListener);
-	commitTransaction();
-    }
-    
-    private DummyAppListener getAppListener() {
-	return (DummyAppListener) dataService.getServiceBinding(
-	    "com.sun.sgs.app.AppListener", AppListener.class);
     }
 
     /**
@@ -2411,7 +2429,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private static class DummyAppListener implements AppListener, Serializable {
+    public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
 
