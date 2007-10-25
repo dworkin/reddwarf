@@ -66,7 +66,7 @@
   <property name="test.showoutput" value="true"/>
   <property name="test.include" value="**/session/Test*.java"/>
 <!--
-  <property name="test.include" value="**/session/Test*.java"/>
+  <property name="test.include" value="**/channel/Test*.java"/>
   <property name="test.include" value="**/Test*.java"/>
 -->
   <!-- Set test.use.je to true to test with BDB Java Edition -->
