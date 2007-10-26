@@ -37,7 +37,7 @@ public class ScheduleMapPutsTask implements Task, Serializable {
 
     /** Schedules the tasks. */
     public void run() {
-	System.out.println("starting tests");
+	System.out.println("starting " + numTasks + " tasks");
 	TaskManager tm = AppContext.getTaskManager();
 	DataManager dm = AppContext.getDataManager();
 	ScalableHashMap<Integer, Integer> map =
