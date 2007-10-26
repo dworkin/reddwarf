@@ -959,6 +959,11 @@ public class DataStoreImpl
 	     * likely that the class will be needed, even if that transaction
 	     * aborts, so it makes sense to commit this operation separately to
 	     * improve concurrency.  -tjb@sun.com (05/23/2007)
+	     *
+	     * Also, if another thread is concurrently allocating an ID for the
+	     * same or different class info, then either the class ID selected
+	     * or the class hash value may already have values assigned.  If
+	     * so, just retry.  -tjb@sun.com (10/26/2007)
 	     */
 	    while (true) {
 		DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
@@ -975,7 +980,6 @@ public class DataStoreImpl
 			    boolean success =
 				cursor.putNoOverwrite(idKey, classInfo);
 			    if (!success) {
-				System.err.println("getClassId retry class ID");
 				logger.log(Level.FINER,
 					   "getClassId txn:{0} retry class ID",
 					   txn);
@@ -987,7 +991,6 @@ public class DataStoreImpl
 			boolean success = classesDb.putNoOverwrite(
 			    dbTxn, hashKey, DataEncoding.encodeInt(result));
 			if (!success) {
-			    System.err.println("getClassId retry class hash");
 			    logger.log(Level.FINER,
 				       "getClassId txn:{0} retry class hash",
 				       txn);
@@ -1007,7 +1010,6 @@ public class DataStoreImpl
 		logger.log(Level.FINER, "getClassId txn:{0} returns {1}",
 			   txn, result);
 	    }
-	    System.err.println("getClassId => " + result);
 	    return result;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINER, e, operation);
