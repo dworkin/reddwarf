@@ -28,6 +28,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
@@ -962,16 +963,52 @@ public class ChannelServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
-	public void recover(final Node node, RecoveryCompleteFuture future) {
+	public void recover(Node node, RecoveryCompleteFuture future) {
+	    final long nodeId = node.getId();
 	    try {
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.log(Level.INFO, "Node:{0} recovering for node:{0}",
+			       localNodeId, nodeId);
+		}
+		/*
+		 * For each session on the failed node, remove the
+		 * given session from all channels it is a member of.
+		 */
+		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
+		taskScheduler.runTransactionalTask(task, taskOwner);
+		
+		for (final byte[] sessionId : task.getSessionIds()) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Removing session:{0} from all channels",
+			    HexDumper.toHexString(sessionId));
+		    }
+		    
+		    taskScheduler.runTransactionalTask(
+			new AbstractKernelRunnable() {
+			    public void run() {
+				removeSessionFromAllChannels(nodeId, sessionId);
+			    }
+		    }, taskOwner);
+		}
+		/*
+		 * Remove binding to channel server proxy for failed
+		 * node, and remove proxy's wrapper.
+		 */
 		taskScheduler.runTransactionalTask(
-		    new RecoveryTask(node.getId()), taskOwner);
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    removeChannelServerProxy(nodeId);
+			}
+		    }, taskOwner);
+		
 		future.done();
+
 	    } catch (Exception e) {
 		logger.logThrow(
  		    Level.WARNING, e,
-		    "removing sessions from channels for node:{0} throws",
-		    node.getId());
+		    "Recovering for failed node:{0} throws", nodeId);
 		// TBD: what should it do if it can't recover?
 	    }
 	}
@@ -983,61 +1020,80 @@ public class ChannelServiceImpl
      * to the node from all channels that those sessions were a member
      * of.
      */
-    private class RecoveryTask extends AbstractKernelRunnable {
+    private class GetNodeSessionIdsTask extends AbstractKernelRunnable {
 
 	private final long nodeId;
+	private Set<byte[]> sessionIds = new HashSet<byte[]>();
 	
-	RecoveryTask(long nodeId) {
+	GetNodeSessionIdsTask(long nodeId) {
 	    this.nodeId = nodeId;
 	}
 
 	/** {@inheritDoc} */
 	public void run() {
-	    /*
-	    Iterator<ClientSession> iter =
+	    Iterator<byte[]> iter =
 		ChannelState.getSessionIdsAnyChannel(dataService, nodeId);
 	    while (iter.hasNext()) {
-		removeSessionFromAllChannels(nodeId, iter.next());
+		sessionIds.add(iter.next());
 	    }
-	    // FIXME: need to remove channel server for failed node.
-	    */
+	}
+
+	Set<byte[]> getSessionIds() {
+	    return sessionIds;
 	}
     }
 
-    private void removeSessionFromAllChannels(ClientSession session) {
-	long nodeId = ChannelState.getNodeId(session);
-	byte[] idBytes = session.getSessionId().getBytes();
-	removeSessionFromAllChannels(session, nodeId, idBytes);
-    }
-				     
     /**
      * Removes the specified client {@code session} from all channels
      * that it is currently a member of.
      */
+    private void removeSessionFromAllChannels(ClientSession session) {
+	long nodeId = ChannelState.getNodeId(session);
+	byte[] sessionIdBytes = session.getSessionId().getBytes();
+	removeSessionFromAllChannels(nodeId, sessionIdBytes);
+    }
+				     
+    /**
+     * Removes the specified client {@code session} from all channels
+     * that it is currently a member of.  This method is invoked when
+     * a session is disconnected from this node, gracefully or
+     * otherwise, or if this node is recovering for a failed node
+     * whose sessions all became disconnected.
+     *
+     * This method should be call within a transaction.
+     */
     private void removeSessionFromAllChannels(
-	ClientSession session, long nodeId, byte[] idBytes)
+	long nodeId, byte[] sessionIdBytes)
     {
-	/*
-	if (session == null) {
-	    session = sessionService.getClientSession(idBytes);
-	}
 	Set<String> channelNames =
-	    ChannelState.getChannelsForSession(dataService, nodeId, idBytes);
+	     ChannelState.getChannelsForSession(
+		dataService, nodeId, sessionIdBytes);
 	for (String name : channelNames) {
 	    try {
 		ChannelImpl channel = (ChannelImpl) getChannel(name);
-		if (session != null) {
-		    channel.leave(session);
-		} else {
-		    channel.state.remove(...);
-		}
-		    
+		channel.state.removeSession(
+		    dataService, nodeId, sessionIdBytes);
 	    } catch (NameNotBoundException e) {
 		logger.logThrow(Level.FINE, e, "channel removed:{0}", name);
 	    }
 	}
-	*/
     }
+
+    void removeChannelServerProxy(long nodeId) {
+	String channelServerKey = getChannelServerKey(nodeId);
+	try {
+	    ChannelServerWrapper proxyWrapper =
+		dataService.getServiceBinding(
+		    channelServerKey, ChannelServerWrapper.class);
+	    dataService.removeObject(proxyWrapper);
+	} catch (NameNotBoundException e) {
+	    // already removed
+	    return;
+	} catch (ObjectNotFoundException e) {
+	}
+	dataService.removeServiceBinding(channelServerKey);
+    }
+    
     /**
      * Returns the key for accessing the {@code ChannelServer}
      * instance (which is wrapped in a {@code ChannelServerWrapper})

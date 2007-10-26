@@ -468,7 +468,8 @@ final class ChannelState implements ManagedObject, Serializable {
 		    dataService, getSessionPrefix()))
 	{
 	    ClientSessionInfo sessionInfo =
-		dataService.getServiceBinding(sessionKey, ClientSessionInfo.class);
+		dataService.getServiceBinding(
+		    sessionKey, ClientSessionInfo.class);
 	    removeSession(dataService, sessionInfo.nodeId,
 			  sessionInfo.sessionIdBytes);
 	}
@@ -652,8 +653,8 @@ final class ChannelState implements ManagedObject, Serializable {
 	implements ManagedObject, Serializable
     {
 	private final static long serialVersionUID = 1L;
-	private final long nodeId;
-	private final byte[] sessionIdBytes;
+	final long nodeId;
+	final byte[] sessionIdBytes;
 	private final ManagedReference sessionRef;
 	    
 
@@ -796,28 +797,46 @@ final class ChannelState implements ManagedObject, Serializable {
 	}
     }
 
-    private static class ClientSessionOnNodeIterator
-	extends ClientSessionIterator
+    private static class ClientSessionIdsOnNodeIterator
+	implements Iterator<byte[]>
     {
+
+	/** The data service. */
+	protected final DataService dataService;
+
+	/** The underlying iterator for service bound names. */
+	protected final Iterator<String> iterator;
+
+	/** The client session to be returned by {@code next}. */
+	private ClientSession nextSession = null;
 
 	/**
 	 * Constructs an instance of this class with the specified
-	 * {@code dataService} and {@code nodeId}.
+	 * {@code dataService}.
 	 */
-	ClientSessionOnNodeIterator(DataService dataService, long nodeId) {
-	    super(dataService, getChannelSetPrefix(nodeId));
+	ClientSessionIdsOnNodeIterator(DataService dataService, long nodeId) {
+	    this.dataService = dataService;
+	    this.iterator =
+		BoundNamesUtil.getServiceBoundNamesIterator(
+ 		    dataService, getChannelSetPrefix(nodeId));
 	}
 
 	/** {@inheritDoc} */
-	public ClientSession next() {
-	    String key = iterator.next();
-	    ChannelSet set =
-		dataService.getServiceBinding(key, ChannelSet.class);
-	    // FIXME: this won't return all necessary the sessions if
-	    // sessions are removed...
-	    return set.getClientSession();
+	public boolean hasNext() {
+	    return iterator.hasNext();
 	}
 
+	/** {@inheritDoc} */
+	public byte[] next() {
+	    ChannelSet channelSet =
+		dataService.getServiceBinding(iterator.next(), ChannelSet.class);
+	    return channelSet.sessionIdBytes;
+	}
+
+	/** {@inheritDoc} */
+	public void remove() {
+	    throw new UnsupportedOperationException("remove is not supported");
+	}
     }
 
     /**
@@ -848,10 +867,10 @@ final class ChannelState implements ManagedObject, Serializable {
      * Returns and iterator for the clients sessions connected to the
      * specified node that are a member of any channel.
      */
-    static Iterator<ClientSession> getSessionsAnyChannel(
+    static Iterator<byte[]> getSessionIdsAnyChannel(
 	DataService dataService, long nodeId)
     {
-	return new ClientSessionOnNodeIterator(dataService, nodeId);
+	return new ClientSessionIdsOnNodeIterator(dataService, nodeId);
     }
 
 }

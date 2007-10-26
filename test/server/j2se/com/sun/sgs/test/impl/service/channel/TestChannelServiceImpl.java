@@ -135,7 +135,7 @@ public class TestChannelServiceImpl extends TestCase {
     private int port;
 
     /** The node ID for the local node. */
-    private long localNodeId;
+    private long serverNodeId;
 
     /** Constructs a test instance. */
     public TestChannelServiceImpl(String name) {
@@ -168,7 +168,7 @@ public class TestChannelServiceImpl extends TestCase {
 	sessionService = serverNode.getClientSessionService();
 	channelService = serverNode.getChannelService();
 	
-	localNodeId = serverNode.getWatchdogService().getLocalNodeId();
+	serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
     }
 
     /** Sets passed if the test passes. */
@@ -1230,7 +1230,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelClose() throws Exception {
 	final String channelName = "closeTest";
 	createChannel(channelName);
-	
+	printServiceBindings();
 	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = channelService.getChannel(channelName);
@@ -1243,6 +1243,7 @@ public class TestChannelServiceImpl extends TestCase {
 		}
 	    }
 	}, taskOwner);
+	printServiceBindings();
     }
 
     public void testChannelCloseTwice() throws Exception {
@@ -1335,6 +1336,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.join(channelName);
 	    group.checkMembership(channelName, true);
 	    group.checkChannelSets(true);
+	    printServiceBindings();
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(channelName, false);
@@ -1343,9 +1345,9 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (Throwable e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
-	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
+	    printServiceBindings();
 	    group.disconnect(false);
 	}
     }
@@ -1375,9 +1377,9 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
-	    printServiceBindings();
 	    fail("unexpected failure: " + e);
 	} finally {
+	    printServiceBindings();
 	    group.disconnect(false);
 	}
 	
@@ -1566,6 +1568,8 @@ public class TestChannelServiceImpl extends TestCase {
 	final List<String> users;
 	final Map<String, DummyClient> clients =
 	    new HashMap<String, DummyClient>();
+	// FIXME: This is a kludge for now
+	final long nodeId = serverNodeId;
 
 	ClientGroup(String... users) {
 	    this(Arrays.asList(users));
@@ -1628,7 +1632,7 @@ public class TestChannelServiceImpl extends TestCase {
 		public void run() {
 		    for (DummyClient client : clients.values()) {
 			String sessionKey =
-			    getChannelSetKey(localNodeId, client.getSessionId());
+			    getChannelSetKey(nodeId, client.getSessionId());
 			try {
 			    dataService.getServiceBinding(
  				sessionKey, ManagedObject.class);
