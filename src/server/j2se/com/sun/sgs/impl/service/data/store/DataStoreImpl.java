@@ -960,44 +960,54 @@ public class DataStoreImpl
 	     * aborts, so it makes sense to commit this operation separately to
 	     * improve concurrency.  -tjb@sun.com (05/23/2007)
 	     */
-	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-	    try {
-		byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
-		if (hashValue != null) {
-		    result = DataEncoding.decodeInt(hashValue);
-		} else {
-		    DbCursor cursor = classesDb.openCursor(dbTxn);
-		    try {
-			result = cursor.findLast()
-			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
-			byte[] idKey = getKeyFromClassId(result);
-			boolean success =
-			    cursor.putNoOverwrite(idKey, classInfo);
-			if (!success) {
-			    throw new DataStoreException(
-				"Class ID key already present");
+	    while (true) {
+		DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
+		try {
+		    byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
+		    if (hashValue != null) {
+			result = DataEncoding.decodeInt(hashValue);
+		    } else {
+			DbCursor cursor = classesDb.openCursor(dbTxn);
+			try {
+			    result = cursor.findLast()
+				? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
+			    byte[] idKey = getKeyFromClassId(result);
+			    boolean success =
+				cursor.putNoOverwrite(idKey, classInfo);
+			    if (!success) {
+				System.err.println("getClassId retry class ID");
+				logger.log(Level.FINER,
+					   "getClassId txn:{0} retry class ID",
+					   txn);
+				continue;
+			    }
+			} finally {
+			    cursor.close();
 			}
-		    } finally {
-			cursor.close();
+			boolean success = classesDb.putNoOverwrite(
+			    dbTxn, hashKey, DataEncoding.encodeInt(result));
+			if (!success) {
+			    System.err.println("getClassId retry class hash");
+			    logger.log(Level.FINER,
+				       "getClassId txn:{0} retry class hash",
+				       txn);
+			    continue;
+			}
 		    }
-		    boolean success = classesDb.putNoOverwrite(
-			dbTxn, hashKey, DataEncoding.encodeInt(result));
-		    if (!success) {
-			throw new DataStoreException(
-			    "Class hash already present");
+		    done = true;
+		    dbTxn.commit();
+		    break;
+		} finally {
+		    if (!done) {
+			dbTxn.abort();
 		    }
-		}
-		done = true;
-		dbTxn.commit();
-	    } finally {
-		if (!done) {
-		    dbTxn.abort();
 		}
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "getClassId txn:{0} returns {1}",
 			   txn, result);
 	    }
+	    System.err.println("getClassId => " + result);
 	    return result;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINER, e, operation);

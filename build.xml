@@ -1133,9 +1133,8 @@
 		  file="analysis/System.properties"/>
      <sysproperty key="java.library.path" 
 		  file="${bdb.lib.dir}"/>
-<!--
      <sysproperty key="java.util.logging.config.file"
-		  file="logging.properties"/> -->
+		  file="${test.logging}"/>
      <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs"
 		  value="true"/>
 

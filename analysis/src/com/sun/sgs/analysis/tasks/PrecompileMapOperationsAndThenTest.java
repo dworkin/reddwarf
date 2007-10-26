@@ -48,7 +48,7 @@ public class PrecompileMapOperationsAndThenTest implements Task, Serializable {
 			new PrecompileMapOperationsAndThenTest(count+1));
 	    } else {
 		AppContext.getTaskManager().
-		    scheduleTask(new MapComparisonTask());
+		    scheduleTask(new ScheduleMapPutsTask());
 	    }
 	} catch (Exception e) { 
 	    e.printStackTrace();
