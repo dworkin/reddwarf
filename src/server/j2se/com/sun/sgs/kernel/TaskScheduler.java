@@ -246,11 +246,12 @@ public interface TaskScheduler
      * be ignored and the owner will remain unchanged.
      * <p>
      * Note also that when this method is called from the context of a
+     * transactional
      * task that was started through this scheduler, then re-try handling
      * is already being applied to the calling task. This means that the
      * provided {@code KernelRunnable} will only be re-tried if this
      * method is called from the context of a thread that isn't running
-     * a task executed through this scheduler.
+     * a tranasactional task executed through this scheduler.
      *
      * @param task the {@code KernelRunnable} to execute transactionally
      * @param owner the requested entity on who's behalf this task may be run
