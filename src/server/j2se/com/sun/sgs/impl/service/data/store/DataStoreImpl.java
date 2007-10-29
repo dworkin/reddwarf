@@ -937,6 +937,14 @@ public class DataStoreImpl
 	}
     }
 
+    private static String toString(Transaction txn) {
+	return "txn " + new java.math.BigInteger(txn.getId());
+    }
+
+    private static String toString(byte[] bytes) {
+	return java.util.Arrays.toString(bytes);
+    }
+
     /** {@inheritDoc} */
     public int getClassId(Transaction txn, byte[] classInfo) {
 	logger.log(Level.FINER, "getClassId txn:{0}", txn);
@@ -948,6 +956,7 @@ public class DataStoreImpl
 		    "The classInfo argument must not be null");
 	    }
 	    byte[] hashKey = getKeyFromClassInfo(classInfo);
+	    System.err.println(toString(txn) + " hashKey " + toString(hashKey));
 	    int result;
 	    boolean done = false;
 	    /*
@@ -959,51 +968,41 @@ public class DataStoreImpl
 	     * likely that the class will be needed, even if that transaction
 	     * aborts, so it makes sense to commit this operation separately to
 	     * improve concurrency.  -tjb@sun.com (05/23/2007)
-	     *
-	     * Also, if another thread is concurrently allocating an ID for the
-	     * same or different class info, then either the class ID selected
-	     * or the class hash value may already have values assigned.  If
-	     * so, just retry.  -tjb@sun.com (10/26/2007)
 	     */
-	    while (true) {
-		DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-		try {
-		    byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
-		    if (hashValue != null) {
-			result = DataEncoding.decodeInt(hashValue);
-		    } else {
-			DbCursor cursor = classesDb.openCursor(dbTxn);
-			try {
-			    result = cursor.findLast()
-				? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
-			    byte[] idKey = getKeyFromClassId(result);
-			    boolean success =
-				cursor.putNoOverwrite(idKey, classInfo);
-			    if (!success) {
-				logger.log(Level.FINER,
-					   "getClassId txn:{0} retry class ID",
-					   txn);
-				continue;
-			    }
-			} finally {
-			    cursor.close();
-			}
-			boolean success = classesDb.putNoOverwrite(
-			    dbTxn, hashKey, DataEncoding.encodeInt(result));
-			if (!success) {
-			    logger.log(Level.FINER,
-				       "getClassId txn:{0} retry class hash",
-				       txn);
-			    continue;
-			}
+	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
+	    try {
+		byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
+		if (hashValue != null) {
+		    result = DataEncoding.decodeInt(hashValue);
+		    System.err.println(toString(txn) + " found " + result);
+		} else {
+		    byte[] idBytes = classesDb.get(
+			dbTxn, DataStoreHeader.LAST_CLASS_ID_KEY, true);
+		    result = (idBytes == null)
+			? 1 : DataEncoding.decodeInt(idBytes) + 1;
+		    System.err.println(toString(txn) + " add class ID " + result);
+		    boolean success = classesDb.putNoOverwrite(
+			dbTxn, getKeyFromClassId(result), classInfo);
+		    if (!success) {
+			System.err.println(toString(txn) + " class ID found");
+			throw new DataStoreException(
+			    "Class ID already present");
 		    }
-		    done = true;
-		    dbTxn.commit();
-		    break;
-		} finally {
-		    if (!done) {
-			dbTxn.abort();
+		    idBytes = DataEncoding.encodeInt(result);
+		    success = classesDb.putNoOverwrite(dbTxn, hashKey, idBytes);
+		    if (!success) {
+			System.err.println(toString(txn) + " class hash found");
+			throw new DataStoreException(
+			    "Class hash already present");
 		    }
+		    classesDb.put(dbTxn, DataStoreHeader.LAST_CLASS_ID_KEY,
+				  idBytes);
+		}
+		done = true;
+		dbTxn.commit();
+	    } finally {
+		if (!done) {
+		    dbTxn.abort();
 		}
 	    }
 	    if (logger.isLoggable(Level.FINER)) {

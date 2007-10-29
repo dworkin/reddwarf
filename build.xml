@@ -1109,9 +1109,12 @@
 
   <!-- Runs the task timing analysis -->
   <target name="analysis" depends="analysis-classes"
-          description="runs the task timing analysis">
-   <delete dir="/tmp/sgs-analysis"/>
-   <mkdir dir="/tmp/sgs-analysis"/>
+          description="Runs the task timing analysis">
+    <mkdir dir="${build.dir}/analysis"/>
+    <delete dir="${build.dir}/analysis/logs"/>
+    <delete dir="${build.dir}/analysis/data"/>
+    <delete dir="/tmp/sgs-analysis"/>
+    <mkdir dir="/tmp/sgs-analysis"/>
    <mkdir dir="/tmp/logs"/>
    <chmod perm="a+w">
      <fileset dir="/tmp/sgs-analysis"/>
