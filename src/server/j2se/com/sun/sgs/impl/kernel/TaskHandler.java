@@ -150,6 +150,9 @@ public final class TaskHandler {
         if (ThreadState.isCurrentTransaction())
             task.run();
         else {
+            // It would be best if we ran through the TaskExecutor
+            // to reuse its retry logic.  Currently, though,
+            // profilers cannot handle nested tasks.
             while (true) {
                 try {
                     runTransactionalTask(task);
@@ -157,7 +160,9 @@ public final class TaskHandler {
                 } catch (Exception e) {
                     if ((e instanceof ExceptionRetryStatus) &&
                         (((ExceptionRetryStatus)e).shouldRetry())) {
-                        // retry it
+                        // retry it  
+                    } else {
+                        throw e;
                     }
                 }
             }
