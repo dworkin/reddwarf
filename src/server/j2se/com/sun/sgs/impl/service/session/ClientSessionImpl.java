@@ -55,7 +55,6 @@ import java.io.Serializable;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -630,7 +629,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     private class WriteHandler implements CompletionHandler<Void, Integer> {
 
         private int availableToReserve;
-        private Deque<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
+        private LinkedList<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
         
         // TODO provide our own, allocated-on-connect backing DirectBuffer
         // for the pendingWrites, which can be view buffers into the
@@ -730,7 +729,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             synchronized (lock) {
                 nowAvailable = availableToReserve + len;
                 availableToReserve = nowAvailable;
-                pendingWrites.pop();
+                pendingWrites.remove();
                 isWriting = false;
             }
             writeFuture = null;
