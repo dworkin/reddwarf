@@ -145,10 +145,9 @@ public interface DataService extends DataManager, Service {
      * the specified identifier, or {@code null} if there are no more objects.
      * If {@code objectId} is {@code null}, then returns the identifier of the
      * first object.  This method will not return identifiers for objects that
-     * have already been removed, and may not include identifiers for objects
-     * that are created after an iteration has begun.  It is not an error for
-     * the object associated with identifier provided as an argument to have
-     * already been removed. <p>
+     * have already been removed, and may not include identifiers for newly
+     * created objects.  It is not an error for the object associated {@code
+     * objectId} to have already been removed. <p>
      *
      * The object identifiers accepted and returned by this method are the same
      * as those returned by the {@link ManagedReference#getId

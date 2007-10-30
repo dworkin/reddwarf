@@ -51,7 +51,10 @@ class DoneRemoving implements Runnable {
      */
     private final Set<Integer> seen = new HashSet<Integer>();
 
-    /** The number of completions seen since the last await or init call. */
+    /**
+     * The number of completions seen since the last await or init call.
+     * Callers should synchronize on the class when reading or writing.
+     */
     private int count = 0;
 
     /** The next completion value. */
@@ -73,7 +76,7 @@ class DoneRemoving implements Runnable {
      * Make sure the ScalableHashMap will notify us of removal completions, and
      * clear the count.
      */
-    static void init() {
+    static synchronized void init() {
 	try {
 	    noteDoneRemoving.set(null, INSTANCE);
 	} catch (Exception e) {

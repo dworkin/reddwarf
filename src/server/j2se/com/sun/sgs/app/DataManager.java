@@ -163,8 +163,8 @@ public interface DataManager {
      * @throws	RuntimeException if {@code object} implements {@code
      *		ManagedObjectRemoval} and calling {@link
      *		ManagedObjectRemoval#removingObject
-     *		ManagedObjectRemoval.removingObject} on the object throws an
-     *		exception
+     *		ManagedObjectRemoval.removingObject} on the object throws a
+     *		runtime exception
      * @see	ManagedObjectRemoval
      */
     void removeObject(ManagedObject object);

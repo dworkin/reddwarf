@@ -25,11 +25,11 @@ package com.sun.sgs.app;
  * DataManager#removeObject DataManager.removeObject} method is called on an
  * object that implements this interface, that method will first call {@link
  * #removingObject removingObject} before removing the object from the data
- * manager.  Managed objects with references to other managed objects that
- * should be removed when the main object is removed can implement the {@code
- * removingObject} method to remove those referred-to objects.  The {@code
- * removingObject} method will not be called if this object has already been
- * removed or is not currently managed by the data manager. <p>
+ * manager.  Managed objects containing references to other managed objects
+ * that should be removed when the main object is removed can implement the
+ * {@code removingObject} method to remove those referred-to objects.  The
+ * {@code removingObject} method will not be called if this object has already
+ * been removed or is not currently managed by the data manager. <p>
  *
  * Note that the implementation of {@code removingObject} should make sure that
  * it only removes objects that are logically "owned" by the main object, and

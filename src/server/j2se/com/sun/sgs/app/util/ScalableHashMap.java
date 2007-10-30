@@ -151,12 +151,16 @@ import java.util.Stack;
  * java.util.ConcurrentModificationException}.  The iterators are stable with
  * respect to concurrent changes to the associated collection, but may ignore
  * additions and removals made to the collection during iteration, and may also
- * visit more than once a key value that is removed and re-added.
+ * visit more than once a key value that is removed and re-added.  Attempting
+ * to use an iterator when the associated map has been removed from the {@code
+ * DataManager} will result in an {@code ObjectNotFoundException} being thrown,
+ * although the {@link Iterator#remove remove} method may throw {@code
+ * IllegalStateException} instead if that is appropriate.
  *
  * <p>
  *
- * If a call to the {@link Iterator#next next} method on the iterators causes a
- * {@link ObjectNotFoundException} to be thrown because the return value has
+ * If a call to the {@link Iterator#next next} method on the iterators causes
+ * an {@code ObjectNotFoundException} to be thrown because the return value has
  * been removed from the {@code DataManager}, the iterator will still have
  * successfully moved to the next entry in its iteration.  In this case, the
  * {@link Iterator#remove remove} method may be called on the iterator to
@@ -649,12 +653,13 @@ public class ScalableHashMap<K,V>
     }
 
     /**
-     * Clears the map of all entries, performing the actual work in a separate
-     * task to avoid scaling problems.  When clearing, all non-{@code
+     * Clears the map of all entries.  When clearing, all non-{@code
      * ManagedObject} keys and values persisted by this map will be removed
      * from the {@code DataManager}.
      */
     public void clear() {
+	assert isRootNode()
+	    : "The clear method should only be called on the root";
 	removeChildrenAndEntries();
 	size = 0;
 	leftLeafRef = null;
@@ -1648,6 +1653,7 @@ public class ScalableHashMap<K,V>
 	    assert !node.isLeafNode();
 	    ManagedReference lastRef = null;
 	    for (ManagedReference ref : node.nodeDirectory) {
+		/* Skip clearing duplicate nodes in the directory */
 		if (ref != lastRef) {
 		    ScalableHashMap child = ref.get(ScalableHashMap.class);
 		    /*
@@ -1712,6 +1718,7 @@ public class ScalableHashMap<K,V>
 		node = currentNodeRef.get(ScalableHashMap.class);
 		ManagedReference childRef = node.nodeDirectory[offset];
 		while (++offset < node.nodeDirectory.length) {
+		    /* Skip clearing duplicate nodes in the directory */
 		    if (childRef != node.nodeDirectory[offset]) {
 			offsets.push(offset);
 			/* More work under this node */

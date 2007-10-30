@@ -1009,7 +1009,7 @@ public class DataStoreImpl
 		} else {
 		    DbCursor cursor = classesDb.openCursor(dbTxn);
 		    try {
-			result = cursor.findLast(true)
+			result = cursor.findLast()
 			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
 			byte[] idKey = getKeyFromClassId(result);
 			boolean success =

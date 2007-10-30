@@ -23,7 +23,6 @@ import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseEntry;
 import com.sleepycat.db.DatabaseException;
-import com.sleepycat.db.LockMode;
 import com.sleepycat.db.OperationStatus;
 import static com.sleepycat.db.OperationStatus.KEYEXIST;
 import static com.sleepycat.db.OperationStatus.NOTFOUND;
@@ -133,10 +132,10 @@ public class BdbCursor implements DbCursor {
     }
 
     /** {@inheritDoc} */
-    public boolean findLast(boolean forUpdate) {
+    public boolean findLast() {
 	try {
-	    OperationStatus status = cursor.getLast(
-		keyEntry, valueEntry, forUpdate ? LockMode.RMW : null);
+	    OperationStatus status =
+		cursor.getLast(keyEntry, valueEntry, null);
 	    if (status == SUCCESS) {
 		isCurrent = true;
 		return true;
