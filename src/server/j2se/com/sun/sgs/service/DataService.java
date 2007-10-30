@@ -146,8 +146,8 @@ public interface DataService extends DataManager, Service {
      * If {@code objectId} is {@code null}, then returns the identifier of the
      * first object.  This method will not return identifiers for objects that
      * have already been removed, and may not include identifiers for newly
-     * created objects.  It is not an error for the object associated {@code
-     * objectId} to have already been removed. <p>
+     * created objects.  It is not an error for the object associated with
+     * {@code objectId} to have already been removed. <p>
      *
      * The object identifiers accepted and returned by this method are the same
      * as those returned by the {@link ManagedReference#getId
