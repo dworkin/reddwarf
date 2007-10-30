@@ -160,7 +160,9 @@ public final class TaskHandler {
                 } catch (Exception e) {
                     if ((e instanceof ExceptionRetryStatus) &&
                         (((ExceptionRetryStatus)e).shouldRetry())) {
-                        // retry it  
+                        logger.log(Level.FINEST, 
+                                "Retrying transactional task");
+                        continue;  
                     } else {
                         throw e;
                     }

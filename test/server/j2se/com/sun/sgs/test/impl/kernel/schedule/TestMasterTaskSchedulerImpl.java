@@ -386,12 +386,8 @@ public class TestMasterTaskSchedulerImpl {
                     scheduler.runTransactionalTask(runner, testOwner);
                 } catch (Exception e) {
                     // Handle the exception, not caring if it's retryable. 
-                    
-                    // Workaround before fix is to rethrow exception
-//                    if ((e instanceof ExceptionRetryStatus) &&
-//                        (((ExceptionRetryStatus)e).shouldRetry())) {
-//                        throw e;
-//                    }
+                    // This demonstrates that the kernel code retries
+                    // the task.
                 }
             }
         }, testOwner);
