@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -148,8 +149,26 @@ public final class TaskHandler {
     {
         if (ThreadState.isCurrentTransaction())
             task.run();
-        else
-            runTransactionalTask(task);
+        else {
+            // It would be best if we ran through the TaskExecutor
+            // to reuse its retry logic.  Currently, though,
+            // profilers cannot handle nested tasks.
+            while (true) {
+                try {
+                    runTransactionalTask(task);
+                    return;
+                } catch (Exception e) {
+                    if ((e instanceof ExceptionRetryStatus) &&
+                        (((ExceptionRetryStatus)e).shouldRetry())) {
+                        logger.log(Level.FINEST, 
+                                "Retrying transactional task");
+                        continue;  
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+        }
     }
 
     /**
