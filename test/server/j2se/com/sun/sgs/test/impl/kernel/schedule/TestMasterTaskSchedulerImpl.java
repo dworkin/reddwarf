@@ -386,8 +386,9 @@ public class TestMasterTaskSchedulerImpl {
                     scheduler.runTransactionalTask(runner, testOwner);
                 } catch (Exception e) {
                     // Handle the exception, not caring if it's retryable. 
-                    // This demonstrates that the kernel code retries
-                    // the task.
+                    // The kernel code should have retried the task;  if it
+                    // doesn't, the retryable exception will be thrown.
+                    fail("Unexpected exception");
                 }
             }
         }, testOwner);
