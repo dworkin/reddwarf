@@ -739,8 +739,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final Object receivedAllMessagesLock = new Object();
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
-	private boolean logoutAck = false;
 	private boolean loginRedirect = false;
+	private boolean logoutAck = false;
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;

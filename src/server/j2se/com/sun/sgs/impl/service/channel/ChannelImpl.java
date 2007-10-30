@@ -28,6 +28,7 @@ import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
 import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -299,11 +300,17 @@ final class ChannelImpl implements Channel, Serializable {
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
 	    sendToAllMembers(message);
-	    logger.log(Level.FINEST, "send message:{0} returns", message);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
+			   state.name, HexDumper.format(message));
+	    }
 	    
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "send message:{0} throws", message);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "send channel:{0} message:{1} throws",
+		    state.name, HexDumper.format(message));
+	    }
 	    throw e;
 	}
     }
@@ -517,6 +524,7 @@ final class ChannelImpl implements Channel, Serializable {
      * channelMessage} from this channel's server to all channel members.
      */
     private void sendToAllMembers(final byte[] channelMessage) {
+	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
 	long localNodeId = context.getLocalNodeId();
 	final byte[] channelIdBytes = state.channelIdBytes;
 	final byte[] protocolMessage =
@@ -543,12 +551,22 @@ final class ChannelImpl implements Channel, Serializable {
 		for (ClientSession session : recipients) {
 		    recipientIds[i++] = session.getSessionId().getBytes();
 		}
-		    
-		context.getClientSessionService().runTask(
+
+		logger.log(
+		    Level.FINEST,
+		    "sendToAllMembers channel:{0} " +
+		    "schedule task to forward to node:{1}", state.name,
+		    nodeId);
+		runTaskOnCommit(
 		    null,
 		    new Runnable() {
 			public void run() {
 			    try {
+				logger.log(
+				    Level.FINEST,
+				    "sendToAllMembers channel:{0} " +
+				    "forwarding to node:{1}", state.name,
+				    nodeId);
 				server.send(channelIdBytes, recipientIds,
 					    protocolMessage, state.delivery);
 			    } catch (Exception e) {
@@ -613,7 +631,7 @@ final class ChannelImpl implements Channel, Serializable {
 		    recipientIds[i++] = session.getSessionId().getBytes();
 		}
 		    
-		context.getClientSessionService().runTask(
+		runTaskOnCommit(
 		    null,
 		    new Runnable() {
 			public void run() {

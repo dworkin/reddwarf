@@ -19,9 +19,14 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
@@ -55,7 +60,16 @@ public abstract class AbstractService implements Service {
 
     /** The logger for the subclass. */
     private final LoggerWrapper logger;
+
+    /** The data service. */
+    protected final DataService dataService;
     
+    /** The task scheduler. */
+    protected final TaskScheduler taskScheduler;
+
+    /** The task owner. */
+    protected volatile TaskOwner taskOwner;
+
     /** The lock for {@code state} and {@code callsInProgress} fields. */
     private final Object lock = new Object();
     
@@ -110,6 +124,9 @@ public abstract class AbstractService implements Service {
 	}	
 	
 	this.logger = logger;
+	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	this.dataService = txnProxy.getService(DataService.class);
+	this.taskOwner = txnProxy.getCurrentOwner();
 	setState(State.INITIALIZED);
     }
 
@@ -147,6 +164,7 @@ public abstract class AbstractService implements Service {
 		throw new IllegalStateException("service shutting down");
 	    }
 	}
+	taskOwner = txnProxy.getCurrentOwner();
 	doReady();
     }
 
@@ -247,6 +265,23 @@ public abstract class AbstractService implements Service {
     protected State getState() {
 	synchronized (lock) {
 	    return state;
+	}
+    }
+
+    protected void runTransactionally(KernelRunnable task) throws Exception {
+	for (;;) {
+	    try {
+		taskScheduler.runTransactionalTask(task, taskOwner);
+		return;
+	    } catch (Exception e) {
+		if (e instanceof ExceptionRetryStatus &&
+		    ((ExceptionRetryStatus) e).shouldRetry())
+		{
+		    continue;
+		} else {
+		    throw e;
+		}
+	    }
 	}
     }
     

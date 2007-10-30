@@ -116,14 +116,6 @@ public class ChannelServiceImpl
     /** List of contexts that have been prepared (non-readonly) or commited. */
     private final List<Context> contextList = new LinkedList<Context>();
 
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-
-    private volatile TaskOwner taskOwner;
-
-    /** The data service. */
-    private final DataService dataService;
-
     /** The watchdog service. */
     private final WatchdogService watchdogService;
 
@@ -186,12 +178,9 @@ public class ChannelServiceImpl
 		}
 	    }
 	    contextFactory = new ContextFactory(contextMap);
-	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-	    dataService = txnProxy.getService(DataService.class);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
-	    taskOwner = txnProxy.getCurrentOwner();
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -216,14 +205,14 @@ public class ChannelServiceImpl
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
-	    taskScheduler.runTransactionalTask(
+	    runTransactionally(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
 			    new ChannelServerWrapper(serverProxy));
-		    }},
-		txnProxy.getCurrentOwner());
+		    }}
+		);
 
 	    /*
 	     * Add listeners for handling recovery and for handling
@@ -248,7 +237,6 @@ public class ChannelServiceImpl
 
     /** {@inheritDoc} */
     protected void doReady() {
-	taskOwner = txnProxy.getCurrentOwner();
         nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
 		    taskScheduler, txnProxy.getCurrentOwner(),
@@ -474,12 +462,12 @@ public class ChannelServiceImpl
 		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
 
 		    try {
-			taskScheduler.runTransactionalTask(
+			runTransactionally(
 			    new AbstractKernelRunnable() {
 				public void run() {
 				    handleChannelSendRequest(session, buf);
-				}},
-			    txnProxy.getCurrentOwner());
+				}}
+			    );
 		    } catch (Exception e) {
 			logger.logThrow(
 			    Level.WARNING, e,
@@ -610,8 +598,8 @@ public class ChannelServiceImpl
 	    }
 	}
 
-	final byte[] channelMessage = buf.getByteArray();
-	byte[] protocolMessage =
+	byte[] channelMessage = buf.getByteArray();
+	final byte[] protocolMessage =
 	    getChannelMessage(
 		channelId, ((ClientSessionImpl) sender).getCompactSessionId(),
 		channelMessage, seq);
@@ -619,7 +607,7 @@ public class ChannelServiceImpl
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
 		Level.FINEST,
-		"name:{0}, message:{1}",
+		"channel:{0}, message:{1}",
 		channelState.name, HexDumper.format(channelMessage));
 	}
 
@@ -627,6 +615,12 @@ public class ChannelServiceImpl
 	 * Send to local recipients.
 	 */
 	ClientSessionId senderId = sender.getSessionId();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"channel:{0} sending to local recipients:{1}",
+		channelState.name, localRecipients);
+	}
 	for (ClientSession session : localRecipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
@@ -654,6 +648,14 @@ public class ChannelServiceImpl
 	    for (final long nodeId : channelState.getChannelServerNodeIds()) {
 		if (nodeId != localNodeId) {
 
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "channel:{0} forwarding to node:{1} " +
+			    "to recipients:{2}",
+			    channelState.name, nodeId, nonLocalRecipientsIds);
+		    }
+
 		    // run task on transaction commit...
 		    final ChannelServer server =
 			channelState.getChannelServer(nodeId);
@@ -663,7 +665,7 @@ public class ChannelServiceImpl
 			    public void run() {
 				try {
 				    server.send(channelIdBytes, recipientIds,
-						channelMessage,
+						protocolMessage,
 						channelState.delivery);
 				} catch (Exception e) {
 				    // skip unresponsive channel server
@@ -975,7 +977,7 @@ public class ChannelServiceImpl
 		 * given session from all channels it is a member of.
 		 */
 		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
-		taskScheduler.runTransactionalTask(task, taskOwner);
+		runTransactionally(task);
 		
 		for (final byte[] sessionId : task.getSessionIds()) {
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -985,23 +987,23 @@ public class ChannelServiceImpl
 			    HexDumper.toHexString(sessionId));
 		    }
 		    
-		    taskScheduler.runTransactionalTask(
+		    runTransactionally(
 			new AbstractKernelRunnable() {
 			    public void run() {
 				removeSessionFromAllChannels(nodeId, sessionId);
 			    }
-		    }, taskOwner);
+			});
 		}
 		/*
 		 * Remove binding to channel server proxy for failed
 		 * node, and remove proxy's wrapper.
 		 */
-		taskScheduler.runTransactionalTask(
+		runTransactionally(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    removeChannelServerProxy(nodeId);
 			}
-		    }, taskOwner);
+		    });
 		
 		future.done();
 

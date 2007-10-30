@@ -726,7 +726,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly = sessionCommitActions.values().isEmpty();
+	    boolean readOnly =
+		sessionCommitActions.values().isEmpty() &&
+		otherCommitActions.isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
 	    }
@@ -779,6 +781,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		for (CommitActions actions : sessionCommitActions.values()) {
 		    actions.flush();
 		}
+		otherCommitActions.flush();
 		return true;
 	    } else {
 		return false;
@@ -802,6 +805,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	CommitActions(ClientSessionImpl sessionImpl) {
 	    this.sessionImpl = sessionImpl;
+	}
+
+	boolean isEmpty() {
+	    return actions.isEmpty();
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {

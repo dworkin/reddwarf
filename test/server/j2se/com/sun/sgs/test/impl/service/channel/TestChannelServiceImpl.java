@@ -103,6 +103,11 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static Object disconnectedCallbackLock = new Object();
 
+    private static final List<String> sevenDwarfs =
+	Arrays.asList(new String[] {
+			  "bashful", "doc", "dopey", "grumpy",
+			  "happy", "sleepy", "sneezy"});
+
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
@@ -1101,10 +1106,8 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelSendAll() throws Exception {
 	final String channelName = "test";
-	List<String> users =
-	    Arrays.asList(new String[] { "moe", "larry", "curly" });
 	createChannel(channelName);
-	ClientGroup group = new ClientGroup(users);
+	ClientGroup group = new ClientGroup(sevenDwarfs);
 	
 	try {
 	    boolean failed = false;
@@ -1152,6 +1155,11 @@ public class TestChannelServiceImpl extends TestCase {
 	} finally {
 	    group.disconnect(false);
 	}
+    }
+
+    public void testChannelSendAllMultipleNodes() throws Exception {
+	addNodes("one", "two", "three");
+	testChannelSendAll();
     }
     
     /* -- Test Channel.send (one recipient) -- */
@@ -1317,7 +1325,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(channelName, false);
 	    
-	} catch (Throwable e) {
+	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
 	    printServiceBindings();
@@ -1342,7 +1350,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.checkMembership(channelName, false);
 	    group.checkChannelSets(false);
 	    
-	} catch (Throwable e) {
+	} catch (Exception e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
 	    fail("unexpected failure: " + e);
@@ -1352,7 +1360,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testSessionsRemovedOnRecovery() throws Exception {
+    public void testSessionsAndChannelSetsRemovedOnRecovery() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
 	ClientGroup group = new ClientGroup("moe", "larry", "curly");
@@ -1384,18 +1392,18 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
-    /*
+
     public void testChannelSendRequestWithSingleRecipient() throws Exception {
-	commitTransaction();
-	String name = CHANNEL_NAME;
-	ClientGroup group =
-	    createChannelAndClientGroup(name, "moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
+
 	try {
-	    group.join(name);
+	    group.join(channelName);
 	    DummyClient moe = group.getClient("moe");
 	    DummyClient larry = group.getClient("larry");
 	    DummyClient curly = group.getClient("curly");
-	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
+	    CompactId channelId = moe.channelNameToId.get(channelName);
 	    int numMessages = 3;
 	    Set<CompactId> recipientIds = new HashSet<CompactId>();
 	    recipientIds.add(larry.sessionId);
@@ -1448,18 +1456,25 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
     }
-    /*
+    
+    public void testChannelSendRequestWithSingleRecipientMultipleNodes()
+	throws Exception
+    {
+	addNodes("one", "two", "three");
+	testChannelSendRequestWithSingleRecipient();
+    }
+    
     public void testChannelSendRequestToAllChannelMembers() throws Exception {
-	commitTransaction();
-	ClientGroup group =
-	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry", "curly");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry", "curly");
 
 	try {
 	    boolean failed = false;
-	    group.join(CHANNEL_NAME);
+	    group.join(channelName);
 	    String senderName = "moe";
 	    DummyClient sender = group.getClient(senderName);
-	    CompactId channelId = sender.channelNameToId.get(CHANNEL_NAME);
+	    CompactId channelId = sender.channelNameToId.get(channelName);
 	    String messageString = "from moe";
 	    MessageBuffer buf =
 		new MessageBuffer(MessageBuffer.getSize(messageString) + 4);
@@ -1495,7 +1510,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 
 	    if (failed) {
-		fail("test failed");
+		fail("test failed: see output");
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -1506,18 +1521,25 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
     }
-    
+
+    public void testChannelSendRequestToAllChannelMembersMultipleNodes()
+	throws Exception
+    {
+	addNodes("one", "two", "three");
+	testChannelSendRequestToAllChannelMembers();
+    }
+
     public void testChannelSendRequestFromNonMemberSession() throws Exception {
-	commitTransaction();
-	ClientGroup group =
-	    createChannelAndClientGroup(CHANNEL_NAME, "moe", "larry");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group = new ClientGroup("moe", "larry");
 	ClientGroup outcast = new ClientGroup("curly");
 
 	try {
 	    boolean failed = false;
-	    group.join(CHANNEL_NAME);
+	    group.join(channelName);
 	    DummyClient moe = group.getClient("moe");
-	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
+	    CompactId channelId = moe.channelNameToId.get(channelName);
 	    DummyClient curly = outcast.getClient("curly");
 	    String messageString = "from curly";
 	    MessageBuffer buf =
@@ -1557,11 +1579,13 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
     }
-    
-    public void testChannelSetsRemovedOnRecovery() throws Exception {
-	fail("this test needs to be implemented");
+
+    public void testChannelSendRequestFromNonMemberSessionMultipleNodes()
+	throws Exception
+    {
+	addNodes("one", "two", "three");
+	testChannelSendRequestFromNonMemberSession();
     }
-    */
 
     private class ClientGroup {
 
@@ -1661,7 +1685,11 @@ public class TestChannelServiceImpl extends TestCase {
 	
 	void disconnect(boolean graceful) {
 	    for (DummyClient client : clients.values()) {
-		client.disconnect(graceful);
+		if (graceful) {
+		    client.logout();
+		} else {
+		    client.disconnect();
+		}
 	    }
 	}
     }
@@ -1910,7 +1938,7 @@ public class TestChannelServiceImpl extends TestCase {
     /**
      * Dummy client code for testing purposes.
      */
-    private static class DummyClient {
+    private class DummyClient {
 
 	String name;
 	CompactId sessionId;
@@ -1921,6 +1949,7 @@ public class TestChannelServiceImpl extends TestCase {
 	private final Object lock = new Object();
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
+	private boolean loginRedirect = false;
 	private boolean logoutAck = false;
 	private boolean joinAck = false;
 	private boolean leaveAck = false;
@@ -1931,7 +1960,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    new HashMap<String, CompactId>();
 	//private String channelName = null;
 	//private CompactId channelId = null;
-	private String reason;
+	private String reason;	
+	private String redirectHost;
 	private CompactId reconnectionKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
@@ -1946,6 +1976,10 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	void connect(int port) {
+	    if (connected) {
+		throw new RuntimeException("DummyClient.connect: already connected");
+	    }
+	    System.err.println("DummyClient.connect[port=" + port + "]");
 	    connected = false;
 	    listener = new Listener();
 	    try {
@@ -1956,55 +1990,66 @@ public class TestChannelServiceImpl extends TestCase {
 		connector = endpoint.createConnector();
 		connector.connect(listener);
 	    } catch (Exception e) {
-		System.err.println("DummyClient.connect throws: " + e);
+		System.err.println("DummyClient.connect[" + name + "] throws: " + e);
 		e.printStackTrace();
-		throw new RuntimeException("DummyClient.connect failed", e);
+		throw new RuntimeException(
+		    "DummyClient.connect[" + name + "]  failed", e);
 	    }
 	    synchronized (lock) {
 		try {
 		    if (connected == false) {
-			lock.wait(WAIT_TIME);
+			lock.wait(WAIT_TIME * 2);
 		    }
 		    if (connected != true) {
 			throw new RuntimeException(
- 			    "DummyClient.connect timed out");
+ 			    "DummyClient.connect[" + name + "] timed out");
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.connect timed out", e);
+			"DummyClient.connect[" + name + "] timed out", e);
 		}
 	    }
 	    
 	}
 
-	void disconnect(boolean graceful) {
-	    System.err.println("DummyClient.disconnect: " + graceful);
-
-            if (graceful) {
-	        logout();
-                return;
-            }
+	void disconnect() {
+	    System.err.println("DummyClient.disconnect[" + name + "]");
 
             synchronized (lock) {
-                if (connected == false) {
-                    return;
-                }
+		if (! connected) {
+		    return;
+		}
                 try {
                     connection.close();
-                } catch (IOException e) {
+		    lock.wait(WAIT_TIME);
+                } catch (Exception e) {
                     System.err.println(
                         "DummyClient.disconnect exception:" + e);
-                    connected = false;
                     lock.notifyAll();
-                }
+		    return;
+                } finally {
+		    if (connected) {
+			reset();
+		    }
+		}
             }
+	}
+
+	void reset() {
+	    assert Thread.holdsLock(lock);
+	    connected = false;
+	    connection = null;
+	    loginAck = false;
+	    loginSuccess = false;
+	    loginRedirect = false;
+	    redirectHost = null;
 	}
 
 	void login(String user, String pass) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(
-			"DummyClient.login not connected");
+			"DummyClient.login[" + name + "] not connected");
 		}
 	    }
 	    this.name = user;
@@ -2023,23 +2068,35 @@ public class TestChannelServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
+	    String host = null;
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
-			lock.wait(WAIT_TIME);
+			lock.wait(WAIT_TIME * 2);
 		    }
 		    if (loginAck != true) {
 			throw new RuntimeException(
-			    "DummyClient.login timed out");
+			    "DummyClient.login[" + name + "] timed out");
 		    }
-		    if (!loginSuccess) {
+		    if (loginSuccess) {
+			return;
+		    } else if (loginRedirect) {
+			host = redirectHost;
+		    } else {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.login timed out", e);
+			"DummyClient.login[" + name + "] timed out", e);
 		}
 	    }
+
+	    // handle redirected login
+	    int redirectPort =
+		(additionalNodes.get(host)).getAppPort();
+	    disconnect();
+	    connect(redirectPort);
+	    login(user, pass);
 	}
 
 	/**
@@ -2218,14 +2275,15 @@ public class TestChannelServiceImpl extends TestCase {
                         }
                         if (logoutAck != true) {
                             throw new RuntimeException(
-                                "DummyClient.disconnect timed out");
+                                "DummyClient.disconnect[" + name + "] timed out");
                         }
                     } catch (InterruptedException e) {
                         throw new RuntimeException(
-                            "DummyClient.disconnect timed out", e);
+                            "DummyClient.disconnect[" + name + "] timed out", e);
                     }
                 }
             }
+	    disconnect();
 	}
 
 	private class Listener implements ConnectionListener {
@@ -2236,7 +2294,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    public void bytesReceived(Connection conn, byte[] buffer) {
 		if (connection != conn) {
 		    System.err.println(
-			"DummyClient.Listener connected wrong handle, got:" +
+			"[" + name + "] bytesReceived: " +
+			"wrong handle, got:" +
 			conn + ", expected:" + connection);
 		    return;
 		}
@@ -2246,7 +2305,7 @@ public class TestChannelServiceImpl extends TestCase {
 		byte version = buf.getByte();
 		if (version != SimpleSgsProtocol.VERSION) {
 		    System.err.println(
-			"bytesReceived: got version: " +
+			"[" + name + "] bytesReceived: got version: " +
 			version + ", expected: " + SimpleSgsProtocol.VERSION);
 		    return;
 		}
@@ -2264,7 +2323,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		default:
 		    System.err.println(
-			"bytesReceived: got service id: " +
+			"[" + name + "] bytesReceived: got service id: " +
                         serviceId + ", expected: " +
                         SimpleSgsProtocol.APPLICATION_SERVICE);
 		    return;
@@ -2283,7 +2342,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
-			System.err.println("login succeeded: " + name);
+			System.err.println("[" + name + "] login succeeded");
 			lock.notifyAll();
 		    }
 		    break;
@@ -2293,7 +2352,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = false;
-			System.err.println("login failed: " + name +
+			System.err.println("[" + name + "] login failed: " +
 					   ", reason:" + reason);
 			lock.notifyAll();
 		    }
@@ -2307,19 +2366,29 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    break;
 
+		case SimpleSgsProtocol.LOGIN_REDIRECT:
+		    redirectHost = buf.getString();
+		    synchronized (lock) {
+			loginAck = true;
+			loginRedirect = true;
+			System.err.println("login redirected: " + name +
+					   ", host:" + redirectHost);
+			lock.notifyAll();
+		    } break;
+
 		case SimpleSgsProtocol.SESSION_MESSAGE:
                     buf.getLong(); // FIXME sequence number
 		    byte[] message = buf.getBytes(buf.getUnsignedShort());
 		    synchronized (lock) {
 			messageList.add(message);
-			System.err.println("message received: " + message);
+			System.err.println("[" + name + "] message received: " + message);
 			lock.notifyAll();
 		    }
 		    break;
 
 		default:
 		    System.err.println(	
-			"processAppProtocolMessage: unknown op code: " +
+			"[" + name + "] processAppProtocolMessage: unknown op code: " +
 			opcode);
 		    break;
 		}
@@ -2404,7 +2473,7 @@ public class TestChannelServiceImpl extends TestCase {
                         // Hack since client might not get last msg
                         logoutAck = true;
                     }
-                    connected = false;
+		    reset();
                     lock.notifyAll();
                 }
 	    }

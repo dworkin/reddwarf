@@ -236,6 +236,9 @@ class ClientSessionHandler {
      * a logout request).
      */
     void handleDisconnect(final boolean graceful) {
+
+	logger.log(Level.FINEST, "handleDisconnect handler:{0}", this);
+	
 	synchronized (lock) {
 	    if (disconnectHandled) {
 		return;
