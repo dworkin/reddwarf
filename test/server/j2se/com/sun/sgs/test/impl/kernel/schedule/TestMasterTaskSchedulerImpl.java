@@ -26,9 +26,10 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
@@ -374,6 +375,26 @@ public class TestMasterTaskSchedulerImpl {
                 }
             });
         scheduler.runTask(new TransactionRunner(runner), testOwner, false);
+    }
+
+    @Test public void runNestedTaskInnerTransaction() throws Exception {
+        final MasterTaskScheduler scheduler = getScheduler(1);
+        final RetryTestRunner runner = new RetryTestRunner();
+        scheduler.scheduleTask( new AbstractKernelRunnable() {
+            public void run() throws Exception {
+                try {
+                    scheduler.runTransactionalTask(runner, testOwner);
+                } catch (Exception e) {
+                    // Handle the exception, not caring if it's retryable. 
+                    // The kernel code should have retried the task;  if it
+                    // doesn't, the retryable exception will be thrown.
+                    fail("Unexpected exception");
+                }
+            }
+        }, testOwner);
+ 
+        Thread.sleep(400);
+        assertTrue("expect the runner to be finished", runner.isFinished());
     }
 
     @Test (expected=IllegalStateException.class)

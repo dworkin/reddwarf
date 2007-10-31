@@ -22,7 +22,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.auth.IdentityCoordinator;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
@@ -39,22 +39,22 @@ import javax.security.auth.login.LoginException;
 
 
 /**
- * This package-private implementation of <code>IdentityManager</code> is
+ * This package-private implementation of <code>IdentityCoordinator</code> is
  * the implementation used by the system when configuring an application. It
  * manages an ordered collection of <code>IdentityAuthenticator</code>s. The
  * ordering is used to determine precidence when more than one authenticator
  * can consume the same credentials.
  * <p>
  * This implementation is kept private to this package so that the context
- * can be assigned, safely, after the manager is created. An instance of the
- * manager is needed before the context can be created.
+ * can be assigned, safely, after the coordinator is created. An instance of the
+ * coordinator is needed before the context can be created.
  */
-class IdentityManagerImpl implements IdentityManager
+class IdentityCoordinatorImpl implements IdentityCoordinator
 {
 
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(IdentityManagerImpl.
+        new LoggerWrapper(Logger.getLogger(IdentityCoordinatorImpl.
                                            class.getName()));
 
     // the available authenticators
@@ -64,14 +64,14 @@ class IdentityManagerImpl implements IdentityManager
     private final HashSet<IdentityAuthenticator> authenticatorSet;
 
     /**
-     * Creates an instance of <code>IdentityManagerImpl</code> that has
+     * Creates an instance of <code>IdentityCoordinatorImpl</code> that has
      * the given <code>IdentityAuthenticators</code> available to authenticate
      * identities. The order of the authenticators determines precidence
      * when more than one authenticator supports a given credentials type.
      *
      * @param authenticators the available <code>IdentityAuthenticator</code>s
      */
-    public IdentityManagerImpl(List<IdentityAuthenticator> authenticators) {
+    public IdentityCoordinatorImpl(List<IdentityAuthenticator> authenticators) {
         if (authenticators == null)
             throw new NullPointerException("Authenticators must not be null");
 
@@ -96,7 +96,7 @@ class IdentityManagerImpl implements IdentityManager
     }
 
     /**
-     * Package-private method that assigns the context for this manager
+     * Package-private method that assigns the context for this coordinator
      * and its associated authenticators.
      *
      * @param appContext the context

@@ -332,6 +332,7 @@ public class TestBoundNamesUtil extends TestCase {
 	public ManagedReference createReferenceForId(BigInteger id) {
 	    return null;
 	}
+	public BigInteger nextObjectId(BigInteger objectId) { return null; }
 	/* -- Stubs for Service -- */
 	public String getName() { return null; }
 	public void ready() { }

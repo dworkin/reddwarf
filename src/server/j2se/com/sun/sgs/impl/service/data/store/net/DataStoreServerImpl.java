@@ -791,6 +791,16 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
+    public long nextObjectId(long tid, long oid) {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.nextObjectId(txn, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
     public long createTransaction(long timeout) {
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
