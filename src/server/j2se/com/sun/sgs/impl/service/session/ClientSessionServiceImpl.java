@@ -264,8 +264,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
                         getListenPort());
                 }
             } catch (Exception e) {
-                acceptFuture.cancel(true);
-                acceptor.close();
+                if (acceptFuture != null) {
+                    acceptFuture.cancel(true);
+                }
+                try {
+                    acceptor.close();
+                } catch (IOException ioe) {
+                    logger.logThrow(Level.WARNING, ioe,
+                        "problem closing acceptor");
+                }
                 throw e;
             }
 
