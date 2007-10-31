@@ -228,7 +228,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	for (int i = 0; i < 5; i++) {
 	    threads.add(new TestReaperConcurrencyThread(server, i));
 	}
-	Thread.sleep(10000);
+	Thread.sleep(5000);
 	TestReaperConcurrencyThread.setDone();
 	for (TestReaperConcurrencyThread thread : threads) {
 	    Throwable t = thread.getResult();
@@ -271,12 +271,12 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
 	public void run() {
 	    try {
-		long tid = server.createTransaction(1000);
+		long tid = server.createTransaction(2);
 		int succeeds = 0;
 		int aborted = 0;
 		int notActive = 0;
 		while (!getDone()) {
-		    long wait = 1 + random.nextInt(4);
+		    long wait = 1 + random.nextInt(3);
 		    try {
 			Thread.sleep(wait);
 		    } catch (InterruptedException e) {
@@ -288,6 +288,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			    server.abort(tid);
 			} else {
 			    server.getBinding(tid, "dummy");
+			    server.prepareAndCommit(tid);
 			}
 			succeeds++;
 		    } catch (TransactionAbortedException e) {
@@ -297,9 +298,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			abort = true;
 			notActive++;
 		    }
-		    if (abort) {
-			tid = server.createTransaction(1000);
-		    }
+		    tid = server.createTransaction(2);
 		}
 		System.err.println(getName() +
 				   ": succeeds:" + succeeds +
