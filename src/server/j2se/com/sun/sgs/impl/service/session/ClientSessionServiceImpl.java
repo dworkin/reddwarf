@@ -432,7 +432,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	if (sessionId == null) {
 	    throw new NullPointerException("null sessionId");
 	}
-	// TBD: is this method necessary?
+	// TBD: is this method invocation necessary?
 	checkLocalNodeAlive();
 	ClientSession session = getLocalClientSession(sessionId);
 	return
@@ -441,6 +441,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    ClientSessionImpl.getSession(dataService, sessionId);
     }
 
+    /** {@inheritDoc} */
     public ClientSession getLocalClientSession(byte[] sessionId) {
 	if (sessionId == null) {
 	    throw new NullPointerException("null sessionId");

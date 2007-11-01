@@ -1428,6 +1428,8 @@ public class TestChannelServiceImpl extends TestCase {
 		MessageBuffer buf = new MessageBuffer(info.message);
 		String senderName = buf.getString();
 		int num = buf.getInt();
+		System.err.println("receiver got message from " + senderName +
+				   " with sequence number " + num);
 		if (!senderName.equals("moe")) {
 		    fail("got sender name " + senderName + ", expected " +
 			 "moe");
@@ -1435,8 +1437,6 @@ public class TestChannelServiceImpl extends TestCase {
 		if (num != nextNum) {
 		    fail("got number " + num + ", expected " + nextNum);
 		}
-		System.err.println("receiver got message from " + senderName +
-				   " with sequence number " + num);
 	    }
 
 	    if (moe.nextChannelMessage() != null) {
@@ -1489,7 +1489,8 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (info != null) {
 			failed = true;
 			System.err.println(
-			    "sender:" + senderName + " recieved message");
+			    "TEST FAILED: sender[" + senderName +
+			    "] recieved message");
 		    }
 		} else {
 		    if (info != null) {

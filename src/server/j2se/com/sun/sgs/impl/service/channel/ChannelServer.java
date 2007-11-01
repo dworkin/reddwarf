@@ -65,7 +65,7 @@ public interface ChannelServer extends Remote {
      * @param	channelId a channel ID
      * @param	recipients an array containing client session ID
      *		byte arrays
-     * @param	protocolMessage a protocol message
+     * @param	message a protocol message
      * @param	delivery the delivery guarantee
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method

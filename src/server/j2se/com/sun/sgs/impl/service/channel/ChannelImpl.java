@@ -27,6 +27,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
+import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -38,8 +39,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -299,7 +298,7 @@ final class ChannelImpl implements Channel, Serializable {
                     "message too long: " + message.length + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
-	    sendToAllMembers(message);
+	    sendToAllMembers(SERVER_ID, message);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
 			   state.name, HexDumper.format(message));
@@ -523,13 +522,13 @@ final class ChannelImpl implements Channel, Serializable {
      * When this transaction commits, sends the given {@code
      * channelMessage} from this channel's server to all channel members.
      */
-    private void sendToAllMembers(final byte[] channelMessage) {
+    void sendToAllMembers(CompactId senderId, final byte[] channelMessage) {
 	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
 	long localNodeId = context.getLocalNodeId();
 	final byte[] channelIdBytes = state.channelIdBytes;
 	final byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
-		state.id, SERVER_ID, channelMessage,
+		state.id, senderId, channelMessage,
 		context.nextSequenceNumber());
 	for (final long nodeId : state.getChannelServerNodeIds()) {
 	    Set<ClientSession> recipients =
@@ -540,6 +539,16 @@ final class ChannelImpl implements Channel, Serializable {
 		 * Send channel message to local recipients.
 		 */
 		for (ClientSession session : recipients) {
+		    // FIXME: check senderId != sessionId...
+		    if (senderId != SERVER_ID) {
+			CompactId sessionId =
+			    ((ClientSessionImpl) session).getCompactSessionId();
+			if (senderId.equals(sessionId)){
+			    // skip sender
+			    continue;
+			}
+		    }
+			
 		    context.getClientSessionService().sendProtocolMessage(
 			session, protocolMessage, state.delivery);
 		}

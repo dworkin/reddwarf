@@ -95,8 +95,9 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * compactId}.
+     * sessionService} and {@code compactId}.
      *
+     * @param	sessionService a client session service
      * @param	compactId a session ID
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService, CompactId compactId) {
