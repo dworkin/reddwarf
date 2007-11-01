@@ -8,5 +8,5 @@ java.util.logging.ConsoleHandler.level = FINEST
 #com.sun.sgs.impl.service.watchdog.server.level = INFO
 #com.sun.sgs.impl.service.watchdog.service.level = INFO
 #com.sun.sgs.impl.service.session.level = INFO
-#com.sun.sgs.impl.service.channel.level = FINEST
-#com.sun.sgs.impl.service.channel.ChannelImpl.level = FINEST
+com.sun.sgs.impl.service.channel.level = FINEST
+com.sun.sgs.impl.service.channel.ChannelImpl.level = FINEST

@@ -332,6 +332,19 @@ public abstract class AbstractService implements Service {
     }
     
     /**
+     * Returns the data service relevant to the current context.
+     *
+     * @return the data service relevant to the current context
+     */
+    public synchronized static DataService getDataService() {
+	if (txnProxy == null) {
+	    throw new IllegalStateException("Service not initialized");
+	} else {
+	    return txnProxy.getService(DataService.class);
+	}
+    }
+
+    /**
      * Thread for shutting down service/server.
      */
     private final class ShutdownThread extends Thread {

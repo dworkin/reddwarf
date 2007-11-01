@@ -1419,7 +1419,7 @@ public class TestChannelServiceImpl extends TestCase {
 		MessageInfo info = larry.nextChannelMessage();
 		if (info == null) {
 		    fail("got "  + nextNum +
-			 "channel messages, expected " + numMessages);
+			 " channel messages, expected " + numMessages);
 		}
 		if (! info.channelId.equals(channelId)) {
 		    fail("got channelId: " + info.channelId + ", expected " +

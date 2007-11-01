@@ -83,6 +83,10 @@ final class ChannelState implements ManagedObject, Serializable {
     /** The listener for this channel, or null. */
     private WrappedSerializable<ChannelListener> channelListener;
 
+    /** The sequence number for messages from the server on this channel. */
+    // FIXME: unused
+    private long seq = 0;
+
     /** The delivery requirement for messages sent on this channel. */
     final Delivery delivery;
 
@@ -92,11 +96,14 @@ final class ChannelState implements ManagedObject, Serializable {
     private final Map<Long, ChannelServer> servers =
 	new HashMap<Long, ChannelServer>();
 
+    /** The data service. */
+    private transient DataService dataService;
+
     /**
      * Constructs an instance of this class with the specified {@code name},
      * {@code listener}, and {@code delivery} requirement.
      */
-    private ChannelState(DataService dataService,
+    private ChannelState(
 		String name, ChannelListener listener, Delivery delivery)
     {
 	if (name == null) {
@@ -108,6 +115,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
 	this.delivery = delivery;
+	dataService = ChannelServiceImpl.getDataService();
 	ManagedReference ref = dataService.createReference(this);
 	channelIdBytes = ref.getId().toByteArray();
 	id = new CompactId(channelIdBytes);
@@ -128,7 +136,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	}
 	
 	ChannelState channelState =
-	    new ChannelState(dataService, name, listener, delivery);
+	    new ChannelState(name, listener, delivery);
 	dataService.setServiceBinding(channelStateKey, channelState);
 	return channelState;
     }
@@ -180,13 +188,12 @@ final class ChannelState implements ManagedObject, Serializable {
 
     /**
      * Returns an iterator for {@code ClientSession}s that are a
-     * member of this channel to be retrieved from the specified
-     * {@code dataService}.  The returned iterator does not support
+     * member of this channel.  The returned iterator does not support
      * the {@code remove} operation.  This method should only be
      * called within a transaction, and the returned iterator should
      * only be used within that transaction.
      */
-    Iterator<ClientSession> getSessionIterator(DataService dataService) {
+    Iterator<ClientSession> getSessionIterator() {
 	return new ClientSessionIterator(dataService, getSessionPrefix());
     }
 
@@ -195,9 +202,9 @@ final class ChannelState implements ManagedObject, Serializable {
      * channel and are connected to the node with the specified {@code
      * nodeId}.
      */
-    Set<ClientSession> getSessions(DataService dataService, long nodeId) {
+    Set<ClientSession> getSessions(long nodeId) {
 	Iterator<ClientSession> iter =
-	    new ClientSessionIterator(dataService, getSessionNodePrefix(nodeId));
+	    new ClientSessionIterator(dataService,getSessionNodePrefix(nodeId));
 	Set<ClientSession> sessions = new HashSet<ClientSession>();
 	while (iter.hasNext()) {
 	    sessions.add(iter.next());
@@ -224,7 +231,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * would be the first session to join this channel on a new node,
      * otherwise returns {@code false}.
      */
-    boolean hasSessionsOnNode(long nodeId) {
+    private boolean hasServerNode(long nodeId) {
 	return servers.containsKey(nodeId);
     }
 
@@ -265,7 +272,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * Returns {@code true} if the specified client {@code session} is
      * a member of this channel.
      */
-    boolean hasSession(DataService dataService, ClientSession session) {
+    boolean hasSession(ClientSession session) {
 	String sessionKey = getSessionKey(session);
 	try {
 	    dataService.getServiceBinding(sessionKey, ClientSessionInfo.class);
@@ -283,7 +290,7 @@ final class ChannelState implements ManagedObject, Serializable {
     /**
      * Returns {@code true} if this channel has any members.
      */
-    boolean hasSessions(DataService dataService) {
+    boolean hasSessions() {
 	String sessionPrefix = getSessionPrefix();
 	return dataService.nextServiceBoundName(getSessionPrefix()).
 	    startsWith(sessionPrefix);
@@ -293,7 +300,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * Returns {@code true} if this channel has any members connected
      * to the node with the specified {@code nodeId}.
      */
-    boolean hasSessionsOnNode(DataService dataService, long nodeId) {
+    boolean hasSessionsOnNode(long nodeId) {
 	String keyPrefix = getSessionNodePrefix(nodeId);
 	return dataService.nextServiceBoundName(keyPrefix).
 	    startsWith(keyPrefix);
@@ -310,15 +317,12 @@ final class ChannelState implements ManagedObject, Serializable {
      * @returns	{@code true} if the session was added to the channel,
      *		and {@code false} if the session is already a member
      */
-    boolean addSession(DataService dataService,
-		       ClientSession session,
-		       ChannelListener listener)
-    {
+    boolean addSession(ClientSession session, ChannelListener listener) {
 	/*
 	 * If client session is already a channel member, return false
 	 * immediately.
 	 */
-	if (hasSession(dataService, session)) {
+	if (hasSession(session)) {
 	    return false;
 	}
 
@@ -327,7 +331,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	 * channel, then add [node, channel server] pair to servers map.
 	 */
 	long nodeId = getNodeId(session);
-	if (! servers.containsKey(nodeId)) {
+	if (! hasServerNode(nodeId)) {
 	    String channelServerKey =
 		ChannelServiceImpl.getChannelServerKey(nodeId);
 	    try {
@@ -390,14 +394,12 @@ final class ChannelState implements ManagedObject, Serializable {
 	return true;
     }
 
-    boolean removeSession(DataService dataService, ClientSession session) {
-	return removeSession(dataService,
+    boolean removeSession(ClientSession session) {
+	return removeSession(
 	    getNodeId(session), session.getSessionId().getBytes());
     }
     
-    boolean removeSession(DataService dataService,
-			  long nodeId, byte[] sessionIdBytes)
-    {
+    boolean removeSession(long nodeId, byte[] sessionIdBytes) {
 	// Remove session binding.
 	String sessionKey = getSessionKey(nodeId, sessionIdBytes);
 	try {
@@ -461,7 +463,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * channel servers for this channel.  This method should be called
      * when all sessions leave the channel.
      */
-    void removeAllSessions(DataService dataService) {
+    void removeAllSessions() {
 	for (String sessionKey : 
 		 BoundNamesUtil.getServiceBoundNamesIterable(
 		    dataService, getSessionPrefix()))
@@ -469,8 +471,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    ClientSessionInfo sessionInfo =
 		dataService.getServiceBinding(
 		    sessionKey, ClientSessionInfo.class);
-	    removeSession(dataService, sessionInfo.nodeId,
-			  sessionInfo.sessionIdBytes);
+	    removeSession(sessionInfo.nodeId, sessionInfo.sessionIdBytes);
 	}
 	dataService.markForUpdate(this);
 	servers.clear();
@@ -483,8 +484,8 @@ final class ChannelState implements ManagedObject, Serializable {
      * service.  This method should be called when the channel is
      * closed.
      */
-    void closeAndRemoveState(DataService dataService) {
-	removeAllSessions(dataService);
+    void closeAndRemoveState() {
+	removeAllSessions();
 	if (channelListener != null) {
 	    channelListener.remove();
 	}
@@ -501,9 +502,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    null;
     }
 
-    ChannelListener getListener(
-	DataService dataService, ClientSession session)
-    {
+    ChannelListener getListener(ClientSession session) {
 	String listenerKey = getListenerKey(session);
 	try {
 	    ManagedObject obj =
@@ -640,6 +639,7 @@ final class ChannelState implements ManagedObject, Serializable {
     {
 	in.defaultReadObject();
 	id = new CompactId(channelIdBytes);
+	dataService = ChannelServiceImpl.getDataService();
     }
 
     /**
@@ -654,6 +654,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	private final static long serialVersionUID = 1L;
 	final long nodeId;
 	final byte[] sessionIdBytes;
+	private long seq = 0;	// FIXME: unused
 	private final ManagedReference sessionRef;
 	    
 

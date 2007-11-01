@@ -127,7 +127,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Add session and listener (if any) to channel state.
 	     */
-	    if (!state.addSession(dataService, session, listener)) {
+	    if (!state.addSession(session, listener)) {
 		// session already added
 		return;
 	    }
@@ -160,14 +160,14 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new NullPointerException("null client session");
 	    }
 
-	    if (!state.hasSession(dataService, session)) {
+	    if (!state.hasSession(session)) {
 		return;
 	    }
 
 	    /*
 	     * Remove session from channel state.
 	     */
-	    state.removeSession(dataService, session);
+	    state.removeSession(session);
 	    
 	    /*
 	     * Send 'leave' message to client session.
@@ -194,7 +194,7 @@ final class ChannelImpl implements Channel, Serializable {
     public void leaveAll() {
 	try {
 	    checkClosed();
-	    if (!state.hasSessions(dataService)) {
+	    if (!state.hasSessions()) {
 		return;
 	    }
 
@@ -210,9 +210,7 @@ final class ChannelImpl implements Channel, Serializable {
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putBytes(state.id.getExternalForm());
 	    final byte[] message = buf.getBuffer();
-	    for (ClientSession session : 
-		     state.getSessions(dataService, localNodeId))
-	    {
+	    for (ClientSession session : state.getSessions(localNodeId)) {
 		sendProtocolMessageOnCommit(session, message);
 	    }
 
@@ -229,7 +227,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 		    final ChannelServer server = state.getChannelServer(nodeId);
 		    final byte[][] sessions =
-			getSessionIds(state.getSessions(dataService, nodeId));
+			getSessionIds(state.getSessions(nodeId));
 		    runTaskOnCommit(
 			null,
 			new Runnable() {
@@ -250,7 +248,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Remove all client sessions from this channel.
 	     */
-	    state.removeAllSessions(dataService);
+	    state.removeAllSessions();
 	    logger.log(Level.FINEST, "leaveAll returns");
 	    
 	} catch (RuntimeException e) {
@@ -275,7 +273,7 @@ final class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
-	boolean hasSessions = state.hasSessions(dataService);
+	boolean hasSessions = state.hasSessions();
 	logger.log(Level.FINEST, "hasSessions returns {0}", hasSessions);
 	return hasSessions;
     }
@@ -283,7 +281,7 @@ final class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public Iterator<ClientSession> getSessions() {
 	checkClosed();
-	return state.getSessionIterator(dataService);
+	return state.getSessionIterator();
     }
 
     /** {@inheritDoc} */
@@ -390,7 +388,7 @@ final class ChannelImpl implements Channel, Serializable {
 	checkContext();
 	if (!isClosed) {
 	    leaveAll();
-	    state.closeAndRemoveState(dataService);
+	    state.closeAndRemoveState();
 	    isClosed = true;
 	}
 	
@@ -496,7 +494,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    // Notify per-session listener.
-	    listener = state.getListener(dataService, senderSession);
+	    listener = state.getListener(senderSession);
 	    if (listener != null) {
 		listener.receivedMessage(this, senderSession, message);
 	    }
@@ -532,7 +530,7 @@ final class ChannelImpl implements Channel, Serializable {
 		context.nextSequenceNumber());
 	for (final long nodeId : state.getChannelServerNodeIds()) {
 	    Set<ClientSession> recipients =
-		state.getSessions(dataService, nodeId);
+		state.getSessions(nodeId);
 	    if (nodeId == localNodeId) {
 		
 		/*
@@ -589,14 +587,27 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	}
     }
+    
 
     /**
-     * When this transaction commits, sends the given {@code
-     * channelMessage} from this channel's server to the specified
-     * recipient {@code sessions}.
+     * Wends the given {@code channelMessage} from the server to the
+     * specified recipient {@code sessions} when the current
+     * transaction commits.
      */
-    private void sendToMembers(Set<ClientSession> sessions,
-			       final byte[] channelMessage)
+    private void sendToMembers(
+	Set<ClientSession> sessions, byte[] channelMessage)
+    {
+	sendToMembers(SERVER_ID, sessions, channelMessage);
+    }
+
+    /**
+     * Sends the given {@code channelMessage} from the sender with the
+     * specified {@code senderId} to the specified recipient {@code
+     * sessions} when the current transaction commits.
+     */
+    void sendToMembers(CompactId senderId,
+		       Set<ClientSession> sessions,
+		       final byte[] channelMessage)
     {
 	final byte[] channelIdBytes = state.channelIdBytes;
 	Map<Long, Set<ClientSession>> recipientsPerNode =
@@ -613,6 +624,10 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 	
 	long localNodeId = context.getLocalNodeId();
+	final byte[] protocolMessage =
+	    ChannelServiceImpl.getChannelMessage(
+		state.id, senderId, channelMessage,
+		context.nextSequenceNumber());
 	for (final long nodeId : state.getChannelServerNodeIds()) {
 	    Set<ClientSession> recipients = recipientsPerNode.get(nodeId);
 	    if (recipients == null) {
@@ -620,10 +635,6 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	    if (nodeId == localNodeId) {
 		
-		byte[] protocolMessage =
-		    ChannelServiceImpl.getChannelMessage(
-			state.id, SERVER_ID, channelMessage,
-			context.nextSequenceNumber());
 		/*
 		 * Send channel message to local recipients.
 		 */
@@ -646,7 +657,7 @@ final class ChannelImpl implements Channel, Serializable {
 			public void run() {
 			    try {
 				server.send(channelIdBytes, recipientIds,
-					    channelMessage, state.delivery);
+					    protocolMessage, state.delivery);
 			    } catch (Exception e) {
 				// skip unresponsive channel server
 				logger.logThrow(
@@ -654,7 +665,8 @@ final class ChannelImpl implements Channel, Serializable {
 				    "Contacting channel server:{0} on " +
 				    " node:{1} throws ", server, nodeId);
 			    }
-			}});
+			}
+		    });
 	    }
 	}
     }
