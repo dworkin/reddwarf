@@ -279,6 +279,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    return success || state.get() == REAPING;
 	}
 
+	/** Returns true if this transaction is being reaped. */
+	boolean getReaping() {
+	    return state.get() == REAPING;
+	}
+
 	/**
 	 * Marks the transaction as prepared.  This method should only be
 	 * called when the transaction is in use and has not already been
@@ -389,7 +394,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Gets the transaction associated with the specified ID, and marks it
 	 * in use.  Checks if the transaction has timed out if checkTimeout is
-	 * true.
+	 * true, and considers transactions being reaped as not active.
 	 */
 	Txn get(long tid, boolean checkTimeout) {
 	    Txn txn = table.get(tid);
@@ -402,7 +407,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 			"Multiple simultaneous accesses to transaction: " +
 			txn);
 		}
-		return txn;
+		if (!txn.getReaping()) {
+		    return txn;
+		}
 	    }
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
@@ -943,7 +950,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     /**
      * Returns the transaction for the specified ID, throwing
      * TransactionNotActiveException if the transaction is not active, and
-     * checking, if requested, whether the transaction has timed out.
+     * checking, if requested, whether the transaction has timed out.  Treats
+     * transactions that are being reaped as being not active.
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
