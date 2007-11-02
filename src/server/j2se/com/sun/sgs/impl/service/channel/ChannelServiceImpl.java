@@ -139,9 +139,6 @@ public class ChannelServiceImpl
     private final WeakHashMap<ClientSession, NonDurableTaskQueue>
 	taskQueues = new WeakHashMap<ClientSession, NonDurableTaskQueue>();
     
-    /** The sequence number for channel messages originating from the server. */
-    private final AtomicLong sequenceNumber = new AtomicLong(0);
-
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -186,7 +183,8 @@ public class ChannelServiceImpl
 		int port = exporter.export(serverImpl, serverPort);
 		serverProxy = exporter.getProxy();
 		logger.log(
-		    Level.CONFIG, "export successful. port:{0,number,#}", port);
+		    Level.CONFIG,
+		    "ChannelServer export successful. port:{0,number,#}", port);
 	    } catch (Exception e) {
 		try {
 		    exporter.unexport();
@@ -561,14 +559,11 @@ public class ChannelServiceImpl
 	    return;
 	}
 
-	ClientSessionId senderId = sender.getSessionId();
-	CompactId compactSenderId =
-	    ((ClientSessionImpl) sender).getCompactSessionId();
 
 	byte[] channelMessage;
 	if (numRecipients == 0) {
 	    channelMessage = buf.getByteArray();
-	    channel.sendToAllMembers(compactSenderId, channelMessage);
+	    channel.sendToAllMembers(sender, channelMessage);
 	    
 	} else {
 
@@ -587,7 +582,7 @@ public class ChannelServiceImpl
 	    }
 
 	    channelMessage = buf.getByteArray();
-	    channel.sendToMembers(compactSenderId, recipients, channelMessage);
+	    channel.sendToMembers(sender, recipients, channelMessage);
 	}
 	
 	/*
@@ -600,7 +595,7 @@ public class ChannelServiceImpl
 	NonDurableTaskQueue queue = getTaskQueue(sender);
 	queue.addTask(
 	    new NotifyTask(channel.state.name, channelId,
-			   senderId, channelMessage));
+			   sender.getSessionId(), channelMessage));
     }
     
     /**
@@ -812,14 +807,6 @@ public class ChannelServiceImpl
 	<T extends Service> T getService(Class<T> type) {
 	    return txnProxy.getService(type);
 	}
-
-	/**
-	 * Returns the next sequence number for messages originating
-	 * from this service.
-	 */
-	long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
     }
 
     /**
@@ -1018,27 +1005,4 @@ public class ChannelServiceImpl
 	return PKG_NAME + ".server." + nodeId;
     }
 
-    /**
-     * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
-     * message with this channel's name, and the specified sender,
-     * message, and sequence number.
-     */
-    static byte[] getChannelMessage(
-	CompactId channelId, CompactId senderId,
-	byte[] message, long sequenceNumber)
-    {
-        MessageBuffer buf =
-            new MessageBuffer(13 + channelId.getExternalFormByteCount() +
-			      senderId.getExternalFormByteCount() +
-			      message.length);
-        buf.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putBytes(channelId.getExternalForm()).
-            putLong(sequenceNumber).
-            putBytes(senderId.getExternalForm()).
-	    putByteArray(message);
-
-        return buf.getBuffer();
-    }
 }

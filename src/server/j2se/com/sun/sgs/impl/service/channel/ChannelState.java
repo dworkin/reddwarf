@@ -84,7 +84,6 @@ final class ChannelState implements ManagedObject, Serializable {
     private WrappedSerializable<ChannelListener> channelListener;
 
     /** The sequence number for messages from the server on this channel. */
-    // FIXME: unused
     private long seq = 0;
 
     /** The delivery requirement for messages sent on this channel. */
@@ -273,10 +272,15 @@ final class ChannelState implements ManagedObject, Serializable {
      * a member of this channel.
      */
     boolean hasSession(ClientSession session) {
+	return getClientSessionInfo(session) != null;
+    }
+
+    private ClientSessionInfo getClientSessionInfo(ClientSession session) {
 	String sessionKey = getSessionKey(session);
+	ClientSessionInfo info = null;
 	try {
-	    dataService.getServiceBinding(sessionKey, ClientSessionInfo.class);
-	    return true;
+	    info = dataService.getServiceBinding(
+		sessionKey, ClientSessionInfo.class);
 	} catch (NameNotBoundException e) {
 	} catch (ObjectNotFoundException e) {
 	    logger.logThrow(
@@ -284,7 +288,20 @@ final class ChannelState implements ManagedObject, Serializable {
 		"ClientSessionInfo binding:{0} exists, but object removed",
 		sessionKey);
 	}
-	return false;
+	return info;
+    }
+
+    long nextSequenceNumber(ClientSession session) {
+	assert session == null || hasSession(session);
+	return
+	    (session != null) ?
+	    getClientSessionInfo(session).nextSequenceNumber(dataService) :
+	    nextSequenceNumber();
+    }
+
+    private long nextSequenceNumber() {
+	dataService.markForUpdate(this);
+	return seq++;
     }
 
     /**
@@ -654,7 +671,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	private final static long serialVersionUID = 1L;
 	final long nodeId;
 	final byte[] sessionIdBytes;
-	private long seq = 0;	// FIXME: unused
+	private long seq = 0;
 	private final ManagedReference sessionRef;
 	    
 
@@ -682,6 +699,11 @@ final class ChannelState implements ManagedObject, Serializable {
 	    } catch (ObjectNotFoundException e) {
 		return null;
 	    }
+	}
+
+	long nextSequenceNumber(DataService dataService) {
+	    dataService.markForUpdate(this);
+	    return seq++;
 	}
     }
 
