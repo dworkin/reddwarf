@@ -32,11 +32,18 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
- * Outputs task timing data to a file for later use by Gnuplot.
+ * Outputs task timing data to files for later use by Gnuplot.  The files are
+ * stored in the {@code data} subdirectory of the application root directory,
+ * as specified by the {@code com.sun.sgs.app.root} configuration property.  A
+ * separate file is created for each base task type.
  */
 public class TaskRuntimeGraphOutputListener implements ProfileListener {
-    
-    private final Map<String,TaskTypeDetail> taskTimes;
+
+    /** A map from basic task type to information collected for that type. */
+    private final Map<String,TaskTypeDetail> taskTimes =
+	new HashMap<String,TaskTypeDetail>();
+
+    /** The directory for storing results. */
     private final String directory;
 
     /**
@@ -50,13 +57,17 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
      * @param resourceCoord the {@code ResourceCoordinator} used to
      *        run any long-lived tasks
      */
-    public TaskRuntimeGraphOutputListener(Properties properties, 
+    public TaskRuntimeGraphOutputListener(Properties properties,
 					  TaskOwner owner,
 					  TaskScheduler taskScheduler,
 					  ResourceCoordinator resourceCoord)
     {
-	taskTimes = new HashMap<String,TaskTypeDetail>();
-	directory = properties.getProperty("com.sun.sgs.app.root") + "/data/";
+	String rootDir = properties.getProperty("com.sun.sgs.app.root");
+	if (rootDir == null) {
+	    throw new IllegalArgumentException(
+		"The com.sun.sgs.app.root property must be specified");
+	}
+	directory = rootDir + File.separator + "data" + File.separator;
     }
 
     /**
@@ -70,32 +81,28 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void report(ProfileReport profileReport) {
-
-        if (profileReport.wasTaskSuccessful()) {
-
-            String name = profileReport.getTask().getBaseTaskType();
+	if (profileReport.wasTaskSuccessful()) {
+	    String name = profileReport.getTask().getBaseTaskType();
 	    TaskTypeDetail detail = taskTimes.get(name);
 	    if (detail == null) {
-		try {		 
+		try {
 		    // NOTE: probably should have some configurable
 		    // option to overwrite the existing file or not
-		    File output = new File(directory + name + 
-					   //"." + System.currentTimeMillis() + 
-					   ".dat");
+		    File output = new File(directory + name + ".dat");
 		    detail = new TaskTypeDetail(new PrintStream(output));
 		    taskTimes.put(name, detail);
-		} catch (Throwable t) {
-		    t.printStackTrace();
+		} catch (Exception e) {
+		    e.printStackTrace();
+		    return;
 		}
-	    }	    
-	    
+	    }
 	    detail.count++;
-	    detail.printStream.printf("%d %d\n", detail.count, 
+	    detail.printStream.printf("%d %d\n", detail.count,
 				      profileReport.getRunningTime());
-
-	    if (detail.count % 100 == 0) 
-		detail.printStream.flush();			    
-	}       
+	    if (detail.count % 100 == 0) {
+		detail.printStream.flush();
+	    }
+	}
     }
 
     /**
@@ -108,15 +115,18 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
 	    ps.close();
 	}
     }
-    
-    private static class TaskTypeDetail {
-	
-	int count;
-	
-	PrintStream printStream;
 
-	TaskTypeDetail(PrintStream printStream) { 
-	    count = 0;
+    /** Records information for a particular task type. */
+    private static class TaskTypeDetail {
+
+	/** The number of tasks of this type. */
+	int count = 0;
+
+	/** A stream for printing output for this type. */
+	final PrintStream printStream;
+
+	/** Creates an instance using the specified stream. */
+	TaskTypeDetail(PrintStream printStream) {
 	    this.printStream = printStream;
 	}
     }
