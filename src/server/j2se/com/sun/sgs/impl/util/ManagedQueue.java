@@ -22,6 +22,7 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import java.io.Serializable;
 import java.util.AbstractQueue;
@@ -34,7 +35,7 @@ import java.util.Iterator;
  */
 public class ManagedQueue<E>
     extends AbstractQueue<E>
-    implements ManagedObject, Serializable //, ManagedObjectRemoval
+    implements ManagedObject, Serializable, ManagedObjectRemoval
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -154,4 +155,5 @@ public class ManagedQueue<E>
     private Entry<E> getHead() {
 	return headRef.get(Entry.class);
     }
+    
 }
