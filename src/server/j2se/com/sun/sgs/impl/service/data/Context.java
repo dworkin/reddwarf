@@ -98,6 +98,10 @@ final class Context extends TransactionContext {
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
 	classSerial = classesTable.createClassSerialization(this.txn);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
+		       getTxnId(), Thread.currentThread().getName());
+	}
     }
 
     /**
@@ -249,13 +253,14 @@ final class Context extends TransactionContext {
 		result = storeParticipant.prepare(txn);
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "prepare tid:{0} returns {1}",
+		logger.log(Level.FINER, "prepare tid:{0,number,#} returns {1}",
 			   getTxnId(), result);
 	    }
 	    return result;
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(Level.FINER, e, "prepare tid:{0} throws",
+		logger.logThrow(Level.FINER, e,
+				"prepare tid:{0,number,#} throws",
 				getTxnId());
 	    }
 	    throw e;
@@ -271,12 +276,13 @@ final class Context extends TransactionContext {
 		storeParticipant.commit(txn);
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "commit tid:{0} returns", getTxnId());
+		logger.log(Level.FINER, "commit tid:{0,number,#} returns",
+			   getTxnId());
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(
-		    Level.FINER, e, "commit tid:{0} throws", getTxnId());
+		logger.logThrow(Level.FINER, e,
+				"commit tid:{0,number,#} throws", getTxnId());
 	    }
 	    throw e;
 	}
@@ -292,13 +298,15 @@ final class Context extends TransactionContext {
 		storeParticipant.prepareAndCommit(txn);
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "prepareAndCommit tid:{0} returns",
+		logger.log(Level.FINER,
+			   "prepareAndCommit tid:{0,number,#} returns",
 			   getTxnId());
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.logThrow(Level.FINER, e,
-				"prepareAndCommit tid:{0} throws", getTxnId());
+				"prepareAndCommit tid:{0,number,#} throws",
+				getTxnId());
 	    }
 	    throw e;
 	}
@@ -312,15 +320,15 @@ final class Context extends TransactionContext {
 		storeParticipant.abort(txn);
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "abort tid:{0}, retryable:{1} returns",
+		logger.log(Level.FINER,
+			   "abort tid:{0,number,#}, retryable:{1} returns",
 			   getTxnId(), retryable);
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(
-		    Level.FINER, e,
-		    "prepareAndCommit tid:{0}, retryable:{1} throws",
-		    getTxnId(), retryable);
+		logger.logThrow(Level.FINER, e,
+				"abort tid:{0,number,#}, retryable:{1} throws",
+				getTxnId(), retryable);
 	    }
 	    throw e;
 	}

@@ -476,7 +476,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "removeObject tid:{0}, object:{1}, oid:{2} returns",
+		    "removeObject tid:{0,number,#}, object:{1}," +
+		    " oid:{2,number,#} returns",
 		    contextTxnId(context), Objects.fastToString(object),
 		    refId(ref));
 	    }
@@ -484,7 +485,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e,
-		    "removeObject tid:{0}, object:{1}, oid:{2} throws",
+		    "removeObject tid:{0,number,#}, object:{1}," +
+		    " oid:{2,number,#} throws",
 		    contextTxnId(context), Objects.fastToString(object),
 		    refId(ref));
 	    }
@@ -511,7 +513,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "markForUpdate tid:{0}, object:{1}, oid:{2} returns",
+		    "markForUpdate tid:{0,number,#}, object:{1}," +
+		    " oid:{2,number,#} returns",
 		    contextTxnId(context), Objects.fastToString(object),
 		    refId(ref));
 	    }
@@ -519,7 +522,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e,
-		    "markForUpdate tid:{0}, object:{1}, oid:{2} throws",
+		    "markForUpdate tid:{0,number,#}, object:{1}," +
+		    " oid:{2,number,#} throws",
 		    contextTxnId(context), Objects.fastToString(object),
 		    refId(ref));
 	    }
@@ -550,7 +554,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "createReference tid:{0}, object:{1} returns {2}",
+		    "createReference tid:{0,number,#}, object:{1}" +
+		    " returns oid:{2,number,#}",
 		    contextTxnId(context), Objects.fastToString(object),
 		    refId(result));
 	    }
@@ -559,7 +564,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e,
-		    "createReference tid:{0}, object:{1} throws",
+		    "createReference tid:{0,number,#}, object:{1} throws",
 		    contextTxnId(context), Objects.fastToString(object));
 	    }
 	    throw e;
@@ -601,16 +606,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    ManagedReference result = context.getReference(id.longValue());
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
-			   "createReferenceForId tid:{0}, oid:{1} returns",
+			   "createReferenceForId tid:{0,number,#}," +
+			   " oid:{1,number,#} returns",
 			   contextTxnId(context), id);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "createReferenceForId tid:{0}, oid:{1} throws",
-		    contextTxnId(context), id);
+		logger.logThrow(Level.FINEST, e,
+				"createReferenceForId tid:{0,number,#}," +
+				" oid:{1,number,#} throws",
+				contextTxnId(context), id);
 	    }
 	    throw e;
 	}
@@ -640,7 +646,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1}, name:{2}, type:{3} returns {4}",
+		    "{0} tid:{1,number,#}, name:{2}, type:{3} returns {4}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    contextTxnId(context), name, type,
 		    Objects.fastToString(result));
@@ -649,7 +655,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} tid:{1}, name:{2}, type:{3} throws",
+		    Level.FINEST, e,
+		    "{0} tid:{1,number,#}, name:{2}, type:{3} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    contextTxnId(context), name, type);
 	    }
@@ -673,18 +680,20 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "{0} tid:{1}, name:{2}, object:{3} returns",
-			   serviceBinding ? "setServiceBinding" : "setBinding",
-			   contextTxnId(context), name,
-			   Objects.fastToString(object));
+		logger.log(
+		    Level.FINEST,
+		    "{0} tid:{1,number,#}, name:{2}, object:{3} returns",
+		    serviceBinding ? "setServiceBinding" : "setBinding",
+		    contextTxnId(context), name,
+		    Objects.fastToString(object));
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} name:{1}, object:{2} throws",
+		    Level.FINEST, e,
+		    "{0} tid:{1,number,#}, name:{2}, object:{3} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    name, Objects.fastToString(object));
+		    contextTxnId(context), name, Objects.fastToString(object));
 	    }
 	    throw e;
 	}
@@ -707,14 +716,14 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1}, name:{2} returns",
+		    "{0} tid:{1,number,#}, name:{2} returns",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    contextTxnId(context), name);
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} tid:{1}, name:{2} throws",
+		    Level.FINEST, e, "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    contextTxnId(context), name);
 	    }
@@ -732,7 +741,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		serviceBinding);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "{0} tid:{1}, name:{2} returns {3}",
+		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns {3}",
 		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
 		    contextTxnId(context), name, result);
 	    }
@@ -740,7 +749,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} tid:{1}, name:{2} throws",
+		    Level.FINEST, e, "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
 		    contextTxnId(context), name);
 	    }

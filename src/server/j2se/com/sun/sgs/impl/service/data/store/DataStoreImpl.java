@@ -1461,7 +1461,7 @@ public class DataStoreImpl
 	    joined = true;
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "join txn:{0}, thread:{1}",
-			   txn, Thread.currentThread());
+			   txn, Thread.currentThread().getName());
 	    }
 	} finally {
 	    if (!joined) {

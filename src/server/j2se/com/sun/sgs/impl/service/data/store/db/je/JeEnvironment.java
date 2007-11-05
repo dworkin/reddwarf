@@ -272,6 +272,8 @@ public class JeEnvironment implements DbEnvironment {
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, DEFAULT_LOCK_TIMEOUT, 1, Long.MAX_VALUE);
+	long lockTimeoutMicro = lockTimeout < (Long.MAX_VALUE / 1000)
+	    ? lockTimeout * 1000 : 0;
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
@@ -281,7 +283,7 @@ public class JeEnvironment implements DbEnvironment {
 	 * detected.  Setting the value on the transaction has no effect on
 	 * deadlock detection.  -tjb@sun.com (11/05/2007)
 	 */
- 	config.setLockTimeout(lockTimeout);
+ 	config.setLockTimeout(lockTimeoutMicro);
 	config.setTransactional(true);
 	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);

@@ -105,6 +105,17 @@ class JeTransaction implements DbTransaction {
 	    long timeoutMicros =
 		timeout < MAX_MILLISECONDS ? timeout * 1000 : 0;
 	    txn.setTxnTimeout(timeoutMicros);
+// 	    try {
+// 		java.lang.reflect.Field field =
+// 		    com.sleepycat.je.Transaction.class.getDeclaredField("txn");
+// 		field.setAccessible(true);
+// 		com.sleepycat.je.txn.Txn jeTxn = (com.sleepycat.je.txn.Txn)
+// 		    field.get(txn);
+// 		System.err.println("lock timeout: " + jeTxn.getLockTimeout());
+// 		System.err.println("txn timeout: " + jeTxn.getTxnTimeOut());
+// 	    } catch (Exception e) {
+// 		e.printStackTrace();
+// 	    }
 	} catch (DatabaseException e) {
 	    throw JeEnvironment.convertException(e, false);
 	}
