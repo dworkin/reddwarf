@@ -48,6 +48,8 @@ import java.io.FileNotFoundException;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -113,6 +115,10 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul> <p>
  *
+ * In addition, name and object operations that throw {@link
+ * TransactionAbortedException} will log the failure to the {@code Logger}
+ * named {@code com.sun.sgs.impl.service.data.DataStoreImpl.abort}, to make it
+ * easier to debug concurrency conflicts.
  */
 public class DataStoreImpl
     implements DataStore, TransactionParticipant, ProfileProducer
@@ -138,11 +144,15 @@ public class DataStoreImpl
 	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
-    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
+    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1024;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** The logger for transaction abort exceptions. */
+    static final LoggerWrapper abortLogger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
 
     /** The number of bytes in a SHA-1 message digest. */
     private static final int SHA1_SIZE = 20;
@@ -176,22 +186,16 @@ public class DataStoreImpl
     private final DbDatabase namesDb;
 
     /**
-     * Object to synchronize on when accessing nextObjectId and
-     * lastObjectId.
+     * Object to synchronize on when accessing freeObjectIds or allocating new
+     * object IDs.
      */
-    private final Object objectIdLock = new Object();
+    final Object objectIdLock = new Object();
 
     /**
-     * The next object ID to use for creating an object.  Valid if not greater
-     * than lastObjectId.
+     * Information about free object IDs -- synchronize on objectIdLock when
+     * accessing.
      */
-    private long nextObjectId = 0;
-
-    /**
-     * The last object ID that is free for allocating an object before needing
-     * to obtain more IDs from the database.
-     */
-    private long lastObjectId = -1;
+    final List<ObjectIdInfo> freeObjectIds = new ArrayList<ObjectIdInfo>();
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -337,7 +341,7 @@ public class DataStoreImpl
     }
 
     /** Stores transaction information. */
-    private static class TxnInfo {
+    private class TxnInfo {
 
 	/** The associated database transaction. */
 	final DbTransaction dbTxn;
@@ -357,6 +361,12 @@ public class DataStoreImpl
 	/** The last key returned by the cursor or null. */
 	private String lastCursorKey;
 
+	/**
+	 * Information about object IDs available for allocation in this
+	 * transaction, or null if this transaction has not done allocation.
+	 */
+	private ObjectIdInfo objectIdInfo = null;
+
 	TxnInfo(Transaction txn, DbEnvironment env) {
 	    dbTxn = env.beginTransaction(txn.getTimeout());
 	}
@@ -374,6 +384,11 @@ public class DataStoreImpl
 	void commit() {
 	    maybeCloseCursor();
 	    dbTxn.commit();
+	    if (objectIdInfo != null) {
+		synchronized (objectIdLock) {
+		    freeObjectIds.add(objectIdInfo);
+		}
+	    }
 	}
 
 	/**
@@ -383,6 +398,12 @@ public class DataStoreImpl
 	void abort() {
 	    maybeCloseCursor();
 	    dbTxn.abort();
+	    if (objectIdInfo != null) {
+		objectIdInfo.abort();
+		synchronized (objectIdLock) {
+		    freeObjectIds.add(objectIdInfo);
+		}
+	    }
 	}
 
 	/** Returns the next name in the names database. */
@@ -427,6 +448,25 @@ public class DataStoreImpl
 		c.close();
 	    }
 	}
+
+	/**
+	 * Returns information about free object IDs available for allocation
+	 * in this transaction.
+	 */
+	ObjectIdInfo getObjectIdInfo() {
+	    if (objectIdInfo == null) {
+		synchronized (objectIdLock) {
+		    objectIdInfo = freeObjectIds.isEmpty()
+			? null : freeObjectIds.remove(0);
+		}
+		if (objectIdInfo == null) {
+		    objectIdInfo = new ObjectIdInfo();
+		} else {
+		    objectIdInfo.initTxn();
+		}
+	    }
+	    return objectIdInfo;
+	}
     }
 
     /** The default implementation of Scheduler. */
@@ -454,6 +494,64 @@ public class DataStoreImpl
      */
     private static class Databases {
 	private DbDatabase info, classes, oids, names;
+    }
+
+    /** Stores information about object IDs available for allocation. */
+    private static final class ObjectIdInfo {
+	/**
+	 * The next object ID to use for creating an object.  Valid if not
+	 * greater than lastObjectId.
+	 */
+	private long nextObjectId = 0;
+
+	/**
+	 * The last object ID that is free for allocating an object before
+	 * needing to obtain more IDs from the database.
+	 */
+	private long lastObjectId = -1;
+
+	/**
+	 * The value of nextObjectId at the start of the transaction, and which
+	 * it should be set to if the transaction aborts.
+	 */
+	private long abortNextObjectId = 0;
+
+	/** Creates an instance of this class. */
+	private ObjectIdInfo() { }
+
+	/**
+	 * Records the initial value of nextObjectId, so that it can be rolled
+	 * back if the transaction aborts.
+	 */
+	void initTxn() {
+	    abortNextObjectId = nextObjectId;
+	}
+
+	/** Returns whether there are more object IDs available. */
+	boolean hasNext() {
+	    return nextObjectId <= lastObjectId;
+	}
+
+	/** Updates the next and last object IDs. */
+	void setObjectIds(long nextObjectId, long lastObjectId) {
+	    this.nextObjectId = nextObjectId;
+	    this.lastObjectId = lastObjectId;
+	    this.abortNextObjectId = nextObjectId;
+	}
+
+	/** Returns the next object ID. */
+	long next() {
+	    assert hasNext();
+	    return nextObjectId++;
+	}
+
+	/**
+	 * Sets nextObjectId back to the failure from the start of the
+	 * transaction, for when the transaction aborts.
+	 */
+	void abort() {
+	    nextObjectId = abortNextObjectId;
+	}
     }
 
     /**
@@ -592,19 +690,21 @@ public class DataStoreImpl
     public long createObject(Transaction txn) {
 	logger.log(Level.FINEST, "createObject txn:{0}", txn);
 	try {
-	    checkTxn(txn, createObjectOp);
-	    long result;
-	    synchronized (objectIdLock) {
-		if (nextObjectId > lastObjectId) {
+	    TxnInfo txnInfo = checkTxn(txn, createObjectOp);
+	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
+	    if (!objectIdInfo.hasNext()) {
+		long newNextObjectId;
+		synchronized (objectIdLock) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
-		    long newNextObjectId = getNextId(
-			DataStoreHeader.NEXT_OBJ_ID_KEY, allocationBlockSize,
-			txn.getTimeout());
-		    nextObjectId = newNextObjectId;
-		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
+		    newNextObjectId = getNextId(
+			DataStoreHeader.NEXT_OBJ_ID_KEY,
+			allocationBlockSize, txn.getTimeout());
 		}
-		result = nextObjectId++;
+		objectIdInfo.setObjectIds(
+		    newNextObjectId,
+		    newNextObjectId + allocationBlockSize - 1);
 	    }
+	    long result = objectIdInfo.next();
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
@@ -755,7 +855,7 @@ public class DataStoreImpl
 	} catch (RuntimeException e) {
 	    throw convertException(
 		txn, Level.FINEST, e,
-		"setObject txn:" + txn + (oidSet ? ", oid:" + oid : ""));
+		"setObjects txn:" + txn + (oidSet ? ", oid:" + oid : ""));
 	}
     }
 
@@ -937,14 +1037,6 @@ public class DataStoreImpl
 	}
     }
 
-    private static String toString(Transaction txn) {
-	return "txn " + new java.math.BigInteger(txn.getId());
-    }
-
-    private static String toString(byte[] bytes) {
-	return java.util.Arrays.toString(bytes);
-    }
-
     /** {@inheritDoc} */
     public int getClassId(Transaction txn, byte[] classInfo) {
 	logger.log(Level.FINER, "getClassId txn:{0}", txn);
@@ -956,7 +1048,6 @@ public class DataStoreImpl
 		    "The classInfo argument must not be null");
 	    }
 	    byte[] hashKey = getKeyFromClassInfo(classInfo);
-	    System.err.println(toString(txn) + " hashKey " + toString(hashKey));
 	    int result;
 	    boolean done = false;
 	    /*
@@ -974,29 +1065,27 @@ public class DataStoreImpl
 		byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
 		if (hashValue != null) {
 		    result = DataEncoding.decodeInt(hashValue);
-		    System.err.println(toString(txn) + " found " + result);
 		} else {
-		    byte[] idBytes = classesDb.get(
-			dbTxn, DataStoreHeader.LAST_CLASS_ID_KEY, true);
-		    result = (idBytes == null)
-			? 1 : DataEncoding.decodeInt(idBytes) + 1;
-		    System.err.println(toString(txn) + " add class ID " + result);
-		    boolean success = classesDb.putNoOverwrite(
-			dbTxn, getKeyFromClassId(result), classInfo);
-		    if (!success) {
-			System.err.println(toString(txn) + " class ID found");
-			throw new DataStoreException(
-			    "Class ID already present");
+		    DbCursor cursor = classesDb.openCursor(dbTxn);
+		    try {
+			result = cursor.findLast()
+			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
+			byte[] idKey = getKeyFromClassId(result);
+			boolean success =
+			    cursor.putNoOverwrite(idKey, classInfo);
+			if (!success) {
+			    throw new DataStoreException(
+				"Class ID key already present");
+			}
+		    } finally {
+			cursor.close();
 		    }
-		    idBytes = DataEncoding.encodeInt(result);
-		    success = classesDb.putNoOverwrite(dbTxn, hashKey, idBytes);
+		    boolean success = classesDb.putNoOverwrite(
+			dbTxn, hashKey, DataEncoding.encodeInt(result));
 		    if (!success) {
-			System.err.println(toString(txn) + " class hash found");
 			throw new DataStoreException(
 			    "Class hash already present");
 		    }
-		    classesDb.put(dbTxn, DataStoreHeader.LAST_CLASS_ID_KEY,
-				  idBytes);
 		}
 		done = true;
 		dbTxn.commit();
@@ -1370,6 +1459,10 @@ public class DataStoreImpl
 	try {
 	    txn.join(this);
 	    joined = true;
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "join txn:{0}, thread:{1}",
+			   txn, Thread.currentThread());
+	    }
 	} finally {
 	    if (!joined) {
 		decrementTxnCount();
@@ -1431,7 +1524,9 @@ public class DataStoreImpl
 	{
 	    txn.abort(e);
 	}
-	logger.logThrow(Level.FINEST, e, "{0} throws", operation);
+	LoggerWrapper thisLogger = e instanceof TransactionAbortedException
+	    ? abortLogger : logger;
+	thisLogger.logThrow(Level.FINEST, e, "{0} throws", operation);
 	return e;
     }
 

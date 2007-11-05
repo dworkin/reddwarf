@@ -18,25 +18,23 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     private static final Random random = new Random();
 
     /** A reference to the map. */
-    private final ManagedReference map;
+    private final ManagedReference mapRef;
 
-    /**
-     * Creates an instance with the specified reference, which should refer to
-     * the map.
-     */
-    public MapPutTask(ManagedReference map) {
+    /** Creates an instance with the map. */
+    public MapPutTask(Map map) {
 	if (map == null) {
 	    throw new NullPointerException("The map must not be null");
 	}
-	this.map = map;
+	mapRef = AppContext.getDataManager().createReference(
+	    (ManagedObject) map);
     }
 
     /** Puts a random integer into the map and reschedules this task. */
     public void run() {
 	@SuppressWarnings("unchecked")
-	Map<Object, Object> m = map.get(Map.class);
+	Map<Object, Object> map = mapRef.get(Map.class);
 	int i = random.nextInt();
-	m.put(i, i);
+	map.put(i, i);
 	AppContext.getTaskManager().scheduleTask(this);
     }
 }

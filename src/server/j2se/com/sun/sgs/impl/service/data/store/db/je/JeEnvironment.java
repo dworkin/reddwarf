@@ -94,6 +94,16 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * property is set to {@code -1} by default, which disables statistics
  * logging. <p>
  *
+ *
+ * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT}
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ * that an attempt to obtain a lock will be allowed to continue before being
+ * aborted.  Since Berkeley DB Java edition only detects deadlocks on lock
+ * timeouts, this value is also the amount of time it will take to detect a
+ * deadlock.  The value must be greater than {@code 0}.
+ *
  * </dl> <p>
  *
  * The constructor also supports any initialization properties supported by the
@@ -157,6 +167,16 @@ public class JeEnvironment implements DbEnvironment {
      */
     public static final String STATS_PROPERTY = PACKAGE + ".stats";
     
+    /**
+     * The property that specifies the amount of time permitted to obtain a
+     * lock, as a proportion of the transaction timeout.
+     */
+    public static final String LOCK_TIMEOUT_PROPERTY =
+	PACKAGE + ".lock.timeout.";
+
+    /** The default value of the relative lock timeout property. */
+    public static final long DEFAULT_LOCK_TIMEOUT = 10;
+
     /**
      * Default values for Berkeley DB Java Edition properties that are
      * different from the BDB defaults.
@@ -250,10 +270,20 @@ public class JeEnvironment implements DbEnvironment {
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
+	long lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, DEFAULT_LOCK_TIMEOUT, 1, Long.MAX_VALUE);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
+	/*
+	 * Note that it seems that the lock timeout value needs to be set on
+	 * the BDB JE environment so that it controls how quickly deadlocks are
+	 * detected.  Setting the value on the transaction has no effect on
+	 * deadlock detection.  -tjb@sun.com (11/05/2007)
+	 */
+ 	config.setLockTimeout(lockTimeout);
 	config.setTransactional(true);
+	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);
 	for (Enumeration<?> names = propertiesWithDefaults.propertyNames();
 	     names.hasMoreElements(); )

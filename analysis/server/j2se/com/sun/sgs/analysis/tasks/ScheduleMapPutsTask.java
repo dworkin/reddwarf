@@ -2,11 +2,11 @@ package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
 import java.io.Serializable;
+import java.util.Properties;
 
 /**
  * A task that creates a {@link ScalableHashMap}, and schedules a number of
@@ -22,18 +22,27 @@ public class ScheduleMapPutsTask implements Task, Serializable {
     private static final long serialVersionUID = 1;
 
     /**
-     * The name of the system property that specifies the number of tasks to
-     * run.
+     * The name of the configuration property that specifies the number of
+     * tasks to run.
      */
     public static final String NUM_TASKS_KEY =
 	ScheduleMapPutsTask.class.getName() + ".num.tasks";
 
     /** The number of tasks to run. */
-    private static int numTasks = Integer.getInteger(
-	NUM_TASKS_KEY, Runtime.getRuntime().availableProcessors());
+    private final int numTasks;
 
-    /** Creates an instance of this class. */
-    public ScheduleMapPutsTask() { }
+    /**
+     * Creates an instance of this class using the specified configuration
+     * properties.
+     */
+    public ScheduleMapPutsTask(Properties properties) { 
+	String numTasksString = properties.getProperty(NUM_TASKS_KEY);
+	if (numTasksString == null) {
+	    numTasks = Runtime.getRuntime().availableProcessors();
+	} else {
+	    numTasks = Integer.parseInt(numTasksString);
+	}
+    }
 
     /** Schedules the tasks. */
     public void run() {
@@ -42,9 +51,8 @@ public class ScheduleMapPutsTask implements Task, Serializable {
 	DataManager dm = AppContext.getDataManager();
 	ScalableHashMap<Integer, Integer> map =
 	    new ScalableHashMap<Integer, Integer>();
-	ManagedReference ref = dm.createReference(map);
 	for (int i = 0; i < numTasks; i++) {
-	    tm.scheduleTask(new MapPutTask(ref));
+	    tm.scheduleTask(new MapPutTask(map));
 	}
     }
 }

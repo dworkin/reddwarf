@@ -30,6 +30,12 @@ import javax.transaction.xa.Xid;
 /** Provides a transaction implementation using Berkeley DB, Java Edition. */
 class JeTransaction implements DbTransaction {
 
+    /**
+     * The maximum number of milliseconds that can be represented in
+     * microsystems as a long.
+     */
+    private static final long MAX_MILLISECONDS = Long.MAX_VALUE / 1000;
+
     /** The Berkeley DB environment. */
     private final XAEnvironment env;
 
@@ -89,18 +95,15 @@ class JeTransaction implements DbTransaction {
      */
     JeTransaction(XAEnvironment env, long timeout) {
 	this.env = env;
-	if (timeout <= 0) {
-	    throw new IllegalArgumentException(
-		"Timeout must be greater than 0");
-	}
 	try {
-	    txn = env.beginTransaction(null, null);
-	    long timeoutMicros = 1000 * timeout;
-	    if (timeoutMicros < 0) {
-		/* Berkeley DB treats a zero timeout as unlimited */
-		timeoutMicros = 0;
+	    if (timeout <= 0) {
+		throw new IllegalArgumentException(
+		    "Timeout must be greater than 0");
 	    }
-	    txn.setLockTimeout(timeoutMicros);
+	    txn = env.beginTransaction(null, null);
+	    /* Berkeley DB treats a zero timeout as unlimited */
+	    long timeoutMicros =
+		timeout < MAX_MILLISECONDS ? timeout * 1000 : 0;
 	    txn.setTxnTimeout(timeoutMicros);
 	} catch (DatabaseException e) {
 	    throw JeEnvironment.convertException(e, false);

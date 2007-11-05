@@ -43,12 +43,9 @@ import java.math.BigInteger;
  * Key 4 stores the ID of the next free transaction ID number for the network
  * version to use in allocating transactions.
  *
- * In the classes database, the value of key zero is the value of the next free
- * class ID.
- 
- * Keys whose initial byte is 1 map the SHA-1 hash of the serialized form of a
- * class descriptor (a ObjectStreamClass) to the class ID, which is 4 byte
- * integer.
+ * In the classes database, keys whose initial byte is 1 map the SHA-1 hash of
+ * the serialized form of a class descriptor (a ObjectStreamClass) to the class
+ * ID, which is 4 byte integer.
  *
  * Keys whose initial byte is 2 map a class ID to the bytes making up the
  * serialized form of the associated class descriptor.  Since these entries
@@ -78,7 +75,6 @@ import java.math.BigInteger;
  * Version 1.0: Initial version, 11/3/2006
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
  * Version 3.0: Add classes DB, compress object values, 5/18/2007
- * Version 4.0: Store next class ID in key zero of classes DB, 10/26/2007
  */
 final class DataStoreHeader {
 
@@ -104,7 +100,7 @@ final class DataStoreHeader {
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 4;
+    static final short MAJOR_VERSION = 3;
 
     /** The minor version number. */
     static final short MINOR_VERSION = 0;
@@ -114,9 +110,6 @@ final class DataStoreHeader {
 
     /** The first free transaction ID. */
     static final long INITIAL_NEXT_TXN_ID = 1;
-
-    /** The key whose value stores the last class ID. */
-    static final byte[] LAST_CLASS_ID_KEY = { 0 };
 
     /** The first byte stored in keys for the classes database hash keys. */
     static final byte CLASS_HASH_PREFIX = 1;

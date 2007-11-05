@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
@@ -458,6 +459,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** {@inheritDoc} */
     public void removeObject(ManagedObject object) {
+	Context context = null;
+	ManagedReferenceImpl ref = null;
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The object must not be null");
@@ -465,22 +468,34 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = getContext();
-	    ManagedReferenceImpl ref = context.findReference(object);
+	    context = getContext();
+	    ref = context.findReference(object);
 	    if (ref != null) {
 		ref.removeObject();
 	    }
-	    logger.log(
-		Level.FINEST, "removeObject object:{0} returns", object);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "removeObject tid:{0}, object:{1}, oid:{2} returns",
+		    contextTxnId(context), Objects.fastToString(object),
+		    refId(ref));
+	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "removeObject object:{0} throws", object);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "removeObject tid:{0}, object:{1}, oid:{2} throws",
+		    contextTxnId(context), Objects.fastToString(object),
+		    refId(ref));
+	    }
 	    throw e;
 	}
     }
 
     /** {@inheritDoc} */
     public void markForUpdate(ManagedObject object) {
+	Context context = null;
+	ManagedReferenceImpl ref = null;
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The object must not be null");
@@ -488,22 +503,41 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = getContext();
-	    ManagedReferenceImpl ref = context.findReference(object);
+	    context = getContext();
+	    ref = context.findReference(object);
 	    if (ref != null) {
 		ref.markForUpdate();
 	    }
-	    logger.log(
-		Level.FINEST, "markForUpdate object:{0} returns", object);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "markForUpdate tid:{0}, object:{1}, oid:{2} returns",
+		    contextTxnId(context), Objects.fastToString(object),
+		    refId(ref));
+	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "markForUpdate object:{0} throws", object);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "markForUpdate tid:{0}, object:{1}, oid:{2} throws",
+		    contextTxnId(context), Objects.fastToString(object),
+		    refId(ref));
+	    }
 	    throw e;
 	}
     }
 
+    private static BigInteger contextTxnId(Context context) {
+	return (context != null) ? context.getTxnId() : null;
+    }
+
+    private static BigInteger refId(ManagedReference ref) {
+	return (ref != null) ? ref.getId() : null;
+    }
+
     /** {@inheritDoc} */
     public ManagedReference createReference(ManagedObject object) {
+	Context context = null;
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The object must not be null");
@@ -511,17 +545,23 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = getContext();
+	    context = getContext();
 	    ManagedReference result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "createReference object:{0} returns {1}",
-		    object, result);
+		    Level.FINEST,
+		    "createReference tid:{0}, object:{1} returns {2}",
+		    contextTxnId(context), Objects.fastToString(object),
+		    refId(result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "createReference object:{0} throws", object);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "createReference tid:{0}, object:{1} throws",
+		    contextTxnId(context), Objects.fastToString(object));
+	    }
 	    throw e;
 	}
     }
@@ -550,23 +590,28 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** {@inheritDoc} */
     public ManagedReference createReferenceForId(BigInteger id) {
+	Context context = null;
 	try {
 	    if (id == null) {
 		throw new NullPointerException("The id must not be null");
 	    } else if (id.bitLength() > 63 || id.signum() < 0) {
 		throw new IllegalArgumentException("The id is invalid: " + id);
 	    }
-	    ManagedReference result =
-		getContext().getReference(id.longValue());
+	    context = getContext();
+	    ManagedReference result = context.getReference(id.longValue());
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
-			   "createReferenceForId id:{0} returns {1}",
-			   id, result);
+			   "createReferenceForId tid:{0}, oid:{1} returns",
+			   contextTxnId(context), id);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "createReferenceForId id:{0} throws", id);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "createReferenceForId tid:{0}, oid:{1} throws",
+		    contextTxnId(context), id);
+	    }
 	    throw e;
 	}
     }
@@ -577,12 +622,13 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     private <T> T getBindingInternal(
 	 String name, Class<T> type, boolean serviceBinding)
     {
+	Context context = null;
 	try {
 	    if (name == null || type == null) {
 		throw new NullPointerException(
 		    "The arguments must not be null");
 	    }
-	    Context context = getContext();
+	    context = getContext();
 	    T result;
 	    try {
 		result = context.getBinding(
@@ -593,17 +639,19 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "{0} name:{1}, type:{2} returns {3}",
+		    Level.FINEST,
+		    "{0} tid:{1}, name:{2}, type:{3} returns {4}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    name, type, result);
+		    contextTxnId(context), name, type,
+		    Objects.fastToString(result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} name:{1}, type:{2} throws",
+		    Level.FINEST, e, "{0} tid:{1}, name:{2}, type:{3} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    name, type);
+		    contextTxnId(context), name, type);
 	    }
 	    throw e;
 	}
@@ -613,6 +661,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     private void setBindingInternal(
 	String name, ManagedObject object, boolean serviceBinding)
     {
+	Context context = null;
 	try {
 	    if (name == null || object == null) {
 		throw new NullPointerException(
@@ -621,19 +670,21 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = getContext();
+	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "{0} name:{1}, object:{2} returns",
+		logger.log(Level.FINEST,
+			   "{0} tid:{1}, name:{2}, object:{3} returns",
 			   serviceBinding ? "setServiceBinding" : "setBinding",
-			   name, object);
+			   contextTxnId(context), name,
+			   Objects.fastToString(object));
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e, "{0} name:{1}, object:{2} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    name, object);
+		    name, Objects.fastToString(object));
 	    }
 	    throw e;
 	}
@@ -641,11 +692,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Implement removeBinding and removeServiceBinding. */
     private void removeBindingInternal(String name, boolean serviceBinding) {
+	Context context = null;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("The name must not be null");
 	    }
-	    Context context = getContext();
+	    context = getContext();
 	    try {
 		context.removeBinding(getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
@@ -654,16 +706,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "{0} name:{1} returns",
+		    Level.FINEST,
+		    "{0} tid:{1}, name:{2} returns",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
-		    name);
+		    contextTxnId(context), name);
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} name:{1} throws",
+		    Level.FINEST, e, "{0} tid:{1}, name:{2} throws",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
-		    name);
+		    contextTxnId(context), name);
 	    }
 	    throw e;
 	}
@@ -671,24 +724,25 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Implement nextBoundName and nextServiceBoundName. */
     private String nextBoundNameInternal(String name, boolean serviceBinding) {
+	Context context = null;
 	try {
-	    Context context = getContext();
+	    context = getContext();
 	    String result = getExternalName(
 		context.nextBoundName(getInternalName(name, serviceBinding)),
 		serviceBinding);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "{0} name:{1} returns {2}",
+		    Level.FINEST, "{0} tid:{1}, name:{2} returns {3}",
 		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
-		    name, result);
+		    contextTxnId(context), name, result);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, e, "{0} name:{1} throws",
+		    Level.FINEST, e, "{0} tid:{1}, name:{2} throws",
 		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
-		    name);
+		    contextTxnId(context), name);
 	    }
 	    throw e;
 	}

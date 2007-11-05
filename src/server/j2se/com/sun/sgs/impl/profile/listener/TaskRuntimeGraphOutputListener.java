@@ -19,39 +19,25 @@
 
 package com.sun.sgs.impl.profile.listener;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
-
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
-
 import java.beans.PropertyChangeEvent;
-
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintStream;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 /**
  * Outputs task timing data to a file for later use by Gnuplot.
  */
-public class TaskRuntimeGraphOutputListener 
-    implements ProfileListener {
-
-    static final String BASE_DIR = "analysis/data/";
-
+public class TaskRuntimeGraphOutputListener implements ProfileListener {
+    
     private final Map<String,TaskTypeDetail> taskTimes;
+    private final String directory;
 
     /**
      * Creates an instance of {@code TaskRuntimeGraphOutputListener}.
@@ -63,16 +49,15 @@ public class TaskRuntimeGraphOutputListener
      *        running short-lived or recurring tasks
      * @param resourceCoord the {@code ResourceCoordinator} used to
      *        run any long-lived tasks
-     *
      */
     public TaskRuntimeGraphOutputListener(Properties properties, 
 					  TaskOwner owner,
 					  TaskScheduler taskScheduler,
-					  ResourceCoordinator resourceCoord) {
-
+					  ResourceCoordinator resourceCoord)
+    {
 	taskTimes = new HashMap<String,TaskTypeDetail>();
+	directory = properties.getProperty("com.sun.sgs.app.root") + "/data/";
     }
-
 
     /**
      * {@inheritDoc}
@@ -80,7 +65,6 @@ public class TaskRuntimeGraphOutputListener
     public void propertyChange(PropertyChangeEvent event) {
 	// unused
     }
-
 
     /**
      * {@inheritDoc}
@@ -95,7 +79,7 @@ public class TaskRuntimeGraphOutputListener
 		try {		 
 		    // NOTE: probably should have some configurable
 		    // option to overwrite the existing file or not
-		    File output = new File(BASE_DIR + name + 
+		    File output = new File(directory + name + 
 					   //"." + System.currentTimeMillis() + 
 					   ".dat");
 		    detail = new TaskTypeDetail(new PrintStream(output));
