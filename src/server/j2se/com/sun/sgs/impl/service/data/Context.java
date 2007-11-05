@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
@@ -27,6 +28,7 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
+import java.util.IdentityHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -80,6 +82,14 @@ final class Context extends TransactionContext {
      * part of the ManagedReferenceImpl class.
      */
     final ReferenceTable refs = new ReferenceTable();
+
+    /**
+     * A map that records all managed objects that are currently having
+     * ManagedObjectRemoval.removingObject called on them, to detect recursion,
+     * or null.  Uses identity comparison to avoid confusion by value-based
+     * equals methods.
+     */
+    private IdentityHashMap<ManagedObjectRemoval, Boolean> removing = null;
 
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
@@ -237,6 +247,17 @@ final class Context extends TransactionContext {
 	return store.nextBoundName(txn, internalName);
     }
 
+    /* -- Methods for object IDs -- */
+
+    /**
+     * Returns the next object ID, or -1 if there are no more objects.  Does
+     * not return IDs for removed objects.  Specifying -1 requests the first
+     * ID.
+     */
+    long nextObjectId(long oid) {
+	return ManagedReferenceImpl.nextObjectId(this, oid);
+    }
+
     /* -- Methods for TransactionContext -- */
 
     @Override
@@ -351,6 +372,23 @@ final class Context extends TransactionContext {
     /** Checks that the service is running or shutting down. */
     void checkState() {
 	service.checkState();
+    }
+
+    /** Calls removingObject on the argument, and checks for recursion. */
+    void removingObject(ManagedObjectRemoval object) {
+	if (removing == null) {
+	    removing = new IdentityHashMap<ManagedObjectRemoval, Boolean>();
+	}
+	if (removing.containsKey(object)) {
+	    throw new IllegalStateException(
+		"Attempt to remove object recursively: " + object);
+	}
+	try {
+	    removing.put(object, Boolean.TRUE);
+	    object.removingObject();
+	} finally {
+	    removing.remove(object);
+	}
     }
 
     BigInteger getTxnId() {

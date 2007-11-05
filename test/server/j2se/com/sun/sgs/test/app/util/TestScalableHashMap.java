@@ -22,18 +22,22 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.NameRunner;
+import static com.sun.sgs.test.util.UtilReflection.getConstructor;
+import static com.sun.sgs.test.util.UtilReflection.getMethod;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -58,7 +62,7 @@ import java.util.Set;
 import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -102,8 +106,11 @@ public class TestScalableHashMap extends Assert {
     private static final Method getAvgTreeDepth =
 	getMethod(ScalableHashMap.class, "getAvgTreeDepth");
 
-    private DummyAbstractKernelAppContext appContext;
-    private DataServiceImpl dataService;
+    /** The data service. */
+    private static DataServiceImpl dataService;
+
+    /** The task service. */
+    private static TaskService taskService;
 
     // the transaction used, which is class state so that it can be aborted
     // (if it's still active) at teardown
@@ -113,21 +120,20 @@ public class TestScalableHashMap extends Assert {
      * Test management.
      */
 
-    @Before public void setUp() throws Exception {
-	appContext = MinimalTestKernel.createContext();
+    @BeforeClass public static void setUpClass() throws Exception {
+	DummyAbstractKernelAppContext appContext =
+	    MinimalTestKernel.createContext();
+	DummyComponentRegistry systemRegistry =
+	    MinimalTestKernel.getSystemRegistry(appContext);
 	DummyComponentRegistry serviceRegistry =
 	    MinimalTestKernel.getServiceRegistry(appContext);
-	serviceRegistry.setComponent(
-	    TaskScheduler.class,
-	    MinimalTestKernel.getSystemRegistry(
-		appContext).getComponent(TaskScheduler.class));
-	deleteDirectory();
-	createDataService(serviceRegistry);
+	createDataService(systemRegistry);
 	txnProxy.setComponent(DataService.class, dataService);
-	txnProxy.setComponent(DataServiceImpl.class, dataService);
 	serviceRegistry.setComponent(DataManager.class, dataService);
 	serviceRegistry.setComponent(DataService.class, dataService);
-	serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+	taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
+	serviceRegistry.setComponent(TaskManager.class, taskService);
     }
 
     @After public void tearDown() {
@@ -135,11 +141,6 @@ public class TestScalableHashMap extends Assert {
 	    System.err.println("had to abort txn");
 	    txn.abort(null);
 	}
-	if (dataService != null) {
-	    dataService.shutdown();
-	}
-	deleteDirectory();
-	MinimalTestKernel.destroyContext(appContext);
     }
 
     /*
@@ -1077,6 +1078,7 @@ public class TestScalableHashMap extends Assert {
 	}
 	assertEquals(control, test);
 
+	DoneRemoving.init();
 	test.clear();
 	control.clear();
 
@@ -1088,15 +1090,25 @@ public class TestScalableHashMap extends Assert {
 	assertEquals(control, test);
 
 	txn.commit();
+	DoneRemoving.await(1);
     }
 
+    @SuppressWarnings("unchecked")
     @Test public void testMultipleClearOperations() throws Exception {
 	txn = createTransaction(1000000);
-	Map<Integer,Integer> test = new ScalableHashMap<Integer,Integer>();
+	ScalableHashMap<Integer,Integer> test =
+	    new ScalableHashMap<Integer,Integer>();
 	Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 
+	DoneRemoving.init();
 	test.clear();
 	assertEquals(control, test);
+
+	dataService.setBinding("test", test);
+	txn.commit();
+	DoneRemoving.await(1);
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
 
 	// add just a few elements
 	for (int i = 0; i < 33; i++) {
@@ -1106,6 +1118,11 @@ public class TestScalableHashMap extends Assert {
 
 	test.clear();
 	assertEquals(control, test);
+
+	txn.commit();
+	DoneRemoving.await(1);
+	txn = createTransaction();
+	test = dataService.getBinding("test", ScalableHashMap.class);
 
 	// add just enough elements to force a split
 	for (int i = 0; i < 1024; i++) {
@@ -1117,6 +1134,7 @@ public class TestScalableHashMap extends Assert {
 	assertEquals(control, test);
 
 	txn.commit();
+	DoneRemoving.await(1);
     }
 
     /*
@@ -2414,7 +2432,8 @@ public class TestScalableHashMap extends Assert {
 	ObjectOutputStream oos = new ObjectOutputStream(baos);
 	oos.writeObject(it);
 
-	// now repalce all th elements in the map
+	// now replace all the elements in the map
+	DoneRemoving.init();
 	test.clear();
 	control.clear();
 	for (int i = 0; i < a.length; i++) {
@@ -2444,6 +2463,7 @@ public class TestScalableHashMap extends Assert {
 	// should still check that no execptions were thrown.
 
 	txn.commit();
+	DoneRemoving.await(1);
     }
 
     /*
@@ -2634,7 +2654,8 @@ public class TestScalableHashMap extends Assert {
 	ObjectOutputStream oos = new ObjectOutputStream(baos);
 	oos.writeObject(it);
 
-	// now repalce all the elements in the map
+	// now replace all the elements in the map
+	DoneRemoving.init();
 	test.clear();
 	control.clear();
 
@@ -2667,6 +2688,7 @@ public class TestScalableHashMap extends Assert {
 	// should still check that no exceptions were thrown.
 
 	txn.commit();
+	DoneRemoving.await(1);
     }
 
     /*
@@ -2721,7 +2743,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     /** Creates the data service. */
-    private void createDataService(DummyComponentRegistry registry)
+    private static void createDataService(DummyComponentRegistry registry)
 	throws Exception
     {
 	File dir = new File(DB_DIRECTORY);
@@ -2819,32 +2841,6 @@ public class TestScalableHashMap extends Assert {
     private double getAvgTreeDepth(ScalableHashMap map) {
 	try {
 	    return (Integer) getAvgTreeDepth.invoke(map);
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /** Returns the specified declared constructor. */
-    private static <T> Constructor<T> getConstructor(
-	Class<T> cl, Class<?>... params)
-    {
-	try {
-	    Constructor<T> result = cl.getDeclaredConstructor(params);
-	    result.setAccessible(true);
-	    return result;
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /** Returns the specified declared method. */
-    private static Method getMethod(
-	Class<?> cl, String methodName, Class<?>... params)
-    {
-	try {
-	    Method result = cl.getDeclaredMethod(methodName, params);
-	    result.setAccessible(true);
-	    return result;
 	} catch (Exception e) {
 	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}
