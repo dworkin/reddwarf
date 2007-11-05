@@ -118,10 +118,9 @@ public class ManagedQueue<E>
 		// last element removed
 		tailRef = null;
 	    }
-	    head.removeObject();
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.removeObject(head);
-	    dataManager.removeObject(element);
+	    dataManager.removeObject((ManagedObject) element);
 	}
 	return element;
     }

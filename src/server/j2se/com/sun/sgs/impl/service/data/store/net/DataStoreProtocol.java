@@ -53,11 +53,12 @@ class DataStoreProtocol implements DataStoreServer {
     private static final short NEXT_BOUND_NAME = 10;
     private static final short GET_CLASS_ID = 11;
     private static final short GET_CLASS_INFO = 12;
-    private static final short CREATE_TRANSACTION = 13;
-    private static final short PREPARE = 14;
-    private static final short COMMIT = 15;
-    private static final short PREPARE_AND_COMMIT = 16;
-    private static final short ABORT = 17;
+    private static final short NEXT_OBJECT_ID = 13;
+    private static final short CREATE_TRANSACTION = 100;
+    private static final short PREPARE = 101;
+    private static final short COMMIT = 102;
+    private static final short PREPARE_AND_COMMIT = 103;
+    private static final short ABORT = 104;
 
     /** The input stream. */
     private final DataInputStream in;
@@ -110,6 +111,9 @@ class DataStoreProtocol implements DataStoreServer {
 	    break;
 	case GET_CLASS_INFO:
 	    handleGetClassInfo(server);
+	    break;
+	case NEXT_OBJECT_ID:
+	    handleNextObjectId(server);
 	    break;
 	case CREATE_TRANSACTION:
 	    handleCreateTransaction(server);
@@ -404,6 +408,29 @@ class DataStoreProtocol implements DataStoreServer {
 	    byte[] result = server.getClassInfo(tid, classId);
 	    out.writeBoolean(true);
 	    writeBytes(result);
+	    out.flush();
+	} catch (Throwable t) {
+	    failure(t);
+	}
+    }
+
+    public long nextObjectId(long tid, long oid) throws IOException {
+	out.writeShort(NEXT_OBJECT_ID);
+	out.writeLong(tid);
+	out.writeLong(oid);
+	checkResult();
+	return in.readLong();
+    }
+
+    private void handleNextObjectId(DataStoreServer server)
+	throws IOException
+    {
+	try {
+	    long tid = in.readLong();
+	    long oid = in.readLong();
+	    long result = server.nextObjectId(tid, oid);
+	    out.writeBoolean(true);
+	    out.writeLong(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);

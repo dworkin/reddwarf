@@ -511,6 +511,31 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     }
 
     /**
+     * Returns the next object ID, or -1 if there are no more objects.  Does
+     * not return IDs for removed objects.  Specifying -1 requests the first
+     * ID.
+     */
+    static long nextObjectId(Context context, long oid) {
+	long lastFound = oid;
+	while (true) {
+	    long result = context.store.nextObjectId(context.txn, lastFound);
+	    if (result == -1) {
+		break;
+	    }
+	    lastFound = result;
+	    ManagedReferenceImpl ref = context.refs.find(lastFound);
+	    if (ref == null || !ref.isRemoved()) {
+		return result;
+	    }
+	}
+	/*
+	 * Check for newly created objects that don't appear in the data store
+	 * but are recorded in the reference table.
+	 */
+	return context.refs.nextNewObjectId(lastFound);
+    }
+
+    /**
      * Returns any modifications that need to be stored to the data store, or
      * null if there are none, and changes the state to FLUSHED.
      */
@@ -557,6 +582,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      */
     boolean isRemoved() {
 	return state == State.REMOVED_EMPTY || state == State.REMOVED_FETCHED;
+    }
+
+    /**
+     * Checks if the object has been created in the current transaction and not
+     * removed.
+     */
+    boolean isNew() {
+	return state == State.NEW;
     }
 
     /** Returns the object currently associated with this reference or null. */

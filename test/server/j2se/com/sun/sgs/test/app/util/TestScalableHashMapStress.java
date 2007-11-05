@@ -23,15 +23,18 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -41,6 +44,7 @@ import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Date;
@@ -50,6 +54,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
 import junit.framework.JUnit4TestAdapter;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -74,11 +79,11 @@ public class TestScalableHashMapStress extends Assert {
 
     /** The maximum number of entries to store in the map. */
     private static final int maxEntries = Integer.getInteger(
-	"test.entries", 3000);
+	"test.entries", 2000);
 
     /** The number of operations to perform. */
     private static final int operations = Integer.getInteger(
-	"test.operations", 30000);
+	"test.operations", 20000);
 
     /**
      * The number of objects that should share each hash code, to test hash
@@ -99,16 +104,15 @@ public class TestScalableHashMapStress extends Assert {
     /** The location for the database files. */
     private static String directory = System.getProperty("test.directory");
 
-    /** The component registry. */
-    private static final DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
-
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
     /** The data service. */
     static DataService dataService;
+
+    /** The task service. */
+    private static TaskService taskService;
 
     /** A list of the operations to perform. */
     final List<Op> ops = new ArrayList<Op>();
@@ -118,6 +122,9 @@ public class TestScalableHashMapStress extends Assert {
 
     /** The current transaction. */
     private DummyTransaction txn;
+
+    /** The number of objects before creating the map. */
+    private int initialObjectCount;
 
     /** The map under test. */
     ScalableHashMap<Key, Value> map;
@@ -201,7 +208,7 @@ public class TestScalableHashMapStress extends Assert {
      */
     private static class Value extends Int {
 	private static final long serialVersionUID = 1;
-	private final ManagedReference key;
+	private ManagedReference key;
 	static Value create(int i) {
 	    return random.nextBoolean() ? new Value(i) : new ManagedValue(i);
 	}
@@ -214,22 +221,24 @@ public class TestScalableHashMapStress extends Assert {
 	}
 	Value(int i, Key key) {
 	    super(i);
+	    setKey(key);
+	}
+	Key getKey() {
+	    return (key == null) ? null : key.get(Key.class);
+	}
+	void setKey(Key key) {
 	    this.key = (key instanceof ManagedObject)
 		? AppContext.getDataManager().createReference(
 		    (ManagedObject) key)
 		: null;
 	}
-	Key getKey() {
-	    return (key == null) ? null : key.get(Key.class);
-	}
-
 	public boolean equals(Object object) {
 	    return object instanceof Value && super.equals(object);
 	}
     }
 
     /** A managed value to store in the map. */
-    private static class ManagedValue extends Value {
+    private static class ManagedValue extends Value implements ManagedObject {
 	private static final long serialVersionUID = 1;
 	ManagedValue(int i) {
 	    super(i);
@@ -276,10 +285,13 @@ public class TestScalableHashMapStress extends Assert {
 		System.err.println("put " + objnum);
 	    }
 	    Key key = Key.create(objnum);
-	    Value oldValue = map.put(key, Value.create(objnum, key));
+	    Value newValue = Value.create(objnum, key);
+	    Value oldValue = map.put(key, newValue);
 	    if (control.get(objnum)) {
 		assertEquals(new Value(objnum), oldValue);
+		newValue.setKey(oldValue.getKey());
 		maybeRemoveObject(oldValue);
+		maybeRemoveObject(key);
 	    } else {
 		assertEquals(null, oldValue);
 	    }
@@ -457,7 +469,7 @@ public class TestScalableHashMapStress extends Assert {
 	    Value value = entry.getValue();
 	    assertTrue(control.get(key.i));
 	    assertEquals(key.i, value.i);
-	    entry.setValue(Value.create(key.i));
+	    entry.setValue(Value.create(key.i, key));
 	    maybeRemoveObject(value);
 	}
     }
@@ -498,24 +510,30 @@ public class TestScalableHashMapStress extends Assert {
 	new EntrySetNext(1);
 	new EntrySetNextRemove(1);
 
-	componentRegistry.setComponent(
-	    TaskScheduler.class, 
-	    MinimalTestKernel.getSystemRegistry(
-		MinimalTestKernel.createContext())
-	    .getComponent(TaskScheduler.class));
+	DummyAbstractKernelAppContext appContext =
+	    MinimalTestKernel.createContext();
+	DummyComponentRegistry systemRegistry =
+	    MinimalTestKernel.getSystemRegistry(appContext);
+	DummyComponentRegistry serviceRegistry =
+	    MinimalTestKernel.getServiceRegistry(appContext);
 	dataService = new DataServiceImpl(
 	    createProperties(
 		DataStoreImpl.class.getName() + ".directory",
 		createDirectory(), StandardProperties.APP_NAME,
 		"TestScalableHashMapStress"),
-	    componentRegistry, txnProxy);
+	    systemRegistry, txnProxy);
 	if (dataService instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(
-		((ProfileProducer) dataService));
+		(ProfileProducer) dataService);
 	}
-	componentRegistry.setComponent(DataManager.class, dataService);
-	componentRegistry.registerAppContext();
+	txnProxy.setComponent(DataService.class, dataService);
+	serviceRegistry.setComponent(DataManager.class, dataService);
+	serviceRegistry.setComponent(DataService.class, dataService);
+	taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
+	serviceRegistry.setComponent(TaskManager.class, taskService);
 	txn = createTransaction();
+	initialObjectCount = getObjectCount();
 	map = new ScalableHashMap<Key, Value>();
 	dataService.setBinding("map", map);
 	keys = map.keySet().iterator();
@@ -529,6 +547,40 @@ public class TestScalableHashMapStress extends Assert {
 	    "entries",
 	    new ManagedSerializable<Iterator<Entry<Key, Value>>>(entries));
     }	
+
+    /** Teardown. */
+    @After public void tearDown() throws Exception {
+	newTransaction();
+	dataService.removeObject(
+	    dataService.getBinding("entries", ManagedSerializable.class));
+	entries = map.entrySet().iterator();
+	dataService.setBinding(
+	    "entries",
+	    new ManagedSerializable<Iterator<Entry<Key, Value>>>(entries));
+	int count = 0;
+	while (entries.hasNext()) {
+	    if (count % 100 == 0) {
+		newTransaction();
+	    }
+	    Entry<Key, Value> entry = entries.next();
+	    maybeRemoveObject(entry.getKey());
+	    maybeRemoveObject(entry.getValue());
+	}
+	newTransaction();
+	DoneRemoving.init();
+	dataService.removeObject(map);
+	dataService.removeObject(
+	    dataService.getBinding("keys", ManagedSerializable.class));
+	dataService.removeObject(
+	    dataService.getBinding("values", ManagedSerializable.class));
+	dataService.removeObject(
+	    dataService.getBinding("entries", ManagedSerializable.class));
+	txn.commit();
+	DoneRemoving.await(1);
+	txn = createTransaction();
+	assertEquals(initialObjectCount, getObjectCount());
+	txn.abort(null);
+    }
 
     /* Tests */
 
@@ -654,6 +706,39 @@ public class TestScalableHashMapStress extends Assert {
     static void maybeRemoveObject(Object object) {
 	if (object instanceof ManagedObject) {
 	    AppContext.getDataManager().removeObject((ManagedObject) object);
+	}
+    }
+
+    /** Returns the current number of objects. */
+    private int getObjectCount() {
+	int count = 0;
+	BigInteger last = null;
+	while (true) {
+	    BigInteger next = dataService.nextObjectId(last);
+	    if (next == null) {
+		break;
+	    }
+	    last = next;
+	    count++;
+	}
+	return count;
+    }
+
+    /** Prints the current objects above the specified value, for debugging. */
+    private void printObjects(BigInteger id) {
+	while (true) {
+	    id = dataService.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    try {
+		ManagedObject obj = dataService.createReferenceForId(id).get(
+		    ManagedObject.class);
+		System.err.println(id + ": (" + obj.getClass().getName() +
+				   ") " + obj);
+	    } catch (Exception e) {
+		System.err.println(id + ": " + e);
+	    }
 	}
     }
 

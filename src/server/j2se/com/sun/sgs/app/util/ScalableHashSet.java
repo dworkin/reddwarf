@@ -22,6 +22,7 @@ package com.sun.sgs.app.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
@@ -148,7 +149,7 @@ import java.util.Iterator;
  */
 public class ScalableHashSet<E>
     extends AbstractSet<E>
-    implements Serializable, ManagedObject {
+    implements Serializable, ManagedObjectRemoval {
 
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
@@ -324,6 +325,16 @@ public class ScalableHashSet<E>
 	    throw new NullPointerException("The argument must not be null");
 	}
 	return super.retainAll(c);
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation removes the underlying {@code ScalableHashMap}.
+     */
+    public void removingObject() {
+	AppContext.getDataManager().removeObject(
+	    map.get(ScalableHashMap.class));
     }
 
     /**
