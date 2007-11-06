@@ -178,8 +178,8 @@ public class JeEnvironment implements DbEnvironment {
 	PACKAGE + ".lock.timeout.";
 
     /**
-     * The default value of the relative lock timeout property, if no
-     * transaction timeout is specified.
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
      */
     public static final long DEFAULT_LOCK_TIMEOUT = 10;
 

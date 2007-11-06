@@ -1,7 +1,6 @@
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
@@ -48,7 +47,6 @@ public class ScheduleMapPutsTask implements Task, Serializable {
     public void run() {
 	System.out.println("starting " + numTasks + " tasks");
 	TaskManager tm = AppContext.getTaskManager();
-	DataManager dm = AppContext.getDataManager();
 	ScalableHashMap<Integer, Integer> map =
 	    new ScalableHashMap<Integer, Integer>();
 	for (int i = 0; i < numTasks; i++) {
