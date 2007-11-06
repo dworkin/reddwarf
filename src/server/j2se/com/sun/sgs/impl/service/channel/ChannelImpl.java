@@ -543,8 +543,7 @@ final class ChannelImpl implements Channel, Serializable {
 		    if (senderId == null ||
 			! senderId.equals(session.getSessionId()))
 		    {
-			context.getClientSessionService().sendProtocolMessage(
-			    session, protocolMessage, state.delivery);
+			sendProtocolMessageOnCommit(session, protocolMessage);
 		    }
 		}
 		
@@ -634,8 +633,7 @@ final class ChannelImpl implements Channel, Serializable {
 		 * Send channel message to local recipients.
 		 */
 		for (ClientSession session : recipients) {
-		    context.getClientSessionService().sendProtocolMessage(
-			session, protocolMessage, state.delivery);
+		    sendProtocolMessageOnCommit(session, protocolMessage);
 		}
 		    
 	    } else {

@@ -156,13 +156,13 @@ final class ChannelState implements ManagedObject, Serializable {
 
     /**
      * Returns a channel state for the channel with the specified
-     * {@code channelId}, or {@code null} if the channel doesn't
-     * exist.  This method uses the {@code channelId} as a {@code
+     * {@code channelIdByes}, or {@code null} if the channel doesn't
+     * exist.  This method uses the {@code channelIdBytes} as a {@code
      * ManagedReference} ID to the channel's state.
      *
-     * @param   channelId a channel ID
+     * @param   channelIdBytes a channel ID byte array
      * @return  the channel state for the channel with the specified
-     *	    {@code channelId}, or {@code null} if the channel
+     *	    {@code channelIdBytes}, or {@code null} if the channel
      *	    doesn't exist
      */
     static ChannelState getInstance(
@@ -331,7 +331,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * session} is already a member of this channel, returns {@code
      * false}.
      *
-     * @returns	{@code true} if the session was added to the channel,
+     * @return	{@code true} if the session was added to the channel,
      *		and {@code false} if the session is already a member
      */
     boolean addSession(ClientSession session, ChannelListener listener) {

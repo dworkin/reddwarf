@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
+import com.sun.sgs.app.ClientSessionManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
@@ -1181,7 +1182,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * context.
      *
      * <p>Note: this method is public so that the {@link
-     * ClientSessionId#getClientSession{byte[])} method can access
+     * ClientSessionId#getClientSession(byte[])} method can access
      * this service to obtain a {@code ClientSession} for an ID
      * encapsulated in a byte array.
      *

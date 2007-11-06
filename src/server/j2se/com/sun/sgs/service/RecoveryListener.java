@@ -9,7 +9,7 @@ package com.sun.sgs.service;
  * when that service on the local node needs to recover for the
  * service on a failed node.
  *
- * @see RecoveryService#addRecoveryListener(RecoveryListener)
+ * @see WatchdogService#addRecoveryListener(RecoveryListener)
  */
 public interface RecoveryListener {
 

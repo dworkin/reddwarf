@@ -31,6 +31,7 @@ import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
@@ -48,25 +49,27 @@ import java.util.logging.Logger;
 public class ClientSessionImpl
     implements ClientSession, ManagedObject, Serializable
 {
-
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
     /** The logger name and prefix for session keys and session node keys. */
-    private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.session.";
 
     /** The prefix to add before a client session ID in a session key. */
-    private static final String SESSION_PREFIX = "proxy";
+    private static final String SESSION_COMPONENT = "proxy.";
 
     /** The prefix to add before a client session listener in a listener key. */
-    private static final String LISTENER_PREFIX = "listener";
+    private static final String LISTENER_COMPONENT = "listener.";
 
-    /** The prefix to add before a node ID in session and session node keys. */
-    private static final String NODE_PREFIX = "node";
-    
+    /** The node component session node keys. */
+    private static final String NODE_COMPONENT = "node.";
+
+    /** The message queue component of a key. */
+    private static final String MSGQ_COMPONENT = "msgq";
+	
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(PKG_NAME));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME + "impl"));
 
     /** The session ID. */
     private transient CompactId compactId;
@@ -339,6 +342,8 @@ public class ClientSessionImpl
 	}
 	dataService.setServiceBinding(getSessionKey(idBytes), this);
 	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
+	dataService.setServiceBinding(getMessageQueueKey(idBytes),
+				      new ManagedQueue<ProtocolMessage>());
     }
 
     /**
@@ -370,6 +375,18 @@ public class ClientSessionImpl
 	}
 	return sessionImpl;
     }
+
+    @SuppressWarnings("unchecked")
+    private ManagedQueue<ProtocolMessage>
+	getMessageQueue(DataService dataService)
+    {
+	try {
+	    return dataService.getBinding(
+		getMessageQueueKey(idBytes), ManagedQueue.class);
+	} catch (NameNotBoundException e) {
+	    return null;
+	}
+    }
     
     /**
      * Invokes the {@code disconnected} callback on this session's
@@ -381,7 +398,8 @@ public class ClientSessionImpl
      * method should only be called within a transaction.
      *
      * @param	dataService a data service
-     * @param	idBytes a session ID
+     * @param	graceful {@code true} if disconnection is graceful,
+     *		and {@code false} otherwise
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
@@ -417,7 +435,7 @@ public class ClientSessionImpl
 	} catch (NameNotBoundException e) {
 	    logger.logThrow(
 		Level.FINE, e,
-		"removing ClientSessionListener for  session:{0} throws",
+		"removing ClientSessionListener for session:{0} throws",
 		this);
 	}
 
@@ -428,6 +446,22 @@ public class ClientSessionImpl
 	    listener.disconnected(graceful);
 	}
 
+	/*
+	 * Remove message queue.
+	 */
+	ManagedQueue<ProtocolMessage> mqueue = getMessageQueue(dataService);
+	if (mqueue != null) {
+	    try {
+		dataService.removeServiceBinding(getMessageQueueKey(idBytes));
+		dataService.removeObject(mqueue);
+	    } catch (NameNotBoundException e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "removing message queue binding for session:{0} throws",
+		    this);
+	    }
+	}
+	
 	/*
 	 * Remove this session's state and bindings.
 	 */
@@ -479,8 +513,7 @@ public class ClientSessionImpl
      */
     private static String getSessionKey(byte[] idBytes) {
 	return
-	    PKG_NAME + "." +
-	    SESSION_PREFIX + "." + HexDumper.toHexString(idBytes);
+	    PKG_NAME + SESSION_COMPONENT + HexDumper.toHexString(idBytes);
     }
 
     /**
@@ -495,8 +528,12 @@ public class ClientSessionImpl
      */
     private static String getListenerKey(byte[] idBytes) {
 	return
-	    PKG_NAME + "." +
-	    LISTENER_PREFIX + "." + HexDumper.toHexString(idBytes);
+	    PKG_NAME + LISTENER_COMPONENT + HexDumper.toHexString(idBytes);
+    }
+
+    private static String getMessageQueueKey(byte[] idBytes) {
+	return
+	    PKG_NAME + MSGQ_COMPONENT + HexDumper.toHexString(idBytes);
     }
 
     /**
@@ -508,9 +545,7 @@ public class ClientSessionImpl
      * @return	a key for acessing the {@code ClientSessionImpl} instance
      */
     private static String getSessionNodeKey(long nodeId, byte[] idBytes) {
-	return
-	    getNodePrefix(nodeId) + "." +
-	    SESSION_PREFIX + "." + HexDumper.toHexString(idBytes);
+	return getNodePrefix(nodeId) + HexDumper.toHexString(idBytes);
     }
 
     /**
@@ -518,9 +553,7 @@ public class ClientSessionImpl
      * ClientSessionImpl} instances with the the specified {@code nodeId}.
      */
     static String getNodePrefix(long nodeId) {
-	return
-	    PKG_NAME + "." +
-	    NODE_PREFIX + "." + nodeId;
+	return PKG_NAME + NODE_COMPONENT + nodeId + ".";
     }
 
     /**

@@ -822,6 +822,16 @@ class ClientSessionHandler {
 		"invoking AppListener.loggedIn session:{0}", identity);
 
 	    sessionImpl.putSession(dataService);
+	    MessageBuffer ack =
+		new MessageBuffer(
+		    3 + compactId.getExternalFormByteCount() +
+		    reconnectionKey.getExternalFormByteCount());
+	    ack.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
+		putBytes(compactId.getExternalForm()).
+		putBytes(reconnectionKey.getExternalForm());
+		
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
 	    
@@ -838,19 +848,10 @@ class ClientSessionHandler {
 
 		sessionImpl.putClientSessionListener(
 		    dataService, returnedListener);
-		MessageBuffer ack =
-		    new MessageBuffer(
-			3 + compactId.getExternalFormByteCount() +
-			reconnectionKey.getExternalFormByteCount());
-		ack.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		    putBytes(compactId.getExternalForm()).
-		    putBytes(reconnectionKey.getExternalForm());
-		
+
 		sessionService.sendProtocolMessageFirst(
 		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE);
-
+		
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
 		    new AbstractKernelRunnable() {
