@@ -286,7 +286,7 @@ public class JeEnvironment implements DbEnvironment {
 	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
 	long defaultLockTimeout = (txnTimeout < 1)
 	    ? DEFAULT_LOCK_TIMEOUT
-	    : txnTimeout / DEFAULT_LOCK_TIMEOUT_PROPORTION;
+	    : (long) (txnTimeout / DEFAULT_LOCK_TIMEOUT_PROPORTION);
 	/* Avoid underflow */
 	if (defaultLockTimeout < 1) {
 	    defaultLockTimeout = 1;

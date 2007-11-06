@@ -22,7 +22,7 @@ package com.sun.sgs.impl.sharedutil;
 /**
  * Utility methods for working with {@link Object}s.
  */
-public class Objects {
+public final class Objects {
 
     /**
      * A thread local that is set to a non-null value while safeToString
@@ -39,7 +39,8 @@ public class Objects {
      * the {@code toString} or {@code hashCode} methods throw exceptions or if
      * the method ends up being called recursively.
      *
-     * @param the object or {@code null}
+     * @param object the object or {@code null}
+     * @return a string representing the object
      */
     public static String safeToString(Object object) {
 	if (object == null) {
@@ -54,12 +55,12 @@ public class Objects {
 			result = result.substring(0, 253) + "...";
 		    }
 		    return result;
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 		}
 		try {
 		    return object.getClass().getName() + '@' +
 			Integer.toHexString(object.hashCode());
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 		}
 	    } finally {
 		callingSafeToString.remove();
@@ -76,6 +77,9 @@ public class Objects {
      * object's class, the {@code '#'} character, and the identity hash code of
      * the object as returned by {@link System#identityHashCode
      * System.identityHashCode}, represented in base 16.
+     *
+     * @param object the object or {@code null}
+     * @return a string representing the object
      */
     public static String fastToString(Object object) {
 	if (object == null) {
