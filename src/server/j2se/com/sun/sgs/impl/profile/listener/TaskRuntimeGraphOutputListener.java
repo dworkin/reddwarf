@@ -109,8 +109,8 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-	for (String taskName : taskTimes.keySet()) {
-	    PrintStream ps = taskTimes.get(taskName).printStream;
+	for (TaskTypeDetail detail : taskTimes.values()) {
+	    PrintStream ps = detail.printStream;
 	    ps.flush();
 	    ps.close();
 	}

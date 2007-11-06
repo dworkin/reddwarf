@@ -281,8 +281,7 @@ final class Context extends TransactionContext {
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.logThrow(Level.FINER, e,
-				"prepare tid:{0,number,#} throws",
-				getTxnId());
+				"prepare tid:{0,number,#} throws", getTxnId());
 	    }
 	    throw e;
 	}
@@ -341,15 +340,13 @@ final class Context extends TransactionContext {
 		storeParticipant.abort(txn);
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER,
-			   "abort tid:{0,number,#}, retryable:{1} returns",
-			   getTxnId(), retryable);
+		logger.log(Level.FINER, "abort tid:{0,number,#} returns",
+			   getTxnId());
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.logThrow(Level.FINER, e,
-				"abort tid:{0,number,#}, retryable:{1} throws",
-				getTxnId(), retryable);
+				"abort tid:{0,number,#} throws", getTxnId());
 	    }
 	    throw e;
 	}
@@ -391,6 +388,7 @@ final class Context extends TransactionContext {
 	}
     }
 
+    /** Returns the ID of the associated transaction as a BigInteger. */
     BigInteger getTxnId() {
 	return new BigInteger(1, txn.getId());
     }

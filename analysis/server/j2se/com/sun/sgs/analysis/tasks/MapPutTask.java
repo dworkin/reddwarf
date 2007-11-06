@@ -20,7 +20,7 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     /** A reference to the map. */
     private final ManagedReference mapRef;
 
-    /** Creates an instance with the map. */
+    /** Creates an instance with the specified map. */
     public MapPutTask(Map map) {
 	if (map == null) {
 	    throw new NullPointerException("The map must not be null");

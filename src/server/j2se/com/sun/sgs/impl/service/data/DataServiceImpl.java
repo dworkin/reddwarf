@@ -540,14 +540,6 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	}
     }
 
-    private static BigInteger contextTxnId(Context context) {
-	return (context != null) ? context.getTxnId() : null;
-    }
-
-    private static BigInteger refId(ManagedReference ref) {
-	return (ref != null) ? ref.getId() : null;
-    }
-
     /** {@inheritDoc} */
     public ManagedReference createReference(ManagedObject object) {
 	Context context = null;
@@ -709,8 +701,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    Level.FINEST,
 		    "{0} tid:{1,number,#}, name:{2}, object:{3} returns",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    contextTxnId(context), name,
-		    Objects.fastToString(object));
+		    contextTxnId(context), name, Objects.fastToString(object));
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -740,8 +731,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2} returns",
+		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    contextTxnId(context), name);
 	    }
@@ -1007,5 +997,21 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		"The object ID is invalid: " + objectId);
 	}
 	return objectId.longValue();
+    }
+
+    /**
+     * Returns the transaction ID associated with the context, or null if the
+     * context is null.
+     */
+    private static BigInteger contextTxnId(Context context) {
+	return (context != null) ? context.getTxnId() : null;
+    }
+
+    /**
+     * Returns the object ID for the reference, or null if the reference is
+     * null.
+     */
+    private static BigInteger refId(ManagedReference ref) {
+	return (ref != null) ? ref.getId() : null;
     }
 }

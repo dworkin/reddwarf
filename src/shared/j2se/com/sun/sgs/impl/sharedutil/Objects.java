@@ -51,7 +51,7 @@ public class Objects {
 		try {
 		    String result = object.toString();
 		    if (result != null && result.length() > 256) {
-			result = result.substring(0, 252) + "...";
+			result = result.substring(0, 253) + "...";
 		    }
 		    return result;
 		} catch (Exception e) {

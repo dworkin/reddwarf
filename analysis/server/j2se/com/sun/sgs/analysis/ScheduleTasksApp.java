@@ -11,12 +11,13 @@ import java.lang.reflect.Constructor;
 import java.util.Properties;
 
 /**
- * An application that schedules tasks specified by class names.  Gets the
- * names of the task classes from the value of the {@value TASK_KEY}
- * configuration property, which should contain the fully qualified names of
- * classes that implement {@link Task}, separated by colons.  The task class
- * should provide a public constructor with a {@link Properties} parameter,
- * which will be used to supply configuration properties.
+ * An application that schedules tasks specified by class names in a
+ * configuration property.  Gets the names of the task classes from the value
+ * of the {@value TASK_KEY} configuration property, which should contain the
+ * fully qualified names of classes that implement {@link Task}, separated by
+ * colons.  Each task class should provide a public constructor with a {@link
+ * Properties} parameter, which will be used to supply configuration
+ * properties.
  */
 public class ScheduleTasksApp implements AppListener, Serializable {
 

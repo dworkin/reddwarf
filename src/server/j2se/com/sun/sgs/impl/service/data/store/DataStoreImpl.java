@@ -539,6 +539,7 @@ public class DataStoreImpl
 
     /** Stores information about object IDs available for allocation. */
     private static final class ObjectIdInfo {
+
 	/**
 	 * The next object ID to use for creating an object.  Valid if not
 	 * greater than lastObjectId.
@@ -558,7 +559,7 @@ public class DataStoreImpl
 	private long abortNextObjectId = 0;
 
 	/** Creates an instance of this class. */
-	private ObjectIdInfo() { }
+	ObjectIdInfo() { }
 
 	/**
 	 * Records the initial value of nextObjectId, so that it can be rolled
@@ -568,16 +569,20 @@ public class DataStoreImpl
 	    abortNextObjectId = nextObjectId;
 	}
 
-	/** Returns whether there are more object IDs available. */
-	boolean hasNext() {
-	    return nextObjectId <= lastObjectId;
-	}
-
 	/** Updates the next and last object IDs. */
 	void setObjectIds(long nextObjectId, long lastObjectId) {
 	    this.nextObjectId = nextObjectId;
 	    this.lastObjectId = lastObjectId;
+	    /*
+	     * Since blocks of object IDs may not be allocated contiguously,
+	     * only back up to the start of the most recently allocated block.
+	     */
 	    this.abortNextObjectId = nextObjectId;
+	}
+
+	/** Returns whether there are more object IDs available. */
+	boolean hasNext() {
+	    return nextObjectId <= lastObjectId;
 	}
 
 	/** Returns the next object ID. */
@@ -587,7 +592,7 @@ public class DataStoreImpl
 	}
 
 	/**
-	 * Sets nextObjectId back to the failure from the start of the
+	 * Sets nextObjectId back to the value from the start of the
 	 * transaction, for when the transaction aborts.
 	 */
 	void abort() {
@@ -734,9 +739,9 @@ public class DataStoreImpl
 	    TxnInfo txnInfo = checkTxn(txn, createObjectOp);
 	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
 	    if (!objectIdInfo.hasNext()) {
+		logger.log(Level.FINE, "Allocate more object IDs");
 		long newNextObjectId;
 		synchronized (objectIdLock) {
-		    logger.log(Level.FINE, "Allocate more object IDs");
 		    newNextObjectId = getNextId(
 			DataStoreHeader.NEXT_OBJ_ID_KEY,
 			allocationBlockSize, txn.getTimeout());
