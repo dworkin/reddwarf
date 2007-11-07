@@ -87,14 +87,6 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * data integrity will be maintained.  Flushing changes to disk avoids data
  * loss but introduces a significant reduction in performance. <p>
  *
- * <dt> <i>Property:</i> <b>{@value #STATS_PROPERTY}</b> <br>
- *	<i>Default:</i> <code>-1</code>
- *
- * <dd style="padding-top: .5em">The interval in milliseconds between calls to
- * log database statistics, or a negative value to disable logging.  The
- * property is set to {@code -1} by default, which disables statistics
- * logging. <p>
- *
  * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	value of the <code>com.sun.sgs.txn.timeout</code> property, if
@@ -105,7 +97,15 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * aborted.  Since Berkeley DB Java edition only detects deadlocks on lock
  * timeouts, this value is also the amount of time it will take to detect a
  * deadlock.  The value must be greater than {@code 0}, and should be less than
- * the transaction timeout.
+ * the transaction timeout. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #STATS_PROPERTY}</b> <br>
+ *	<i>Default:</i> <code>-1</code>
+ *
+ * <dd style="padding-top: .5em">The interval in milliseconds between calls to
+ * log database statistics, or a negative value to disable logging.  The
+ * property is set to {@code -1} by default, which disables statistics
+ * logging. <p>
  *
  * </dl> <p>
  *
@@ -164,13 +164,6 @@ public class JeEnvironment implements DbEnvironment {
 	PACKAGE + ".flush.to.disk";
 
     /**
-     * The property that specifies the interval in milliseconds between calls
-     * to log database statistics, or a negative value to disable logging.  The
-     * property is set to -1 by default.
-     */
-    public static final String STATS_PROPERTY = PACKAGE + ".stats";
-    
-    /**
      * The property that specifies the amount of time permitted to obtain a
      * lock, in milliseconds.
      */
@@ -189,6 +182,13 @@ public class JeEnvironment implements DbEnvironment {
      */
     public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
 
+    /**
+     * The property that specifies the interval in milliseconds between calls
+     * to log database statistics, or a negative value to disable logging.  The
+     * property is set to -1 by default.
+     */
+    public static final String STATS_PROPERTY = PACKAGE + ".stats";
+    
     /**
      * Default values for Berkeley DB Java Edition properties that are
      * different from the BDB defaults.
@@ -281,21 +281,21 @@ public class JeEnvironment implements DbEnvironment {
 	    propertiesWithDefaults);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
-	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	long txnTimeout = wrappedProps.getLongProperty(
 	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
 	long defaultLockTimeout = (txnTimeout < 1)
 	    ? DEFAULT_LOCK_TIMEOUT
-	    : (long) (txnTimeout / DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
 	/* Avoid underflow */
 	if (defaultLockTimeout < 1) {
 	    defaultLockTimeout = 1;
 	}
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
-	/* Avoid overflow -- BDB JE treats 0 as unlimited */
-	long lockTimeoutMicro = (lockTimeout < (Long.MAX_VALUE / 1000))
+	/* Avoid overflow -- BDB treats 0 as unlimited */
+	long lockTimeoutMicros = (lockTimeout < (Long.MAX_VALUE / 1000))
 	    ? lockTimeout * 1000 : 0;
+	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
@@ -305,7 +305,7 @@ public class JeEnvironment implements DbEnvironment {
 	 * detected.  Setting the value on the transaction appears to have no
 	 * effect on deadlock detection.  -tjb@sun.com (11/05/2007)
 	 */
- 	config.setLockTimeout(lockTimeoutMicro);
+ 	config.setLockTimeout(lockTimeoutMicros);
 	config.setTransactional(true);
 	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);
@@ -380,6 +380,15 @@ public class JeEnvironment implements DbEnvironment {
 	}
 	throw new DbDatabaseException(
 	    "Unexpected database exception: " + e, e);
+    }
+
+    /** Returns the lock timeout in microseconds -- for testing. */
+    private long getLockTimeoutMicros() {
+	try {
+	    return env.getConfig().getLockTimeout();
+	} catch (DatabaseException e) {
+	    throw convertException(e, false);
+	}
     }
 
     /* -- Implement DbEnvironment -- */

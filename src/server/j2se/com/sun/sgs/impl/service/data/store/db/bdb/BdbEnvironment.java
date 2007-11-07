@@ -37,6 +37,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabase;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.TransactionParticipant;
@@ -133,6 +134,25 @@ public class BdbEnvironment implements DbEnvironment {
 	PACKAGE + ".flush.to.disk";
 
     /**
+     * The property that specifies the amount of time permitted to obtain a
+     * lock, in milliseconds.
+     */
+    public static final String LOCK_TIMEOUT_PROPERTY =
+	PACKAGE + ".lock.timeout.";
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT = 10;
+
+    /**
+     * The default proportion of the transaction timeout to use for the lock
+     * timeout, if no lock timeout is specified.
+     */
+    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+
+    /**
      * The property that specifies whether to automatically remove log files.
      */
     public static final String REMOVE_LOGS_PROPERTY =
@@ -214,6 +234,20 @@ public class BdbEnvironment implements DbEnvironment {
 	    CHECKPOINT_SIZE_PROPERTY, DEFAULT_CHECKPOINT_SIZE);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
+	long txnTimeout = wrappedProps.getLongProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
+	long defaultLockTimeout = (txnTimeout < 1)
+	    ? DEFAULT_LOCK_TIMEOUT
+	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Avoid underflow */
+	if (defaultLockTimeout < 1) {
+	    defaultLockTimeout = 1;
+	}
+	long lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
+	/* Avoid overflow -- BDB treats 0 as unlimited */
+	long lockTimeoutMicros = (lockTimeout < (Long.MAX_VALUE / 1000))
+	    ? lockTimeout * 1000 : 0;
 	boolean removeLogs = wrappedProps.getBooleanProperty(
 	    REMOVE_LOGS_PROPERTY, false);
 	EnvironmentConfig config = new EnvironmentConfig();
@@ -224,6 +258,7 @@ public class BdbEnvironment implements DbEnvironment {
 	config.setInitializeLocking(true);
 	config.setInitializeLogging(true);
 	config.setLockDetectMode(LockDetectMode.YOUNGEST);
+	config.setLockTimeout(lockTimeoutMicros);
 	config.setLogAutoRemove(removeLogs);
 	config.setMessageHandler(new LoggingMessageHandler());
 	config.setRunRecovery(true);
@@ -277,6 +312,15 @@ public class BdbEnvironment implements DbEnvironment {
 	} else {
 	    throw new DbDatabaseException(
 		"Unexpected database exception: " + e);
+	}
+    }
+
+    /** Returns the lock timeout in microseconds -- for testing. */
+    private long getLockTimeoutMicros() {
+	try {
+	    return env.getConfig().getLockTimeout();
+	} catch (DatabaseException e) {
+	    throw convertException(e, false);
 	}
     }
 

@@ -89,13 +89,13 @@ class JeTransaction implements DbTransaction {
      */
     JeTransaction(XAEnvironment env, long timeout) {
 	this.env = env;
+	if (timeout <= 0) {
+	    throw new IllegalArgumentException(
+		"Timeout must be greater than 0");
+	}
 	try {
-	    if (timeout <= 0) {
-		throw new IllegalArgumentException(
-		    "Timeout must be greater than 0");
-	    }
 	    txn = env.beginTransaction(null, null);
-	    /* Avoid overflow -- BDB JE treats 0 as unlimited */
+	    /* Avoid overflow -- BDB treats 0 as unlimited */
 	    long timeoutMicros =
 		(timeout < (Long.MAX_VALUE / 1000)) ? timeout * 1000 : 0;
 	    txn.setTxnTimeout(timeoutMicros);
