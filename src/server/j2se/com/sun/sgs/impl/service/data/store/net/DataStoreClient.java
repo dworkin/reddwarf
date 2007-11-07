@@ -665,6 +665,34 @@ public final class DataStoreClient
 	    "getClassInfo txn:" + txn + ", classId:" + classId);
     }
 
+    /** {@inheritDoc} */
+    public long nextObjectId(Transaction txn, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
+	TxnInfo txnInfo = null;
+	Exception exception;
+	try {
+	    txnInfo = checkTxn(txn);
+	    long result = server.nextObjectId(txnInfo.tid, oid);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "nextObjectId txn:{0}, oid:{1,number,#} " +
+			   "returns oid:{2,number,#}",
+			   txn, oid, result);
+	    }
+	    return result;
+	} catch (IOException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txn, txnInfo, Level.FINEST, exception,
+	    "nextObjectId txn:" + txn + ", oid:" + oid + " throws");
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */

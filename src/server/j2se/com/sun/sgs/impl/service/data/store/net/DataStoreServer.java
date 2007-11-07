@@ -255,6 +255,32 @@ public interface DataStoreServer extends Remote {
     byte[] getClassInfo(long tid, int classId)
 	throws ClassInfoNotFoundException, IOException;
 
+    /**
+     * Returns the object ID for the next object after the object with the
+     * specified ID, or {@code -1} if there are no more objects.  If {@code
+     * objectId} is {@code -1}, then returns the ID of the first object.  The
+     * IDs returned by this method will not include ones for objects that have
+     * already been removed, and may not include identifiers for objects
+     * created after an iteration has begun.  It is not an error for the object
+     * associated with the specified identifier to have already been
+     * removed. <p>
+     *
+     * @param	tid the ID of the transaction
+     * @param	oid the identifier of the object to search after, or
+     *		{@code -1} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code oid}, or {@code -1} if there are no more
+     *		objects
+     * @throws	IllegalArgumentException if the argument is less than {@code -1}
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @throws	IOException if a network problem occurs
+     */
+    long nextObjectId(long tid, long oid) throws IOException;
+
     /** 
      * Creates a new transaction and returns the associated ID.
      *

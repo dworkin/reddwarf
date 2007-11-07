@@ -246,6 +246,7 @@ public class JeEnvironment implements DbEnvironment {
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
 	config.setTransactional(true);
+	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);
 	for (Enumeration<?> names = propertiesWithDefaults.propertyNames();
 	     names.hasMoreElements(); )
