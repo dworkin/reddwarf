@@ -107,7 +107,9 @@ public interface ManagedReference {
     boolean equals(Object object);
 
     /**
-     * Returns an appropriate hash code value for the object.
+     * Returns an appropriate hash code value for the object, which should be
+     * the same as the hash code for the identifier returned by {@link #getId
+     * getId}.
      *
      * @return	the hash code for this object
      */

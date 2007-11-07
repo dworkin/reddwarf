@@ -359,6 +359,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public <T> T getForUpdate(Class<T> type) {
 	if (type == null) {
@@ -419,7 +420,21 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	return id;
     }
 
+    /** {@inheritDoc} */
+    public boolean equals(Object object) {
+	if (object == this) {
+	    return true;
+	} else if (object instanceof ManagedReference) {
+	    return getId().equals(((ManagedReference) object).getId());
+	} else {
+	    return false;
+	}
+    }
 
+    /** {@inheritDoc} */
+    public int hashCode() {
+	return getId().hashCode();
+    }
 
     /* -- Implement Serializable -- */
 

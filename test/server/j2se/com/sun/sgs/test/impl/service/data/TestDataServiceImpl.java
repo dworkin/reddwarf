@@ -2273,7 +2273,10 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testReferenceEquals() throws Exception {
 	ManagedReference ref = service.createReference(dummy);
+	final BigInteger id = ref.getId();
+	assertEquals(id.hashCode(), ref.hashCode());
 	assertFalse(ref.equals(null));
+	assertFalse(ref.equals(Boolean.TRUE));
 	assertTrue(ref.equals(ref));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	ManagedReference ref2 = service.createReference(dummy2);
@@ -2281,9 +2284,9 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedReference ref3 = new ManagedReference() {
 	    public <T> T get(Class<T> type) { return null; }
 	    public <T> T getForUpdate(Class<T> type) { return null; }
-	    public BigInteger getId() { return null; }
+	    public BigInteger getId() { return id; }
 	};
-	assertFalse(ref.equals(ref3));
+	assertTrue(ref.equals(ref3));
     }
 
     /* -- Test shutdown -- */
