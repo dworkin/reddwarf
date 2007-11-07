@@ -8,8 +8,9 @@
 # classes, using the local platform's path separator.  The remaining
 # arguments are the names of application configuration files.
 #
-# Either set the SGSHOME environment variable to the installation
-# directory, or run from that directory.
+# Either set the SGSHOME environment variable to the sgs-...
+# subdirectory of the installation directory, or run from that
+# directory.
 #
 # Runs java from the value of the JAVA_HOME environment variable, if
 # set, or else from the path.
@@ -27,7 +28,8 @@ app_classpath="$1"
 shift
 app_config_files="$*"
 
-# The install directory, or the current directory if not set
+# The sgs-... subdirectory of the install directory, or the current
+# directory if not set
 sgshome="${SGSHOME:=.}"
 
 # The java command

@@ -168,8 +168,9 @@
   </target>
 
   <!-- Builds database layer for Berkeley DB, standard edition -->
-  <target name="build-bdb-db" depends="build-server"
-	  description="Builds database layer for Berkeley DB, standard edition">
+  <target
+     name="build-bdb-db" depends="build-server"
+     description="Builds database layer for Berkeley DB, standard edition">
     <fail unless="bdb.lib.dir.supplied"
 	  message="Need to supply a value for bdb.lib.dir property"/>
     <depend srcdir="j2se"
