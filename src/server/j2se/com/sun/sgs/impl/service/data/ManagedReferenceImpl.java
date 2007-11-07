@@ -296,6 +296,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
+    /** {@inheritDoc} */
     public <T> T get(Class<T> type) {
 	return get(type, true);
     }
@@ -410,12 +411,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     public BigInteger getId() {
 	if (id == null) {
 	    id = BigInteger.valueOf(oid);
 	}
 	return id;
     }
+
+
 
     /* -- Implement Serializable -- */
 
