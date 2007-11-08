@@ -166,7 +166,7 @@ final class ClassesTable {
      *		operation failed because of a problem with the current
      *		transaction
      */
-    private int getClassId(Transaction txn, ObjectStreamClass classDesc) {
+    int getClassId(Transaction txn, ObjectStreamClass classDesc) {
 	lock.readLock().lock();
 	try {
 	    Integer classId = classIdMap.get(classDesc);

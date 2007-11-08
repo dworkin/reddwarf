@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -468,6 +469,14 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    Context context = getContext();
 	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
+		if (object instanceof ManagedObjectRemoval) {
+		    context.removingObject((ManagedObjectRemoval) object);
+		    /*
+		     * Get the context again in case something changed as a
+		     * result of the call to removingObject.
+		     */
+		    getContext();
+		}
 		ref.removeObject();
 	    }
 	    logger.log(
@@ -551,13 +560,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** {@inheritDoc} */
     public ManagedReference createReferenceForId(BigInteger id) {
 	try {
-	    if (id == null) {
-		throw new NullPointerException("The id must not be null");
-	    } else if (id.bitLength() > 63 || id.signum() < 0) {
-		throw new IllegalArgumentException("The id is invalid: " + id);
-	    }
-	    ManagedReference result =
-		getContext().getReference(id.longValue());
+	    ManagedReference result = getContext().getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId id:{0} returns {1}",
@@ -567,6 +570,27 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.FINEST, e, "createReferenceForId id:{0} throws", id);
+	    throw e;
+	}
+    }
+
+    /** {@inheritDoc} */
+    public BigInteger nextObjectId(BigInteger objectId) {
+	try {
+	    long oid = (objectId == null) ? -1 : getOid(objectId);
+	    Context context = getContext();
+	    long nextOid = context.nextObjectId(oid);
+	    BigInteger result =
+		(nextOid == -1) ? null : BigInteger.valueOf(nextOid);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "nextObjectId objectId:{0} returns {1}",
+		    objectId, result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    logger.logThrow(
+		Level.FINEST, e, "nextObjectId objectId:{0} throws", objectId);
 	    throw e;
 	}
     }
@@ -906,4 +930,18 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    : "Name has wrong prefix";
 	return name.startsWith(prefix) ? name.substring(2) : null;
     }	    
+
+    /**
+     * Converts a BigInteger object ID into a long, throwing an exception if
+     * the argument is invalid.
+     */
+    private static long getOid(BigInteger objectId) {
+	if (objectId == null) {
+	    throw new NullPointerException("The object ID must not be null");
+	} else if (objectId.bitLength() > 63 || objectId.signum() < 0) {
+	    throw new IllegalArgumentException(
+		"The object ID is invalid: " + objectId);
+	}
+	return objectId.longValue();
+    }
 }
