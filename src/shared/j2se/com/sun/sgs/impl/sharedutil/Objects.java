@@ -72,10 +72,14 @@ public final class Objects {
 
     /**
      * Returns a string representing the object without calling any methods on
-     * the object.  Returns {@code "null"} if the argument is {@code null},
-     * otherwise returns the concatenation of the fully qualified name of the
-     * object's class, the {@code '#'} character, and the identity hash code of
-     * the object as returned by {@link System#identityHashCode
+     * the object.  Callers can use this method to avoid the accesses that
+     * {@code toString} might perform to any ManagedReferences that the object
+     * contains, which could lead to exceptions or scaling problems. <p>
+     *
+     * Returns {@code "null"} if the argument is {@code null}, otherwise
+     * returns the concatenation of the fully qualified name of the object's
+     * class, the {@code '#'} character, and the identity hash code of the
+     * object as returned by {@link System#identityHashCode
      * System.identityHashCode}, represented in base 16.
      *
      * @param object the object or {@code null}

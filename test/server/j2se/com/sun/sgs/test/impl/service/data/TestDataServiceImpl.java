@@ -1570,12 +1570,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertFalse(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test createReference -- */
@@ -2244,12 +2244,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertFalse(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(threadFlag.tryAcquire(10, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test ManagedReference.getId -- */

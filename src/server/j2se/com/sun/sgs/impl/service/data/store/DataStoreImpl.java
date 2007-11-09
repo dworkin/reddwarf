@@ -49,6 +49,7 @@ import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Executors;
@@ -185,17 +186,9 @@ public class DataStoreImpl
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
-    /**
-     * Object to synchronize on when accessing freeObjectIds or allocating new
-     * object IDs.
-     */
-    final Object objectIdLock = new Object();
-
-    /**
-     * Information about free object IDs -- synchronize on objectIdLock when
-     * accessing.
-     */
-    final List<ObjectIdInfo> freeObjectIds = new ArrayList<ObjectIdInfo>();
+    /** Information about free object IDs. */
+    final List<ObjectIdInfo> freeObjectIds =
+	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -389,9 +382,7 @@ public class DataStoreImpl
 	    maybeCloseCursors();
 	    dbTxn.commit();
 	    if (objectIdInfo != null) {
-		synchronized (objectIdLock) {
-		    freeObjectIds.add(objectIdInfo);
-		}
+		freeObjectIds.add(objectIdInfo);
 	    }
 	}
 
@@ -404,9 +395,7 @@ public class DataStoreImpl
 	    dbTxn.abort();
 	    if (objectIdInfo != null) {
 		objectIdInfo.abort();
-		synchronized (objectIdLock) {
-		    freeObjectIds.add(objectIdInfo);
-		}
+		freeObjectIds.add(objectIdInfo);
 	    }
 	}
 
@@ -496,7 +485,7 @@ public class DataStoreImpl
 	 */
 	ObjectIdInfo getObjectIdInfo() {
 	    if (objectIdInfo == null) {
-		synchronized (objectIdLock) {
+		synchronized (freeObjectIds) {
 		    objectIdInfo = freeObjectIds.isEmpty()
 			? null : freeObjectIds.remove(0);
 		}
@@ -740,12 +729,9 @@ public class DataStoreImpl
 	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
 	    if (!objectIdInfo.hasNext()) {
 		logger.log(Level.FINE, "Allocate more object IDs");
-		long newNextObjectId;
-		synchronized (objectIdLock) {
-		    newNextObjectId = getNextId(
-			DataStoreHeader.NEXT_OBJ_ID_KEY,
-			allocationBlockSize, txn.getTimeout());
-		}
+		long newNextObjectId = getNextId(
+		    DataStoreHeader.NEXT_OBJ_ID_KEY,
+		    allocationBlockSize, txn.getTimeout());
 		objectIdInfo.setObjectIds(
 		    newNextObjectId,
 		    newNextObjectId + allocationBlockSize - 1);
@@ -1406,37 +1392,6 @@ public class DataStoreImpl
      */
     public String toString() {
 	return "DataStoreImpl[directory=\"" + directory + "\"]";
-    }
-
-    /**
-     * Returns the next available object ID, and reserves the specified number
-     * of IDs.
-     *
-     * @param	txn the transaction
-     * @param	count the number of IDs to reserve
-     * @return	the next available object ID
-     */
-    public long allocateObjects(Transaction txn, int count) {
-	if (logger.isLoggable(Level.FINE)) {
-	    logger.log(Level.FINE,
-		       "allocateObjects txn:{0}, count:{1,number,#}",
-		       txn, count);
-	}
-	try {
-	    long result = getNextId(
-		DataStoreHeader.NEXT_OBJ_ID_KEY, count, txn.getTimeout());
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE,
-			   "allocateObjects txn:{0}, count:{1,number,#} " +
-			   "returns oid:{2,number,#}",
-			   txn, count, result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINE, e,
-		"allocateObjects txn:" + txn + ", count:" + count);
-	}
     }
 
     /* -- Protected methods -- */

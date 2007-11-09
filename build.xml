@@ -82,6 +82,17 @@
 		   -XX:NewSize=512m
 		   -Xms700m
 		   -Xmx2g"/>
+  <!-- Set analysis.use.data.store.server to perform analysis using the
+       networked data store -->
+  <condition
+     property="analysis.data.store.class"
+     value="com.sun.sgs.impl.service.data.store.net.DataStoreClient"
+     else="com.sun.sgs.impl.service.data.store.DataStoreImpl">
+    <istrue value="${analysis.use.data.store.server}"/>
+  </condition>
+  <property name="analysis.data.store.server.run" value="true"/>
+  <property name="analysis.data.store.server.host" value="localhost"/>
+  <property name="analysis.data.store.server.port" value="44530"/>
 
   <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
@@ -1137,6 +1148,15 @@
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
 	 value="${test.bdb.env}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"
+	 value="${analysis.data.store.class}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.run"
+		   value="${analysis.data.store.server.run}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.host"
+		   value="${analysis.data.store.server.host}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
+		   value="${analysis.data.store.server.port}"/>
       <classpath>
         <pathelement location="${build.dir}/analysis/classes"/>
         <path refid="server.classpath"/>
@@ -1250,6 +1270,8 @@
       com.sun.sgs.impl.service.data.store.net.server.run = true
       com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class = \
         com.sun.sgs.impl.service.data.store.net.DataStoreClient
+      com.sun.sgs.impl.service.data.store.db.environment.class = \
+        ${test.bdb.env}
     </echo>
     <echo file="${test.server.dir}/logging.config">
       .level = ${test.server.level}

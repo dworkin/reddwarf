@@ -107,7 +107,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
 	tid = server.createTransaction(1000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
     }
 
     /** Sets passed if the test passes. */
@@ -326,7 +326,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
 	server = getDataStoreServer();
 	tid = server.createTransaction(2000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
 	Thread.sleep(1000);
 	try {
 	    server.getObject(tid, oid, false);
