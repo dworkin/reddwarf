@@ -443,8 +443,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** {@inheritDoc} */
     public int hashCode() {
-	/* Return the XOR of the upper and lower 32 bits */
-	return (int) (oid >>> 32) ^ (int) oid;
+	/*
+	 * Follow the suggestions in Effective Java to XOR the upper and lower
+	 * 32 bits of a long field, and add a non-zero constant.
+	 */
+	return (int) (oid ^ (oid >>> 32)) + 6883;
     }
 
     /* -- Implement Serializable -- */
