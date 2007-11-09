@@ -2292,6 +2292,7 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedReference ref4 = service.createReference(dummy);
 	assertTrue(ref.equals(ref4));
 	assertTrue(ref4.equals(ref));
+	assertEquals(ref.hashCode(), ref4.hashCode());
     }
 
     /* -- Test shutdown -- */
