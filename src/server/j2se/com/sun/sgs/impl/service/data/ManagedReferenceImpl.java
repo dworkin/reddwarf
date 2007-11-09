@@ -424,8 +424,18 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     public boolean equals(Object object) {
 	if (object == this) {
 	    return true;
-	} else if (object instanceof ManagedReference) {
-	    return getId().equals(((ManagedReference) object).getId());
+	} else if (object instanceof ManagedReferenceImpl) {
+	    /*
+	     * This implementation depends on the fact that references are
+	     * associated with the current data service, which is true since
+	     * the data service is obtained from the current context rather
+	     * than being represented explicitly within the reference.  If it
+	     * were possible to compare references associated with different
+	     * data services, that would produce false equality for references
+	     * to objects in the different data services that happened to have
+	     * the same object IDs.  -tjb@sun.com (11/09/2007)
+	     */
+	    return oid == (((ManagedReferenceImpl) object).oid);
 	} else {
 	    return false;
 	}
@@ -433,7 +443,8 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** {@inheritDoc} */
     public int hashCode() {
-	return getId().hashCode();
+	/* Return the XOR of the upper and lower 32 bits */
+	return (int) (oid >>> 32) ^ (int) oid;
     }
 
     /* -- Implement Serializable -- */

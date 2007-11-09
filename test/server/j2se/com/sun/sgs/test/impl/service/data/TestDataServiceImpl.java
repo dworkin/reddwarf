@@ -2272,21 +2272,26 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test ManagedReference.equals -- */
 
     public void testReferenceEquals() throws Exception {
-	ManagedReference ref = service.createReference(dummy);
-	final BigInteger id = ref.getId();
-	assertEquals(id.hashCode(), ref.hashCode());
+	final ManagedReference ref = service.createReference(dummy);
 	assertFalse(ref.equals(null));
 	assertFalse(ref.equals(Boolean.TRUE));
 	assertTrue(ref.equals(ref));
+	assertTrue(ref.equals(service.createReference(dummy)));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	ManagedReference ref2 = service.createReference(dummy2);
 	assertFalse(ref.equals(ref2));
 	ManagedReference ref3 = new ManagedReference() {
 	    public <T> T get(Class<T> type) { return null; }
 	    public <T> T getForUpdate(Class<T> type) { return null; }
-	    public BigInteger getId() { return id; }
+	    public BigInteger getId() { return ref.getId(); }
 	};
-	assertTrue(ref.equals(ref3));
+	assertFalse(ref.equals(ref3));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	ManagedReference ref4 = service.createReference(dummy);
+	assertTrue(ref.equals(ref4));
+	assertTrue(ref4.equals(ref));
     }
 
     /* -- Test shutdown -- */
