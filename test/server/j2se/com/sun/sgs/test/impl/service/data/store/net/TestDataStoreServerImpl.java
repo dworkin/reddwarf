@@ -536,15 +536,19 @@ public class TestDataStoreServerImpl extends TestCase {
 		try {
 		    flag.release();
 		    server.getObject(tid, oid, false);
-		    flag.release();
+		} catch (TransactionAbortedException e) {
+		    System.err.println(e);
+		    tid = -1;
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
+		} finally {
+		    flag.release();
 		}
 	    }
 	};
 	thread.start();
 	/* Wait for thread to block */
-	assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	Thread.sleep(10);
 	/* Concurrent access */
 	try {
@@ -555,7 +559,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	} finally {
 	    /* Clean up */
 	    server.abort(tid2);
-	    assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	    assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	}
     }
 }
