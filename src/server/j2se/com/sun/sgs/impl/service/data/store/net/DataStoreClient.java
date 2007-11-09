@@ -170,24 +170,6 @@ public final class DataStoreClient
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
 
-    /**
-     * Object to synchronize on when accessing nextObjectId and
-     * lastObjectId.
-     */
-    private final Object objectIdLock = new Object();
-
-    /**
-     * The next object ID to use for creating an object.  Valid if not greater
-     * than lastObjectId.
-     */
-    private long nextObjectId = 0;
-
-    /**
-     * The last object ID that is free for allocating an object before needing
-     * to obtain more IDs from the database.
-     */
-    private long lastObjectId = -1;
-
     /** Object to synchronize on when accessing txnCount. */
     private final Object txnCountLock = new Object();
 
