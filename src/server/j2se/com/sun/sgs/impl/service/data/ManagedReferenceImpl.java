@@ -296,6 +296,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
+    /** {@inheritDoc} */
     public <T> T get(Class<T> type) {
 	return get(type, true);
     }
@@ -358,6 +359,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public <T> T getForUpdate(Class<T> type) {
 	if (type == null) {
@@ -410,11 +412,42 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     public BigInteger getId() {
 	if (id == null) {
 	    id = BigInteger.valueOf(oid);
 	}
 	return id;
+    }
+
+    /** {@inheritDoc} */
+    public boolean equals(Object object) {
+	if (object == this) {
+	    return true;
+	} else if (object instanceof ManagedReferenceImpl) {
+	    /*
+	     * This implementation depends on the fact that references are
+	     * associated with the current data service, which is true since
+	     * the data service is obtained from the current context rather
+	     * than being represented explicitly within the reference.  If it
+	     * were possible to compare references associated with different
+	     * data services, that would produce false equality for references
+	     * to objects in the different data services that happened to have
+	     * the same object IDs.  -tjb@sun.com (11/09/2007)
+	     */
+	    return oid == (((ManagedReferenceImpl) object).oid);
+	} else {
+	    return false;
+	}
+    }
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	/*
+	 * Follow the suggestions in Effective Java to XOR the upper and lower
+	 * 32 bits of a long field, and add a non-zero constant.
+	 */
+	return (int) (oid ^ (oid >>> 32)) + 6883;
     }
 
     /* -- Implement Serializable -- */
