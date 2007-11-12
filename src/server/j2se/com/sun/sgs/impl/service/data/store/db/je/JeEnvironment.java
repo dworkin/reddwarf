@@ -38,6 +38,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabase;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.TransactionParticipant;
@@ -143,6 +144,25 @@ public class JeEnvironment implements DbEnvironment {
 	PACKAGE + ".flush.to.disk";
 
     /**
+     * The property that specifies the amount of time permitted to obtain a
+     * lock, in milliseconds.
+     */
+    public static final String LOCK_TIMEOUT_PROPERTY =
+	PACKAGE + ".lock.timeout";
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT = 10;
+
+    /**
+     * The default proportion of the transaction timeout to use for the lock
+     * timeout, if no lock timeout is specified.
+     */
+    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+
+    /**
      * The property that specifies the interval in milliseconds between calls
      * to log database statistics, or a negative value to disable logging.  The
      * property is set to -1 by default.
@@ -241,10 +261,31 @@ public class JeEnvironment implements DbEnvironment {
 	    propertiesWithDefaults);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
+	long txnTimeout = wrappedProps.getLongProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
+	long defaultLockTimeout = (txnTimeout < 1)
+	    ? DEFAULT_LOCK_TIMEOUT
+	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Avoid underflow */
+	if (defaultLockTimeout < 1) {
+	    defaultLockTimeout = 1;
+	}
+	long lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
+	/* Avoid overflow -- BDB treats 0 as unlimited */
+	long lockTimeoutMicros = (lockTimeout < (Long.MAX_VALUE / 1000))
+	    ? lockTimeout * 1000 : 0;
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
+	/*
+	 * Note that it seems that the lock timeout value needs to be set on
+	 * the BDB JE environment in order to control how quickly deadlocks are
+	 * detected.  Setting the value on the transaction appears to have no
+	 * effect on deadlock detection.  -tjb@sun.com (11/05/2007)
+	 */
+ 	config.setLockTimeout(lockTimeoutMicros);
 	config.setTransactional(true);
 	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);
@@ -319,6 +360,15 @@ public class JeEnvironment implements DbEnvironment {
 	}
 	throw new DbDatabaseException(
 	    "Unexpected database exception: " + e, e);
+    }
+
+    /** Returns the lock timeout in microseconds -- for testing. */
+    private long getLockTimeoutMicros() {
+	try {
+	    return env.getConfig().getLockTimeout();
+	} catch (DatabaseException e) {
+	    throw convertException(e, false);
+	}
     }
 
     /** Checks that the environment is currently open. */

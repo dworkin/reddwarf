@@ -22,14 +22,22 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import java.math.BigInteger;
 import java.util.IdentityHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Stores information for a specific transaction. */
 final class Context extends TransactionContext {
+
+    /** The logger for the data service class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(DataServiceImpl.class.getName()));
 
     /** The data service. */
     private final DataServiceImpl service;
@@ -100,6 +108,10 @@ final class Context extends TransactionContext {
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
 	classSerial = classesTable.createClassSerialization(this.txn);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
+		       getTxnId(), Thread.currentThread().getName());
+	}
     }
 
     /**
@@ -108,7 +120,7 @@ final class Context extends TransactionContext {
      * instances of this class to the DataStore in order to mediate its
      * participation in the transaction.
      */
-    private final class TxnTrampoline implements Transaction {
+    final class TxnTrampoline implements Transaction {
 
 	/** The original transaction. */
 	private final Transaction originalTxn;
@@ -250,41 +262,93 @@ final class Context extends TransactionContext {
 
     @Override
     public boolean prepare() throws Exception {
-	isPrepared = true;
-	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
-	if (storeParticipant == null) {
-	    isCommitted = true;
-	    return true;
-	} else {
-	    return storeParticipant.prepare(txn);
+	try {
+	    isPrepared = true;
+	    txn.setInactive();
+	    ManagedReferenceImpl.flushAll(this);
+	    boolean result;
+	    if (storeParticipant == null) {
+		isCommitted = true;
+		result = true;
+	    } else {
+		result = storeParticipant.prepare(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "prepare tid:{0,number,#} returns {1}",
+			   getTxnId(), result);
+	    }
+	    return result;
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"prepare tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void commit() {
-	isCommitted = true;
-	txn.setInactive();
-	if (storeParticipant != null) {
-	    storeParticipant.commit(txn);
+	try {
+	    isCommitted = true;
+	    txn.setInactive();
+	    if (storeParticipant != null) {
+		storeParticipant.commit(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "commit tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"commit tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void prepareAndCommit() throws Exception {
-	isCommitted = true;
-	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
-	if (storeParticipant != null) {
-	    storeParticipant.prepareAndCommit(txn);
+	try {
+	    isCommitted = true;
+	    txn.setInactive();
+	    ManagedReferenceImpl.flushAll(this);
+	    if (storeParticipant != null) {
+		storeParticipant.prepareAndCommit(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "prepareAndCommit tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"prepareAndCommit tid:{0,number,#} throws",
+				getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void abort(boolean retryable) {
-	txn.setInactive();
-	if (storeParticipant != null) {
-	    storeParticipant.abort(txn);
+	try {
+	    txn.setInactive();
+	    if (storeParticipant != null) {
+		storeParticipant.abort(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "abort tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"abort tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
@@ -322,5 +386,10 @@ final class Context extends TransactionContext {
 	} finally {
 	    removing.remove(object);
 	}
+    }
+
+    /** Returns the ID of the associated transaction as a BigInteger. */
+    BigInteger getTxnId() {
+	return new BigInteger(1, txn.getId());
     }
 }
