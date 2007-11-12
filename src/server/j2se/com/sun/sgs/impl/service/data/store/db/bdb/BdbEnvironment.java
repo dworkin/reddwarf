@@ -138,7 +138,7 @@ public class BdbEnvironment implements DbEnvironment {
      * lock, in milliseconds.
      */
     public static final String LOCK_TIMEOUT_PROPERTY =
-	PACKAGE + ".lock.timeout.";
+	PACKAGE + ".lock.timeout";
 
     /**
      * The default value of the lock timeout property, if no transaction

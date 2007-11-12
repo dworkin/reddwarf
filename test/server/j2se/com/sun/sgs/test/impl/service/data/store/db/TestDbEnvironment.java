@@ -23,13 +23,11 @@ import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutMicros;
+import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.test.util.UtilReflection;
 import java.io.File;
-import java.lang.reflect.Method;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -50,11 +48,9 @@ public class TestDbEnvironment extends TestCase {
 	}
     };
 
-    /** The type of environment implementation in use. */
-    static final EnvironmentType environmentType = getEnvironmentType();
-
     /** The system property that specifies the lock timeout. */
-    static final String lockTimeoutPropertyName = getLockTimeoutPropertyName();
+    static final String lockTimeoutPropertyName =
+	getLockTimeoutPropertyName(System.getProperties());
 
     /** Properties for creating the environment. */
     private Properties props;
@@ -101,118 +97,72 @@ public class TestDbEnvironment extends TestCase {
     public void testLockTimeoutDefault() {
 	props.remove(TransactionCoordinator.TXN_TIMEOUT_PROPERTY);
 	env = getEnvironment(props);
-	assertEquals(10000, getLockTimeoutMicros());
+	assertEquals(10000, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutFromTxnTimeoutIllegal() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "-1");
 	env = getEnvironment(props);
-	assertEquals(10000, getLockTimeoutMicros());
+	assertEquals(10000, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutFromTxnTimeoutUnderflow() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "1");
 	env = getEnvironment(props);
-	assertEquals(1000, getLockTimeoutMicros());
+	assertEquals(1000, getLockTimeoutMicros(env));
 	env.close();
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "9");
 	env = getEnvironment(props);
-	assertEquals(1000, getLockTimeoutMicros());
+	assertEquals(1000, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutFromTxnTimeout() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 			  "12345678");
 	env = getEnvironment(props);
-	assertEquals(1234567000, getLockTimeoutMicros());
+	assertEquals(1234567000, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutFromTxnTimeoutOverflow() {
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 			  String.valueOf((Long.MAX_VALUE / 100) + 1));
 	env = getEnvironment(props);
-	assertEquals(0, getLockTimeoutMicros());
+	assertEquals(0, getLockTimeoutMicros(env));
 	env.close();
 	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
 			  String.valueOf(Long.MAX_VALUE));
 	env = getEnvironment(props);
-	assertEquals(0, getLockTimeoutMicros());
+	assertEquals(0, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutSpecified() {
 	props.setProperty(lockTimeoutPropertyName, "1");
 	env = getEnvironment(props);
-	assertEquals(1000, getLockTimeoutMicros());
+	assertEquals(1000, getLockTimeoutMicros(env));
 	env.close();
 	props.setProperty(lockTimeoutPropertyName, "437");
 	env = getEnvironment(props);
-	assertEquals(437000, getLockTimeoutMicros());
+	assertEquals(437000, getLockTimeoutMicros(env));
     }
 
     public void testLockTimeoutSpecifiedOverflow() {
 	props.setProperty(lockTimeoutPropertyName,
 			  String.valueOf((Long.MAX_VALUE / 1000) + 1));
 	env = getEnvironment(props);
-	assertEquals(0, getLockTimeoutMicros());
+	assertEquals(0, getLockTimeoutMicros(env));
 	env.close();
 	props.setProperty(lockTimeoutPropertyName,
 			  String.valueOf(Long.MAX_VALUE));
 	env = getEnvironment(props);
-	assertEquals(0, getLockTimeoutMicros());
+	assertEquals(0, getLockTimeoutMicros(env));
     }
 
     /* -- Other classes and methods -- */
-
-    /** Types of environment implementations. */
-    enum EnvironmentType { BDB, JE };
 
     /** Creates an environment using the specified properties. */
     static DbEnvironment getEnvironment(Properties properties) {
 	return DbEnvironmentFactory.getEnvironment(
 	    dbDirectory, properties, dummyScheduler);
-    }
-
-    /** Returns type of environment implementation in use. */
-    static EnvironmentType getEnvironmentType() {
-	String className = System.getProperty(
-	    DbEnvironmentFactory.ENVIRONMENT_CLASS_PROPERTY);
-	if (className == null ||
-	    className.equals(
-		"com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"))
-	{
-	    return EnvironmentType.BDB;
-	} else if (className.equals(
-		       "com.sun.sgs.impl.service.data.store.db.je." +
-		       "JeEnvironment"))
-	{
-	    return EnvironmentType.JE;
-	} else {
-	    throw new RuntimeException(
-		"Unknown environment class: " + className);
-	}
-    }
-
-    /** Returns the system property that specifies the lock timeout. */
-    static String getLockTimeoutPropertyName() {
-	switch (environmentType) {
-	case BDB:
-	    return BdbEnvironment.LOCK_TIMEOUT_PROPERTY;
-	case JE:
-	    return JeEnvironment.LOCK_TIMEOUT_PROPERTY;
-	default:
-	    throw new RuntimeException("Unknown environment");
-	}
-    }
-
-    /** Returns the environment's lock timeout. */
-    long getLockTimeoutMicros() {
-	Method method = UtilReflection.getMethod(
-	    env.getClass(), "getLockTimeoutMicros");
-	try {
-	    return (Long) method.invoke(env);
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
     }
 
     /** Insures an empty version of the directory exists. */
