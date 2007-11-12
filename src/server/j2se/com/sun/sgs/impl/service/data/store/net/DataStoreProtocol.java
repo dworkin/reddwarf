@@ -41,7 +41,7 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Opcodes for the methods -- */
 
-    private static final short ALLOCATE_OBJECTS = 1;
+    private static final short CREATE_OBJECT = 1;
     private static final short MARK_FOR_UPDATE = 2;
     private static final short GET_OBJECT = 3;
     private static final short SET_OBJECT = 4;
@@ -76,8 +76,8 @@ class DataStoreProtocol implements DataStoreServer {
     void dispatch(DataStoreServer server) throws IOException {
 	short op = in.readShort();
 	switch (op) {
-	case ALLOCATE_OBJECTS:
-	    handleAllocateObjects(server);
+	case CREATE_OBJECT:
+	    handleCreateObject(server);
 	    break;
 	case MARK_FOR_UPDATE:
 	    handleMarkForUpdate(server);
@@ -137,21 +137,19 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Implement methods for the client and server sides -- */
 
-    public long allocateObjects(long tid, int count) throws IOException {
-	out.writeShort(ALLOCATE_OBJECTS);
+    public long createObject(long tid) throws IOException {
+	out.writeShort(CREATE_OBJECT);
 	out.writeLong(tid);
-	out.writeInt(count);
 	checkResult();
 	return in.readLong();
     }
 
-    private void handleAllocateObjects(DataStoreServer server)
+    private void handleCreateObject(DataStoreServer server)
 	throws IOException
     {
 	try {
 	    long tid = in.readLong();
-	    int count = in.readInt();
-	    long result = server.allocateObjects(tid, count);
+	    long result = server.createObject(tid);
 	    out.writeBoolean(true);
 	    out.writeLong(result);
 	    out.flush();

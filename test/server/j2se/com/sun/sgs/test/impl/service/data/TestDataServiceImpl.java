@@ -46,6 +46,7 @@ import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -1544,6 +1545,10 @@ public class TestDataServiceImpl extends TestCase {
     public void testMarkForUpdateLocking() throws Exception {
 	dummy.setValue("a");
 	txn.commit();
+	service.shutdown();
+	props.setProperty(getLockTimeoutPropertyName(props), "500");
+	service = getDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
 	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	assertEquals("a", dummy.value);
@@ -1576,6 +1581,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	service.shutdown();
+	service = null;
     }
 
     /* -- Test createReference -- */
@@ -2219,6 +2226,10 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateLocking() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
+	service.shutdown();
+	props.setProperty(getLockTimeoutPropertyName(props), "500");
+	service = getDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
 	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	dummy.getNext();
@@ -2250,6 +2261,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	service.shutdown();
+	service = null;
     }
 
     /* -- Test ManagedReference.getId -- */
