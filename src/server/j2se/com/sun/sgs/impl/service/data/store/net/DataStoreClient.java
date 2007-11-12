@@ -46,14 +46,6 @@ import java.util.logging.Logger;
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.client.allocation.block.size
- *	</b></code><br>
- *	<i>Default:</i> {@code 100}
- *
- * <dd style="padding-top: .5em">The number of object IDs to allocate at one
- *	time.  This value must be greater than {@code 0}. <p>
- *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
  *	</b></code><br>
@@ -118,16 +110,6 @@ public final class DataStoreClient
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
 
-    /**
-     * The property that specifies the number of object IDs to allocate at one
-     * time.
-     */
-    private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	PACKAGE + ".client.allocation.block.size";
-
-    /** The default for the number of object IDs to allocate at one time. */
-    private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
-
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
 	PACKAGE + ".server.host";
@@ -181,33 +163,12 @@ public final class DataStoreClient
     /** The local server or null. */
     private DataStoreServerImpl localServer = null;
 
-    /** The number of object IDs to allocate at one time. */
-    private final int allocationBlockSize;
-
     /** The maximum transaction timeout. */
     private final long maxTxnTimeout;
 
     /** Provides information about the transaction for the current thread. */
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
-
-    /**
-     * Object to synchronize on when accessing nextObjectId and
-     * lastObjectId.
-     */
-    private final Object objectIdLock = new Object();
-
-    /**
-     * The next object ID to use for creating an object.  Valid if not greater
-     * than lastObjectId.
-     */
-    private long nextObjectId = 0;
-
-    /**
-     * The last object ID that is free for allocating an object before needing
-     * to obtain more IDs from the database.
-     */
-    private long lastObjectId = -1;
 
     /** Object to synchronize on when accessing txnCount. */
     private final Object txnCountLock = new Object();
@@ -244,14 +205,11 @@ public final class DataStoreClient
      *
      * @param	properties the properties for configuring this instance
      * @throws	IllegalArgumentException if the {@code
-     *		com.sun.sgs.impl.service.data.store.net.server.host}
-     *		property is not set, if the value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.client.allocation.block.size}
-     *		property is not a valid integer greater than zero, or if the
-     *		value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.server.port}
-     *		property is not a valid integer not less than {@code 0} and not
-     *		greater than {@code 65535}
+     *		com.sun.sgs.impl.service.data.store.net.server.host} property
+     *		is not set, or if the value of the {@code
+     *		com.sun.sgs.impl.service.data.store.net.server.port} property
+     *		is not a valid integer not less than {@code 0} and not greater
+     *		than {@code 65535}
      * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the Java RMI
      *		registry
@@ -272,9 +230,6 @@ public final class DataStoreClient
 	int specifiedServerPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, runServer ? 0 : 1,
 	    65535);
-	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
-	    1, Integer.MAX_VALUE);
 	maxTxnTimeout = wrappedProps.getLongProperty(
 	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 1,
 	    Long.MAX_VALUE);
@@ -305,17 +260,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxn(txn);
-	    long result;
-	    synchronized (objectIdLock) {
-		if (nextObjectId > lastObjectId) {
-		    logger.log(Level.FINE, "Allocate more object IDs");
-		    long newNextObjectId = server.allocateObjects(
-			txnInfo.tid, allocationBlockSize);
-		    nextObjectId = newNextObjectId;
-		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
-		}
-		result = nextObjectId++;
-	    }
+	    long result = server.createObject(txnInfo.tid);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
