@@ -38,6 +38,15 @@ if [ -n "$JAVA_HOME" ]; then
     java=$JAVA_HOME/bin/java;
 fi
 
+# The path separator for the current platform
+os=`uname -s`
+case $os in
+    CYGWIN*)
+	pathsep=";";;
+    *)
+	pathsep=":";;
+esac
+
 set -x
 
 # Run the SGS server, specifying the logging configuration file, the SGS

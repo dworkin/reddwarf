@@ -15,18 +15,12 @@ cd "$1"
 # Suppress file expansion so that it can happen within the find command
 set -f
 
-# Specify a find pattern for JAR files whose contents should not be
-# checked
-dont_check_jars='( -path ./lib/je-*.jar -or
-		   -path ./lib/mina-*.jar -or
-		   -path ./lib/slf4j-*.jar )'
-
 # List the installation files
 echo root:
 find . -print | sort
 
 # List the contents of JAR files
-for jar in `find . -name *.jar -not $dont_check_jars -print | sort`; do
+for jar in `find . -name *.jar -print | sort`; do
     echo $jar\:
     jar tf $jar | sort
 done

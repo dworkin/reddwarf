@@ -21,14 +21,27 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.test.util.UtilReflection;
 import java.lang.reflect.Method;
 import java.util.Properties;
 
 /** Utilities for handling the data store database layer in tests. */
 public final class UtilDataStoreDb {
+
+    /**
+     * The name of the class that implements the data store database
+     * environment using Berkeley DB Standard Edition.
+     */
+    public static final String BDB_ENVIRONMENT_CLASS_NAME =
+	"com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
+
+    /**
+     * The name of the class that implements the data store database
+     * environment using Berkeley DB Java Edition.
+     */
+    public static final String JE_ENVIRONMENT_CLASS_NAME =
+	"com.sun.sgs.impl.service.data.store.db.je.JeEnvironment";
+
 
     /** Types of data store database environment implementations. */
     public enum EnvironmentType {
@@ -50,14 +63,10 @@ public final class UtilDataStoreDb {
 	String className = properties.getProperty(
 	    DbEnvironmentFactory.ENVIRONMENT_CLASS_PROPERTY);
 	if (className == null ||
-	    className.equals(
-		"com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"))
+	    className.equals(BDB_ENVIRONMENT_CLASS_NAME))
 	{
 	    return EnvironmentType.BDB;
-	} else if (className.equals(
-		       "com.sun.sgs.impl.service.data.store.db.je." +
-		       "JeEnvironment"))
-	{
+	} else if (className.equals(JE_ENVIRONMENT_CLASS_NAME)) {
 	    return EnvironmentType.JE;
 	} else {
 	    throw new RuntimeException(
@@ -76,9 +85,23 @@ public final class UtilDataStoreDb {
     {
 	switch (getEnvironmentType(properties)) {
 	case BDB:
-	    return BdbEnvironment.LOCK_TIMEOUT_PROPERTY;
+	    try {
+		return (String) UtilReflection.getField(
+		    Class.forName(BDB_ENVIRONMENT_CLASS_NAME),
+		    "LOCK_TIMEOUT_PROPERTY").get(null);
+	    } catch (Exception e) {
+		throw new RuntimeException(
+		    "Unexpected exception: " + e, e);
+	    }
 	case JE:
-	    return JeEnvironment.LOCK_TIMEOUT_PROPERTY;
+	    try {
+		return (String) UtilReflection.getField(
+		    Class.forName(JE_ENVIRONMENT_CLASS_NAME),
+		    "LOCK_TIMEOUT_PROPERTY").get(null);
+	    } catch (Exception e) {
+		throw new RuntimeException(
+		    "Unexpected exception: " + e, e);
+	    }
 	default:
 	    throw new RuntimeException("Unknown environment");
 	}
