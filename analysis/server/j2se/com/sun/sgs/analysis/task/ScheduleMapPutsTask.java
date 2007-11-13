@@ -12,7 +12,7 @@ import java.util.Properties;
  * {@link MapPutTask}s to insert random integers into it.  By default, the
  * number of tasks scheduled equals the number of available processors, as
  * returned by {@link Runtime#availableProcessors Runtime.availableProcessors},
- * but the value can be specified with the {@value NUM_TASKS_KEY} system
+ * but the value can be specified with the {@value #NUM_TASKS_KEY} system
  * property.
  */
 public class ScheduleMapPutsTask implements Task, Serializable {
