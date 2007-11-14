@@ -1045,7 +1045,7 @@
   </target>
 
   <!-- Builds the example code -->
-  <target name="example-classes" depends="build"
+  <target name="example-classes" depends="build, -test-maybe-build-bdb-db"
           description="Builds the example code">
     <mkdir dir="${build.dir}/example/classes"/>
     <depend srcdir="example"
@@ -1068,7 +1068,8 @@
   </target>
 
   <!-- Builds the analysis code -->
-  <target name="analysis-classes" depends="build"
+  <target name="analysis-classes"
+	  depends="build-server, -test-maybe-build-bdb-db"
           description="Builds the analysis code">
     <mkdir dir="${build.dir}/analysis/classes"/>
     <depend srcdir="analysis"
@@ -1250,7 +1251,8 @@
   </target>
 
   <!-- Runs the data store network server -->
-  <target name="test-data-store-network-server" depends="build-server"
+  <target name="test-data-store-network-server"
+	  depends="build-server, -test-maybe-build-bdb-db"
 	  description="Runs the data store network server">
     <property name="test.server.dir"
 	      location="${build.dir}/test/data-store-network-server"/>
