@@ -663,10 +663,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, type:{3} returns {4}",
+		    "{0} tid:{1,number,#}, name:{2}, type:{3}" +
+		    " returns {4}, oid:{5,number,#}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    contextTxnId(context), name, type,
-		    Objects.fastToString(result));
+		    Objects.fastToString(result),
+		    refId(context.findReference((ManagedObject) result)));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
@@ -697,11 +699,13 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, object:{3} returns",
-		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    contextTxnId(context), name, Objects.fastToString(object));
+		logger.log(Level.FINEST,
+			   "{0} tid:{1,number,#}, name:{2}, object:{3}," +
+			   " oid:{4,number,#} returns",
+			   serviceBinding ? "setServiceBinding" : "setBinding",
+			   contextTxnId(context), name,
+			   Objects.fastToString(object),
+			   refId(context.findReference(object)));
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {

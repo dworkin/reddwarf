@@ -66,6 +66,9 @@ class PendingTask implements ManagedObject, Serializable {
     // whether this task has been marked as cancelled
     private boolean cancelled = false;
 
+    // whether this is a non-periodic task that has been completed
+    private boolean completed = false;
+
     /**
      * Creates an instance of {@code PendingTask}, handling the task
      * reference correctly. As described on {@code TaskManager}, any
@@ -143,6 +146,22 @@ class PendingTask implements ManagedObject, Serializable {
         return cancelled;
     }
 
+    /**
+     * Marks this task as completed if it is a non-periodic task.  Must be
+     * called in a transaction.
+     */
+    private void markCompleted() {
+	if (period == TaskServiceImpl.PERIOD_NONE) {
+	    AppContext.getDataManager().markForUpdate(this);
+	    completed = true;
+	}
+    }
+
+    /** Checks if this is a non-periodic task that has been completed. */
+    boolean isCompleted() {
+	return completed;
+    }
+
     /** Returns the identity that owns this task. */
     Identity getIdentity() {
         return identity;
@@ -181,6 +200,7 @@ class PendingTask implements ManagedObject, Serializable {
             return;
         }
         actualTask.run();
+	markCompleted();
     }
 
 }

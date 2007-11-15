@@ -20,10 +20,6 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
@@ -58,6 +54,8 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
 import java.io.Serializable;
+
+import java.math.BigInteger;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -103,7 +101,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
     private static final long START_NOW = 0;
 
     // the internal value used to represent a task that does not repeat
-    private static final long PERIOD_NONE = -1;
+    static final long PERIOD_NONE = -1;
 
     // the system's task scheduler, where tasks actually run
     private TaskScheduler taskScheduler = null;
@@ -118,7 +116,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
     private final TransactionContextFactory<TxnState> ctxFactory;
 
     // the transient map for all recurring tasks' handles
-    private ConcurrentHashMap<String,RecurringTaskHandle> recurringMap;
+    private ConcurrentHashMap<BigInteger,RecurringTaskHandle> recurringMap;
 
     // a local copy of the default priority, which is used in almost all
     // cases for tasks submitted by this service
@@ -150,7 +148,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 	if (txnProxy == null)
 	    throw new NullPointerException("Null proxy not allowed");
 
-        recurringMap = new ConcurrentHashMap<String,RecurringTaskHandle>();
+        recurringMap = new ConcurrentHashMap<BigInteger,RecurringTaskHandle>();
 
         // the scheduler is the only system component that we use
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -193,8 +191,16 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
         while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
             PendingTask ptask =
-                dataService.getServiceBinding(name, PendingTask.class);
-            TaskRunner runner = new TaskRunner(name, ptask.getBaseTaskType());
+		dataService.getServiceBinding(name, PendingTask.class);
+	    if (ptask.isCompleted() || ptask.isCancelled()) {
+		/* Task was done -- remove the task and the binding */
+		dataService.removeObject(ptask);
+		dataService.removeServiceBinding(name);
+		continue;
+	    }
+	    BigInteger oid =
+		new BigInteger(name.substring(DS_PENDING_SPACE.length()));
+            TaskRunner runner = new TaskRunner(oid, ptask.getBaseTaskType());
             TaskOwner owner =
                 new TaskOwnerImpl(ptask.getIdentity(), transactionProxy.
                                   getCurrentOwner().getContext());
@@ -218,7 +224,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                 RecurringTaskHandle handle =
                     taskScheduler.scheduleRecurringTask(runner, owner,
                                                         startTime, period);
-                txnState.addRecurringTask(name, handle);
+                txnState.addRecurringTask(oid, handle);
             }
 
             // finally, get the next name, and increment the task count
@@ -297,16 +303,16 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
         // setup the runner for this task
         TaskRunner taskRunner = getRunner(task, startTime, period);
-        String objName = taskRunner.getObjName();
+        BigInteger oid = taskRunner.getObjectId();
 
         // get a handle from the scheduler and save it
         TaskOwner owner = transactionProxy.getCurrentOwner();
         RecurringTaskHandle handle =
             taskScheduler.scheduleRecurringTask(taskRunner, owner, startTime,
                                                 period);
-        ctxFactory.joinTransaction().addRecurringTask(objName, handle);
+        ctxFactory.joinTransaction().addRecurringTask(oid, handle);
 
-        return new PeriodicTaskHandleImpl(objName);
+        return new PeriodicTaskHandleImpl(oid);
     }
 
     /**
@@ -368,14 +374,14 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
         // get the name of the new object and bind that into the pending
         // namespace for recovery on startup
-        ManagedReference taskRef = dataService.createReference(ptask);
-        String objName = DS_PENDING_SPACE + taskRef.getId();
+	BigInteger oid = dataService.createReference(ptask).getId();
+        String objName = DS_PENDING_SPACE + oid;
         dataService.setServiceBinding(objName, ptask);
 
         if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "created pending task {0}", objName);
+            logger.log(Level.FINEST, "created pending task {0}", oid);
 
-        return new TaskRunner(objName, ptask.getBaseTaskType());
+        return new TaskRunner(oid, ptask.getBaseTaskType());
     }
 
     /**
@@ -418,28 +424,63 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * already removed the pending task entry, then this method returns null
      * meaning that there is no task to run.
      */
-    private PendingTask fetchPendingTask(String objName) {
-        PendingTask ptask = null;
-        try {
-            ptask = dataService.getServiceBinding(objName, PendingTask.class);
-        } catch (NameNotBoundException nnbe) {
-            return null;
-        }
+    private PendingTask fetchPendingTask(BigInteger oid) {
+        PendingTask ptask =
+	    dataService.createReferenceForId(oid).get(PendingTask.class);
         boolean isAvailable = ptask.isTaskAvailable();
 
         // if it's not periodic, remove both the task and the name binding
         if (ptask.getPeriod() == PERIOD_NONE) {
-            dataService.removeServiceBinding(objName);
-            dataService.removeObject(ptask);
+	    scheduleRemovePendingTask(oid);
         } else {
             // Make sure that the task is still available, because if it's
             // not, then we need to remove the mapping and cancel the task.
             // Note that this should be a very rare case
             if (! isAvailable)
-                cancelPeriodicTask(objName);
+                cancelPeriodicTask(oid);
         }
 
         return isAvailable ? ptask : null;
+    }
+
+    /**
+     * Schedule removing the pending task with the specified object ID when the
+     * current transaction commits.
+     */
+    private void scheduleRemovePendingTask(BigInteger oid) {
+	try {
+	    scheduleNonDurableTask(
+		new TransactionRunner(
+		    new RemovePendingTask(oid)));
+	} catch (TaskRejectedException tre) {
+	    logger.logThrow(
+		Level.WARNING, tre,
+		"Could not schedule task to remove completed task {0}",
+		oid);
+	}
+    }
+
+    /** A kernel runnable for removing a completed pending task. */
+    private class RemovePendingTask implements KernelRunnable {
+	private final BigInteger oid;
+	RemovePendingTask(BigInteger oid) {
+	    this.oid = oid;
+	}
+	public String getBaseTaskType() {
+	    return RemovePendingTask.class.getName();
+	}
+	public void run() throws Exception {
+	    removePendingTask(oid);
+	}
+    }
+
+    /** Removes the completed pending task with the specified object ID. */
+    void removePendingTask(BigInteger oid) {
+	PendingTask ptask =
+	    dataService.createReferenceForId(oid).get(PendingTask.class);
+	assert ptask.isCompleted() || ptask.isCancelled();
+	dataService.removeObject(ptask);
+	dataService.removeServiceBinding(DS_PENDING_SPACE + oid);
     }
 
     /**
@@ -453,10 +494,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * periodic. Note that this method is not called within an active
      * transaction.
      */
-    private void notifyNonRetry(final String objName) {
+    private void notifyNonRetry(final BigInteger oid) {
         if (logger.isLoggable(Level.INFO))
             logger.log(Level.INFO, "trying to remove non-retried task {0}",
-                       objName);
+                       oid);
 
         // check if the task is in the recurring map, in which case we don't
         // do anything else, because we don't remove recurring tasks except
@@ -467,11 +508,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         // that will have no effect once run (because fetchPendingTask will
         // look at the pending task data, see that it's recurring, and
         // leave it in the map)
-        if (recurringMap.containsKey(objName))
+        if (recurringMap.containsKey(oid))
             return;
         
         TransactionRunner transactionRunner =
-            new TransactionRunner(new NonRetryCleanupRunnable(objName));
+            new TransactionRunner(new NonRetryCleanupRunnable(oid));
         try {
             taskScheduler.scheduleTask(transactionRunner,
                                        transactionProxy.getCurrentOwner());
@@ -479,7 +520,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
             if (logger.isLoggable(Level.WARNING))
                 logger.logThrow(Level.WARNING, tre, "could not schedule " +
                                 "task to remove non-retried task {0}: " +
-                                "giving up", objName);
+                                "giving up", oid);
             throw tre;
         }
     }
@@ -489,9 +530,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * block comment above in notifyNonRetry for more detail.
      */
     private class NonRetryCleanupRunnable implements KernelRunnable {
-        private final String objName;
-        NonRetryCleanupRunnable(String objName) {
-            this.objName = objName;
+        private final BigInteger oid;
+        NonRetryCleanupRunnable(BigInteger oid) {
+            this.oid = oid;
         }
         /** {@inheritDoc} */
         public String getBaseTaskType() {
@@ -499,7 +540,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
-            fetchPendingTask(objName);
+            fetchPendingTask(oid);
         }
     }
 
@@ -508,29 +549,24 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * underlying recurring task, removes the task and name binding, and
      * notes the cancelled task in the local transaction state.
      */
-    private void cancelPeriodicTask(String objName) {
+    private void cancelPeriodicTask(BigInteger oid) {
         if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "cancelling periodic task {0}", objName);
+            logger.log(Level.FINEST, "cancelling periodic task {0}", oid);
 
         TxnState txnState = ctxFactory.joinTransaction();
-        PendingTask ptask = null;
 
         // resolve the task, which checks if the task was already cancelled
-        try {
-            ptask = dataService.getServiceBinding(objName, PendingTask.class);
-        } catch (NameNotBoundException nnbe) {
-            throw new ObjectNotFoundException("task was already cancelled");
-        }
+        PendingTask ptask =
+	    dataService.createReferenceForId(oid).get(PendingTask.class);
 
         // if the task was scheduled within this transaction, then we just
         // need to remove it from the transaction's state...otherwise, we
         // explicitly cancel the task
-        if (! txnState.undoRecurringTask(objName))
-            txnState.cancelRecurringTask(objName);
+        if (! txnState.undoRecurringTask(oid))
+            txnState.cancelRecurringTask(oid);
 
         // remove the task from the data service
-        dataService.removeServiceBinding(objName);
-        dataService.removeObject(ptask);
+	scheduleRemovePendingTask(oid);
     }
 
     /**
@@ -539,8 +575,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      */
     private class TxnState extends TransactionContext {
         private HashSet<TaskReservation> reservationSet = null;
-        private HashMap<String,RecurringTaskHandle> addedRecurringMap = null;
-        private HashSet<String> cancelledRecurringSet = null;
+        private HashMap<BigInteger,RecurringTaskHandle> addedRecurringMap
+	    = null;
+        private HashSet<BigInteger> cancelledRecurringSet = null;
         /** Creates context tied to the given transaction. */
         TxnState(Transaction txn) {
             super(txn);
@@ -553,7 +590,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                     reservation.use();
             // ...start the periodic tasks...
             if (addedRecurringMap != null) {
-                for (Entry<String,RecurringTaskHandle> entry :
+                for (Entry<BigInteger,RecurringTaskHandle> entry :
                          addedRecurringMap.entrySet()) {
                     RecurringTaskHandle handle = entry.getValue();
                     recurringMap.put(entry.getKey(), handle);
@@ -562,8 +599,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
             }
             // ...and cancel the cancelled periodic tasks
             if (cancelledRecurringSet != null) {
-                for (String objName : cancelledRecurringSet) {
-                    RecurringTaskHandle handle = recurringMap.remove(objName);
+                for (BigInteger oid : cancelledRecurringSet) {
+                    RecurringTaskHandle handle = recurringMap.remove(oid);
                     if (handle != null)
                         handle.cancel();
                 }
@@ -587,30 +624,31 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
             reservationSet.add(reservation);
         }
         /** Adds a handle to start at commit-time. */
-        void addRecurringTask(String name, RecurringTaskHandle handle) {
+        void addRecurringTask(BigInteger oid, RecurringTaskHandle handle) {
             if (addedRecurringMap == null)
-                addedRecurringMap = new HashMap<String,RecurringTaskHandle>();
-            addedRecurringMap.put(name, handle);
+                addedRecurringMap =
+		    new HashMap<BigInteger,RecurringTaskHandle>();
+            addedRecurringMap.put(oid, handle);
         }
         /**
          * Tries to remove and cancel a handle added in the current transaction
          * returning {@code true} if successful or {@code false} if no such
          * task was added during this transaction.
          */
-        boolean undoRecurringTask(String name) {
+        boolean undoRecurringTask(BigInteger oid) {
             if (addedRecurringMap == null)
                 return false;
-            RecurringTaskHandle handle = addedRecurringMap.remove(name);
+            RecurringTaskHandle handle = addedRecurringMap.remove(oid);
             if (handle == null)
                 return false;
             handle.cancel();
             return true;
         }
         /** Adds an already-running recurring task to cancel at commit-time. */
-        void cancelRecurringTask(String name) {
+        void cancelRecurringTask(BigInteger oid) {
             if (cancelledRecurringSet == null)
-                cancelledRecurringSet = new HashSet<String>();
-            cancelledRecurringSet.add(name);
+                cancelledRecurringSet = new HashSet<BigInteger>();
+            cancelledRecurringSet.add(oid);
         }
     }
 
@@ -633,14 +671,14 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * run the <code>Task</code>s scheduled by the application.
      */
     private class TaskRunner implements KernelRunnable {
-        private final String objName;
+        private final BigInteger oid;
         private final String objTaskType;
-        TaskRunner(String objName, String objTaskType) {
-            this.objName = objName;
+        TaskRunner(BigInteger oid, String objTaskType) {
+            this.oid = oid;
             this.objTaskType = objTaskType;
         }
-        String getObjName() {
-            return objName;
+        BigInteger getObjectId() {
+            return oid;
         }
         /** {@inheritDoc} */
         public String getBaseTaskType() {
@@ -655,7 +693,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                             return objTaskType;
                         }
                         public void run() throws Exception {
-                            PendingTask ptask = fetchPendingTask(objName);
+                            PendingTask ptask = fetchPendingTask(oid);
                             if (ptask == null) {
                                 logger.log(Level.FINER, "tried to run a task "
                                            + "that was removed previously " +
@@ -665,7 +703,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                             if (logger.isLoggable(Level.FINEST))
                                 logger.log(Level.FINEST, "running task {0} " +
                                            "scheduled to run at {1}",
-                                           ptask.getStartTime(), objName);
+                                           ptask.getStartTime(), oid);
                             ptask.run();
                         }
                     })).run();
@@ -675,7 +713,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                 // notify the service
                 if ((! (e instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)e).shouldRetry()))
-                    notifyNonRetry(objName);
+                    notifyNonRetry(oid);
                 throw e;
             }
         }
@@ -692,14 +730,14 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         implements PeriodicTaskHandle, Serializable
     {
         private static final long serialVersionUID = 1;
-        private final String objName;
-        PeriodicTaskHandleImpl(String objName) {
-            this.objName = objName;
+        private final BigInteger oid;
+        PeriodicTaskHandleImpl(BigInteger oid) {
+            this.oid = oid;
         }
         /** {@inheritDoc} */
         public void cancel() {
             TaskServiceImpl.transactionProxy.getService(TaskServiceImpl.class).
-                cancelPeriodicTask(objName);
+                cancelPeriodicTask(oid);
         }
     }
 
