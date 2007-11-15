@@ -122,9 +122,12 @@ class ClientSessionHandler {
      *
      * @param	id the session ID
      */
-    ClientSessionHandler(ClientSessionServiceImpl sessionService, byte[] id) {
+    ClientSessionHandler(ClientSessionServiceImpl sessionService,
+			 DataService dataService,
+			 byte[] id)
+    {
 	this.sessionService = sessionService;
-        this.dataService = sessionService.dataService;
+        this.dataService = dataService;
 	this.connectionListener = new Listener();
 	this.compactId = new CompactId(id);
 	this.idBytes = compactId.getId();
@@ -640,7 +643,7 @@ class ClientSessionHandler {
 		 */
 		taskQueue =
 		    new NonDurableTaskQueue(
-			sessionService.txnProxy,
+			sessionService.getTransactionProxy(),
 			sessionService.nonDurableTaskScheduler,
 			authenticatedIdentity);
 		sessionImpl.setIdentityAndNodeId(

@@ -28,7 +28,6 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -55,7 +54,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -65,7 +63,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -657,10 +654,7 @@ public class ChannelServiceImpl
 			      Delivery delivery)
 	{
 	    ChannelImpl channel =
-		new ChannelImpl(
-		    this, 
-		    ChannelState.newInstance(
-			dataService, name, listener, delivery));
+		ChannelImpl.newInstance(this, name, listener, delivery);
 	    internalTable.put(name, channel);
 	    return channel;
 	}
@@ -679,10 +673,7 @@ public class ChannelServiceImpl
 	Channel getChannel(String name) {
 	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
-		channel =
-		    new ChannelImpl(
-			this,
-			ChannelState.getInstance(dataService, name));
+		channel = ChannelImpl.getInstance(this, name);
 		internalTable.put(name, channel);
 	    } else if (channel.isClosed) {
 		throw new NameNotBoundException(name);
@@ -706,11 +697,11 @@ public class ChannelServiceImpl
 	    assert channelId != null;
 	    ChannelImpl channel = null;
 	    ChannelState channelState =
-		ChannelState.getInstance(dataService, channelId);
+		ChannelState.getInstance(channelId);
 	    if (channelState != null) {
 		channel = internalTable.get(channelState.name);
 		if (channel == null) {
-		    channel = new ChannelImpl(this, channelState);
+		    channel = ChannelImpl.newInstance(this, channelState);
 		    internalTable.put(channelState.name, channel);
 		}
 

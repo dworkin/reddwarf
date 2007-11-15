@@ -33,16 +33,13 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,13 +48,13 @@ import java.util.logging.Logger;
  * Channel implementation for use within a single transaction
  * specified by the context passed during construction.
  */
-final class ChannelImpl implements Channel, Serializable {
+abstract class ChannelImpl implements Channel, Serializable {
 
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
     
     /** The logger for this class. */
-    private final static LoggerWrapper logger =
+    protected final static LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
@@ -65,13 +62,10 @@ final class ChannelImpl implements Channel, Serializable {
     private final static CompactId SERVER_ID = new CompactId(new byte[]{0});
 
     /** Transaction-related context information. */
-    private final Context context;
-
-    /** The data service. */
-    private final DataService dataService;
+    protected final Context context;
 
     /** Persistent channel state. */
-    final ChannelState state;
+    protected final ChannelState state;
 
     /** Flag that is 'true' if this channel is closed. */
     boolean isClosed = false;
@@ -83,14 +77,48 @@ final class ChannelImpl implements Channel, Serializable {
      * @param context a context
      * @param state a channel state
      */
-    ChannelImpl(Context context, ChannelState state) {
+    protected ChannelImpl(Context context, ChannelState state) {
+	if (context == null || state == null) {
+	    throw new NullPointerException("null argument");
+	}
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "Created ChannelImpl context:{0} state:{1}",
 		       context, state);
 	}
 	this.state =  state;
 	this.context = context;
-	this.dataService = context.getService(DataService.class);
+    }
+
+    /**
+     * Constructs a new {@code ChannelImpl} with the given {@code name},
+     * {@code listener}, {@code delivery} requirement, and transaction
+     * {@code context}.
+     */
+    static ChannelImpl newInstance(Context context, String name,
+				   ChannelListener listener, Delivery delivery)
+    {
+	ChannelState channelState =
+	    ChannelState.newInstance(name, listener, delivery);
+	return newInstance(context, channelState);
+    }
+
+    /**
+     * Constructs a {@code ChannelImpl} with the given transaction
+     * {@code context} and {@code channelState}.
+     */
+    static ChannelImpl newInstance(Context context, ChannelState channelState) {
+	// TBD: create other channel types depending on delivery.
+	return new OrderedUnreliableChannelImpl(context, channelState);
+    }
+
+    /**
+     * TBD: return null instead?
+     * @throws NameNotBoundException if channel doesn't exist
+     */
+    static ChannelImpl getInstance(Context context, String name) {
+	ChannelState channelState = ChannelState.getInstance(name);
+	return newInstance(context, channelState);
+	
     }
 
     /* -- Implement Channel -- */
@@ -418,7 +446,12 @@ final class ChannelImpl implements Channel, Serializable {
 
     /* -- Serialization methods -- */
 
-    private Object writeReplace() {
+    /**
+     * Returns an object that represents this channel's external form.
+     *
+     * @return	an object that represents this channel's external form
+     */
+    protected final Object writeReplace() {
 	return new External(state.name);
     }
 
@@ -506,14 +539,14 @@ final class ChannelImpl implements Channel, Serializable {
      * Send a protocol message to the specified session when the
      * transaction commits.
      */
-    private void sendProtocolMessageOnCommit(
+    protected void sendProtocolMessageOnCommit(
 	ClientSession session, byte[] message)
     {
 	context.getClientSessionService().sendProtocolMessage(
 	    session, message, state.delivery);
     }
 
-    private void runTaskOnCommit(ClientSession session, Runnable task) {
+    protected void runTaskOnCommit(ClientSession session, Runnable task) {
 	context.getClientSessionService().runTask(session, task);
     }
 
@@ -521,76 +554,15 @@ final class ChannelImpl implements Channel, Serializable {
      * When this transaction commits, sends the given {@code
      * channelMessage} from this channel's server to all channel members.
      */
-    void sendToAllMembers(ClientSession sender, final byte[] channelMessage) {
-	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
-	long localNodeId = context.getLocalNodeId();
-	final byte[] channelIdBytes = state.channelIdBytes;
-	final byte[] protocolMessage =
-	    getChannelMessage(sender, channelMessage);
-	for (final long nodeId : state.getChannelServerNodeIds()) {
-	    Set<ClientSession> recipients =
-		state.getSessions(nodeId);
-	    if (nodeId == localNodeId) {
-		
-		/*
-		 * Send channel message to local recipients, skipping sender.
-		 */
-		ClientSessionId senderId =
-		    (sender != null) ?
-		    sender.getSessionId() :
-		    null;
-		for (ClientSession session : recipients) {
-		    if (senderId == null ||
-			! senderId.equals(session.getSessionId()))
-		    {
-			sendProtocolMessageOnCommit(session, protocolMessage);
-		    }
-		}
-		
-	    } else {
-		final ChannelServer server = state.getChannelServer(nodeId);
-		final byte[][] recipientIds = new byte[recipients.size()][];
-		int i = 0;
-		for (ClientSession session : recipients) {
-		    recipientIds[i++] = session.getSessionId().getBytes();
-		}
-
-		logger.log(
-		    Level.FINEST,
-		    "sendToAllMembers channel:{0} " +
-		    "schedule task to forward to node:{1}", state.name,
-		    nodeId);
-		runTaskOnCommit(
-		    null,
-		    new Runnable() {
-			public void run() {
-			    try {
-				logger.log(
-				    Level.FINEST,
-				    "sendToAllMembers channel:{0} " +
-				    "forwarding to node:{1}", state.name,
-				    nodeId);
-				server.send(channelIdBytes, recipientIds,
-					    protocolMessage, state.delivery);
-			    } catch (Exception e) {
-				// skip unresponsive channel server
-				logger.logThrow(
-				    Level.WARNING, e,
-				    "Contacting channel server:{0} on " +
-				    " node:{1} throws ", server, nodeId);
-			    }
-			}});
-	    }
-	}
-    }
-    
+    protected abstract void sendToAllMembers(
+	ClientSession sender, final byte[] channelMessage);
 
     /**
-     * Wends the given {@code channelMessage} from the server to the
+     * Sends the given {@code channelMessage} from the server to the
      * specified recipient {@code sessions} when the current
      * transaction commits.
      */
-    private void sendToMembers(
+    protected void sendToMembers(
 	Set<ClientSession> sessions, byte[] channelMessage)
     {
 	sendToMembers(null, sessions, channelMessage);
@@ -601,75 +573,16 @@ final class ChannelImpl implements Channel, Serializable {
      * {@code sender} to the specified recipient {@code sessions} when
      * the current transaction commits.
      */
-    void sendToMembers(ClientSession sender,
-		       Set<ClientSession> sessions,
-		       final byte[] channelMessage)
-    {
-	final byte[] channelIdBytes = state.channelIdBytes;
-	Map<Long, Set<ClientSession>> recipientsPerNode =
-	    new HashMap<Long, Set<ClientSession>>();
-	for (ClientSession session : sessions) {
-	    long nodeId = ChannelState.getNodeId(session);
-	    Set<ClientSession> recipients =
-		recipientsPerNode.get(nodeId);
-	    if (recipients == null) {
-		recipients = new HashSet<ClientSession>();
-		recipientsPerNode.put(nodeId, recipients);
-	    }
-	    recipients.add(session);
-	}
-	
-	long localNodeId = context.getLocalNodeId();
-	final byte[] protocolMessage =
-	    getChannelMessage(sender, channelMessage);
-	for (final long nodeId : state.getChannelServerNodeIds()) {
-	    Set<ClientSession> recipients = recipientsPerNode.get(nodeId);
-	    if (recipients == null) {
-		continue;
-	    }
-	    if (nodeId == localNodeId) {
-		
-		/*
-		 * Send channel message to local recipients.
-		 */
-		for (ClientSession session : recipients) {
-		    sendProtocolMessageOnCommit(session, protocolMessage);
-		}
-		    
-	    } else {
-		final ChannelServer server = state.getChannelServer(nodeId);
-		final byte[][] recipientIds = new byte[recipients.size()][];
-		int i = 0;
-		for (ClientSession session : recipients) {
-		    recipientIds[i++] = session.getSessionId().getBytes();
-		}
-		    
-		runTaskOnCommit(
-		    null,
-		    new Runnable() {
-			public void run() {
-			    try {
-				server.send(channelIdBytes, recipientIds,
-					    protocolMessage, state.delivery);
-			    } catch (Exception e) {
-				// skip unresponsive channel server
-				logger.logThrow(
-				    Level.WARNING, e,
-				    "Contacting channel server:{0} on " +
-				    " node:{1} throws ", server, nodeId);
-			    }
-			}
-		    });
-	    }
-	}
-    }
-
+    protected abstract void sendToMembers(ClientSession sender,
+					  Set<ClientSession> sessions,
+					  final byte[] channelMessage);
+    
     /**
      * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
      * message with this channel's name, and the specified sender,
      * message, and sequence number.
      */
-    private byte[] getChannelMessage(ClientSession sender, byte[] message) {
+    protected byte[] getChannelMessage(ClientSession sender, byte[] message) {
 
 	CompactId senderId =
 	    (sender == null) ? SERVER_ID : getCompactId(sender);

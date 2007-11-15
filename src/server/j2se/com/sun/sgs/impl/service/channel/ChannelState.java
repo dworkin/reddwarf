@@ -124,10 +124,11 @@ final class ChannelState implements ManagedObject, Serializable {
      * @throws	NameExistsException if a channel with the specified
      * 		{@code name} already exists
      */
-    static ChannelState newInstance(DataService dataService,
+    static ChannelState newInstance(
 		String name, ChannelListener listener, Delivery delivery)
     {
 	String channelStateKey = getChannelStateKey(name);
+	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
 	    dataService.getServiceBinding(channelStateKey, ChannelState.class);
 	    throw new NameExistsException(name);
@@ -143,9 +144,9 @@ final class ChannelState implements ManagedObject, Serializable {
     /**
      * @throws	NameNotBoundException if the channel doesn't exist
      */
-    static ChannelState getInstance(DataService dataService, String name) {
-	ChannelState channelState;
+    static ChannelState getInstance(String name) {
 	try {
+	    DataService dataService = ChannelServiceImpl.getDataService();
 	    return
 		dataService.getServiceBinding(
 		    getChannelStateKey(name), ChannelState.class);
@@ -165,11 +166,10 @@ final class ChannelState implements ManagedObject, Serializable {
      *	    {@code channelIdBytes}, or {@code null} if the channel
      *	    doesn't exist
      */
-    static ChannelState getInstance(
-	DataService dataService, byte[] channelIdBytes)
-    {
+    static ChannelState getInstance(byte[] channelIdBytes) {
 	try {
 	    BigInteger refId = new BigInteger(1, channelIdBytes);
+	    DataService dataService = ChannelServiceImpl.getDataService();
 	    ManagedReference stateRef =
 		dataService.createReferenceForId(refId);
 	    return stateRef.get(ChannelState.class);

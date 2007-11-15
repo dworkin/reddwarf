@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
-import com.sun.sgs.app.ClientSessionManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
@@ -33,6 +32,7 @@ import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
@@ -45,9 +45,7 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.ProtocolMessageListener;
@@ -84,8 +82,10 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
  */
-public class ClientSessionServiceImpl implements ClientSessionService {
-
+public class ClientSessionServiceImpl
+    extends AbstractService
+    implements ClientSessionService
+{
     /** The package name. */
     public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
     
@@ -115,15 +115,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
     
-    /** The transaction proxy for this class. */
-    static TransactionProxy txnProxy;
-
     /** Provides transaction and other information for the current thread. */
     private static final ThreadLocal<Context> currentContext =
         new ThreadLocal<Context>();
-
-    /** The application name. */
-    private final String appName;
 
     /** The port for accepting connections. */
     private final int appPort;
@@ -157,21 +151,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The Acceptor for listening for new connections. */
     private final Acceptor<SocketAddress> acceptor;
 
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-
-    /** The task owner. */
-    volatile TaskOwner taskOwner;
-
     /** The task scheduler for non-durable tasks. */
     volatile NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
-    /** The data service. */
-    final DataService dataService;
-
     /** The watchdog service. */
     final WatchdogService watchdogService;
 
@@ -196,9 +181,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
 
-    /** If true, this service is shutting down; initially, false. */
-    private boolean shuttingDown = false;
-
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -212,6 +194,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 				    TransactionProxy txnProxy)
 	throws Exception
     {
+	super(properties, systemRegistry, txnProxy, logger);
+	
 	logger.log(
 	    Level.CONFIG,
 	    "Creating ClientSessionServiceImpl properties:{0}",
@@ -219,18 +203,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-	    if (systemRegistry == null) {
-		throw new NullPointerException("null systemRegistry");
-	    } else if (txnProxy == null) {
-		throw new NullPointerException("null txnProxy");
-	    }
-	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
-	    if (appName == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_NAME +
-		    " property must be specified");
-	    }
-
 	    String portString =
 		wrappedProps.getProperty(StandardProperties.APP_PORT);
 	    if (portString == null) {
@@ -271,20 +243,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		throw e;
 	    }
 
-	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
 
-	    synchronized (ClientSessionServiceImpl.class) {
-		if (ClientSessionServiceImpl.txnProxy == null) {
-		    ClientSessionServiceImpl.txnProxy = txnProxy;
-		} else {
-		    assert ClientSessionServiceImpl.txnProxy == txnProxy;
-		}
-	    }
 	    contextFactory = new ContextFactory(txnProxy);
-	    dataService = txnProxy.getService(DataService.class);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    idGenerator =
@@ -325,64 +288,22 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
     }
 
-    /* -- Implement Service -- */
+    /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
-    public String getName() {
-	return toString();
-    }
-    
-    /** {@inheritDoc} */
-    public void ready()  throws Exception {
+    public void doReady() {
 	// TBD: the AcceptorListener.newConnection method needs to
 	// reject connections until ready is invoked.  Need to
 	// implement interlock for this.  -- ann (8/29/07)
 
-        // TBD: Update with the application owner? Is this correct?
-	taskOwner = txnProxy.getCurrentOwner();
         nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
 		    taskScheduler, taskOwner,
 		    txnProxy.getService(TaskService.class));
     }
 
-    /**
-     * Returns the port this service is listening on for incoming
-     * client session connections.
-     *
-     * @return the port this service is listening on
-     */
-    public int getListenPort() {
-	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
-	    getPort();
-    }
-
-    /**
-     * Returns the proxy for the client session server
-     *
-     * @return	the proxy for the client session server
-     */
-    ClientSessionServer getServerProxy() {
-	return serverProxy;
-    }
-
-    /**
-     * Shuts down this service.
-     *
-     * @return {@code true} if shutdown is successful, otherwise
-     * {@code false}
-     */
-    public boolean shutdown() {
-	logger.log(Level.FINEST, "shutdown");
-	
-	synchronized (this) {
-	    if (shuttingDown) {
-		logger.log(Level.FINEST, "shutdown in progress");
-		return false;
-	    }
-	    shuttingDown = true;
-	}
-
+    /** {@inheritDoc} */
+    public void doShutdown() {
 	try {
 	    acceptor.shutdown();
 	    logger.log(Level.FINEST, "acceptor shutdown");
@@ -404,8 +325,26 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	handlers.clear();
 
 	flushContextsThread.interrupt();
-	
-	return true;
+    }
+
+    /**
+     * Returns the port this service is listening on for incoming
+     * client session connections.
+     *
+     * @return the port this service is listening on
+     */
+    public int getListenPort() {
+	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
+	    getPort();
+    }
+
+    /**
+     * Returns the proxy for the client session server
+     *
+     * @return	the proxy for the client session server
+     */
+    ClientSessionServer getServerProxy() {
+	return serverProxy;
     }
 
     /* -- Implement ClientSessionManager -- */
@@ -557,7 +496,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    logger.log(
 		Level.FINEST, "Accepting connection for session:{0}", nextId);
 	    ClientSessionHandler handler =
-		new ClientSessionHandler(ClientSessionServiceImpl.this, nextId);
+		new ClientSessionHandler(
+		    ClientSessionServiceImpl.this, dataService, nextId);
 	    handlers.put(handler.getSessionId(), handler);
 	    return handler.getConnectionListener();
 	}
@@ -1124,6 +1064,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /* -- Other methods -- */
 
+    TransactionProxy getTransactionProxy() {
+	return txnProxy;
+    }
+
     /**
      * Returns the {@code ClientSessionImpl} for the specified session
      * {@code idBytes}.
@@ -1187,7 +1131,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * encapsulated in a byte array.
      *
      * <p>TBD: Alternatively, a {@code getClientSession(byte[])}
-     * method could be added to the {@link ClientSessionManager}
+     * method could be added to the {@code ClientSessionManager}
      * interface.
      *
      * @return the client session service relevant to the current
@@ -1266,14 +1210,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    
 	taskScheduler.runTransactionalTask(task, owner);
     }
-
-    /**
-     * Returns {@code true} if this service is shutting down.
-     */
-    private synchronized boolean shuttingDown() {
-	return shuttingDown;
-    }
-
 
     /**
      * The {@code RecoveryListener} for handling requests to recover

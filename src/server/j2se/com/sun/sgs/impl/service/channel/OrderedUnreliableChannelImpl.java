@@ -1,0 +1,167 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package com.sun.sgs.impl.service.channel;
+
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
+import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
+
+class OrderedUnreliableChannelImpl extends ChannelImpl {
+    
+    /** The serialVersionUID for this class. */
+    private final static long serialVersionUID = 1L;
+
+    OrderedUnreliableChannelImpl(Context context, ChannelState state) {
+	super(context, state);
+    }
+    
+    protected void sendToAllMembers(
+	ClientSession sender, final byte[] channelMessage)
+    {
+	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
+	long localNodeId = context.getLocalNodeId();
+	final byte[] channelIdBytes = state.channelIdBytes;
+	final byte[] protocolMessage =
+	    getChannelMessage(sender, channelMessage);
+	for (final long nodeId : state.getChannelServerNodeIds()) {
+	    Set<ClientSession> recipients =
+		state.getSessions(nodeId);
+	    if (nodeId == localNodeId) {
+		
+		/*
+		 * Send channel message to local recipients, skipping sender.
+		 */
+		ClientSessionId senderId =
+		    (sender != null) ?
+		    sender.getSessionId() :
+		    null;
+		for (ClientSession session : recipients) {
+		    if (senderId == null ||
+			! senderId.equals(session.getSessionId()))
+		    {
+			sendProtocolMessageOnCommit(session, protocolMessage);
+		    }
+		}
+		
+	    } else {
+		final ChannelServer server = state.getChannelServer(nodeId);
+		final byte[][] recipientIds = new byte[recipients.size()][];
+		int i = 0;
+		for (ClientSession session : recipients) {
+		    recipientIds[i++] = session.getSessionId().getBytes();
+		}
+
+		logger.log(
+		    Level.FINEST,
+		    "sendToAllMembers channel:{0} " +
+		    "schedule task to forward to node:{1}", state.name,
+		    nodeId);
+		runTaskOnCommit(
+		    null,
+		    new Runnable() {
+			public void run() {
+			    try {
+				logger.log(
+				    Level.FINEST,
+				    "sendToAllMembers channel:{0} " +
+				    "forwarding to node:{1}", state.name,
+				    nodeId);
+				server.send(channelIdBytes, recipientIds,
+					    protocolMessage, state.delivery);
+			    } catch (Exception e) {
+				// skip unresponsive channel server
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "Contacting channel server:{0} on " +
+				    " node:{1} throws ", server, nodeId);
+			    }
+			}});
+	    }
+	}
+    }
+
+    protected void sendToMembers(ClientSession sender,
+				 Set<ClientSession> sessions,
+				 final byte[] channelMessage)
+    {
+	final byte[] channelIdBytes = state.channelIdBytes;
+	Map<Long, Set<ClientSession>> recipientsPerNode =
+	    new HashMap<Long, Set<ClientSession>>();
+	for (ClientSession session : sessions) {
+	    long nodeId = ChannelState.getNodeId(session);
+	    Set<ClientSession> recipients =
+		recipientsPerNode.get(nodeId);
+	    if (recipients == null) {
+		recipients = new HashSet<ClientSession>();
+		recipientsPerNode.put(nodeId, recipients);
+	    }
+	    recipients.add(session);
+	}
+	
+	long localNodeId = context.getLocalNodeId();
+	final byte[] protocolMessage =
+	    getChannelMessage(sender, channelMessage);
+	for (final long nodeId : state.getChannelServerNodeIds()) {
+	    Set<ClientSession> recipients = recipientsPerNode.get(nodeId);
+	    if (recipients == null) {
+		continue;
+	    }
+	    if (nodeId == localNodeId) {
+		
+		/*
+		 * Send channel message to local recipients.
+		 */
+		for (ClientSession session : recipients) {
+		    sendProtocolMessageOnCommit(session, protocolMessage);
+		}
+		    
+	    } else {
+		final ChannelServer server = state.getChannelServer(nodeId);
+		final byte[][] recipientIds = new byte[recipients.size()][];
+		int i = 0;
+		for (ClientSession session : recipients) {
+		    recipientIds[i++] = session.getSessionId().getBytes();
+		}
+		    
+		runTaskOnCommit(
+		    null,
+		    new Runnable() {
+			public void run() {
+			    try {
+				server.send(channelIdBytes, recipientIds,
+					    protocolMessage, state.delivery);
+			    } catch (Exception e) {
+				// skip unresponsive channel server
+				logger.logThrow(
+				    Level.WARNING, e,
+				    "Contacting channel server:{0} on " +
+				    " node:{1} throws ", server, nodeId);
+			    }
+			}
+		    });
+	    }
+	}
+    }
+}

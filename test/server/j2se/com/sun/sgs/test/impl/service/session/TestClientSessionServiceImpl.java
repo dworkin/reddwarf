@@ -42,8 +42,6 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
@@ -189,8 +187,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
-		null, new DummyComponentRegistry(),
-		new DummyTransactionProxy());
+		null, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -204,7 +202,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    "com.sun.sgs.app.name", APP_NAME,
 		    "com.sun.sgs.app.port", "0");
 	    new ClientSessionServiceImpl(props, null,
-					 new DummyTransactionProxy());
+					 serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -218,7 +216,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    "com.sun.sgs.app.name", APP_NAME,
 		    "com.sun.sgs.app.port", "0");
 	    new ClientSessionServiceImpl(props,
-					 new DummyComponentRegistry(), null);
+					 serverNode.getSystemRegistry(), null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -228,8 +226,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
-		new Properties(), new DummyComponentRegistry(),
-		new DummyTransactionProxy());
+		new Properties(), serverNode.getSystemRegistry(),
+		serverNode.getProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -242,8 +240,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		createProperties(
 		    "com.sun.sgs.app.name", APP_NAME);
 	    new ClientSessionServiceImpl(
-		props, new DummyComponentRegistry(),
-		new DummyTransactionProxy());
+		props, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
 
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {

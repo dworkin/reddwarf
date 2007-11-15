@@ -53,7 +53,7 @@ public abstract class AbstractService implements Service {
     }
 
     /** The transaction proxy, or null if configure has not been called. */    
-    protected static TransactionProxy txnProxy = null;
+    protected static volatile TransactionProxy txnProxy = null;
 
     /** The application name. */
     protected final String appName;
@@ -135,7 +135,8 @@ public abstract class AbstractService implements Service {
 	return toString();
     }
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
      *
      * <p>If this service is in the {@code INITIALIZED} state, this
      * method sets the state to {@code READY} and invokes the {@link
@@ -175,7 +176,8 @@ public abstract class AbstractService implements Service {
      */
     protected abstract void doReady();
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
      *
      * <p>If this service is in the {@code INITIALIZED} state, this
      * method throws {@code IllegalStateException}.  If this service
@@ -268,6 +270,7 @@ public abstract class AbstractService implements Service {
 	}
     }
 
+    /** Note: this is a hack that can be removed. */
     protected void runTransactionally(KernelRunnable task) throws Exception {
 	for (;;) {
 	    try {
