@@ -17,10 +17,14 @@ import java.util.Properties;
  * configuration property.  The number of operations per task can be specified
  * with the {@value #OPS_KEY} property, and defaults to {@value #DEFAULT_OPS}.
  */
-public class ScheduleSimpleTasks implements Task, Serializable {
+public class ScheduleSimpleTasks implements ManagedObject, Task, Serializable {
 
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
+
+    /** The configuration property for how many times to perform the test. */
+    public static final String REPEAT_KEY =
+	ScheduleSimpleTasks.class.getName() + ".repeat";
 
     /** The configuration property for the number of tasks to run. */
     public static final String TASKS_KEY =
@@ -33,11 +37,23 @@ public class ScheduleSimpleTasks implements Task, Serializable {
     /** The default number of operations per task. */
     public static final int DEFAULT_OPS = 1000;
 
+    /** The number of times to repeat the test. */
+    private final int repeat;
+
     /** The number of tasks. */
     private final int tasks;
 
     /** The number of operations per task. */
     private final int ops;
+
+    /** The number of the current run of the test. */
+    private int repetition = 0;
+
+    /** The number of tasks that have not completed. */
+    private int remainingTasks;
+
+    /** The time the tasks were started. */
+    private long startTime;
 
     /**
      * Creates an instance using the specified configuration properties.
@@ -45,6 +61,8 @@ public class ScheduleSimpleTasks implements Task, Serializable {
      * @param properties the configuration properties
      */
     public ScheduleSimpleTasks(Properties properties) {
+	String repeatString = properties.getProperty(REPEAT_KEY);
+	repeat = (repeatString == null) ? 1 : Integer.parseInt(repeatString);
 	String tasksString = properties.getProperty(TASKS_KEY);
 	tasks = (tasksString == null)
 	    ? Runtime.getRuntime().availableProcessors()
@@ -55,59 +73,41 @@ public class ScheduleSimpleTasks implements Task, Serializable {
 
     /** Schedules the tasks. */
     public void run() {
-	System.out.println(
-	    "Starting " + tasks + " tasks, " + ops + " ops per task");
+	AppContext.getDataManager().markForUpdate(this);
+	repetition++;
+	if (repetition == 1) {
+	    System.out.println(
+		"Starting " + (repeat > 0 ? (repeat + " repetitions, ") : "") +
+		tasks + " tasks, " + ops + " ops per task");
+	}
+	remainingTasks = tasks;
+	startTime = System.currentTimeMillis();
 	TaskManager taskManager = AppContext.getTaskManager();
-	Status status = new Status(tasks, ops);
 	for (int i = 0; i < tasks; i++) {
-	    taskManager.scheduleTask(new SimpleTask(status, ops));
+	    taskManager.scheduleTask(new SimpleTask(this, ops));
 	}
     }
 
-    /** A managed object that tracks the status of the tasks. */
-    private static class Status implements ManagedObject, Serializable {
-
-	/** The version of the serialized form. */
-	private static final long serialVersionUID = 1;
-
-	/** The time the tasks were started. */
-	private final long startTime = System.currentTimeMillis();
-
-	/** The number of tasks. */
-	private final int tasks;
-
-	/** The number of tasks that have not completed. */
-	private int remainingTasks;
-
-	/** The total number of operations being run. */
-	private final int totalOps;
-
-	/**
-	 * Creates an instance.
-	 *
-	 * @param tasks the number of tasks
-	 * @param ops the number of operations per task
-	 */
-	Status(int tasks, int ops) {
-	    this.tasks = tasks;
-	    remainingTasks = tasks;
-	    totalOps = tasks * ops;
-	}
-
-	/** Notes that a task has completed its operations. */
-	void taskDone() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    remainingTasks--;
-	    if (remainingTasks == 0) {
-		long elapsedTime = System.currentTimeMillis() - startTime;
-		System.err.println("Tasks completed");
-		System.err.println("Elapsed time: " + elapsedTime + " ms");
-		System.err.println("Tasks: " + tasks);
-		System.err.println("Total ops: " + totalOps);
-		System.err.println("Ops/sec: " +
-				   ((totalOps * 1000) / elapsedTime));
-		System.err.println("Elapsed time per op: " +
-				   ((elapsedTime * tasks) / totalOps) + " ms");
+    /** Notes that a task has completed its operations. */
+    void taskDone() {
+	AppContext.getDataManager().markForUpdate(this);
+	remainingTasks--;
+	if (remainingTasks == 0) {
+	    long elapsedTime = System.currentTimeMillis() - startTime;
+	    int totalOps = ops * tasks;
+	    System.err.println(repeat > 0
+			       ? ("Results for repetition " + repetition + ":")
+			       : "Results:");
+	    System.err.println("Tasks: " + tasks);
+	    System.err.println("Total ops: " + totalOps);
+	    System.err.println("Elapsed time: " + elapsedTime + " ms");
+	    System.err.println("Ops/sec: " +
+			       ((totalOps * 1000) / elapsedTime));
+	    System.err.println("Elapsed time per op: " +
+			       ((elapsedTime * tasks) / totalOps) + " ms");
+	    if (repetition < repeat) {
+		AppContext.getTaskManager().scheduleTask(this);
+	    } else {
 		System.exit(0);
 	    }
 	}
@@ -122,8 +122,8 @@ public class ScheduleSimpleTasks implements Task, Serializable {
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
-	/** A reference to the status object to notify. */
-	private final ManagedReference status;
+	/** A reference to the object to notify when done. */
+	private final ManagedReference scheduler;
 
 	/** The remaining number of operations to run. */
 	private int remainingOps;
@@ -134,8 +134,9 @@ public class ScheduleSimpleTasks implements Task, Serializable {
 	 * @param status the status object to notify when done
 	 * @param ops the number of operations to run
 	 */
-	SimpleTask(Status status, int ops) {
-	    this.status = AppContext.getDataManager().createReference(status);
+	SimpleTask(ScheduleSimpleTasks scheduler, int ops) {
+	    this.scheduler =
+		AppContext.getDataManager().createReference(scheduler);
 	    remainingOps = ops;
 	}
 
@@ -143,7 +144,7 @@ public class ScheduleSimpleTasks implements Task, Serializable {
 	public void run() {
 	    remainingOps--;
 	    if (remainingOps == 0) {
-		status.get(Status.class).taskDone();
+		scheduler.get(ScheduleSimpleTasks.class).taskDone();
 	    } else {
 		AppContext.getTaskManager().scheduleTask(this);
 	    }
