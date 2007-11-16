@@ -85,6 +85,8 @@
 		   -XX:NewSize=512m
 		   -Xms700m
 		   -Xmx2g"/>
+  <property name="analysis.tasks"
+	    value="com.sun.sgs.analysis.task.ScheduleMapPutsTask"/>
   <!-- Set analysis.use.data.store.server to perform analysis using the
        networked data store -->
   <condition
@@ -1156,6 +1158,13 @@
 		   value="${analysis.data.store.server.host}"/>
       <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
 		   value="${analysis.data.store.server.port}"/>
+      <sysproperty key="com.sun.sgs.analysis.tasks"
+		   value="${analysis.tasks}"/>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+	<propertyref prefix="je."/>
+      </syspropertyset>
       <classpath>
         <pathelement location="${build.dir}/analysis/classes"/>
         <path refid="server.classpath"/>

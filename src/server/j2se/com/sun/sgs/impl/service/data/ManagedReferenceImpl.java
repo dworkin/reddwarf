@@ -216,7 +216,24 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     /** Creates a NEW reference to an object. */
     private ManagedReferenceImpl(Context context, ManagedObject object) {
 	this.context = context;
-	oid = context.store.createObject(context.txn);
+	try {
+	    oid = context.store.createObject(context.txn);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "createObject tid:{0,number,#}, object:{1}" +
+			   " returns oid:{2,number,#}",
+			   context.getTxnId(), Objects.fastToString(object),
+			   oid);
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "createObject tid:{0,number,#}, object:{1} throws",
+		    context.getTxnId(), Objects.fastToString(object));
+	    }
+	    throw e;
+	}
 	this.object = object;
 	state = State.NEW;
 	validate();
@@ -556,9 +573,38 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     static void flushAll(Context context) {
 	FlushInfo info = context.refs.flushModifiedObjects();
 	if (info != null) {
-	    context.store.setObjects(
-		context.txn, info.getOids(), info.getDataArray());
+	    long[] oids = info.getOids();
+	    try {
+		context.store.setObjects(
+		    context.txn, oids, info.getDataArray());
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "flushAll tid:{0,number,#}, {1} returns",
+			       context.getTxnId(), oidsString(oids));
+		}
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.logThrow(Level.FINEST, e,
+				    "flushAll tid:{0,number,#}, {1} throws",
+				    context.getTxnId(), oidsString(oids));
+		}
+		throw e;
+	    }
 	}
+    }
+
+    /** Returns a string that describes the specified object IDs. */
+    private static String oidsString(long[] oids) {
+	StringBuffer sb = new StringBuffer("{ ");
+	for (int i = 0; i < oids.length; i++) {
+	    if (i != 0) {
+		sb.append(", ");
+	    }
+	    sb.append("oid:");
+	    sb.append(oids[i]);
+	}
+	sb.append(" }");
+	return sb.toString();
     }
 
     /**
