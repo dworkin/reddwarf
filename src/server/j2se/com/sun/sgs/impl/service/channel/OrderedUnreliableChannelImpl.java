@@ -20,11 +20,6 @@
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
-import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -33,36 +28,22 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
 
-    OrderedUnreliableChannelImpl(Context context, ChannelState state) {
-	super(context, state);
+    OrderedUnreliableChannelImpl(ChannelState state) {
+	super(state);
     }
     
-    protected void sendToAllMembers(
-	ClientSession sender, final byte[] channelMessage)
-    {
+    protected void sendToAllMembers(final byte[] channelMessage) {
 	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
-	long localNodeId = context.getLocalNodeId();
+	long localNodeId = getLocalNodeId();
 	final byte[] channelIdBytes = state.channelIdBytes;
 	final byte[] protocolMessage =
-	    getChannelMessage(sender, channelMessage);
+	    getChannelMessage(channelMessage);
 	for (final long nodeId : state.getChannelServerNodeIds()) {
 	    Set<ClientSession> recipients =
 		state.getSessions(nodeId);
 	    if (nodeId == localNodeId) {
-		
-		/*
-		 * Send channel message to local recipients, skipping sender.
-		 */
-		ClientSessionId senderId =
-		    (sender != null) ?
-		    sender.getSessionId() :
-		    null;
 		for (ClientSession session : recipients) {
-		    if (senderId == null ||
-			! senderId.equals(session.getSessionId()))
-		    {
-			sendProtocolMessageOnCommit(session, protocolMessage);
-		    }
+		    sendProtocolMessageOnCommit(session, protocolMessage);
 		}
 		
 	    } else {
@@ -98,69 +79,6 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
 				    " node:{1} throws ", server, nodeId);
 			    }
 			}});
-	    }
-	}
-    }
-
-    protected void sendToMembers(ClientSession sender,
-				 Set<ClientSession> sessions,
-				 final byte[] channelMessage)
-    {
-	final byte[] channelIdBytes = state.channelIdBytes;
-	Map<Long, Set<ClientSession>> recipientsPerNode =
-	    new HashMap<Long, Set<ClientSession>>();
-	for (ClientSession session : sessions) {
-	    long nodeId = ChannelState.getNodeId(session);
-	    Set<ClientSession> recipients =
-		recipientsPerNode.get(nodeId);
-	    if (recipients == null) {
-		recipients = new HashSet<ClientSession>();
-		recipientsPerNode.put(nodeId, recipients);
-	    }
-	    recipients.add(session);
-	}
-	
-	long localNodeId = context.getLocalNodeId();
-	final byte[] protocolMessage =
-	    getChannelMessage(sender, channelMessage);
-	for (final long nodeId : state.getChannelServerNodeIds()) {
-	    Set<ClientSession> recipients = recipientsPerNode.get(nodeId);
-	    if (recipients == null) {
-		continue;
-	    }
-	    if (nodeId == localNodeId) {
-		
-		/*
-		 * Send channel message to local recipients.
-		 */
-		for (ClientSession session : recipients) {
-		    sendProtocolMessageOnCommit(session, protocolMessage);
-		}
-		    
-	    } else {
-		final ChannelServer server = state.getChannelServer(nodeId);
-		final byte[][] recipientIds = new byte[recipients.size()][];
-		int i = 0;
-		for (ClientSession session : recipients) {
-		    recipientIds[i++] = session.getSessionId().getBytes();
-		}
-		    
-		runTaskOnCommit(
-		    null,
-		    new Runnable() {
-			public void run() {
-			    try {
-				server.send(channelIdBytes, recipientIds,
-					    protocolMessage, state.delivery);
-			    } catch (Exception e) {
-				// skip unresponsive channel server
-				logger.logThrow(
-				    Level.WARNING, e,
-				    "Contacting channel server:{0} on " +
-				    " node:{1} throws ", server, nodeId);
-			    }
-			}
-		    });
 	    }
 	}
     }

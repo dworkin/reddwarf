@@ -21,12 +21,9 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -38,15 +35,13 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Channel implementation for use within a single transaction
- * specified by the context passed during construction.
+ * Channel implementation for use within a single transaction.
  */
 abstract class ChannelImpl implements Channel, Serializable {
 
@@ -61,9 +56,6 @@ abstract class ChannelImpl implements Channel, Serializable {
     /** The compact ID for the server. */
     private final static CompactId SERVER_ID = new CompactId(new byte[]{0});
 
-    /** Transaction-related context information. */
-    protected final Context context;
-
     /** Persistent channel state. */
     protected final ChannelState state;
 
@@ -71,53 +63,44 @@ abstract class ChannelImpl implements Channel, Serializable {
     boolean isClosed = false;
 
     /**
-     * Constructs an instance of this class with the specified context
-     * and channel state.
+     * Constructs an instance of this class with the specified channel state.
      *
-     * @param context a context
      * @param state a channel state
      */
-    protected ChannelImpl(Context context, ChannelState state) {
-	if (context == null || state == null) {
-	    throw new NullPointerException("null argument");
+    protected ChannelImpl(ChannelState state) {
+	if (state == null) {
+	    throw new NullPointerException("null state");
 	}
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "Created ChannelImpl context:{0} state:{1}",
-		       context, state);
-	}
+	logger.log(Level.FINER, "Created ChannelImpl state:{0}", state);
 	this.state =  state;
-	this.context = context;
     }
 
     /**
-     * Constructs a new {@code ChannelImpl} with the given {@code name},
-     * {@code listener}, {@code delivery} requirement, and transaction
-     * {@code context}.
+     * Constructs a new {@code ChannelImpl} with the given {@code
+     * name}, {@code delivery} requirement, and transaction {@code
+     * context}.
      */
-    static ChannelImpl newInstance(Context context, String name,
-				   ChannelListener listener, Delivery delivery)
-    {
+    static ChannelImpl newInstance(String name, Delivery delivery) {
 	ChannelState channelState =
-	    ChannelState.newInstance(name, listener, delivery);
-	return newInstance(context, channelState);
+	    ChannelState.newInstance(name, delivery);
+	return newInstance(channelState);
     }
 
     /**
-     * Constructs a {@code ChannelImpl} with the given transaction
-     * {@code context} and {@code channelState}.
+     * Constructs a {@code ChannelImpl} with the given {@code channelState}.
      */
-    static ChannelImpl newInstance(Context context, ChannelState channelState) {
+    static ChannelImpl newInstance(ChannelState channelState) {
 	// TBD: create other channel types depending on delivery.
-	return new OrderedUnreliableChannelImpl(context, channelState);
+	return new OrderedUnreliableChannelImpl(channelState);
     }
 
     /**
      * TBD: return null instead?
      * @throws NameNotBoundException if channel doesn't exist
      */
-    static ChannelImpl getInstance(Context context, String name) {
+    static ChannelImpl getInstance(String name) {
 	ChannelState channelState = ChannelState.getInstance(name);
-	return newInstance(context, channelState);
+	return newInstance(channelState);
 	
     }
 
@@ -143,20 +126,17 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void join(final ClientSession session, ChannelListener listener) {
+    public void join(final ClientSession session) {
 	try {
 	    checkClosed();
 	    if (session == null) {
 		throw new NullPointerException("null session");
 	    }
-	    if (listener != null && !(listener instanceof Serializable)) {
-		throw new IllegalArgumentException("listener not serializable");
-	    }
-
+	    
 	    /*
-	     * Add session and listener (if any) to channel state.
+	     * Add session to channel state.
 	     */
-	    if (!state.addSession(session, listener)) {
+	    if (!state.addSession(session)) {
 		// session already added
 		return;
 	    }
@@ -164,13 +144,14 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     * Send 'join' message to client session.
 	     */
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(state.name) +
-				  state.id.getExternalFormByteCount());
+		new MessageBuffer(
+		    3 + MessageBuffer.getSize(state.name) +
+		    state.compactChannelId.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 		putString(state.name).
-		putBytes(state.id.getExternalForm());
+		putBytes(state.compactChannelId.getExternalForm());
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
@@ -203,11 +184,12 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     */
 	    if (session.isConnected()) {
 		MessageBuffer buf =
-		    new MessageBuffer(3 + state.id.getExternalFormByteCount());
+		    new MessageBuffer(
+			3 + state.compactChannelId.getExternalFormByteCount());
 		buf.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		    putBytes(state.id.getExternalForm());
+		    putBytes(state.compactChannelId.getExternalForm());
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
 	    
@@ -231,13 +213,14 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     * Send 'leave' message to all client sessions connected
 	     * to this node.
 	     */
-	    long localNodeId = context.getLocalNodeId();
+	    long localNodeId = getLocalNodeId();
 	    MessageBuffer buf =
-		new MessageBuffer(3 + state.id.getExternalFormByteCount());
+		new MessageBuffer(
+		    3 + state.compactChannelId.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		putBytes(state.id.getExternalForm());
+		putBytes(state.compactChannelId.getExternalForm());
 	    final byte[] message = buf.getBuffer();
 	    for (ClientSession session : state.getSessions(localNodeId)) {
 		sendProtocolMessageOnCommit(session, message);
@@ -325,7 +308,7 @@ abstract class ChannelImpl implements Channel, Serializable {
                     "message too long: " + message.length + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
-	    sendToAllMembers(null, message);
+	    sendToAllMembers(message);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
 			   state.name, HexDumper.format(message));
@@ -336,77 +319,6 @@ abstract class ChannelImpl implements Channel, Serializable {
 		logger.logThrow(
 		    Level.FINEST, e, "send channel:{0} message:{1} throws",
 		    state.name, HexDumper.format(message));
-	    }
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void send(ClientSession recipient, byte[] message) {
-	try {
-	    checkClosed();
-	    if (recipient == null) {
-		throw new NullPointerException("null recipient");
-	    } else if (message == null) {
-		throw new NullPointerException("null message");
-	    }
-            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
-                throw new IllegalArgumentException(
-                    "message too long: " + message.length + " > " +
-                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
-            }
-	
-	    Set<ClientSession> sessions = new HashSet<ClientSession>();
-	    sessions.add(recipient);
-	    sendToMembers(sessions, message);
-	    
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "send recipient: {0} message:{1} returns",
-		    recipient, message);
-	    }
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "send recipient: {0} message:{1} throws",
-		    recipient, message);
-	    }
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void send(Set<ClientSession> recipients,
-		     byte[] message)
-    {
-	try {
-	    checkClosed();
-	    if (recipients == null) {
-		throw new NullPointerException("null recipients");
-	    } else if (message == null) {
-		throw new NullPointerException("null message");
-	    }
-            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
-                throw new IllegalArgumentException(
-                    "message too long: " + message.length + " > " +
-                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
-            }
-
-	    if (!recipients.isEmpty()) {
-		sendToMembers(recipients, message);
-	    }
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "send recipients: {0} message:{1} returns",
-		    recipients, message);
-	    }
-	
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "send recipients: {0} message:{1} throws",
-		    recipients, message);
 	    }
 	    throw e;
 	}
@@ -452,20 +364,20 @@ abstract class ChannelImpl implements Channel, Serializable {
      * @return	an object that represents this channel's external form
      */
     protected final Object writeReplace() {
-	return new External(state.name);
+	return new External(state.channelIdBytes);
     }
 
     /**
-     * Represents the persistent representation for a channel (just its name).
+     * Represents the persistent representation for a channel (just its channel ID).
      */
     private final static class External implements Serializable {
 
 	private final static long serialVersionUID = 1L;
 
-	private final String name;
+	private final byte[] channelIdBytes;
 
-	External(String name) {
-	    this.name = name;
+	External(byte[] channelIdBytes) {
+	    this.channelIdBytes = channelIdBytes;
 	}
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
@@ -479,9 +391,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-	    ChannelManager cm = AppContext.getChannelManager();
-	    Channel channel = cm.getChannel(name);
-	    return channel;
+	    ChannelState channelState = ChannelState.getInstance(channelIdBytes);
+	    return newInstance(channelState);
 	}
     }
 
@@ -492,7 +403,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      * throwing TransactionNotActiveException if it isn't.
      */
     private void checkContext() {
-	ChannelServiceImpl.checkContext(context);
+	// FIXME: should check to see that a transaction is active.
     }
 
     /**
@@ -508,97 +419,54 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Notifies this channel's global channel listener (if any), and
-     * notifies the per-session channel listener (if any) that the
-     * specified {@code message} was sent by the client session with
-     * the specified {@code senderId}.
-     */
-    void notifyListeners(ClientSessionId senderId, byte[] message) {
-	checkClosed();
-
-	/*
-	 * Notify channel listeners of channel message.
-	 */
-	ClientSession senderSession = senderId.getClientSession();
-	if (senderSession != null) {
-	    // Notify per-channel listener.
-	    ChannelListener listener = state.getListener();
-	    if (listener != null) {
-		listener.receivedMessage(this, senderSession, message);
-	    }
-
-	    // Notify per-session listener.
-	    listener = state.getListener(senderSession);
-	    if (listener != null) {
-		listener.receivedMessage(this, senderSession, message);
-	    }
-	}
-    }
-
-    /**
      * Send a protocol message to the specified session when the
      * transaction commits.
      */
     protected void sendProtocolMessageOnCommit(
 	ClientSession session, byte[] message)
     {
-	context.getClientSessionService().sendProtocolMessage(
+	ChannelServiceImpl.getClientSessionService().sendProtocolMessage(
 	    session, message, state.delivery);
     }
 
     protected void runTaskOnCommit(ClientSession session, Runnable task) {
-	context.getClientSessionService().runTask(session, task);
+	ChannelServiceImpl.getClientSessionService().runTask(session, task);
     }
 
     /**
      * When this transaction commits, sends the given {@code
      * channelMessage} from this channel's server to all channel members.
      */
-    protected abstract void sendToAllMembers(
-	ClientSession sender, final byte[] channelMessage);
+    protected abstract void sendToAllMembers(final byte[] channelMessage);
 
-    /**
-     * Sends the given {@code channelMessage} from the server to the
-     * specified recipient {@code sessions} when the current
-     * transaction commits.
-     */
-    protected void sendToMembers(
-	Set<ClientSession> sessions, byte[] channelMessage)
-    {
-	sendToMembers(null, sessions, channelMessage);
-    }
-
-    /**
-     * Sends the given {@code channelMessage} from the specified
-     * {@code sender} to the specified recipient {@code sessions} when
-     * the current transaction commits.
-     */
-    protected abstract void sendToMembers(ClientSession sender,
-					  Set<ClientSession> sessions,
-					  final byte[] channelMessage);
-    
     /**
      * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
      * message with this channel's name, and the specified sender,
      * message, and sequence number.
      */
-    protected byte[] getChannelMessage(ClientSession sender, byte[] message) {
+    protected byte[] getChannelMessage(byte[] message) {
 
-	CompactId senderId =
-	    (sender == null) ? SERVER_ID : getCompactId(sender);
+	CompactId senderId = SERVER_ID;
         MessageBuffer buf =
-            new MessageBuffer(13 + state.id.getExternalFormByteCount() +
-			      senderId.getExternalFormByteCount() +
-			      message.length);
+            new MessageBuffer(
+		13 + state.compactChannelId.getExternalFormByteCount() +
+		senderId.getExternalFormByteCount() + message.length);
         buf.putByte(SimpleSgsProtocol.VERSION).
             putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putBytes(state.id.getExternalForm()).
-            putLong(state.nextSequenceNumber(sender)).
+            putBytes(state.compactChannelId.getExternalForm()).
+            putLong(state.nextSequenceNumber()).
             putBytes(senderId.getExternalForm()).
 	    putByteArray(message);
 
         return buf.getBuffer();
+    }
+
+    /**
+     * Returns the local node's ID.
+     */
+    protected long getLocalNodeId() {
+	return ChannelServiceImpl.getLocalNodeId();
     }
 
     private static CompactId getCompactId(ClientSession session) {

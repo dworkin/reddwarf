@@ -62,7 +62,7 @@ import java.io.Serializable;
  * client.  When that client logs back in again, a new session is
  * established with the server.
  */
-public interface ClientSession {
+public interface ClientSession extends ManagedObject {
 
     /**
      * Returns the login name used to authenticate this session.

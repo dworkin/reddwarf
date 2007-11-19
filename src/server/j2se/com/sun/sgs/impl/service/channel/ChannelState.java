@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
@@ -32,7 +31,6 @@ import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.impl.util.WrappedSerializable;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -69,8 +67,6 @@ final class ChannelState implements ManagedObject, Serializable {
 
     private static final String SESSION_COMPONENT = "session.";
 
-    private static final String LISTENER_COMPONENT = "listener.";    
-
     /** The name of this channel. */
     final String name;
 
@@ -78,10 +74,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final byte[] channelIdBytes;
 
     /** The channel ID for this instance, constructed from {@code channelIdBytes}. */
-    transient CompactId id;
-
-    /** The listener for this channel, or null. */
-    private WrappedSerializable<ChannelListener> channelListener;
+    transient CompactId compactChannelId;
 
     /** The sequence number for messages from the server on this channel. */
     private long seq = 0;
@@ -99,34 +92,26 @@ final class ChannelState implements ManagedObject, Serializable {
     private transient DataService dataService;
 
     /**
-     * Constructs an instance of this class with the specified {@code name},
-     * {@code listener}, and {@code delivery} requirement.
+     * Constructs an instance of this class with the specified {@code name}
+     * and {@code delivery} requirement.
      */
-    private ChannelState(
-		String name, ChannelListener listener, Delivery delivery)
-    {
+    private ChannelState(String name, Delivery delivery) {
 	if (name == null) {
 	    throw new NullPointerException("null name");
 	}
 	this.name = name;
-	this.channelListener =
-	    listener != null ?
-	    new WrappedSerializable<ChannelListener>(listener) :
-	    null;
 	this.delivery = delivery;
 	dataService = ChannelServiceImpl.getDataService();
 	ManagedReference ref = dataService.createReference(this);
 	channelIdBytes = ref.getId().toByteArray();
-	id = new CompactId(channelIdBytes);
+	compactChannelId = new CompactId(channelIdBytes);
     }
 
     /**
      * @throws	NameExistsException if a channel with the specified
      * 		{@code name} already exists
      */
-    static ChannelState newInstance(
-		String name, ChannelListener listener, Delivery delivery)
-    {
+    static ChannelState newInstance(String name, Delivery delivery) {
 	String channelStateKey = getChannelStateKey(name);
 	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
@@ -135,8 +120,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	} catch (NameNotBoundException e) {
 	}
 	
-	ChannelState channelState =
-	    new ChannelState(name, listener, delivery);
+	ChannelState channelState = new ChannelState(name, delivery);
 	dataService.setServiceBinding(channelStateKey, channelState);
 	return channelState;
     }
@@ -291,15 +275,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	return info;
     }
 
-    long nextSequenceNumber(ClientSession session) {
-	assert session == null || hasSession(session);
-	return
-	    (session != null) ?
-	    getClientSessionInfo(session).nextSequenceNumber(dataService) :
-	    nextSequenceNumber();
-    }
-
-    private long nextSequenceNumber() {
+    long nextSequenceNumber() {
 	dataService.markForUpdate(this);
 	return seq++;
     }
@@ -325,8 +301,7 @@ final class ChannelState implements ManagedObject, Serializable {
 
     /**
      * If the specified {@code session} is not already a member of
-     * this channel, adds the session with the specified {@code
-     * listener} (which can be {@code null}) to this channel and
+     * this channel, adds the session to this channel and
      * returns {@code true}; otherwise if the specified {@code
      * session} is already a member of this channel, returns {@code
      * false}.
@@ -334,7 +309,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * @return	{@code true} if the session was added to the channel,
      *		and {@code false} if the session is already a member
      */
-    boolean addSession(ClientSession session, ChannelListener listener) {
+    boolean addSession(ClientSession session) {
 	/*
 	 * If client session is already a channel member, return false
 	 * immediately.
@@ -373,20 +348,11 @@ final class ChannelState implements ManagedObject, Serializable {
 	}
 
 	/*
-	 * Add session binding, and listener binding if listener is
-	 * non-null.
+	 * Add session binding.
 	 */
 	String sessionKey = getSessionKey(session);
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
-	if (listener != null) {
-	    ManagedObject maybeWrappedListener =
-		(listener instanceof ManagedObject) ?
-		(ManagedObject) listener :
-		new ListenerWrapper(listener);
-	    dataService.setServiceBinding(
-		getListenerKey(session), maybeWrappedListener);
-	}
 	
 	/*
 	 * Add channel to session's channel set.
@@ -423,21 +389,6 @@ final class ChannelState implements ManagedObject, Serializable {
 	    dataService.removeServiceBinding(sessionKey);
 	} catch (NameNotBoundException e) {
 	    return false;
-	}
-
-	/*
-	 * Remove listener binding, if any, and listener's wrapper, if any.
-	 */
-	try {
-	    String listenerKey = getListenerKey(nodeId, sessionIdBytes);
-	    ManagedObject maybeWrappedListener =
-		dataService.getServiceBinding(listenerKey, ManagedObject.class);
-	    dataService.removeServiceBinding(listenerKey);
-	    if (maybeWrappedListener instanceof ListenerWrapper) {
-		dataService.removeObject(maybeWrappedListener);
-	    }
-	} catch (NameNotBoundException e) {
-	    // Ignore: no per-session channel listener.
 	}
 
 	/*
@@ -496,42 +447,14 @@ final class ChannelState implements ManagedObject, Serializable {
 
     /**
      * Removes all sessions from this channel, clears the list of
-     * channel servers for this channel, removes the per-channel
-     * listener (if any). and removes the channel state from the data
-     * service.  This method should be called when the channel is
-     * closed.
+     * channel servers for this channel, and removes the channel state
+     * from the data service.  This method should be called when the
+     * channel is closed.
      */
     void closeAndRemoveState() {
 	removeAllSessions();
-	if (channelListener != null) {
-	    channelListener.remove();
-	}
-	channelListener = null;
-
 	dataService.removeServiceBinding(getChannelStateKey(name));
 	dataService.removeObject(this);
-    }
-
-    ChannelListener getListener() {
-	return
-	    channelListener != null  ?
-	    channelListener.get(ChannelListener.class) :
-	    null;
-    }
-
-    ChannelListener getListener(ClientSession session) {
-	String listenerKey = getListenerKey(session);
-	try {
-	    ManagedObject obj =
-		dataService.getServiceBinding(listenerKey, ManagedObject.class);
-	    return 
-		(obj instanceof ListenerWrapper) ?
-		((ListenerWrapper) obj).get() :
-		(ChannelListener) obj;
-	    
-	} catch (NameNotBoundException e) {
-	    return null;
-	}
     }
 
     /**
@@ -581,25 +504,6 @@ final class ChannelState implements ManagedObject, Serializable {
     private String getSessionKey(long nodeId, byte[] sessionIdBytes) {
 	return getSessionNodePrefix(nodeId) +
 	    HexDumper.toHexString(sessionIdBytes);
-    }
-
-    /**
-     * Returns a key for accessing the channel listener for the
-     * specified {@code session} as a member of this channel.
-     * The key has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		listener.<channelId>.<nodeId>.<sessionId>
-     */
-    private String getListenerKey(ClientSession session) {
-	return getListenerKey(
-	    getNodeId(session), session.getSessionId().getBytes());
-    }
-
-    private String getListenerKey(long nodeId, byte[] sessionIdBytes) {
-	return PKG_NAME +
-	    LISTENER_COMPONENT + HexDumper.toHexString(channelIdBytes) +
-	    nodeId + "." + HexDumper.toHexString(sessionIdBytes);
     }
 
     /**
@@ -655,7 +559,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	throws IOException, ClassNotFoundException
     {
 	in.defaultReadObject();
-	id = new CompactId(channelIdBytes);
+	compactChannelId = new CompactId(channelIdBytes);
 	dataService = ChannelServiceImpl.getDataService();
     }
 
@@ -685,8 +589,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    }
 	    this.nodeId = getNodeId(session);
 	    this.sessionIdBytes = session.getSessionId().getBytes();
-	    this.sessionRef =
-		dataService.createReference((ManagedObject) session);
+	    this.sessionRef = dataService.createReference(session);
 	}
 
 	/**
@@ -699,31 +602,6 @@ final class ChannelState implements ManagedObject, Serializable {
 	    } catch (ObjectNotFoundException e) {
 		return null;
 	    }
-	}
-
-	long nextSequenceNumber(DataService dataService) {
-	    dataService.markForUpdate(this);
-	    return seq++;
-	}
-    }
-
-    /**
-     * A {@code ManagedObject} wrapper for a {@code ChannelListener}.
-     */
-    private static class ListenerWrapper
-	implements ManagedObject, Serializable
-    {
-	private final static long serialVersionUID = 1L;
-	
-	private ChannelListener listener;
-
-	ListenerWrapper(ChannelListener listener) {
-	    assert listener != null && listener instanceof Serializable;
-	    this.listener = listener;
-	}
-
-	ChannelListener get() {
-	    return listener;
 	}
     }
 
@@ -894,5 +772,4 @@ final class ChannelState implements ManagedObject, Serializable {
     {
 	return new ClientSessionIdsOnNodeIterator(dataService, nodeId);
     }
-
 }

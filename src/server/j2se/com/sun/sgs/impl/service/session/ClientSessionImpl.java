@@ -46,9 +46,8 @@ import java.util.logging.Logger;
 /**
  * Implements a client session (proxy).
  */
-public class ClientSessionImpl
-    implements ClientSession, ManagedObject, Serializable
-{
+public class ClientSessionImpl implements ClientSession, Serializable {
+    
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
