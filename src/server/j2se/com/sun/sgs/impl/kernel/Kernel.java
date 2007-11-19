@@ -97,6 +97,9 @@ class Kernel {
     // create a factory to create not-static instances.  
     private static TransactionCoordinator transactionCoordinator;
 
+    // FIXME
+    private final MasterTaskScheduler scheduler;
+
     // the registration point for producers of profiling data
     private final ProfileRegistrarImpl profileRegistrar;
 
@@ -179,7 +182,7 @@ class Kernel {
                   getTransactionCoordinator(systemProperties, profileCollector), 
                   profileCollector);
             
-            MasterTaskScheduler scheduler =
+            scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
                                         taskHandler, profileCollector,
                                         SystemKernelAppContext.CONTEXT);
@@ -336,12 +339,14 @@ class Kernel {
 
     /**
      * Shut down all applications in this kernel in reverse
-     * order of how they were started.
+     * order of how they were started, and also shutdown the
+     * task scheduler.
      */
     void shutdown() {
         for (AppKernelAppContext ctx: applications) {
             ctx.shutdownServices();
         }
+        scheduler.shutdown();
     }
     
     /**
