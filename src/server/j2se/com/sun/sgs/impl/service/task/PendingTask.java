@@ -54,14 +54,14 @@ class PendingTask implements ManagedObject, Serializable {
 
     // the task that is pending, one of which is null based on whether the
     // task was managed by the caller (see docs on constructor)
-    private final Task task;
-    private final ManagedReference taskRef;
+    private Task task;
+    private ManagedReference taskRef;
 
     // the task's meta-data
-    private final String taskType;
-    private final long startTime;
-    private final long period;
-    private final Identity identity;
+    private String taskType;
+    private long startTime;
+    private long period;
+    private Identity identity;
 
     // whether this task has been marked as cancelled
     private boolean cancelled = false;
@@ -93,6 +93,15 @@ class PendingTask implements ManagedObject, Serializable {
      */
     PendingTask(Task task, long startTime, long period, Identity identity,
                 DataService dataService) {
+	set(task, startTime, period, identity, dataService);
+    }
+
+    /**
+     * Modifies this instance of {@code PendingTask} to handle the specified
+     * task.
+     */
+    void set(Task task, long startTime, long period, Identity identity,
+	     DataService dataService) {
         // If the Task is also a ManagedObject then the assumption is
         // that the object was already managed by the application so we
         // just keep a reference...otherwise, we make it part of our
