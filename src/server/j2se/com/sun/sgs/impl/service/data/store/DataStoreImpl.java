@@ -550,7 +550,7 @@ public class DataStoreImpl
 	/** Finds a free offset within the block of IDs. */
 	private int findFree(long previousId) {
 	    if (previousId - firstId >= 0 &&
-		previousId - firstId < allocationBlockSize)
+		previousId - firstId < allocationBlockSize - 1)
 	    {
 		/* Try next position */
 		int offset = (int) (previousId - firstId) + 1;

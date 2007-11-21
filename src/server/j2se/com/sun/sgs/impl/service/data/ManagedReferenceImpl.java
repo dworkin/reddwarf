@@ -24,6 +24,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.sharedutil.Exceptions;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ObjectStreamException;
@@ -333,6 +334,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    throw new NullPointerException(
 		"The type argument must not be null");
 	}
+	RuntimeException exception;
 	try {
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
@@ -372,18 +374,27 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		    "get tid:{0,number,#}, oid:{1,number,#} returns {2}",
 		    context.getTxnId(), oid, Objects.fastToString(object));
 	    }
-	    return type.cast(object);
+	    try {
+		return type.cast(object);
+	    } catch (ClassCastException e) {
+		throw Exceptions.initCause(
+		    new ClassCastException(
+			"Attempt to cast " + Objects.fastToString(object) +
+			", oid:" + oid + " to class " + type.getName()),
+		    e);
+	    }
 	} catch (TransactionNotActiveException e) {
-	    throw new TransactionNotActiveException(
+	    exception = new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
 		"reference that was created in another transaction",
 		e);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e,
-			    "get tid:{0,number,#}, oid:{1,number,#} throws",
-			    context.getTxnId(), oid);
-	    throw e;
+	    exception = e;
 	}
+	logger.logThrow(Level.FINEST, exception,
+			"get tid:{0,number,#}, oid:{1,number,#} throws",
+			context.getTxnId(), oid);
+	throw exception;
     }
 
     /** {@inheritDoc} */
@@ -431,7 +442,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 			   context.getTxnId(), oid,
 			   Objects.fastToString(object));
 	    }
-	    return type.cast(object);
+	    try {
+		return type.cast(object);
+	    } catch (ClassCastException e) {
+		throw Exceptions.initCause(
+		    new ClassCastException(
+			"Attempt to cast " + Objects.fastToString(object) +
+			", oid:" + oid + " to class " + type.getName()),
+		    e);
+	    }
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
