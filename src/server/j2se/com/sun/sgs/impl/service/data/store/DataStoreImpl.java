@@ -48,7 +48,10 @@ import java.io.FileNotFoundException;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Executors;
@@ -144,7 +147,7 @@ public class DataStoreImpl
 	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
-    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1000;
+    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1024;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -186,7 +189,11 @@ public class DataStoreImpl
     private final DbDatabase namesDb;
 
     /** Information about free object IDs. */
-    final FreeObjectIds freeObjectIds = new FreeObjectIds();
+    final List<ObjectIdInfo> freeObjectIds =
+	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
+
+    /** A random number generator for choosing object ID info */
+    final Random random = new Random();
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -357,10 +364,10 @@ public class DataStoreImpl
 	private long lastOidsCursorKey = -1;
 
 	/**
-	 * The ID of the last object created in this transaction, or -1 if none
-	 * have been created.
+	 * Information about object IDs available for allocation in this
+	 * transaction, or null if this transaction has not done allocation.
 	 */
-	private long lastNewObjectId = -1;
+	private ObjectIdInfo objectIdInfo = null;
 
 	TxnInfo(Transaction txn, DbEnvironment env) {
 	    dbTxn = env.beginTransaction(txn.getTimeout());
@@ -379,6 +386,9 @@ public class DataStoreImpl
 	void commit() {
 	    maybeCloseCursors();
 	    dbTxn.commit();
+	    if (objectIdInfo != null) {
+		freeObjectIds.add(objectIdInfo);
+	    }
 	}
 
 	/**
@@ -388,6 +398,9 @@ public class DataStoreImpl
 	void abort() {
 	    maybeCloseCursors();
 	    dbTxn.abort();
+	    if (objectIdInfo != null) {
+		freeObjectIds.add(objectIdInfo);
+	    }
 	}
 
 	/** Returns the next name in the names database. */
@@ -470,10 +483,26 @@ public class DataStoreImpl
 	    }
 	}
 
-	/** Allocates an object ID for a new object. */
-	long newObjectId(Transaction txn) {
-	    lastNewObjectId = freeObjectIds.next(lastNewObjectId, txn);
-	    return lastNewObjectId;
+	/**
+	 * Returns information about free object IDs available for allocation
+	 * in this transaction.
+	 */
+	ObjectIdInfo getObjectIdInfo() {
+	    if (objectIdInfo == null) {
+		synchronized (freeObjectIds) {
+		    int size = freeObjectIds.size();
+		    if (size != 0) {
+			objectIdInfo =
+			    freeObjectIds.remove(random.nextInt(size));
+		    }
+		}
+		if (objectIdInfo == null) {
+		    objectIdInfo = new ObjectIdInfo();
+		} else {
+		    objectIdInfo.initTxn();
+		}
+	    }
+	    return objectIdInfo;
 	}
     }
 
@@ -505,7 +534,7 @@ public class DataStoreImpl
     }
 
     /** Stores information about object IDs available for allocation. */
-    private final class FreeObjectIds {
+    private static final class ObjectIdInfo {
 
 	/** The first object ID in the current block of free IDs. */
 	private long firstId;
@@ -513,34 +542,44 @@ public class DataStoreImpl
 	/** The number of free object IDs in the block of IDs. */
 	private int freeCount = 0;
 
-	/**
-	 * A bit map representing the IDs that have been allocated in the
-	 * range of IDs from firstId to firstId + allocationBlockSize - 1.
-	 */
-	private final BitSet allocMap = new BitSet(allocationBlockSize);
+	private long previousId = -1;
+
+	private int blockSize;
 
 	/**
-	 * A random number generator for choosing the location of the next run
-	 * of IDs.
+	 * A bit map representing the IDs that have been allocated in the range
+	 * of IDs from firstId to firstId + blockSize - 1.
 	 */
-	private final Random random = new Random();
+	private final BitSet allocMap = new BitSet();
 
-	FreeObjectIds() { }
+	/** Creates an instance of this class. */
+	ObjectIdInfo() { }
+
+	void initTxn() {
+	    previousId = -1;
+	}
+
+	/** Updates the next and last object IDs. */
+	void setObjectIds(long nextObjectId, long lastObjectId) {
+	    firstId = nextObjectId;
+	    assert lastObjectId - nextObjectId < Integer.MAX_VALUE;
+	    freeCount = (int) (lastObjectId - nextObjectId) + 1;
+	    blockSize = freeCount;
+	    allocMap.clear();
+	    previousId = -1;
+	}
+
+	/** Returns whether there are more object IDs available. */
+	boolean hasNext() {
+	    return freeCount > 0;
+	}
 
 	/**
 	 * Returns the next object ID.  The previousId parameter should be the
 	 * last ID used by the specified transaction or -1.
 	 */
-	synchronized long next(long previousId, Transaction txn) {
-	    if (freeCount == 0) {
-		logger.log(Level.FINE, "Allocate more object IDs");
-		firstId = getNextId(
-		    DataStoreHeader.NEXT_OBJ_ID_KEY,
-		    allocationBlockSize, txn.getTimeout());
-		freeCount = allocationBlockSize;
-		allocMap.clear();
-		previousId = -1;
-	    }
+	long next() {
+	    assert hasNext();
 	    int offset = findFree(previousId);
 	    allocMap.set(offset);
 	    freeCount--;
@@ -550,7 +589,7 @@ public class DataStoreImpl
 	/** Finds a free offset within the block of IDs. */
 	private int findFree(long previousId) {
 	    if (previousId - firstId >= 0 &&
-		previousId - firstId < allocationBlockSize - 1)
+		previousId - firstId < blockSize - 1)
 	    {
 		/* Try next position */
 		int offset = (int) (previousId - firstId) + 1;
@@ -558,37 +597,18 @@ public class DataStoreImpl
 		    return offset;
 		}
 	    }
-	    /*
-	     * Divide the block into sections, and try picking from one at
-	     * random.
-	     */
-	    BitSet regions = new BitSet(10);
-	    int regionSize = allocationBlockSize / 10;
-	    for (int i = 0; i < 10; i++) {
-		int region = random.nextInt(10);
-		if (regions.get(region)) {
-		    region = regions.nextClearBit(region);
-		    if (region >= 10) {
-			region = regions.nextClearBit(0);
-		    }
+	    int offset =
+		(Integer.reverse(freeCount % blockSize) >>>
+		 (Integer.numberOfLeadingZeros(blockSize - 1))) %
+		blockSize;
+	    if (allocMap.get(offset)) {
+		offset = allocMap.nextClearBit(offset);
+		if (offset >= blockSize) {
+		    offset = allocMap.nextClearBit(0);
+		    assert offset < blockSize;
 		}
-		regions.set(region);
-		int regionStart = regionSize * region;
-		int nextRegion = (region == 9)
-		    ? allocationBlockSize : regionStart + regionSize;
-		int offset = regionStart + random.nextInt(regionSize);
-		if (allocMap.get(offset)) {
-		    offset = allocMap.nextClearBit(offset);
-		    if (offset >= nextRegion) {
-			offset = allocMap.nextClearBit(regionStart);
-			if (offset >= nextRegion) {
-			    continue;
-			}
-		    }
-		}
-		return offset;
 	    }
-	    throw new RuntimeException("No free space");
+	    return offset;
 	}
     }
 
@@ -729,7 +749,17 @@ public class DataStoreImpl
 	logger.log(Level.FINEST, "createObject txn:{0}", txn);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, createObjectOp);
-	    long result = txnInfo.newObjectId(txn);
+	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
+	    if (!objectIdInfo.hasNext()) {
+		logger.log(Level.FINE, "Allocate more object IDs");
+		long newNextObjectId = getNextId(
+		    DataStoreHeader.NEXT_OBJ_ID_KEY,
+		    allocationBlockSize, txn.getTimeout());
+		objectIdInfo.setObjectIds(
+		    newNextObjectId,
+		    newNextObjectId + allocationBlockSize - 1);
+	    }
+	    long result = objectIdInfo.next();
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
