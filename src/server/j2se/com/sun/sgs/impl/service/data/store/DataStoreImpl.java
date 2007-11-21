@@ -558,18 +558,37 @@ public class DataStoreImpl
 		    return offset;
 		}
 	    }
-	    /* Pick randomly */
-	    int offset = random.nextInt(allocationBlockSize);
-	    if (allocMap.get(offset)) {
-		/* Search for next open position */
-		offset = allocMap.nextClearBit(offset);
-		if (offset >= allocationBlockSize) {
-		    /* Search for first open position */
-		    offset = allocMap.nextClearBit(0);
-		    assert offset < allocationBlockSize;
+	    /*
+	     * Divide the block into sections, and try picking from one at
+	     * random.
+	     */
+	    BitSet regions = new BitSet(10);
+	    int regionSize = allocationBlockSize / 10;
+	    for (int i = 0; i < 10; i++) {
+		int region = random.nextInt(10);
+		if (regions.get(region)) {
+		    region = regions.nextClearBit(region);
+		    if (region >= 10) {
+			region = regions.nextClearBit(0);
+		    }
 		}
+		regions.set(region);
+		int regionStart = regionSize * region;
+		int nextRegion = (region == 9)
+		    ? allocationBlockSize : regionStart + regionSize;
+		int offset = regionStart + random.nextInt(regionSize);
+		if (allocMap.get(offset)) {
+		    offset = allocMap.nextClearBit(offset);
+		    if (offset >= nextRegion) {
+			offset = allocMap.nextClearBit(regionStart);
+			if (offset >= nextRegion) {
+			    continue;
+			}
+		    }
+		}
+		return offset;
 	    }
-	    return offset;
+	    throw new RuntimeException("No free space");
 	}
     }
 
