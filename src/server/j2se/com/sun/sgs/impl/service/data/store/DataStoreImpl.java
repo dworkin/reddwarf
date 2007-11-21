@@ -147,7 +147,12 @@ public class DataStoreImpl
 	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
-    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1024;
+    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 2048;
+
+    public static final String ALLOCATION_BLOCKS_PROPERTY =
+	CLASSNAME + ".allocation.blocks";
+
+    public static final int DEFAULT_ALLOCATION_BLOCKS = 5;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -193,7 +198,7 @@ public class DataStoreImpl
 	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
 
     /** A random number generator for choosing object ID info */
-    final Random random = new Random();
+    static final Random random = new Random();
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -583,7 +588,8 @@ public class DataStoreImpl
 	    int offset = findFree(previousId);
 	    allocMap.set(offset);
 	    freeCount--;
-	    return firstId + offset;
+	    previousId = firstId + offset;
+	    return previousId;
 	}
 
 	/** Finds a free offset within the block of IDs. */
@@ -597,10 +603,10 @@ public class DataStoreImpl
 		    return offset;
 		}
 	    }
-	    int offset =
-		(Integer.reverse(freeCount % blockSize) >>>
-		 (Integer.numberOfLeadingZeros(blockSize - 1))) %
-		blockSize;
+	    int offset = random.nextInt(blockSize);
+// 		(Integer.reverse(freeCount % blockSize) >>>
+// 		 (Integer.numberOfLeadingZeros(blockSize - 1))) %
+// 		blockSize;
 	    if (allocMap.get(offset)) {
 		offset = allocMap.nextClearBit(offset);
 		if (offset >= blockSize) {
@@ -661,7 +667,13 @@ public class DataStoreImpl
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
 	    1, Integer.MAX_VALUE);
+	int allocationBlocks = wrappedProps.getIntProperty(
+	    ALLOCATION_BLOCKS_PROPERTY, DEFAULT_ALLOCATION_BLOCKS,
+	    1, Integer.MAX_VALUE);
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
+	for (int i = 0; i < allocationBlocks; i++) {
+	    freeObjectIds.add(new ObjectIdInfo());
+	}
 	DbTransaction dbTxn = null;
 	boolean done = false;
 	try {
