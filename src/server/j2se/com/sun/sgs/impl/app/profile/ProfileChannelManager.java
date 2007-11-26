@@ -70,15 +70,7 @@ public class ProfileChannelManager implements ChannelManager, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public Channel createChannel(String name, Delivery delivery) {
-        return backingManager.createChannel(name, delivery);
+    public Channel createChannel(Delivery delivery) {
+        return backingManager.createChannel(delivery);
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Channel getChannel(String name) {
-        return backingManager.getChannel(name);
-    }
-
 }

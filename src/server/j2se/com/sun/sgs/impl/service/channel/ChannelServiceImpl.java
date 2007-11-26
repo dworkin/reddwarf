@@ -25,7 +25,6 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -35,9 +34,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.TransactionContext;
-import com.sun.sgs.impl.util.TransactionContextFactory;
-import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -45,17 +41,11 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
-import com.sun.sgs.service.Service;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
@@ -93,23 +83,12 @@ public class ChannelServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
     
-    /**
-     * The transaction context map, or null if configure has not been called.
-     */
-    private static volatile TransactionContextMap<Context> contextMap = null;
-
-    /** List of contexts that have been prepared (non-readonly) or commited. */
-    private final List<Context> contextList = new LinkedList<Context>();
-
     /** The watchdog service. */
     private final WatchdogService watchdogService;
 
     /** The client session service. */
     private final ClientSessionService sessionService;
 
-    /** The transaction context factory. */
-    private final TransactionContextFactory<Context> contextFactory;
-    
     /** The exporter for the ChannelServer. */
     private final Exporter<ChannelServer> exporter;
 
@@ -145,12 +124,6 @@ public class ChannelServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	try {
-	    synchronized (ChannelServiceImpl.class) {
-		if (ChannelServiceImpl.contextMap == null) {
-		    contextMap = new TransactionContextMap<Context>(txnProxy);
-		}
-	    }
-	    contextFactory = new ContextFactory(contextMap);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
@@ -228,107 +201,16 @@ public class ChannelServiceImpl
     /* -- Implement ChannelManager -- */
 
     /** {@inheritDoc} */
-    public Channel createChannel(String name, Delivery delivery) {
+    public Channel createChannel(Delivery delivery) {
 	try {
-	    if (name == null) {
-		throw new NullPointerException("null name");
-	    }
-	    Context context = contextFactory.joinTransaction();
-	    Channel channel = context.createChannel(name, delivery);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "createChannel name:{0} returns {1}",
-		    name, channel);
-	    }
+	    Channel channel = ChannelImpl.newInstance(delivery);
+	    logger.log(Level.FINEST, "createChannel returns {0}", channel);
 	    return channel;
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "createChannel name:{0} throws", name);
-	    }
+	    logger.logThrow(Level.FINEST, e, "createChannel:{0} throws");
 	    throw e;
 	}
-    }
-
-    /** {@inheritDoc} */
-    public Channel getChannel(String name) {
-	try {
-	    if (name == null) {
-		throw new NullPointerException("null name");
-	    }
-	    Context context = contextFactory.joinTransaction();
-	    Channel channel = context.getChannel(name);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "getChannel name:{0} returns {1}",
-		    name, channel);
-	    }
-	    return channel;
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "getChannel name:{0} throws", name);
-	    }
-	    throw e;
-	}
-    }
-
-    /* -- Implement TransactionContextFactory -- */
-       
-    private class ContextFactory extends TransactionContextFactory<Context> {
-	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
-	}
-	
-	public Context createContext(Transaction txn) {
-	    return new Context(txn);
-	}
-    }
-
-    /**
-     * Iterates through the context list, in order, to flush any
-     * committed changes.  During iteration, this method invokes
-     * {@code flush} on the {@code Context} returned by {@code next}.
-     * Iteration ceases when either a context's {@code flush} method
-     * returns {@code false} (indicating that the transaction
-     * associated with the context has not yet committed) or when
-     * there are no more contexts in the context list.
-     */
-    private void flushContexts() {
-	synchronized (contextList) {
-	    Iterator<Context> iter = contextList.iterator();
-	    while (iter.hasNext()) {
-		Context context = iter.next();
-		if (context.flush()) {
-		    iter.remove();
-		} else {
-		    break;
-		}
-	    }
-	}
-    }
-
-    /**
-     * Checks that the specified context is currently active, throwing
-     * TransactionNotActiveException if it isn't.
-     */
-    static void checkContext(Context context) {
-	getContextMap().checkContext(context);
-    }
-
-    /**
-     * Returns the transaction context map.
-     *
-     * @return the transaction context map
-     */
-    private synchronized static TransactionContextMap<Context> getContextMap()
-    {
-	if (contextMap == null) {
-	    throw new IllegalStateException("Service not configured");
-	}
-	return contextMap;
     }
 
     /* -- Implement ChannelServer -- */
@@ -473,181 +355,11 @@ public class ChannelServiceImpl
  		     new TransactionRunner(
 			new AbstractKernelRunnable() {
 			    public void run() {
-				removeSessionFromAllChannels(session);
+				ChannelImpl.removeSessionFromAllChannels(session);
 			    }
 			}),
 		     new TaskOwnerImpl(identity, taskOwner.getContext()));
 	    }
-	}
-    }
-    
-    /**
-     * Stores information relating to a specific transaction operating on
-     * channels.
-     *
-     * <p>This context maintains an internal table that maps (for the
-     * channels used in the context's associated transaction) channel
-     * name to channel implementation.  To create or obtain a channel
-     * within a transaction, the {@code createChannel} or {@code
-     * getChannel} methods (respectively) must be called on the
-     * context so that the proper channel instances are used.
-     */
-    final class Context extends TransactionContext {
-
-	/**
-	 * Map of channel name to transient channel impl (for those
-	 * channels used during this context's associated
-	 * transaction).
-	 */
-	private final Map<String, ChannelImpl> internalTable =
-	    new HashMap<String, ChannelImpl>();
-
-	/**
-	 * Constructs a context with the specified transaction. 
-	 */
-	private Context(Transaction txn) {
-	    super(txn);
-	}
-
-	/* -- ChannelManager methods -- */
-
-	/**
-	 * Creates a channel with the specified {@code name} and
-	 * {@code delivery} requirement.  The channel's state is bound
-	 * to a name composed of the channel service's prefix followed
-	 * by ".state." followed by the channel name.
-	 */
-	Channel createChannel(String name, Delivery delivery) {
-	    ChannelImpl channel =
-		ChannelImpl.newInstance(name, delivery);
-	    internalTable.put(name, channel);
-	    return channel;
-	}
-
-	/**
-	 * Returns a channel with the specified {@code name}.  If the
-	 * channel is already present in the internal channel table
-	 * for this transaction, then the channel is returned;
-	 * otherwise, this method gets the channel's state by looking
-	 * up the service binding for the channel.
-	 *
-	 * @param   name a channel name
-	 * @return  the channel with the specified {@code name}
-	 * @throws  NameNotBoundException if the channel does not exist
-	 */
-	Channel getChannel(String name) {
-	    ChannelImpl channel = internalTable.get(name);
-	    if (channel == null) {
-		channel = ChannelImpl.getInstance(name);
-		internalTable.put(name, channel);
-	    } else if (channel.isClosed) {
-		throw new NameNotBoundException(name);
-	    }
-	    return channel;
-	}
-
-	/**
-	 * Returns a channel with the specified {@code channelId}, or
-	 * {@code null} if the channel doesn't exist.  If the channel
-	 * is already present in the internal channel table for this
-	 * transaction, then the channel is returned.  This method
-	 * uses the {@code channelId} as a {@code ManagedReference} ID
-	 * to the channel's state.
-	 *
-	 * @return  the channel with the specified {@code channelId},
-	 *	    or {@code null} if the channel doesn't exist
-	 * @throws  NameNotBoundException if the channel does not exist
-	 */
-	ChannelImpl getChannel(byte[] channelId) {
-	    assert channelId != null;
-	    ChannelImpl channel = null;
-	    ChannelState channelState =
-		ChannelState.getInstance(channelId);
-	    if (channelState != null) {
-		channel = internalTable.get(channelState.name);
-		if (channel == null) {
-		    channel = ChannelImpl.newInstance(channelState);
-		    internalTable.put(channelState.name, channel);
-		}
-
-		if (channel.isClosed) {
-		    channel = null;
-		}
-	    }
-		
-	    return channel;
-	}
-
-	/* -- transaction participant methods -- */
-
-	/**
-	 * Throws a {@code TransactionNotActiveException} if this
-	 * transaction is prepared.
-	 */
-	private void checkPrepared() {
-	    if (isPrepared) {
-		throw new TransactionNotActiveException("Already prepared");
-	    }
-	}
-	
-	/**
-	 * Marks this transaction as prepared, and if there are
-	 * pending changes, adds this context to the context list and
-	 * returns {@code false}.  Otherwise, if there are no pending
-	 * changes returns {@code true} indicating readonly status.
-	 */
-        public boolean prepare() {
-	    isPrepared = true;
-	    boolean readOnly = internalTable.isEmpty();
-	    if (! readOnly) {
-		synchronized (contextList) {
-		    contextList.add(this);
-		}
-	    }
-            return readOnly;
-        }
-
-	/**
-	 * Marks this transaction as aborted, removes the context from
-	 * the context list containing pending updates, and flushes
-	 * all committed contexts preceding prepared ones.
-	 */
-	public void abort(boolean retryable) {
-	    synchronized (contextList) {
-		contextList.remove(this);
-	    }
-	    flushContexts();
-	}
-
-	/**
-	 * Marks this transaction as committed and flushes all
-	 * committed contexts preceding prepared ones.
-	 */
-	public void commit() {
-	    isCommitted = true;
-	    flushContexts();
-        }
-
-	/**
-	 * If the context is committed, flushes channel state updates
-	 * to the channel state cache and returns true; otherwise
-	 * returns false.
-	 */
-	private boolean flush() {
-	    if (isCommitted) {
-		return true;
-	    } else {
-		return false;
-	    }
-	}
-
-	/* -- other methods -- */
-
-	/**
-	 * Returns a service of the given {@code type}.
-	 */
-	<T extends Service> T getService(Class<T> type) {
-	    return txnProxy.getService(type);
 	}
     }
     
@@ -663,6 +375,14 @@ public class ChannelServiceImpl
      */
     static long getLocalNodeId() {
 	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
+    }
+
+    /**
+     * Throws {@code TransactionNotActiveException} if a transaction
+     * is not currently active.
+     */
+    static void checkContext() {
+	txnProxy.getCurrentTransaction();
     }
 
     /**
@@ -698,7 +418,8 @@ public class ChannelServiceImpl
 		    runTransactionally(
 			new AbstractKernelRunnable() {
 			    public void run() {
-				removeSessionFromAllChannels(nodeId, sessionId);
+				ChannelImpl.removeSessionFromAllChannels(
+				    nodeId, sessionId);
 			    }
 			});
 		}
@@ -742,7 +463,7 @@ public class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void run() {
 	    Iterator<byte[]> iter =
-		ChannelState.getSessionIdsAnyChannel(dataService, nodeId);
+		ChannelImpl.getSessionIdsAnyChannel(dataService, nodeId);
 	    while (iter.hasNext()) {
 		sessionIds.add(iter.next());
 	    }
@@ -754,41 +475,9 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Removes the specified client {@code session} from all channels
-     * that it is currently a member of.
+     * Removes channel server proxy and binding for the specified node.
      */
-    private void removeSessionFromAllChannels(ClientSession session) {
-	long nodeId = ChannelState.getNodeId(session);
-	byte[] sessionIdBytes = session.getSessionId().getBytes();
-	removeSessionFromAllChannels(nodeId, sessionIdBytes);
-    }
-				     
-    /**
-     * Removes the specified client {@code session} from all channels
-     * that it is currently a member of.  This method is invoked when
-     * a session is disconnected from this node, gracefully or
-     * otherwise, or if this node is recovering for a failed node
-     * whose sessions all became disconnected.
-     *
-     * This method should be call within a transaction.
-     */
-    private void removeSessionFromAllChannels(
-	long nodeId, byte[] sessionIdBytes)
-    {
-	Set<String> channelNames =
-	     ChannelState.getChannelsForSession(
-		dataService, nodeId, sessionIdBytes);
-	for (String name : channelNames) {
-	    try {
-		ChannelImpl channel = (ChannelImpl) getChannel(name);
-		channel.state.removeSession(nodeId, sessionIdBytes);
-	    } catch (NameNotBoundException e) {
-		logger.logThrow(Level.FINE, e, "channel removed:{0}", name);
-	    }
-	}
-    }
-
-    void removeChannelServerProxy(long nodeId) {
+    private void removeChannelServerProxy(long nodeId) {
 	String channelServerKey = getChannelServerKey(nodeId);
 	try {
 	    ChannelServerWrapper proxyWrapper =

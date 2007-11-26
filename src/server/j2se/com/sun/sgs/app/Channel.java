@@ -29,7 +29,7 @@ import java.util.Iterator;
  * also implement {@link Serializable}.
  *
  * <p>A channel is created by invoking the {@link
- * ChannelManager#getChannel(String) ChannelManager.createChannel}
+ * ChannelManager#createChannel(String) ChannelManager.createChannel}
  * method with a name for the channel and a {@link Delivery}
  * requirement.  A {@link ClientSession} can be added or removed from
  * a channel using that {@code Channel}'s {@link #join join} and
@@ -67,20 +67,8 @@ import java.util.Iterator;
  * operations will throw {@link IllegalStateException} if invoked.
  *
  * @see ChannelManager#createChannel ChannelManager.createChannel
- * @see ChannelManager#getChannel ChannelManager.getChannel
  */
 public interface Channel extends ManagedObject {
-
-    /**
-     * Returns the name bound to this channel.
-     *
-     * @return the name bound to this channel
-     *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
-     */
-    String getName();
-
 
     /**
      * Returns the delivery requirement of this channel.

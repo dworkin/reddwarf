@@ -36,35 +36,15 @@ import java.io.Serializable;
 public interface ChannelManager {
 
     /**
-     * Creates a new channel with the specified delivery requirement,
-     * binds it to the specified name, and returns it.
+     * Creates a new channel with the specified delivery requirement.
      *
-     * <p>Messages sent on the returned channel are delivered
-     * according to the specified delivery requirement.
-     *
-     * @param name a name
      * @param delivery a delivery requirement
      *
-     * @return a new channel bound to the specified name
+     * @return a new channel
      *
-     * @throws NameExistsException if a channel is already bound to
-     * the specified name
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    Channel createChannel(String name, Delivery delivery);
+    Channel createChannel(Delivery delivery);
     
-    /**
-     * Returns an existing channel with the specified name.
-     *
-     * @param name a channel name
-     *
-     * @return an exisiting channel bound to the specified name
-     *
-     * @throws NameNotBoundException if a channel is not bound to the
-     * specified name
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
-     */
-    Channel getChannel(String name);
 }

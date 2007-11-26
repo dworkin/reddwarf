@@ -20,6 +20,8 @@
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -28,37 +30,38 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
 
-    OrderedUnreliableChannelImpl(ChannelState state) {
-	super(state);
+    OrderedUnreliableChannelImpl(Delivery delivery) {
+	super(delivery);
     }
     
     protected void sendToAllMembers(final byte[] channelMessage) {
-	logger.log(Level.FINEST, "sendToAllMembers channel:{0}", state.name);
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "sendToAllMembers channel:{0}, message:{1}",
+		this, HexDumper.format(channelMessage));
+	}
 	long localNodeId = getLocalNodeId();
-	final byte[] channelIdBytes = state.channelIdBytes;
-	final byte[] protocolMessage =
-	    getChannelMessage(channelMessage);
-	for (final long nodeId : state.getChannelServerNodeIds()) {
-	    Set<ClientSession> recipients =
-		state.getSessions(nodeId);
+	final byte[] protocolMessage = getChannelMessage(channelMessage);
+	for (final long nodeId : getChannelServerNodeIds()) {
+	    Set<ClientSession> recipients = getSessions(nodeId);
 	    if (nodeId == localNodeId) {
 		for (ClientSession session : recipients) {
 		    sendProtocolMessageOnCommit(session, protocolMessage);
 		}
 		
 	    } else {
-		final ChannelServer server = state.getChannelServer(nodeId);
+		final ChannelServer server = getChannelServer(nodeId);
 		final byte[][] recipientIds = new byte[recipients.size()][];
 		int i = 0;
 		for (ClientSession session : recipients) {
 		    recipientIds[i++] = session.getSessionId().getBytes();
 		}
 
-		logger.log(
-		    Level.FINEST,
-		    "sendToAllMembers channel:{0} " +
-		    "schedule task to forward to node:{1}", state.name,
-		    nodeId);
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST, "sendToAllMembers channel:{0} " +
+			"schedule task to forward to node:{1}", this, nodeId);
+		}
 		runTaskOnCommit(
 		    null,
 		    new Runnable() {
@@ -67,10 +70,9 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
 				logger.log(
 				    Level.FINEST,
 				    "sendToAllMembers channel:{0} " +
-				    "forwarding to node:{1}", state.name,
-				    nodeId);
+				    "forwarding to node:{1}", this, nodeId);
 				server.send(channelIdBytes, recipientIds,
-					    protocolMessage, state.delivery);
+					    protocolMessage, delivery);
 			    } catch (Exception e) {
 				// skip unresponsive channel server
 				logger.logThrow(
