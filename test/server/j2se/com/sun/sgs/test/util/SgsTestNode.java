@@ -48,12 +48,6 @@ public class SgsTestNode {
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
-    /** application context */
-    private static Field kernelLastOwner;
-    /** set current owner method */
-    private static Method setCurrentOwnerMethod;
-    /** get current owner method */
-    private static Method getCurrentOwnerMethod;
     
     static {
         try {
@@ -75,21 +69,8 @@ public class SgsTestNode {
             kernelProxy = kernelClass.getDeclaredField("transactionProxy");
             kernelProxy.setAccessible(true);
 
-            kernelReg = kernelClass.getDeclaredField("lastSystemRegistry");
+            kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
-
-            kernelLastOwner = kernelClass.getDeclaredField("lastOwner");
-            kernelLastOwner.setAccessible(true);
-            
-            Class tsClass =
-                Class.forName("com.sun.sgs.impl.kernel.ThreadState");
-            setCurrentOwnerMethod =
-                tsClass.getDeclaredMethod("setCurrentOwner", TaskOwner.class);
-            setCurrentOwnerMethod.setAccessible(true);
-            
-            getCurrentOwnerMethod =
-                tsClass.getDeclaredMethod("getCurrentOwner");
-            getCurrentOwnerMethod.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -180,9 +161,6 @@ public class SgsTestNode {
     {
         this.appName = appName;
 	this.serverNode = serverNode;
-        
-	
-
 	
         // The node mapping service requires at least one full stack
         // to run properly (it will not assign identities to a node
@@ -252,25 +230,7 @@ public class SgsTestNode {
         
         kernel = kernelCtor.newInstance(props);
         kernelStartupMethod.invoke(kernel, props);
-        
-        // Wait for the application context to finish.  
-        //
-        // Note that if we could run the tests from within the system 
-        // (i.e. from within a test service), we would not have to do this.
-        // We'd simply wait for the test service's ready method to be called.
-        // However, we also want to use the JUnit framework.  We'd probably 
-        // want to use the JUnit version with annotations so it could find
-        // the tests, and would need to coordinate JUnit's setup call and
-        // our ready() call.
-        TaskOwner owner = (TaskOwner) kernelLastOwner.get(kernel);
-        while (owner == null) {
-            Thread.currentThread().sleep(500);
-            owner = (TaskOwner) kernelLastOwner.get(kernel);
-        }
-        
-        TaskOwner oldOwner = (TaskOwner) getCurrentOwnerMethod.invoke(null);
-        setCurrentOwnerMethod.invoke(null, owner);
-        
+
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
         
@@ -281,10 +241,6 @@ public class SgsTestNode {
         sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
                 
-        if (!isServerNode) {
-            // restore the old owner
-            setCurrentOwnerMethod.invoke(null, oldOwner);
-        }
         appPort = sessionService.getListenPort();
     }
     

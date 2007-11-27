@@ -27,8 +27,6 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -66,10 +64,6 @@ public class TestMasterTaskSchedulerImpl {
     // the default owner for tests
     private static final DummyTaskOwner testOwner = new DummyTaskOwner();
 
-    // the default context used for the tests
-    private static final KernelAppContext testContext =
-        testOwner.getContext();
-
     // the resource coordinator used in many tests
     private TestResourceCoordinator resourceCoordinator;
 
@@ -102,65 +96,21 @@ public class TestMasterTaskSchedulerImpl {
         public void constructorNullProperties() throws Exception {
         new MasterTaskScheduler(null, new TestResourceCoordinator(),
                                 MinimalTestKernel.getTaskHandler(),
-                                null, testContext);
+                                null);
     }
 
     @Test (expected=NullPointerException.class)
         public void constructorNullResourceCoordinator() throws Exception {
         new MasterTaskScheduler(new Properties(), null,
                                 MinimalTestKernel.getTaskHandler(),
-                                null, testContext);
+                                null);
     }
 
     @Test (expected=NullPointerException.class)
         public void constructorNullTaskHandler() throws Exception {
         new MasterTaskScheduler(new Properties(),
                                 new TestResourceCoordinator(), null,
-                                null, testContext);
-    }
-
-    @Test public void constructorCustomSystemScheduler() throws Exception {
-        Properties p = new Properties();
-        p.setProperty(MasterTaskScheduler.SYSTEM_SCHEDULER_PROPERTY,
-                      "com.sun.sgs.impl.kernel.schedule." +
-                      "RoundRobinSystemScheduler");
-        getScheduler(p);
-    }
-
-    @Test (expected=ClassNotFoundException.class)
-        public void constructorUnknownSystemScheduler() throws Exception {
-        Properties p = new Properties();
-        p.setProperty(MasterTaskScheduler.SYSTEM_SCHEDULER_PROPERTY, "foo");
-        getScheduler(p);
-    }
-
-    /**
-     * Test registerApplication.
-     */
-
-    @Test public void registerValidApp() throws Exception {
-        MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication((new DummyTaskOwner()).getContext(),
-                                      new Properties());
-    }
-
-    @Test (expected=NullPointerException.class)
-        public void registerAppNullContext() throws Exception {
-        MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication(null, new Properties());
-    }
-
-    @Test (expected=NullPointerException.class)
-        public void registerAppNullProperties() throws Exception {
-        MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication((new DummyTaskOwner()).getContext(),
-                                      null);
-    }
-
-    @Test (expected=IllegalArgumentException.class)
-        public void registerAppExisting() throws Exception {
-        MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication(testContext, new Properties());
+                                null);
     }
 
     /**
@@ -427,7 +377,7 @@ public class TestMasterTaskSchedulerImpl {
         masterTaskScheduler =
             new MasterTaskScheduler(p, resourceCoordinator,
                                     MinimalTestKernel.getTaskHandler(),
-                                    null, testContext);
+                                    null);
         return masterTaskScheduler;
     }
 

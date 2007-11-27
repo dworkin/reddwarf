@@ -78,13 +78,6 @@ class Kernel {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(Kernel.class.getName()));
 
-    /**
-     * A utility owner for all system tasks.
-     */
-    static final TaskOwnerImpl TASK_OWNER =
-        new TaskOwnerImpl(SystemIdentity.IDENTITY,
-                          SystemKernelAppContext.CONTEXT);
-
     // the collection of core system components
     private final HashSet<Object> systemComponents;
 
@@ -117,12 +110,12 @@ class Kernel {
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
-    // The last system registry used by this kernel, for testing only.
-    // Note that each time an application is started, a new registry will
-    // be created, which reassigned lastSystemRegistry.
-    private ComponentRegistry lastSystemRegistry = null;
-    // the last task owner created by this kernel, for testing only
-    private TaskOwner lastOwner = null;
+    // The system registry which will, by the time ready() is called,
+    // contain all services and components.
+    private ComponentRegistry systemRegistry = null;
+    
+    private final TaskHandler taskHandler;
+    private final MasterTaskScheduler scheduler;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -174,15 +167,14 @@ class Kernel {
             }
 
             // create the task handler and scheduler
-            TaskHandler taskHandler =
+            taskHandler =
                 new TaskHandler(
                   getTransactionCoordinator(systemProperties, profileCollector), 
                   profileCollector);
             
-            MasterTaskScheduler scheduler =
+            scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
-                                        taskHandler, profileCollector,
-                                        SystemKernelAppContext.CONTEXT);
+                                        taskHandler, profileCollector);
 
             // with the scheduler created, if profiling is on then create
             // the listeners for profiling data
@@ -204,6 +196,13 @@ class Kernel {
 	    logger.log(Level.INFO, "The Kernel is ready, version: {0}",
 		       Version.getVersion());
 	}
+    }
+    
+    /**
+     * Return the task handler;  used to set kernel context.
+     */
+    TaskHandler getTaskHandler() {
+        return taskHandler;
     }
     
     /**
@@ -246,8 +245,7 @@ class Kernel {
 
                 // create a new identity for the listener
                 TaskOwnerImpl owner =
-                    new TaskOwnerImpl(new IdentityImpl(listenerClassName),
-                                      SystemKernelAppContext.CONTEXT);
+                    new TaskOwnerImpl(new IdentityImpl(listenerClassName));
 
                 // try to create and register the listener
                 Object obj =
@@ -323,15 +321,16 @@ class Kernel {
         HashSet<Object> appSystemComponents =
             new HashSet<Object>(systemComponents);
         appSystemComponents.add(appIdentityCoordinator);
-        lastSystemRegistry =
+        systemRegistry =
             new ComponentRegistryImpl(appSystemComponents);
 
-        // startup the service creation in a separate thread
+        // startup the service creation 
+        // JANE this used to be in a separate thread - no longer necessary
+        // because there's only one application.
         ServiceConfigRunner configRunner =
-            new ServiceConfigRunner(this, lastSystemRegistry, profileRegistrar,
+            new ServiceConfigRunner(this, systemRegistry, profileRegistrar,
                                     transactionProxy, appName, properties);
-        lastSystemRegistry.getComponent(ResourceCoordinator.class).
-            startTask(configRunner, null);
+        configRunner.run();
     }
 
     /**
@@ -339,6 +338,7 @@ class Kernel {
      * order of how they were started.
      */
     void shutdown() {
+        scheduler.shutdown();
         for (AppKernelAppContext ctx: applications) {
             ctx.shutdownServices();
         }
@@ -363,13 +363,12 @@ class Kernel {
      * associated application, the application has started to run. This
      * is called by <code>ServiceConfigRunner</code>.
      *
-     * @param owner the TaskOwner containing the context
+     * @param owner the TaskOwner 
      * @param hasApplication <code>true</code> if the context is associated
      *                       with a running application, <code>false</code>
      *                       otherwise 
      */
-    void contextReady(TaskOwner owner, boolean hasApplication) {
-        AppKernelAppContext context = (AppKernelAppContext) owner.getContext();
+    void contextReady(TaskOwner owner, AppKernelAppContext context, boolean hasApplication) {
         applications.add(context);
         if (logger.isLoggable(Level.INFO)) {
             if (hasApplication)
@@ -378,7 +377,6 @@ class Kernel {
                 logger.log(Level.INFO, "{0}: non-application context is ready",
                            context);
         }
-        lastOwner = owner;
     }
 
     /**
@@ -428,15 +426,12 @@ class Kernel {
     }
 
     /**
-     * Main-line method that starts the <code>Kernel</code>. Note that right
-     * now there is no management for the stack, so we accept on the
-     * command-line the set of applications to run. Once we have management
-     * and configration facilities, this command-line list will be removed.
+     * Main-line method that starts the {@code Kernel}. Each kernel
+     * instance runs a single application.
      * <p>
-     * Each argument on the command-line is a <code>Properties</code> file for
-     * an application to run. For each application some properties are
-     * required to be specified in that file. For required and optional
-     * properties see <code>StandardProperties</code>.
+     * The argument on the command-line is a {@code Properties} file for the
+     * application. Some properties are required to be specified in that file.
+     * See {@code StandardProperties} for the required and optional properties.
      * <p>
      * The order of precedence for properties is as follows. If a value is
      * provided for a given property key by the application's configuration,
@@ -449,16 +444,16 @@ class Kernel {
      * or an <code>Exception</code> is thrown (depending on whether a default
      * value is available).
      * 
-     * @param args filenames for <code>Properties</code> files associated with
-     *             each application to run
+     * @param args filename for <code>Properties</code> file associated with
+     *             the application to run
      *
      * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
         // make sure we were given an application to run
-        if (args.length < 1) {
-            logger.log(Level.SEVERE, "No applications were provided: halting");
-            System.out.println("Usage: AppPropertyFile [AppPropertyFile ...]");
+        if (args.length != 1) {
+            logger.log(Level.SEVERE, "No application was provided: halting");
+            System.out.println("Usage: AppPropertyFile ");
             System.exit(0);
         }
 
@@ -485,8 +480,10 @@ class Kernel {
         // boot the kernel
         Kernel kernel = new Kernel(systemProperties);
 
-        // setup and run each application
-        for (String appPropertyFile : args) {
+        // JANE all this can happen at boot time now
+        // setup and run the application
+        String appPropertyFile = args[0];
+//        for (String appPropertyFile : args) {
             Properties appProperties =
                 getProperties(appPropertyFile, systemProperties);
             String appName =
@@ -529,7 +526,7 @@ class Kernel {
                                         appName);
                 }
             }
-        }
+//        }
     }
 
 }

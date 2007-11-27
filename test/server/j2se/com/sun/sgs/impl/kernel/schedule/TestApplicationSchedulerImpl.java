@@ -20,8 +20,6 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
-
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
@@ -30,6 +28,7 @@ import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
+import java.lang.reflect.Constructor;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -608,10 +607,25 @@ public class TestApplicationSchedulerImpl {
     protected ApplicationScheduler getSchedulerInstance(Properties p)
         throws Exception
     {
-        applicationScheduler = LoaderUtil.getScheduler(p);
-        if (applicationScheduler == null)
-            throw new Exception("Couldn't load the app scheduler");
-        return applicationScheduler;
+        String appSchedulerName =
+            p.getProperty(ApplicationScheduler.
+                                   APPLICATION_SCHEDULER_PROPERTY);
+        if (appSchedulerName == null)
+            throw new Exception("Couldn't load the app scheduler, no property");
+
+        try {
+            Constructor<?> schedulerConstructor = null;
+       
+            Class<?> schedulerClass =
+                Class.forName(appSchedulerName);
+            schedulerConstructor =
+                schedulerClass.getConstructor(Properties.class);
+
+            return (ApplicationScheduler)(schedulerConstructor.
+                                          newInstance(p));
+        } catch (Exception e) {
+            throw new Exception("Couldn't load the app scheduler", e);
+        }
     }
 
     protected static ScheduledTask getNewTask() {

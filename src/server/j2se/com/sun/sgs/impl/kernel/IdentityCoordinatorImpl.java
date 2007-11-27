@@ -96,17 +96,6 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
     }
 
     /**
-     * Package-private method that assigns the context for this coordinator
-     * and its associated authenticators.
-     *
-     * @param appContext the context
-     */
-    void assignContext(AbstractKernelAppContext appContext) {
-        for (IdentityAuthenticator authenticator : authenticatorSet)
-            authenticator.assignContext(appContext);
-    }
-
-    /**
      * {@inheritDoc}
      *
      * @throws CredentialException if the authenticator for the credentials

@@ -20,8 +20,6 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
-
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;
 
 
@@ -34,9 +32,6 @@ public class TaskOwnerImpl implements TaskOwner {
     // the identity of the owner
     private final Identity identity;
 
-    // the context of the owner
-    private final KernelAppContext context;
-
     // a cache for the hash code
     private final int hash;
 
@@ -44,21 +39,10 @@ public class TaskOwnerImpl implements TaskOwner {
      * Creates an instance of <code>SimpleTaskOwner</code>.
      *
      * @param identity the <code>Identity</code> of the owner
-     * @param context the context in which this owner runs tasks
      */
-    public TaskOwnerImpl(Identity identity, KernelAppContext context) {
+    public TaskOwnerImpl(Identity identity) {
         this.identity = identity;
-        this.context = context;
-
-        // cache the hash code as the hash of the identity and the context
-        hash = identity.hashCode() ^ context.hashCode();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public KernelAppContext getContext() {
-        return context;
+        hash = identity.hashCode();
     }
 
     /**
@@ -75,8 +59,7 @@ public class TaskOwnerImpl implements TaskOwner {
      */
     @Override
     public String toString() {
-        return "[ id=\"" + identity.getName() + "\" context=" +
-            context.toString() + " ]";
+        return "[ id=\"" + identity.getName() + " ]";
     }
 
     /**
@@ -98,8 +81,8 @@ public class TaskOwnerImpl implements TaskOwner {
 
         TaskOwnerImpl other = (TaskOwnerImpl)o;
 
-        return ((other.identity.equals(identity)) &&
-                (other.context.equals(context)));
+        return other.identity.equals(identity);
+
     }
 
     /**

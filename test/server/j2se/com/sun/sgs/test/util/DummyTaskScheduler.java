@@ -24,8 +24,6 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
@@ -74,15 +72,11 @@ public class DummyTaskScheduler implements TaskScheduler {
      * scheduler that will accept any number of tasks and run them as soon
      * as possible, or an empty scheduler that will reject all tasks.
      *
-     * @param context the <code>KernelAppContext</code> to use for the tasks
-     *                run through this scheduler, which can be
-     *                <code>null</code> if <code>rejectTasks</code> is
-     *                <code>true</code>
      * @param rejectTasks <code>false</code> if this is an infinite scheduler,
      *                    <code>true</code> to cause all scheduling methods
      *                    to throw <code>TaskRejectedException</code>
      */
-    public DummyTaskScheduler(KernelAppContext context, boolean rejectTasks) {
+    public DummyTaskScheduler(boolean rejectTasks) {
         this.rejectTasks = rejectTasks;
         this.timer = new Timer();
 
@@ -94,8 +88,7 @@ public class DummyTaskScheduler implements TaskScheduler {
             // but this should probably be tunable
             for (int i = 0; i < 2; i++) {
                 Thread thread =
-                    MinimalTestKernel.createThread(new ConsumerRunnable(),
-                                                   context);
+                    MinimalTestKernel.createThread(new ConsumerRunnable());
                 threads.add(thread);
                 thread.start();
             }

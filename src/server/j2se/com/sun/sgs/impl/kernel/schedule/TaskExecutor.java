@@ -46,8 +46,8 @@ class TaskExecutor {
     // the kernel's task handler used to set the task's owner
     private final TaskHandler taskHandler;
 
-    // the single system scheduler
-    private final SystemScheduler scheduler;
+    // the scheduler
+    private final ApplicationScheduler scheduler;
 
     // the optional collector of profiling data
     private final ProfileCollector collector;
@@ -56,11 +56,12 @@ class TaskExecutor {
      * Creates an instance of {@code TaskExecutor}.
      *
      * @param taskHandler the kernel's {@code TaskHandler}
-     * @param scheduler the {@code SystemScheduler} providing the running tasks
+     * @param scheduler the {@code ApplicationScheduler} providing the 
+     *                  running tasks
      * @param collector the system's {@code ProfileCollector}, or {@code null}
      *                  if profiling is not enabled
      */
-    TaskExecutor(TaskHandler taskHandler, SystemScheduler scheduler,
+    TaskExecutor(TaskHandler taskHandler, ApplicationScheduler scheduler,
                  ProfileCollector collector) {
         if (taskHandler == null)
             throw new NullPointerException("A task handler must be provided");
@@ -97,7 +98,7 @@ class TaskExecutor {
             try {
                 if (collector != null) {
                     TaskOwner owner = task.getOwner();
-                    int ready = scheduler.getReadyCount(owner.getContext());
+                    int ready = scheduler.getReadyCount();
                     collector.startTask(task.getTask(), owner,
                                         task.getStartTime(), ready);
                 }

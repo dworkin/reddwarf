@@ -120,7 +120,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
+    final NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -184,6 +184,11 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    dataService = txnProxy.getService(DataService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 
+            nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+            
 	    taskScheduler.runTask(
 		new TransactionRunner(
 		    new AbstractKernelRunnable() {
@@ -219,10 +224,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 
     /** {@inheritDoc} */
     public void ready() { 
-        nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
-		    txnProxy.getService(TaskService.class));
+
     }
 
     /** {@inheritDoc} */

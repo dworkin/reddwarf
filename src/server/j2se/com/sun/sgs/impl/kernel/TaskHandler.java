@@ -64,6 +64,10 @@ public final class TaskHandler {
     // the single instance used to collect profile data
     private static ProfileCollector profileCollector = null;
 
+    // The context we'll be using, which allows code in tasks to
+    // easily find the managers
+    private AppKernelAppContext ctx;
+    
     /**
      * Package-private constructor used by the kernel to create the single
      * instance of <code>TaskHandler</code>.
@@ -119,6 +123,7 @@ public final class TaskHandler {
 
         // change to the context of the new owner and run the task
         ThreadState.setCurrentOwner(owner);
+        ContextResolver.setContext(ctx);
         try {
             task.run();
         } finally {
@@ -127,6 +132,10 @@ public final class TaskHandler {
         }
     }
 
+    void setContext(AppKernelAppContext ctx) {
+        this.ctx = ctx;
+    }
+    
     /**
      * Runs the given task in a transactional state. If no transaction is
      * currently active then one is created, attempting to commit on

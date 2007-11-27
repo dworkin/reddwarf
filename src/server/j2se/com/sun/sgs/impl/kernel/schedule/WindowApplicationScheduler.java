@@ -48,8 +48,7 @@ import java.util.logging.Logger;
  * may never submit tasks into windows that have already passed. See
  * SUN070191 for more details.
  */
-class WindowApplicationScheduler
-    implements ApplicationScheduler, TimedTaskConsumer {
+class WindowApplicationScheduler implements ApplicationScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =

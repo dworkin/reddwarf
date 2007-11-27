@@ -37,7 +37,6 @@ import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
@@ -65,7 +64,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -123,7 +121,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
-    private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
@@ -157,9 +154,9 @@ public class TestClientSessionServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
 
-	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+	MinimalTestKernel.create();
+	systemRegistry = MinimalTestKernel.getSystemRegistry();
+	serviceRegistry = MinimalTestKernel.getServiceRegistry();
 	    
 	// create data service
 	dataService = createDataService(systemRegistry);
@@ -247,7 +244,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        MinimalTestKernel.destroy();
     }
 
     /* -- Test constructor -- */

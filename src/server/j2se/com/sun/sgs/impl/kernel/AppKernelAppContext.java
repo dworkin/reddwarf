@@ -42,8 +42,14 @@ import java.util.MissingResourceException;
  * FIXME:  the context should check that it isn't shutdown before
  *  handing out services and managers
  */
-class AppKernelAppContext extends AbstractKernelAppContext {
 
+// JANE cannot be final because tests extend it
+class AppKernelAppContext {
+
+    // the application's name and cached hash code
+    private final String applicationName;
+    private final int applicationCode;
+    
     // the managers available in this context
     private final ComponentRegistry managerComponents;
 
@@ -67,7 +73,11 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     AppKernelAppContext (String applicationName,
                          ComponentRegistry serviceComponents,
                          ComponentRegistry managerComponents) {
-        super(applicationName);
+        this.applicationName = applicationName;
+
+        // the hash code is the hash of the application name, which never
+        // changes, so the hash code gets pre-cached here
+        applicationCode = applicationName.hashCode();
 
         this.serviceComponents = serviceComponents;
         this.managerComponents = managerComponents;
@@ -164,5 +174,41 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         for (Object service: list) {
             ((Service) service).shutdown();
         }
+    }
+    
+    /**
+     * Returns a unique representation of this context, in this case the
+     * name of the application.
+     *
+     * @return a <code>String</code> representation of the context
+     */
+    public String toString() {
+        return applicationName;
+    }
+
+    /**
+     * Returns <code>true</code> if the provided object is an instance of
+     * <code>AppKernelAppContext</code> that represents the same
+     * application context.
+     *
+     * @param o an instance of <code>ApptKernelAppContext</code>
+     *
+     * @return <code>true</code> if the provided object represents the same
+     *         context as this object, <code>false</code> otherwise
+     */
+    public boolean equals(Object o) {
+        if ((o == null) || (! (o instanceof AppKernelAppContext)))
+            return false;
+
+        AppKernelAppContext other = (AppKernelAppContext)o;
+
+        return other.applicationName.equals(applicationName);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return applicationCode;
     }
 }

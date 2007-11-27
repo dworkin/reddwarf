@@ -143,7 +143,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
+    final NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -234,6 +234,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    contextFactory = new ContextFactory(txnProxy);
 	    dataService = txnProxy.getService(DataService.class);
 
+            nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, txnProxy.getCurrentOwner(),
+		    txnProxy.getService(TaskService.class));
+            
 	    idGenerator =
 		new IdGenerator(ID_GENERATOR_NAME,
 				idBlockSize,
@@ -278,12 +283,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** {@inheritDoc} */
     public void ready() throws Exception { 
-        // Update with the application owner
-        nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
-		    txnProxy.getService(TaskService.class));
-        
         taskScheduler.runTask(
 		new TransactionRunner(
 		    new AbstractKernelRunnable() {

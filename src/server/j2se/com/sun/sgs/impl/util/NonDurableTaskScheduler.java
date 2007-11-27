@@ -109,7 +109,7 @@ public class NonDurableTaskScheduler {
         }
 
         taskScheduler.scheduleTask(task,
-                new TaskOwnerImpl(identity, owner.getContext()));
+                new TaskOwnerImpl(identity));
     }
 
     /**

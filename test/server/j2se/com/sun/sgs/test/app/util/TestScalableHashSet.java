@@ -25,7 +25,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -96,12 +95,11 @@ public class TestScalableHashSet extends Assert {
 
     /** Initial setup */
     @BeforeClass public static void setUpClass() throws Exception {
-	DummyAbstractKernelAppContext appContext =
-	    MinimalTestKernel.createContext();
+	MinimalTestKernel.create();
 	DummyComponentRegistry systemRegistry =
-	    MinimalTestKernel.getSystemRegistry(appContext);
+	    MinimalTestKernel.getSystemRegistry();
 	DummyComponentRegistry serviceRegistry =
-	    MinimalTestKernel.getServiceRegistry(appContext);
+	    MinimalTestKernel.getServiceRegistry();
 	dataService = new DataServiceImpl(
 	    createProperties(
 		DataStoreImpl.class.getName() + ".directory",

@@ -33,14 +33,6 @@ import com.sun.sgs.auth.Identity;
  */
 public interface TaskOwner
 {
-
-    /**
-     * Returns the context in which this <code>TaskOwner</code>'s tasks run.
-     *
-     * @return the <code>TaskOwner</code>'s <code>KernelAppContext</code>
-     */
-    public KernelAppContext getContext();
-
     /**
      * Returns the <code>Identity</code> for this <code>TaskOwner</code>.
      *

@@ -29,8 +29,6 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 
@@ -77,9 +75,6 @@ public class TestTaskServiceImpl extends TestCase {
     private static DummyTransactionProxy txnProxy =
         MinimalTestKernel.getTransactionProxy();
 
-    // the context in which tasks are run
-    private DummyAbstractKernelAppContext appContext;
-
     // cached services and registries from the context
     private DataServiceImpl dataService;
     private TaskServiceImpl taskService;
@@ -101,9 +96,9 @@ public class TestTaskServiceImpl extends TestCase {
     protected void setUp() throws Exception {
         System.err.println("Testcase: " + getName());
 
-        appContext = MinimalTestKernel.createContext();
-        systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-        serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+        MinimalTestKernel.create();
+        systemRegistry = MinimalTestKernel.getSystemRegistry();
+        serviceRegistry = MinimalTestKernel.getServiceRegistry();
         
         // create the task and data services used by most of the tests
         // NOTE: this should probably be done on demand for those tests
@@ -154,7 +149,7 @@ public class TestTaskServiceImpl extends TestCase {
         deleteDirectory(DB_DIRECTORY);
 
         // clean up after this app
-        MinimalTestKernel.destroyContext(appContext);
+        MinimalTestKernel.destroy();
     }
 
     /**
@@ -196,7 +191,7 @@ public class TestTaskServiceImpl extends TestCase {
     public void testConstructorNoDataService() throws Exception {
         DummyComponentRegistry registry = new DummyComponentRegistry();
         registry.setComponent(
-	    TaskScheduler.class, new DummyTaskScheduler(appContext, false));
+	    TaskScheduler.class, new DummyTaskScheduler(false));
         try {
             new TaskServiceImpl(
 		new Properties(), registry, new DummyTransactionProxy());
@@ -369,7 +364,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
+        DummyTaskScheduler rejSched = new DummyTaskScheduler(true);
         DummyComponentRegistry registry = new DummyComponentRegistry();
         registry.setComponent(TaskScheduler.class, rejSched);
         TaskServiceImpl service =

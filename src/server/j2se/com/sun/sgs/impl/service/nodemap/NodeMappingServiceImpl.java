@@ -517,11 +517,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
    
     /** {@inheritDoc} */
     public void ready() {
-        // We don't update our taskOwner because we know the initial
-        // context used during construction time is sufficient (this service
-        // does not need to run application code, and does not require
-        // Managers.
-        
         synchronized(stateLock) {
             state = State.RUNNING;
         }

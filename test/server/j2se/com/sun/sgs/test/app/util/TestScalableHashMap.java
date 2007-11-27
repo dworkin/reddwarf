@@ -24,7 +24,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -121,12 +120,11 @@ public class TestScalableHashMap extends Assert {
      */
 
     @BeforeClass public static void setUpClass() throws Exception {
-	DummyAbstractKernelAppContext appContext =
-	    MinimalTestKernel.createContext();
+	MinimalTestKernel.create();
 	DummyComponentRegistry systemRegistry =
-	    MinimalTestKernel.getSystemRegistry(appContext);
+	    MinimalTestKernel.getSystemRegistry();
 	DummyComponentRegistry serviceRegistry =
-	    MinimalTestKernel.getServiceRegistry(appContext);
+	    MinimalTestKernel.getServiceRegistry();
 	createDataService(systemRegistry);
 	txnProxy.setComponent(DataService.class, dataService);
 	serviceRegistry.setComponent(DataManager.class, dataService);

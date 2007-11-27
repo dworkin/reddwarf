@@ -22,7 +22,6 @@ package com.sun.sgs.test.impl.util;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -30,7 +29,6 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.IdGenerator;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
@@ -69,7 +67,6 @@ public class TestIdGenerator extends TestCase {
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
-    private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
@@ -94,9 +91,9 @@ public class TestIdGenerator extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
 
-	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+	MinimalTestKernel.create();
+	systemRegistry = MinimalTestKernel.getSystemRegistry();
+	serviceRegistry = MinimalTestKernel.getServiceRegistry();
 	    
 	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -155,7 +152,7 @@ public class TestIdGenerator extends TestCase {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        MinimalTestKernel.destroy();
     }
 
     /* -- Tests -- */

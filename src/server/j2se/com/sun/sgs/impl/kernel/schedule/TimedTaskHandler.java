@@ -37,20 +37,20 @@ class TimedTaskHandler {
     public static final int FUTURE_THRESHOLD = 15;
 
     // the consumer for all future tasks
-    private final TimedTaskConsumer consumer;
+    private final ApplicationScheduler consumer;
 
     // the timer used for future execution
     private Timer timer;
 
     /**
-     * Creates an instance of <code>TimedTaskConsumer</code>. This has the
+     * Creates an instance of <code>TimedTaskHandler</code>. This has the
      * effect of creating a new <code>Timer</code> which involves creating
      * at least one new thread.
      *
-     * @param consumer the <code>TimedTaskConsumer</code> that will consume
+     * @param consumer the <code>ApplicationScheduler</code> that will consume
      *                 the task when its time comes
      */
-    public TimedTaskHandler(TimedTaskConsumer consumer) {
+    public TimedTaskHandler(ApplicationScheduler consumer) {
         if (consumer == null)
             throw new NullPointerException("Consumer cannot be null");
 

@@ -41,7 +41,6 @@ import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
@@ -124,7 +123,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
-    private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
@@ -158,9 +156,9 @@ public class TestChannelServiceImpl extends TestCase {
             deleteDirectory(DB_DIRECTORY);
         }
 
-        appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+        MinimalTestKernel.create();
+	systemRegistry = MinimalTestKernel.getSystemRegistry();
+	serviceRegistry = MinimalTestKernel.getServiceRegistry();
 
 	// create data service
 	dataService = createDataService(systemRegistry);
@@ -254,7 +252,7 @@ public class TestChannelServiceImpl extends TestCase {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        MinimalTestKernel.destroy();
     }
 
     /* -- Test constructor -- */

@@ -34,12 +34,8 @@ import com.sun.sgs.service.Transaction;
 final class ThreadState {
 
     // the current owner of any given thread
-    private static ThreadLocal<TaskOwner> currentOwner =
-        new ThreadLocal<TaskOwner>() {
-            protected TaskOwner initialValue() {
-                return Kernel.TASK_OWNER;
-            } 
-        };
+    private static ThreadLocal<TaskOwner> currentOwner = 
+        new ThreadLocal<TaskOwner>();
 
     // the current transaction for any given thread
     private static ThreadLocal<Transaction> currentTransaction =
@@ -71,18 +67,8 @@ final class ThreadState {
      * the <code>TaskScheduler</code> (via the <code>TaskHandler</code>).
      *
      * @param newOwner the new {@code TaskOwner}
-     *
-     * @throws IllegalArgumentException if the context of the owner is not
-     *                                  a valid context created by the kernel
      */
     static void setCurrentOwner(TaskOwner newOwner) {
-        try {
-            ContextResolver.
-                setContext((AbstractKernelAppContext)(newOwner.getContext()));
-        } catch (ClassCastException cce) {
-            throw new IllegalArgumentException("Invalid context: " +
-                                               newOwner.getContext());
-        }
         currentOwner.set(newOwner);
     }
 

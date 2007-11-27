@@ -25,7 +25,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -510,12 +509,11 @@ public class TestScalableHashMapStress extends Assert {
 	new EntrySetNext(1);
 	new EntrySetNextRemove(1);
 
-	DummyAbstractKernelAppContext appContext =
-	    MinimalTestKernel.createContext();
+	MinimalTestKernel.create();
 	DummyComponentRegistry systemRegistry =
-	    MinimalTestKernel.getSystemRegistry(appContext);
+	    MinimalTestKernel.getSystemRegistry();
 	DummyComponentRegistry serviceRegistry =
-	    MinimalTestKernel.getServiceRegistry(appContext);
+	    MinimalTestKernel.getServiceRegistry();
 	dataService = new DataServiceImpl(
 	    createProperties(
 		DataStoreImpl.class.getName() + ".directory",

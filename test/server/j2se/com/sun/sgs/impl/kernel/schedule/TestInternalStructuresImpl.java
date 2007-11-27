@@ -29,7 +29,6 @@ import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
 
 import java.util.Collection;
-import java.util.Properties;
 
 import junit.framework.JUnit4TestAdapter;
 
@@ -211,7 +210,7 @@ public class TestInternalStructuresImpl {
     }
 
     @Test public void timedTaskHandlerRejects() {
-        assertFalse((new TimedTaskHandler(new TimedTaskConsumerImpl())).
+        assertFalse((new TimedTaskHandler(new DummyApplicationScheduler())).
                     runDelayed(testTask));
     }
 
@@ -221,7 +220,7 @@ public class TestInternalStructuresImpl {
                               Priority.getDefaultPriority(),
                               System.currentTimeMillis() +
                               TimedTaskHandler.FUTURE_THRESHOLD + 50);
-        assertTrue((new TimedTaskHandler(new TimedTaskConsumerImpl())).
+        assertTrue((new TimedTaskHandler(new DummyApplicationScheduler())).
                    runDelayed(task));
     }
 
@@ -249,14 +248,11 @@ public class TestInternalStructuresImpl {
         public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
             return new RecurringTaskHandleImpl(this, task);
         }
-        public void notifyCancelled(ScheduledTask task) {}
-        public void shutdown() {}
-    }
-
-    private static class TimedTaskConsumerImpl implements TimedTaskConsumer {
         public void timedTaskReady(ScheduledTask task) {
 
         }
+        public void notifyCancelled(ScheduledTask task) {}
+        public void shutdown() {}
     }
 
     /**

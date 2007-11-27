@@ -140,19 +140,12 @@ class ServiceConfigRunner implements Runnable {
                 new AppKernelAppContext(appName, services, managers);
         MasterTaskScheduler scheduler =
             systemRegistry.getComponent(MasterTaskScheduler.class);
-        try {
-            scheduler.registerApplication(ctx, appProperties);
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e, "{0}: failed app scheduler " +
-                                "setup", appName);
-            return;
-        }
 
         // create the application's identity, and set as the current owner
         IdentityImpl id = new IdentityImpl("app:" + appName);
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, ctx);
+        TaskOwnerImpl owner = new TaskOwnerImpl(id);
         ThreadState.setCurrentOwner(owner);
+        kernel.getTaskHandler().setContext(ctx);
 
         // get the managers and services that we're using
         HashSet<Object> managerSet = new HashSet<Object>();
@@ -177,10 +170,10 @@ class ServiceConfigRunner implements Runnable {
             managers.addComponent(manager);
         }
 
-        // with the managers created, setup the final context and owner
+        // with the managers created, setup the AppContext
+        // the thread owner has not changed
         ctx = new AppKernelAppContext(appName, services, managers);
-        owner = new TaskOwnerImpl(id, ctx);
-        ThreadState.setCurrentOwner(owner);
+        kernel.getTaskHandler().setContext(ctx);
 
         // notify all of the services that the application state is ready
 	try {
@@ -213,7 +206,7 @@ class ServiceConfigRunner implements Runnable {
                                appName);
                 // run the startup task, notifying the kernel on success
                 scheduler.runTask(unboundedTransactionRunner, owner, true);
-                kernel.contextReady(owner, true);
+                kernel.contextReady(owner, ctx, true);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.CONFIG))
                     logger.logThrow(Level.CONFIG, e, "{0}: failed to " +
@@ -222,7 +215,7 @@ class ServiceConfigRunner implements Runnable {
             }
         } else {
             // we're running without an application, so we're finished
-            kernel.contextReady(owner, false);
+            kernel.contextReady(owner, ctx, false);
         }
 
         if (logger.isLoggable(Level.CONFIG))

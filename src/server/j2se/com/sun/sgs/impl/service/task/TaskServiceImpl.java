@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -196,8 +195,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
                 dataService.getServiceBinding(name, PendingTask.class);
             TaskRunner runner = new TaskRunner(name, ptask.getBaseTaskType());
             TaskOwner owner =
-                new TaskOwnerImpl(ptask.getIdentity(), transactionProxy.
-                                  getCurrentOwner().getContext());
+                new TaskOwnerImpl(ptask.getIdentity());
 
             if (ptask.getPeriod() == PERIOD_NONE) {
                 // this is a non-periodic task
