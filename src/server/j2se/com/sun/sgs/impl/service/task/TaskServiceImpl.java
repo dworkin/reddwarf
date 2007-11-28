@@ -29,6 +29,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -90,6 +91,16 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         new LoggerWrapper(Logger.getLogger(NAME));
 
     /**
+     * The property that specifies the initial number of pending task objects
+     * to create.
+     */
+    public static final String INITIAL_PENDING_TASKS_PROPERTY =
+	TaskServiceImpl.class.getName() + ".initial.pending.tasks";
+
+    /** The default number of pending task objects to create. */
+    public static final int DEFAULT_INITIAL_PENDING_TASKS = 200;
+
+    /**
      * The name prefix used to bind all service-level objects associated
      * with this service.
      */
@@ -121,6 +132,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
     // the transient map for all recurring tasks' handles
     private ConcurrentHashMap<BigInteger,RecurringTaskHandle> recurringMap;
+
+    // the number of pending tasks to start with initially
+    private final int initialPendingTasks;
 
     // the object IDs of PendingTask objects that are free to use for
     // scheduling tasks
@@ -163,6 +177,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
         recurringMap = new ConcurrentHashMap<BigInteger,RecurringTaskHandle>();
 
+	PropertiesWrapper wrappedProperties =
+	    new PropertiesWrapper(properties);
+	initialPendingTasks = wrappedProperties.getIntProperty(
+	    INITIAL_PENDING_TASKS_PROPERTY, DEFAULT_INITIAL_PENDING_TASKS,
+	    0, Integer.MAX_VALUE);
+
         // the scheduler is the only system component that we use
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -201,8 +221,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         TxnState txnState = ctxFactory.joinTransaction();
         String name = dataService.nextServiceBoundName(DS_PENDING_SPACE);
         int taskCount = 0;
+	int scheduledTaskCount = 0;
 
         while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
+	    taskCount++;
             PendingTask ptask =
 		dataService.getServiceBinding(name, PendingTask.class);
 	    BigInteger taskId =
@@ -241,11 +263,22 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
 
             // finally, get the next name, and increment the task count
             name = dataService.nextServiceBoundName(name);
-            taskCount++;
+            scheduledTaskCount++;
         }
 
+	if (taskCount < initialPendingTasks) {
+	    for (int i = taskCount; i < initialPendingTasks; i++) {
+		PendingTask ptask = new PendingTask();
+		BigInteger taskId = dataService.createReference(ptask).getId();
+		String objName = DS_PENDING_SPACE + taskId;
+		dataService.setServiceBinding(objName, ptask);		
+		txnState.noteFreeTaskId(taskId);
+	    }
+	}
+
         if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "re-scheduled {0} tasks", taskCount);
+            logger.log(Level.CONFIG, "re-scheduled {0} tasks",
+		       scheduledTaskCount);
     }
 
     /**

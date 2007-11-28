@@ -70,6 +70,12 @@ class PendingTask implements ManagedObject, Serializable {
     private boolean completed = false;
 
     /**
+     * Creates an instance of {@code PendingTask} that is is not currently in
+     * use.
+     */
+    PendingTask() { }
+
+    /**
      * Creates an instance of {@code PendingTask}, handling the task
      * reference correctly. As described on {@code TaskManager}, any
      * {@code Task} may or may not implement {@code ManagedObject} and
