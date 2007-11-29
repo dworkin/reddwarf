@@ -21,6 +21,8 @@ package com.sun.sgs.kernel;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import java.util.Collection;
 
 
@@ -81,7 +83,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner);
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner);
 
     /**
      * Reserves the ability to run the given task. The scheduler will make
@@ -95,7 +97,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority);
 
     /**
@@ -111,7 +113,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime);
 
     /**
@@ -127,7 +129,7 @@ public interface TaskScheduler
      * @throws TaskRejectedException if a reservation cannot be made
      */
     public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
-                                        tasks, TaskOwner owner);
+                                        tasks, Identity owner);
 
     /**
      * Schedules a task to run as soon as possible based on the specific
@@ -138,7 +140,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner);
+    public void scheduleTask(KernelRunnable task, Identity owner);
 
     /**
      * Schedules a task to run as soon as possible based on the specific
@@ -151,7 +153,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority);
 
     /**
@@ -166,7 +168,7 @@ public interface TaskScheduler
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime);
 
     /**
@@ -193,7 +195,7 @@ public interface TaskScheduler
      *         recurring task
      */
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-                                                     TaskOwner owner,
+                                                     Identity owner,
                                                      long startTime,
                                                      long period);
 
@@ -221,7 +223,7 @@ public interface TaskScheduler
      *                               a task that was run through this scheduler
      * @throws Exception if the task fails and is not re-tried
      */
-    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+    public void runTask(KernelRunnable task, Identity owner, boolean retry)
         throws Exception;
 
     /**
@@ -261,7 +263,7 @@ public interface TaskScheduler
      *                               of {@code TransactionRunner}
      * @throws Exception if the task fails and is not re-tried
      */
-    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+    public void runTransactionalTask(KernelRunnable task, Identity owner)
         throws Exception;
 
 }

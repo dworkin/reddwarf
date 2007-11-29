@@ -19,8 +19,8 @@
 
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -36,7 +36,7 @@ public class DummyTransactionProxy implements TransactionProxy {
 	new ThreadLocal<DummyTransaction>();
 
     /** The task owner. */
-    private final DummyTaskOwner taskOwner = new DummyTaskOwner();
+    private final Identity taskOwner = new DummyIdentity();
 
     /** Mapping from type to service. */
     private final Map<Class<? extends Service>, Service> services =
@@ -57,7 +57,7 @@ public class DummyTransactionProxy implements TransactionProxy {
 	return txn;
     }
 
-    public TaskOwner getCurrentOwner() {
+    public Identity getCurrentOwner() {
 	return taskOwner;
     }
 

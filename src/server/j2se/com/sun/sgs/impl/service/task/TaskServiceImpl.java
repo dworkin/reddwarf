@@ -29,8 +29,6 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
-
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -41,7 +39,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
@@ -194,8 +191,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
             PendingTask ptask =
                 dataService.getServiceBinding(name, PendingTask.class);
             TaskRunner runner = new TaskRunner(name, ptask.getBaseTaskType());
-            TaskOwner owner =
-                new TaskOwnerImpl(ptask.getIdentity());
+            Identity owner = ptask.getIdentity();
 
             if (ptask.getPeriod() == PERIOD_NONE) {
                 // this is a non-periodic task
@@ -298,7 +294,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
         String objName = taskRunner.getObjName();
 
         // get a handle from the scheduler and save it
-        TaskOwner owner = transactionProxy.getCurrentOwner();
+        Identity owner = transactionProxy.getCurrentOwner();
         RecurringTaskHandle handle =
             taskScheduler.scheduleRecurringTask(taskRunner, owner, startTime,
                                                 period);
@@ -360,7 +356,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
             throw new NullPointerException("Task must not be null");
 
         // create a new pending task that will be used when the runner runs
-        Identity identity = transactionProxy.getCurrentOwner().getIdentity();
+        Identity identity = transactionProxy.getCurrentOwner();
         PendingTask ptask =
             new PendingTask(task, startTime, period, identity, dataService);
 
@@ -381,7 +377,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService {
      * from the scheduler. This is used for both the durable and non-durable
      * tasks, but not for periodic tasks.
      */
-    private void scheduleTask(KernelRunnable task, TaskOwner owner,
+    private void scheduleTask(KernelRunnable task, Identity owner,
                               long startTime, Priority priority) {
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "reserving a task starting " +

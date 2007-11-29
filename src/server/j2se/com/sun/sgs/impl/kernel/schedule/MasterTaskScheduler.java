@@ -21,6 +21,8 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -29,12 +31,10 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
 
@@ -201,7 +201,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner) {
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner) {
         ScheduledTask t = new ScheduledTask(task, owner, defaultPriority,
                                             System.currentTimeMillis());
         return scheduler.reserveTask(t);
@@ -210,7 +210,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority) {
         ScheduledTask t = new ScheduledTask(task, owner, priority,
                                             System.currentTimeMillis());
@@ -220,7 +220,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime) {
         ScheduledTask t = new ScheduledTask(task, owner, defaultPriority,
                                             startTime);
@@ -231,7 +231,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
      * {@inheritDoc}
      */
     public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
-                                        tasks, TaskOwner owner) {
+                                        tasks, Identity owner) {
         if (tasks == null)
             throw new NullPointerException("Collection cannot be null");
 
@@ -258,7 +258,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner) {
+    public void scheduleTask(KernelRunnable task, Identity owner) {
         scheduler.
             addTask(new ScheduledTask(task, owner, defaultPriority,
                                       System.currentTimeMillis()));
@@ -267,7 +267,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority) {
         scheduler.
             addTask(new ScheduledTask(task, owner, priority,
@@ -277,7 +277,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime) {
         scheduler.
             addTask(new ScheduledTask(task, owner, defaultPriority,
@@ -288,7 +288,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
      * {@inheritDoc}
      */
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-                                                     TaskOwner owner,
+                                                     Identity owner,
                                                      long startTime,
                                                      long period) {
         return scheduler.
@@ -299,7 +299,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+    public void runTask(KernelRunnable task, Identity owner, boolean retry)
         throws Exception
     {
         // check that we're not already running a direct task
@@ -327,7 +327,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+    public void runTransactionalTask(KernelRunnable task, Identity owner)
         throws Exception
     {
         // if we're not in the context of a scheduler thread, then we can

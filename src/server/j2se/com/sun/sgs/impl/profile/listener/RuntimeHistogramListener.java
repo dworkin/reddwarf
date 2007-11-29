@@ -19,33 +19,19 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.profile.util.Histogram;
-import com.sun.sgs.impl.profile.util.LinearHistogram;
 import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
-
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
-
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
-
-import java.io.IOException;
-
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
-
-import java.util.concurrent.atomic.AtomicLong;
-
 
 /**
  * A text-output listener that displays the distribution of successful
@@ -98,7 +84,7 @@ public class RuntimeHistogramListener implements ProfileListener {
      * Creates an instance of {@code RuntimeHistogramListener}.
      *
      * @param properties the {@code Properties} for this listener
-     * @param owner the {@code TaskOwner} to use for all tasks run by
+     * @param owner the {@code Identity} to use for all tasks run by
      *        this listener
      * @param taskScheduler the {@code TaskScheduler} to use for
      *        running short-lived or recurring tasks
@@ -106,7 +92,7 @@ public class RuntimeHistogramListener implements ProfileListener {
      *        run any long-lived tasks
      *
      */
-    public RuntimeHistogramListener(Properties properties, TaskOwner owner,
+    public RuntimeHistogramListener(Properties properties, Identity owner,
 				    TaskScheduler taskScheduler,
 				    ResourceCoordinator resourceCoord) {
   	taskCount = 0;

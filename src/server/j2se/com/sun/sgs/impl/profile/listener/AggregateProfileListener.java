@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.profile.util.NetworkReporter;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -26,7 +28,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileOperation;
@@ -111,7 +112,7 @@ public class AggregateProfileListener implements ProfileListener {
      * Creates an instance of <code>AggregateProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
-     * @param owner the <code>TaskOwner</code> to use for all tasks run by
+     * @param owner the <code>Identity</code> to use for all tasks run by
      *              this listener
      * @param taskScheduler the <code>TaskScheduler</code> to use for
      *                      running short-lived or recurring tasks
@@ -120,7 +121,7 @@ public class AggregateProfileListener implements ProfileListener {
      *
      * @throws IOException if the server socket cannot be created
      */
-    public AggregateProfileListener(Properties properties, TaskOwner owner,
+    public AggregateProfileListener(Properties properties, Identity owner,
                                     TaskScheduler taskScheduler,
                                     ResourceCoordinator resourceCoord)
         throws IOException

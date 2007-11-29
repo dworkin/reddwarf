@@ -17,7 +17,6 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.TransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
@@ -40,8 +39,6 @@ public class SgsTestNode {
     
     /** kernel constructor */
     private static Constructor kernelCtor;
-    /** application startup method */
-    private static Method kernelStartupMethod;
     /** kernel shutdown */
     private static Method kernelShutdownMethod;
     /** transaction proxy */
@@ -54,19 +51,15 @@ public class SgsTestNode {
             kernelClass =
                 Class.forName("com.sun.sgs.impl.kernel.Kernel");
             kernelCtor =  
-                kernelClass.getDeclaredConstructor(Properties.class);
+                kernelClass.getDeclaredConstructor(
+                    new Class[] {Properties.class, Properties.class});
             kernelCtor.setAccessible(true);
-
-            kernelStartupMethod = 
-                    kernelClass.getDeclaredMethod("startupApplication", 
-                                                  Properties.class);
-            kernelStartupMethod.setAccessible(true);
 
             kernelShutdownMethod = 
                     kernelClass.getDeclaredMethod("shutdown");
             kernelShutdownMethod.setAccessible(true);
             
-            kernelProxy = kernelClass.getDeclaredField("transactionProxy");
+            kernelProxy = kernelClass.getDeclaredField("proxy");
             kernelProxy.setAccessible(true);
 
             kernelReg = kernelClass.getDeclaredField("systemRegistry");
@@ -228,8 +221,7 @@ public class SgsTestNode {
             createDirectory(dbDirectory);
         }
         
-        kernel = kernelCtor.newInstance(props);
-        kernelStartupMethod.invoke(kernel, props);
+        kernel = kernelCtor.newInstance(props, props);
 
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);

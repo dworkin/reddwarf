@@ -23,6 +23,7 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -137,8 +138,7 @@ public final class MinimalTestKernel
      * @return a <code>Thread</code>, ready to run but not started
      */
     public static Thread createThread(final Runnable runnable) {
-        final TaskOwnerImpl owner =
-            new TaskOwnerImpl(new DummyIdentity());
+        final Identity owner = new DummyIdentity();
         return new Thread(new Runnable() {
                 public void run() {
                     ThreadState.setCurrentOwner(owner);

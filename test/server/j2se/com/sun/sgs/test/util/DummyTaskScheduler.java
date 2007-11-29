@@ -22,12 +22,13 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
@@ -108,7 +109,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner) {
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner) {
         if (rejectTasks)
             throw new TaskRejectedException("Reservation unavailable");
         return new TaskReservationImpl(task);
@@ -120,7 +121,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      * Note that this ignores priority. All tasks are scheduled at the
      * default priority.
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority) {
         if (rejectTasks)
             throw new TaskRejectedException("Reservation unavailable");
@@ -130,7 +131,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime) {
         if (rejectTasks)
             throw new TaskRejectedException("Reservation unavailable");
@@ -141,7 +142,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      * {@inheritDoc}
      */
     public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
-                                        tasks, TaskOwner owner) {
+                                        tasks, Identity owner) {
         if (rejectTasks)
             throw new TaskRejectedException("Reservation unavailable");
         return new TaskReservationImpl(tasks);
@@ -150,7 +151,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner) {
+    public void scheduleTask(KernelRunnable task, Identity owner) {
         scheduleTask(task, owner, System.currentTimeMillis());
     }
 
@@ -160,7 +161,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      * Note that this ignores priority. All tasks are scheduled at the
      * default priority.
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority) {
         scheduleTask(task, owner, System.currentTimeMillis());
     }
@@ -168,7 +169,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime) {
         if (startTime < System.currentTimeMillis()) {
             // if the time has passed then schedule to run immediately...
@@ -186,7 +187,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      * {@inheritDoc}
      */
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-                                                     TaskOwner owner,
+                                                     Identity owner,
                                                      long startTime,
                                                      long period) {
         if (rejectTasks)
@@ -197,7 +198,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+    public void runTask(KernelRunnable task, Identity owner, boolean retry)
         throws Exception
     {
         while (true) {
@@ -229,7 +230,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      * @throws UnsupportedOperationException always, because this method
      *                                       is not supported
      */
-    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+    public void runTransactionalTask(KernelRunnable task, Identity owner)
         throws Exception
     {
         throw new UnsupportedOperationException("Dummy Scheduler doesn't " +

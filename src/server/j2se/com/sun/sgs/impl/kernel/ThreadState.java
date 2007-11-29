@@ -22,7 +22,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 
-import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.service.Transaction;
 
@@ -34,8 +34,8 @@ import com.sun.sgs.service.Transaction;
 final class ThreadState {
 
     // the current owner of any given thread
-    private static ThreadLocal<TaskOwner> currentOwner = 
-        new ThreadLocal<TaskOwner>();
+    private static ThreadLocal<Identity> currentOwner = 
+        new ThreadLocal<Identity>();
 
     // the current transaction for any given thread
     private static ThreadLocal<Transaction> currentTransaction =
@@ -57,7 +57,7 @@ final class ThreadState {
      *
      * @return the current owner
      */
-    static TaskOwner getCurrentOwner() {
+    static Identity getCurrentOwner() {
         return currentOwner.get();
     }
 
@@ -66,9 +66,9 @@ final class ThreadState {
      * components who have access to this ability are those in the kernel and
      * the <code>TaskScheduler</code> (via the <code>TaskHandler</code>).
      *
-     * @param newOwner the new {@code TaskOwner}
+     * @param newOwner the new owner
      */
-    static void setCurrentOwner(TaskOwner newOwner) {
+    static void setCurrentOwner(Identity newOwner) {
         currentOwner.set(newOwner);
     }
 

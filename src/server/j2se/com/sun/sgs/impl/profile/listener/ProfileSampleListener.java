@@ -19,11 +19,11 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.profile.util.Histogram;
 import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProperties;
@@ -76,7 +76,7 @@ public class ProfileSampleListener implements ProfileListener {
      * Creates an instance of {@code ProfileSampleListener}.
      *
      * @param properties the {@code Properties} for this listener
-     * @param owner the {@code TaskOwner} to use for all tasks run by
+     * @param owner the {@code Identity} to use for all tasks run by
      *        this listener
      * @param taskScheduler the {@code TaskScheduler} to use for
      *        running short-lived or recurring tasks
@@ -84,7 +84,7 @@ public class ProfileSampleListener implements ProfileListener {
      *        run any long-lived tasks
      *
      */
-    public ProfileSampleListener(Properties properties, TaskOwner owner,
+    public ProfileSampleListener(Properties properties, Identity owner,
 				 TaskScheduler taskScheduler,
 				 ResourceCoordinator resourceCoord) {
 

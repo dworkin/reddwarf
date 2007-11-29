@@ -32,7 +32,6 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
@@ -314,7 +313,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private final TaskScheduler taskScheduler;
     
     /** The owner for tasks I initiate. */
-    private final TaskOwner taskOwner;
+    private final Identity taskOwner;
     
     /** The data service. */
     private final DataService dataService;

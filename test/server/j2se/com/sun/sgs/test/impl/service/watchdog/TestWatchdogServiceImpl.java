@@ -20,12 +20,12 @@
 package com.sun.sgs.test.impl.service.watchdog;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -66,7 +66,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private TaskScheduler taskScheduler;
     
     /** The owner for tasks I initiate. */
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
     
     /** The watchdog service for serverNode */
     private WatchdogServiceImpl watchdogService;

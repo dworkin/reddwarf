@@ -21,10 +21,11 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.Collection;
@@ -59,7 +60,7 @@ class WindowApplicationScheduler implements ApplicationScheduler {
     private PriorityBlockingQueue<QueueElement> queue;
 
     // the map of users to their windows
-    private ConcurrentHashMap<TaskOwner,QueueUser> userMap;
+    private ConcurrentHashMap<Identity,QueueUser> userMap;
 
     // the handler for all delayed tasks
     private final TimedTaskHandler timedTaskHandler;
@@ -76,7 +77,7 @@ class WindowApplicationScheduler implements ApplicationScheduler {
             throw new NullPointerException("Properties cannot be null");
 
         queue = new PriorityBlockingQueue<QueueElement>();
-        userMap = new ConcurrentHashMap<TaskOwner,QueueUser>();
+        userMap = new ConcurrentHashMap<Identity,QueueUser>();
         timedTaskHandler = new TimedTaskHandler(this);
     }
 

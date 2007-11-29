@@ -21,6 +21,8 @@ package com.sun.sgs.test.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
@@ -34,8 +36,8 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
+import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
 
 import java.util.HashSet;
@@ -62,7 +64,7 @@ import org.junit.runner.RunWith;
 public class TestMasterTaskSchedulerImpl {
 
     // the default owner for tests
-    private static final DummyTaskOwner testOwner = new DummyTaskOwner();
+    private static final Identity testOwner = new DummyIdentity();
 
     // the resource coordinator used in many tests
     private TestResourceCoordinator resourceCoordinator;

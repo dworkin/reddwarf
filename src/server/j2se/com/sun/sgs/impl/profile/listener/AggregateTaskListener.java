@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.profile.util.NetworkReporter;
@@ -26,7 +28,6 @@ import com.sun.sgs.impl.profile.util.NetworkReporter;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileOperation;
@@ -92,7 +93,7 @@ public class AggregateTaskListener implements ProfileListener {
      * Creates an instance of {@code RuntimeHistogramListener}.
      *
      * @param properties the {@code Properties} for this listener
-     * @param owner the {@code TaskOwner} to use for all tasks run by
+     * @param owner the {@code Identity} to use for all tasks run by
      *        this listener
      * @param taskScheduler the {@code TaskScheduler} to use for
      *        running short-lived or recurring tasks
@@ -100,7 +101,7 @@ public class AggregateTaskListener implements ProfileListener {
      *        run any long-lived tasks
      *
      */
-    public AggregateTaskListener(Properties properties, TaskOwner owner,
+    public AggregateTaskListener(Properties properties, Identity owner,
                                  TaskScheduler taskScheduler,
                                  ResourceCoordinator resourceCoord)
         throws IOException

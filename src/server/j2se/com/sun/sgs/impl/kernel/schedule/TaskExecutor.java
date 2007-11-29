@@ -21,11 +21,11 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-
-import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.profile.ProfileCollector;
 
@@ -97,7 +97,7 @@ class TaskExecutor {
         for (int tryCount = 1; ; tryCount++) {
             try {
                 if (collector != null) {
-                    TaskOwner owner = task.getOwner();
+                    Identity owner = task.getOwner();
                     int ready = scheduler.getReadyCount();
                     collector.startTask(task.getTask(), owner,
                                         task.getStartTime(), ready);
