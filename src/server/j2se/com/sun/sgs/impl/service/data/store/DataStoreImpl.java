@@ -594,19 +594,7 @@ public class DataStoreImpl
 
 	/** Finds a free offset within the block of IDs. */
 	private int findFree(long previousId) {
-	    if (previousId - firstId >= 0 &&
-		previousId - firstId < blockSize - 1)
-	    {
-		/* Try next position */
-		int offset = (int) (previousId - firstId) + 1;
-		if (!allocMap.get(offset)) {
-		    return offset;
-		}
-	    }
 	    int offset = random.nextInt(blockSize);
-// 		(Integer.reverse(freeCount % blockSize) >>>
-// 		 (Integer.numberOfLeadingZeros(blockSize - 1))) %
-// 		blockSize;
 	    if (allocMap.get(offset)) {
 		offset = allocMap.nextClearBit(offset);
 		if (offset >= blockSize) {

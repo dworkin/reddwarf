@@ -13,11 +13,11 @@ import java.util.Properties;
  * tasks, printing performance information after each has run a number of
  * times, and optionally repeating the test.  By default, the number of tasks
  * scheduled equals the number of available processors, but the value can be
- * specified with the {@value #TASKS_KEY} configuration property.  The number
- * of times each task is run can be specified with the {@value #COUNT_KEY}
- * property, and defaults to {@value #DEFAULT_COUNT}.  The test can be repeated
- * by setting the {@value #REPEAT_KEY} property to the desired number of
- * repetitions.
+ * specified with the {@value #TASKS_KEY} configuration property.  The total
+ * number of times the tasks are run can be specified with the {@value
+ * #TOTAL_COUNT_KEY} property, and defaults to {@value #DEFAULT_TOTAL_COUNT}.
+ * The test can be repeated by setting the {@value #REPEAT_KEY} property to the
+ * desired number of repetitions.
  */
 public abstract class BasicScheduleTasks
     implements ManagedObject, Task, Serializable
@@ -33,12 +33,15 @@ public abstract class BasicScheduleTasks
     public static final String TASKS_KEY =
 	BasicScheduleTasks.class.getName() + ".tasks";
 
-    /** The configuration property for the number times to run each task. */
-    public static final String COUNT_KEY =
-	BasicScheduleTasks.class.getName() + ".count";
+    /**
+     * The configuration property for the total number times to run the
+     * tasks.
+     */
+    public static final String TOTAL_COUNT_KEY =
+	BasicScheduleTasks.class.getName() + ".total.count";
 
-    /** The default number of times to run each task. */
-    public static final int DEFAULT_COUNT = 1000;
+    /** The default total number of times to the tasks. */
+    public static final int DEFAULT_TOTAL_COUNT = 10000;
 
     /** The number of times to repeat the test. */
     protected final int repeat;
@@ -69,8 +72,10 @@ public abstract class BasicScheduleTasks
 	    properties.getProperty(
 		TASKS_KEY,
 		String.valueOf(Runtime.getRuntime().availableProcessors())));
-	count = Integer.parseInt(
-	    properties.getProperty(COUNT_KEY, String.valueOf(DEFAULT_COUNT)));
+	int totalCount = Integer.parseInt(
+	    properties.getProperty(
+		TOTAL_COUNT_KEY, String.valueOf(DEFAULT_TOTAL_COUNT)));
+	count = totalCount / tasks;
     }
 
     /** Schedules the tasks. */
