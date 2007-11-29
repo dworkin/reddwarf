@@ -1,6 +1,7 @@
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
@@ -17,20 +18,29 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     /** Generates the random integer. */
     private static final Random random = new Random();
 
+    /** A reference to the object to notify when done. */
+    private final ManagedReference schedulerRef;
+
     /** A reference to the map. */
     private final ManagedReference mapRef;
 
+    /** The remaining number of operations to run. */
+    private int count;
+
     /** Creates an instance with the specified map. */
-    public MapPutTask(Map map) {
-	if (map == null) {
-	    throw new NullPointerException("The map must not be null");
-	}
-	mapRef = AppContext.getDataManager().createReference(
-	    (ManagedObject) map);
+    public MapPutTask(ScheduleMapPutsTask scheduler, Map map, int count) {
+	DataManager dataManager = AppContext.getDataManager();
+	schedulerRef = dataManager.createReference(scheduler);
+	mapRef = dataManager.createReference((ManagedObject) map);
+	this.count = count;
     }
 
     /** Puts a random integer into the map and reschedules this task. */
     public void run() {
+	if (--count <= 0) {
+	    schedulerRef.get(ScheduleMapPutsTask.class).taskDone();
+	    return;
+	}
 	@SuppressWarnings("unchecked")
 	Map<Object, Object> map = mapRef.get(Map.class);
 	int i = random.nextInt();
