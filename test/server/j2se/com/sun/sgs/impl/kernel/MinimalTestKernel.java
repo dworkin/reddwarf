@@ -240,7 +240,7 @@ public final class MinimalTestKernel
      * Define an implementation of AppKernelAppContext that obtains components
      * from a specified component registry.
      */
-    static class SimpleAppContext extends AppKernelAppContext {
+    private static class SimpleAppContext extends AppKernelAppContext {
 
         /** The component registry. */
         ComponentRegistry componentRegistry;

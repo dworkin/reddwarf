@@ -43,7 +43,7 @@ import java.util.MissingResourceException;
  *  handing out services and managers
  */
 
-// JANE cannot be final because tests extend it
+// Cannot be final because tests extend it
 class AppKernelAppContext {
 
     // the application's name and cached hash code
