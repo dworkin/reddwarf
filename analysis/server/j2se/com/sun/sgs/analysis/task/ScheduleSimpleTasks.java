@@ -9,15 +9,15 @@ import java.util.Properties;
 
 /**
  * A task that schedules a number of simple tasks, each of which runs a number
- * of times, optionally allocating a new task object for each run.  When done,
- * prints performance information and exits.  This test provides a simple
- * metric for the performance of the task service.  By default, the number of
- * tasks scheduled equals the number of available processors, but the value can
- * be specified with the {@value #TASKS_KEY} configuration property.  The
- * number of operations per task can be specified with the {@value #COUNT_KEY}
- * property, and defaults to {@value #DEFAULT_COUNT}.  Allocates a new object
- * for each task run if the {@value #ALLOCATE_KEY} configuration property is
- * set to {@code true}.
+ * of times, optionally allocating a new task object for each run, and printing
+ * performance information after each task has run a number of times.  This
+ * test provides a simple metric for the performance of the task service.  By
+ * default, the number of tasks scheduled equals the number of available
+ * processors, but the value can be specified with the {@value #TASKS_KEY}
+ * configuration property.  The total number of times the tasks are run can be
+ * specified with the {@value #TOTAL_COUNT_KEY} property, and defaults to
+ * {@value #DEFAULT_TOTAL_COUNT}.  Allocates a new object for each task run if
+ * the {@value #ALLOCATE_KEY} configuration property is set to {@code true}.
  */
 public class ScheduleSimpleTasks extends BasicScheduleTasks {
 

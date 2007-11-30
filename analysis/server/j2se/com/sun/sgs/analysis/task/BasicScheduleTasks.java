@@ -52,39 +52,6 @@ public abstract class BasicScheduleTasks
     /** The time the tasks were started for the current run. */
     protected long startTime;
 
-    /**
-     * Creates an instance using the specified configuration properties.
-     *
-     * @param properties the configuration properties
-     */
-    protected BasicScheduleTasks(Properties properties) {
-	tasks = Integer.parseInt(
-	    properties.getProperty(
-		TASKS_KEY,
-		String.valueOf(Runtime.getRuntime().availableProcessors())));
-	int totalCount = Integer.parseInt(
-	    properties.getProperty(
-		TOTAL_COUNT_KEY, String.valueOf(DEFAULT_TOTAL_COUNT)));
-	count = totalCount / tasks;
-    }
-
-    /** Schedules the tasks. */
-    public void run() {
-	AppContext.getDataManager().markForUpdate(this);
-	repetition++;
-	if (repetition == 1) {
-	    System.out.println(
-		"Starting " + tasks + " tasks, " + count + " runs per task");
-	}
-	remainingTasks = tasks;
-	startTime = System.currentTimeMillis();
-	AppContext.getTaskManager().scheduleTask(
-	    new ScheduleTasks(this, tasks, count));
-    }
-
-    /** Creates a task to run. */
-    protected abstract Task createTask();
-
     /** A task that schedules a number of tasks. */
     private static class ScheduleTasks implements Serializable, Task {
 
@@ -119,6 +86,39 @@ public abstract class BasicScheduleTasks
 	}
     }
 
+    /**
+     * Creates an instance using the specified configuration properties.
+     *
+     * @param properties the configuration properties
+     */
+    protected BasicScheduleTasks(Properties properties) {
+	tasks = Integer.parseInt(
+	    properties.getProperty(
+		TASKS_KEY,
+		String.valueOf(Runtime.getRuntime().availableProcessors())));
+	int totalCount = Integer.parseInt(
+	    properties.getProperty(
+		TOTAL_COUNT_KEY, String.valueOf(DEFAULT_TOTAL_COUNT)));
+	count = totalCount / tasks;
+    }
+
+    /** Schedules the tasks. */
+    public void run() {
+	AppContext.getDataManager().markForUpdate(this);
+	repetition++;
+	if (repetition == 1) {
+	    System.out.println(
+		"Starting " + tasks + " tasks, " + count + " runs per task");
+	}
+	remainingTasks = tasks;
+	startTime = System.currentTimeMillis();
+	AppContext.getTaskManager().scheduleTask(
+	    new ScheduleTasks(this, tasks, count));
+    }
+
+    /** Creates a task to run. */
+    protected abstract Task createTask();
+
     /** Notes that a task has completed its operations. */
     protected void taskDone() {
 	AppContext.getDataManager().markForUpdate(this);
@@ -127,11 +127,11 @@ public abstract class BasicScheduleTasks
 	    long elapsedTime = System.currentTimeMillis() - startTime;
 	    int totalRuns = count * tasks;
 	    System.err.println("Repetition " + repetition + ":");
-	    System.err.println("  " + tasks + " tasks, " +
-			       totalRuns + " txns, " +
-			       elapsedTime + " ms, " +
-			       ((totalRuns * 1000) / elapsedTime) +
-			       " txn/sec");
+	    System.err.println(
+		"  " + tasks + " tasks, " +
+		totalRuns + " txns, " +
+		elapsedTime + " ms, " +
+		((totalRuns * 1000) / elapsedTime) + " txn/sec");
 	    AppContext.getTaskManager().scheduleTask(this);
 	}
     }
