@@ -27,7 +27,13 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     /** The remaining number of operations to run. */
     private int count;
 
-    /** Creates an instance with the specified map. */
+    /**
+     * Creates an instance.
+     *
+     * @param scheduler the object to notify when done
+     * @param map the map
+     * @param count the number of times to perform puts
+     */
     public MapPutTask(ScheduleMapPutsTask scheduler, Map map, int count) {
 	DataManager dataManager = AppContext.getDataManager();
 	schedulerRef = dataManager.createReference(scheduler);

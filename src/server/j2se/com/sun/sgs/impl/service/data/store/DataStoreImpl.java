@@ -149,9 +149,14 @@ public class DataStoreImpl
     /** The default for the number of object IDs to allocate at one time. */
     public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 2048;
 
+    /**
+     * The property that specifies the number of allocation blocks to create
+     * initially.
+     */
     public static final String ALLOCATION_BLOCKS_PROPERTY =
 	CLASSNAME + ".allocation.blocks";
 
+    /** The default number of allocation blocks to create initially. */
     public static final int DEFAULT_ALLOCATION_BLOCKS = 5;
 
     /** The logger for this class. */
