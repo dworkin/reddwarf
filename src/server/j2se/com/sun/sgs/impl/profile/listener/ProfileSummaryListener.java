@@ -59,9 +59,11 @@ import java.util.concurrent.atomic.AtomicLong;
  *   mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
  *   mean ready count: 4.09,  mean lag time: 11.87ms, 
  *   parallelism factor: 0.99
+ *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
  * all 104302000 tasks:
  *   mean: 2.64ms,  max: 1010ms,  failed 1713 (0.62%),
  *   mean ready count: 3.98,  mean lag time: 9.75ms
+ *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
  * </pre>
  *
  * <p>
@@ -108,6 +110,7 @@ public class ProfileSummaryListener implements ProfileListener {
      private long lifetimeRunTime;
      private long lifetimeLagTime;
      private long lifetimeReadyCountSum;
+     private long lifetimeWindowTime;
 
     /**
      * Creates an instance of {@code ProfileSummaryListener}.
@@ -140,6 +143,7 @@ public class ProfileSummaryListener implements ProfileListener {
 	lifetimeLagTime = 0;
 	lifetimeMax     = 0;
 	lifetimeReadyCountSum = 0;
+	lifetimeWindowTime = 0;
 
 	windowSize = new PropertiesWrapper(properties).
 	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
@@ -160,11 +164,9 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	taskCount++;
 	readyCountSum += profileReport.getReadyCount();
-	lagTimeSum += (profileReport.getActualStartTime() -
-		    profileReport.getScheduledStartTime());
 
 
-	// calculate the run-time only if it was successful
+	// calculate the run-time and lag-time only if it was successful
 	if (profileReport.wasTaskSuccessful()) {
 
 	    long r = profileReport.getRunningTime();
@@ -173,6 +175,9 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	    if (r > maxRunTime)
 		maxRunTime = r;
+
+	    lagTimeSum += (profileReport.getActualStartTime() -
+			   profileReport.getScheduledStartTime());
 	}
 	else {
 	    failedCount++;
@@ -187,6 +192,7 @@ public class ProfileSummaryListener implements ProfileListener {
 	    lifetimeRunTime += runTime;
 	    lifetimeLagTime += lagTimeSum;
 	    lifetimeReadyCountSum += readyCountSum;
+	    lifetimeWindowTime += (windowEndTime - lastWindowStart);
 	    
 	    if (maxRunTime > lifetimeMax)
 		lifetimeMax = maxRunTime;
@@ -200,13 +206,17 @@ public class ProfileSummaryListener implements ProfileListener {
 			      + "  failed: %d (%2.2f%%)," 
 			      + "\n  mean ready count: %.2f,"
 			      + "  mean lag time: %.2fms,"
-			      + "\n  parallelism factor: %.2f\n"
+			      + "\n  parallelism factor: %.2f"
+			      + "\n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn\n"
 			      + "all %d tasks:\n"
 			      + "  mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%),"
 			      + "\n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms\n",
+			      + "  mean lag time: %.2fms"
+			      + "\n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn\n",
 			      taskCount, 
 			      runTime/ successful,
 			      maxRunTime, 
@@ -216,13 +226,21 @@ public class ProfileSummaryListener implements ProfileListener {
 			      lagTimeSum / successful,
 			      ((double)runTime / 
 			       (double)(windowEndTime - lastWindowStart)),	
+			      ((successful*1000) /
+			       (double)(windowEndTime - lastWindowStart)),
+			      (runTime + lagTimeSum) / successful,
 			      lifetimeCount, 
 			      lifetimeRunTime / lifetimeSuccessful,
 			      lifetimeMax, 
 			      lifetimeFailed, 
 			      (lifetimeFailed*100) / (double)lifetimeCount,
 			      lifetimeReadyCountSum / (double)lifetimeCount,
-			      lifetimeLagTime / lifetimeSuccessful);
+			      lifetimeLagTime / lifetimeSuccessful,
+			      ((lifetimeSuccessful*1000) /
+			       (double)lifetimeWindowTime),
+			      ((lifetimeRunTime + lifetimeLagTime) /
+			       (double)lifetimeSuccessful)
+		);
 
  	    maxRunTime = 0;
  	    failedCount = 0;

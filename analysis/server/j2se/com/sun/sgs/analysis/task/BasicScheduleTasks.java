@@ -10,24 +10,18 @@ import java.util.Properties;
 
 /**
  * An abstract task class that provides support for scheduling a number of
- * tasks, printing performance information after each has run a number of
- * times, and optionally repeating the test.  By default, the number of tasks
- * scheduled equals the number of available processors, but the value can be
- * specified with the {@value #TASKS_KEY} configuration property.  The total
- * number of times the tasks are run can be specified with the {@value
- * #TOTAL_COUNT_KEY} property, and defaults to {@value #DEFAULT_TOTAL_COUNT}.
- * The test can be repeated by setting the {@value #REPEAT_KEY} property to the
- * desired number of repetitions.
+ * tasks and printing performance information after each has run a number of
+ * times.  By default, the number of tasks scheduled equals the number of
+ * available processors, but the value can be specified with the {@value
+ * #TASKS_KEY} configuration property.  The total number of times the tasks are
+ * run can be specified with the {@value #TOTAL_COUNT_KEY} property, and
+ * defaults to {@value #DEFAULT_TOTAL_COUNT}.
  */
 public abstract class BasicScheduleTasks
     implements ManagedObject, Task, Serializable
 {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
-
-    /** The configuration property for how many times to perform the test. */
-    public static final String REPEAT_KEY =
-	BasicScheduleTasks.class.getName() + ".repeat";
 
     /** The configuration property for the number of tasks to run. */
     public static final String TASKS_KEY =
@@ -42,9 +36,6 @@ public abstract class BasicScheduleTasks
 
     /** The default total number of times to the tasks. */
     public static final int DEFAULT_TOTAL_COUNT = 10000;
-
-    /** The number of times to repeat the test. */
-    protected final int repeat;
 
     /** The number of tasks. */
     protected final int tasks;
@@ -67,7 +58,6 @@ public abstract class BasicScheduleTasks
      * @param properties the configuration properties
      */
     protected BasicScheduleTasks(Properties properties) {
-	repeat = Integer.parseInt(properties.getProperty(REPEAT_KEY, "1"));
 	tasks = Integer.parseInt(
 	    properties.getProperty(
 		TASKS_KEY,
@@ -84,8 +74,7 @@ public abstract class BasicScheduleTasks
 	repetition++;
 	if (repetition == 1) {
 	    System.out.println(
-		"Starting " + (repeat > 0 ? (repeat + " repetitions, ") : "") +
-		tasks + " tasks, " + count + " runs per task");
+		"Starting " + tasks + " tasks, " + count + " runs per task");
 	}
 	remainingTasks = tasks;
 	startTime = System.currentTimeMillis();
@@ -96,7 +85,7 @@ public abstract class BasicScheduleTasks
     /** Creates a task to run. */
     protected abstract Task createTask();
 
-    /** A task that schedules a number of simple tasks. */
+    /** A task that schedules a number of tasks. */
     private static class ScheduleTasks implements Serializable, Task {
 
 	/** The version of the serialized form. */
@@ -137,21 +126,14 @@ public abstract class BasicScheduleTasks
 	if (remainingTasks == 0) {
 	    long elapsedTime = System.currentTimeMillis() - startTime;
 	    int totalRuns = count * tasks;
-	    System.err.println(repeat > 0
-			       ? ("Results for repetition " + repetition + ":")
-			       : "Results:");
-	    System.err.println("Tasks: " + tasks);
-	    System.err.println("Total runs: " + totalRuns);
-	    System.err.println("Elapsed time: " + elapsedTime + " ms");
-	    System.err.println("Runs/sec: " +
-			       ((totalRuns * 1000) / elapsedTime));
-	    System.err.println("Elapsed time per run: " +
-			       ((elapsedTime * tasks) / totalRuns) + " ms");
-	    if (repetition < repeat) {
-		AppContext.getTaskManager().scheduleTask(this);
-	    } else {
-		System.exit(0);
-	    }
+	    System.err.println("Repetition " + repetition + ":");
+	    System.err.println("  " + tasks + " tasks, " +
+			       totalRuns + " txns, " +
+			       elapsedTime + " ms");
+	    System.err.println(
+		"  " + ((totalRuns * 1000) / elapsedTime) + " txn/sec, " +
+		((elapsedTime * tasks) / totalRuns) + " ms/txn");
+	    AppContext.getTaskManager().scheduleTask(this);
 	}
     }
 }
