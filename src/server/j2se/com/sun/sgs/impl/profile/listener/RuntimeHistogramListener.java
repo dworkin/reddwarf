@@ -20,10 +20,12 @@
 package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.profile.util.Histogram;
 import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
+
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileListener;

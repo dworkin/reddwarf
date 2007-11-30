@@ -251,9 +251,11 @@ class Kernel {
     private TransactionCoordinator getTransactionCoordinator(
                     Properties props, ProfileCollectorImpl profileCollector) 
     {
-        if (transactionCoordinator == null) {
-            transactionCoordinator = 
-                new TransactionCoordinatorImpl(props, profileCollector);
+        synchronized(Kernel.class) {
+            if (transactionCoordinator == null) {
+                transactionCoordinator = 
+                    new TransactionCoordinatorImpl(props, profileCollector);
+            }
         }
         return transactionCoordinator;
     } 
@@ -809,7 +811,7 @@ class Kernel {
         
         // boot the kernel
         // TODO: is it still worthwhile to have two sets of properties?
-        Kernel kernel = new Kernel(systemProperties, appProperties);
+        new Kernel(systemProperties, appProperties);
     }
 
     /**

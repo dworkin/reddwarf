@@ -112,7 +112,9 @@ class AppKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>ChannelManager</code> used in this context.
+     *
+     * @return the context's <code>ChannelManager</code>
      */
     ChannelManager getChannelManager() {
         if (channelManager == null)
@@ -122,7 +124,9 @@ class AppKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>DataManager</code> used in this context.
+     *
+     * @return the context's <code>DataManager</code>
      */
     DataManager getDataManager() {
         if (dataManager == null)
@@ -132,7 +136,9 @@ class AppKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>TaskManager</code> used in this context.
+     *
+     * @return the context's <code>TaskManager</code>
      */
     TaskManager getTaskManager() {
         if (taskManager == null)
@@ -142,7 +148,18 @@ class AppKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns a manager based on the given type. If the manager type is
+     * unknown, or if there is more than one manager of the given type,
+     * <code>ManagerNotFoundException</code> is thrown. This may be used
+     * to find any available manager, including the three standard
+     * managers.
+     *
+     * @param type the <code>Class</code> of the requested manager
+     *
+     * @return the requested manager
+     *
+     * @throws ManagerNotFoundException if there wasn't exactly one match to
+     *                                  the requested type
      */
     <T> T getManager(Class<T> type) {
         try {
@@ -154,7 +171,19 @@ class AppKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns a <code>Service</code> based on the given type. If the type is
+     * unknown, or if there is more than one <code>Service</code> of the
+     * given type, <code>MissingResourceException</code> is thrown. This is
+     * the only way to resolve service components directly, and should be
+     * used with care, as <code>Service</code>s should not be resolved and
+     * invoked directly outside of a transactional context.
+     *
+     * @param type the <code>Class</code> of the requested <code>Service</code>
+     *
+     * @return the requested <code>Service</code>
+     *
+     * @throws MissingResourceException if there wasn't exactly one match to
+     *                                  the requested type
      */
     <T extends Service> T getService(Class<T> type) {
         return serviceComponents.getComponent(type);

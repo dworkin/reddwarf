@@ -20,9 +20,10 @@
 package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.profile.util.NetworkReporter;
+
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;

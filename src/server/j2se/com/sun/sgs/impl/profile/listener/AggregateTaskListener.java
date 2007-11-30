@@ -21,17 +21,17 @@ package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-
 import com.sun.sgs.impl.profile.util.NetworkReporter;
+
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -90,7 +90,7 @@ public class AggregateTaskListener implements ProfileListener {
     }
 
     /**
-     * Creates an instance of {@code RuntimeHistogramListener}.
+     * Creates an instance of {@code AggregateTaskListener}.
      *
      * @param properties the {@code Properties} for this listener
      * @param owner the {@code Identity} to use for all tasks run by
@@ -100,6 +100,8 @@ public class AggregateTaskListener implements ProfileListener {
      * @param resourceCoord the {@code ResourceCoordinator} used to
      *        run any long-lived tasks
      *
+     * @throws IOException if the socket where data will be published 
+     *                     cannot be created
      */
     public AggregateTaskListener(Properties properties, Identity owner,
                                  TaskScheduler taskScheduler,

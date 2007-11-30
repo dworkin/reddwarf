@@ -27,8 +27,8 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;

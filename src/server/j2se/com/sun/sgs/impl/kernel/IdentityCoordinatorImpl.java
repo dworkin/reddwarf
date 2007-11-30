@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
-import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.auth.IdentityCredentials;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 

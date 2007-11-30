@@ -26,8 +26,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCounter;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileSample;
 

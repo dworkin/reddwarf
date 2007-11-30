@@ -20,17 +20,18 @@
 package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.profile.util.NetworkReporter;
+
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -98,6 +99,8 @@ public class SnapshotTaskListener implements ProfileListener {
      * @param resourceCoord the {@code ResourceCoordinator} used to
      *        run any long-lived tasks
      *
+     * @throws IOException if the socket where data will be published 
+     *                     cannot be created
      */
     public SnapshotTaskListener(Properties properties, Identity owner,
                                 TaskScheduler taskScheduler,
