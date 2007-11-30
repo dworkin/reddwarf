@@ -32,7 +32,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
+import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -49,9 +49,11 @@ import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -98,14 +100,23 @@ import java.util.logging.Logger;
  *	allocated.  This number limits the maximum number of object IDs that
  *	would be discarded when the program exits. <p>
  *
+ * <dt> <i>Property:</i> <b>{@value #ALLOCATION_BLOCKS_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_ALLOCATION_BLOCKS}
+ *
+ * <dd style="padding-top: .5em">The number of blocks of free object IDs to use
+ *	for allocating object IDs.  This value must be greater than
+ *	<code>zero</code>.  Using more blocks makes it more likely that objects
+ *	allocated in different transactions will not cause spurious locks when
+ *	used concurrently. <p>
+ *
  * </dl> <p>
  *
- * The constructor also passes the properties to the {@link BdbEnvironment}
+ * The constructor also passes the properties to the {@link JeEnvironment}
  * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information
- * at the following logging levels: <p>
+ * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
+ * information at the following logging levels: <p>
  *
  * <ul>
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
@@ -118,8 +129,8 @@ import java.util.logging.Logger;
  *
  * In addition, name and object operations that throw {@link
  * TransactionAbortedException} will log the failure to the {@code Logger}
- * named {@code com.sun.sgs.impl.service.data.DataStoreImpl.abort}, to make it
- * easier to debug concurrency conflicts.
+ * named {@code com.sun.sgs.impl.service.data.store.DataStoreImpl.abort}, to
+ * make it easier to debug concurrency conflicts.
  */
 public class DataStoreImpl
     implements DataStore, TransactionParticipant, ProfileProducer
@@ -145,7 +156,17 @@ public class DataStoreImpl
 	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
-    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1024;
+    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 2048;
+
+    /**
+     * The property that specifies the number of allocation blocks to create
+     * initially.
+     */
+    public static final String ALLOCATION_BLOCKS_PROPERTY =
+	CLASSNAME + ".allocation.blocks";
+
+    /** The default number of allocation blocks to create initially. */
+    public static final int DEFAULT_ALLOCATION_BLOCKS = 5;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -189,6 +210,11 @@ public class DataStoreImpl
     /** Information about free object IDs. */
     final List<ObjectIdInfo> freeObjectIds =
 	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
+
+    /**
+     * A random number generator for choosing object ID info and object IDs.
+     */
+    static final Random random = new Random();
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -394,7 +420,6 @@ public class DataStoreImpl
 	    maybeCloseCursors();
 	    dbTxn.abort();
 	    if (objectIdInfo != null) {
-		objectIdInfo.abort();
 		freeObjectIds.add(objectIdInfo);
 	    }
 	}
@@ -486,13 +511,14 @@ public class DataStoreImpl
 	ObjectIdInfo getObjectIdInfo() {
 	    if (objectIdInfo == null) {
 		synchronized (freeObjectIds) {
-		    objectIdInfo = freeObjectIds.isEmpty()
-			? null : freeObjectIds.remove(0);
+		    int size = freeObjectIds.size();
+		    if (size != 0) {
+			objectIdInfo =
+			    freeObjectIds.remove(random.nextInt(size));
+		    }
 		}
 		if (objectIdInfo == null) {
 		    objectIdInfo = new ObjectIdInfo();
-		} else {
-		    objectIdInfo.initTxn();
 		}
 	    }
 	    return objectIdInfo;
@@ -529,63 +555,58 @@ public class DataStoreImpl
     /** Stores information about object IDs available for allocation. */
     private static final class ObjectIdInfo {
 
-	/**
-	 * The next object ID to use for creating an object.  Valid if not
-	 * greater than lastObjectId.
-	 */
-	private long nextObjectId = 0;
+	/** The first object ID in the current block of free IDs. */
+	private long firstId;
+
+	/** The number of free object IDs in the block of IDs. */
+	private int freeCount = 0;
+
+	/** The size of the block of IDs. */
+	private int blockSize;
 
 	/**
-	 * The last object ID that is free for allocating an object before
-	 * needing to obtain more IDs from the database.
+	 * A bit map representing the IDs that have been allocated in the range
+	 * of IDs from firstId to firstId + blockSize - 1.
 	 */
-	private long lastObjectId = -1;
-
-	/**
-	 * The value of nextObjectId at the start of the transaction, and which
-	 * it should be set to if the transaction aborts.
-	 */
-	private long abortNextObjectId = 0;
+	private final BitSet allocMap = new BitSet();
 
 	/** Creates an instance of this class. */
 	ObjectIdInfo() { }
 
-	/**
-	 * Records the initial value of nextObjectId, so that it can be rolled
-	 * back if the transaction aborts.
-	 */
-	void initTxn() {
-	    abortNextObjectId = nextObjectId;
-	}
-
 	/** Updates the next and last object IDs. */
 	void setObjectIds(long nextObjectId, long lastObjectId) {
-	    this.nextObjectId = nextObjectId;
-	    this.lastObjectId = lastObjectId;
-	    /*
-	     * Since blocks of object IDs may not be allocated contiguously,
-	     * only back up to the start of the most recently allocated block.
-	     */
-	    this.abortNextObjectId = nextObjectId;
+	    firstId = nextObjectId;
+	    assert lastObjectId - nextObjectId < Integer.MAX_VALUE;
+	    freeCount = (int) (lastObjectId - nextObjectId) + 1;
+	    blockSize = freeCount;
+	    allocMap.clear();
 	}
 
 	/** Returns whether there are more object IDs available. */
 	boolean hasNext() {
-	    return nextObjectId <= lastObjectId;
+	    return freeCount > 0;
 	}
 
 	/** Returns the next object ID. */
 	long next() {
 	    assert hasNext();
-	    return nextObjectId++;
+	    int offset = findFree();
+	    allocMap.set(offset);
+	    freeCount--;
+	    return firstId + offset;
 	}
 
-	/**
-	 * Sets nextObjectId back to the value from the start of the
-	 * transaction, for when the transaction aborts.
-	 */
-	void abort() {
-	    nextObjectId = abortNextObjectId;
+	/** Finds a free offset within the block of IDs. */
+	private int findFree() {
+	    int offset = random.nextInt(blockSize);
+	    if (allocMap.get(offset)) {
+		offset = allocMap.nextClearBit(offset);
+		if (offset >= blockSize) {
+		    offset = allocMap.nextClearBit(0);
+		    assert offset < blockSize;
+		}
+	    }
+	    return offset;
 	}
     }
 
@@ -638,6 +659,12 @@ public class DataStoreImpl
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
 	    1, Integer.MAX_VALUE);
+	int allocationBlocks = wrappedProps.getIntProperty(
+	    ALLOCATION_BLOCKS_PROPERTY, DEFAULT_ALLOCATION_BLOCKS,
+	    1, Integer.MAX_VALUE);
+	for (int i = 0; i < allocationBlocks; i++) {
+	    freeObjectIds.add(new ObjectIdInfo());
+	}
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	DbTransaction dbTxn = null;
 	boolean done = false;
