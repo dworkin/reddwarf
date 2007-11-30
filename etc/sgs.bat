@@ -40,11 +40,12 @@
 @set java=%java_home%\bin\java
 )
 
-@rem Run the SGS server, specifying the logging configuration file, the
-@rem SGS configuration file, the classpath, the main class, and the
-@rem application configuration files
+@rem Run the SGS server, specifying the library path, the logging
+@rem configuration file, the SGS configuration file, the classpath, the
+@rem main class, and the application configuration files
 :cmdline
-"%java%" -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
+"%java%" -Djava.library.path="%sgshome%\lib\bdb\win32-x86" ^
+       	 -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
        	 -Dcom.sun.sgs.config.file="%sgshome%\sgs-config.properties" ^
        	 -cp "%sgshome%\lib\sgs.jar";%app_classpath% ^
        	 com.sun.sgs.impl.kernel.Kernel ^
