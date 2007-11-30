@@ -126,6 +126,9 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The total number of aborts seen by the various threads. */
     private int aborts;
 
+    /** The total number of commits seen by the various threads. */
+    private int commits;
+
     /** The number of threads that are done. */
     private int done;
 
@@ -235,6 +238,7 @@ public class TestDataServiceConcurrency extends TestCase {
     /** Perform operations in the specified number of threads. */
     private void runOperations(int threads) throws Throwable {
 	aborts = 0;
+	commits = 0;
 	done = 0;
 	long start = System.currentTimeMillis();
 	for (int i = 0; i < threads; i++) {
@@ -263,16 +267,18 @@ public class TestDataServiceConcurrency extends TestCase {
 	    "Threads: " + threads + ", " +
 	    "time: " + ms + " ms, " +
 	    "aborts: " + aborts + ", " +
+	    "commits: " + commits + ", " +
 	    "ops/sec: " + Math.round((threads * operations) / s));
     }
 
     /**
      * Notes that a thread has completed successfully, and records the number
-     * of aborts that occurred in the thread.
+     * of aborts and commits that occurred in the thread.
      */
-    synchronized void threadDone(int aborts) {
+    synchronized void threadDone(int aborts, int commits) {
 	done++;
 	this.aborts += aborts;
+	this.commits += commits;
 	notifyAll();
     }
 
@@ -289,6 +295,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	private final Random random = new Random();
 	private DummyTransaction txn;
 	private int aborts;
+	private int commits;
 
 	OperationThread(int id, DataService service) {
 	    super("OperationThread" + id);
@@ -319,7 +326,7 @@ public class TestDataServiceConcurrency extends TestCase {
 		    }
 		}
 		txn.abort(null);
-		threadDone(aborts);
+		threadDone(aborts, commits);
 	    } catch (Throwable t) {
 		try {
 		    txn.abort(null);
@@ -334,6 +341,7 @@ public class TestDataServiceConcurrency extends TestCase {
 		DummyTransaction t = txn;
 		txn = null;
 		t.commit();
+		commits++;
 		createTxn();
 	    }
 	    int start = id * (objects + objectsBuffer);

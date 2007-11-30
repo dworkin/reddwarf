@@ -8,7 +8,8 @@
 @rem arguments are the names of application configuration files.
 
 @rem Either set the sgshome environment variable to the location of the
-@rem sgs directory, or run from that directory.
+@rem sgs-... subdirectory of the installation directory, or run from
+@rem that directory.
 
 @rem Runs java from the value of the JAVA_HOME environment variable, if
 @rem set, or else from the path.
@@ -27,7 +28,8 @@
 @shift
 @if not %1"" == "" goto :loop
 
-@rem The install directory, or the current directory if not set
+@rem The sgs-... subdirectory of the install directory, or the current
+@rem directory if not set
 @if "%sgshome%" == "" (
 @set sgshome=.
 )
@@ -38,12 +40,11 @@
 @set java=%java_home%\bin\java
 )
 
-@rem Run the SGS server, specifying the library path, the logging
-@rem configuration file, the SGS configuration file, the classpath, the
-@rem main class, and the application configuration files
+@rem Run the SGS server, specifying the logging configuration file, the
+@rem SGS configuration file, the classpath, the main class, and the
+@rem application configuration files
 :cmdline
-"%java%" -Djava.library.path="%sgshome%\lib\bdb\win32-x86" ^
-       	 -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
+"%java%" -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
        	 -Dcom.sun.sgs.config.file="%sgshome%\sgs-config.properties" ^
        	 -cp "%sgshome%\lib\sgs.jar";%app_classpath% ^
        	 com.sun.sgs.impl.kernel.Kernel ^

@@ -8,8 +8,9 @@
 # classes, using the local platform's path separator.  The remaining
 # arguments are the names of application configuration files.
 #
-# Either set the SGSHOME environment variable to the installation
-# directory, or run from that directory.
+# Either set the SGSHOME environment variable to the sgs-...
+# subdirectory of the installation directory, or run from that
+# directory.
 #
 # Runs java from the value of the JAVA_HOME environment variable, if
 # set, or else from the path.
@@ -27,7 +28,8 @@ app_classpath="$1"
 shift
 app_config_files="$*"
 
-# The install directory, or the current directory if not set
+# The sgs-... subdirectory of the install directory, or the current
+# directory if not set
 sgshome="${SGSHOME:=.}"
 
 # The java command
@@ -36,80 +38,21 @@ if [ -n "$JAVA_HOME" ]; then
     java=$JAVA_HOME/bin/java;
 fi
 
-# Figure out what platform we're running on and set the platform and
-# pathsep variables appropriately.  Here are the supported platforms:
-#
-# OS		Hardware	Platform	Path Separator
-# --------	--------	--------------	--------------
-# Mac OS X	PowerPC		macosx-ppc	:
-# Mac OS X	Intel x86	macosx-x86	:
-# Solaris	Intel x86	solaris-x86	:
-# Solaris	Sparc		solaris-sparc	:
-# Linux		Intel x86	linux-x86	:
-# Linux		Intel x86_64	linux-x86_64	:
-# Windows	Intel x86	win32-x86	;
-#
-platform=unknown
+# The path separator for the current platform
 os=`uname -s`
 case $os in
-    Darwin)
-	pathsep=":"
-	mach=`uname -p`
-	case $mach in
-	    powerpc)
-		platform=macosx-ppc;;
-	    i386)
-	    	platform=macosx-x86;;
-	    *)
-		echo Unknown hardware: $mach;
-		exit 1;
-	esac;;
-    SunOS)
-	pathsep=":"
-	mach=`uname -p`
-	case $mach in
-	    i386)
-	    	platform=solaris-x86;;
-	    sparc)
-	    	platform=solaris-sparc;;
-	    *)
-		echo Unknown hardware: $mach;
-		exit 1;
-	esac;;
-    Linux)
-	pathsep=":"
-	mach=`uname -m`;
-	case $mach in
-	    i686)
-		platform=linux-x86;;
-	    x86_64)
-		platform=linux-x86_64;;
-	    *)
-		echo Unknown hardware: $mach;
-		exit 1;
-	esac;;
     CYGWIN*)
-	pathsep=";"
-	mach=`uname -m`;
-	case $mach in
-	    i686)
-		platform=win32-x86;;
-	    *)
-		echo Unknown hardware: $mach;
-		exit 1;
-	esac;;
+	pathsep=";";;
     *)
-	echo Unknown operating system: $os;
-	exit 1;
+	pathsep=":";;
 esac
 
 set -x
 
-# Run the SGS server, specifying the library path, the logging
-# configuration file, the SGS configuration file, the classpath, the
-# main class, and the application configuration files
-$java -Djava.library.path=$sgshome/lib/bdb/$platform \
-      -Djava.util.logging.config.file=$sgshome/sgs-logging.properties \
+# Run the SGS server, specifying the logging configuration file, the SGS
+# configuration file, the classpath, the main class, and the application
+# configuration files
+$java -Djava.util.logging.config.file=$sgshome/sgs-logging.properties \
       -Dcom.sun.sgs.config.file=$sgshome/sgs-config.properties \
       -cp "$sgshome/lib/sgs.jar$pathsep$app_classpath" \
       com.sun.sgs.impl.kernel.Kernel \
