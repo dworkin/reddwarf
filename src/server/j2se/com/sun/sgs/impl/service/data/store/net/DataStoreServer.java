@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data.store.net;
@@ -15,15 +30,15 @@ import java.rmi.Remote;
 public interface DataStoreServer extends Remote {
 
     /**
-     * Reserves a batch of object IDs for allocating new objects.  This
-     * operation is performed in its own transaction.
+     * Reserves an object ID for a new object.  Note that calling other
+     * operations using this ID are not required to find the objects until
+     * {@link #setObject setObject} is called.  Aborting a transaction is also
+     * not required to unassign any of the IDs so long as other operations
+     * treat them as non-existent objects.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
-     * @param	count the number of object IDs to reserve
-     * @return	the next available object ID
-     * @throws	IllegalArgumentException if {@code count} is less than
-     *		{@code 1}
+     * @return	the new object ID
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -31,7 +46,7 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    long allocateObjects(long tid, int count) throws IOException;
+    long createObject(long tid) throws IOException;
 
     /**
      * Notifies the server that an object is going to be modified.
@@ -239,6 +254,32 @@ public interface DataStoreServer extends Remote {
      */
     byte[] getClassInfo(long tid, int classId)
 	throws ClassInfoNotFoundException, IOException;
+
+    /**
+     * Returns the object ID for the next object after the object with the
+     * specified ID, or {@code -1} if there are no more objects.  If {@code
+     * objectId} is {@code -1}, then returns the ID of the first object.  The
+     * IDs returned by this method will not include ones for objects that have
+     * already been removed, and may not include identifiers for objects
+     * created after an iteration has begun.  It is not an error for the object
+     * associated with the specified identifier to have already been
+     * removed. <p>
+     *
+     * @param	tid the ID of the transaction
+     * @param	oid the identifier of the object to search after, or
+     *		{@code -1} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code oid}, or {@code -1} if there are no more
+     *		objects
+     * @throws	IllegalArgumentException if the argument is less than {@code -1}
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @throws	IOException if a network problem occurs
+     */
+    long nextObjectId(long tid, long oid) throws IOException;
 
     /** 
      * Creates a new transaction and returns the associated ID.

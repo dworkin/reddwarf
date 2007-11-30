@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data.store.net;
@@ -10,15 +25,10 @@ import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.rmi.NoSuchObjectException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.RMIServerSocketFactory;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,8 +56,8 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
- *	</b></code>
+ *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
+ *	</b></code><br>
  *      <i>Default:</i> {@code 600000}
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
@@ -55,7 +65,7 @@ import java.util.logging.Logger;
  *	for being aborted. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
+ *	com.sun.sgs.impl.service.data.store.net.server.reap.delay
  *	</b></code><br>
  *      <i>Default:</i> {@code 500}
  *
@@ -63,7 +73,7 @@ import java.util.logging.Logger;
  *	reap timed out transactions. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
+ *	com.sun.sgs.impl.service.data.store.net.server.port
  *	</b></code><br>
  *      <i>Default:</i> {@code 44530}
  *
@@ -77,14 +87,11 @@ import java.util.logging.Logger;
  *
  * In addition to any logging performed by the {@code DataStoreImpl} class,
  * this class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl} to log
+ * com.sun.sgs.impl.service.data.store.net.server} to log
  * information at the following levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - problems starting the server from {@link
- *	#main main} 
- * <li> {@link Level#INFO INFO} - starting the server from {@code main},
- *	actual port if anonymous port was requested
+ * <li> {@link Level#INFO INFO} - actual port if anonymous port was requested
  * <li> {@link Level#CONFIG CONFIG} - server properties
  * <li> {@link Level#FINE FINE} - allocation transaction IDs, problems
  *	unexporting the server, reaping expired transactions, problems
@@ -94,17 +101,17 @@ import java.util.logging.Logger;
  */
 public class DataStoreServerImpl implements DataStoreServer {
 
-    /** The name of this class. */
-    private static final String CLASSNAME =
-	DataStoreServerImpl.class.getName();
+    /** The package for this class. */
+    private static final String PACKAGE =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".server"));
 
     /** The property that specifies the maximum transaction timeout. */
     private static final String MAX_TXN_TIMEOUT_PROPERTY =
-	CLASSNAME + ".max.txn.timeout";
+	PACKAGE + ".max.txn.timeout";
 
     /** The default maximum transaction timeout in milliseconds. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
@@ -113,8 +120,8 @@ public class DataStoreServerImpl implements DataStoreServer {
      * The property that specifies the delay in milliseconds between attempts
      * to reap timed out transactions.
      */
-    private static final String REAP_DELAY_PROPERTY = CLASSNAME +
-	".reap.delay";
+    private static final String REAP_DELAY_PROPERTY = PACKAGE +
+	".server.reap.delay";
 
     /** The default reap delay. */
     private static final long DEFAULT_REAP_DELAY = 500;
@@ -122,7 +129,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     /**
      * The name of the property for specifying the port for running the server.
      */
-    private static final String PORT_PROPERTY = CLASSNAME + ".port";
+    private static final String PORT_PROPERTY = PACKAGE + ".server.port";
 
     /** The default value of the port for running the server. */
     private static final int DEFAULT_PORT = 44530;
@@ -135,10 +142,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
-	CLASSNAME + ".no.rmi");
-
-    /** Set by main to make sure that the server is reachable. */
-    private static DataStoreServerImpl server;
+	PACKAGE + ".no.rmi");
 
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
@@ -147,7 +151,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     private final long maxTxnTimeout;
 
     /** The object used to export the server. */
-    private final Exporter exporter;
+    private final Exporter<DataStoreServer> exporter;
 
     /** The port for running the server. */
     private final int port;
@@ -161,17 +165,36 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
 
-	/** The state value for when the transaction is not in use. */
-	private static final int IDLE = 1;
+	/**
+	 * The state value for when the transaction is not in use, prepared, or
+	 * being reaped.
+	 */
+	private static final int IDLE = 0;
 
-	/** The state value for when the transaction is currently in use. */
-	private static final int IN_USE = 2;
+	/**
+	 * The state value for when the transaction is currently in use, and is
+	 * not prepared or being reaped.
+	 */
+	private static final int IN_USE = 1;
+
+	/**
+	 * The state value for when the transaction is not in use, has been
+	 * prepared, and is not being reaped.
+	 */
+	private static final int PREPARED = 2;
+
+	/**
+	 * The state value for when the transaction is currently in use and
+	 * prepared, and is not being reaped.
+	 */
+	private static final int IN_USE_PREPARED = IN_USE | PREPARED;
 
 	/**
 	 * The state value for when the transaction is being reaped because it
 	 * is expired.  Once this state is reached, it never changes.
+	 * Transactions that are in use or prepared are not reaped.
 	 */
-	private static final int REAPING = 3;
+	private static final int REAPING = 4;
 
 	/** The transaction ID. */
 	private final long tid;
@@ -185,7 +208,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The information associated with this transaction, or null. */
 	private Object txnInfo;
 
-	/** The current state, one of IDLE, IN_USE, or REAPING. */
+	/**
+	 * The current state, one of IDLE, IN_USE, PREPARED, IN_USE_PREPARED,
+	 * or REAPING.
+	 */
 	private final AtomicInteger state = new AtomicInteger(IDLE);
 
 	/** The transaction participant or null. */
@@ -193,6 +219,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Whether the transaction has already started aborting. */
 	private boolean aborting;
+
+	/** Whether the transaction has been committed or aborted. */
+	private boolean inactive;
 
 	/**
 	 * The exception that caused the transaction to be aborted, or null if
@@ -228,24 +257,50 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Sets whether this transaction is in use, doing nothing if the state
 	 * is REAPING.  Returns whether the attempt to set the state was
-	 * successful.  The attempt succeeds if the state is REAPING or if it
-	 * is the opposite of the requested state.
+	 * successful.  The attempt succeeds if the state is REAPING or if the
+	 * IN_USE bit is the opposite of the requested state, independent of
+	 * the PREPARED bit.
 	 */
 	boolean setInUse(boolean inUse) {
-	    int expect = inUse ? IDLE : IN_USE;
-	    int update = inUse ? IN_USE : IDLE;
+	    int prepared = state.get() & PREPARED;
+	    int expect = (inUse ? IDLE : IN_USE) | prepared;
+	    int update = (inUse ? IN_USE : IDLE) | prepared;
 	    return state.compareAndSet(expect, update) ||
 		state.get() == REAPING;
 	}
 
 	/**
 	 * Sets this transaction as being reaped.  Returns whether the attempt
-	 * to set the state was successful.  The attempt fails if the state was
-	 * IN_USE.
+	 * to set the state was successful.  The attempt fails if the
+	 * transaction is in use or if it has been prepared.
 	 */
 	boolean setReaping() {
 	    boolean success = state.compareAndSet(IDLE, REAPING);
 	    return success || state.get() == REAPING;
+	}
+
+	/** Returns true if this transaction is being reaped. */
+	boolean getReaping() {
+	    return state.get() == REAPING;
+	}
+
+	/**
+	 * Marks the transaction as prepared.  This method should only be
+	 * called when the transaction is in use and has not already been
+	 * prepared.
+	 */
+	void setPrepared() {
+	    boolean success = state.compareAndSet(IN_USE, IN_USE_PREPARED);
+	    assert success;
+	}
+
+	/**
+	 * Marks the transaction as inactive.  This method should only be
+	 * called when the transaction is in use.
+	 */
+	void setInactive() {
+	    assert (state.get() & IN_USE) != 0;
+	    inactive = true;
 	}
 
 	/* -- Implement Transaction -- */
@@ -263,6 +318,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void checkTimeout() {
+	    if (inactive) {
+		throw new TransactionNotActiveException(
+		    "The transaction is not active");
+	    } else if ((state.get() & PREPARED) != 0) {
+		return;
+	    }
 	    long runningTime = System.currentTimeMillis() - getCreationTime();
 	    if (runningTime > getTimeout()) {
 		throw new TransactionTimeoutException(
@@ -332,17 +393,23 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/**
 	 * Gets the transaction associated with the specified ID, and marks it
-	 * in use.
+	 * in use.  Checks if the transaction has timed out if checkTimeout is
+	 * true, and considers transactions being reaped as not active.
 	 */
-	Txn get(long tid) {
+	Txn get(long tid, boolean checkTimeout) {
 	    Txn txn = table.get(tid);
 	    if (txn != null) {
+		if (checkTimeout) {
+		    txn.checkTimeout();
+		}
 		if (!txn.setInUse(true)) {
 		    throw new IllegalStateException(
 			"Multiple simultaneous accesses to transaction: " +
 			txn);
 		}
-		return txn;
+		if (!txn.getReaping()) {
+		    return txn;
+		}
 	    }
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
@@ -526,105 +593,21 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Provides for making the server available on the network, and removing it
-     * from the network during shutdown.
-     */
-    private static class Exporter {
-
-	/** The server for handling inbound requests. */
-	private DataStoreServer server;
-
-	/** The Java RMI registry for advertising the server. */
-	private Registry registry;
-
-	/** Creates an instance. */
-	Exporter() { }
-
-	/**
-	 * Makes the server available on the network on the specified port.  If
-	 * the port is 0, chooses an anonymous port.  Returns the actual port
-	 * on which the server is available.
-	 */
-	int export(DataStoreServer server, int port) throws IOException {
-	    this.server = server;
-	    assert server != null;
-	    ServerSocketFactory ssf = new ServerSocketFactory();
-	    registry = LocateRegistry.createRegistry(port, null, ssf);
-	    registry.rebind(
-		"DataStoreServer",
-		UnicastRemoteObject.exportObject(server, port, null, ssf));
-	    return ssf.getLocalPort();
-	}
-
-	/**
-	 * Removes the server from the network, returning true if successful.
-	 * Throws IllegalStateException if the server has already been removed
-	 * from the network.
-	 */
-	boolean unexport() {
-	    if (registry == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
-	    }
-	    if (server != null) {
-		try {
-		    UnicastRemoteObject.unexportObject(server, true);
-		    server = null;
-		} catch (NoSuchObjectException e) {
-		    logger.logThrow(
-			Level.FINE, e, "Problem unexporting server");
-		    return false;
-		}
-	    }
-	    try {
-		UnicastRemoteObject.unexportObject(registry, true);
-		registry = null;
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(
-		    Level.FINE, e, "Problem unexporting registry");
-		return false;
-	    }
-	    return true;
-	}
-    }   
-
-    /**
-     * Defines a server socket factory that provides access to the server
-     * socket's local port.
-     */
-    private static class ServerSocketFactory
-	implements RMIServerSocketFactory
-    {
-	/** The last server socket created. */
-	private ServerSocket serverSocket;
-
-	/** Creates an instance. */
-	ServerSocketFactory() { }
-
-	/** {@inheritDoc} */
-	public ServerSocket createServerSocket(int port) throws IOException {
-	    serverSocket = new ServerSocket(port);
-	    return serverSocket;
-	}
-
-	/** Returns the local port of the last server socket created. */
-	int getLocalPort() {
-	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
-	}
-    }
-
-    /**
      * An alternative exporter that uses an experimental socket-based facility
      * instead of Java RMI.
      */
-    private static class SocketExporter extends Exporter {
+    private static class SocketExporter extends Exporter<DataStoreServer> {
 	private DataStoreServerRemote remote;
-	SocketExporter() { }
-	int export(DataStoreServer server, int port) throws IOException {
+	SocketExporter(Class<DataStoreServer> type) {
+	    super(type);
+	}
+	public int export(DataStoreServer server, String name, int port)
+	    throws IOException
+	{
 	    remote = new DataStoreServerRemote(server, port);
 	    return remote.serverSocket.getLocalPort();
 	}
-	boolean unexport() {
+	public boolean unexport() {
 	    if (remote == null) {
 		throw new IllegalStateException(
 		    "The server is already shut down");
@@ -638,22 +621,6 @@ public class DataStoreServerImpl implements DataStoreServer {
 		return false;
 	    }
 	    return true;
-	}
-    }
-
-    /**
-     * Starts the server.  The current system properties supplied to the
-     * constructor.  Exits with a non-zero status value if a problem occurs.
-     *
-     * @param	args ignored
-     */
-    public static void main(String[] args) {
-	try {
-	    server = new DataStoreServerImpl(System.getProperties());
-	    logger.log(Level.INFO, "Server started: {0}", server);
-	} catch (Throwable t) {
-	    logger.logThrow(Level.SEVERE, t, "Problem starting server");
-	    System.exit(1);
 	}
     }
 
@@ -681,8 +648,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    1, Long.MAX_VALUE);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
-	exporter = noRmi ? new SocketExporter() : new Exporter();
-	port = exporter.export(this, requestedPort);
+	exporter = noRmi ?
+	    new SocketExporter(DataStoreServer.class) :
+	    new Exporter<DataStoreServer>(DataStoreServer.class);
+	port = exporter.export(this, "DataStoreServer", requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
@@ -707,10 +676,10 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Implement DataStoreServer -- */
 
     /** {@inheritDoc} */
-    public long allocateObjects(long tid, int count) {
+    public long createObject(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.allocateObjects(txn, count);
+	    return store.createObject(txn);
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -829,6 +798,16 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
+    public long nextObjectId(long tid, long oid) {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.nextObjectId(txn, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
     public long createTransaction(long timeout) {
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
@@ -841,7 +820,9 @@ public class DataStoreServerImpl implements DataStoreServer {
     public boolean prepare(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.prepare(txn);
+	    boolean result = store.prepare(txn);
+	    txn.setPrepared();
+	    return result;
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -852,6 +833,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.commit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -862,6 +844,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid);
 	try {
 	    store.prepareAndCommit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -872,6 +855,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.abort(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -966,15 +950,12 @@ public class DataStoreServerImpl implements DataStoreServer {
     /**
      * Returns the transaction for the specified ID, throwing
      * TransactionNotActiveException if the transaction is not active, and
-     * checking, if requested, whether the transaction has timed out.
+     * checking, if requested, whether the transaction has timed out.  Treats
+     * transactions that are being reaped as being not active.
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
 	try {
-	    Txn txn = txnTable.get(tid);
-	    if (checkTimeout) {
-		txn.checkTimeout();
-	    }
-	    return txn;
+	    return txnTable.get(tid, checkTimeout);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
 			    "Getting transaction stid:{0,number,#} failed",

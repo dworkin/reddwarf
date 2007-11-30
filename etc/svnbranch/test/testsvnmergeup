@@ -203,7 +203,7 @@ test("Argument is SVN URL with unknown repository",
      "cd $escaped_trunk",
      "$svnmergeup -n svn://$svnserver/whatrepositoryisthis/foo",
      check_diff_fail("Error: Argument not top of branch: " .
-		"svn://$svnserver/whatrepositoryisthis/foo"));
+		     "svn://$svnserver/whatrepositoryisthis/foo"));
 
 test("Argument is trunk URL",
      "cd $escaped_trunk",
@@ -214,7 +214,7 @@ test("Argument is non-existent subdirectory of branch URL",
      "cd $escaped_trunk",
      "$svnmergeup -n $branch_url/whatisthissubdirectory",
      check_diff_fail("Error: Argument not top of branch: " .
-		"$branch_url/whatisthissubdirectory"));
+		     "$branch_url/whatisthissubdirectory"));
 
 test("Argument is subdirectory of branch URL",
      "cd $escaped_trunk",
@@ -257,7 +257,7 @@ test("Branch directory modified",
 	  "date > file2.txt",
 	  "cd $escaped_trunk"),
      "$svnmergeup -n $escaped_branch",
-     check_diff_fail("Error: Branch working copy is modified: $branch"),
+     check_diff_pass("Warning: Branch working copy is modified: $branch"),
      "svn revert -R $escaped_branch");
 
 test("Trunk directory modified",
@@ -278,16 +278,20 @@ test("Force trunk directory modified",
 
 test("Branch directory needs updating",
      join(" &&\n",
+	  "cd $escaped_branch_copy",
+	  "svn update",
 	  "cd $escaped_branch",
 	  "date > file2.txt",
 	  "svn commit file2.txt -m \"Modify file2.txt\"",
 	  "cd $escaped_trunk"),
      "$svnmergeup -n $escaped_branch_copy",
-     check_diff_fail("Error: Branch working copy needs to be updated: " .
-		$branch_copy));
+     check_diff_pass("Warning: Branch working copy needs to be updated: " .
+		     $branch_copy));
 
 test("Trunk directory needs updating",
      join(" &&\n",
+	  "cd $escaped_trunk_copy",
+	  "svn update",
 	  "cd $escaped_trunk",
 	  "date > file.txt",
 	  "svn commit file.txt -m \"Modify file.txt\"",
@@ -302,6 +306,8 @@ test("Trunk directory needs updating",
 
 test("Trunk modified and needs updating",
      join(" &&\n",
+	  "cd $escaped_trunk_copy",
+	  "svn update",
 	  "cd $escaped_trunk",
 	  "date > file.txt",
 	  "svn commit -m ''",
@@ -319,14 +325,16 @@ test("Trunk modified and needs updating",
 
 test("Branch modified and needs updating",
      join(" &&\n",
+	  "cd $escaped_branch_copy",
+	  "svn update",
 	  "cd $escaped_branch",
 	  "date > file2.txt",
 	  "svn commit -m ''",
 	  "date > $escaped_branch_copy/file2.txt",
 	  "cd $escaped_trunk"),
      "$svnmergeup -n $escaped_branch_copy",
-     check_diff_fail(
-	 "Error: Branch working copy needs to be updated and is modified: " .
+     check_diff_pass(
+	 "Warning: Branch working copy needs to be updated and is modified: " .
 	 $branch_copy),
      "svn revert -R $escaped_branch_copy");
 
@@ -334,7 +342,7 @@ test("Branch modified and needs updating",
 # Check not refreshed
 ####
 
-test("Merge without refresh fails",
+test("Merge without refresh",
      join(" &&\n",
 	  "cd $escaped_branch",
 	  "date > file2.txt",
@@ -345,8 +353,8 @@ test("Merge without refresh fails",
 	  "svn commit -m ''",
 	  "trunkrev=`" . escape($program_dir) . "/svnrev`"),
      "$svnmergeup -n $escaped_branch",
-     check_diff_fail(
-	 "Error: Branch needs to be refreshed before merging up\n" .
+     check_diff_pass(
+	 "Warning: Branch needs to be refreshed before merging up\n" .
 	 "  Current trunk revision: \$trunkrev\n" .
 	 "  Branch refreshed to trunk revision: \$refreshed"),
      join(" &&\n",
@@ -380,43 +388,7 @@ test("Merge change to file2.txt into working copy",
 ####
 
 {
-    my $name = "Don't merge moves without -f";
-    my $time = time();
-    test($name,
-	 join(" &&\n",
-	      "cd $escaped_branch",
-	      "echo \"foo\" > file-a-$time",
-	      "svn add file-a-$time",
-	      "svn commit -m ''",
-	      "cd $escaped_trunk",
-	      "$svnmergeup $escaped_branch",
-	      "svn commit -m ''",
-	      "cd $escaped_branch",
-	      "$install_dir/svnrefresh",
-	      "svn mv file-a-$time file-b-$time",
-	      "svn commit -m ''",
-	      "cd $escaped_trunk"),
-	 "$svnmergeup -n $escaped_branch",
-	 join(" &&\n",
-	      check_non_zero_exit(),
-	      check_diff(
-		  "Error: Branch changes contain moves:\n" .
-		  "  svn mv file-a-$time file-b-$time\n" .
-		  "Account for moves manually and then call 'svnmergeup -f'")),
-	 join(" &&\n",
-	      "cd $escaped_branch",
-	      "$install_dir/svnrefresh",
-	      "svn commit -m ''",
-	      "cd $escaped_trunk",
-	      "$svnmergeup -f $branch_url",
-	      "svn commit -m ''",
-	      "cd $escaped_branch",
-	      "$install_dir/svnrefresh",
-	      "svn commit -m ''"));
-}
-
-{
-    my $name = "Merge moves with -f";
+    my $name = "Merge moves without -f";
     my $time = time();
     test($name,
 	 join(" &&\n",
@@ -432,8 +404,10 @@ test("Merge change to file2.txt into working copy",
 	      "svn mv file-a-$time file-b-$time",
 	      "svn commit -m ''",
 	      "cd $escaped_trunk"),
-	 "$svnmergeup -f $branch_url",
-	 check_pass(),
+	 "$svnmergeup $branch_url",
+	 check_diff_pass(
+	     "Warning: Branch changes contain moves:\n" .
+	     "  svn mv file-a-$time file-b-$time"),
 	 join(" &&\n",
 	      "svn commit -m \"Merge up move\"",
 	      "cd $escaped_branch",

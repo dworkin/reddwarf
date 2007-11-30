@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.data;
@@ -11,14 +26,17 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -176,21 +194,17 @@ public class TestDataServiceConcurrency extends TestCase {
     /* -- Tests -- */
 
     public void testConcurrency() throws Throwable {
-	service = getDataService(props, componentRegistry);
+	service = getDataService(props, componentRegistry, txnProxy);
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(
 		((ProfileProducer) service));
 	}
-	DummyTransaction txn = new DummyTransaction(10000);
-	txnProxy.setCurrentTransaction(txn);
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
-	txn.commit();
 	int perThread = objects + objectsBuffer;
 	/* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
-	    txn = new DummyTransaction(10000);
+	    DummyTransaction txn = new DummyTransaction(10000);
 	    txnProxy.setCurrentTransaction(txn);
 	    int start = t * perThread;
 	    for (int i = 0; i < perThread; i++) {
@@ -206,12 +220,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	}
 	/* Warm up */
 	if (repeat != 1) {
-	    System.err.println("Warmup:");
 	    runOperations(1);
 	}
 	/* Test */
 	for (int t = threads; t <= maxThreads; t++) {
-	    System.err.println("Threads: " + t);
 	    for (int r = 0; r < repeat; r++) {
 		runOperations(t);
 	    }
@@ -248,9 +260,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	long ms = stop - start;
 	double s = (stop - start) / 1000.0d;
 	System.err.println(
-	    "Time: " + ms + " ms\n" +
-	    "Aborts: " + aborts + "\n" +
-	    "Ops per second: " + Math.round((threads * operations) / s));
+	    "Threads: " + threads + ", " +
+	    "time: " + ms + " ms, " +
+	    "aborts: " + aborts + ", " +
+	    "ops/sec: " + Math.round((threads * operations) / s));
     }
 
     /**
@@ -289,8 +302,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	    try {
 		createTxn();
 		for (int i = 0; i < operations; i++) {
-		    if (i % 1000 == 0) {
-			System.err.println(this + ": Operation " + i);
+		    if (i % 1000 == 0 && logger.isLoggable(Level.FINE)) {
+			logger.log(Level.FINE, "Operation {0}", i);
 		    }
 		    while (true) {
 			try {
@@ -394,26 +407,13 @@ public class TestDataServiceConcurrency extends TestCase {
 	}
     }
 
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	/* Include system properties and allow them to override */
-	props.putAll(System.getProperties());
-	return props;
-    }
-
     /** Returns the data service to test. */
-    protected DataService getDataService(
-	Properties props, DummyComponentRegistry componentRegistry)
+    protected DataService getDataService(Properties props,
+					 ComponentRegistry componentRegistry,
+					 TransactionProxy txnProxy)
 	throws Exception
     {
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /** Returns the binding name to use for the i'th object. */

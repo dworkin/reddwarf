@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.data;
@@ -11,13 +26,16 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -166,15 +184,12 @@ public class TestDataServicePerformance extends TestCase {
     private void doTestRead(boolean detectMods) throws Exception {
 	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
-	service = getDataService(props, componentRegistry);
+	service = getDataService(props, componentRegistry, txnProxy);
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
-	createTransaction(10000);
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
-	txn.commit();
 	createTransaction(10000);
 	service.setBinding("counters", new Counters(items));
 	txn.commit();
@@ -217,15 +232,12 @@ public class TestDataServicePerformance extends TestCase {
 			  String.valueOf(detectMods));
 	props.setProperty(DataStoreImplClass + ".flush.to.disk",
 			  String.valueOf(flush));
-	service = getDataService(props, componentRegistry);
+	service = getDataService(props, componentRegistry, txnProxy);
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
-	txn.commit();
 	createTransaction();
 	service.setBinding("counters", new Counters(items));
 	txn.commit();
@@ -283,18 +295,6 @@ public class TestDataServicePerformance extends TestCase {
 	}
     }
 
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
     /** Creates a new transaction. */
     private DummyTransaction createTransaction() {
 	txn = new DummyTransaction();
@@ -336,10 +336,11 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     /** Returns the data service to test. */
-    protected DataService getDataService(
-	Properties props, DummyComponentRegistry componentRegistry)
+    protected DataService getDataService(Properties props,
+					 ComponentRegistry componentRegistry,
+					 TransactionProxy txnProxy)
 	throws Exception
     {
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 }

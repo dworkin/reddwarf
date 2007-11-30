@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.sharedutil;
@@ -208,7 +223,8 @@ public class PropertiesWrapper {
      * @return	the new instance or <code>null</code> if the property is not
      *		found
      * @throws	IllegalArgumentException if the property is found and a problem
-     *		occurs creating the instance
+     *		occurs creating the instance, or if the constructor throws a
+     *		checked exception
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)
@@ -250,11 +266,17 @@ public class PropertiesWrapper {
 		e);
 	} catch (InvocationTargetException e) {
 	    Throwable cause = e.getCause();
-	    throw new IllegalArgumentException(
-		"Problem calling the constructor for the class " +
-		"specified by the " + name + " property: " +
-		className + ": " + cause,
-		cause);
+	    if (cause instanceof RuntimeException) {
+		throw (RuntimeException) cause;
+	    } else if (cause instanceof Error) {
+		throw (Error) cause;
+	    } else {
+		throw new IllegalArgumentException(
+		    "Problem calling the constructor for the class " +
+		    "specified by the " + name + " property: " +
+		    className + ": " + cause,
+		    cause);
+	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
 		"Problem creating an instance of the class specified by the " +

@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data.store.net;
@@ -26,7 +41,7 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Opcodes for the methods -- */
 
-    private static final short ALLOCATE_OBJECTS = 1;
+    private static final short CREATE_OBJECT = 1;
     private static final short MARK_FOR_UPDATE = 2;
     private static final short GET_OBJECT = 3;
     private static final short SET_OBJECT = 4;
@@ -38,11 +53,12 @@ class DataStoreProtocol implements DataStoreServer {
     private static final short NEXT_BOUND_NAME = 10;
     private static final short GET_CLASS_ID = 11;
     private static final short GET_CLASS_INFO = 12;
-    private static final short CREATE_TRANSACTION = 13;
-    private static final short PREPARE = 14;
-    private static final short COMMIT = 15;
-    private static final short PREPARE_AND_COMMIT = 16;
-    private static final short ABORT = 17;
+    private static final short NEXT_OBJECT_ID = 13;
+    private static final short CREATE_TRANSACTION = 100;
+    private static final short PREPARE = 101;
+    private static final short COMMIT = 102;
+    private static final short PREPARE_AND_COMMIT = 103;
+    private static final short ABORT = 104;
 
     /** The input stream. */
     private final DataInputStream in;
@@ -60,8 +76,8 @@ class DataStoreProtocol implements DataStoreServer {
     void dispatch(DataStoreServer server) throws IOException {
 	short op = in.readShort();
 	switch (op) {
-	case ALLOCATE_OBJECTS:
-	    handleAllocateObjects(server);
+	case CREATE_OBJECT:
+	    handleCreateObject(server);
 	    break;
 	case MARK_FOR_UPDATE:
 	    handleMarkForUpdate(server);
@@ -96,6 +112,9 @@ class DataStoreProtocol implements DataStoreServer {
 	case GET_CLASS_INFO:
 	    handleGetClassInfo(server);
 	    break;
+	case NEXT_OBJECT_ID:
+	    handleNextObjectId(server);
+	    break;
 	case CREATE_TRANSACTION:
 	    handleCreateTransaction(server);
 	    break;
@@ -118,21 +137,19 @@ class DataStoreProtocol implements DataStoreServer {
 
     /* -- Implement methods for the client and server sides -- */
 
-    public long allocateObjects(long tid, int count) throws IOException {
-	out.writeShort(ALLOCATE_OBJECTS);
+    public long createObject(long tid) throws IOException {
+	out.writeShort(CREATE_OBJECT);
 	out.writeLong(tid);
-	out.writeInt(count);
 	checkResult();
 	return in.readLong();
     }
 
-    private void handleAllocateObjects(DataStoreServer server)
+    private void handleCreateObject(DataStoreServer server)
 	throws IOException
     {
 	try {
 	    long tid = in.readLong();
-	    int count = in.readInt();
-	    long result = server.allocateObjects(tid, count);
+	    long result = server.createObject(tid);
 	    out.writeBoolean(true);
 	    out.writeLong(result);
 	    out.flush();
@@ -389,6 +406,29 @@ class DataStoreProtocol implements DataStoreServer {
 	    byte[] result = server.getClassInfo(tid, classId);
 	    out.writeBoolean(true);
 	    writeBytes(result);
+	    out.flush();
+	} catch (Throwable t) {
+	    failure(t);
+	}
+    }
+
+    public long nextObjectId(long tid, long oid) throws IOException {
+	out.writeShort(NEXT_OBJECT_ID);
+	out.writeLong(tid);
+	out.writeLong(oid);
+	checkResult();
+	return in.readLong();
+    }
+
+    private void handleNextObjectId(DataStoreServer server)
+	throws IOException
+    {
+	try {
+	    long tid = in.readLong();
+	    long oid = in.readLong();
+	    long result = server.nextObjectId(tid, oid);
+	    out.writeBoolean(true);
+	    out.writeLong(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);

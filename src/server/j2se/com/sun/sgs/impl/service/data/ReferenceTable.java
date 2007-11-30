@@ -1,14 +1,30 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -17,8 +33,8 @@ import java.util.Map.Entry;
 final class ReferenceTable {
 
     /** Maps object IDs to managed references. */
-    private final Map<Long, ManagedReferenceImpl> oids =
-	new HashMap<Long, ManagedReferenceImpl>();
+    private final SortedMap<Long, ManagedReferenceImpl> oids =
+	new TreeMap<Long, ManagedReferenceImpl>();
 
     /**
      * Maps managed objects to managed references.  The objects are compared by
@@ -94,6 +110,23 @@ final class ReferenceTable {
 	    assert existing == ref
 		: "Found duplicate reference for oid:" + ref.oid;
 	}
+    }
+
+    /**
+     * Returns the next object ID in the reference table of a newly created
+     * object, or -1 if none is found.  Does not return IDs for removed
+     * objects.  Specifying -1 requests the first ID.
+     */
+    long nextNewObjectId(long oid) {
+	for (Entry<Long, ManagedReferenceImpl> entry :
+		 oids.tailMap(oid).entrySet())
+	{
+	    long key = entry.getKey();
+	    if (key > oid && entry.getValue().isNew()) {
+		return key;
+	    }
+	}
+	return -1;
     }
 
     /**

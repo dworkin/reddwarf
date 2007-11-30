@@ -1,18 +1,36 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
+
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.TaskOwner;
+
+import com.sun.sgs.profile.ProfileCollector;
 
 import com.sun.sgs.service.Transaction;
 
@@ -61,15 +79,22 @@ public final class TaskHandler {
      */
     TaskHandler(TransactionCoordinator transactionCoordinator,
                 ProfileCollector profileCollector) {
-        if (TaskHandler.transactionCoordinator != null)
-            throw new IllegalStateException("an instance already exists");
         if (transactionCoordinator == null)
             throw new NullPointerException("null coordinator not allowed");
 
         logger.log(Level.CONFIG, "Creating the Task Handler");
 
-        TaskHandler.transactionCoordinator = transactionCoordinator;
-        TaskHandler.profileCollector = profileCollector;
+        synchronized (TaskHandler.class) {
+            if (TaskHandler.transactionCoordinator == null) {
+                TaskHandler.transactionCoordinator = transactionCoordinator;
+            } else if 
+                (TaskHandler.transactionCoordinator != transactionCoordinator) {
+                throw 
+                    new IllegalStateException("wrong transactionCoordinator");
+            }
+            
+            TaskHandler.profileCollector = profileCollector;
+        }
     }
 
     /**
@@ -103,13 +128,58 @@ public final class TaskHandler {
     }
 
     /**
+     * Runs the given task in a transactional state. If no transaction is
+     * currently active then one is created, attempting to commit on
+     * completion of the task. If a transaction is already active then the
+     * task is run in the context of the active transaction, but is not
+     * committed when this method returns.
+     * <p>
+     * Note that this method is typically only called from the context of
+     * a task run through the scheduler. If you need to run a transactional
+     * task from an independent thread, you should use{@code runTask}
+     * on {@code TaskScheduler} and provide a {@code TransactionRunner},
+     * or simply use the scheduler's {@code runTransactionalTask} method.
+     *
+     * @param task the <code>KernelRunnable</code> to run transactionally
+     *
+     * @throws Exception if there is any failure in running the task
+     */
+    public static void runTransactionally(KernelRunnable task)
+        throws Exception
+    {
+        if (ThreadState.isCurrentTransaction())
+            task.run();
+        else {
+            // It would be best if we ran through the TaskExecutor
+            // to reuse its retry logic.  Currently, though,
+            // profilers cannot handle nested tasks.
+            while (true) {
+                try {
+                    runTransactionalTask(task);
+                    return;
+                } catch (Exception e) {
+                    if ((e instanceof ExceptionRetryStatus) &&
+                        (((ExceptionRetryStatus)e).shouldRetry())) {
+                        logger.log(Level.FINEST, 
+                                "Retrying transactional task");
+                        continue;  
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Runs the given task in a transactional state, committing the
      * transaction on completion of the task.
      * <p>
      * Note that this method is typically only called from the context of
-     * a thread created by the system. If you need to run a transactional
-     * task from an independent thread, you should use {@code runTask}
-     * on {@code TaskScheduler} and provide a {@code TransactionRunner}.
+     * a task run through the scheduler. If you need to run a transactional
+     * task from an independent thread, you should use{@code runTask}
+     * on {@code TaskScheduler} and provide a {@code TransactionRunner},
+     * or simply use the scheduler's {@code runTransactionalTask} method.
      *
      * @param task the <code>KernelRunnable</code> to run transactionally
      *
@@ -119,6 +189,7 @@ public final class TaskHandler {
     public static void runTransactionalTask(KernelRunnable task)
         throws Exception
     {
+        // FIXME: should this assert that we're in a scheduler thread?
 	runTransactionalTask(task, false);
     }
 

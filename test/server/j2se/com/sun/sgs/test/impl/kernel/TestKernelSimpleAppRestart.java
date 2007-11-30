@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.kernel;
@@ -19,6 +34,8 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 
     /** Run a simple application */
     public void testRunSimpleApp() throws Exception {
+        logging.setProperty(
+	    "com.sun.sgs.impl.service.watchdog.server.level", "SEVERE");
 	runApp(3);
 	runApp(6);
     }
@@ -26,13 +43,11 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
     private void runApp(final int stopCount) throws Exception {
 	new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
 	    void handleInput(String line) {
-		System.out.println("stdout: " + line);
 		if (line.equals("count=" + stopCount)) {
 		    done();
 		}
 	    }
 	    void handleError(String line) {
-		System.err.println("stderr: " + line);
 		failed(
 		    new RuntimeException(
 			"Unexpected error input: " + line));

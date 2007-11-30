@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.service;
@@ -124,4 +139,34 @@ public interface DataService extends DataManager, Service {
      *		problem with the current transaction
      */
     ManagedReference createReferenceForId(BigInteger id);
+
+    /**
+     * Returns a unique identifier for the next object after the object with
+     * the specified identifier, or {@code null} if there are no more objects.
+     * If {@code objectId} is {@code null}, then returns the identifier of the
+     * first object.  This method will not return identifiers for objects that
+     * have already been removed, and may not include identifiers for newly
+     * created objects.  It is not an error for the object associated with
+     * {@code objectId} to have already been removed. <p>
+     *
+     * The object identifiers accepted and returned by this method are the same
+     * as those returned by the {@link ManagedReference#getId
+     * ManagedReference.getId} method. <p>
+     *
+     * Callers should not assume that objects associated with the identifiers
+     * returned by this method, but which cannot be reached by traversing
+     * object field references starting with an object associated with a name
+     * binding, will continue to be retained by the data service.
+     *
+     * @param	objectId the identifier of the object to search after, or
+     *		{@code null} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code objectId}, or {@code null} if there are no
+     *		more objects
+     * @throws	IllegalArgumentException if the implementation can determine
+     *		that {@code objectId} is not a valid object identifier
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    BigInteger nextObjectId(BigInteger objectId);
 }

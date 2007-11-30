@@ -1,11 +1,27 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
@@ -22,12 +38,15 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -53,7 +72,7 @@ public class TestDataServiceImpl extends TestCase {
      * Specify the test suite to include all tests, or just a single method if
      * specified.
      */
-    public static final TestSuite suite() {
+    public static TestSuite suite() {
 	if (testMethod == null) {
 	    return new TestSuite(TestDataServiceImpl.class);
 	}
@@ -125,9 +144,6 @@ public class TestDataServiceImpl extends TestCase {
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
-	    createTransaction(10000);
-	    service.configure(componentRegistry, txnProxy);
-	    txn.commit();
 	    componentRegistry.setComponent(DataManager.class, service);
 	}
 	componentRegistry.registerAppContext();
@@ -172,13 +188,19 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConstructorNullArgs() throws Exception {
 	try {
-	    createDataServiceImpl(null, componentRegistry);
+	    createDataServiceImpl(null, componentRegistry, txnProxy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
 	try {
-	    createDataServiceImpl(props, null);
+	    createDataServiceImpl(props, null, txnProxy);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    createDataServiceImpl(props, componentRegistry, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -188,7 +210,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
 	props.remove(StandardProperties.APP_NAME);
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -199,7 +221,7 @@ public class TestDataServiceImpl extends TestCase {
 	props.setProperty(
 	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -213,6 +235,8 @@ public class TestDataServiceImpl extends TestCase {
      * @throws Exception if an unexpected exception occurs
      */
     public void testConstructorNoDirectory() throws Exception {
+	txn.commit();
+	txn = null;
         String rootDir = createDirectory();
         File dataDir = new File(rootDir, "dsdb");
         if (!dataDir.mkdir()) {
@@ -221,14 +245,14 @@ public class TestDataServiceImpl extends TestCase {
 	props.remove(DataStoreImplClassName + ".directory");
 	props.setProperty(StandardProperties.APP_ROOT, rootDir);
 	DataServiceImpl testSvc =
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
         testSvc.shutdown();
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {
 	props.remove(DataStoreImplClassName + ".directory");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -239,7 +263,7 @@ public class TestDataServiceImpl extends TestCase {
 	props.setProperty(
 	    DataServiceImplClassName + ".data.store.class", "AnUnknownClass");
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -251,7 +275,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    Object.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -263,7 +287,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreNoConstructor.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -277,7 +301,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreAbstract.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -295,81 +319,29 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreConstructorFails.class.getName());
 	try {
-	    createDataServiceImpl(props, componentRegistry);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
+	    fail("Expected DataStoreConstructorException");
+	} catch (DataStoreConstructorException e) {
 	    System.err.println(e);
 	}
     }
 
     public static class DataStoreConstructorFails extends DummyDataStore {
 	public DataStoreConstructorFails(Properties props) {
-	    throw new RuntimeException("Constructor fails");
+	    throw new DataStoreConstructorException();
 	}
+    }
+
+    private static class DataStoreConstructorException
+	extends RuntimeException
+    {
+	private static final long serialVersionUID = 1;
     }
 
     /* -- Test getName -- */
 
     public void testGetName() {
 	assertNotNull(service.getName());
-    }
-
-    /* -- Test configure -- */
-
-    public void testConfigureNullArgs() throws Exception {
-	txn.commit();
-	txn = null;
-	service.shutdown();
-	service = getDataServiceImpl();
-	try {
-	    service.configure(null, txnProxy);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-	try {
-	    service.configure(componentRegistry, null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureNoTxn() throws Exception {
-	txn.commit();
-	txn = null;
-	service = getDataServiceImpl();
-	try {
-	    service.configure(componentRegistry, txnProxy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureAgain() throws Exception {
-	try {
-	    service.configure(componentRegistry, txnProxy);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-	service = null;
-    }
-
-    public void testConfigureAborted() throws Exception {
-	txn.commit();
-	service = getDataServiceImpl();
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
-	txn.abort(null);
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
-	txn.commit();
-	txn = null;
-	service = null;
     }
 
     /* -- Test getBinding and getServiceBinding -- */
@@ -551,12 +523,6 @@ public class TestDataServiceImpl extends TestCase {
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	}
     };
-    public void testGetBindingUninitialized() throws Exception {
-	testUninitialized(getBinding);
-    }
-    public void testGetServiceBindingUninitialized() throws Exception {
-	testUninitialized(getServiceBinding);
-    }
     public void testGetBindingAborting() throws Exception {
 	testAborting(getBinding);
     }
@@ -746,12 +712,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action setServiceBinding = new Action() {
 	void run() { service.setServiceBinding("dummy", dummy); }
     };
-    public void testSetBindingUninitialized() throws Exception {
-	testUninitialized(setBinding);
-    }
-    public void testSetServiceBindingUninitialized() throws Exception {
-	testUninitialized(setServiceBinding);
-    }
     public void testSetBindingAborting() throws Exception {
 	testAborting(setBinding);
     }
@@ -999,12 +959,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action removeServiceBinding = new Action() {
 	void run() { service.removeServiceBinding("dummy"); }
     };
-    public void testRemoveBindingUninitialized() throws Exception {
-	testUninitialized(removeBinding);
-    }
-    public void testRemoveServiceBindingUninitialized() throws Exception {
-	testUninitialized(removeServiceBinding);
-    }
     public void testRemoveBindingAborting() throws Exception {
 	testAborting(removeBinding);
     }
@@ -1184,12 +1138,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action nextServiceBoundName = new Action() {
 	void run() { service.nextServiceBoundName(null); }
     };
-    public void testNextBoundNameUninitialized() throws Exception {
-	testUninitialized(nextBoundName);
-    }
-    public void testNextServiceBoundNameUninitialized() throws Exception {
-	testUninitialized(nextServiceBoundName);
-    }
     public void testNextBoundNameAborting() throws Exception {
 	testAborting(nextBoundName);
     }
@@ -1369,9 +1317,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action removeObject = new Action() {
 	void run() { service.removeObject(dummy); }
     };
-    public void testRemoveObjectUninitialized() throws Exception {
-	testUninitialized(removeObject);
-    }
     public void testRemoveObjectAborting() throws Exception {
 	testAborting(removeObject);
     }
@@ -1431,6 +1376,96 @@ public class TestDataServiceImpl extends TestCase {
 	service.removeObject(dummy);
     }
 
+    public void testRemoveObjectRemoval() throws Exception {
+	int count = getObjectCount();
+	ObjectWithRemoval removal = new ObjectWithRemoval();
+	service.removeObject(removal);
+	assertFalse("Shouldn't call removingObject for transient objects",
+		    removal.removingCalled);
+	service.setBinding("removal", removal);
+	txn.commit();
+	createTransaction();
+	removal = service.getBinding("removal", ObjectWithRemoval.class);
+	service.removeObject(removal);
+	assertTrue(removal.removingCalled);
+	assertEquals(count, getObjectCount());
+	try {
+	    service.removeObject(removal);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	try {
+	    service.getBinding("removal", ObjectWithRemoval.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+    }
+
+    public void testRemoveObjectRemovalRecurse() throws Exception {
+	ObjectWithRemoval x = new ObjectWithRemovalRecurse();
+	ObjectWithRemoval y = new ObjectWithRemovalRecurse();
+	ObjectWithRemoval z = new ObjectWithRemovalRecurse();
+	x.setNext(y);
+	y.setNext(z);
+	z.setNext(x);
+	service.setBinding("x", x);
+	txn.commit();
+	createTransaction();
+	x = service.getBinding("x", ObjectWithRemoval.class);
+	try {
+	    service.removeObject(x);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /**
+     * A managed object whose removingObject method calls removeObject on its
+     * next field.
+     */
+    private static class ObjectWithRemovalRecurse extends ObjectWithRemoval {
+	private static final long serialVersionUID = 1;
+	ObjectWithRemovalRecurse() {
+	    super(1);
+	}
+	public void removingObject() {
+	    super.removingObject();
+	    DummyManagedObject next = getNext();
+	    if (next != null) {
+		service.removeObject(next);
+	    }
+	}
+    }
+
+    public void testRemoveObjectRemovalThrows() throws Exception {
+	ObjectWithRemoval x = new ObjectWithRemovalThrows();
+	service.setBinding("x", x);
+	try {
+	    service.removeObject(x);
+	    fail("Expected ObjectWithRemovalThrows.E");
+	} catch (ObjectWithRemovalThrows.E e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** A managed object whose removingObject method throws an exception. */
+    private static class ObjectWithRemovalThrows extends ObjectWithRemoval {
+	private static final long serialVersionUID = 1;
+	ObjectWithRemovalThrows() {
+	    super(1);
+	}
+	public void removingObject() {
+	    throw new E();
+	}
+	static class E extends RuntimeException {
+	    private static final long serialVersionUID = 1;
+	}
+    }
+
     /* -- Test markForUpdate -- */
 
     public void testMarkForUpdateNull() {
@@ -1466,9 +1501,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action markForUpdate = new Action() {
 	void run() { service.markForUpdate(dummy); }
     };
-    public void testMarkForUpdateUninitialized() throws Exception {
-	testUninitialized(markForUpdate);
-    }
     public void testMarkForUpdateAborting() throws Exception {
 	testAborting(markForUpdate);
     }
@@ -1513,6 +1545,10 @@ public class TestDataServiceImpl extends TestCase {
     public void testMarkForUpdateLocking() throws Exception {
 	dummy.setValue("a");
 	txn.commit();
+	service.shutdown();
+	props.setProperty(getLockTimeoutPropertyName(props), "500");
+	service = getDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
 	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	assertEquals("a", dummy.value);
@@ -1521,7 +1557,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
@@ -1545,6 +1581,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	service.shutdown();
+	service = null;
     }
 
     /* -- Test createReference -- */
@@ -1572,9 +1610,6 @@ public class TestDataServiceImpl extends TestCase {
     private final Action createReference = new Action() {
 	void run() { service.createReference(dummy); }
     };
-    public void testCreateReferenceUninitialized() throws Exception {
-	testUninitialized(createReference);
-    }
     public void testCreateReferenceAborting() throws Exception {
 	testAborting(createReference);
     }
@@ -1692,9 +1727,6 @@ public class TestDataServiceImpl extends TestCase {
 	void setUp() { id = service.createReference(dummy).getId(); }
 	void run() { service.createReferenceForId(id); }
     };
-    public void testCreateReferenceForIdUninitialized() throws Exception {
-	testUninitialized(createReferenceForId);
-    }
     public void testCreateReferenceForIdAborting() throws Exception {
 	testAborting(createReferenceForId);
     }
@@ -1748,6 +1780,177 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (ObjectNotFoundException e) {
 	    System.err.println(e);
 	}
+    }
+
+    /* -- Test getNextId -- */
+
+    public void testNextObjectIdIllegalIds() {
+	BigInteger id =
+	    BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	id = BigInteger.valueOf(-1);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	id = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE);
+	try {
+	    service.nextObjectId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }	
+
+    public void testNextObjectIdBoundaryIds() {
+	BigInteger first = service.nextObjectId(null);
+	assertEquals(first, service.nextObjectId(null));
+	assertEquals(first, service.nextObjectId(BigInteger.ZERO));
+	BigInteger last = null;
+	while (true) {
+	    BigInteger id = service.nextObjectId(last);
+	    if (id == null) {
+		break;
+	    }
+	    last = id;
+	}
+	assertEquals(null, service.nextObjectId(last));
+	assertEquals(
+	    null, service.nextObjectId(BigInteger.valueOf(Long.MAX_VALUE)));
+    }
+
+    public void testNextObjectIdRemoved() throws Exception {
+	DummyManagedObject dummy2 = new DummyManagedObject();
+	BigInteger dummyId = service.createReference(dummy).getId();
+	BigInteger dummy2Id = service.createReference(dummy2).getId();
+	/* Make sure dummyId is smaller than dummy2Id */
+	if (dummyId.compareTo(dummy2Id) > 0) {
+	    BigInteger temp = dummyId;
+	    dummyId = dummy2Id;
+	    dummy2Id = dummyId;
+	}
+	BigInteger id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	service.removeObject(dummy);
+	id = null;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in this txn",
+			dummyId.equals(id));
+	}
+	id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+	txn.commit();
+	createTransaction();
+	id = null;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't find ID removed in last txn",
+			dummyId.equals(id));
+	}
+
+	id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    assertNotNull("Didn't find dummy2Id after removed dummyId", id);
+	    if (id.equals(dummy2Id)) {
+		break;
+	    }
+	}
+    }
+
+    /**
+     * Test that producing a reference to an object removed in another
+     * transaction doesn't cause that object's ID to be returned.
+     */
+    public void testNextObjectIdRemovedIgnoreRef() throws Exception {
+	DummyManagedObject dummy2 = new DummyManagedObject();
+	BigInteger dummyId = service.createReference(dummy).getId();
+	BigInteger dummy2Id = service.createReference(dummy2).getId();
+	/* Make sure dummyId is smaller than dummy2Id */
+	if (dummyId.compareTo(dummy2Id) > 0) {
+	    DummyManagedObject obj = dummy;
+	    dummy = dummy2;
+	    dummy2 = obj;
+	    service.setBinding("dummy", dummy);
+	    BigInteger id = dummyId;
+	    dummyId = dummy2Id;
+	    dummy2Id = id;
+	}
+	dummy.setNext(dummy2);
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	service.removeObject(dummy.getNext());
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	BigInteger id = dummyId;
+	while (true) {
+	    id = service.nextObjectId(id);
+	    if (id == null) {
+		break;
+	    }
+	    assertFalse("Shouldn't get removed dummy2 ID",
+			id.equals(dummy2Id));
+	}
+    }	    
+
+    /* -- Unusual states -- */
+    private final Action nextObjectId = new Action() {
+	void run() { service.nextObjectId(null); }
+    };
+    public void testNextObjectIdAborting() throws Exception {
+	testAborting(nextObjectId);
+    }
+    public void testNextObjectIdAborted() throws Exception {
+	testAborted(nextObjectId);
+    }
+    public void testNextObjectIdPreparing() throws Exception {
+	testPreparing(nextObjectId);
+    }
+    public void testNextObjectIdCommitting() throws Exception {
+	testCommitting(nextObjectId);
+    }
+    public void testNextObjectIdCommitted() throws Exception {
+	testCommitted(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextObjectId);
+    }
+    public void testNextObjectIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextObjectId);
+    }
+    public void testNextObjectIdShutdown() throws Exception {
+	testShutdown(nextObjectId);
     }
 
     /* -- Test ManagedReference.get -- */
@@ -2023,6 +2226,10 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateLocking() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
+	service.shutdown();
+	props.setProperty(getLockTimeoutPropertyName(props), "500");
+	service = getDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
 	createTransaction(1000);
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	dummy.getNext();
@@ -2031,7 +2238,7 @@ public class TestDataServiceImpl extends TestCase {
 	Thread thread = new Thread() {
 	    public void run() {
 		DummyTransaction txn2 =
-		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		    new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 1000);
 		try {
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
@@ -2054,6 +2261,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	service.shutdown();
+	service = null;
     }
 
     /* -- Test ManagedReference.getId -- */
@@ -2076,18 +2285,27 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test ManagedReference.equals -- */
 
     public void testReferenceEquals() throws Exception {
-	ManagedReference ref = service.createReference(dummy);
+	final ManagedReference ref = service.createReference(dummy);
 	assertFalse(ref.equals(null));
+	assertFalse(ref.equals(Boolean.TRUE));
 	assertTrue(ref.equals(ref));
+	assertTrue(ref.equals(service.createReference(dummy)));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	ManagedReference ref2 = service.createReference(dummy2);
 	assertFalse(ref.equals(ref2));
 	ManagedReference ref3 = new ManagedReference() {
 	    public <T> T get(Class<T> type) { return null; }
 	    public <T> T getForUpdate(Class<T> type) { return null; }
-	    public BigInteger getId() { return null; }
+	    public BigInteger getId() { return ref.getId(); }
 	};
 	assertFalse(ref.equals(ref3));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	ManagedReference ref4 = service.createReference(dummy);
+	assertTrue(ref.equals(ref4));
+	assertTrue(ref4.equals(ref));
+	assertEquals(ref.hashCode(), ref4.hashCode());
     }
 
     /* -- Test shutdown -- */
@@ -2158,10 +2376,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	service.shutdown();
 	service = getDataServiceImpl();
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
-	txn.commit();
 	createTransaction();
 	assertEquals(
 	    dummy, service.getBinding("dummy", DummyManagedObject.class));
@@ -2610,24 +2825,14 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /** Creates a property list with the specified keys and values. */
-    static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
     /**
      * Returns a DataServiceImpl for the shared database using the specified
      * properties and component registry.
      */
     protected DataServiceImpl createDataServiceImpl(
-	Properties props, ComponentRegistry componentRegistry)
+	Properties props,
+	ComponentRegistry componentRegistry,
+	TransactionProxy txnProxy)
 	throws Exception
     {
 	File dir = new File(dbDirectory);
@@ -2637,7 +2842,7 @@ public class TestDataServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /**
@@ -2645,7 +2850,7 @@ public class TestDataServiceImpl extends TestCase {
      * registry.
      */
     private DataServiceImpl getDataServiceImpl() throws Exception {
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /** Returns the default properties to use for creating data services. */
@@ -2769,21 +2974,6 @@ public class TestDataServiceImpl extends TestCase {
     abstract class Action {
 	void setUp() { };
 	abstract void run();
-    }
-
-    /** Tests running the action with an uninitialized service. */
-    void testUninitialized(Action action) throws Exception {
-	action.setUp();
-	txn.commit();
-	createTransaction();
-	service = getDataServiceImpl();
-	try {
-	    action.run();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-	service = null;
     }
 
     /** Tests running the action while aborting. */
@@ -3116,5 +3306,54 @@ public class TestDataServiceImpl extends TestCase {
 	public byte[] getClassInfo(Transaction txn, int classId) {
 	    return null;
 	}
+	public long nextObjectId(Transaction txn, long oid) { return -1; }
+    }
+
+    /**
+     * A managed object with subobjects that it removes during removingObject.
+     */
+    static class ObjectWithRemoval extends DummyManagedObject
+	implements ManagedObjectRemoval
+    {
+	private static final long serialVersionUID = 1;
+	private final ManagedReference left;
+	private final ManagedReference right;
+	transient boolean removingCalled;
+	ObjectWithRemoval() {
+	    this(3);
+	}
+	ObjectWithRemoval(int depth) {
+	    if (--depth <= 0) {
+		left = null;
+		right = null;
+		return;
+	    }
+	    left = service.createReference(new ObjectWithRemoval(depth));
+	    right = service.createReference(new ObjectWithRemoval(depth));
+	}
+	public void removingObject() {
+	    removingCalled = true;
+	    if (left != null) {
+		service.removeObject(left.get(ObjectWithRemoval.class));
+	    }
+	    if (right != null) {
+		service.removeObject(right.get(ObjectWithRemoval.class));
+	    }
+	}
+    }
+
+    /** Returns the current number of objects. */
+    private int getObjectCount() {
+	int count = 0;
+	BigInteger last = null;
+	while (true) {
+	    BigInteger next = service.nextObjectId(last);
+	    if (next == null) {
+		break;
+	    }
+	    last = next;
+	    count++;
+	}
+	return count;
     }
 }

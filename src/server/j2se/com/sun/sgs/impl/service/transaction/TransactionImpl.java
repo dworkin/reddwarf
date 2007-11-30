@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.transaction;
@@ -10,7 +25,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
-import com.sun.sgs.kernel.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -120,10 +135,30 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void checkTimeout() {
+	assert Thread.currentThread() == owner : "Wrong thread";
+	logger.log(Level.FINEST, "checkTimeout {0}", this);
+	switch (state) {
+	case ABORTED:
+	case COMMITTED:
+	    throw new TransactionNotActiveException(
+		"Transaction is not active: " + state);
+	case ABORTING:
+	case COMMITTING:
+	    return;
+	case ACTIVE:
+	case PREPARING:
+	    break;
+	default:
+	    throw new AssertionError();
+	}
 	long runningTime = System.currentTimeMillis() - getCreationTime();
-	if (runningTime > getTimeout())
-	    throw new TransactionTimeoutException("transaction timed out: " +
-						  runningTime + " ms");
+	if (runningTime > getTimeout()) {
+	    TransactionTimeoutException exception =
+		new TransactionTimeoutException(
+		    "transaction timed out: " + runningTime + " ms");
+	    abort(exception);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */
@@ -232,7 +267,10 @@ final class TransactionImpl implements Transaction {
      * @return	a string representation of this instance
      */
     public String toString() {
-	return "TransactionImpl[tid:" + tid + "]";
+	return "TransactionImpl[tid:" + tid +
+	    ", creationTime:" + creationTime +
+	    ", timeout:" + timeout +
+	    ", state:" + state + "]";
     }
 
     /**

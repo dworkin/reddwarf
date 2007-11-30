@@ -1,15 +1,29 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
 import java.util.Properties;
 
@@ -35,16 +49,13 @@ public class TestDataServiceClientConcurrency
     private static final String DataStoreClientClassName =
 	DataStoreClient.class.getName();
 
-    /** The name of the DataStoreServerImpl class. */
-    private static final String DataStoreServerImplClassName =
-	DataStoreServerImpl.class.getName();
+    /** The name of the DataStoreClient package. */
+    private static final String DataStoreNetPackage =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The name of the DataServiceImpl class. */
     private static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
-
-    /** The data store server. */
-    DataStoreServerImpl server;
 
     /** Creates an instance. */
     public TestDataServiceClientConcurrency(String name) {
@@ -54,44 +65,28 @@ public class TestDataServiceClientConcurrency
 	objects = Integer.getInteger("test.objects", 500);
     }
 
-    /** Shutdown the server. */
-    protected void tearDown() throws Exception {
-	super.tearDown();
-	try {
-	    if (server != null) {
-		server.shutdown();
-	    }
-	} catch (RuntimeException e) {
-	    if (passed) {
-		throw e;
-	    } else {
-		e.printStackTrace();
-	    }
-	}
-    }
-
     /**
      * Create a DataService, set any default properties, and start the server,
      * if needed.
      */
+    @Override
     protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry)
+					 ComponentRegistry componentRegistry,
+					 TransactionProxy txnProxy)
 	throws Exception
     {
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
-	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
-	    server = serverImpl;
 	    host = "localhost";
-	    port = serverImpl.getPort();
+	    port = 0;
+	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
 	}
-	props.setProperty(DataStoreClientClassName + ".server.host", host);
-	props.setProperty(DataStoreClientClassName + ".server.port",
+	props.setProperty(DataStoreNetPackage + ".server.host", host);
+	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 }

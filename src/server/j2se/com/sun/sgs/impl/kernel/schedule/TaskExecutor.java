@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel.schedule;
@@ -10,8 +25,9 @@ import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.TaskOwner;
+
+import com.sun.sgs.profile.ProfileCollector;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -89,12 +105,12 @@ class TaskExecutor {
                 taskHandler.runTaskAsOwner(task.getTask(), task.getOwner());
 
                 if (collector != null)
-                    collector.finishTask(tryCount, true);
+                    collector.finishTask(tryCount);
 
                 return;
             } catch (InterruptedException ie) {
                 if (collector != null)
-                    collector.finishTask(tryCount, false);
+                    collector.finishTask(tryCount, ie);
 
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, ie, "skipping a task " +
@@ -103,7 +119,7 @@ class TaskExecutor {
                 throw ie;
             } catch (Exception e) {
                 if (collector != null)
-                    collector.finishTask(tryCount, false);
+                    collector.finishTask(tryCount, e);
 
                 if (! retry) {
                     if (throwExceptions)

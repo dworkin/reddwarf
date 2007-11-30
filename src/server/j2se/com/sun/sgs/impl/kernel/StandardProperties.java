@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.kernel;
@@ -81,6 +96,12 @@ public class StandardProperties {
 
     /**
      * An optional key specifying a specific class to use for an application's
+     * <code>NodeMappingService</code>.
+     */
+    public static final String NODE_MAPPING_SERVICE =
+        NS + "app.nodeMappingService";
+    /**
+     * An optional key specifying a specific class to use for an application's
      * <code>TaskService</code>.
      */
     public static final String TASK_SERVICE = NS + "app.taskService";
@@ -90,6 +111,12 @@ public class StandardProperties {
      * <code>TaskManager</code>.
      */
     public static final String TASK_MANAGER = NS + "app.taskManager";
+
+    /**
+     * An optional key specifying a specific class to use for an application's
+     * {@code WatchdogService}.
+     */
+    public static final String WATCHDOG_SERVICE = NS + "app.watchdogService";
 
     /**
      * An optional key specifying a specific class to use for an application's
@@ -145,17 +172,17 @@ public class StandardProperties {
      * ordering represents the order in which the services are configured.
      */
     public enum StandardService {
-        /** Enumeration for the Data Service */
+        /** Enumeration for the Data Service. */
         DataService,
-        /** Enumeration for the Watchdog Service */
+        /** Enumeration for the Watchdog Service. */
         WatchdogService,
-        /** Enumeration for the Registration Service */
-        RegistrationService,
-        /** Enumeration for the Task Service */
+        /** Enumeration for the Node Mapping Service. */
+        NodeMappingService,
+        /** Enumeration for the Task Service. */
         TaskService,
-        /** Enumeration for the Client Session Service */
+        /** Enumeration for the Client Session Service. */
         ClientSessionService,
-        /** Enumeration for the Channel Service */
+        /** Enumeration for the Channel Service. */
         ChannelService;
 
         /** The last service that gets configured for an application. */

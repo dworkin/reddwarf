@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.util;
@@ -22,6 +37,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.util.Properties;
 import junit.framework.TestCase;
@@ -61,8 +77,6 @@ public class TestIdGenerator extends TestCase {
     private DataServiceImpl dataService;
     private TaskServiceImpl taskService;
     private TaskScheduler taskScheduler;
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
-
 
     /** Constructs a test instance. */
     public TestIdGenerator(String name) {
@@ -84,32 +98,30 @@ public class TestIdGenerator extends TestCase {
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
 	    
-	// create services
-	dataService = createDataService(systemRegistry);
-	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
 	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
-	createTransaction(10000);
-
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
+	// create data service
+	dataService = createDataService(systemRegistry);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-	// configure task service
-        taskService.configure(serviceRegistry, txnProxy);
+	// create task service
+	taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
         serviceRegistry.setComponent(TaskManager.class, taskService);
         serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
 	//serviceRegistry.registerAppContext();
-	nonDurableTaskScheduler = createNonDurableTaskScheduler();
 
-	commitTransaction();
+	// services ready
+	dataService.ready();
+	taskService.ready();
+
 	createTransaction();
     }
 
@@ -151,7 +163,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullName() {
 	try {
 	    new IdGenerator(null, IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -161,7 +173,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorEmptyName() {
 	try {
 	    new IdGenerator("", IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -171,7 +183,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorBadBlockSize() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE-1,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -181,7 +193,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullProxy() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
-			    null, nonDurableTaskScheduler);
+			    null, taskScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -219,7 +231,7 @@ public class TestIdGenerator extends TestCase {
     private void doNextTest(int blockSize, int iterations) throws Exception {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    long generatedId = generator.next();
@@ -233,7 +245,7 @@ public class TestIdGenerator extends TestCase {
     private void doNextBytesTest(int blockSize, int iterations) throws Exception {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, nonDurableTaskScheduler);
+			    txnProxy, taskScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    byte[] generatedIdBytes = generator.nextBytes();
@@ -249,18 +261,6 @@ public class TestIdGenerator extends TestCase {
     
     /* -- other methods -- */
 
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
- 
     /**
      * Creates a new transaction, and sets transaction proxy's
      * current transaction.
@@ -327,12 +327,6 @@ public class TestIdGenerator extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, registry);
-    }
-
-
-    private NonDurableTaskScheduler createNonDurableTaskScheduler() {
-	return new NonDurableTaskScheduler(
-	    taskScheduler, txnProxy.getCurrentOwner(), taskService);
+	return new DataServiceImpl(dbProps, registry, txnProxy);
     }
 }

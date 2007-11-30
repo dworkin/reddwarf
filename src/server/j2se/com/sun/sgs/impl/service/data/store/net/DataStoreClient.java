@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.data.store.net;
@@ -23,23 +38,16 @@ import java.util.logging.Logger;
 
 /**
  * Provides an implementation of {@code DataStore} by communicating over the
- * network to an implementation of {@link DataStoreServer}. <p>
+ * network to an implementation of {@link DataStoreServer}, and optionally runs
+ * the server. <p>
  *
  * The {@link #DataStoreClient constructor} supports the following properties:
  * <p>
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
- *	</b></code><br>
- *	<i>Default:</i> {@code 100}
- *
- * <dd style="padding-top: .5em">The number of object IDs to allocate at one
- *	time.  This value must be greater than {@code 0}. <p>
- *
  * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.max.txn.timeout
+ *	com.sun.sgs.impl.service.data.store.net.max.txn.timeout
  *	</b></code><br>
  *	<i>Default:</i> {@code 600000}
  *
@@ -48,8 +56,17 @@ import java.util.logging.Logger;
  *	before it is a candidate for being aborted.  This value must be greater
  *	than {@code 0}. <p>
  *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.server.run
+ *	</b></code><br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to run the server by creating an
+ *	instance of {@link DataStoreServerImpl}, using the properties provided
+ *	to this instance's constructor. <p>
+
  * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
+ *	com.sun.sgs.impl.service.data.store.net.server.host
  *	</b></code><br>
  *	<i>Required</i>
  *
@@ -57,53 +74,49 @@ import java.util.logging.Logger;
  *	DataStoreServer}. <p>
  *
  * <dt>	<i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
+ *	com.sun.sgs.impl.service.data.store.net.server.port
  *	</b></code><br>
  *	<i>Default:</i> {@code 44530}
  *
  * <dd style="padding-top: .5em">The network port for the {@code
- *	DataStoreServer}.  This value must be greater than {@code 0} and no
- *	greater than {@code 65535}. <p>
+ *	DataStoreServer}.  This value must be no less than {@code 0} and no
+ *	greater than {@code 65535}.  The value {@code 0} can only be specified
+ *	if the {@code com.sun.sgs.impl.service.data.store.net.server.run}
+ *	property is {@code true}, and means that an anonymous port will be
+ *	chosen for running the server. <p>
  *
  * </dl> <p>
  *
  * This class uses the {@link Logger} named {@code
- * com.sun.sgs.impl.service.data.store.net.DataStoreClient} to log information
+ * com.sun.sgs.impl.service.data.store.net.client} to log information
  * at the following levels: <p>
  *
  * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Problems starting the server
+ * <li> {@link Level#INFO INFO} - Starting the server
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
- * <li> {@link Level#FINE FINE} - Allocating object IDs.
+ * <li> {@link Level#FINE FINE} - Allocating object IDs
  * <li> {@link Level#FINEST FINEST} - Object operations
  * </ul>
  */
 public final class DataStoreClient
     implements DataStore, TransactionParticipant
 {
-    /** The name of this class. */
-    private static final String CLASSNAME = DataStoreClient.class.getName();
+    /** The package for this class. */
+    private static final String PACKAGE =
+	"com.sun.sgs.impl.service.data.store.net";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
-    /**
-     * The property that specifies the number of object IDs to allocate at one
-     * time.
-     */
-    private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocation.block.size";
-
-    /** The default for the number of object IDs to allocate at one time. */
-    private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
 
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
-	CLASSNAME + ".server.host";
+	PACKAGE + ".server.host";
 
     /** The property that specifies the server port. */
     private static final String SERVER_PORT_PROPERTY =
-	CLASSNAME + ".server.port";
+	PACKAGE + ".server.port";
 
     /** The default for the server port. */
     private static final int DEFAULT_SERVER_PORT = 44530;
@@ -125,14 +138,18 @@ public final class DataStoreClient
      * Java(TM) RMI with an experimental, socket-based facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
-	CLASSNAME + ".no.rmi");
+	PACKAGE + ".no.rmi");
 
     /** The property that specifies the maximum transaction timeout. */
     private static final String MAX_TXN_TIMEOUT_PROPERTY =
-	CLASSNAME + ".max.txn.timeout";
+	PACKAGE + ".max.txn.timeout";
 
     /** The default maximum transaction timeout. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
+
+    /** The property that specifies to run the server. */
+    private static final String RUN_SERVER_PROPERTY =
+	PACKAGE + ".server.run";
 
     /** The server host name. */
     private final String serverHost;
@@ -140,11 +157,11 @@ public final class DataStoreClient
     /** The server port. */
     private final int serverPort;
 
-    /** The server. */
+    /** The remote server. */
     private final DataStoreServer server;
 
-    /** The number of object IDs to allocate at one time. */
-    private final int allocationBlockSize;
+    /** The local server or null. */
+    private DataStoreServerImpl localServer = null;
 
     /** The maximum transaction timeout. */
     private final long maxTxnTimeout;
@@ -152,24 +169,6 @@ public final class DataStoreClient
     /** Provides information about the transaction for the current thread. */
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
-
-    /**
-     * Object to synchronize on when accessing nextObjectId and
-     * lastObjectId.
-     */
-    private final Object objectIdLock = new Object();
-
-    /**
-     * The next object ID to use for creating an object.  Valid if not greater
-     * than lastObjectId.
-     */
-    private long nextObjectId = 0;
-
-    /**
-     * The last object ID that is free for allocating an object before needing
-     * to obtain more IDs from the database.
-     */
-    private long lastObjectId = -1;
 
     /** Object to synchronize on when accessing txnCount. */
     private final Object txnCountLock = new Object();
@@ -206,14 +205,11 @@ public final class DataStoreClient
      *
      * @param	properties the properties for configuring this instance
      * @throws	IllegalArgumentException if the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
-     *		property is not set, if the value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
-     *		property is not a valid integer greater than zero, or if the
-     *		value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
-     *		property is not a valid integer greater than {@code 0} and not
-     *		greater than {@code 65535}
+     *		com.sun.sgs.impl.service.data.store.net.server.host} property
+     *		is not set, or if the value of the {@code
+     *		com.sun.sgs.impl.service.data.store.net.server.port} property
+     *		is not a valid integer not less than {@code 0} and not greater
+     *		than {@code 65535}
      * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the Java RMI
      *		registry
@@ -229,14 +225,29 @@ public final class DataStoreClient
 	    throw new IllegalArgumentException(
 		"The " + SERVER_HOST_PROPERTY + " property must be specified");
 	}
-	serverPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
-	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
-	    1, Integer.MAX_VALUE);
+	boolean runServer = wrappedProps.getBooleanProperty(
+	    RUN_SERVER_PROPERTY, false);
+	int specifiedServerPort = wrappedProps.getIntProperty(
+	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, runServer ? 0 : 1,
+	    65535);
 	maxTxnTimeout = wrappedProps.getLongProperty(
 	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 1,
 	    Long.MAX_VALUE);
+	if (runServer) {
+	    try {
+		localServer = new DataStoreServerImpl(properties);
+		serverPort = localServer.getPort();
+		logger.log(Level.INFO, "Started server: {0}", localServer);
+	    } catch (IOException t) {
+		logger.logThrow(Level.SEVERE, t, "Problem starting server");
+		throw t;
+	    } catch (RuntimeException t) {
+		logger.logThrow(Level.SEVERE, t, "Problem starting server");
+		throw t;
+	    }
+	} else {
+	    serverPort = specifiedServerPort;
+	}
 	server = getServer();
     }
 
@@ -249,17 +260,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxn(txn);
-	    long result;
-	    synchronized (objectIdLock) {
-		if (nextObjectId > lastObjectId) {
-		    logger.log(Level.FINE, "Allocate more object IDs");
-		    long newNextObjectId = server.allocateObjects(
-			txnInfo.tid, allocationBlockSize);
-		    nextObjectId = newNextObjectId;
-		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
-		}
-		result = nextObjectId++;
-	    }
+	    long result = server.createObject(txnInfo.tid);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
@@ -540,6 +541,13 @@ public final class DataStoreClient
 		boolean ok = (txnCount == 0);
 		if (ok) {
 		    txnCount = -1;
+		    if (localServer != null) {
+			if (localServer.shutdown()) {
+			    localServer = null;
+			} else {
+			    ok = false;
+			}
+		    }
 		}
 		logger.log(Level.FINER, "shutdown returns {0}", ok);
 		return ok;
@@ -600,6 +608,34 @@ public final class DataStoreClient
 	throw convertException(
 	    txn, txnInfo, Level.FINER, exception,
 	    "getClassInfo txn:" + txn + ", classId:" + classId);
+    }
+
+    /** {@inheritDoc} */
+    public long nextObjectId(Transaction txn, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
+	TxnInfo txnInfo = null;
+	Exception exception;
+	try {
+	    txnInfo = checkTxn(txn);
+	    long result = server.nextObjectId(txnInfo.tid, oid);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "nextObjectId txn:{0}, oid:{1,number,#} " +
+			   "returns oid:{2,number,#}",
+			   txn, oid, result);
+	    }
+	    return result;
+	} catch (IOException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txn, txnInfo, Level.FINEST, exception,
+	    "nextObjectId txn:" + txn + ", oid:" + oid + " throws");
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -883,7 +919,7 @@ public final class DataStoreClient
 	    if (txnInfo != null) {
 		txnInfo.serverAborted = true;
 	    }
-	    if (txn != null) {
+	    if (txn != null && !txn.isAborted()) {
 		txn.abort(re);
 	    }
 	}

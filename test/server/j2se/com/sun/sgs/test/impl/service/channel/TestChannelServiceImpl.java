@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.channel;
@@ -22,7 +37,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -48,6 +63,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -117,7 +133,7 @@ public class TestChannelServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private DummyIdentityManager identityManager;
+    private DummyIdentityCoordinator identityCoordinator;
     
     /** The listen port for the client session service. */
     private int port;
@@ -146,27 +162,17 @@ public class TestChannelServiceImpl extends TestCase {
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
 
-	// create services
+	// create data service
 	dataService = createDataService(systemRegistry);
-	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-	identityManager = new DummyIdentityManager();
-	systemRegistry.setComponent(IdentityManager.class, identityManager);
-	sessionService =
-	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
-	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
-
-	createTransaction(10000);
-
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
-	// configure task service
-        taskService.configure(serviceRegistry, txnProxy);
+	// create task service
+	taskService = new TaskServiceImpl(
+	    new Properties(), systemRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
         serviceRegistry.setComponent(TaskManager.class, taskService);
@@ -174,21 +180,32 @@ public class TestChannelServiceImpl extends TestCase {
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
 	//serviceRegistry.registerAppContext();
 
-	// configure client session service
-	sessionService.configure(serviceRegistry, txnProxy);
+	// create identity coordinator
+	identityCoordinator = new DummyIdentityCoordinator();
+	systemRegistry.setComponent(IdentityCoordinator.class, identityCoordinator);
+
+	// create client session service
+	sessionService = new ClientSessionServiceImpl(
+	    serviceProps, systemRegistry, txnProxy);
 	serviceRegistry.setComponent(
 	    ClientSessionService.class, sessionService);
 	txnProxy.setComponent(
 	    ClientSessionService.class, sessionService);
 	port = sessionService.getListenPort();
 	
-	// configure channel service
-	channelService.configure(serviceRegistry, txnProxy);
+	// create channel service
+	channelService = new ChannelServiceImpl(
+	    serviceProps, systemRegistry, txnProxy);
 	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
-	commitTransaction();
+	// services ready
+	dataService.ready();
+	taskService.ready();
+	sessionService.ready();
+	channelService.ready();
+
 	createTransaction(1000);
     }
 
@@ -242,18 +259,30 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullProperties() {
+    public void testConstructorNullProperties() throws Exception {
 	try {
-	    new ChannelServiceImpl(null, new DummyComponentRegistry());
+	    new ChannelServiceImpl(null, new DummyComponentRegistry(),
+				   new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNullComponentRegistry() {
+    public void testConstructorNullComponentRegistry() throws Exception {
 	try {
-	    new ChannelServiceImpl(serviceProps, null);
+	    new ChannelServiceImpl(serviceProps, null,
+				   new DummyTransactionProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullTransactionProxy() throws Exception {
+	try {
+	    new ChannelServiceImpl(serviceProps, new DummyComponentRegistry(),
+				   null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -262,42 +291,11 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
 	try {
-	    new ChannelServiceImpl(new Properties(), new DummyComponentRegistry());
+	    new ChannelServiceImpl(
+		new Properties(), new DummyComponentRegistry(),
+		new DummyTransactionProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    /* -- Test configure -- */
-
-    public void testConfigureNullRegistry() {
-	ChannelServiceImpl service =
-	    new ChannelServiceImpl(serviceProps, systemRegistry);
-	try {
-            service.configure(null, new DummyTransactionProxy());
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-    
-    public void testConfigureNullTransactionProxy() {
-	ChannelServiceImpl service =
-	    new ChannelServiceImpl(serviceProps, systemRegistry);
-	try {
-            service.configure(new DummyComponentRegistry(), null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConfigureTwice() {
-	try {
-	    channelService.configure(new DummyComponentRegistry(), txnProxy);
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
     }
@@ -1482,18 +1480,6 @@ public class TestChannelServiceImpl extends TestCase {
 	txn = null;
     }
     
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
- 
     /**
      * Creates a new data service.  If the database directory does
      * not exist, one is created.
@@ -1509,7 +1495,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, registry);
+	return new DataServiceImpl(dbProps, registry, txnProxy);
     }
     
     /* -- other classes -- */
@@ -1667,16 +1653,16 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     /**
-     * Dummy identity manager for testing purposes.
+     * Dummy identity coordinator for testing purposes.
      */
-    private static class DummyIdentityManager implements IdentityManager {
+    private static class DummyIdentityCoordinator implements IdentityCoordinator {
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
 	    return new DummyIdentity(credentials);
 	}
     }
     
     /**
-     * Identity returned by the DummyIdentityManager.
+     * Identity returned by the DummyIdentityCoordinator.
      */
     private static class DummyIdentity implements Identity, Serializable {
 
