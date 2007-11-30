@@ -129,10 +129,9 @@ public abstract class BasicScheduleTasks
 	    System.err.println("Repetition " + repetition + ":");
 	    System.err.println("  " + tasks + " tasks, " +
 			       totalRuns + " txns, " +
-			       elapsedTime + " ms");
-	    System.err.println(
-		"  " + ((totalRuns * 1000) / elapsedTime) + " txn/sec, " +
-		((elapsedTime * tasks) / totalRuns) + " ms/txn");
+			       elapsedTime + " ms, " +
+			       ((totalRuns * 1000) / elapsedTime) +
+			       " txn/sec");
 	    AppContext.getTaskManager().scheduleTask(this);
 	}
     }

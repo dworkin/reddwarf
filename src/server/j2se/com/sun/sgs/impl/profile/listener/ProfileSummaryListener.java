@@ -239,7 +239,7 @@ public class ProfileSummaryListener implements ProfileListener {
 			      ((lifetimeSuccessful*1000) /
 			       (double)lifetimeWindowTime),
 			      ((lifetimeRunTime + lifetimeLagTime) /
-			       (double)lifetimeSuccessful)
+			       lifetimeSuccessful)
 		);
 
  	    maxRunTime = 0;
