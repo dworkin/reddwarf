@@ -32,7 +32,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
+import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -111,7 +111,7 @@ import java.util.logging.Logger;
  *
  * </dl> <p>
  *
- * The constructor also passes the properties to the {@link JeEnvironment}
+ * The constructor also passes the properties to the {@link BdbEnvironment}
  * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
