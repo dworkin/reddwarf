@@ -65,7 +65,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.start
  *	</b></code><br>
- *	<i>Default:</i> {@code false} <br>
+ *	<i>Default:</i> {@code true} <br>
  *	Specifies whether the watchdog server should be started by this service.
  *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
@@ -241,7 +241,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    " property must be specified");
 	    }
 	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY, false);
+ 		START_SERVER_PROPERTY, true);
 	    localHost = InetAddress.getLocalHost().getHostName();
 	    String host;
 	    int serverPort;

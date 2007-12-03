@@ -69,7 +69,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.start
  *	</b></code><br>
- *	<i>Default:</i> <code>false</code>
+ *	<i>Default:</i> <code>true</code>
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link NodeMappingServerImpl}, using the properties provided
@@ -432,7 +432,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
                 
             // Find or create our server.   
             boolean instantiateServer =  wrappedProps.getBooleanProperty(
-                                                SERVER_START_PROPERTY, false);
+                                                SERVER_START_PROPERTY, true);
             String localHost = InetAddress.getLocalHost().getHostName();            
             String host;
             int port;

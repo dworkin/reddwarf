@@ -8,7 +8,8 @@
 @rem arguments are the names of application configuration files.
 
 @rem Either set the sgshome environment variable to the location of the
-@rem sgs directory, or run from that directory.
+@rem sgs-... subdirectory of the installation directory, or run from
+@rem that directory.
 
 @rem Runs java from the value of the JAVA_HOME environment variable, if
 @rem set, or else from the path.
@@ -27,7 +28,8 @@
 @shift
 @if not %1"" == "" goto :loop
 
-@rem The install directory, or the current directory if not set
+@rem The sgs-... subdirectory of the install directory, or the current
+@rem directory if not set
 @if "%sgshome%" == "" (
 @set sgshome=.
 )
