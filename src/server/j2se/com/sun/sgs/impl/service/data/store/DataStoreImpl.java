@@ -179,6 +179,11 @@ public class DataStoreImpl
     /** The number of bytes in a SHA-1 message digest. */
     private static final int SHA1_SIZE = 20;
 
+    /**
+     * A random number generator for choosing object ID info and object IDs.
+     */
+    static final Random random = new Random();
+
     /** The directory in which to store database files. */
     private final String directory;
 
@@ -210,11 +215,6 @@ public class DataStoreImpl
     /** Information about free object IDs. */
     final List<ObjectIdInfo> freeObjectIds =
 	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
-
-    /**
-     * A random number generator for choosing object ID info and object IDs.
-     */
-    static final Random random = new Random();
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
