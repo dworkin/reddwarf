@@ -44,6 +44,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -1324,6 +1325,21 @@ public class TestChannelServiceImpl extends TestCase {
 		/*
 	fail("this test needs to be implemented");
 		*/
+    }
+
+    /* -- Test ChannelImpl.getChannelId -- */
+
+    public void testChannelImplGetChannelId() throws Exception {
+	Channel channel = createChannel("testy");
+	byte[] channelId = ((ChannelImpl) channel).getChannelId();
+
+	if (channelId == null) {
+	    fail("channelId is null");
+	} else if (channelId.length == 0) {
+	    fail("channelId has zero length");
+	}
+	
+	System.err.println("channelId: " + HexDumper.toHexString(channelId));
     }
 
     private class ClientGroup {
