@@ -374,7 +374,10 @@ public final class ChannelImpl implements Channel, Serializable {
      * @return the ID for this channel.
      */
     public byte[] getChannelId() {
-	return state.idBytes;
+	int len = state.idBytes.length;
+	byte[] idBytes = new byte[len];
+	System.arraycopy(state.idBytes, 0, idBytes, 0, len);
+	return idBytes;
     }
 
     /* -- Implement Object -- */
