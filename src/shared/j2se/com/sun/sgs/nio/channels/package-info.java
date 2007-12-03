@@ -1,5 +1,5 @@
 /**
- Defines asynchronous-channel classes that are connected to a stream-oriented
+ Defines asynchronous channels that are connected to a stream-oriented
  connecting or listening socket, or a datagram-oriented socket. <p>
 
  <a name="async"></a>
