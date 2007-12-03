@@ -75,6 +75,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * application properties file.  The default window size for this
  * class is {@code 5000}.
  *
+ * <p>
+ *
+ * Note that the mean, max, mean throughput, and mean latency reports only
+ * apply to successful tasks.
+ *
  * @see ProfileProperties
  */
 public class ProfileSummaryListener implements ProfileListener {
