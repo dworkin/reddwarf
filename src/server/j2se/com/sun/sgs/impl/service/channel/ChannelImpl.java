@@ -48,7 +48,7 @@ import java.util.logging.Logger;
  * Channel implementation for use within a single transaction
  * specified by the context passed during construction.
  */
-final class ChannelImpl implements Channel, Serializable {
+public final class ChannelImpl implements Channel, Serializable {
 
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
@@ -364,6 +364,20 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 	
 	logger.log(Level.FINEST, "close returns");
+    }
+
+    /* -- Public methods *-- */
+    
+    /**
+     * Returns the ID for this channel.
+     *
+     * @return the ID for this channel.
+     */
+    public byte[] getChannelId() {
+	int len = state.idBytes.length;
+	byte[] idBytes = new byte[len];
+	System.arraycopy(state.idBytes, 0, idBytes, 0, len);
+	return idBytes;
     }
 
     /* -- Implement Object -- */
