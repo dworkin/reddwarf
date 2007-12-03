@@ -48,7 +48,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final String name;
 
     /** The ID from a managed reference to this instance. */
-    private final byte[] idBytes;
+    final byte[] idBytes;
 
     /** The channel ID for this instance, constructed from {@code idBytes}. */
     transient CompactId id;
