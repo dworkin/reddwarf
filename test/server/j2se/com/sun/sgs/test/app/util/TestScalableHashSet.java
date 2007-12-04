@@ -23,7 +23,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -31,17 +30,16 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
-import java.io.File;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.JUnit4TestAdapter;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -61,16 +59,14 @@ public class TestScalableHashSet extends Assert {
     private static DataService dataService;
 
     /** A set to test. */
-    private ScalableHashSet<Object> set;
+    private static ScalableHashSet<Object> set;
 
     /** An object to use in tests. */
-    private Int one;
+    private static Int one;
 
-    private Iterator<Object> iter;
-
-    /** Initial setup */
+    /** Setup */
     @BeforeClass public static void setUpClass() throws Exception {
-        serverNode = new SgsTestNode("TestScalableHashSet", null, null);
+	serverNode = new SgsTestNode("TestScalableHashSet", null, null);
         taskScheduler = serverNode.getSystemRegistry().
             getComponent(TaskScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
@@ -78,7 +74,7 @@ public class TestScalableHashSet extends Assert {
     }
 
     /** Per-test setup */
-    @Before public void setUpTest() throws Exception {
+    @Before public void setUp() throws Exception {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -90,10 +86,8 @@ public class TestScalableHashSet extends Assert {
     }
 
     /** Teardown. */
-    @After public void tearDown() throws Exception {
-	// NOTE: shutting down causes failures due to the clean-up work
-	// that the collection is still trying to do...
-        //serverNode.shutdown(true);
+    @AfterClass public static void tearDownClass() throws Exception {
+        serverNode.shutdown(true);
     }
 
     /* -- Tests -- */
@@ -377,7 +371,7 @@ public class TestScalableHashSet extends Assert {
 		    set.add(null);
 		    set.add(1);
 		    set.add(2);
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
 		    dataService.setBinding("iter",
 					   new ManagedSerializable(iter));
 		}
@@ -385,7 +379,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = (Iterator)
+		    Iterator<Object> iter = (Iterator<Object>)
 			dataService.getBinding("iter",
 					       ManagedSerializable.class).get();
 		    int count = 0;
@@ -404,7 +398,7 @@ public class TestScalableHashSet extends Assert {
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
 		    dataService.setBinding("iter",
 					   new ManagedSerializable(iter));
 		}
@@ -420,7 +414,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = (Iterator<Object>)
+		    Iterator<Object> iter = (Iterator<Object>)
 			dataService.getBinding("iter",
 					       ManagedSerializable.class).get();
 		    try {
@@ -454,7 +448,7 @@ public class TestScalableHashSet extends Assert {
 		public void run() {
 		    set.add(one);
 		    set.add(new Int(2));
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
 		    dataService.setBinding("iter",
 					   new ManagedSerializable(iter));
 		}
@@ -468,7 +462,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = (Iterator<Object>)
+		    Iterator<Object> iter = (Iterator<Object>)
 			dataService.getBinding("iter",
 					       ManagedSerializable.class).get();
 		    int count = 0;
@@ -489,7 +483,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
 		    try {
 			iter.remove();
 			fail("Expected IllegalStateException");
@@ -510,7 +504,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = (Iterator)
+		    Iterator<Object> iter = (Iterator<Object>)
 			dataService.getBinding("iter",
 					       ManagedSerializable.class).get();
 		    while (iter.hasNext()) {
@@ -529,7 +523,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
 		    int count = 0;
 		    while (iter.hasNext()) {
 			assertFalse(one.equals(iter.next()));
@@ -542,11 +536,13 @@ public class TestScalableHashSet extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testIteratorRetainAcrossTransactions() throws Exception {
+	final AtomicReference<Iterator<Object>> iterRef = new AtomicReference();
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
-		    iter = set.iterator();
+		    Iterator<Object> iter = set.iterator();
+		    iterRef.set(iter);
 		    dataService.setBinding("iter",
 					   new ManagedSerializable(iter));
 		}
@@ -554,6 +550,7 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
+		    Iterator<Object> iter = iterRef.get();
 		    try {
 			iter.hasNext();
 			fail("Expected TransactionNotActiveException");
@@ -888,10 +885,9 @@ public class TestScalableHashSet extends Assert {
     /* -- Utilities -- */
     
     /**
-     * Stores fields, if they are not null, into bindings and commits the
-     * current transaction.
+     * Stores fields, if they are not null, into bindings.
      */
-    private void endTransaction() throws Exception {
+    private static void endTransaction() throws Exception {
 	if (set != null) {
 	    try {
 		dataService.setBinding("set", set);
@@ -907,11 +903,11 @@ public class TestScalableHashSet extends Assert {
     }
 
     /**
-     * Starts a new transaction and updates fields from bindings, setting the
-     * fields to null if the objects are not found.
+     * Updates fields from bindings, setting the fields to null if the
+     * objects are not found.
      */
     @SuppressWarnings("unchecked")
-    private void startTransaction() throws Exception {
+    private static void startTransaction() throws Exception {
 	try {
 	    set = dataService.getBinding("set", ScalableHashSet.class);
 	} catch (ObjectNotFoundException e) {

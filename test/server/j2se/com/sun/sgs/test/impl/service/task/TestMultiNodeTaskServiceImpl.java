@@ -62,7 +62,14 @@ import junit.framework.TestCase;
 import static org.junit.Assert.*;
 
 
-/** Test the TaskServiceImpl class for specific cases with multiple nodes. */
+/**
+ * Test the {@code TaskServiceImpl} class for specific cases with multiple
+ * nodes. Rather than use the production Node Mapping Service, these tests
+ * use a dummy implementation (and therefore a backing dummy Watchdog
+ * Service) so that explicit movement and interaction cases can be tested
+ * that cannot be done with the production service. This assumes that basic
+ * interaction tests are already passing from {code TestTaskServiceImpl}.
+ */
 public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     /** The node that creates the servers */

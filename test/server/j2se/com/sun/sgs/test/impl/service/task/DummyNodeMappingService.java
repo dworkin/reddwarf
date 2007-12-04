@@ -86,27 +86,27 @@ public class DummyNodeMappingService implements NodeMappingService,
         serviceMap.put(localId, this);
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public String getName() {
         return getClass().getName();
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void ready() {
         
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public boolean shutdown() {
         return true;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void assignNode(Class service, Identity identity) {
         assignIdentity(service, identity, chooseNode(identity).getId());
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void setStatus(Class service, Identity identity, 
                           boolean active) throws UnknownIdentityException {
         if (! nodeMap.containsKey(identity))
@@ -131,7 +131,7 @@ public class DummyNodeMappingService implements NodeMappingService,
             updateVote(identity, active);
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public Node getNode(Identity identity) throws UnknownIdentityException {
         Node node = nodeMap.get(identity);
         if (node == null)
@@ -140,7 +140,7 @@ public class DummyNodeMappingService implements NodeMappingService,
         return node;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public Iterator<Identity> getIdentities(long nodeId)
         throws UnknownNodeException
     {
@@ -152,17 +152,17 @@ public class DummyNodeMappingService implements NodeMappingService,
         return set.iterator();
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void addNodeMappingListener(NodeMappingListener listener) {
         listeners.add(listener);
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void nodeStarted(Node node) {
         availableNodes.add(node);
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void nodeFailed(Node node) {
         
     }

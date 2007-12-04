@@ -23,7 +23,6 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableHashMap;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -31,9 +30,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import java.io.File;
-import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -42,7 +38,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -497,7 +492,31 @@ public class TestScalableHashMapStress extends Assert {
             getComponent(TaskScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
         dataService = serverNode.getDataService();
-    }	
+
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    initialObjectCount = getObjectCount();
+		    map = new ScalableHashMap<Key, Value>();
+		    dataService.setBinding("map", map);
+		    keys = map.keySet().iterator();
+		    dataService.
+			setBinding("keys",
+				   new ManagedSerializable<Iterator<Key>>
+				   (keys));
+		    values = map.values().iterator();
+		    dataService.
+			setBinding("values",
+				   new ManagedSerializable<Iterator<Value>>
+				   (values));
+		    entries = map.entrySet().iterator();
+		    dataService.
+			setBinding("entries",
+				   new ManagedSerializable<Iterator<Entry
+				   <Key, Value>>>(entries));
+		}
+	    }, taskOwner);
+    }
 
     /** Teardown. */
     @After public void tearDown() throws Exception {
@@ -561,6 +580,7 @@ public class TestScalableHashMapStress extends Assert {
 		    assertEquals(initialObjectCount, getObjectCount());
 		}
 	    }, taskOwner);
+        serverNode.shutdown(true);
     }
 
     /* Tests */
@@ -573,7 +593,6 @@ public class TestScalableHashMapStress extends Assert {
 	System.err.println("test.collisions=" + collisions);
 	System.err.println("test.seed=" + seed);
 
-	final AtomicBoolean isFirstTime = new AtomicBoolean(true);
 	final AtomicBoolean isDone = new AtomicBoolean(false);
 	final AtomicInteger opsPerTxn = new AtomicInteger(getRandomOpsPerTxn());
 	final AtomicInteger opnum = new AtomicInteger(0);
@@ -581,30 +600,8 @@ public class TestScalableHashMapStress extends Assert {
 	    taskScheduler.runTransactionalTask(
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
-			if (isFirstTime.get()) {
-			    isFirstTime.set(false);
-			    initialObjectCount = getObjectCount();
-			    map = new ScalableHashMap<Key, Value>();
-			    dataService.setBinding("map", map);
-			    keys = map.keySet().iterator();
-			    dataService.
-				setBinding("keys",
-	       		            new ManagedSerializable<Iterator<Key>>
-					   (keys));
-			    values = map.values().iterator();
-			    dataService.
-				setBinding("values",
-		                    new ManagedSerializable<Iterator<Value>>
-					   (values));
-			    entries = map.entrySet().iterator();
-			    dataService.
-				setBinding("entries",
-			            new ManagedSerializable<Iterator<Entry
-					   <Key, Value>>>(entries));
-			} else {
-			    initTxnState();
-			    getRandomOp().run();
-			}
+			initTxnState();
+			getRandomOp().run();
 			int num;
 			while ((num = opnum.getAndIncrement()) < operations) {
 			    if (num > 0 && num % 5000 == 0) {

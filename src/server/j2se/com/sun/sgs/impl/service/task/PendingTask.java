@@ -60,6 +60,9 @@ class PendingTask implements ManagedObject, Serializable {
     // whether this task has been marked as cancelled
     private boolean cancelled = false;
 
+    // if this is a periodic task, where it's currently running
+    private long runningNode = -1;
+
     /**
      * Creates an instance of {@code PendingTask}, handling the task
      * reference correctly. As described on {@code TaskManager}, any
@@ -132,9 +135,35 @@ class PendingTask implements ManagedObject, Serializable {
         cancelled = true;
     }
 
+    /**
+     * Returns the node where the associated task is running if the task
+     * is periodic, or -1 if the task is non-periodic or the node hasn't
+     * been assigned.
+     */
+    long getRunningNode() {
+        return runningNode;
+    }
+
+    /**
+     * Sets the node where the associated task is running if the task is
+     * periodic. If the task is not periodic, {@code IllegalStateException}
+     * is thrown.
+     */
+    void setRunningNode(long nodeId) {
+        if (! isPeriodic())
+            throw new IllegalStateException("Cannot assign running node " +
+                                            "for a non-periodic task");
+        runningNode = nodeId;
+    }
+
     /** Checks if this task has been marked as cancelled. */
     boolean isCancelled() {
         return cancelled;
+    }
+
+    /** Checks if this is a periodic task. */
+    boolean isPeriodic() {
+        return (period != TaskServiceImpl.PERIOD_NONE);
     }
 
     /** Returns the identity that owns this task. */

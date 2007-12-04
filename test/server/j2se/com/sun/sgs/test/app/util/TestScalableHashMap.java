@@ -55,7 +55,7 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import junit.framework.JUnit4TestAdapter;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -109,10 +109,8 @@ public class TestScalableHashMap extends Assert {
         dataService = serverNode.getDataService();
     }
 
-    @After public void tearDown() {
-	// NOTE: shutting down causes failures due to the clean-up work
-	// that the collection is still trying to do...
-        //serverNode.shutdown(true);
+    @AfterClass public static void tearDownClass() throws Exception {
+	serverNode.shutdown(true);
     }
 
     /*
@@ -1849,7 +1847,7 @@ public class TestScalableHashMap extends Assert {
 			control.put(j,j);
 		    }
 
-		    //equals(control, test);
+		    checkEquals(control, test);
 		    assertEquals(control, test);
 
 		    for (int i = 0; i < inputs.length; i += 4) {
@@ -1857,7 +1855,7 @@ public class TestScalableHashMap extends Assert {
 			control.remove(inputs[i]);
 		    }
 
-		    //equals(control, test);
+		    checkEquals(control, test);
 		    assertEquals(control, test);
 
 		    for (int i = 0; i < inputs.length; i += 3) {
@@ -1865,7 +1863,7 @@ public class TestScalableHashMap extends Assert {
 			control.put(inputs[i],inputs[i]);
 		    }
 
-		    //equals(control, test);
+		    checkEquals(control, test);
 		    assertEquals(control, test);
 
 		    for (int i = 0; i < inputs.length; i += 2) {
@@ -2192,43 +2190,56 @@ public class TestScalableHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    /* FIXME
     @SuppressWarnings("unchecked")
     @Test public void testIteratorNotFound() throws Exception {
-	txn = createTransaction();
-	ScalableHashMap test = new ScalableHashMap();
-	dataService.setBinding("test", test);
-	Bar bar = new Bar(1);
-	dataService.setBinding("bar", bar);
-	test.put(1, bar);
-	test.put(2, new Bar(2));
-	for (int i = 0; i < 2; i++) {
-	    test = dataService.getBinding("test", ScalableHashMap.class);
-	    dataService.setBinding(
-		"valuesIter",
-		new ManagedSerializable(test.values().iterator()));
-	    txn.commit();
-	    txn = createTransaction();
-	    if (i == 0) {
-		dataService.removeObject(
-		    dataService.getBinding("bar", Bar.class));
-	    }
-	    Iterator valuesIter = (Iterator)
-		dataService.getBinding(
-		    "valuesIter", ManagedSerializable.class).get();
-	    int count = 0;
-	    while (valuesIter.hasNext()) {
-		count++;
-		try {
-		    assertEquals(new Bar(2), valuesIter.next());
-		} catch (ObjectNotFoundException e) {
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableHashMap test = new ScalableHashMap();
+		    dataService.setBinding("test", test);
+		    Bar bar = new Bar(1);
+		    dataService.setBinding("bar", bar);
+		    test.put(1, bar);
+		    test.put(2, new Bar(2));
 		}
-	    }
-	    assertEquals(2, count);
+	    }, taskOwner);
+	for (int i = 0; i < 2; i++) {
+	    final int local = i;
+	    taskScheduler.runTransactionalTask(
+	        new AbstractKernelRunnable() {
+		    public void run() throws Exception {
+			ScalableHashMap test =
+			    dataService.getBinding("test",
+						   ScalableHashMap.class);
+			dataService.setBinding("valuesIter",
+			    new ManagedSerializable(test.values().iterator()));
+		    }
+		}, taskOwner);
+	    taskScheduler.runTransactionalTask(
+	        new AbstractKernelRunnable() {
+		    public void run() throws Exception {
+			if (local == 0) {
+			    dataService.
+				removeObject(dataService.
+					     getBinding("bar", Bar.class));
+			}
+			Iterator valuesIter = (Iterator)
+			    dataService.getBinding("valuesIter",
+						   ManagedSerializable.
+						   class).get();
+			int count = 0;
+			while (valuesIter.hasNext()) {
+			    count++;
+			    try {
+				assertEquals(new Bar(2), valuesIter.next());
+			    } catch (ObjectNotFoundException e) {
+			    }
+			}
+			assertEquals(2, count);
+		    }
+		}, taskOwner);
 	}
-	txn.commit();
     }
-    */
 
     @Test public void testIteratorOnSplitTree() throws Exception {
 	taskScheduler.runTransactionalTask(
@@ -3146,7 +3157,8 @@ public class TestScalableHashMap extends Assert {
      * Utility routines.
      */
 
-    public boolean equals(Map<Integer,Integer> m1, Map<Integer,Integer> m2) {
+    public boolean checkEquals(Map<Integer,Integer> m1,
+			       Map<Integer,Integer> m2) {
 
 	if (m1.size() != m2.size()) {
 	    System.out.printf("sizes not equal: %d != %d\n",
@@ -3275,6 +3287,10 @@ public class TestScalableHashMap extends Assert {
     }
 
     private static Properties createProps(String appName) throws Exception {
+        // TODO: we don't currently support creating transactions with
+        // specific timeout values, so currently the default timeout is being
+        // set very high, but when we can run specific transactions longer,
+        // this should be used for the few tests that actually need this
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
             "com.sun.sgs.app.port", "0",

@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -76,8 +75,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import java.util.concurrent.ConcurrentHashMap;
-
-import java.util.concurrent.atomic.AtomicInteger;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -202,7 +199,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     private static final long START_NOW = 0;
 
     // the internal value used to represent a task that does not repeat
-    private static final long PERIOD_NONE = -1;
+    static final long PERIOD_NONE = -1;
 
     // the system's task scheduler, where tasks actually run
     private final TaskScheduler taskScheduler;
@@ -219,6 +216,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // the data service used in the same context
     private final DataService dataService;
 
+    // the watchdog service used in the same context
+    private final WatchdogService watchdogService;
+
     // the mapping service used in the same context
     private final NodeMappingService nodeMappingService;
 
@@ -230,6 +230,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     // the transient map for all recurring handles based on identity
     private HashMap<Identity,Set<RecurringTaskHandle>> identityRecurringMap;
+
+    // a flag noting whether this service has shutdown
+    private volatile boolean isShutdown = false;
 
     // a local copy of the default priority, which is used in almost all
     // cases for tasks submitted by this service
@@ -247,6 +250,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * @param properties application properties
      * @param systemRegistry the registry of system components
      * @param transactionProxy the system's {@code TransactionProxy}
+     *
+     * @throws Exception if the service cannot be created
      */
     public TaskServiceImpl(Properties properties,
                            ComponentRegistry systemRegistry,
@@ -279,10 +284,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // ...and to the other Services that are needed
         dataService = transactionProxy.getService(DataService.class);
+        watchdogService = transactionProxy.getService(WatchdogService.class);
         nodeMappingService =
             transactionProxy.getService(NodeMappingService.class);
 
-        // note that the application is always active locally
+        // note that the application is always active locally, so there's
+        // no chance of voting the application as inactive
         activeIdentityMap.put(transactionProxy.getCurrentOwner().
                               getIdentity(), 1);
 
@@ -290,22 +297,30 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         nodeMappingService.addNodeMappingListener(this);
 
         // get the current node id for the hand-off namespace
-        nodeId = transactionProxy.getService(WatchdogService.class).
-            getLocalNodeId();
+        nodeId = watchdogService.getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
 
         // get the start delay and the length of time between hand-off checks
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         handoffStart = wrappedProps.getLongProperty(HANDOFF_START_PROPERTY,
                                                     HANDOFF_START_DEFAULT);
+        if (handoffStart < 0)
+            throw new IllegalStateException("Handoff Start property must " +
+                                            "be non-negative");
         handoffPeriod = wrappedProps.getLongProperty(HANDOFF_PERIOD_PROPERTY,
                                                      HANDOFF_PERIOD_DEFAULT);
+        if (handoffPeriod < 0)
+            throw new IllegalStateException("Handoff Period property must " +
+                                            "be non-negative");
 
         // finally, create a timer for delaying the status votes and get
         // the delay used in submitting status votes
         statusUpdateTimer = new Timer("TaskServiceImpl Status Vote Timer");
         voteDelay = wrappedProps.getLongProperty(VOTE_DELAY_PROPERTY,
                                                  VOTE_DELAY_DEFAULT);
+        if (voteDelay < 0)
+            throw new IllegalStateException("Vote Delay property must " +
+                                            "be non-negative");
     }
 
     /**
@@ -319,23 +334,33 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * {@inheritDoc}
      */
     public void ready() {
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
+
         logger.log(Level.CONFIG, "readying TaskService");
 
         appOwner = transactionProxy.getCurrentOwner();
 
-        // setup the local-node hand-off set
+        // bind the node-local hand-off set, noting that there's a (very
+        // small) chance that another node may have already tried to hand-off
+        // to us, in which case the set will already exist
         try {
             taskScheduler.runTask(new TransactionRunner(new KernelRunnable() {
                     public String getBaseTaskType() {
                         return NAME + ".HandoffBindingRunner";
                     }
                     public void run() throws Exception {
-                        dataService.setServiceBinding(localHandoffSpace,
-                                                      new StringHashSet());
+                        try {
+                            dataService.getServiceBinding(localHandoffSpace,
+                                                          StringHashSet.class);
+                        } catch (NameNotBoundException nnbe) {
+                            dataService.setServiceBinding(localHandoffSpace,
+                                                          new StringHashSet());
+                        }
                     }
                 }), appOwner, true);
         } catch (Exception e) {
-            throw new AssertionError("Failed to bind local hand-off set");
+            throw new AssertionError("Failed to setup node-local sets");
         }
 
         // assert that the application identity is active, so that there
@@ -362,6 +387,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * {@inheritDoc}
      */
     public boolean shutdown() {
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
+        isShutdown = true;
+
         // stop the handoff and status processing tasks
         handoffTaskHandle.cancel();
         statusUpdateTimer.cancel();
@@ -413,21 +442,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * {@inheritDoc}
      */
     public void scheduleTask(Task task) {
-        if (task == null)
-            throw new NullPointerException("Task must not be null");
-
-        // persist the task regardless of where it will ultimately run
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        Identity identity = owner.getIdentity();
-        TaskRunner runner = getRunner(task, identity, START_NOW, PERIOD_NONE);
-
-        // check where the owner is active to get the task running
-        if (! isMappedLocally(identity)) {
-            if (handoffTask(runner.getObjName(), identity))
-                return;
-            runner.markIgnoreIsLocal();
-        }
-        scheduleTask(runner, owner, START_NOW, defaultPriority);
+        scheduleSingleTask(task, START_NOW);
     }
 
     /**
@@ -436,10 +451,18 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     public void scheduleTask(Task task, long delay) {
         long startTime = System.currentTimeMillis() + delay;
 
-        if (task == null)
-            throw new NullPointerException("Task must not be null");
         if (delay < 0)
             throw new IllegalArgumentException("Delay must not be negative");
+
+        scheduleSingleTask(task, startTime);
+    }
+
+    /** Private helper for common scheduling code. */
+    private void scheduleSingleTask(Task task, long startTime) {
+        if (task == null)
+            throw new NullPointerException("Task must not be null");
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
 
         // persist the task regardless of where it will ultimately run
         TaskOwner owner = transactionProxy.getCurrentOwner();
@@ -467,6 +490,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new NullPointerException("Task must not be null");
         if ((delay < 0) || (period < 0))
             throw new IllegalArgumentException("Times must not be null");
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
 
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "scheduling a periodic task starting " +
@@ -484,6 +509,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 return new PeriodicTaskHandleImpl(objName);
             runner.markIgnoreIsLocal();
         }
+        PendingTask ptask =
+            dataService.getServiceBinding(objName, PendingTask.class);
+        dataService.markForUpdate(ptask);
+        ptask.setRunningNode(nodeId);
         RecurringTaskHandle handle =
             taskScheduler.scheduleRecurringTask(runner, owner, startTime,
                                                 period);
@@ -498,6 +527,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     public void scheduleNonDurableTask(KernelRunnable task) {
         if (task == null)
             throw new NullPointerException("Task must not be null");
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskOp != null)
             scheduleNDTaskOp.report();
 
@@ -514,6 +545,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new NullPointerException("Task must not be null");
         if (delay < 0)
             throw new IllegalArgumentException("Delay must not be negative");
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskDelayedOp != null)
             scheduleNDTaskDelayedOp.report();
 
@@ -531,6 +564,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new NullPointerException("Task must not be null");
         if (priority == null)
             throw new NullPointerException("Priority must not be null");
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskPrioritizedOp != null)
             scheduleNDTaskPrioritizedOp.report();
 
@@ -606,7 +641,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * already removed the pending task entry, then this method returns null
      * meaning that there is no task to run.
      */
-    private PendingTask fetchPendingTask(String objName) {
+    PendingTask fetchPendingTask(String objName) {
         PendingTask ptask = null;
         try {
             ptask = dataService.getServiceBinding(objName, PendingTask.class);
@@ -629,7 +664,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // if it's not periodic, remove both the task and the name binding,
         // checking that this doesn't change the identity's status
-        if (ptask.getPeriod() == PERIOD_NONE) {
+        if (! ptask.isPeriodic()) {
             dataService.removeServiceBinding(objName);
             dataService.removeObject(ptask);
             ctxFactory.joinTransaction().
@@ -732,6 +767,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
+            if (isShutdown) {
+                if (logger.isLoggable(Level.WARNING))
+                    logger.log(Level.WARNING, "Service is shutdown, so a " +
+                               "non-retried task {0} will not be removed",
+                               objName);
+                throw new IllegalStateException("Service is shutdown");
+            }
             fetchPendingTask(objName);
         }
     }
@@ -744,7 +786,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         private HashSet<TaskReservation> reservationSet = null;
         private HashMap<String,RecurringDetail> addedRecurringMap = null;
         private HashSet<String> cancelledRecurringSet = null;
-        private HashMap<Identity,Integer> statusMap = null;
+        private HashMap<Identity,Integer> statusMap =
+            new HashMap<Identity,Integer>();
         /** Creates context tied to the given transaction. */
         TxnState(Transaction txn) {
             super(txn);
@@ -777,12 +820,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 }
             }
             // ...and hand-off any pending status votes
-            if (statusMap != null) {
-                for (Entry<Identity,Integer> entry : statusMap.entrySet()) {
-                    int countChange = entry.getValue();
-                    if (countChange != 0)
-                        submitStatusChange(entry.getKey(), countChange);
-                }
+            for (Entry<Identity,Integer> entry : statusMap.entrySet()) {
+                int countChange = entry.getValue();
+                if (countChange != 0)
+                    submitStatusChange(entry.getKey(), countChange);
             }
         }
         /** {@inheritDoc} */
@@ -833,27 +874,17 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** Notes that a task has been added for the given identity. */
         void incrementStatusCount(Identity identity) {
-            if (statusMap == null) {
-                statusMap = new HashMap<Identity,Integer>();
+            if (statusMap.containsKey(identity))
+                statusMap.put(identity, statusMap.get(identity) + 1);
+            else
                 statusMap.put(identity, 1);
-            } else {
-                if (statusMap.containsKey(identity))
-                    statusMap.put(identity, statusMap.get(identity) + 1);
-                else
-                    statusMap.put(identity, 1);
-            }
         }
         /** Notes that a task has been removed for the given identity. */
         void decrementStatusCount(Identity identity) {
-            if (statusMap == null) {
-                statusMap = new HashMap<Identity,Integer>();
+            if (statusMap.containsKey(identity))
+                statusMap.put(identity, statusMap.get(identity) - 1);
+            else
                 statusMap.put(identity, -1);
-            } else {
-                if (statusMap.containsKey(identity))
-                    statusMap.put(identity, statusMap.get(identity) - 1);
-                else
-                    statusMap.put(identity, -1);
-            }
         }
     }
 
@@ -903,6 +934,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
+            if (isShutdown)
+                throw new IllegalStateException("Service is shutdown");
+
             // check that the task's identity is still active on this node,
             // and if not then return, cancelling the task if it's recurring
             if ((doLocalCheck) && (! isMappedLocally(taskIdentity))) {
@@ -922,6 +956,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                             return objTaskType;
                         }
                         public void run() throws Exception {
+                            // fetch the task, making sure that it's available
                             PendingTask ptask = fetchPendingTask(objName);
                             if (ptask == null) {
                                 logger.log(Level.FINER, "tried to run a task "
@@ -929,10 +964,24 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                                            "from the data service; giving up");
                                 return;
                             }
+                            // check that the task isn't perdiodic and now
+                            // running on another node
+                            if (ptask.isPeriodic()) {
+                                long node = ptask.getRunningNode();
+                                if (node != nodeId) {
+                                    // someone else picked up this task, so
+                                    // cancel it locally and we're done
+                                    ctxFactory.joinTransaction().
+                                        cancelRecurringTask(objName,
+                                                            taskIdentity);
+                                    return;
+                                }
+                            }
                             if (logger.isLoggable(Level.FINEST))
                                 logger.log(Level.FINEST, "running task {0} " +
                                            "scheduled to run at {1}",
                                            objName, ptask.getStartTime());
+                            // run the task
                             ptask.run();
                         }
                     })).run();
@@ -964,9 +1013,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             return runnable.getBaseTaskType();
         }
         public void run() throws Exception {
+            if (isShutdown)
+                throw new IllegalStateException("Service is shutdown");
             try {
                 runnable.run();
             } catch (Throwable t) {
+                // only if the task isn't going to be retried, submit the
+                // status change now
                 if ((! (t instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)t).shouldRetry()))
                     submitStatusChange(identity, -1);
@@ -983,9 +1036,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     /**
      * Private helper that restarts all of the tasks associated with the
      * given identity. This must be called within a transaction.
-     * TODO: should this be split up? If there are more than N tasks?
-     * NOTE: we are probably going to add the ability to run arbitrary
-     * unbounded transactions, exactly to support this kind of scenario
      */
     private void restartTasks(String identityName) {
         // start iterating from the root of the pending task namespace
@@ -995,9 +1045,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         int taskCount = 0;
 
         // loop through all bound names for the given identity, starting
-        // each pending task
+        // each pending task in a separate transaction
         while ((objName != null) && (objName.startsWith(prefix))) {
-            restartTask(objName, txnState);
+            scheduleNonDurableTask(new TransactionRunner(
+                    new TaskRestartRunner(objName)));
             objName = dataService.nextServiceBoundName(objName);
             taskCount++;
         }
@@ -1011,17 +1062,24 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * Private helper that restarts a single named task. This must be called
      * within a transaction.
      */
-    private void restartTask(String objName, TxnState txnState) {
+    private void restartTask(String objName) {
         PendingTask ptask =
             dataService.getServiceBinding(objName, PendingTask.class);
+
+        // check that the task is supposed to run here, or if not, that
+        // we were able to hand it off
+        boolean markLocal = false;
         Identity identity = ptask.getIdentity();
         if (! isMappedLocally(identity)) {
-            handoffTask(objName, identity);
-            return;
+            // if we handed off the task, we're done
+            if (handoffTask(objName, identity))
+                return;
+            markLocal = true;
         }
 
         TaskRunner runner = new TaskRunner(objName, ptask.getBaseTaskType(),
                                            identity);
+        runner.markIgnoreIsLocal();
         TaskOwner owner = new TaskOwnerImpl(identity, appOwner.getContext());
 
         if (ptask.getPeriod() == PERIOD_NONE) {
@@ -1046,10 +1104,31 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (start < now)
                 start += (((int)((now - start) / period)) + 1) * period;
 
+            // mark the task as running on this node so that it doesn't
+            // also run somewhere else
+            dataService.markForUpdate(ptask);
+            ptask.setRunningNode(nodeId);
+
             RecurringTaskHandle handle =
                 taskScheduler.scheduleRecurringTask(runner, owner, start,
                                                     period);
-            txnState.addRecurringTask(objName, handle, identity);
+            ctxFactory.joinTransaction().
+                addRecurringTask(objName, handle, identity);
+        }
+    }
+
+    /** A private runnable used to re-start a single task; this must be run
+        within a transaction. */
+    private class TaskRestartRunner implements KernelRunnable {
+        private final String objName;
+        TaskRestartRunner(String objName) {
+            this.objName = objName;
+        }
+        public String getBaseTaskType() {
+            return getClass().getName();
+        }
+        public void run() throws Exception {
+            restartTask(objName);
         }
     }
 
@@ -1091,6 +1170,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             Set<RecurringTaskHandle> set = identityRecurringMap.get(identity);
             if (set != null)
                 set.remove(handle);
+            if (set.isEmpty())
+                identityRecurringMap.remove(identity);
         }
     }
 
@@ -1110,7 +1191,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * Private helper method that hands-off a durable task from the current
      * node to a new node. The task needs to have already been persisted
      * as a {@code PendingTask} under the given name binding. This method
-     * must be called in the context of a valid transaction.
+     * must be called in the context of a valid transaction. If this method
+     * returns {@code false} then the task was not handed-off, and so it
+     * must be run on the local node.
+     * NOTE: we may want to revisit this final assumption, perhaps delaying
+     * such tasks, or coming up with some other policy
      */
     private boolean handoffTask(String objName, Identity identity) {
         Node handoffNode = null;
@@ -1121,8 +1206,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             // a mapping available, there's really nothing to be done except
             // just run the task locally, and in a separate thread try to get
             // the assignment taken care of
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, uie, "No mapping exists for " +
+            if (logger.isLoggable(Level.INFO))
+                logger.logThrow(Level.INFO, uie, "No mapping exists for " +
                                 "identity {0} so task {1} will run locally",
                                 identity.getName(), objName);
             assignNode(identity);
@@ -1145,15 +1230,26 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 dataService.getServiceBinding(handoffName, StringHashSet.class);
             set.add(objName);
         } catch (NameNotBoundException nnbe) {
-            // this is an extremely unlikely event, where the node has gone
-            // down, but the mapping hasn't been corrected yet
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, nnbe, "Mapping for identity " +
-                                "{0} was to node {1} which has failed so " +
-                                "task {2} will run locally",
-                                identity.getName(), newNodeId, objName);
-            assignNode(identity);
-            return false;
+            // one of two very unlikely events has happened: either we're
+            // trying to hand-off to a node that hasn't finished coming up,
+            // or we're handing-off to a node that has gone down but the
+            // mapping hasn't been corrected yet
+            if (watchdogService.getNode(newNodeId).isAlive()) {
+                // the new node is still coming up, so create its hand-off
+                // set and hand-off the task
+                StringHashSet set = new StringHashSet();
+                set.add(objName);
+                dataService.setServiceBinding(handoffName, new StringHashSet());
+            } else {
+                // since the mapped node is down, run the task locally
+                if (logger.isLoggable(Level.INFO))
+                    logger.logThrow(Level.INFO, nnbe, "Mapping for identity " +
+                                    "{0} was to node {1} which has failed " +
+                                    "so task {2} will run locally",
+                                    identity.getName(), newNodeId, objName);
+                assignNode(identity);
+                return false;
+            }
         }
 
         return true;
@@ -1184,12 +1280,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 dataService.getServiceBinding(localHandoffSpace,
                                               StringHashSet.class);
             if (! set.isEmpty()) {
-                TxnState txnState = ctxFactory.joinTransaction();
-                // TODO: should this only do N re-starts? Should it split
-                // the re-start work into different transactions?
                 Iterator<String> it = set.iterator();
                 while (it.hasNext()) {
-                    restartTask(it.next(), txnState);
+                    scheduleNonDurableTask(new TransactionRunner(
+                            new TaskRestartRunner(it.next())));
                     it.remove();
                 }
             }
@@ -1223,9 +1317,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * not access any transactional context or other services, but may
      * be called in a transaction. Note that a count of 0 is ignored.
      */
-    private void submitStatusChange(Identity identity, int count) {
+    private void submitStatusChange(Identity identity, int change) {
         // a count of zero means that nothing would change
-        if (count == 0)
+        if (change == 0)
             return;
 
         // apply the count change, and see if this changes the status
@@ -1234,7 +1328,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (activeIdentityMap.containsKey(identity)) {
                 // there is currently a count, so we'll need to see what
                 // affect the change has
-                int current = activeIdentityMap.get(identity) + count;
+                int current = activeIdentityMap.get(identity) + change;
                 assert current >= 0 : "task count went negative for " +
                     "identity: " + identity.getName();
                 if (current == 0) {
@@ -1246,9 +1340,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 }
             } else {
                 // unless the count is negative, we're going active
-                assert count >= 0 : "task count went negative for identity: " +
+                assert change >= 0 : "task count went negative for identity: " +
                     identity.getName();
-                activeIdentityMap.put(identity, count);
+                activeIdentityMap.put(identity, change);
                 active = true;
             }
 
@@ -1295,10 +1389,18 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     /** {@inheritDoc} */
     public void mappingAdded(Identity id, Node oldNode) {
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
+
+        // check that the identity isn't already mapped here
+        if (isMappedLocally(id))
+            return;
+
         // keep track of the new identity
         synchronized (mappedIdentitySet) {
             mappedIdentitySet.add(id);
         }
+
         // start-up the pending tasks for this identity
         final String identityName = id.getName();
         try {
@@ -1321,6 +1423,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     /** {@inheritDoc} */
     public void mappingRemoved(Identity id, Node newNode) {
+        if (isShutdown)
+            throw new IllegalStateException("Service is shutdown");
+
         // if the newNode is null, this means that the identity has been
         // removed entirely, so if there are still local tasks, keep
         // running them and push-back on the mapping service
@@ -1364,8 +1469,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void cancel() {
-            TaskServiceImpl.transactionProxy.getService(TaskServiceImpl.class).
-                cancelPeriodicTask(objName);
+            TaskServiceImpl service = TaskServiceImpl.transactionProxy.
+                getService(TaskServiceImpl.class);
+            if (service.isShutdown)
+                throw new IllegalStateException("Service is shutdown");
+            service.cancelPeriodicTask(objName);
         }
     }
 

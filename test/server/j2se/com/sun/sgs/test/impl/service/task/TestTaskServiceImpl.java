@@ -907,29 +907,6 @@ public class TestTaskServiceImpl extends TestCase {
             fail("Some pending non-durable tasks did not run");
     }
 
-    // FIXME: run most of the tests also with the un-assigned identity, and
-    // also with the identity but first assign it
-
-    public void testRunTaskNewIdentity() throws Exception {
-        TaskOwner newOwner =
-            new TaskOwnerImpl(new IdentityImpl("id"), taskOwner.getContext());
-        /*mappingService.assignNode(TestTaskServiceImpl.class,
-          newOwner.getIdentity());*/
-        taskScheduler.runTransactionalTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    Counter counter = getClearedCounter();
-                    for (int i = 0; i < 3; i++) {
-                        taskService.scheduleTask(new NonManagedTask());
-                        counter.increment();
-                    }
-                }
-        }, newOwner);
-
-        Thread.sleep(200);
-        assertCounterClearXAction("Some immediate tasks did not run");
-    }
-
     /**
      * Utility routines.
      */

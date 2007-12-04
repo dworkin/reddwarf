@@ -65,19 +65,19 @@ public class DummyWatchdogService implements WatchdogService {
         nodeMap.put(localId, new NodeImpl(localId));
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public String getName() {
         return getClass().getName();
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void ready() {
         Node node = nodeMap.get(localId);
         for (NodeListener listener : listeners)
             listener.nodeStarted(node);
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public boolean shutdown() {
         isAlive = false;
         nodeMap.remove(localId);
@@ -87,27 +87,27 @@ public class DummyWatchdogService implements WatchdogService {
         return true;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public long getLocalNodeId() {
         return localId;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
         return isAlive;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public boolean isLocalNodeAliveNonTransactional() {
         return isLocalNodeAlive();
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
         return nodeMap.values().iterator();
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public Node getNode(long nodeId) {
         Node node = nodeMap.get(nodeId);
         if (node == null)
@@ -115,7 +115,7 @@ public class DummyWatchdogService implements WatchdogService {
         return node;
     }
 
-    /** @{inheritDoc} */
+    /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
         listeners.add(listener);
     }

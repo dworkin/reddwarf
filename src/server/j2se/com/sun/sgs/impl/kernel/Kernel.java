@@ -97,7 +97,7 @@ class Kernel {
     // create a factory to create not-static instances.  
     private static TransactionCoordinator transactionCoordinator;
 
-    // FIXME
+    // the scheduler used by this kernel
     private final MasterTaskScheduler scheduler;
 
     // the registration point for producers of profiling data
