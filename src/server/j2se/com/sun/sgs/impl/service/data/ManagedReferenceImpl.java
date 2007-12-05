@@ -567,23 +567,23 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * ID.
      */
     static long nextObjectId(Context context, long oid) {
-	long lastFound = oid;
-	while (true) {
-	    long result = context.store.nextObjectId(context.txn, lastFound);
-	    if (result == -1) {
-		break;
-	    }
-	    lastFound = result;
-	    ManagedReferenceImpl ref = context.refs.find(lastFound);
-	    if (ref == null || !ref.isRemoved()) {
-		return result;
-	    }
-	}
 	/*
-	 * Check for newly created objects that don't appear in the data store
-	 * but are recorded in the reference table.
+	 * Find the next newly created object, but only return it if there are
+	 * no existing objects with a lower ID.
 	 */
-	return context.refs.nextNewObjectId(lastFound);
+	long nextNew = context.refs.nextNewObjectId(oid);
+	long last = oid;
+	while (true) {
+	    long nextOld = context.store.nextObjectId(context.txn, last);
+	    if (nextOld == -1 || (nextNew != -1 && nextOld > nextNew)) {
+		return nextNew;
+	    }
+	    ManagedReferenceImpl ref = context.refs.find(nextOld);
+	    if (ref == null || !ref.isRemoved()) {
+		return nextOld;
+	    }
+	    last = nextOld;
+	}
     }
 
     /**
