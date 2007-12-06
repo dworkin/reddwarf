@@ -610,7 +610,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
         synchronized (lock) {
             if (!disconnectHandled) {
-                state = State.DISCONNECTED;
+                state = State.DISCONNECTING;
                 scheduleNonTransactionalTask(new AbstractKernelRunnable() {
                     public void run() {
                         handleDisconnect(false);
