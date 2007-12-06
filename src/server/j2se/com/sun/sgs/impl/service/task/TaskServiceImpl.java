@@ -20,14 +20,13 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
-
-import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
@@ -216,9 +215,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // the data service used in the same context
     private final DataService dataService;
 
-    // the watchdog service used in the same context
-    private final WatchdogService watchdogService;
-
     // the mapping service used in the same context
     private final NodeMappingService nodeMappingService;
 
@@ -284,7 +280,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // ...and to the other Services that are needed
         dataService = transactionProxy.getService(DataService.class);
-        watchdogService = transactionProxy.getService(WatchdogService.class);
         nodeMappingService =
             transactionProxy.getService(NodeMappingService.class);
 
@@ -297,7 +292,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         nodeMappingService.addNodeMappingListener(this);
 
         // get the current node id for the hand-off namespace
-        nodeId = watchdogService.getLocalNodeId();
+        nodeId = transactionProxy.getService(WatchdogService.class).
+            getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
 
         // get the start delay and the length of time between hand-off checks
@@ -387,9 +383,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * {@inheritDoc}
      */
     public boolean shutdown() {
-        if (isShutdown)
-            throw new IllegalStateException("Service is shutdown");
-        isShutdown = true;
+        synchronized (this) {
+            if (isShutdown)
+                throw new IllegalStateException("Service is shutdown");
+            isShutdown = true;
+        }
 
         // stop the handoff and status processing tasks
         handoffTaskHandle.cancel();
@@ -935,7 +933,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         /** {@inheritDoc} */
         public void run() throws Exception {
             if (isShutdown)
-                throw new IllegalStateException("Service is shutdown");
+                return;
 
             // check that the task's identity is still active on this node,
             // and if not then return, cancelling the task if it's recurring
@@ -1014,7 +1012,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         public void run() throws Exception {
             if (isShutdown)
-                throw new IllegalStateException("Service is shutdown");
+                return;
             try {
                 runnable.run();
             } catch (Throwable t) {
@@ -1068,13 +1066,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // check that the task is supposed to run here, or if not, that
         // we were able to hand it off
-        boolean markLocal = false;
         Identity identity = ptask.getIdentity();
         if (! isMappedLocally(identity)) {
             // if we handed off the task, we're done
             if (handoffTask(objName, identity))
                 return;
-            markLocal = true;
         }
 
         TaskRunner runner = new TaskRunner(objName, ptask.getBaseTaskType(),
@@ -1132,8 +1128,16 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
     }
 
-    /** A private extension of ScalabaleHashSet to provide type info. */
-    private static class StringHashSet extends ScalableHashSet<String> {
+    /** A private extension of HashSet to provide type info. */
+    // TODO: this was originally a ScalableHashSet, but these can't be
+    // removed from the data store on shutdown because they want to use
+    // the Task Service to schedule cleanup tasks, and the Recovery
+    // Service isn't available yet to move the removal to recovery
+    // notifications...when the Recovery Service is available, this
+    // hand-off structure should be updated
+    private static class StringHashSet extends HashSet<String>
+        implements ManagedObject
+    {
         private static final long serialVersionUID = 1;
     }
 
@@ -1214,6 +1218,18 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             return false;
         }
 
+        // since the call to get an assigned node can actually return a
+        // failed node, check for this case first
+        if (! handoffNode.isAlive()) {
+            // since the mapped node is down, run the task locally
+            if (logger.isLoggable(Level.INFO))
+                logger.log(Level.INFO, "Mapping for identity {0} was to " +
+                           "node {1} which has failed so task {2} will " +
+                           "run locally", identity.getName(),
+                           handoffNode.getId(), objName);
+            return false;
+        }
+
         long newNodeId = handoffNode.getId();
         if (newNodeId == nodeId) {
             // a timing issue caused us to try handing-off to ourselves, so
@@ -1230,26 +1246,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 dataService.getServiceBinding(handoffName, StringHashSet.class);
             set.add(objName);
         } catch (NameNotBoundException nnbe) {
-            // one of two very unlikely events has happened: either we're
-            // trying to hand-off to a node that hasn't finished coming up,
-            // or we're handing-off to a node that has gone down but the
-            // mapping hasn't been corrected yet
-            if (watchdogService.getNode(newNodeId).isAlive()) {
-                // the new node is still coming up, so create its hand-off
-                // set and hand-off the task
-                StringHashSet set = new StringHashSet();
-                set.add(objName);
-                dataService.setServiceBinding(handoffName, new StringHashSet());
-            } else {
-                // since the mapped node is down, run the task locally
-                if (logger.isLoggable(Level.INFO))
-                    logger.logThrow(Level.INFO, nnbe, "Mapping for identity " +
-                                    "{0} was to node {1} which has failed " +
-                                    "so task {2} will run locally",
-                                    identity.getName(), newNodeId, objName);
-                assignNode(identity);
-                return false;
-            }
+            // this will only happen in the unlikely event that the identity
+            // has been assigned to a node that is still coming up and hasn't
+            // bound its hand-off set yet, in which case the new node will
+            // run this task when it learns about the identity mapping
         }
 
         return true;
@@ -1318,7 +1318,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * be called in a transaction. Note that a count of 0 is ignored.
      */
     private void submitStatusChange(Identity identity, int change) {
-        // a count of zero means that nothing would change
+        // a change of zero means that nothing would change
         if (change == 0)
             return;
 
@@ -1390,7 +1390,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     /** {@inheritDoc} */
     public void mappingAdded(Identity id, Node oldNode) {
         if (isShutdown)
-            throw new IllegalStateException("Service is shutdown");
+            return;
 
         // check that the identity isn't already mapped here
         if (isMappedLocally(id))
@@ -1424,7 +1424,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     /** {@inheritDoc} */
     public void mappingRemoved(Identity id, Node newNode) {
         if (isShutdown)
-            throw new IllegalStateException("Service is shutdown");
+            return;
 
         // if the newNode is null, this means that the identity has been
         // removed entirely, so if there are still local tasks, keep

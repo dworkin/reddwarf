@@ -59,10 +59,10 @@ public class TestScalableHashSet extends Assert {
     private static DataService dataService;
 
     /** A set to test. */
-    private static ScalableHashSet<Object> set;
+    private ScalableHashSet<Object> set;
 
     /** An object to use in tests. */
-    private static Int one;
+    private Int one;
 
     /** Setup */
     @BeforeClass public static void setUpClass() throws Exception {
@@ -887,7 +887,7 @@ public class TestScalableHashSet extends Assert {
     /**
      * Stores fields, if they are not null, into bindings.
      */
-    private static void endTransaction() throws Exception {
+    private void endTransaction() throws Exception {
 	if (set != null) {
 	    try {
 		dataService.setBinding("set", set);
@@ -907,7 +907,7 @@ public class TestScalableHashSet extends Assert {
      * objects are not found.
      */
     @SuppressWarnings("unchecked")
-    private static void startTransaction() throws Exception {
+    private void startTransaction() throws Exception {
 	try {
 	    set = dataService.getBinding("set", ScalableHashSet.class);
 	} catch (ObjectNotFoundException e) {
