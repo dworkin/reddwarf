@@ -752,9 +752,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 // TODO if we're expecting the session to close,
                 // don't complain.
 
-                if (logger.isLoggable(Level.WARNING)) {
+                if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
-                        Level.WARNING, e,
+                        Level.FINE, e,
                         "Write completion exception {0}, len:{1}",
                         sessionConnection, len);
                 }
@@ -848,9 +848,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
                 // TODO if we're expecting the channel to close,
                 // don't complain.
 
-                if (logger.isLoggable(Level.WARNING)) {
+                if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
-                        Level.WARNING, e,
+                        Level.FINE, e,
                         "Read completion exception {0}", sessionConnection);
                 }
                 disconnected();
