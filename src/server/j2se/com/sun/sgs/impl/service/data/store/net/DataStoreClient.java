@@ -41,7 +41,8 @@ import java.util.logging.Logger;
  * network to an implementation of {@link DataStoreServer}, and optionally runs
  * the server. <p>
  *
- * The {@link #DataStoreClient constructor} supports the following properties:
+ * The {@link #DataStoreClient(Properties) constructor} supports the following
+ * properties:
  * <p>
  *
  * <dl style="margin-left: 1em">
@@ -521,7 +522,6 @@ public final class DataStoreClient
     /** {@inheritDoc} */
     public boolean shutdown() {
 	logger.log(Level.FINER, "shutdown");
-	Exception exception;
 	try {
 	    synchronized (txnCountLock) {
 		while (txnCount > 0) {

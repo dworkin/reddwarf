@@ -49,8 +49,8 @@ import java.util.logging.Logger;
 /**
  * The {@link WatchdogServer} implementation. <p>
  *
- * The {@link #WatchdogServerImpl constructor} supports the following
- * properties: <p>
+ * The {@link #WatchdogServerImpl(Properties, ComponentRegistry, TransactionProxy)
+ * constructor} supports the following properties: <p>
  *
  * <dl style="margin-left: 1em">
  *
@@ -561,7 +561,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    renewInterval :
 		    expirationSet.first().getExpiration() - now;
 		try {
-		    Thread.currentThread().sleep(sleepTime);
+		    Thread.sleep(sleepTime);
 		} catch (InterruptedException e) {
 		}
 	    }
@@ -594,7 +594,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * This thread informs all currently known clients of node status
      * changes (either nodes started or failed) as they occur.  This
-     * thread is notified by {@link #registerNode registerNode) when
+     * thread is notified by {@link #registerNode registerNode} when
      * nodes are registered, or by the {@code CheckExpirationThread}
      * when nodes fail to renew before their expiration time has
      * lapsed.

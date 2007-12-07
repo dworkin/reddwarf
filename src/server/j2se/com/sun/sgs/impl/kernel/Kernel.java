@@ -114,7 +114,7 @@ class Kernel {
         "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.profile.AggregateProfileListener";
+        "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -124,7 +124,9 @@ class Kernel {
     // Note that each time an application is started, a new registry will
     // be created, which reassigned lastSystemRegistry.
     private ComponentRegistry lastSystemRegistry = null;
+
     // the last task owner created by this kernel, for testing only
+    @SuppressWarnings("unused")
     private TaskOwner lastOwner = null;
     
     /**
