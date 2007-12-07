@@ -94,7 +94,8 @@ public class TestWatchdogServiceImpl extends TestCase {
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
         
-        watchdogService = serverNode.getWatchdogService();
+        watchdogService =
+	    (WatchdogServiceImpl)(serverNode.getWatchdogService());
     }
     
     /** 
@@ -491,7 +492,8 @@ public class TestWatchdogServiceImpl extends TestCase {
         addNodes(null, NUM_WATCHDOGS);
         
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            WatchdogServiceImpl watchdog =
+		(WatchdogServiceImpl)(node.getWatchdogService());
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -602,7 +604,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	watchdogService.addNodeListener(listener);
         addNodes(null, NUM_WATCHDOGS);
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            WatchdogServiceImpl watchdog =
+		(WatchdogServiceImpl)(node.getWatchdogService());
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
