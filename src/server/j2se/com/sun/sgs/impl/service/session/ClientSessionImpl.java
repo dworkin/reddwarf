@@ -109,12 +109,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     public static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
     
     /** The read completion handler for IO. */
-    private final ReadHandler readHandler =
-        new ReadHandler(DEFAULT_READ_BUFFER_SIZE);
+    private ReadHandler readHandler = new ClosedReadHandler();
     
     /** The write completion handler for IO. */
-    private final WriteHandler writeHandler =
-        new WriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
+    private WriteHandler writeHandler = new ClosedWriteHandler();
 
     /** The session id. */
     private final CompactId sessionId;
@@ -524,6 +522,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
 
+	readHandler = new ClosedReadHandler();
+        writeHandler = new ClosedWriteHandler();
+
 	if (listener != null) {
 	    scheduleTask(new AbstractKernelRunnable() {
 		public void run() throws IOException {
@@ -586,6 +587,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             }
 
             sessionConnection = conn;
+            readHandler = new ConnectedReadHandler(DEFAULT_READ_BUFFER_SIZE);
+            writeHandler = new ConnectedWriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
 
             switch (state) {
 
@@ -623,10 +626,38 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      * Write completion handler for the session's connection.
-     * TODO needs a reset method when the session becomes connected
-     * TODO clear things when disconnected
      */
-    private class WriteHandler implements CompletionHandler<Void, Integer> {
+    private abstract class WriteHandler
+        implements CompletionHandler<Void, Integer>
+    {
+        public abstract Object reserve(ByteBuffer message);
+        public abstract void cancelReservation(Object reservation);
+        public abstract void write(Object reservation);
+    }
+
+    private class ClosedWriteHandler extends WriteHandler {
+
+        @Override
+        public void cancelReservation(Object reservation) {
+            throw new ClosedAsynchronousChannelException();
+        }
+
+        @Override
+        public Object reserve(ByteBuffer message) {
+            throw new ClosedAsynchronousChannelException();
+        }
+
+        @Override
+        public void write(Object reservation) {
+            throw new ClosedAsynchronousChannelException();
+        }
+
+        public void completed(IoFuture<Void, Integer> result) {
+            // Ignore
+        }
+        
+    }
+    private class ConnectedWriteHandler extends WriteHandler {
 
         private int availableToReserve;
         private LinkedList<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
@@ -638,11 +669,11 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         private IoFuture<Void, ?> writeFuture = null;
         private boolean isWriting = false;
 
-        WriteHandler(int bufferSize) {
+        ConnectedWriteHandler(int bufferSize) {
             availableToReserve = bufferSize;
         }
 
-        Object reserve(ByteBuffer message) {
+        public Object reserve(ByteBuffer message) {
             int size = message.remaining();
 
             if (size <= 0)
@@ -666,7 +697,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             return message.slice().asReadOnlyBuffer();
         }
 
-        void cancelReservation(Object reservation) {
+        public void cancelReservation(Object reservation) {
             ByteBuffer rsvp = (ByteBuffer) reservation;
             if (! rsvp.hasRemaining())
                 throw new IllegalArgumentException("bad reservation");
@@ -679,7 +710,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             }
         }
 
-        void write(Object reservation) {
+        public void write(Object reservation) {
             ByteBuffer rsvp = (ByteBuffer) reservation;
             if (! rsvp.hasRemaining())
                 throw new IllegalArgumentException("bad reservation");
@@ -765,20 +796,35 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      * Read completion handler for the session's connection.
-     * TODO needs a reset method when the session becomes connected
-     * TODO clear things when disconnected
      */
-    private class ReadHandler implements CompletionHandler<ByteBuffer, Void> {
+    private abstract class ReadHandler
+        implements CompletionHandler<ByteBuffer, Void>
+    {
+        public abstract void read();
+    }
 
-        private ByteBuffer readBuffer; // not final so we can null it (TODO)
+    private class ClosedReadHandler extends ReadHandler {
+
+        public void read() {
+            throw new ClosedAsynchronousChannelException();
+        }
+
+        public void completed(IoFuture<ByteBuffer, Void> result) {
+            // Ignore
+        }
+    }
+
+    private class ConnectedReadHandler extends ReadHandler {
+
+        private final ByteBuffer readBuffer;
         private IoFuture<ByteBuffer, ?> readFuture = null;
         private boolean isReading = false;
 
-        ReadHandler(int bufferSize) {
+        ConnectedReadHandler(int bufferSize) {
             readBuffer = ByteBuffer.allocateDirect(bufferSize);
         }
 
-        void read() {
+        public void read() {
             synchronized (lock) {
                 if (isReading)
                     throw new ReadPendingException();
@@ -829,7 +875,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
                 byte version = message.get();
                 byte serviceId = message.get();
-                byte opcode = message.get();
                 byte[] payload = new byte[message.remaining()];
                 message.get(payload);
 
@@ -838,7 +883,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
                 // Dispatch
                 boolean keepReading =
-                    bytesReceived(version, serviceId, opcode, payload);
+                    bytesReceived(version, serviceId, payload);
 
                 if (keepReading)
                     read();
@@ -865,7 +910,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         }
 
 	private boolean bytesReceived(
-            byte version, byte serviceId, byte opcode, byte[] buffer)
+            byte version, byte serviceId, byte[] buffer)
         {
 
 	    /*
@@ -886,7 +931,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	     * Dispatch message to service.
 	     */
 	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
-		return handleApplicationServiceMessage(opcode, buffer);
+		return handleApplicationServiceMessage(buffer);
 	    } else {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
@@ -903,7 +948,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }
 		    
 		    return serviceListener.receivedMessage(
-			ClientSessionImpl.this, opcode, buffer);
+			ClientSessionImpl.this, buffer);
 
                 } else {
 		    if (logger.isLoggable(Level.SEVERE)) {
@@ -926,9 +971,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	 * version and service ID have already been processed by the
 	 * caller.
 	 */
-	private boolean handleApplicationServiceMessage(byte opcode, byte[] payload) {
+	private boolean handleApplicationServiceMessage(byte[] payload) {
 
             MessageBuffer msg = new MessageBuffer(payload);
+            byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
