@@ -37,7 +37,7 @@ public interface ProtocolMessageListener {
      * message has been received by the specified client session.
      *
      * @param	session a client session
-     * @param	message a protocol messge
+     * @param	message a protocol message
      */
     void receivedMessage(SgsClientSession session, byte[] message);
 

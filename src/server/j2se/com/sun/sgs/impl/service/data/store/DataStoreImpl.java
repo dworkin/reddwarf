@@ -23,6 +23,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.db.DataEncoding;
@@ -80,7 +81,7 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl constructor} supports these public <a
+ * The {@link #DataStoreImpl(Properties) constructor} supports these public <a
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>, and the following additional properties: <p>
  *
@@ -248,8 +249,8 @@ public class DataStoreImpl
 	 *
 	 * @param	txn the transaction
 	 * @return	the associated information, or null if none is found
-	 * @throws	TransactionNotActive if the implementation determines
-	 *		that the transaction is no longer active
+	 * @throws	TransactionNotActiveException if the implementation
+	 *              determines that the transaction is no longer active
 	 * @throws	IllegalStateException if the implementation determines
 	 *		that the specified transaction does not match the
 	 *		current context
@@ -982,7 +983,6 @@ public class DataStoreImpl
 	    logger.log(
 		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	}
-	Exception exception;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
@@ -1146,7 +1146,6 @@ public class DataStoreImpl
 		       txn, classId);
 	}
 	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
-	Exception exception;
 	try {
 	    checkTxn(txn, getClassInfoOp);
 	    if (classId < 1) {

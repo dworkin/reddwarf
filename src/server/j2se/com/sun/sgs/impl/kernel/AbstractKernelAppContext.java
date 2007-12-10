@@ -19,12 +19,13 @@
 
 package com.sun.sgs.impl.kernel;
 
+import java.util.MissingResourceException;
+
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.app.TaskManager;
 
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelAppContext;
 
 import com.sun.sgs.service.Service;
