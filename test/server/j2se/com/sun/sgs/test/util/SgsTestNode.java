@@ -211,8 +211,8 @@ public class SgsTestNode {
             int requestedWatchdogPort =
                 isServerNode ?
                 0 :
-                ((WatchdogServiceImpl)(serverNode.getWatchdogService()))
-                    .getServer().getPort();
+                ((WatchdogServiceImpl)(serverNode.getWatchdogService())).
+                    getServer().getPort();
 
             int requestedNodeMapPort =
                 isServerNode ?

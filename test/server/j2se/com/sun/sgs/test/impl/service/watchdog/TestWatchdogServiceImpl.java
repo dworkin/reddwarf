@@ -34,6 +34,7 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1116,18 +1117,6 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /* -- other methods -- */
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
 
     private static class DummyNodeListener implements NodeListener {
 
