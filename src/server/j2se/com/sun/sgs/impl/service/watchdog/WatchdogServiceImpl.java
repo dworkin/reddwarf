@@ -30,16 +30,20 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -65,7 +69,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.start
  *	</b></code><br>
- *	<i>Default:</i> {@code true} <br>
+ *	<i>Default:</i> {@code false} <br>
  *	Specifies whether the watchdog server should be started by this service.
  *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
@@ -97,6 +101,15 @@ import java.util.logging.Logger;
  *	{@code 0} and no greater than {@code 65535}, otherwise the value
  *	must be non-zero, positive, and no greater than	{@code 65535}.<p>
  * 
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.watchdog.client.host
+ *	</b></code><br>
+ *	<i>Default:</i> the local host name <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Specifies the host name for the watchdog client used when
+ *	registering the node with the watchdog service.
+ *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.port
  *	</b></code><br>
@@ -144,6 +157,10 @@ public class WatchdogServiceImpl implements WatchdogService {
     private static final int DEFAULT_SERVER_PORT =
 	WatchdogServerImpl.DEFAULT_PORT;
 
+    /** The property name for the watchdog client host. */
+    private static final String CLIENT_HOST_PROPERTY =
+	CLIENT_PROPERTY_PREFIX + ".host";
+    
     /** The property name for the watchdog client port. */
     private static final String CLIENT_PORT_PROPERTY =
 	CLIENT_PROPERTY_PREFIX + ".port";
@@ -170,7 +187,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    private final TaskOwner taskOwner;
+    volatile TaskOwner taskOwner;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;
@@ -199,6 +216,16 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
 	new ConcurrentHashMap<NodeListener, NodeListener>();
+
+    /** The set of recovery listeners for this node. */
+    private final ConcurrentMap<RecoveryListener, RecoveryListener>
+	recoveryListeners =
+	    new ConcurrentHashMap<RecoveryListener, RecoveryListener>();
+
+    /** The queues of RecoveryCompleteFutures, keyed by node being recovered. */
+    private final ConcurrentMap<Node, Queue<RecoveryCompleteFuture>>
+	recoveryFutures =
+	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
 
     /** The data service. */
     final DataService dataService;
@@ -241,7 +268,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    " property must be specified");
 	    }
 	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY, true);
+ 		START_SERVER_PROPERTY, false);
 	    localHost = InetAddress.getLocalHost().getHostName();
 	    String host;
 	    int serverPort;
@@ -254,11 +281,14 @@ public class WatchdogServiceImpl implements WatchdogService {
 		serverImpl = null;
 		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
 		serverPort = wrappedProps.getIntProperty(
-		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    }
 
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
+
+	    String clientHost = wrappedProps.getProperty(
+		CLIENT_HOST_PROPERTY, localHost);
 
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
@@ -279,9 +309,13 @@ public class WatchdogServiceImpl implements WatchdogService {
 		}
 	    }
 	    dataService = txnProxy.getService(DataService.class);
+	    // TBD: This task owner is probably not correct because it
+	    // contains the system context.
 	    taskOwner = txnProxy.getCurrentOwner();
 
-	    long[] values = serverProxy.registerNode(localHost, clientProxy);
+	    // TBD: should the watchdog service that starts the
+	    // watchdog server register itself as a node?
+	    long[] values = serverProxy.registerNode(clientHost, clientProxy);
 	    if (values == null || values.length < 2) {
 		setFailedThenNotify(false);
 		throw new IllegalArgumentException(
@@ -290,6 +324,12 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    localNodeId = values[0];
 	    renewInterval = values[1];
 	    renewThread.start();
+
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG,
+			   "node registered, host:{0}, localNodeId:{1}",
+			   clientHost, localNodeId);
+	    }
 	    
 	} catch (Exception e) {
 	    logger.logThrow(
@@ -307,7 +347,12 @@ public class WatchdogServiceImpl implements WatchdogService {
     }
     
     /** {@inheritDoc} */
-    public void ready() { 
+    public void ready() {
+	// TBD: the client shouldn't accept incoming calls until this
+	// service is ready which would give all RecoveryListeners a
+	// chance to register and ensure that the taskOwner has the
+	// correct context for callbacks.
+	taskOwner = txnProxy.getCurrentOwner();
         if (serverImpl != null) {
             serverImpl.ready();
         }
@@ -388,6 +433,24 @@ public class WatchdogServiceImpl implements WatchdogService {
 	nodeListeners.putIfAbsent(listener, listener);
     }
 
+    /** {@inheritDoc} */
+    public Node getBackup(long nodeId) {
+	NodeImpl node = (NodeImpl) getNode(nodeId);
+	return
+	    (node != null && node.hasBackup()) ?
+	    getNode(node.getBackupId()) :
+	    null;
+    }
+
+    /** {@inheritDoc} */
+    public void addRecoveryListener(RecoveryListener listener) {
+	checkState();
+	if (listener == null) {
+	    throw new NullPointerException("null listener");
+	}
+	recoveryListeners.putIfAbsent(listener, listener);
+    }
+
     /**
      * This thread continuously renews this node with the watchdog server
      * before the renew interval (returned when registering the node) expires.
@@ -434,7 +497,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		     * server again before the renew interval expires.
 		     */
 		    logger.logThrow(
-			Level.WARNING, e,
+			Level.INFO, e,
 			"renewing with watchdog server throws");
 		    nextRenewInterval =
 			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
@@ -512,7 +575,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 	if (notify) {
 	    Node node = new NodeImpl(localNodeId, localHost, false);
-	    notifyListeners(node);
+	    notifyNodeListeners(node);
 	}
     }
 
@@ -527,17 +590,65 @@ public class WatchdogServiceImpl implements WatchdogService {
      *
      * @param	node a node
      */
-    private void notifyListeners(final Node node) {
+    private void notifyNodeListeners(final Node node) {
 
 	for (NodeListener listener : nodeListeners.keySet()) {
 	    final NodeListener nodeListener = listener;
 	    taskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			if (node.isAlive()) {
-			    nodeListener.nodeStarted(node);
-			} else {
-			    nodeListener.nodeFailed(node);
+			if (! shuttingDown() &&
+			    isLocalNodeAliveNonTransactional()) 
+			{
+			    if (node.isAlive()) {
+				nodeListener.nodeStarted(node);
+			    } else {
+				nodeListener.nodeFailed(node);
+			    }
+			}
+		    }
+		}, taskOwner);
+	}
+    }
+
+    /**
+     * Notifies the registered recovery listeners that the specified
+     * {@code node} needs to be recovered.
+     *
+     * @param	node a node	
+     */
+    private void notifyRecoveryListeners(final Node node) {
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
+		       localNodeId, node.getId());
+	}
+	Queue<RecoveryCompleteFuture> futureQueue =
+	    new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
+	if (recoveryFutures.putIfAbsent(node, futureQueue) != null) {
+	    // recovery for node already being handled
+	    return;
+	}
+	
+	for (RecoveryListener listener : recoveryListeners.keySet()) {
+	    final RecoveryListener recoveryListener = listener;
+	    final RecoveryCompleteFuture future =
+		new RecoveryCompleteFutureImpl(node, listener);
+	    futureQueue.add(future);
+	    taskScheduler.scheduleTask(
+		new AbstractKernelRunnable() {
+		    public void run() {
+			try {
+			    if (! shuttingDown() &&
+				isLocalNodeAliveNonTransactional())
+			    {
+				recoveryListener.recover(node, future);
+			    }
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying recovery listener on node:{0} " +
+				"with node:{1}, future:{2} throws",
+				localNodeId, node, future);
 			}
 		    }
 		}, taskOwner);
@@ -552,9 +663,11 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 	/** {@inheritDoc} */
 	public void nodeStatusChanges(
-	    long[] ids, String hosts[], boolean[] status)
+ 	    long[] ids, String hosts[], boolean[] status, long[] backups)
 	{
-	    if (ids.length != hosts.length || hosts.length != status.length) {
+	    if (ids.length != hosts.length || hosts.length != status.length ||
+		status.length != backups.length)
+	    {
 		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
@@ -562,9 +675,74 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    /* Don't notify the local node that it is alive. */
 		    continue;
 		}
-		Node node = new NodeImpl(ids[i], hosts[i], status[i]);
-		notifyListeners(node);
+		Node node =
+		    new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
+		notifyNodeListeners(node);
+		if (status[i] == false && backups[i] == localNodeId) {
+		    notifyRecoveryListeners(node);
+		}
 	    }
+	}
+    }
+
+    /**
+     * The {@code RecoveryCompleteFuture} implementation.  When {@code
+     * done} is invoked, the future instance is removed from the recovery
+     * future queue for the associated node.  If a given future is the
+     * last one to be removed from a node's queue, then recovery is
+     * complete for that node, and the data store is updated to clean
+     * up recovery information for that node.
+     */
+    private final class RecoveryCompleteFutureImpl
+	implements RecoveryCompleteFuture
+    {
+	private final Node node;
+	private final RecoveryListener listener;
+	private boolean isDone = false;
+
+	/**
+	 * Constructs an instance with the specified {@code node} and
+	 * recovery {@code listener}.
+	 */
+	RecoveryCompleteFutureImpl(Node node, RecoveryListener listener) {
+	    this.node = node;
+	    this.listener = listener;
+	}
+
+	/** {@inheritDoc} */
+	public void done() {
+	    synchronized (this) {
+		if (isDone) {
+		    return;
+		}
+		isDone = true;
+	    }
+
+	    Queue<RecoveryCompleteFuture> futureQueue =
+		recoveryFutures.get(node);
+	    assert futureQueue != null;
+	    futureQueue.remove(this);
+	    if (futureQueue.isEmpty()) {
+		// recovery for the node is complete, so remove node
+		// from table of recovery futures
+		if (recoveryFutures.remove(node) != null) {
+		    try {
+			if (isLocalNodeAliveNonTransactional()) {
+			    serverProxy.recoveredNode(node.getId(), localNodeId);
+			}
+		    } catch (Exception e) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Problem invoking WatchdogServer.recoveredNode " +
+			    "for node:{0} backup:{1}",  node, localNodeId);
+		    }
+		}
+	    }
+	}
+
+	/** {@inheritDoc} */
+	synchronized public boolean isDone() {
+	    return isDone;
 	}
     }
 }

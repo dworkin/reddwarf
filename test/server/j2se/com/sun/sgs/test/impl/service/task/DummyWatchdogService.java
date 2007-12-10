@@ -25,6 +25,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.service.RecoveryListener;
 
 import java.util.Iterator;
 import java.util.Properties;
@@ -118,6 +119,16 @@ public class DummyWatchdogService implements WatchdogService {
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
         listeners.add(listener);
+    }
+
+    /** {@inheritDoc} */
+    public Node getBackup(long nodeId) {
+	throw new AssertionError("not implemented");
+    }
+       
+    /** {@inheritDoc} */
+    public void addRecoveryListener(RecoveryListener listener) {
+	throw new AssertionError("not implemented");
     }
 
     /** A basic, private implementation of Node. */

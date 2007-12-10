@@ -28,7 +28,9 @@ import com.sun.sgs.service.Node;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 /**
  * Implements the {@link Node} interface.  The state for a given
@@ -40,15 +42,17 @@ import java.util.Iterator;
 class NodeImpl
     implements Node, ManagedObject, Serializable, Comparable<NodeImpl>
 {
-    
     /** The serialVersionUID of this class. */
     private static final long serialVersionUID = 1L;
 
+    private static final long INVALID_ID = -1L;
+
     /** The name of this class. */
-    private static final String CLASSNAME = NodeImpl.class.getName();
+    private static final String PKG_NAME =
+	"com.sun.sgs.impl.service.watchdog";
 
     /** The prefix for NodeImpl state. */
-    private static final String NODE_PREFIX = CLASSNAME;
+    private static final String NODE_PREFIX = PKG_NAME + ".node";
 
     /** The node id. */
     private final long id;
@@ -61,6 +65,12 @@ class NodeImpl
     
     /** If true, this node is considered alive. */
     private boolean isAlive;
+
+    /** The ID of the backup for this node. */
+    private long backupId = INVALID_ID;
+
+    /** The set of primaries for which this node is a backup. */
+    private Set<Long> primaryIds = new HashSet<Long>();
 
     /**
      * The expiration time for this node. A value of {@code 0} means
@@ -89,17 +99,35 @@ class NodeImpl
     /**
      * Constructs an instance of this class with the given {@code
      * nodeId}, {@code hostname}, and {@code isAlive} status.  This
-     * instance's watchdog client is set to {@code null}.
+     * instance's watchdog client is set to {@code null} and its
+     * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
     NodeImpl(long nodeId, String hostName, boolean isAlive) {
+	this(nodeId, hostName, isAlive, INVALID_ID);
+    }
+	
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostname}, {@code backupId}, and {@code
+     * isAlive} status.  This instance's watchdog client is set to
+     * {@code null}.
+     *
+     * @param 	nodeId a node ID
+     * @param 	hostName a host name, or {@code null}
+     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	backupId the ID of the node's backup (-1 if no backup
+     *		is assigned)
+     */
+    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
 	this.id = nodeId;
 	this.host = hostName;
 	this.client = null;
 	this.isAlive = isAlive;
+	this.backupId = backupId;
     }
 
     /* -- Implement Node -- */
@@ -156,7 +184,8 @@ class NodeImpl
     /** {@inheritDoc} */
     public String toString() {
 	return getClass().getName() + "[" + id + "," +
-	    (isAlive() ? "alive" : "failed") + "]@" + host;
+	    (isAlive() ? "alive" : "failed") + ",backup:" +
+	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;
     }
 
     /* -- package access methods -- */
@@ -181,6 +210,8 @@ class NodeImpl
 
     /**
      * Sets the expiration time for this node instance.
+     *
+     * @param	newExpiration the new expiration value
      */
     synchronized void setExpiration(long newExpiration) {
 	expiration = newExpiration;
@@ -199,18 +230,64 @@ class NodeImpl
     
     /**
      * Sets the alive status of this node instance to {@code false},
+     * sets this node's backup to the specified {@code backup},
+     * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
      * dataService}.  Subsequent calls to {@link #isAlive isAlive}
-     * will return {@code false}.
+     * will return {@code false}
      *
      * @param	dataService a data service
+     * @param	backup a chosen backup
      * @throws	ObjectNotFoundException if this node has been removed
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    synchronized void setFailed(DataService dataService) {
-	isAlive = false;
-	dataService.markForUpdate(this);
+    synchronized void setFailed(DataService dataService, NodeImpl backup) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	this.isAlive = nodeImpl.isAlive = false;
+	this.backupId = nodeImpl.backupId =
+	    (backup != null) ?
+	    backup.getId() :
+	    INVALID_ID;
+	this.primaryIds.clear();
+	nodeImpl.primaryIds.clear();
+    }
+
+    /**
+     * Adds the specified {@code primaryId} to the list of primaries
+     * for which this node is a backup, and updates the node's state
+     * in the specified {@code dataService}.
+     *
+     * @param	dataService a data service
+     * @param	primaryId the ID of a primary for which this node is a
+     *		backup
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void addPrimary(DataService dataService, long primaryId) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	primaryIds.add(primaryId);
+	nodeImpl.primaryIds.add(primaryId);
+    }
+
+    synchronized Set<Long> getPrimaries() {
+	return primaryIds;
+    }
+
+    /** Returns {@code true} if this node has a backup. */
+    synchronized boolean hasBackup() {
+	return backupId != INVALID_ID;
+    }
+
+    /**
+     * Returns the backup for this node.  If no backup is assigned to
+     * this node, then {@code IllegalStateException} is thrown.  This
+     * method should only be invoked if {@code hasBackup} returns
+     * {@code true}.
+     */
+    synchronized long getBackupId() {
+	return backupId;
     }
 
     /**
@@ -225,6 +302,25 @@ class NodeImpl
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
     
+    /**
+     * Fetches this node's state from the specified {@code
+     * dataService}, marked for update.
+     *
+     * @param	dataService a data service
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+     private NodeImpl getForUpdate(DataService dataService) {
+	NodeImpl nodeImpl = getNode(dataService, id);
+	if (nodeImpl == null) {
+	    throw new ObjectNotFoundException("node is removed");
+	}
+	// update non-final fields before
+	dataService.markForUpdate(nodeImpl);
+	return nodeImpl;
+    }
+
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding
@@ -287,7 +383,7 @@ class NodeImpl
 		dataService, NODE_PREFIX))
 	{
 	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
-	    node.setFailed(dataService);
+	    node.setFailed(dataService, null);
 	    nodes.add(node);
 	}
 	return nodes;
