@@ -140,11 +140,10 @@ public class GameSimBoot implements AppListener, Serializable {
         // let the player know what their new session is
         player.setCurrentSession(session);
 
-        // now that we have a valid Player ref, send it off to the lobby,
+        // now that we have a valid Player, send it off to the lobby,
         // unless they have no characters, in which case they need to go
         // to the creator first
-        ManagedReference playerRef =
-            AppContext.getDataManager().createReference(player);
+
         ManagedReference gameRef = null;
         if (player.getCharacterManager().getCharacterCount() == 0)
             gameRef = creatorRef;
