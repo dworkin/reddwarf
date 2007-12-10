@@ -40,7 +40,9 @@ public class NullAuthenticator implements IdentityAuthenticator {
      *
      * @param properties the application's configuration properties
      */
-    public NullAuthenticator(Properties properties) {
+    public NullAuthenticator(
+        @SuppressWarnings("unused") Properties properties)
+    {
     }
 
     /**

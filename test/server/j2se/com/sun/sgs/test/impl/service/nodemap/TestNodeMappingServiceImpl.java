@@ -482,12 +482,13 @@ public class TestNodeMappingServiceImpl extends TestCase {
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
+		    Set<Identity> foundSet = new HashSet<Identity>();
                     Iterator<Identity> ids = 
                         nodeMappingService.getIdentities(node.getId());
                     while (ids.hasNext()) {
-                        Identity id = ids.next();
-                        assertEquals(id, id1);
-                    }
+                        foundSet.add(ids.next());
+		    }
+		    assertTrue(foundSet.contains(id1));
                 }
         }, taskOwner);
     }
@@ -528,12 +529,13 @@ public class TestNodeMappingServiceImpl extends TestCase {
             
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable(){
                 public void run() throws Exception {
+		    Set<Identity> foundSet = new HashSet<Identity>();
                     Iterator<Identity> idIter = 
-                        nodeMappingService.getIdentities(node.getId());   
+                        nodeMappingService.getIdentities(node.getId());
                     while (idIter.hasNext()) {
-                        Identity ident = idIter.next();         
-                        assertTrue(s.contains(ident));
-                    }
+                        foundSet.add(idIter.next());
+		    }
+		    assertTrue(foundSet.containsAll(s));
                 }
             }, taskOwner);
         }
@@ -760,12 +762,13 @@ public class TestNodeMappingServiceImpl extends TestCase {
         taskScheduler.runTransactionalTask(new AbstractKernelRunnable(){
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
+		    Set<Identity> foundSet = new HashSet<Identity>();
                     Iterator<Identity> idIter = 
                         nodeMappingService.getIdentities(node.getId());   
                     while (idIter.hasNext()) {
-                        Identity id = idIter.next();         
-                        assertEquals(id, id1);
-                    }
+                        foundSet.add(idIter.next());
+		    }
+		    assertTrue(foundSet.contains(id1));
                 }
             }, taskOwner);
         swapToNormalServer(nodeMappingService, oldServer);

@@ -42,7 +42,9 @@ import junit.framework.TestCase;
 public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** The default transaction timeout. */
-    private static final long TIMEOUT = 50;
+    private static final long TIMEOUT =
+	Long.getLong(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+		     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
 
     /** Long enough for a transaction to timeout. */
     private static final long TIMED_OUT = TIMEOUT + 5;

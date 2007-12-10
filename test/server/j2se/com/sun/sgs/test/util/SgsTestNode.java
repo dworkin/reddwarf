@@ -5,6 +5,7 @@
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -13,11 +14,14 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.Serializable;
@@ -86,15 +90,12 @@ public class SgsTestNode {
     private final ComponentRegistry systemRegistry;
     
     /** Services. */
-    private final DataServiceImpl dataService;
-    private final WatchdogServiceImpl watchdogService;
-    private final NodeMappingServiceImpl nodeMappingService;
-    private final TaskServiceImpl taskService;
-    private final ClientSessionServiceImpl sessionService;
-    private final ChannelServiceImpl channelService;
-    
-    /** The listen port for the client session service. */
-    private int appPort;
+    private final DataService dataService;
+    private final WatchdogService watchdogService;
+    private final NodeMappingService nodeMappingService;
+    private final TaskService taskService;
+    private final ClientSessionService sessionService;
+    private final ChannelManager channelService;
     
     /**
      * Creates the first SgsTestNode instance in this VM.  This thread's
@@ -120,7 +121,9 @@ public class SgsTestNode {
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
-     *                     defaults
+     *                     defaults which will cause an exception to be
+     *                     thrown if the standard services have been
+     *                     replaced by custom implementations
      */
     public SgsTestNode(SgsTestNode firstNode,
                        Class listenerClass,
@@ -141,7 +144,9 @@ public class SgsTestNode {
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
-     *                     defaults
+     *                     defaults which will cause an exception to be
+     *                     thrown if the standard services have been
+     *                     replaced by custom implementations
      * @param clean if {@code true}, make sure the data store directory is 
      *                     fresh
      */
@@ -171,17 +176,20 @@ public class SgsTestNode {
             int requestedDataPort =
                 isServerNode ?
                 0 :
-                getDataServerPort(serverNode.getDataService());
+                getDataServerPort((DataServiceImpl)
+				  (serverNode.getDataService()));
 
             int requestedWatchdogPort =
                 isServerNode ?
                 0 :
-                serverNode.getWatchdogService().getServer().getPort();
+                ((WatchdogServiceImpl)(serverNode.getWatchdogService())).
+		getServer().getPort();
 
             int requestedNodeMapPort =
                 isServerNode ?
                 0 :
-                getNodeMapServerPort(serverNode.getNodeMappingService());
+                getNodeMapServerPort(((NodeMappingServiceImpl)
+				      (serverNode.getNodeMappingService())));
             
             dbDirectory = System.getProperty("java.io.tmpdir") +
                                     File.separator +  appName + ".db";
@@ -226,14 +234,13 @@ public class SgsTestNode {
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
         
-        dataService = txnProxy.getService(DataServiceImpl.class);
-        watchdogService = txnProxy.getService(WatchdogServiceImpl.class);
-        nodeMappingService = txnProxy.getService(NodeMappingServiceImpl.class);
-        taskService = txnProxy.getService(TaskServiceImpl.class);
-        sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
+        dataService = txnProxy.getService(DataService.class);
+        watchdogService = txnProxy.getService(WatchdogService.class);
+        nodeMappingService = txnProxy.getService(NodeMappingService.class);
+        taskService = txnProxy.getService(TaskService.class);
+        sessionService = txnProxy.getService(ClientSessionService.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
                 
-        appPort = sessionService.getListenPort();
     }
     
     /**
@@ -285,41 +292,41 @@ public class SgsTestNode {
     /**
      * Returns the data service.
      */
-    public DataServiceImpl getDataService() {
+    public DataService getDataService() {
 	return dataService;
     }
 
     /**
      * Returns the watchdog service.
      */
-    public WatchdogServiceImpl getWatchdogService() {
+    public WatchdogService getWatchdogService() {
 	return watchdogService;
     }
 
     /**
      * Returns the node mapping service.
      */
-    public NodeMappingServiceImpl getNodeMappingService() {
+    public NodeMappingService getNodeMappingService() {
 	return nodeMappingService;
     }
     
     /**
      * Returns the task service.
      */
-    public TaskServiceImpl getTaskService() {
+    public TaskService getTaskService() {
 	return taskService;
     }
     /**
      * Returns the client session service.
      */
-    public ClientSessionServiceImpl getClientSessionService() {
+    public ClientSessionService getClientSessionService() {
 	return sessionService;
     }
     
     /**
      * Returns the channel service.
      */
-    public ChannelServiceImpl getChannelService() {
+    public ChannelManager getChannelService() {
 	return channelService;
     }
     
@@ -331,10 +338,10 @@ public class SgsTestNode {
     }
     
     /**
-     * Returns the bound app port.
+     * Returns the nodeId for this test node.
      */
-    public int getAppPort() {
-	return appPort;
+    public long getNodeId() {
+        return getWatchdogService().getLocalNodeId();
     }
     
     /** Creates the specified directory, if it does not already exist. */
@@ -367,7 +374,7 @@ public class SgsTestNode {
     /**
      * Returns the bound port for the data server.
      */
-    private static int getDataServerPort(DataServiceImpl service) 
+    public static int getDataServerPort(DataServiceImpl service) 
         throws Exception
     {
         Field storeField = DataServiceImpl.class.getDeclaredField("store");
@@ -377,7 +384,6 @@ public class SgsTestNode {
         Field serverPortField = DataStoreClient.class.getDeclaredField("serverPort");
         serverPortField.setAccessible(true);
         return (Integer) serverPortField.get(dsClient);
-        
     }
     
     /**

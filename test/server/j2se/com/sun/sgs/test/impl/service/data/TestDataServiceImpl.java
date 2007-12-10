@@ -1827,7 +1827,11 @@ public class TestDataServiceImpl extends TestCase {
 	if (dummyId.compareTo(dummy2Id) > 0) {
 	    BigInteger temp = dummyId;
 	    dummyId = dummy2Id;
-	    dummy2Id = dummyId;
+	    dummy2Id = temp;
+	    DummyManagedObject dummyTemp = dummy;
+	    dummy = dummy2;
+	    dummy2 = dummyTemp;
+	    service.setBinding("dummy", dummy);
 	}
 	BigInteger id = dummyId;
 	while (true) {

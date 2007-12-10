@@ -96,13 +96,13 @@ class Kernel {
         "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.profile.AggregateProfileListener";
+        "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
         "com.sun.sgs.impl.auth.NullAuthenticator";
 
-        // the default services
+    // the default services
     private static final String DEFAULT_CHANNEL_SERVICE =
         "com.sun.sgs.impl.service.channel.ChannelServiceImpl";
     private static final String DEFAULT_CLIENT_SESSION_SERVICE =
@@ -694,11 +694,12 @@ class Kernel {
     
     /**
      * Shut down all applications in this kernel in reverse
-     * order of how they were started.
+     * order of how they were started, and also shutdown the
+     * task scheduler.
      */
     void shutdown() {
-        scheduler.shutdown();
         application.shutdownServices();
+        scheduler.shutdown();
     }
     
     /**

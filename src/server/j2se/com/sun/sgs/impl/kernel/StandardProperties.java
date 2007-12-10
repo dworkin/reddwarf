@@ -56,7 +56,7 @@ public class StandardProperties {
     public static final String CONFIG_FILE = NS + "config.file";
 
     /**
-     * A required key specifying the name of an applcation.
+     * A required key specifying the name of an application.
      */
     public static final String APP_NAME = NS + "app.name";
     

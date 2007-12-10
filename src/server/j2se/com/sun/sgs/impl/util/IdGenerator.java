@@ -97,8 +97,7 @@ public class IdGenerator {
 	synchronized (lock) {
 	    if (nextId > lastReservedId) {
 		ReserveIdBlockTask reserveTask = new ReserveIdBlockTask();
-		scheduler.runTask(
-		    new TransactionRunner(reserveTask), owner, true);
+		scheduler.runTransactionalTask(reserveTask, owner);
 		nextId = reserveTask.firstId;
 		lastReservedId = reserveTask.lastId;
 	    }

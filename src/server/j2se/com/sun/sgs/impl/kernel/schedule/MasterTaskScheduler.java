@@ -308,7 +308,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
                                             "task run through this scheduler");
         ThreadState.setAsSchedulerThread(true);
 
-        // NOTE: since there isn't much fairness being guarenteed by the
+        // NOTE: since there isn't much fairness being guaranteed by the
         // system yet, this method simply runs the task directly. When
         // there is more use of policy and priority in the scheduler, and
         // when the resource coordinator is being used effectively to
@@ -341,7 +341,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
 
     /**
      * Private inner class that represents a group of reservations. When a
-     * reservation is made for a group, they are all accpeted or none of them
+     * reservation is made for a group, they are all accepted or none of them
      * is accepted. When used or cancelled, it also applies to all tasks.
      */
     private static class GroupTaskReservation implements TaskReservation {
