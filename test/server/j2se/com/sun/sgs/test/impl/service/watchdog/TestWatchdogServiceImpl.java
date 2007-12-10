@@ -32,6 +32,7 @@ import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 
 import java.util.ArrayList;
@@ -102,7 +103,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
 
-        watchdogService = serverNode.getWatchdogService();
+        watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
     }
 
     /** 
@@ -282,6 +283,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -322,6 +324,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -385,6 +388,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -495,7 +499,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         addNodes(null, NUM_WATCHDOGS);
 
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -606,7 +610,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	watchdogService.addNodeListener(listener);
         addNodes(null, NUM_WATCHDOGS);
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog = node.getWatchdogService();
+            WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -656,6 +660,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
 	try {
@@ -975,6 +980,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
 	WatchdogServiceImpl watchdog = 

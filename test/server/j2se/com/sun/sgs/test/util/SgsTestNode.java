@@ -117,7 +117,7 @@ public class SgsTestNode {
     
     /** Services. */
     private final DataService dataService;
-    private final WatchdogServiceImpl watchdogService;
+    private final WatchdogService watchdogService;
     private final NodeMappingService nodeMappingService;
     private final TaskService taskService;
     private final ClientSessionService sessionService;
@@ -127,7 +127,7 @@ public class SgsTestNode {
      * Creates the first SgsTestNode instance in this VM.  This thread's
      * owner will be set to the owner which created this {@code SgsTestNode}.
      *
- appName the application name
+     * @param appName the application name
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
@@ -211,7 +211,8 @@ public class SgsTestNode {
             int requestedWatchdogPort =
                 isServerNode ?
                 0 :
-                serverNode.getWatchdogService().getServer().getPort();
+                ((WatchdogServiceImpl)(serverNode.getWatchdogService()))
+                    .getServer().getPort();
 
             int requestedNodeMapPort =
                 isServerNode ?
@@ -282,8 +283,7 @@ public class SgsTestNode {
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
         
         dataService = txnProxy.getService(DataService.class);
-        watchdogService = (WatchdogServiceImpl)
-	    txnProxy.getService(WatchdogService.class);
+        watchdogService = txnProxy.getService(WatchdogService.class);
         nodeMappingService = txnProxy.getService(NodeMappingService.class);
         taskService = txnProxy.getService(TaskService.class);
         sessionService = txnProxy.getService(ClientSessionService.class);
@@ -351,7 +351,7 @@ public class SgsTestNode {
     /**
      * Returns the watchdog service.
      */
-    public WatchdogServiceImpl getWatchdogService() {
+    public WatchdogService getWatchdogService() {
 	return watchdogService;
     }
 

@@ -750,7 +750,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	 * nodes map.
 	 */
 	private NodeImpl chooseBackup(NodeImpl node) {
-	    long nodeId = node.getId();
 	    NodeImpl choice = null;
 	    synchronized (aliveNodes) {
 		if (aliveNodes.size() > 1) {
@@ -762,7 +761,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			// unassigned until a new node is registered.
 			// This will delay recovery. -- ann (9/7/07)
 			
-			// assert backupCandidate.getId() !=  nodeId
+			// assert backupCandidate.getId() !=  node.getId()
 			if (backupCandidate.getId() != localNodeId) {
 			    choice = backupCandidate;
 			    break;
