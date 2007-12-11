@@ -121,14 +121,20 @@ public class DummyWatchdogService implements WatchdogService {
         listeners.add(listener);
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * <p>
+     *  This method is not implemented, and will throw an AssertionError.
+     */
     public Node getBackup(long nodeId) {
 	throw new AssertionError("not implemented");
     }
        
-    /** {@inheritDoc} */
+    /** {@inheritDoc} 
+     * <p> 
+     * This implementation does nothing.
+     */
     public void addRecoveryListener(RecoveryListener listener) {
-	throw new AssertionError("not implemented");
+	// Silently do nothing.
     }
 
     /** A basic, private implementation of Node. */
