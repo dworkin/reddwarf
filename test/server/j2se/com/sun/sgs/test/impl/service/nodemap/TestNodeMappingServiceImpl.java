@@ -19,6 +19,7 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -349,36 +350,72 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         final int MOVE_COUNT = 5;
         // Create a new nodeMappingServer which will move an identity
-        // automatically every so often.
-        Properties p = new Properties(serviceProps);
-        p.setProperty("com.sun.sgs.impl.service.nodemap.policy.movecount", 
-                      String.valueOf(MOVE_COUNT));
+        // automatically every so often.  
+        serviceProps.setProperty(
+                "com.sun.sgs.impl.service.nodemap.policy.movecount", 
+                String.valueOf(MOVE_COUNT));
 
-        setUp(p);
+        setUp(serviceProps);
         addNodes(null);
 
-        // Now assign a few ids.  
-        Identity ids[] = new Identity[MOVE_COUNT];
-        Node assignments[] = new Node[MOVE_COUNT];
+        final List<Identity> ids = new ArrayList<Identity>();
+        final List<Node> assignments = new ArrayList<Node>();
+        
+        final WatchdogService watchdog = serverNode.getWatchdogService();
+        // First, Gather up any ids assigned by the other services
+        // The set of nodes the watchdog knows about
+        final Set<Node> nodes = new HashSet<Node>();
+        
+        // Gather up the nodes
+        taskScheduler.runTransactionalTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Iterator<Node> iter = watchdog.getNodes();
+                    while (iter.hasNext()) {
+                        nodes.add(iter.next());
+                    }       
+
+                }
+        }, taskOwner);
+        
+        // For each node, gather up the identities
+        for (final Node node : nodes) {
+        taskScheduler.runTransactionalTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Iterator<Identity> idIter = 
+                        nodeMappingService.getIdentities(node.getId());
+                    while (idIter.hasNext()) {
+                        Identity id = idIter.next();
+                        ids.add(id);
+                        assignments.add(nodeMappingService.getNode(id));
+                    }    
+                }
+            }, taskOwner);
+        }
+        
+        // Now start adding our identities.  The round robin policy
+        // should cause a random identity to move while we do this.
         for (int i = 0; i < MOVE_COUNT; i++) {
             Identity id = new IdentityImpl("identity" + i);
-            ids[i] = id;
+            ids.add(id);
             nodeMappingService.assignNode(DataService.class, id);
             verifyMapCorrect(id);
 
             GetNodeTask task = new GetNodeTask(id);
             taskScheduler.runTransactionalTask(task, taskOwner);
-            assignments[i] = task.getNode();
+            assignments.add(task.getNode());
         }
 
         // We expected an automatic move to have occurred.
         boolean foundDiff = false;
-        for (int i = 0; i < MOVE_COUNT; i++) {
-            GetNodeTask task = new GetNodeTask(ids[i]);
+        final int size = ids.size();
+        for (int i = 0; i < size; i++) {
+            GetNodeTask task = new GetNodeTask(ids.get(i));
             taskScheduler.runTransactionalTask(task, taskOwner);
             Node current = task.getNode();
             foundDiff = foundDiff || 
-                        (current.getId() != assignments[i].getId());
+                        (current.getId() != assignments.get(i).getId());
         }
 
         assertTrue("expected an id to move", foundDiff);
@@ -490,6 +527,25 @@ public class TestNodeMappingServiceImpl extends TestCase {
                         foundSet.add(ids.next());
 		    }
 		    assertTrue(foundSet.contains(id1));
+                }
+        }, taskOwner);
+    }
+    
+    public void testGetIdentitiesNoIds() throws Exception {
+        addNodes(null);
+        // This test assumes that we can create a node that has no
+        // assignments.  That's currently true (Dec 11 2007).
+        final long nodeId = additionalNodes[NUM_NODES - 1].getNodeId();
+
+        taskScheduler.runTransactionalTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    Iterator<Identity> ids = 
+                        nodeMappingService.getIdentities(nodeId);
+                    while (ids.hasNext()) {
+                        fail("expected no identities on this node " + 
+                             ids.next());
+                    }
                 }
         }, taskOwner);
     }
