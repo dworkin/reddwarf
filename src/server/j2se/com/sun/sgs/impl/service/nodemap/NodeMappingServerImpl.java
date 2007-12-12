@@ -465,10 +465,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 found = true;
                 long nodeId = idmo.getNodeId();
 
-                isAlive = watchdogService.getNode(nodeId).isAlive();
+                node = watchdogService.getNode(nodeId);
+                isAlive = (node != null && node.isAlive());
                 if (!isAlive) {
-                    // Caller can get result from getNodeId()
-                    node = watchdogService.getNode(nodeId);
                     return;
                 }
                 // The identity already has an assignment but we still 
@@ -628,7 +627,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         boolean isDead() {
             return dead;
         }
-        /** Returns the node id for the node the identity was removed from. */
+        /** Returns the node the identity was removed from, which can be
+         *  null if the node has failed and been removed from the data store.
+         */
         Node getNode() {
             return node;
         } 
@@ -800,24 +801,39 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 public void run() {                   
                     // First, we clean up any old mappings.
                     if (oldNode != null) {
-                        // Find the old IdentityMO, with the old node info.
-                        IdentityMO oldidmo = 
-                            dataService.getServiceBinding(idkey, 
-                                                          IdentityMO.class);
-                        //Remove the old node->id key.
-                        dataService.removeServiceBinding(oldNodeKey);
+                        try {
+                            // Find the old IdentityMO, with the old node info.
+                            IdentityMO oldidmo = 
+                                dataService.getServiceBinding(idkey, 
+                                                              IdentityMO.class);
 
-                        // Remove the old status information.  We don't 
-                        // retain any info about the old node's status.
-                        Iterator<String> iter =
-                            BoundNamesUtil.getServiceBoundNamesIterator(
-                                dataService, oldStatusKey);
-                        while (iter.hasNext()) {
-                            iter.next();
-                            iter.remove();
+                            // Check once more for the assigned node - someone
+                            // else could have mapped it before we got here.
+                            // If so, just return.
+                            if (oldidmo.getNodeId() != oldNode.getId()) {
+                                return;
+                            }
+
+                            //Remove the old node->id key.
+                            dataService.removeServiceBinding(oldNodeKey);
+
+                            // Remove the old status information.  We don't 
+                            // retain any info about the old node's status.
+                            Iterator<String> iter =
+                                BoundNamesUtil.getServiceBoundNamesIterator(
+                                    dataService, oldStatusKey);
+                            while (iter.hasNext()) {
+                                iter.next();
+                                iter.remove();
+                            }
+                            // Remove the old IdentityMO with the old node info.
+                            dataService.removeObject(oldidmo);
+                        } catch (NameNotBoundException e) {
+                            // The identity was removed before we could
+                            // reassign it to a new node.
+                            // Simply make the new assignment, as if oldNode
+                            // was null to begin with.
                         }
-                        // Remove the old IdentityMO with the old node info.
-                        dataService.removeObject(oldidmo);
                     }
                     // Add (or update) the id->node mapping. 
                     dataService.setServiceBinding(idkey, newidmo);
@@ -872,7 +888,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                              
         /**             
          * Returns the node found by the watchdog service, or null if
-         * this task has not run.
+         * this task has not run or the node has failed and been removed
+         * from the data store.
          */
         public Node getNode() {
             return node;
