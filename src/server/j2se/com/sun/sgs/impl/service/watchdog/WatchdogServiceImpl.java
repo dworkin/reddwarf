@@ -589,6 +589,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * node listener.
      *
      * @param	node a node
+     * @throws  IllegalStateException if this service is shutting down
      */
     private void notifyNodeListeners(final Node node) {
 
@@ -598,7 +599,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		new AbstractKernelRunnable() {
 		    public void run() {
 			if (! shuttingDown() &&
-			    isLocalNodeAliveNonTransactional()) 
+                            isLocalNodeAliveNonTransactional()) 
 			{
 			    if (node.isAlive()) {
 				nodeListener.nodeStarted(node);

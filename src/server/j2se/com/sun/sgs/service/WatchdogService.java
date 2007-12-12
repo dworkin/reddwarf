@@ -104,6 +104,8 @@ public interface WatchdogService extends Service {
      *
      * @param	nodeId a node ID
      * @return	a backup node, or {@code null}
+     * @throws	IllegalArgumentException if the specified {@code nodeId}
+     *		is not within the range of valid IDs
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */

@@ -1079,14 +1079,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	DummyRecoveryListener() {}
 
 	public void recover(Node node, RecoveryCompleteFuture future) {
-	    if (node == null) {
-		System.err.println("DummyRecoveryListener.recover: null node");
-		return;
-	    } else if (future == null) {
-		System.err.println(
-		    "DummyRecoveryListener.recover: null future");
-		return;
-	    }
+            assert(node != null);
+            assert(future != null);
 	    
 	    if (nodes.get(node) == null) {
 		System.err.println(

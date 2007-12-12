@@ -316,7 +316,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    recoveringNodes.put(failedNode.getId(), failedNode);
 	}
 	if (!failedNodes.isEmpty()) {
-	    notifyClients(failedNodes, failedNodes);
 	    notifyClients(aliveNodes.values(), failedNodes);
 	    failedNodes.clear();
 	}
@@ -675,7 +674,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    }
 		}
 
-		// TBD: should reminders notifications be sent to
+		// TBD: should reminder notifications be sent to
 		// nodes that haven't recovered yet?
 
 		/*
@@ -699,7 +698,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			expirationSet.first().getExpiration() - now;
 		}
 		try {
-		    Thread.currentThread().sleep(sleepTime);
+		    Thread.sleep(sleepTime);
 		} catch (InterruptedException e) {
 		    return;
 		}
@@ -796,7 +795,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * This thread informs all currently known clients of node status
      * changes (either nodes started or failed) as they occur.  This
-     * thread is notified by {@link #registerNode registerNode) when
+     * thread is notified by {@link #registerNode registerNode)} when
      * nodes are registered, or by the {@code CheckExpirationThread}
      * when nodes fail to renew before their expiration time has
      * lapsed.
