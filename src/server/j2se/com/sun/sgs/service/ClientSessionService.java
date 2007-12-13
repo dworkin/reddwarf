@@ -20,13 +20,12 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionManager;
 import com.sun.sgs.app.Delivery;
 
 /**
  * The client session service manages client sessions.
  */
-public interface ClientSessionService extends ClientSessionManager, Service {
+public interface ClientSessionService extends Service {
 
     /**
      * Registers the specified protocol message listener for the

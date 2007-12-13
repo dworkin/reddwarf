@@ -30,62 +30,70 @@ import java.rmi.Remote;
 public interface ChannelServer extends Remote {
 
     /**
-     * Notifies this server that the node with the specified {@code
-     * nodeId} has one or more sessions that have joined the channel
-     * with the specified {@code channelId}.
+     * Notifies this server that it should service the event queue of
+     * the channel with the specified {@code channelId}.
      *
-     * @param	channelId a channel ID
-     * @param	nodeId a nodeId
+     * @param	channeId a channelID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void join(byte[] channelId, long nodeId)
-	throws IOException;
+    void serviceEventQueue(byte[] channelId) throws IOException;
+
+    void refresh(byte[] channelId) throws IOException;
 
     /**
-     * Notifies this server that the node with the specified {@code
-     * nodeId} has no more sessions joined to the channel with the
+     * Notifies this server that locally-connected session with the
+     * specified {@code sessionId} has joined the channel with the
      * specified {@code channelId}.
      *
      * @param	channelId a channel ID
-     * @param	nodeId a nodeId
+     * @param	sessionId a session ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void leave(byte[] channelId, long nodeId)
-	throws IOException;
+    void join(byte[] channelId, byte[] sessionId) throws IOException;
 
     /**
-     * For each client session recipient (specified by its
-     * corresponding client session ID in the {@code recipients} array
-     * of ID byte arrays), sends the specified {@code protocolMessage}
-     * to the recipient if the recipient is connected to the local
-     * node.
+     * Notifies this server that the locally-connected session with
+     * the specified {@code sessionId} has left the channel with the
+     * specified {@code channelId}.
      *
      * @param	channelId a channel ID
-     * @param	recipients an array containing client session ID
-     *		byte arrays
-     * @param	message a protocol message
-     * @param	delivery the delivery guarantee
+     * @param	sessionId a session ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(byte[] channelId,
-	      byte[][] recipients,
-	      byte[] message,
-	      Delivery delivery)
-	throws IOException;
+    void leave(byte[] channelId, byte[] sessionId) throws IOException;
+
+    /**
+     * Notifies this server that all locally-connected member sessions
+     * have left the channel with the specified {@code channelId}.
+     *
+     * @param	channelId a channel ID
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void leaveAll(byte[] channelId) throws IOException;
+
+    /**
+     * Sends the specified message to all locally-connected sessions
+     * that are members of the channel with the specified {@code
+     * channelId}.
+     *
+     * @param	channelId a channel ID
+     * @param	message a channel message
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void send(byte[] channelId, byte[] message) throws IOException;
 
     /**
      * Notifies this server that the channel with the specified {@code
-     * channelId} was closed by the node with the specified {@code
-     * nodeId}.
+     * channelId} is closed.
      *
      * @param	channelId a channel ID
-     * @param	nodeId a nodeId
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void close(byte[] channelId, long nodeId)
-	throws IOException;
+    void close(byte[] channelId) throws IOException;
 }

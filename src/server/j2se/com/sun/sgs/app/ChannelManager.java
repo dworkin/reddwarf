@@ -38,13 +38,18 @@ public interface ChannelManager {
     /**
      * Creates a new channel with the specified delivery requirement.
      *
-     * @param delivery a delivery requirement
+     * @param	delivery a delivery requirement
      *
-     * @return a new channel
+     * @return	a new channel
      *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @throws	TransactionException if the operation failed because of
+     *		a problem with the current transaction
      */
     Channel createChannel(Delivery delivery);
+    
+    // TBD: should we add this method?
+    /*
+    Channel createChannel(Delivery delivery, ClientSession[] sessions);
+    */
     
 }

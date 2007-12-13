@@ -17,28 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.channel;
+package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.sharedutil.HexDumper;
-import java.util.Set;
-import java.util.logging.Level;
+import com.sun.sgs.auth.Identity;
+import java.math.BigInteger;
 
-class OrderedUnreliableChannelImpl extends ChannelImpl {
-    
-    /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+public interface IdentityAssignment {
 
-    OrderedUnreliableChannelImpl(Delivery delivery) {
-	super(delivery);
-    }
-    
-    protected void sendToAllMembers(final byte[] channelMessage) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "sendToAllMembers channel:{0}, message:{1}",
-		this, HexDumper.format(channelMessage));
-	}
-    }
+    BigInteger getId();
+    byte[] getIdBytes();
+    Identity getIdentity();
 }

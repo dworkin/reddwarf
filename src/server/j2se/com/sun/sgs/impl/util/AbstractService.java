@@ -203,6 +203,7 @@ public abstract class AbstractService implements Service {
 	    switch (state) {
 		
 	    case INITIALIZED:
+		// TBD: is this the correct behavior?
 		throw new IllegalStateException("service not ready");
 		
 	    case READY:

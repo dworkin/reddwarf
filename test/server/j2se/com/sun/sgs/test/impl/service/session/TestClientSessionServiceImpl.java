@@ -22,7 +22,6 @@ package com.sun.sgs.test.impl.service.session;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
@@ -638,36 +637,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testClientSessionGetSessionId() throws Exception {
-	final DummyClient client = new DummyClient("clientname");
-	try {
-	    client.connect(serverNode.getAppPort());
-	    client.login("dummypassword");
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-                public void run() {
-                    DummyAppListener appListener = getAppListener();
-                    Set<ClientSession> sessions = appListener.getSessions();
-                    if (sessions.isEmpty()) {
-                        fail("appListener contains no client sessions!");
-                    }
-                    for (ClientSession session : appListener.getSessions()) {
-                        if (session.getSessionId().equals(client.getSessionId())) {
-                            System.err.println("session IDs match");
-                            return;
-                        } else {
-                            fail("Expected session id: " + client.getSessionId() +
-                                 ", got: " + session.getSessionId());
-                        }
-                    }
-                    fail("expected a connected session");
-                }
-            }, taskOwner);
-	} finally {
-	    client.disconnect(false);
-	}
-	
-    }
-
     public void testClientSend() throws Exception {
 	sendMessagesAndCheck(5, 5, null);
     }
@@ -758,10 +727,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient(String name) {
 	    this.name = name;
 	    dummyClients.put(name, this);
-	}
-
-	ClientSessionId getSessionId() {
-	    return new ClientSessionId(sessionId.getId());
 	}
 
 	void connect(int port) {
@@ -1020,7 +985,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
 		    sessionId = CompactId.getCompactId(buf);
-		    reconnectionKey = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;

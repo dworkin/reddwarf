@@ -5,7 +5,6 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ExceptionRetryStatus;
@@ -27,8 +26,7 @@ import com.sun.sgs.service.Node;
 import com.sun.sgs.service.ProtocolMessageListener;
 import java.io.IOException;
 import java.io.Serializable;
-import java.security.SecureRandom;
-import java.util.Random;
+import java.math.BigInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -48,17 +46,12 @@ class ClientSessionHandler {
 	CONNECTING,
         /** Session is connected */
         CONNECTED,
-        /** Reconnection is in progress */
-        RECONNECTING,
         /** Disconnection is in progress */
         DISCONNECTING, 
         /** Session is disconnected */
         DISCONNECTED
     }
 
-    /** Random number generator for generating session ids. */
-    private static final Random random = new Random(getSeed());
-    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(
@@ -81,20 +74,14 @@ class ClientSessionHandler {
     /** The data service. */
     private final DataService dataService;
 
+    /** The ConnectionListener for receiving messages from the client. */
+    private final ConnectionListener connectionListener;
+
     /** The Connection for sending messages to the client. */
     private volatile Connection sessionConnection;
 
-    /** The session ID. */
-    private final CompactId compactId;
-
     /** The session ID bytes. */
-    private final byte[] idBytes;
-
-    /** The reconnection key. */
-    private final CompactId reconnectionKey;
-
-    /** The ConnectionListener for receiving messages from the client. */
-    private final ConnectionListener connectionListener;
+    private volatile BigInteger id;
 
     /** The identity for this session. */
     private volatile Identity identity;
@@ -117,27 +104,20 @@ class ClientSessionHandler {
     private volatile NonDurableTaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class with the specified session
-     * {@code id}.
-     *
-     * @param	id the session ID
+     * Constructs an instance of this class.
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
-			 DataService dataService,
-			 byte[] id)
+			 DataService dataService)
     {
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.connectionListener = new Listener();
-	this.compactId = new CompactId(id);
-	this.idBytes = compactId.getId();
-	this.sessionImpl = new ClientSessionImpl(sessionService, compactId);
-	this.reconnectionKey = compactId; // not used yet
+	this.sessionImpl = new ClientSessionImpl(sessionService);
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
-		       "creating ClientSessionHandler: id:{0}, nodeId:{1}",
-		       compactId, sessionService.getLocalNodeId());
+		       "creating new ClientSessionHandler on nodeId:{0}",
+		        sessionService.getLocalNodeId());
 	}
     }
 
@@ -153,12 +133,10 @@ class ClientSessionHandler {
     }
 
     /**
-     * Returns the client session ID.
-     *
-     * @return 	the client session ID
+     * Returns the ID for the client session.
      */
-    ClientSessionId getSessionId() {
-        return new ClientSessionId(idBytes);
+    BigInteger getId() {
+	return id;
     }
 
     /**
@@ -182,8 +160,7 @@ class ClientSessionHandler {
 
 	boolean connected =
 	    currentState == State.CONNECTING ||
-	    currentState == State.CONNECTED ||
-	    currentState == State.RECONNECTING;
+	    currentState == State.CONNECTED;
 
 	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
@@ -291,8 +268,10 @@ class ClientSessionHandler {
 
 	scheduleTask(new AbstractKernelRunnable() {
 	    public void run() throws IOException {
-		ClientSessionImpl sessionImpl =
-		    ClientSessionImpl.getSession(dataService, idBytes);
+		ClientSessionImpl sessionImpl = null;
+		if (id != null) {
+		    sessionImpl = ClientSessionImpl.getSession(dataService, id);
+		}
 		if (sessionImpl != null) {
 		    sessionImpl.
 			notifyListenerAndRemoveSession(dataService, graceful);
@@ -324,41 +303,8 @@ class ClientSessionHandler {
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
-    public boolean equals(Object obj) {
-	if (this == obj) {
-	    return true;
-	} else if (obj.getClass() == this.getClass()) {
-	    ClientSessionHandler session = (ClientSessionHandler) obj;
-	    return
-		areEqualIdentities(identity, session.identity) &&
-		compactId.equals(session.compactId);
-	}
-	return false;
-    }
-
-    /**
-     * Returns {@code true} if the given identities are either both
-     * null, or both non-null and invoking {@code equals} on the first
-     * identity passing the second identity returns {@code true}.
-     */
-    private static boolean areEqualIdentities(Identity id1, Identity id2) {
-	if (id1 == null) {
-	    return id2 == null;
-	} else if (id2 == null) {
-	    return false;
-	} else {
-	    return id1.equals(id2);
-	}
-    }
-    
-    /** {@inheritDoc} */
-    public int hashCode() {
-	return compactId.hashCode();
-    }
-
-    /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + compactId;
+	return getClass().getName() + "[" + identity + "]@" + id;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -387,7 +333,6 @@ class ClientSessionHandler {
 		switch (state) {
 		    
 		case CONNECTING:
-		case RECONNECTING:
 		    state = State.CONNECTED;
 		    break;
 		default:
@@ -540,9 +485,6 @@ class ClientSessionHandler {
 		handleLoginRequest(name, password);
 		break;
 		
-	    case SimpleSgsProtocol.RECONNECT_REQUEST:
-		break;
-
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		if (identity == null) {
 		    logger.log(
@@ -639,7 +581,14 @@ class ClientSessionHandler {
 	    long assignedNodeId = node.getId();
 	    if (assignedNodeId == sessionService.getLocalNodeId()) {
 		/*
-		 * Handle login request locally.
+		 * Handle this login request locally: Set the client
+		 * session's node ID and identity, store the client
+		 * session in the data store (which assigns it an
+		 * ID--the ID of the reference to the client session
+		 * object), inform the session service that this
+		 * handler is "connected:", and schedule a task to
+		 * perform client login (call the AppListener.loggedIn
+		 * method).
 		 */
 		taskQueue =
 		    new NonDurableTaskQueue(
@@ -649,6 +598,22 @@ class ClientSessionHandler {
 		sessionImpl.setIdentityAndNodeId(
 		    authenticatedIdentity, assignedNodeId);
 		identity = authenticatedIdentity;
+		try {
+		    sessionService.runTransactionalTask(
+		    	new AbstractKernelRunnable() {
+			    public void run() {
+				sessionImpl.putSession(dataService);
+			    }
+			}, identity);
+		} catch (Exception e) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Storing ClientSession for identity:{0} throws", name);
+		    sendLoginFailureAndDisconnect();
+		    return;
+		}
+		id = sessionImpl.getId();
+		sessionService.connected(ClientSessionHandler.this);
 		scheduleTask(new LoginTask());
 		
 	    } else {
@@ -729,17 +694,6 @@ class ClientSessionHandler {
 	    currentState = state;
 	}
 	return currentState;
-    }
-
-    /** Returns a random seed to use in generating session ids. */
-    private static long getSeed() {
-	byte[] seedArray = SecureRandom.getSeed(8);
-	long seed = 0;
-	for (long b : seedArray) {
-	    seed <<= 8;
-	    seed += b & 0xff;
-	}
-	return seed;
     }
 
     /**
@@ -824,16 +778,13 @@ class ClientSessionHandler {
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    sessionImpl.putSession(dataService);
+	    CompactId compactId = new CompactId(id.toByteArray());
 	    MessageBuffer ack =
-		new MessageBuffer(
-		    3 + compactId.getExternalFormByteCount() +
-		    reconnectionKey.getExternalFormByteCount());
+		new MessageBuffer(3 + compactId.getExternalFormByteCount());
 	    ack.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		putBytes(compactId.getExternalForm()).
-		putBytes(reconnectionKey.getExternalForm());
+		putBytes(compactId.getExternalForm());
 		
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;

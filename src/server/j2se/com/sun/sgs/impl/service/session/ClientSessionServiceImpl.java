@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
@@ -35,7 +34,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -56,6 +54,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -97,17 +96,6 @@ public class ClientSessionServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
-    /** The name of the IdGenerator. */
-    private static final String ID_GENERATOR_NAME =
-	PKG_NAME + ".id.generator";
-
-    /** The name of the ID block size property. */
-    private static final String ID_BLOCK_SIZE_PROPERTY =
-	PKG_NAME + ".id.block.size";
-	
-    /** The default block size for the IdGenerator. */
-    private static final int DEFAULT_ID_BLOCK_SIZE = 256;
-    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -115,10 +103,6 @@ public class ClientSessionServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
     
-    /** Provides transaction and other information for the current thread. */
-    private static final ThreadLocal<Context> currentContext =
-        new ThreadLocal<Context>();
-
     /** The port for accepting connections. */
     private final int appPort;
 
@@ -134,9 +118,9 @@ public class ClientSessionServiceImpl
 	    new HashMap<Byte, ProtocolMessageListener>());
 
     /** A map of local session handlers, keyed by session ID . */
-    private final Map<ClientSessionId, ClientSessionHandler> handlers =
+    private final Map<BigInteger, ClientSessionHandler> handlers =
 	Collections.synchronizedMap(
-	    new HashMap<ClientSessionId, ClientSessionHandler>());
+	    new HashMap<BigInteger, ClientSessionHandler>());
 
     /** Queue of contexts that are prepared (non-readonly) or committed. */
     private final Queue<Context> contextQueue =
@@ -165,12 +149,6 @@ public class ClientSessionServiceImpl
 
     /** The identity manager. */
     final IdentityCoordinator identityManager;
-
-    /** The ID block size for the IdGenerator. */
-    private final int idBlockSize;
-    
-    /** The IdGenerator. */
-    private final IdGenerator idGenerator;
 
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
@@ -218,10 +196,6 @@ public class ClientSessionServiceImpl
 		    " property can't be negative: " + appPort);
 	    }
 
-	    idBlockSize = wrappedProps.getIntProperty(
-		ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
-		IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
-
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new SessionServerImpl();
@@ -250,11 +224,6 @@ public class ClientSessionServiceImpl
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
-	    idGenerator =
-		new IdGenerator(ID_GENERATOR_NAME,
-				idBlockSize,
-				txnProxy,
-				taskScheduler);
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
@@ -347,14 +316,6 @@ public class ClientSessionServiceImpl
 	return serverProxy;
     }
 
-    /* -- Implement ClientSessionManager -- */
-    
-    /** {@inheritDoc} */
-    public ClientSession getClientSession(String user) {
-	checkLocalNodeAlive();
-	throw new AssertionError("not implemented");
-    }
-
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
@@ -378,7 +339,8 @@ public class ClientSessionServiceImpl
 	return
 	    (session != null) ?
 	    session :
-	    ClientSessionImpl.getSession(dataService, sessionId);
+	    ClientSessionImpl.getSession(
+		dataService, new BigInteger(1, sessionId));
     }
 
     /** {@inheritDoc} */
@@ -448,7 +410,7 @@ public class ClientSessionServiceImpl
     public void sendProtocolMessageNonTransactional(
 	ClientSession session, byte[] message, Delivery delivery)
     {
-	ClientSessionId sessionId = session.getSessionId();
+	BigInteger sessionId = ((IdentityAssignment) session).getId();
 	ClientSessionHandler handler = handlers.get(sessionId);
 	/*
 	 * If a local handler exists, forward message to local handler
@@ -478,27 +440,18 @@ public class ClientSessionServiceImpl
 	 * {@inheritDoc}
 	 *
 	 * <p>Creates a new client session with the specified handle,
-	 * and adds the session to the internal session map.
+	 * and adds the session to the internal session map.  If the
+	 * handler determine that the session should not be
+	 * redirected, then the handler should be stored locally by
+	 * invoking the {@link connected} method.
 	 */
 	public ConnectionListener newConnection() {
 	    if (shuttingDown()) {
 		return null;
 	    }
-	    byte[] nextId;
-	    try {
-		nextId = idGenerator.nextBytes();
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Failed to obtain client session ID, throws");
-		return null;
-	    }
-	    logger.log(
-		Level.FINEST, "Accepting connection for session:{0}", nextId);
 	    ClientSessionHandler handler =
 		new ClientSessionHandler(
-		    ClientSessionServiceImpl.this, dataService, nextId);
-	    handlers.put(handler.getSessionId(), handler);
+		    ClientSessionServiceImpl.this, dataService);
 	    return handler.getConnectionListener();
 	}
 
@@ -787,7 +740,7 @@ public class ClientSessionServiceImpl
 		action.doAction();
 	    }
 	    if (disconnect) {
-		ClientSessionId sessionId = sessionImpl.getSessionId();
+		BigInteger sessionId = sessionImpl.getId();
 		ClientSessionHandler handler = handlers.get(sessionId);
 		if (handler != null) {
 		    handler.handleDisconnect(false);
@@ -826,7 +779,7 @@ public class ClientSessionServiceImpl
 
 	    void doAction() {
 
-		ClientSessionId sessionId = sessionImpl.getSessionId();
+		BigInteger sessionId = sessionImpl.getId();
 		ClientSessionHandler handler = handlers.get(sessionId);
 		/*
 		 * If a local handler exists, forward messages to
@@ -866,7 +819,7 @@ public class ClientSessionServiceImpl
 		
 		    try {
 			boolean connected = sessionImpl.getClientSessionServer().
-			    sendProtocolMessages(sessionId.getBytes(),
+			    sendProtocolMessages(sessionId.toByteArray(), null,
 						 messageData,
 						 deliveryData);
 			if (! connected) {
@@ -994,9 +947,9 @@ public class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public boolean sendProtocolMessage(
-	    byte[] sessionId, byte[] message, Delivery delivery)
+ 	    byte[] idBytes, long seq, byte[] message, Delivery delivery)
 	{
-	    ClientSessionId id = new ClientSessionId(sessionId);
+	    BigInteger id = new BigInteger(1, idBytes);
 	    ClientSessionHandler handler = handlers.get(id);
 	    if (handler != null) {
 		if (handler.isConnected()) {
@@ -1018,10 +971,11 @@ public class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public boolean sendProtocolMessages(byte[] sessionId,
+					    long [] seq,
 					    byte[][] messages,
 					    Delivery[] delivery)
 	{
-	    ClientSessionId id = new ClientSessionId(sessionId);
+	    BigInteger id = new BigInteger(1, sessionId);
 	    ClientSessionHandler handler = handlers.get(id);
 	    if (handler == null || ! handler.isConnected()) {
 		logger.log (
@@ -1044,7 +998,7 @@ public class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public boolean disconnect(byte[] sessionId) {
-	    ClientSessionId id = new ClientSessionId(sessionId);
+	    BigInteger id = new BigInteger(1, sessionId);
 	    ClientSessionHandler handler = handlers.get(id);
 	    if (handler != null) {
 		if (handler.isConnected()) {
@@ -1093,7 +1047,7 @@ public class ClientSessionServiceImpl
      * {@code idBytes}.
      */
     private ClientSessionHandler getHandler(byte[] idBytes) {
-	return handlers.get(new ClientSessionId(idBytes));
+	return handlers.get(new BigInteger(1, idBytes));
     }
 
     /**
@@ -1125,19 +1079,10 @@ public class ClientSessionServiceImpl
      * Returns the client session service relevant to the current
      * context.
      *
-     * <p>Note: this method is public so that the {@link
-     * ClientSessionId#getClientSession(byte[])} method can access
-     * this service to obtain a {@code ClientSession} for an ID
-     * encapsulated in a byte array.
-     *
-     * <p>TBD: Alternatively, a {@code getClientSession(byte[])}
-     * method could be added to the {@code ClientSessionManager}
-     * interface.
-     *
      * @return the client session service relevant to the current
      * context
      */
-    public synchronized static ClientSessionServiceImpl getInstance() {
+    synchronized static ClientSessionServiceImpl getInstance() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not initialized");
 	} else {
@@ -1154,9 +1099,17 @@ public class ClientSessionServiceImpl
     }
 
     /**
+     * Adds the handler for the specified sessions to the internal
+     * session map.
+     */
+    void connected(ClientSessionHandler handler) {
+	handlers.put(handler.getId(), handler);
+    }
+    
+    /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(ClientSession session) {
+    void disconnected(ClientSessionImpl session) {
 	if (shuttingDown()) {
 	    return;
 	}
@@ -1166,7 +1119,7 @@ public class ClientSessionServiceImpl
 	{
 	    serviceListener.disconnected(session);
 	}
-	handlers.remove(session.getSessionId());
+	handlers.remove(session.getId());
     }
 
     /**

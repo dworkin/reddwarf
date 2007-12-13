@@ -62,7 +62,7 @@ public interface ClientSessionServer extends Remote {
      * 		invoking this method
      */
     boolean sendProtocolMessage(
-	byte[] sessionId, byte[] message, Delivery delivery)
+	byte[] sessionId, long seq, byte[] message, Delivery delivery)
 	throws IOException;
 
     /**
@@ -85,6 +85,7 @@ public interface ClientSessionServer extends Remote {
      * 		invoking this method
      */
     boolean sendProtocolMessages(byte[] sessionId,
+				 long[] seq,
 				 byte[][] messages,
 				 Delivery[] delivery)
 	throws IOException;

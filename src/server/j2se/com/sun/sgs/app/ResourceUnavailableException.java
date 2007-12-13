@@ -20,13 +20,17 @@
 package com.sun.sgs.app;
 
 /**
- * Thrown when an operation fails because it referred to a name that
- * is currently bound to an object.
+ * Thrown when an operation fails because a resource, necessary for
+ * the operation, is unavailable.
  *
- * @see	ChannelManager#getChannel ChannelManager.getChannel
+ * @see ClientSession#send
+ * @see Channel#send
+ * @see ClientSessionListener#receivedMessage
  */
-public class NameExistsException extends RuntimeException {
-
+public class ResourceUnavailableException
+    extends RuntimeException
+    implements ExceptionRetryStatus
+{
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
@@ -35,7 +39,7 @@ public class NameExistsException extends RuntimeException {
      *
      * @param	message the detail message or <code>null</code>
      */
-    public NameExistsException(String message) {
+    public ResourceUnavailableException(String message) {
 	super(message);
     }
 
@@ -46,7 +50,18 @@ public class NameExistsException extends RuntimeException {
      * @param	message the detail message or <code>null</code>
      * @param	cause the cause or <code>null</code>
      */
-    public NameExistsException(String message, Throwable cause) {
+    public ResourceUnavailableException(String message, Throwable cause) {
 	super(message, cause);
+    }
+
+    /* -- Implement ExceptionRetryStatus -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation always returns <code>true</code>.
+     */
+    public boolean shouldRetry() {
+	return true;
     }
 }

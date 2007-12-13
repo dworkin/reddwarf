@@ -26,13 +26,11 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TaskManager;
@@ -46,6 +44,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -430,7 +429,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
 		try {
-		    channel.join(null);
+		    channel.join((ClientSession) null);
 		    fail("Expected NullPointerException");
 		} catch (NullPointerException e) {
 		    System.err.println(e);
@@ -567,7 +566,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
 		try {
-		    channel.leave(null);
+		    channel.leave((ClientSession) null);
 		    fail("Expected NullPointerException");
 		} catch (NullPointerException e) {
 		    System.err.println(e);
@@ -722,35 +721,6 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    /* -- Test Channel.hasSessions -- */
-
-    public void testChannelHasSessionsNoTxn() throws Exception {
-	Channel channel = createChannel();
-	try {
-	    channel.hasSessions();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testChannelHasSessionsClosedChannel() throws Exception {
-	final String channelName = "test";
-	createChannel(channelName);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-		channel.close();
-		try {
-		    channel.hasSessions();
-		    fail("Expected IllegalStateException");
-		} catch (IllegalStateException e) {
-		    System.err.println(e);
-		}
-	    }
-	}, taskOwner);
-    }
-
     private void printServiceBindings() throws Exception {
 	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
@@ -766,94 +736,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}, taskOwner);
     }
 
-    public void testChannelHasSessionsNoSessionsJoined() throws Exception {
-	final String channelName = "test";
-	createChannel(channelName);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-		if (channel.hasSessions()) {
-		    fail("Expected hasSessions to return false");
-		}
-		System.err.println("hasSessions returned false");
-	    }
-	}, taskOwner);
-    }
-    
-    public void testChannelHasSessionsSessionsJoined() throws Exception {
-	final String channelName = "leaveTest";
-	createChannel(channelName);
-	ClientGroup group = new ClientGroup(someUsers);
-	
-	try {
-	    joinUsers(channelName, someUsers);
-	    checkUsersJoined(channelName, someUsers);
-
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    if (!channel.hasSessions()) {
-			fail("Expected hasSessions to return true");
-		    }
-		    System.err.println("hasSessions returned true");
-		    channel.close();
-		}
-	    }, taskOwner);
-
-	} finally {
-	    group.disconnect(false);
-	}
-    }
-
-    /* -- Test Channel.getSessions -- */
-
-    public void testChannelGetSessionsNoTxn() throws Exception {
-	Channel channel = createChannel();
-	try {
-	    getSessions(channel);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testChannelGetSessionsClosedChannel() throws Exception {
-	final String channelName = "test";
-	createChannel(channelName);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-		channel.close();
-		try {
-		    getSessions(channel);
-		    fail("Expected IllegalStateException");
-		} catch (IllegalStateException e) {
-		    System.err.println(e);
-		}
-	    }
-	}, taskOwner);
-    }
-
-    public void testChannelGetSessionsNoSessionsJoined() throws Exception {
-	final String channelName = "test";
-	createChannel(channelName);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-
-		if (!getSessions(channel).isEmpty()) {
-		    fail("Expected no sessions");
-		}
-		System.err.println("No sessions joined");
-	    }
-	}, taskOwner);
-    }
-    
-    public void testChannelGetSessionsSessionsJoined() throws Exception {
-	testChannelJoin();
-    }
-
-    /* -- Test Channel.send (to all) -- */
+    /* -- Test Channel.send -- */
 
     private static byte[] testMessage = new byte[] {'x'};
 
@@ -1230,7 +1113,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private Set<ClientSession> getSessions(Channel channel) {
 	Set<ClientSession> sessions = new HashSet<ClientSession>();
-	Iterator<ClientSession> iter = channel.getSessions();
+	Iterator<ClientSession> iter = ((ChannelImpl) channel).getSessions();
 	while (iter.hasNext()) {
 	    sessions.add(iter.next());
 	}
@@ -1311,7 +1194,6 @@ public class TestChannelServiceImpl extends TestCase {
 	//private CompactId channelId = null;
 	private String reason;	
 	private String redirectHost;
-	private CompactId reconnectionKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
@@ -1659,7 +1541,6 @@ public class TestChannelServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
 		    sessionId = CompactId.getCompactId(buf);
-		    reconnectionKey = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;

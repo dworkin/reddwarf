@@ -19,7 +19,6 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.auth.Identity;
 import java.io.Serializable;
 
 /**
@@ -57,6 +56,9 @@ import java.io.Serializable;
  * {@code ClientSessionListener} with a {@code boolean} that
  * if {@code true} indicates the client logged out gracefully.
  *
+ * <p>If the application removes a {@code ClientSession} object from
+ * the data store, that session will be forcibly disconnected.
+ *
  * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that
  * client.  When that client logs back in again, a new session is
@@ -73,26 +75,7 @@ public interface ClientSession extends ManagedObject {
      * 		a problem with the current transaction
      */
     String getName();
-
-    /**
-     * Returns the identity for this session.
-     *
-     * @return	the identity for this session
-     */
-    Identity getIdentity();
-
-    /**
-     * Returns a {@code ClientSessionId} containing the representation
-     * of the session identifier for this session.  The session
-     * identifier is constant for the life of this session.
-     *
-     * @return 	the {@code ClientSessionId} for this session
-     *
-     * @throws	TransactionException if the operation failed because of
-     * 		a problem with the current transaction
-     */
-    ClientSessionId getSessionId();
-
+    
     /**
      * Sends a message contained in the specified byte array to this
      * session's client.
@@ -103,11 +86,15 @@ public interface ClientSession extends ManagedObject {
      
      * @param	message a message
      *
+     * @return	this client session
+     *
      * @throws	IllegalStateException if this session is disconnected
+     * @throws	MessageRejectedException if there are not enough resources
+     *		to send the specified message
      * @throws	TransactionException if the operation failed because of
      *		 a problem with the current transaction
      */
-    void send(byte[] message);
+    ClientSession send(byte[] message);
 
     /**
      * Forcibly disconnects this client session.  If this session is

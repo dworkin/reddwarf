@@ -39,18 +39,6 @@ public final class AppContext {
     }
 
     /**
-     * Returns the {@code ClientSessionManager} for use by the current
-     * application.  The object returned is not serializable, and should not be
-     * stored as part of a managed object.
-     *
-     * @return	the {@code ClientSessionManager} for the current application
-     */
-    public static ClientSessionManager getClientSessionManager() {
-        //return ContextResolver.getClientSessionManager();
-	throw new AssertionError("not implemented");
-    }
-    
-    /**
      * Returns the {@code DataManager} for use by the current application.
      * The object returned is not serializable, and should not be stored as
      * part of a managed object.

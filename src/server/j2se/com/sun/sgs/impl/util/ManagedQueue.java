@@ -35,7 +35,7 @@ import java.util.Iterator;
  */
 public class ManagedQueue<E>
     extends AbstractQueue<E>
-    implements ManagedObject, Serializable, ManagedObjectRemoval
+    implements Serializable, ManagedObjectRemoval
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -141,6 +141,15 @@ public class ManagedQueue<E>
 	throw new AssertionError("not implemented");
     }
 
+    /* -- Implement Object.toString -- */
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return getClass().getName() + '@' + Integer.toHexString(hashCode());
+    }
+
+    /* -- Implement ManagedObjectRemoval -- */
+
     /**
      * {@inheritDoc}
      *
@@ -151,9 +160,10 @@ public class ManagedQueue<E>
 	clear();
     }
 
+    /* -- Other methods -- */
+    
     @SuppressWarnings("unchecked")
     private Entry<E> getHead() {
 	return headRef.get(Entry.class);
     }
-    
 }

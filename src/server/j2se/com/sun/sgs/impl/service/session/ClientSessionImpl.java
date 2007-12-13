@@ -20,14 +20,13 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -39,6 +38,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,8 +46,9 @@ import java.util.logging.Logger;
 /**
  * Implements a client session (proxy).
  */
-public class ClientSessionImpl implements ClientSession, Serializable {
-    
+public class ClientSessionImpl
+    implements ClientSession, NodeAssignment, IdentityAssignment, Serializable
+{
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
@@ -70,15 +71,15 @@ public class ClientSessionImpl implements ClientSession, Serializable {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "impl"));
 
-    /** The session ID. */
-    private transient CompactId compactId;
-
     /** The local ClientSessionService. */
     private transient ClientSessionServiceImpl sessionService;
 
-    /** The session ID bytes. */
-    private final byte[] idBytes;
+    /** The session ID. */
+    private volatile BigInteger id;
 
+    /** The session ID bytes. */
+    private volatile byte[] idBytes;
+    
     /** The identity for this session. */
     private volatile Identity identity;
 
@@ -97,18 +98,16 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService} and {@code compactId}.
+     * sessionService}.  The session's ID, identity, and nodeId are
+     * set when this instance is persisted.
      *
      * @param	sessionService a client session service
-     * @param	compactId a session ID
      */
-    ClientSessionImpl(ClientSessionServiceImpl sessionService, CompactId compactId) {
-	if (sessionService == null || compactId == null) {
-	    throw new NullPointerException("null argument");
+    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+	if (sessionService == null) {
+	    throw new NullPointerException("null sessionService");
 	}
 	this.sessionService = sessionService;
-	this.compactId = compactId;
-	this.idBytes = compactId.getId();
 	this.sessionServer = sessionService.getServerProxy();
     }
 
@@ -117,15 +116,15 @@ public class ClientSessionImpl implements ClientSession, Serializable {
      * external form.
      */
     private ClientSessionImpl(ClientSessionServiceImpl sessionService,
-			      CompactId compactId,
+			      byte[] idBytes,
 			      Identity identity,
 			      long nodeId,
 			      ClientSessionServer sessionServer,
 			      boolean connected)
     {
 	this.sessionService = sessionService;
-	this.compactId = compactId;
-	this.idBytes = compactId.getId();
+	this.idBytes = idBytes;
+	this.id = new BigInteger(1, idBytes);
 	this.identity = identity;
 	this.nodeId = nodeId;
 	this.sessionServer = sessionServer;
@@ -136,21 +135,12 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 
     /** {@inheritDoc} */
     public String getName() {
+	if (identity == null) {
+	    throw new IllegalStateException("session identity not initialized");
+	}
         String name = identity.getName();
 	logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
-    }
-    
-    /** {@inheritDoc} */
-    public Identity getIdentity() {
-        logger.log(Level.FINEST, "getIdentity returns {0}", identity);
-	return identity;
-    }
-
-    /** {@inheritDoc} */
-    public ClientSessionId getSessionId() {
-	logger.log(Level.FINEST, "getSessionId returns {0}", compactId);
-        return new ClientSessionId(idBytes);
     }
 
     /** {@inheritDoc} */
@@ -160,7 +150,7 @@ public class ClientSessionImpl implements ClientSession, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void send(final byte[] message) {
+    public ClientSession send(final byte[] message) {
 	try {
             if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
                 throw new IllegalArgumentException(
@@ -181,14 +171,15 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 	    // session server and the sequence number should be assigned there.
 	    sessionService.sendProtocolMessage(
 		this, buf.getBuffer(), Delivery.RELIABLE);
+	
+	    logger.log(Level.FINEST, "send message:{0} returns", message);
+	    return this;
 
 	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.FINEST, e, "send message:{0} throws", message);
 	    throw e;
 	}
-	
-	logger.log(Level.FINEST, "send message:{0} returns", message);
     }
 
     /** {@inheritDoc} */
@@ -199,6 +190,33 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 	logger.log(Level.FINEST, "disconnect returns");
     }
 
+    /* -- Implement NodeAssignment -- */
+
+    /** {@inheritDoc} */
+    public long getNodeId() {
+	return nodeId;
+    }
+    
+    /* -- Implement IdentityAssignment -- */
+
+    /** {@inheritDoc} */
+    public Identity getIdentity() {
+        logger.log(Level.FINEST, "getIdentity returns {0}", identity);
+	return identity;
+    }
+
+    /**
+     * Returns the ID of this client session as a {@code BigInteger}.
+     */
+    public BigInteger getId() {
+	logger.log(Level.FINEST, "getSessionId returns {0}", id);
+        return id;
+    }
+
+    public byte[] getIdBytes() {
+	return idBytes;
+    }
+    
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
@@ -208,43 +226,42 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 	} else if (obj.getClass() == this.getClass()) {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return
-		areEqualIdentities(getIdentity(), session.getIdentity()) &&
-		compactId.equals(session.compactId);
+		equalsInclNull(identity, session.identity) &&
+		equalsInclNull(id, session.id);
 	}
 	return false;
     }
 
     /**
-     * Returns {@code true} if the given identities are either both
+     * Returns {@code true} if the given objects are either both
      * null, or both non-null and invoking {@code equals} on the first
-     * identity passing the second identity returns {@code true}.
+     * object passing the second object returns {@code true}.
      */
-    private static boolean areEqualIdentities(Identity id1, Identity id2) {
-	if (id1 == null) {
-	    return id2 == null;
-	} else if (id2 == null) {
+    private static boolean equalsInclNull(Object obj1, Object obj2) {
+	if (obj1 == null) {
+	    return obj2 == null;
+	} else if (obj2 == null) {
 	    return false;
 	} else {
-	    return id1.equals(id2);
+	    return obj1.equals(obj2);
 	}
     }
     
     /** {@inheritDoc} */
     public int hashCode() {
-	return compactId.hashCode();
+	return id.hashCode();
     }
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@" + compactId;
+	return getClass().getName() + "[" + getName() + "]@" + id;
     }
     
     /* -- Serialization methods -- */
 
     private Object writeReplace() {
 	return
-	    new External(
-		idBytes, identity, nodeId, sessionServer, connected);
+	    new External(idBytes, identity, nodeId, sessionServer, connected);
     }
 
     /**
@@ -286,37 +303,18 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 	private Object readResolve() throws ObjectStreamException {
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
-	    ClientSessionImpl sessionImpl =
-		sessionService.getLocalClientSessionImpl(idBytes);
+	    ClientSessionImpl sessionImpl = null;
+	    if (nodeId == sessionService.getLocalNodeId()) {
+		sessionImpl =
+		    sessionService.getLocalClientSessionImpl(idBytes);
+	    }
 	    if (sessionImpl == null) {
-		CompactId compactId = new CompactId(idBytes);
 		sessionImpl = new ClientSessionImpl(
-		    sessionService, compactId, identity, nodeId,
+		    sessionService, idBytes, identity, nodeId,
 		    sessionServer, connected);
 	    }
 	    return sessionImpl;
 	}
-    }
-
-    /* -- Public instance methods -- */
-    
-    /**
-     * Returns the client session ID for this client session in {@code
-     * CompactId} format.
-     *
-     * @return	the client session ID as a {@code CompactId}
-     */
-    public CompactId getCompactSessionId() {
-	return compactId;
-    }
-
-    /**
-     * Returns the node ID for this client session.
-     *
-     * @return	the node ID for this client session
-     */
-    public long getNodeId() {
-	return nodeId;
     }
 
     /* -- Other methods -- */
@@ -339,38 +337,39 @@ public class ClientSessionImpl implements ClientSession, Serializable {
 	if (identity == null) {
 	    throw new IllegalStateException("session's identity is not set");
 	}
+	ManagedReference sessionRef = dataService.createReference(this);
+	id = sessionRef.getId();
+	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(idBytes), this);
 	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
 	dataService.setServiceBinding(getMessageQueueKey(idBytes),
 				      new ManagedQueue<ProtocolMessage>());
+	logger.log(Level.FINEST, "Stored session, identity:{0} id:{1}",
+		   identity, id);
     }
 
     /**
      * Returns the {@code ClientSession} instance for the given {@code
-     * idBytes}, retrieved from the specified {@code dataService}, or
+     * id}, retrieved from the specified {@code dataService}, or
      * {@code null} if the client session isn't bound in the data
      * service.  This method should only be called within a
      * transaction.
      *
      * @param	dataService a data service
-     * @param	idBytes a sessionID
-     * @return	the session for the given session {@code idBytes},
+     * @param	id a session ID
+     * @return	the session for the given session {@code id},
      *		or {@code null}
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    static ClientSessionImpl getSession(DataService dataService, byte[] idBytes) {
-	String key = getSessionKey(idBytes);
+    static ClientSessionImpl getSession(
+	DataService dataService, BigInteger id)
+    {
 	ClientSessionImpl sessionImpl = null;
 	try {
-	    sessionImpl =
-		dataService.getServiceBinding(key, ClientSessionImpl.class);
-	} catch (NameNotBoundException e) {
-	} catch (ObjectNotFoundException e) {
-	    logger.logThrow(
-		Level.SEVERE, e,
-		"ClientSessionImpl binding:{0} exists, but object removed",
-		key);
+	    ManagedReference sessionRef = dataService.createReferenceForId(id);
+	    sessionImpl = sessionRef.get(ClientSessionImpl.class);
+	} catch (ObjectNotFoundException e)  {
 	}
 	return sessionImpl;
     }
