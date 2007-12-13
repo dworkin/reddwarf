@@ -13,11 +13,12 @@ import java.util.Properties;
  * performance information after each task has run a number of times.  This
  * test provides a simple metric for the performance of the task service.  By
  * default, the number of tasks scheduled equals the number of available
- * processors, but the value can be specified with the {@value #TASKS_KEY}
- * configuration property.  The total number of times the tasks are run can be
- * specified with the {@value #TOTAL_COUNT_KEY} property, and defaults to
- * {@value #DEFAULT_TOTAL_COUNT}.  Allocates a new object for each task run if
- * the {@value #ALLOCATE_KEY} configuration property is set to {@code true}.
+ * processors, but the value can be specified with the {@code
+ * com.sun.sgs.analysis.task.BasicScheduleTasks.tasks} configuration property.
+ * The total number of times the tasks are run can be specified with the {@code
+ * com.sun.sgs.analysis.task.BasicScheduleTasks.total.count} property, and
+ * defaults to {@code 10000}.  Allocates a new object for each task run if the
+ * {@value #ALLOCATE_KEY} configuration property is set to {@code true}.
  */
 public class ScheduleSimpleTasks extends BasicScheduleTasks {
 
@@ -29,7 +30,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
      * for each task run.
      */
     public static final String ALLOCATE_KEY =
-	ScheduleSimpleTasks.class.getName() + ".allocate";
+	"com.sun.sgs.analysis.task.ScheduleSimpleTasks.allocate";
 
     /** Whether to allocate new tasks as managed objects. */
     private final boolean allocate;

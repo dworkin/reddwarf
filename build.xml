@@ -134,7 +134,10 @@
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server,build-client"
+  <target name="build"
+	  depends="build-server, build-client, -test-shared.classes,
+		   -test-server.classes, -test-client.classes,
+		   analysis-classes"
 	  description="Builds code"/>
 
   <!-- Builds the shared code -->
@@ -215,6 +218,7 @@
         <pathelement location="${build.dir}/test/classes/client"/>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <pathelement location="${build.dir}/example/classes"/>
+	<pathelement location="${build.dir}/analysis/classes"/>
         <path refid="server.classpath"/>
         <path refid="client.classpath"/>
         <pathelement location="lib/junit-4.1.jar"/>
@@ -223,6 +227,7 @@
         <dirset dir="src" includes="*/j2se"/>
         <dirset dir="test" includes="*/j2se"/>
         <dirset dir="example" includes="*/src"/>
+	<dirset dir="analysis" includes="*/j2se"/>
       </sourcepath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
@@ -1175,10 +1180,10 @@
   </target>
 
   <!-- Runs the example HackApp (server) -->
-  <target name="example-hack-app" depends="example-classes"
+  <target name="example-hack-app"
+	  depends="example-classes, -maybe-delete-hack-app-datastore"
           description="Runs the example HackApp (server)">
     <mkdir dir="${build.dir}/example"/>
-    <delete dir="${build.dir}/example/HackApp"/>
     <mkdir dir="${build.dir}/example/HackApp/dsdb"/>
     <copy todir="${build.dir}/example/HackApp/gameData">
       <fileset dir="example/hack/gameData"/>
@@ -1204,6 +1209,13 @@
       </classpath>
       <arg value="example/hack/HackApp.properties"/>
     </java>
+  </target>
+
+  <!-- Deletes the Hack example data store files unless the
+       hack.server.delete.datastore property is set. -->
+  <target name="-maybe-delete-hack-app-datastore"
+	  unless="hack.server.retain.datastore">
+    <delete dir="${build.dir}/example/HackApp"/>
   </target>
 
   <!-- Runs the example HackClient (GUI client) -->
