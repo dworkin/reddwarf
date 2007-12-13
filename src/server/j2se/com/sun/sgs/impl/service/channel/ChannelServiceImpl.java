@@ -212,6 +212,8 @@ public class ChannelServiceImpl
 		SimpleSgsProtocol.CHANNEL_SERVICE,
 		new ChannelProtocolMessageListener());
 
+	    taskHandlerThread.start();
+
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -237,6 +239,8 @@ public class ChannelServiceImpl
 	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
 	}
+
+	taskHandlerThread.interrupt();
     }
     
     /* -- Implement ChannelManager -- */

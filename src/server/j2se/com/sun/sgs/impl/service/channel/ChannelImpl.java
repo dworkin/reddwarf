@@ -1145,13 +1145,18 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		    getObjectForId(event.data, ClientSession.class);
 		final ChannelImpl channel = getChannel();
 		channel.addSession(session);
-		final ChannelServer server =
-		    getChannelServer(getNodeId(session));
+		final long nodeId = getNodeId(session);
+		final ChannelServer server = getChannelServer(nodeId);
 		context.addChannelTask(channelRef.getId(), new Runnable() {
 		    public void run() {
 			try {
 			    server.join(channel.channelId, event.data);
 			} catch (IOException e) {
+			    // TBD: what is the right thing to do here?
+			    logger.logThrow(
+				Level.WARNING, e,
+				"unable to contact channel server:{0} to " +
+				"handle event:{1}", nodeId, event);
 			    throw new RuntimeException(
 				"unable to contact server", e);
 			}

@@ -94,7 +94,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static final String CHANNEL_NAME = "three stooges";
     
-    private static final int WAIT_TIME = 2000;
+    private static final int WAIT_TIME = 5000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -467,8 +467,22 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}, taskOwner);
     }
-    
+
     private void checkUsersJoined(
+	final String channelName, final List<String> users)
+	throws Exception
+    {
+	for (int i = 0; i < 3; i++) {
+	    try {
+		checkUsersJoined0(channelName, users);
+		return;
+	    } catch (junit.framework.AssertionFailedError e) {
+	    }
+	    Thread.currentThread().sleep(100);
+	}
+    }
+    
+    private void checkUsersJoined0(
 	final String channelName, final List<String> users)
 	throws Exception
     {
