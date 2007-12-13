@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -203,6 +204,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The set of failed nodes that are currently recovering. */
     private final ConcurrentMap<Long, NodeImpl> recoveringNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
+    
+    /** A random number generator, for choosing backup nodes. */
+    private final Random backupChooser = new Random();
     
     /** The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned.. */
@@ -741,33 +745,45 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	
 	/**
 	 * Chooses a backup for the specified {@code node} from the
-	 * map of "alive" nodes.  For now, the choice is the first
-	 * node encountered (returned arbitrarily from iterating
-	 * through the "alive" nodes).  Before this method is invoked,
-	 * the specified {@code node} as well as other currently
-	 * detected failed nodes should not be present in the "alive"
+	 * map of "alive" nodes.  The backup is picked randomly. Before this 
+         * method is invoked, the specified {@code node} as well as other 
+         * currently detected failed nodes should not be present in the "alive"
 	 * nodes map.
 	 */
 	private NodeImpl chooseBackup(NodeImpl node) {
 	    NodeImpl choice = null;
+            // Copy of the alive nodes
+            NodeImpl[] values;
 	    synchronized (aliveNodes) {
-		if (aliveNodes.size() > 1) {
-		    for (NodeImpl backupCandidate : aliveNodes.values()) {
-			// TBD: the watchdog server's node should not be
-			// assigned as a backup because it may not contain
-			// a full stack.  If it is the only "alive" node,
-			// then a backup for this node will remain
-			// unassigned until a new node is registered.
-			// This will delay recovery. -- ann (9/7/07)
-			
-			// assert backupCandidate.getId() !=  node.getId()
-			if (backupCandidate.getId() != localNodeId) {
-			    choice = backupCandidate;
-			    break;
-			}
-		    }
-		}
-	    }
+                values = aliveNodes.values().toArray(new NodeImpl[0]);
+            }
+            int numAliveNodes = values.length;
+            // Cap by MAX_VALUE - numAliveNodes to avoid potential overflow
+            // when calulating tryNode.
+            int random = 
+                  backupChooser.nextInt(Integer.MAX_VALUE - numAliveNodes);
+
+            if (numAliveNodes > 1) {
+                for (int i = 0; i < numAliveNodes; i++) {
+                    // Choose one of the values[] elements randomly. If we
+                    // chose the localNodeId, loop again, choosing the next
+                    // array element.
+                    int tryNode = (random + i) % numAliveNodes;
+                    NodeImpl backupCandidate = values[tryNode];
+                    // TBD: the watchdog server's node should not be
+                    // assigned as a backup because it may not contain
+                    // a full stack.  If it is the only "alive" node,
+                    // then a backup for this node will remain
+                    // unassigned until a new node is registered.
+                    // This will delay recovery. -- ann (9/7/07)
+
+                    // assert backupCandidate.getId() !=  node.getId()
+                    if (backupCandidate.getId() != localNodeId) {
+                        choice = backupCandidate;
+                        break;
+                    }
+                }
+            }
 	    return choice;
 	}
 
