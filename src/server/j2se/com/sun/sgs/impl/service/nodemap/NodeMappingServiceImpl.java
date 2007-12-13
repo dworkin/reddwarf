@@ -746,11 +746,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
     {
         checkState();
         // Verify that the nodeId is valid.
-        watchdogService.getNode(nodeId);
-        IdentityIterator iter = new IdentityIterator(dataService, nodeId);
-        if (!iter.hasNext()) {
+        Node node = watchdogService.getNode(nodeId);
+        if (node == null) {
             throw new UnknownNodeException("node id: " + nodeId);
         }
+        IdentityIterator iter = new IdentityIterator(dataService, nodeId);
         logger.log(Level.FINEST, "getIdentities successful");
         return iter;
     }
@@ -978,6 +978,12 @@ public class NodeMappingServiceImpl implements NodeMappingService
 		IdentityMO idmo = 
                         dataService.getServiceBinding(key, IdentityMO.class);
                 node = watchdogService.getNode(idmo.getNodeId());
+                if (node == null) {
+                    // The identity is on a failed node, where the node has
+                    // been removed from the data store but the identity hasn't
+                    // yet.
+                    throw new UnknownIdentityException("id: " + identity);
+                }
                 Node old = idcache.put(identity, node);
                 assert (old == null);
                 return node;
