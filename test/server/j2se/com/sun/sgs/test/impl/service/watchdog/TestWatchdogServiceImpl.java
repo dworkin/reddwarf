@@ -1104,10 +1104,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 		future.done();
 	    }
 	}
-	
-	void recoverDone(Node node) {
-	    nodes.get(node).done();
-	}
     }
 
     /* -- other methods -- */
