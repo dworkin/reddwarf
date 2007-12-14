@@ -34,6 +34,7 @@ import java.beans.PropertyChangeEvent;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 /**
@@ -120,7 +121,8 @@ public class ProfileSampleListener implements ProfileListener {
 	if (m == null)
 	    return;
 
-	for (String name : m.keySet()) {
+	for (Entry<String, List<Long>> entry : m.entrySet()) {
+	    String name = entry.getKey();
 
 	    Histogram hist = profileSamples.get(name);
 	    if (hist == null) {
@@ -128,7 +130,7 @@ public class ProfileSampleListener implements ProfileListener {
 		profileSamples.put(name, hist);
 	    }
 
-	    List<Long> samples =  m.get(name);
+	    List<Long> samples = entry.getValue();
 	    for (Long l : samples) 
 		hist.bin(l.longValue());	   
 	}

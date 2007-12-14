@@ -134,10 +134,7 @@
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build"
-	  depends="build-server, build-client, -test-shared.classes,
-		   -test-server.classes, -test-client.classes,
-		   analysis-classes"
+  <target name="build" depends="build-server,build-client"
 	  description="Builds code"/>
 
   <!-- Builds the shared code -->
@@ -205,7 +202,10 @@
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal JavaDoc -->
-  <target name="javadoc-internal" depends="build, project-version"
+  <target name="javadoc-internal"
+	  depends="build, -test-shared.classes, -test-server.classes,
+		   -test-client.classes, analysis-classes,
+		   project-version"
           description="Builds internal (full) javadoc">
     <javadoc destdir="${build.dir}/javadoc/internal"
              packagenames="com.sun.*"
@@ -700,7 +700,8 @@
   <target name="findbugs-client" depends="build-client, -findbugs.init"
 	  description="Checks for bugs in the client">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/client/j2se"/>
       <class location="${build.dir}/classes/client"/>
       <auxClasspath>
@@ -713,7 +714,8 @@
   <target name="findbugs-server" depends="build-server, -findbugs.init"
 	  description="Checks for bugs in the server">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/server/j2se"/>
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
@@ -728,7 +730,8 @@
   <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
 	  description="Checks for bugs in shared code">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/shared/j2se"/>
       <class location="${build.dir}/classes/shared"/>
       <auxClasspath>

@@ -98,7 +98,7 @@ public class AggregateTaskListener implements ProfileListener {
      *        running short-lived or recurring tasks
      * @param resourceCoord the {@code ResourceCoordinator} used to
      *        run any long-lived tasks
-     *
+     * @throws IOException if the server socket cannot be created
      */
     public AggregateTaskListener(Properties properties, TaskOwner owner,
                                  TaskScheduler taskScheduler,

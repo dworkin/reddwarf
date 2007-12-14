@@ -1,0 +1,105 @@
+<!-- This file specifies a findbugs filter for excluding reports that
+     should not be considered errors.
+
+     In most cases, please specify the full names of the bug codes,
+     using the pattern attribute, to make it clearer what reports are
+     being suppressed.  You can find a listing of codes at:
+
+       http://findbugs.sourceforge.net/bugDescriptions.html
+
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+  -->
+
+<FindBugsFilter>
+
+  <!-- Testing methods to call via reflection -->  
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"/>
+    </Or>
+    <Method name="getLockTimeoutMicros"/>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
+  <!-- Cursor methods that are supposed to return null. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbCursor"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeCursor"/>
+    </Or>
+    <Or>
+      <Method name="getKey"/>
+      <Method name="getValue"/>
+    </Or>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Database methods that are supposed to return null. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbDatabase"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeDatabase"/>
+    </Or>
+    <Method name="get"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- JeTransaction.SimpleXid.getBranchQualifier can return null. -->
+  <Match>
+    <Class
+       name=
+       "com.sun.sgs.impl.service.data.store.db.je.JeTransaction$SimpleXid"/>
+    <Method name="getBranchQualifier"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Testing methods to call via reflection. -->
+  <Match>
+    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+    <Or>
+      <Method name="getAvgTreeDepth"/>
+      <Method name="getMaxTreeDepth"/>
+      <Method name="getMinTreeDepth"/>
+    </Or>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
+  <!-- Intentionally falling through switch cases. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.ManagedReferenceImpl"/>
+    <Or>
+      <Method name="flush"/>
+      <Method name="removeObject"/>
+    </Or>
+    <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
+  </Match>
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Class
+       name=
+       "com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Not worth making an inner class static. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$DelegatingScheduler$Handle"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"/>
+  </Match>
+
+  <!-- OK if version fields are not being read yet. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
+      <Class name="com.sun.sgs.impl.service.data.DataServiceHeader"/>
+    </Or>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+</FindBugsFilter>

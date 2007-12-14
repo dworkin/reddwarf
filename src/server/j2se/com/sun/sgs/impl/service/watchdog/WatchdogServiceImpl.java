@@ -36,10 +36,11 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -285,7 +286,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    if (values == null || values.length < 2) {
 		setFailedThenNotify(false);
 		throw new IllegalArgumentException(
-		    "registerNode returned improper array: " + values);
+		    "registerNode returned improper array: " +
+		    Arrays.toString(values));
 	    }
 	    localNodeId = values[0];
 	    renewInterval = values[1];
