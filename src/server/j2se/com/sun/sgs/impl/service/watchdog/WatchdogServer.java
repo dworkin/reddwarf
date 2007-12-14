@@ -98,7 +98,7 @@ public interface WatchdogServer extends Remote {
     boolean isAlive(long nodeId) throws IOException;
 
     /**
-     * Notifies this watchdog that the node with the specified ({@code
+     * Notifies this watchdog that the node with the specified {@code
      * nodeId} has been recovered by the node with the specified
      * {@code backupId}.
      *

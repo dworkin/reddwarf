@@ -757,13 +757,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    synchronized (aliveNodes) {
                 values = aliveNodes.values().toArray(new NodeImpl[0]);
             }
-            int numAliveNodes = values.length;
-            // Cap by MAX_VALUE - numAliveNodes to avoid potential overflow
-            // when calulating tryNode.
-            int random = 
-                  backupChooser.nextInt(Integer.MAX_VALUE - numAliveNodes);
-
+            int numAliveNodes = values.length;       
             if (numAliveNodes > 1) {
+                int random = backupChooser.nextInt(numAliveNodes);
                 for (int i = 0; i < numAliveNodes; i++) {
                     // Choose one of the values[] elements randomly. If we
                     // chose the localNodeId, loop again, choosing the next

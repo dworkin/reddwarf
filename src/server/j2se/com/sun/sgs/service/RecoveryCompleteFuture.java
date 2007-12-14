@@ -30,7 +30,7 @@ public interface RecoveryCompleteFuture {
     /**
      * Notifies this future that the recovery operations initiated by
      * the {@link RecoveryListener} associated with this future are
-     * complete.
+     * complete.  This method is idempotent and can be called multiple times.
      */
     void done();
 
