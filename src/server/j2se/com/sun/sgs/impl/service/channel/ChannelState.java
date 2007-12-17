@@ -112,8 +112,6 @@ final class ChannelState implements ManagedObject, Serializable {
     public boolean equals(Object obj) {
 	if (this == obj) {
 	    return true;
-	} else if (obj == null) {
-	    return false;
 	} else if (obj.getClass() == this.getClass()) {
 	    ChannelState state = (ChannelState) obj;
 	    return name.equals(state.name);

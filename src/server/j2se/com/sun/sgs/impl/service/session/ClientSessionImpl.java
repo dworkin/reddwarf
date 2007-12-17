@@ -314,8 +314,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     public boolean equals(Object obj) {
 	if (this == obj) {
 	    return true;
-	} else if (obj == null) {
-	    return false;
 	} else if (obj.getClass() == this.getClass()) {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return

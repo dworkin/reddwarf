@@ -384,14 +384,10 @@ public final class ChannelImpl implements Channel, Serializable {
 
     /** {@inheritDoc} */
     public boolean equals(Object obj) {
-	if (this == obj) {
-	    return true;
-	} else if (obj == null) {
-	    return false;
-	} else {
-	    return (obj.getClass() == this.getClass() &&
-		    state.equals(((ChannelImpl) obj).state));
-	}
+	return
+	    (this == obj) ||
+	    (obj.getClass() == this.getClass() &&
+	     state.equals(((ChannelImpl) obj).state));
     }
 
     /** {@inheritDoc} */
