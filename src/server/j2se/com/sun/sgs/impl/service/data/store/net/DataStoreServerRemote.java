@@ -68,11 +68,6 @@ class DataStoreServerRemote implements Runnable {
 	return serverSocket.getLocalPort();
     }
 
-    /** Checks if the server is shut down. */
-    private synchronized boolean isShutdown() {
-	return serverSocket == null;
-    }
-
     /** Accepts and hands off new connections until shut down. */
     public void run() {
 	while (true) {
@@ -105,20 +100,7 @@ class DataStoreServerRemote implements Runnable {
 	/** Handles requests until an exception occurs. */
 	public void run() {
 	    try {
-		try {
-		    socket.setTcpNoDelay(true);
-		} catch (Exception e) {
-		}
-		try {
-		    socket.setKeepAlive(true);
-		} catch (Exception e) {
-		}
-		if (connectionReadTimeout > 0) {
-		    try {
-			socket.setSoTimeout(connectionReadTimeout);
-		    } catch (Exception e) {
-		    }
-		}
+		setSocketOptions(socket);
 		DataStoreProtocol protocol =
 		    new DataStoreProtocol(
 			socket.getInputStream(), socket.getOutputStream());
@@ -130,6 +112,24 @@ class DataStoreServerRemote implements Runnable {
 		try {
 		    socket.close();
 		} catch (IOException e) {
+		}
+	    }
+	}
+
+	/** Sets TcpNoDelay, KeepAlive, and SoTimeout options, if possible. */
+	private void setSocketOptions(Socket socket) {
+	    try {
+		socket.setTcpNoDelay(true);
+	    } catch (Exception e) {
+	    }
+	    try {
+		socket.setKeepAlive(true);
+	    } catch (Exception e) {
+	    }
+	    if (connectionReadTimeout > 0) {
+		try {
+		    socket.setSoTimeout(connectionReadTimeout);
+		} catch (Exception e) {
 		}
 	    }
 	}

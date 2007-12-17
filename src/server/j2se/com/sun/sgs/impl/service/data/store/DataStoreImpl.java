@@ -159,6 +159,18 @@ public class DataStoreImpl
     /** The number of bytes in a SHA-1 message digest. */
     private static final int SHA1_SIZE = 20;
 
+    /** A message digest for use by the current thread. */
+    private static final ThreadLocal<MessageDigest> messageDigest =
+	new ThreadLocal<MessageDigest>() {
+	    protected MessageDigest initialValue() {
+		try {
+		    return MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+		    throw new AssertionError(e);
+		}
+	    }
+        };
+
     /** The directory in which to store database files. */
     private final String directory;
 
@@ -196,18 +208,6 @@ public class DataStoreImpl
 
     /** The number of currently active transactions. */
     private int txnCount = 0;
-
-    /** A message digest for use by the current thread. */
-    private ThreadLocal<MessageDigest> messageDigest =
-	new ThreadLocal<MessageDigest>() {
-	    protected MessageDigest initialValue() {
-		try {
-		    return MessageDigest.getInstance("SHA-1");
-		} catch (NoSuchAlgorithmException e) {
-		    throw new AssertionError(e);
-		}
-	    }
-        };
 
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;

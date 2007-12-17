@@ -14,15 +14,75 @@
 
 <FindBugsFilter>
 
-  <!-- Testing methods to call via reflection -->  
+  <!-- Package com.sun.sgs.app.util -->
+
+  <!-- Testing methods to call via reflection. -->
   <Match>
+    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
     <Or>
-      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"/>
-      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"/>
+      <Method name="getAvgTreeDepth"/>
+      <Method name="getMaxTreeDepth"/>
+      <Method name="getMinTreeDepth"/>
     </Or>
-    <Method name="getLockTimeoutMicros"/>
     <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
   </Match>
+
+  <!-- OK if version fields are not being read yet. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
+    </Or>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+  <!-- The root fields of these classes is initialized the the default
+       value (null) and set lazily. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
+    </Or>
+    <Field name="root"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data -->
+
+  <!-- OK if version fields are not being read yet. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceHeader"/>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+  <!-- Not worth making an inner class static. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$DelegatingScheduler$Handle"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"/>
+  </Match>
+
+  <!-- Intentionally falling through switch cases. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.ManagedReferenceImpl"/>
+    <Or>
+      <Method name="flush"/>
+      <Method name="removeObject"/>
+    </Or>
+    <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data.store -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Packages com.sun.sgs.impl.service.data.store.{bdb,je} -->
 
   <!-- Cursor methods that are supposed to return null. -->
   <Match>
@@ -47,71 +107,33 @@
     <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
   </Match>
 
+  <!-- Testing methods to call via reflection -->  
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"/>
+    </Or>
+    <Method name="getLockTimeoutMicros"/>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
   <!-- JeTransaction.SimpleXid.getBranchQualifier can return null. -->
   <Match>
-    <Class
-       name=
-       "com.sun.sgs.impl.service.data.store.db.je.JeTransaction$SimpleXid"/>
+    <Class name="com.sun.sgs.impl.service.data.store.db.je.JeTransaction$SimpleXid"/>
     <Method name="getBranchQualifier"/>
     <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
   </Match>
 
-  <!-- Testing methods to call via reflection. -->
-  <Match>
-    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
-    <Or>
-      <Method name="getAvgTreeDepth"/>
-      <Method name="getMaxTreeDepth"/>
-      <Method name="getMinTreeDepth"/>
-    </Or>
-    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
-  </Match>
+  <!-- Package com.sun.sgs.impl.service.data.store.net -->
 
-  <!-- Intentionally falling through switch cases. -->
-  <Match>
-    <Class name="com.sun.sgs.impl.service.data.ManagedReferenceImpl"/>
-    <Or>
-      <Method name="flush"/>
-      <Method name="removeObject"/>
-    </Or>
-    <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
-  </Match>
-
-  <!-- Not worth replacing an anonymous class with a static inner class. -->
-  <Match>
-    <Class
-       name=
-       "com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
-    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
-  </Match>
-
-  <!-- Not worth making an inner class static. -->
-  <Match>
-    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$DelegatingScheduler$Handle"/>
-    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"/>
-  </Match>
-
-  <!-- OK if version fields are not being read yet. -->
+  <!-- OK to ignore exceptions for optional socket settings. -->
   <Match>
     <Or>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
-      <Class name="com.sun.sgs.impl.service.data.DataServiceHeader"/>
+      <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreClientRemote"/>
+      <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreServerRemote$Handler"/>
     </Or>
-    <Field name="minorVersion"/>
-    <Bug pattern="SS_SHOULD_BE_STATIC"/>
-  </Match>
-
-  <!-- The root fields of these classes is initialized the the default
-       value (null) and set lazily. -->
-  <Match>
-    <Or>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
-    </Or>
-    <Field name="root"/>
-    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    <Method name="setSocketOptions"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
   <!-- OK to catch reflection bugs with an Exception catch-all. -->
