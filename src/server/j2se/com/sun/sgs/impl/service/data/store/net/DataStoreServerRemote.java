@@ -38,7 +38,7 @@ class DataStoreServerRemote implements Runnable {
     private static final int connectionReadTimeout = 2 * 3600 * 1000;
 
     /** The server socket, or null if closed. */
-    ServerSocket serverSocket;
+    private ServerSocket serverSocket;
 
     /** The data store server, for up calls. */
     private final DataStoreServer server;
@@ -60,6 +60,14 @@ class DataStoreServerRemote implements Runnable {
 	}
     }
 
+    /** Returns the local port. */
+    synchronized int getLocalPort() throws IOException {
+	if (serverSocket == null) {
+	    throw new IOException("Server is shut down");
+	}
+	return serverSocket.getLocalPort();
+    }
+
     /** Checks if the server is shut down. */
     private synchronized boolean isShutdown() {
 	return serverSocket == null;
@@ -67,10 +75,17 @@ class DataStoreServerRemote implements Runnable {
 
     /** Accepts and hands off new connections until shut down. */
     public void run() {
-	while (!isShutdown()) {
+	while (true) {
+	    ServerSocket ss;
+	    synchronized (this) {
+		ss = serverSocket;
+	    }
+	    if (ss == null) {
+		break;
+	    }
 	    try {
 		new Thread(
-		    new Handler(serverSocket.accept()), "Handler").start();
+		    new Handler(ss.accept()), "Handler").start();
 	    } catch (Throwable t) {
 	    }
 	}

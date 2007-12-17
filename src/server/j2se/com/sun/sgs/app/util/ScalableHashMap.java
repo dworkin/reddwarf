@@ -2502,13 +2502,6 @@ public class ScalableHashMap<K,V>
 	    checkCache();
 	    root.clear();
 	}
-
-	/** Set root to null. */
-	private void readObject(ObjectInputStream s)
-	    throws IOException, ClassNotFoundException
-	{
-	    root = null;
-	}
     }
 
     /**
@@ -2552,7 +2545,7 @@ public class ScalableHashMap<K,V>
 
 	KeySet(ScalableHashMap<K,V> root) {
 	    this.root = root;
-	    rootRef = AppContext.getDataManager().createReference(root);
+	     rootRef = AppContext.getDataManager().createReference(root);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -2585,13 +2578,6 @@ public class ScalableHashMap<K,V>
 	public void clear() {
 	    checkCache();
 	    root.clear();
-	}
-
-	/** Set root to null. */
-	private void readObject(ObjectInputStream s)
-	    throws IOException, ClassNotFoundException
-	{
-	    root = null;
 	}
     }
 
@@ -2669,13 +2655,6 @@ public class ScalableHashMap<K,V>
 	public void clear() {
 	    checkCache();
 	    root.clear();
-	}
-
-	/** Set root to null. */
-	private void readObject(ObjectInputStream s)
-	    throws IOException, ClassNotFoundException
-	{
-	    root = null;
 	}
     }
 

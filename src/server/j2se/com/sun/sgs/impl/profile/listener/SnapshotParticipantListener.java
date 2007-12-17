@@ -38,8 +38,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
-import java.text.DecimalFormat;
-
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -85,13 +84,6 @@ public class SnapshotParticipantListener implements ProfileListener {
 
     // the number of transactional tasks from the current snapshot window
     private int taskCount = 0;
-
-    // a simple formatter used to make decimal numbers easier to read
-    static final DecimalFormat df = new DecimalFormat();
-    static {
-        df.setMaximumFractionDigits(2);
-        df.setMinimumFractionDigits(2);
-    }
 
     /**
      * Creates an instance of <code>SnapshotParticipantListener</code>.
@@ -175,9 +167,11 @@ public class SnapshotParticipantListener implements ProfileListener {
 	    double taskTotal = (double)(commits + aborts);
 	    double participationPct = (taskTotal / (double)taskCount) * 100.0;
 	    double commitPct = ((double)commits / taskTotal) * 100.0;
-	    return " participated=" + df.format(participationPct) +
-		"% committed=" + df.format(commitPct) + "% avgTime=" +
-		df.format((double)time / taskTotal) + "ms";
+	    Formatter formatter = new Formatter();
+	    formatter.format(" participated=%2.2f%%", participationPct);
+	    formatter.format(" committed=%2.2f%%", commitPct);
+	    formatter.format(" avgTime=%2.2fms", (double)time / taskTotal);
+	    return formatter.toString();
 	}
     }
 
@@ -197,18 +191,20 @@ public class SnapshotParticipantListener implements ProfileListener {
             return ParticipantRunnable.class.getName();
         }
         public void run() throws Exception {
-	    String reportStr;
+	    Formatter reportStr = new Formatter();
 	    synchronized (participantMap) {
-		reportStr = "Participants for last " + taskCount +
-		    " transactional tasks:\n";
+		reportStr.format(
+		    "Participants for last %d transactional tasks:\n",
+		    taskCount);
                 for (Entry<String,ParticipantCounts> entry :
 			 participantMap.entrySet())
-		    reportStr += entry.getKey() + entry.getValue() + "\n";
+		    reportStr.format(
+			"%s%s\n", entry.getKey(), entry.getValue());
 		participantMap.clear();
 		taskCount = 0;
 	    }
-	    reportStr += "\n";
-	    networkReporter.report(reportStr);
+	    reportStr.format("\n");
+	    networkReporter.report(reportStr.toString());
 	}
     }
 

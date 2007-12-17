@@ -102,4 +102,23 @@
     <Bug pattern="SS_SHOULD_BE_STATIC"/>
   </Match>
 
+  <!-- The root fields of these classes is initialized the the default
+       value (null) and set lazily. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
+    </Or>
+    <Field name="root"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- OK to catch reflection bugs with an Exception catch-all. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreProtocol"/>
+    <Method name="checkResult"/>
+    <Bug pattern="REC_CATCH_EXCEPTION"/>
+  </Match>
+
 </FindBugsFilter>
