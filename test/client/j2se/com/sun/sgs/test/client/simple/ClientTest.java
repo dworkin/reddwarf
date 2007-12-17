@@ -36,17 +36,13 @@ import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.util.Properties;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
 /**
  * A basic test harness for the Client API.
  */
-public class ClientTest implements SimpleClientListener,
-        ClientChannelListener
+public class ClientTest implements SimpleClientListener
 {
     private SimpleClient client;
 
@@ -136,15 +132,6 @@ public class ClientTest implements SimpleClientListener,
         // TODO Auto-generated method stub
     }
 
-    /**
-     * {@inheritDoc}
-     */
-   public ClientChannelListener joinedChannel(ClientChannel channel) {
-        System.out.println("ClientTest joinedChannel: " + channel.getName());
-
-        return this;
-    }
-
    /**
     * {@inheritDoc}
     */
@@ -152,32 +139,5 @@ public class ClientTest implements SimpleClientListener,
         System.out.println("Received general server message size "
                 + message.length + " "
                 + new String(message));
-    }
-
-    // methods inherited from ClientChannelListener
-
-    /**
-     * {@inheritDoc}
-     */
-    public void leftChannel(ClientChannel channel) {
-        System.out.println("ClientTest leftChannel " + channel.getName());
-        client.logout(false);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-            byte[] message) {
-        System.out.println("ClientTest receivedChannelMessage "
-                + channel.getName() + " from "
-                + (sender != null ? sender.toString() : " Server ")
-                + new String(message));
-
-        try {
-            channel.send("client message".getBytes());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 }

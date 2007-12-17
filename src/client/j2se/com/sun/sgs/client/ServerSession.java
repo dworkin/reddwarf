@@ -50,15 +50,6 @@ import java.io.IOException;
 public interface ServerSession {
 
     /**
-     * Returns the session identifier for this server session.
-     * 
-     * @return the session identifier for this server session
-     *
-     * @throws IllegalStateException if this session is disconnected
-     */
-    SessionId getSessionId();
-
-    /**
      * Sends the message contained in the specified byte array to the
      * server. The specified message is sent asychronously to the server;
      * therefore, a successful invocation of this method does not indicate

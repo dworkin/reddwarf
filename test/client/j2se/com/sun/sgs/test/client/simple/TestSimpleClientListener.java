@@ -35,6 +35,7 @@ package com.sun.sgs.test.client.simple;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,9 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.impl.client.comm.ClientConnection;
@@ -63,7 +61,6 @@ public class TestSimpleClientListener
     MockClientConnector  mockConnector;
     Properties connectionProps;
     SimpleClient client;
-    volatile ClientChannel testChannel = null;
 
     static final String DEFAULT_USER = "alice";
     static final String DEFAULT_PASS = "s3cR37";
@@ -82,7 +79,6 @@ public class TestSimpleClientListener
             new MockConnectorFactory(mockConnector));
 
         connectionProps = new Properties();
-        testChannel = null;
     }
 
     @Override
@@ -91,7 +87,6 @@ public class TestSimpleClientListener
         mockConnector = null;
         mockConnection = null;
         connectionProps = null;
-        testChannel = null;
         client = null;
     }
 
@@ -118,142 +113,6 @@ public class TestSimpleClientListener
             return;
         }
         Assert.fail("Expected NullPointerException");
-    }
-
-    public void testNullChannelListener() throws IOException {
-        byte[] message = new byte[1];
-        ClientListenerBase listener = new ClientListenerBase() {
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                testChannel = channel;
-                return null;
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelJoin("foo", 1);
-        try {
-            mockConnection.mockDeliverRecv();
-        } catch (NullPointerException expected) {
-            try {
-                testChannel.send(message);
-            } catch (IOException e) {
-                e.printStackTrace();
-                Assert.fail("Expected IllegalStateException");
-            } catch (IllegalStateException e) {
-                // passed
-                return;                
-            }
-            Assert.fail("Expected failure to send on channel");
-        }
-        Assert.fail("Expected NullPointerException");
-    }
-
-    public void testChannelJoinedException() throws IOException {
-        byte[] message = new byte[1];
-        ClientListenerBase listener = new ClientListenerBase() {
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                testChannel = channel;
-                throw new RuntimeException("Intentionally testing exception");
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelJoin("foo", 1);
-        try {
-            mockConnection.mockDeliverRecv();
-        } catch (RuntimeException expected) {
-            try {
-                testChannel.send(message);
-            } catch (IOException e) {
-                e.printStackTrace();
-                Assert.fail("Expected IllegalStateException");
-            } catch (IllegalStateException e) {
-                // passed
-                return;                
-            }
-            Assert.fail("Expected failure to send on channel");
-        }
-        Assert.fail("Expected RuntimeException");
-    }
-
-    public void testChannelJoinedBeforeLoggedIn() throws IOException {
-        ClientListenerBase listener = new ClientListenerBase() {
-            boolean gotLoggedIn = false;
-            @Override
-            public void loggedIn()
-            {
-                Assert.assertFalse("Already logged in", gotLoggedIn);
-                gotLoggedIn = true;
-            }
-
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                Assert.assertFalse("Already logged in", gotLoggedIn);
-                Assert.fail("Did not expect channel join; not logged in");
-                return null;
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueChannelJoin("foo", 1);
-        try {
-            mockConnection.mockDeliverRecv();
-        } catch (IllegalStateException expected) {
-            // passed
-            return;
-        }
-        Assert.fail("Expected IllegalStateException");
-    }
-
-    /**
-     * Verify that clients are allowed to send on a channel during the
-     * channelJoined callback notifying them about that channel.
-     *
-     * @throws IOException if an I/O error occurs
-     */
-    public void testChannelSendInJoinCallback() throws IOException {
-        ClientListenerBase listener = new ClientListenerBase() {
-            boolean sentChannelMessage = false;
-
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                byte[] message = new byte[1];
-                try {
-                    int sentBefore = mockConnection.sendQueue.size();
-                    channel.send(message);
-                    if (mockConnection.sendQueue.size() == (sentBefore + 1)) {
-                        sentChannelMessage = true;
-                    } else {
-                        System.err.println("Didn't send channel message");
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (IllegalStateException e) {
-                    e.printStackTrace();
-                }
-                return new ClientChannelListenerBase();
-            }
-
-            @Override
-            void validate() {
-                Assert.assertTrue(
-                    "Expected to send a message during channel join",
-                    sentChannelMessage);
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelJoin("foo", 1);
-        mockConnection.mockDeliverRecv();
-        listener.validate();
     }
 
     public void testDisconnect() throws IOException {
@@ -284,102 +143,7 @@ public class TestSimpleClientListener
         };
         connect(listener);
         mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        mockConnection.mockRequestDisconnect(false, null);
-        listener.validate();
-    }
-
-    /**
-     * Verify that clients cannot send on a channel during the
-     * channelLeft callback on that channel.
-     *
-     * @throws IOException if an I/O error occurs
-     */
-    public void testChannelSendInLeftCallback() throws IOException {
-        ClientListenerBase listener = new ClientListenerBase() {
-            boolean passed = false;
-
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                
-                return new ClientChannelListenerBase() {
-                    @Override
-                    public void leftChannel(ClientChannel ch)
-                    {
-                        byte[] message = new byte[1];
-                        try {
-                            int sentBefore = mockConnection.sendQueue.size();
-                            ch.send(message);
-                            if (mockConnection.sendQueue.size() == (sentBefore + 1)) {
-                                System.err.println("Sent channel message");
-                            } else {
-                            }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        } catch (IllegalStateException e) {
-                            passed = true;
-                        }
-                    }
-                };
-            }
-
-            @Override
-            void validate() {
-                Assert.assertTrue(
-                    "Expected IllegalStateExeception trying to send " +
-                    "during leftChannel", passed);
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelJoin("foo", 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelLeft(1);
-        mockConnection.mockDeliverRecv();
-        listener.validate();
-    }
-
-    public void testChannelLeftOnDisconnect() throws IOException {
-        ClientListenerBase listener = new ClientListenerBase() {
-            boolean gotLeftChannel = false;
-            boolean gotDisconnected = false;
-
-            @Override
-            public ClientChannelListener joinedChannel(ClientChannel channel) {
-                
-                return new ClientChannelListenerBase() {
-                    @Override
-                    public void leftChannel(ClientChannel ch)
-                    {
-                        Assert.assertFalse("Already disconnected", gotDisconnected);
-                        Assert.assertFalse("Already left channel", gotLeftChannel);
-                        gotLeftChannel = true;
-                    }
-                };
-            }
-
-            @Override
-            public void disconnected(boolean graceful, String reason)
-            {
-                Assert.assertTrue("Expected to have left channel", gotLeftChannel);
-                Assert.assertFalse("Already disconnected", gotDisconnected);
-                gotDisconnected = true;
-            }
-            
-            @Override
-            void validate() {
-                Assert.assertTrue("Expected to have left channel", gotLeftChannel);
-                Assert.assertTrue("Expected to have disconnected", gotDisconnected);
-            }
-        };
-        connect(listener);
-        mockConnection.mockConnect();
-        queueLoggedIn(1, 1);
-        mockConnection.mockDeliverRecv();
-        queueChannelJoin("foo", 1);
+        queueLoggedIn(1);
         mockConnection.mockDeliverRecv();
         mockConnection.mockRequestDisconnect(false, null);
         listener.validate();
@@ -392,20 +156,9 @@ public class TestSimpleClientListener
         client.login(connectionProps);
     }
 
-    void queueLoggedIn(long sessionId, long reconnectKey) {
-        byte[] sid = BigInteger.valueOf(sessionId).toByteArray();
+    void queueLoggedIn(long reconnectKey) {
         byte[] rkey = BigInteger.valueOf(reconnectKey).toByteArray();
-        mockConnection.mockLoggedIn(new CompactId(sid), new CompactId(rkey));
-    }
-
-    void queueChannelJoin(String name, long channelId) {
-        byte[] id = BigInteger.valueOf(channelId).toByteArray();
-        mockConnection.mockChannelJoined(name, new CompactId(id));
-    }
-
-    void queueChannelLeft(long channelId) {
-        byte[] id = BigInteger.valueOf(channelId).toByteArray();
-        mockConnection.mockChannelLeft(new CompactId(id));
+        mockConnection.mockLoggedIn(new CompactId(rkey));
     }
 
     static class ClientListenerBase implements SimpleClientListener
@@ -436,10 +189,6 @@ public class TestSimpleClientListener
 
         public void disconnected(boolean graceful, String reason) { }
 
-        public ClientChannelListener joinedChannel(ClientChannel channel) {
-            return new ClientChannelListenerBase();
-        }
-
         public void receivedMessage(byte[] message) { }
 
         public void reconnected() { }
@@ -448,15 +197,6 @@ public class TestSimpleClientListener
     
     }
 
-    static class ClientChannelListenerBase
-        implements ClientChannelListener
-    {
-        public void leftChannel(ClientChannel channel) { }
-
-        public void receivedMessage(ClientChannel channel, SessionId sender,
-            byte[] message) { }
-    }
-    
     static final class MockClientConnection
         implements ClientConnection
     {
@@ -512,40 +252,12 @@ public class TestSimpleClientListener
             listener.receivedMessage(message);
         }
 
-        void mockLoggedIn(CompactId sessionId, CompactId reconnectKey) {
+        void mockLoggedIn(CompactId reconnectKey) {
             MessageBuffer buf =
-                new MessageBuffer(3 +
-                    sessionId.getExternalFormByteCount() +
+                new MessageBuffer(1 +
                     reconnectKey.getExternalFormByteCount());
-            buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-                putBytes(sessionId.getExternalForm()).
+            buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
                 putBytes(reconnectKey.getExternalForm());
-            recvQueue.add(buf);
-        }
-
-        void mockChannelJoined(String name, CompactId id) {
-            MessageBuffer buf =
-                new MessageBuffer(3 + MessageBuffer.getSize(name) +
-                                  id.getExternalFormByteCount());
-            buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-                putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-                putString(name).
-                putBytes(id.getExternalForm());
-            
-            recvQueue.add(buf);
-        }
-
-        void mockChannelLeft(CompactId id) {
-            MessageBuffer buf =
-                new MessageBuffer(3 + id.getExternalFormByteCount());
-            buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-                putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-                putBytes(id.getExternalForm());
-            
             recvQueue.add(buf);
         }
 
@@ -553,10 +265,10 @@ public class TestSimpleClientListener
             mockRequestDisconnect(true, null);
         }
 
-        public void sendMessage(byte[] message) throws IOException {
+        public void sendMessage(ByteBuffer message) throws IOException {
             assert state.get() == CONNECTED;
-            byte[] messageCopy = new byte[message.length];
-            System.arraycopy(message, 0, messageCopy, 0, messageCopy.length);
+            byte[] messageCopy = new byte[message.remaining()];
+            message.duplicate().get(messageCopy);
             sendQueue.add(new MessageBuffer(messageCopy));
         }
     }

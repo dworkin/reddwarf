@@ -48,8 +48,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -299,15 +297,6 @@ public class HelloUserClient extends JFrame
     public void disconnected(boolean graceful, String reason) {
         inputPanel.setEnabled(false);
         setStatus("Disconnected: " + reason);
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Returns {@code null} since this basic client doesn't support channels.
-     */
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
-        return null;
     }
 
     /**

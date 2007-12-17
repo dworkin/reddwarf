@@ -32,8 +32,6 @@
 
 package com.sun.sgs.test.client.simple;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -81,10 +79,6 @@ public class TestSimpleClient extends TestCase {
 	}
 
 	public void loginFailed(String reason) {
-	}
-
-	public ClientChannelListener joinedChannel(ClientChannel channel) {
-	    return null;
 	}
 
 	public void receivedMessage(byte[] message) {

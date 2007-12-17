@@ -37,8 +37,7 @@ package com.sun.sgs.client;
  * for handling other connection-related events.
  * <p>
  * A {@code ServerSessionListener} for a client is notified in the
- * following cases: when the associated client is joined to a channel
- * ({@link #joinedChannel joinedChannel}), a message is received from the
+ * following cases: when a message is received from the
  * server ({@link #receivedMessage receivedMessage}), a connection with
  * the server is being re-established ({@link #reconnecting reconnecting}),
  * a connection has been re-established ({@link #reconnected reconnected}),
@@ -50,29 +49,6 @@ package com.sun.sgs.client;
  * obtain a new server session to communicate with the server.
  */
 public interface ServerSessionListener {
-
-    /**
-     * Notifies this listener that its associated client has joined the
-     * specified channel, and returns a {@link ClientChannelListener} for
-     * that channel.
-     * <p>
-     * When a message is received on the specified channel, the returned
-     * listener's {@link ClientChannelListener#receivedMessage
-     * receivedMessage} method is invoked with the specified channel, the
-     * sender's session identifier, and the message. A {@code null}
-     * sender indicates that the message was sent by the server. The
-     * returned listener is <i>not</i> notified of messages that its client
-     * sends on the specified channel.
-     * <p>
-     * When the client associated with this server session leaves the
-     * specified channel, the returned listener's {@link
-     * ClientChannelListener#leftChannel leftChannel} method is invoked with
-     * the specified channel.
-     * 
-     * @param channel a channel
-     * @return a listener for the specified channel
-     */
-    ClientChannelListener joinedChannel(ClientChannel channel);
 
     /**
      * Notifies this listener that the specified message was sent by the
@@ -109,11 +85,6 @@ public interface ServerSessionListener {
      * was due to the associated client gracefully logging out; otherwise,
      * the disconnection was due to other circumstances, such as forced
      * disconnection.
-     * <p>
-     * Before this method is invoked, it is guaranteed that the listeners
-     * of all {@code ClientChannel}s with this session as a member will
-     * have their {@link ClientChannelListener#leftChannel leftChannel}
-     * methods invoked.
      *
      * @param graceful {@code true} if disconnection was due to the
      *        associated client gracefully logging out, and
