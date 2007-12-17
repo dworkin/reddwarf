@@ -31,7 +31,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.WatchdogService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -86,14 +85,14 @@ import java.util.logging.Logger;
  *	Specifies the block size to use when reserving node IDs.  The value
  *	must be greater than {@code 8}.<p>
  * </dl> <p>
-
+ * 
+ * Note that this server caches NodeImpls outside the data service to
+ * maintain state.
  */
 public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** Server state. */
     private static enum State {
-        /** The service is initialized */
-	INITIALIZED,
         /** The service is ready */
         READY,
         /** The service is shutting down */
@@ -160,7 +159,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     final long renewInterval;
 
     /** The node ID for this server. */
-    private volatile long localNodeId;
+    final long localNodeId;
 
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
@@ -190,9 +189,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The ID generator. */
     private final IdGenerator idGenerator;
 
-    /** Failed nodes that were detected by the constructor. */
-    private final Collection<NodeImpl> failedNodes;
-
     /** The map of registered nodes that are alive, keyed by node ID. */
     private final ConcurrentMap<Long, NodeImpl> aliveNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
@@ -213,7 +209,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final Thread checkExpirationThread = new CheckExpirationThread();
 
     /** The server state. */
-    private State state;
+    private State state = State.READY;
     
     /** The count of calls in progress. */
     private int callsInProgress = 0;
@@ -226,12 +222,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * @param	properties server properties
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
+     * @param	hostname  a hostname
+     * @param	client a watchdog client
      *
      * @throws	Exception if there is a problem starting the server
      */
     public WatchdogServerImpl(Properties properties,
 			      ComponentRegistry systemRegistry,
-			      TransactionProxy txnProxy)
+			      TransactionProxy txnProxy,
+                              String hostname, 
+                              WatchdogClient client)
 	throws Exception
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
@@ -268,12 +268,19 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			    idBlockSize,
 			    txnProxy,
 			    taskScheduler);
-	setState(State.INITIALIZED);
-	
+
 	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
 	runTransactionally(failedNodesRunnable);
-	failedNodes = failedNodesRunnable.nodes;
-	
+	Collection<NodeImpl> failedNodes = failedNodesRunnable.nodes;
+        statusChangedNodes.addAll(failedNodes);
+        for (NodeImpl failedNode : failedNodes) {
+	    recoveringNodes.put(failedNode.getId(), failedNode);
+	}
+ 
+        // register our local id
+        long[] values = registerNode(hostname, client);
+        localNodeId = values[0];
+        
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -281,7 +288,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 	
 	checkExpirationThread.start();
-	notifyClientsThread.start();
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
@@ -299,30 +305,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     
     /** {@inheritDoc} */
     public void ready() {
-	synchronized (lock) {
-	    switch (state) {
-		
-	    case INITIALIZED:
-		setState(State.READY);
-		break;
-		
-	    case READY:
-		return;
-		
-	    case SHUTTING_DOWN:
-	    case SHUTDOWN:
-		throw new IllegalStateException("service shutting down");
-	    }
-	}
-	localNodeId = txnProxy.getService(WatchdogService.class).
-	    getLocalNodeId();
-	for (NodeImpl failedNode : failedNodes) {
-	    recoveringNodes.put(failedNode.getId(), failedNode);
-	}
-	if (!failedNodes.isEmpty()) {
-	    notifyClients(aliveNodes.values(), failedNodes);
-	    failedNodes.clear();
-	}
+        // Don't notify clients until other services have had a chance
+        // to register themselves with the watchdog.
+        notifyClientsThread.start();      
     }
 
     /** {@inheritDoc} */
@@ -463,24 +448,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		return true;
 	    }
 
-	} finally {
-	    callFinished();
-	}
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isAlive(long nodeId) {
-	callStarted();
-
-	try {
-	    NodeImpl node = aliveNodes.get(nodeId);
-	    if (node == null || node.isExpired()) {
-		return false;
-	    } else {
-		return node.isAlive();
-	    }
 	} finally {
 	    callFinished();
 	}

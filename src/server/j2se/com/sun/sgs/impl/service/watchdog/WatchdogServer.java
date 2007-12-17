@@ -83,21 +83,6 @@ public interface WatchdogServer extends Remote {
     boolean renewNode(long nodeId) throws IOException;
 
     /**
-     * Returns {@code true} if this watchdog considers the node with
-     * the specified {@code nodeId} to be alive, otherwise returns
-     * {@code false}.
-     *
-     * @param	nodeId	a node ID
-     *
-     * @return	{@code true} if the node is considered alive,
-     *		{@code false} otherwise
-     *
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    boolean isAlive(long nodeId) throws IOException;
-
-    /**
      * Notifies this watchdog that the node with the specified {@code
      * nodeId} has been recovered by the node with the specified
      * {@code backupId}.

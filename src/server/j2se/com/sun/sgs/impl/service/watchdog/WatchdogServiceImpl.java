@@ -270,11 +270,24 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    boolean startServer = wrappedProps.getBooleanProperty(
  		START_SERVER_PROPERTY, true);
 	    localHost = InetAddress.getLocalHost().getHostName();
+            
+	    int clientPort = wrappedProps.getIntProperty(
+		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
+
+	    String clientHost = wrappedProps.getProperty(
+		CLIENT_HOST_PROPERTY, localHost);
+
+	    clientImpl = new WatchdogClientImpl();
+	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
+	    exporter.export(clientImpl, clientPort);
+	    clientProxy = exporter.getProxy();
+            
 	    String host;
 	    int serverPort;
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
-		    properties, systemRegistry, txnProxy);
+		    properties, systemRegistry, txnProxy, 
+                    clientHost, clientProxy);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -284,20 +297,9 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
 
-	    int clientPort = wrappedProps.getIntProperty(
-		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
-
-	    String clientHost = wrappedProps.getProperty(
-		CLIENT_HOST_PROPERTY, localHost);
-
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
-	    
-	    clientImpl = new WatchdogClientImpl();
-	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
-	    exporter.export(clientImpl, clientPort);
-	    clientProxy = exporter.getProxy();
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -313,18 +315,22 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    // contains the system context.
 	    taskOwner = txnProxy.getCurrentOwner();
 
-	    // TBD: should the watchdog service that starts the
-	    // watchdog server register itself as a node?
-	    long[] values = serverProxy.registerNode(clientHost, clientProxy);
-	    if (values == null || values.length < 2) {
-		setFailedThenNotify(false);
-		throw new IllegalArgumentException(
-		    "registerNode returned improper array: " + values);
-	    }
-	    localNodeId = values[0];
-	    renewInterval = values[1];
-	    renewThread.start();
-
+            if (startServer) {
+                localNodeId = serverImpl.localNodeId;
+                renewInterval = serverImpl.renewInterval;
+            } else {
+                long[] values = serverProxy.registerNode(clientHost, 
+                                                         clientProxy);
+                if (values == null || values.length < 2) {
+                    setFailedThenNotify(false);
+                    throw new IllegalArgumentException(
+                        "registerNode returned improper array: " + values);
+                }
+                localNodeId = values[0];
+                renewInterval = values[1];
+            }
+            renewThread.start();
+            
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
 			   "node registered, host:{0}, localNodeId:{1}",

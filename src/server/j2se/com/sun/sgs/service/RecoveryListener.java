@@ -41,7 +41,9 @@ public interface RecoveryListener {
      * may be performed asynchronously.
      *
      * <p>The implementation of this method should be idempotent
-     * because it may be invoked multiple times.
+     * because it may be invoked multiple times.  If it is invoked multiple
+     * times, the {@link RecoveryCompleteFuture#done done} method must
+     * be called for each {@code future} provided.
      *
      * @param	node a failed node to recover
      * @param	future a future to notify when recovery is complete
