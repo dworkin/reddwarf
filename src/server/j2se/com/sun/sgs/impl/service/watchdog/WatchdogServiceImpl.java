@@ -316,6 +316,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    // TBD: should the watchdog service that starts the
 	    // watchdog server register itself as a node?
 	    long[] values = serverProxy.registerNode(clientHost, clientProxy);
+	    
 	    if (values == null || values.length < 2) {
 		setFailedThenNotify(false);
 		throw new IllegalArgumentException(

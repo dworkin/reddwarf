@@ -446,6 +446,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	     * Enqueue close event.
 	     */
 	    addEvent(new ChannelEvent(EventType.CLOSE, channelId));
+	    isClosed = true;
 	}
 	
 	logger.log(Level.FINEST, "close returns");

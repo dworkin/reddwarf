@@ -35,6 +35,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
@@ -60,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -135,6 +137,11 @@ public class ChannelServiceImpl
     /** The local channel membership lists, keyed by channel ID. */
     private final Map<BigInteger, Set<BigInteger>> localChannelMembersMap =
 	Collections.synchronizedMap(new HashMap<BigInteger, Set<BigInteger>>());
+
+    /** The map of channel coordinator task queues, keyed by channel ID. */
+    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
+	coordinatorTaskQueues =
+	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
 
     /**
      * Constructs an instance of this class with the specified {@code
@@ -269,14 +276,26 @@ public class ChannelServiceImpl
 		logger.log(Level.FINEST, "serviceEventQueue channelId:{0}",
 			   HexDumper.toHexString(channelId));
 	    }
+
 	    try {
-		taskScheduler.scheduleTask(
-		    new TransactionRunner(new AbstractKernelRunnable() {
-			public void run() {
-			    Context context = contextFactory.joinTransaction();
-			    ChannelImpl.serviceEventQueue(channelId, context);
-			}}),
-		    taskOwner);
+		BigInteger channelIdRef = new BigInteger(1, channelId);
+		NonDurableTaskQueue taskQueue =
+		    coordinatorTaskQueues.get(channelIdRef);
+		if (taskQueue == null) {
+		    NonDurableTaskQueue newTaskQueue =
+			new NonDurableTaskQueue(txnProxy, taskScheduler,
+						taskOwner, null);
+		    taskQueue = coordinatorTaskQueues.
+			putIfAbsent(channelIdRef, newTaskQueue);
+		    if (taskQueue == null) {
+			taskQueue = newTaskQueue;
+		    }
+		}
+		taskQueue.addTask(new AbstractKernelRunnable() {
+		    public void run() {
+			Context context = contextFactory.joinTransaction();
+			ChannelImpl.serviceEventQueue(channelId, context);
+		    }});
 					  
 	    } finally {
 		callFinished();
@@ -418,6 +437,9 @@ public class ChannelServiceImpl
 		BigInteger channelRefId = new BigInteger(1, channelId);
 		synchronized (localChannelMembersMap) {
 		    localChannelMembersMap.remove(channelRefId);
+		}
+		synchronized (coordinatorTaskQueues) {
+		    coordinatorTaskQueues.remove(channelRefId);
 		}
 
 	    } finally {
