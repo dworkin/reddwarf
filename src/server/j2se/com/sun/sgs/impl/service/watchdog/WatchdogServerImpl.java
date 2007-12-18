@@ -222,8 +222,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * @param	properties server properties
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
-     * @param	hostname  a hostname
-     * @param	client a watchdog client
+     * @param	hostname  the local hostname
+     * @param	client the local watchdog client
      *
      * @throws	Exception if there is a problem starting the server
      */
@@ -305,6 +305,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     
     /** {@inheritDoc} */
     public void ready() {
+        assert(!notifyClientsThread.isAlive());
         // Don't notify clients until other services have had a chance
         // to register themselves with the watchdog.
         notifyClientsThread.start();      
