@@ -30,15 +30,15 @@ import java.rmi.Remote;
 public interface DataStoreServer extends Remote {
 
     /**
-     * Reserves a batch of object IDs for allocating new objects.  This
-     * operation is performed in its own transaction.
+     * Reserves an object ID for a new object.  Note that calling other
+     * operations using this ID are not required to find the objects until
+     * {@link #setObject setObject} is called.  Aborting a transaction is also
+     * not required to unassign any of the IDs so long as other operations
+     * treat them as non-existent objects.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
-     * @param	count the number of object IDs to reserve
-     * @return	the next available object ID
-     * @throws	IllegalArgumentException if {@code count} is less than
-     *		{@code 1}
+     * @return	the new object ID
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -46,7 +46,7 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    long allocateObjects(long tid, int count) throws IOException;
+    long createObject(long tid) throws IOException;
 
     /**
      * Notifies the server that an object is going to be modified.

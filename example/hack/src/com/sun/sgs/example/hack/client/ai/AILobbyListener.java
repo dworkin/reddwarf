@@ -26,6 +26,7 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Random;
 
 
@@ -34,32 +35,37 @@ public class AILobbyListener implements LobbyListener {
     private final LobbyManager lobbyManager;
     private final String name;
 
-    private ArrayList<String> games;
+    private List<String> games = new ArrayList<String>();
 
-    private final Random random;
+    private final Random random = new Random();
 
     public AILobbyListener(LobbyManager lobbyManager, String name) {
         this.lobbyManager = lobbyManager;
         this.name = name;
-
-        games = new ArrayList<String>();
-        random = new Random();
     }
 
     public void enteredLobby() {
         AIClient.runDelayed(new Runnable() {
                 public void run() {
-                    int whichGame = random.nextInt(games.size());
-                    lobbyManager.joinGame(games.get(whichGame), name);
+		    synchronized (games) {
+			if (!games.isEmpty()) {
+			    int whichGame = random.nextInt(games.size());
+			    lobbyManager.joinGame(games.get(whichGame), name);
+			}
+		    }
                 }
             }, random.nextInt(4000));
     }
 
     public void gameAdded(String game) {
-        games.add(game);
+	synchronized (games) {
+	    games.add(game);
+	}
     }
     public void gameRemoved(String game) {
-        games.remove(game);
+	synchronized (games) {
+	    games.remove(game);
+	}
     }
     public void playerCountUpdated(int count) {}
     public void playerCountUpdated(String game, int count) {}

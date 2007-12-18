@@ -97,6 +97,9 @@ class Kernel {
     // create a factory to create not-static instances.  
     private static TransactionCoordinator transactionCoordinator;
 
+    // the scheduler used by this kernel
+    private final MasterTaskScheduler scheduler;
+
     // the registration point for producers of profiling data
     private final ProfileRegistrarImpl profileRegistrar;
 
@@ -111,7 +114,7 @@ class Kernel {
         "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.profile.AggregateProfileListener";
+        "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -121,7 +124,9 @@ class Kernel {
     // Note that each time an application is started, a new registry will
     // be created, which reassigned lastSystemRegistry.
     private ComponentRegistry lastSystemRegistry = null;
+
     // the last task owner created by this kernel, for testing only
+    @SuppressWarnings("unused")
     private TaskOwner lastOwner = null;
     
     /**
@@ -179,7 +184,7 @@ class Kernel {
                   getTransactionCoordinator(systemProperties, profileCollector), 
                   profileCollector);
             
-            MasterTaskScheduler scheduler =
+            scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
                                         taskHandler, profileCollector,
                                         SystemKernelAppContext.CONTEXT);
@@ -336,12 +341,14 @@ class Kernel {
 
     /**
      * Shut down all applications in this kernel in reverse
-     * order of how they were started.
+     * order of how they were started, and also shutdown the
+     * task scheduler.
      */
     void shutdown() {
         for (AppKernelAppContext ctx: applications) {
             ctx.shutdownServices();
         }
+        scheduler.shutdown();
     }
     
     /**

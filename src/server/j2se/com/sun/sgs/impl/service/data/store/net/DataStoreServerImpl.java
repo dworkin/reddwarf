@@ -676,10 +676,10 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Implement DataStoreServer -- */
 
     /** {@inheritDoc} */
-    public long allocateObjects(long tid, int count) {
+    public long createObject(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.allocateObjects(txn, count);
+	    return store.createObject(txn);
 	} finally {
 	    txnTable.notInUse(txn);
 	}

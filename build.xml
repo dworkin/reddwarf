@@ -72,6 +72,30 @@
     <istrue value="${test.use.je}"/>
   </condition>
 
+  <!-- Values for analysis -->
+  <property name="analysis.jvm.args"
+	    value="-server
+		   -XX:+UseParallelGC
+		   -XX:+UseFastAccessorMethods
+		   -XX:+AggressiveOpts
+		   -XX:+MaxFDLimit
+		   -XX:NewSize=512m
+		   -Xms700m
+		   -Xmx2g"/>
+  <property name="analysis.tasks"
+	    value="com.sun.sgs.analysis.task.ScheduleMapPutsTask"/>
+  <!-- Set analysis.use.data.store.server to perform analysis using the
+       networked data store -->
+  <condition
+     property="analysis.data.store.class"
+     value="com.sun.sgs.impl.service.data.store.net.DataStoreClient"
+     else="com.sun.sgs.impl.service.data.store.DataStoreImpl">
+    <istrue value="${analysis.use.data.store.server}"/>
+  </condition>
+  <property name="analysis.data.store.server.run" value="true"/>
+  <property name="analysis.data.store.server.host" value="localhost"/>
+  <property name="analysis.data.store.server.port" value="44530"/>
+
   <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
        containing the full set of JAR and native library files for
@@ -1047,6 +1071,25 @@
     </javac>
   </target>
 
+  <!-- Builds the analysis code -->
+  <target name="analysis-classes" depends="build-server"
+          description="Builds the analysis code">
+    <mkdir dir="${build.dir}/analysis/classes"/>
+    <depend srcdir="analysis"
+            destdir="${build.dir}/analysis/classes"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac srcdir="analysis/server/j2se"
+	   destdir="${build.dir}/analysis/classes"
+	   includeAntRuntime="no"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="server.classpath"
+	   includes="**/*.java">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
   <!-- Runs the example ChatApp (server) -->
   <target name="example-chat-app" depends="example-classes"
           description="Runs the example ChatApp (server)">
@@ -1083,11 +1126,61 @@
     </java>
   </target>
 
+  <!-- Runs the task timing analysis -->
+  <target name="analysis" depends="analysis-classes"
+          description="Runs the task timing analysis">
+    <mkdir dir="${build.dir}/analysis"/>
+    <delete dir="${build.dir}/analysis/logs"/>
+    <delete dir="${build.dir}/analysis/data"/>
+    <delete dir="${build.dir}/analysis/dsdb"/>
+    <mkdir dir="${build.dir}/analysis/logs"/>
+    <mkdir dir="${build.dir}/analysis/data"/>
+    <mkdir dir="${build.dir}/analysis/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  fork="true">
+      <jvmarg line="${analysis.jvm.args}"/>
+      <sysproperty key="com.sun.sgs.config.file"
+		   file="analysis/System.properties"/>
+      <sysproperty key="java.library.path" 
+		   file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root"
+		   file="${build.dir}/analysis"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"
+	 value="${analysis.data.store.class}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.run"
+		   value="${analysis.data.store.server.run}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.host"
+		   value="${analysis.data.store.server.host}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
+		   value="${analysis.data.store.server.port}"/>
+      <sysproperty key="com.sun.sgs.analysis.tasks"
+		   value="${analysis.tasks}"/>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+	<propertyref prefix="je."/>
+      </syspropertyset>
+      <classpath>
+        <pathelement location="${build.dir}/analysis/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="analysis/AnalysisApplication.properties"/>
+    </java>
+  </target>
+
   <!-- Runs the example HackApp (server) -->
   <target name="example-hack-app" depends="example-classes"
           description="Runs the example HackApp (server)">
-    <mkdir dir="/tmp/HackApp/dsdb"/>
-    <copy todir="/tmp/HackApp/gameData">
+    <mkdir dir="${build.dir}/example"/>
+    <delete dir="${build.dir}/example/HackApp"/>
+    <mkdir dir="${build.dir}/example/HackApp/dsdb"/>
+    <copy todir="${build.dir}/example/HackApp/gameData">
       <fileset dir="example/hack/gameData"/>
     </copy>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
@@ -1095,8 +1188,10 @@
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg line="-server"/>
       <!--<sysproperty key="com.sun.management.jmxremote" value=""/>-->
+      <sysproperty key="com.sun.sgs.app.root"
+		   file="${build.dir}/example/HackApp"/>
       <sysproperty key="com.sun.sgs.config.file"
-           file="example/hack/System.properties"/>
+		   file="example/hack/System.properties"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
@@ -1125,6 +1220,26 @@
         <pathelement location="${build.dir}/example/classes"/>
         <path refid="client.classpath"/>
       </classpath>
+    </java>
+  </target>
+
+  <!-- Runs the Hack example AIClient -->
+  <target name="example-hack-ai-client" depends="example-classes"
+          description="Runs the example HackClient (AI client)">
+    <property name="hack.server.host" value="localhost"/>
+    <property name="hack.client.count" value="10"/>
+    <java classname="com.sun.sgs.example.hack.client.ai.AIClient"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="host" value="${hack.server.host}"/>
+      <sysproperty key="port" value="4458"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+      <arg value="${hack.client.count}"/>
     </java>
   </target>
 
@@ -1188,6 +1303,8 @@
       com.sun.sgs.impl.service.data.store.net.server.run = true
       com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class = \
         com.sun.sgs.impl.service.data.store.net.DataStoreClient
+      com.sun.sgs.impl.service.data.store.db.environment.class = \
+        ${test.bdb.env}
     </echo>
     <echo file="${test.server.dir}/logging.config">
       .level = ${test.server.level}

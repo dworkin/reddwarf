@@ -1164,7 +1164,7 @@ public class ScalableHashMap<K,V>
 	    try {
 		keyMatches = safeEquals(e.getKey(), key);
 	    } catch (ObjectNotFoundException onfe) {
-		 keyMatches = false;
+		keyMatches = false;
 	    }
 	    if (keyMatches) {
 		/* Remove the unused new entry, if any */
@@ -1191,7 +1191,6 @@ public class ScalableHashMap<K,V>
 		prev = e;
 	    } else {
 		assert compareKey != 0 : "Entry is already present";
-		break;
 	    }
 	}
 

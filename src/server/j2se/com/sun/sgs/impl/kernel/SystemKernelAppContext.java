@@ -25,8 +25,6 @@ import com.sun.sgs.app.TaskManager;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-import com.sun.sgs.kernel.ComponentRegistry;
-
 import com.sun.sgs.service.Service;
 
 import java.util.logging.Level;
