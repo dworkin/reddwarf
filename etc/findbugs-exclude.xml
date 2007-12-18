@@ -1,15 +1,15 @@
 <!-- This file specifies a findbugs filter for excluding reports that
      should not be considered errors.
 
-     In most cases, please specify the full names of the bug codes,
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+
+     When possible, please specify the full names of the bug codes,
      using the pattern attribute, to make it clearer what reports are
      being suppressed.  You can find a listing of codes at:
 
        http://findbugs.sourceforge.net/bugDescriptions.html
-
-     The format of this file is documented at:
-
-       http://findbugs.sourceforge.net/manual/filter.html
   -->
 
 <FindBugsFilter>
@@ -27,7 +27,8 @@
     <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
   </Match>
 
-  <!-- OK if version fields are not being read yet. -->
+  <!-- OK if version fields are not currently being read, they should
+       still be instance fields. -->
   <Match>
     <Or>
       <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
@@ -37,7 +38,7 @@
     <Bug pattern="SS_SHOULD_BE_STATIC"/>
   </Match>
 
-  <!-- The root fields of these classes is initialized the the default
+  <!-- The root fields of these classes are initialized the the default
        value (null) and set lazily. -->
   <Match>
     <Or>
@@ -51,7 +52,8 @@
 
   <!-- Package com.sun.sgs.impl.service.data -->
 
-  <!-- OK if version fields are not being read yet. -->
+  <!-- OK if version field is not currently being read, it should still
+       be an instance field. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.data.DataServiceHeader"/>
     <Field name="minorVersion"/>

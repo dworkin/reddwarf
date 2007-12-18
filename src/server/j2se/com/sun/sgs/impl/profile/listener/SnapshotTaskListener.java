@@ -176,7 +176,7 @@ public class SnapshotTaskListener implements ProfileListener {
 		formatter.format("\n  ");
 	    for (ProfileOperation op : ops.keySet()) {
 		formatter.format(
-		    "%s=%2.2f%%",
+		    "%s=%2.2f%% ",
 		    op,
 		    100.0 * (double)(ops.get(op).longValue()) / 
 		    (double)opCount);

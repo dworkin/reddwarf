@@ -1215,7 +1215,7 @@
   </target>
 
   <!-- Deletes the Hack example data store files unless the
-       hack.server.delete.datastore property is set. -->
+       hack.server.retain.datastore property is set. -->
   <target name="-maybe-delete-hack-app-datastore"
 	  unless="hack.server.retain.datastore">
     <delete dir="${build.dir}/example/HackApp"/>
