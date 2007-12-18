@@ -957,7 +957,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitLoginFailure = false;
 	private String reason;
 	private CompactId sessionId;
-	private CompactId reconnectionKey;
+	private byte[] reconnectionKey;
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
 	DummyClient() {
@@ -1091,9 +1091,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + message.length);
+		new MessageBuffer(1 + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putByteArray(message);
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1152,8 +1152,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
-		    reconnectionKey = CompactId.getCompactId(buf);
+                    reconnectionKey = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1182,7 +1181,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
-		    byte[] message = buf.getBytes(buf.getUnsignedShort());
+                    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
 			System.err.println("message received: " + message);

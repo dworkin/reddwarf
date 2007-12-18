@@ -24,14 +24,13 @@ package com.sun.sgs.protocol.simple;
  * <p>
  * A protocol message is constructed as follows:
  * <ul>
- * <li> (int) payload length, not including this int
+ * <li> (unsigned short) payload length, not including this field
  * <li> (byte) operation code
  * <li> optional content, depending on the operation code.
  * </ul>
  * <p>
  * A {@code ByteArray} is encoded as follows:
  * <ul>
- * <li> (unsigned short) number of bytes in the array
  * <li> (byte[]) the bytes in the array
  * </ul>
  * <p>
@@ -80,7 +79,7 @@ public interface SimpleSgsProtocol {
      * <br>
      * Payload:
      * <ul>
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte LOGIN_SUCCESS = 0x11;
@@ -116,7 +115,7 @@ public interface SimpleSgsProtocol {
      * <br>
      * Payload:
      * <ul>
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_REQUEST = 0x20;
@@ -129,7 +128,7 @@ public interface SimpleSgsProtocol {
      * <br>
      * Payload:
      * <ul>
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_SUCCESS = 0x21;

@@ -1741,7 +1741,7 @@ public class TestChannelServiceImpl extends TestCase {
 	//private String channelName = null;
 	//private CompactId channelId = null;
 	private String reason;
-	private CompactId reconnectionKey;
+	private byte[] reconnectionKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
@@ -1864,9 +1864,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + message.length);
+		new MessageBuffer(1 + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putByteArray(message);
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1892,11 +1892,11 @@ public class TestChannelServiceImpl extends TestCase {
 		putBytes(channelToSend.getExternalForm()).
 		putLong(nextSequenceNumber()).
 		putShort(recipientIds.size());
-*/
 	    for (CompactId recipientId : recipientIds) {
 		recipientId.putCompactId(buf);
 	    }
 	    buf.putByteArray(message);
+*/
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -2056,8 +2056,7 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
-		    reconnectionKey = CompactId.getCompactId(buf);
+		    reconnectionKey = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -2086,8 +2085,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    byte[] message = buf.getBytes(buf.getUnsignedShort());
+		    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
 			System.err.println("message received: " + message);

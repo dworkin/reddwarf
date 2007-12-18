@@ -228,9 +228,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case CONNECTED:
 	    case RECONNECTING:
 		MessageBuffer buf =
-		    new MessageBuffer(1 + 2 + message.length);
+		    new MessageBuffer(1 + message.length);
 		buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		    putShort(message.length).
 		    putBytes(message);
 		sendProtocolMessageOnCommit(buf.getBuffer(), Delivery.RELIABLE);
 		break;
@@ -734,8 +733,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			"session message received before login:{0}", this);
 		    break;
 		}
-		int size = msg.getUnsignedShort();
-		final byte[] clientMessage = msg.getBytes(size);
+		final byte[] clientMessage = msg.getBytes(msg.limit() - msg.position());
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
@@ -918,10 +916,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
-			1 + sessionId.getExternalFormByteCount() +
-			reconnectionKey.getExternalFormByteCount());
+			1 + reconnectionKey.getExternalFormByteCount());
 		ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		    putBytes(sessionId.getExternalForm()).
 		    putBytes(reconnectionKey.getExternalForm());
 		
 		getContext().addMessageFirst(
