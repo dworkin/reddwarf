@@ -1819,12 +1819,11 @@ public class TestChannelServiceImpl extends TestCase {
 	    this.name = user;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(user) +
+		new MessageBuffer(2 + MessageBuffer.getSize(user) +
 				  MessageBuffer.getSize(pass));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-		putString(user).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	        putByte(SimpleSgsProtocol.VERSION).
+	        putString(user).
 		putString(pass);
 	    loginAck = false;
 	    try {
@@ -1865,11 +1864,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
+		new MessageBuffer(3 + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
@@ -1891,12 +1887,12 @@ public class TestChannelServiceImpl extends TestCase {
 		new MessageBuffer(3 + channelToSend.getExternalFormByteCount() +
 				  8 + 2 + getSize(recipientIds) +
 				  2 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-		putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
+/*
+	    buf.putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
 		putBytes(channelToSend.getExternalForm()).
 		putLong(nextSequenceNumber()).
 		putShort(recipientIds.size());
+*/
 	    for (CompactId recipientId : recipientIds) {
 		recipientId.putCompactId(buf);
 	    }
@@ -2009,10 +2005,8 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -2051,33 +2045,8 @@ public class TestChannelServiceImpl extends TestCase {
 		}
 
 		MessageBuffer buf = new MessageBuffer(buffer);
-
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		switch (serviceId) {
 		    
-		case SimpleSgsProtocol.APPLICATION_SERVICE:
-		    processAppProtocolMessage(buf);
-		    break;
-
-		case SimpleSgsProtocol.CHANNEL_SERVICE:
-		    processChannelProtocolMessage(buf);
-		    break;
-
-		default:
-		    System.err.println(
-			"bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
+		processAppProtocolMessage(buf);
 	    }
 
 	    private void processAppProtocolMessage(MessageBuffer buf) {
@@ -2139,7 +2108,7 @@ public class TestChannelServiceImpl extends TestCase {
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
-
+/*
 		case SimpleSgsProtocol.CHANNEL_JOIN: {
 		    String channelName = buf.getString();
 		    CompactId channelId = CompactId.getCompactId(buf);
@@ -2177,7 +2146,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    break;
 		}
-
+*/
 		default:
 		    System.err.println(	
 			"processChannelProtocolMessage: unknown op code: " +

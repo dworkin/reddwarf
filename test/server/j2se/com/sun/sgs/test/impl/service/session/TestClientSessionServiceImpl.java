@@ -1033,11 +1033,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    this.password = password;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(name) +
+		new MessageBuffer(2 + MessageBuffer.getSize(name) +
 				  MessageBuffer.getSize(password));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+		putByte(SimpleSgsProtocol.VERSION).
 		putString(name).
 		putString(password);
 	    loginAck = false;
@@ -1092,11 +1091,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
+		new MessageBuffer(3 + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
@@ -1110,10 +1106,8 @@ public class TestClientSessionServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -1153,23 +1147,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
-		    System.err.println(
-			"bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
-
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
@@ -1205,7 +1182,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
 		    byte[] message = buf.getBytes(buf.getUnsignedShort());
 		    synchronized (lock) {
 			messageList.add(message);

@@ -134,13 +134,14 @@ public final class ChannelImpl implements Channel, Serializable {
 	    state.addSession(session, listener);
 	    context.joinChannel(session, this);
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(state.name) +
+		new MessageBuffer(1 + MessageBuffer.getSize(state.name) +
 				  state.id.getExternalFormByteCount());
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-		putByte(SimpleSgsProtocol.CHANNEL_JOIN).
+            // NOTE this is all changed in Ann's new multi-node services
+	    /*
+	    buf.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 		putString(state.name).
 		putBytes(state.id.getExternalForm());
+            */
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -182,11 +183,14 @@ public final class ChannelImpl implements Channel, Serializable {
 	    state.removeSession(session);
 	    if (session.isConnected()) {
 		MessageBuffer buf =
-		    new MessageBuffer(3 + state.id.getExternalFormByteCount());
+		    new MessageBuffer(1 + state.id.getExternalFormByteCount());
+		// NOTE this is all changed in Ann's new multi-node services
+		/*
 		buf.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		    putBytes(state.id.getExternalForm());
+		*/
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
 	    
@@ -217,11 +221,12 @@ public final class ChannelImpl implements Channel, Serializable {
 	    state.removeAllSessions();
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + state.id.getExternalFormByteCount());
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
+		new MessageBuffer(1 + state.id.getExternalFormByteCount());
+            // NOTE this is all changed in Ann's new multi-node services
+	    /*
+	    buf.putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putBytes(state.id.getExternalForm());
+	    */
 	    byte[] message = buf.getBuffer();
 		    
 	    for (ClientSession session : sessions) {

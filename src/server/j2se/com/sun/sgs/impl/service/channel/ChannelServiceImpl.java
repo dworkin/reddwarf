@@ -198,8 +198,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 			}
 		    }),
 		txnProxy.getCurrentOwner(), true);
-	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -362,7 +360,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		 * Handle service id.
 		 */
 		byte serviceId = buf.getByte();
-
+/*
 		if (serviceId != SimpleSgsProtocol.CHANNEL_SERVICE) {
 		    if (logger.isLoggable(Level.SEVERE)) {
 			logger.log(
@@ -372,19 +370,19 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		    }
 		    return;
 		}
-
+*/
 		/*
 		 * Handle op code.
 		 */
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
-		    
+/*		    
 		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
 
 		    handleChannelSendRequest(session, buf);
 		    break;
-		    
+*/		    
 		default:
 		    if (logger.isLoggable(Level.SEVERE)) {
 			logger.log(
@@ -984,17 +982,16 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	byte[] message, long sequenceNumber)
     {
         MessageBuffer buf =
-            new MessageBuffer(13 + channelId.getExternalFormByteCount() +
+            new MessageBuffer(11 + channelId.getExternalFormByteCount() +
 			      senderId.getExternalFormByteCount() +
 			      message.length);
-        buf.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
+/*
+        buf.putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
             putBytes(channelId.getExternalForm()).
             putLong(sequenceNumber).
             putBytes(senderId.getExternalForm()).
 	    putByteArray(message);
-
+*/
         return buf.getBuffer();
     }
 }

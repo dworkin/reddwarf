@@ -228,11 +228,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case CONNECTED:
 	    case RECONNECTING:
 		MessageBuffer buf =
-		    new MessageBuffer(3 + 8 + 2 + message.length);
-		buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-                    putLong(sequenceNumber.getAndIncrement()).
+		    new MessageBuffer(1 + 2 + message.length);
+		buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		    putShort(message.length).
 		    putBytes(message);
 		sendProtocolMessageOnCommit(buf.getBuffer(), Delivery.RELIABLE);
@@ -459,10 +456,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
-		MessageBuffer buf = new MessageBuffer(3);
-		buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
+		MessageBuffer buf = new MessageBuffer(1);
+		buf.putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
 	    
 		sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
 	    }
@@ -626,27 +621,15 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
-		
-	    /*
-	     * Handle version.
-	     */
-	    byte version = msg.getByte();
-	    if (version != SimpleSgsProtocol.VERSION) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"Handler.messageReceived protocol version:{0}, " +
-			"expected {1}", version, SimpleSgsProtocol.VERSION);
-		}
-		    // TBD: should the connection be disconnected?
-		return;
-	    }
 
 	    /*
 	     * Dispatch message to service.
 	     */
-	    byte serviceId = msg.getByte();
+            handleApplicationServiceMessage(msg);
 
+            // NOTE: this server-side code will change with Ann's
+            // new multi-node services
+            /*
 	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
 		handleApplicationServiceMessage(msg);
 	    } else {
@@ -676,6 +659,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }
 		}
 	    }
+	    */
 	}
 
 	/**
@@ -699,6 +683,22 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	    switch (opcode) {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
+
+	        /*
+	         * Handle version.
+	         */
+	        byte version = msg.getByte();
+	        if (version != SimpleSgsProtocol.VERSION) {
+	            if (logger.isLoggable(Level.SEVERE)) {
+	                logger.log(
+	                    Level.SEVERE,
+	                    "Handler.messageReceived protocol version:{0}, " +
+	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+	            }
+	            // TBD: should the connection be disconnected?
+	            return;
+	        }
+
 		String name = msg.getString();
 		String password = msg.getString();
 
@@ -734,7 +734,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 			"session message received before login:{0}", this);
 		    break;
 		}
-                msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
 		taskQueue.addTask(new AbstractKernelRunnable() {
@@ -919,11 +918,9 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
-			3 + sessionId.getExternalFormByteCount() +
+			1 + sessionId.getExternalFormByteCount() +
 			reconnectionKey.getExternalFormByteCount());
-		ack.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
+		ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 		    putBytes(sessionId.getExternalForm()).
 		    putBytes(reconnectionKey.getExternalForm());
 		
@@ -974,10 +971,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     private static byte[] getLoginNackMessage() {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
         MessageBuffer ack =
-            new MessageBuffer(3 + stringSize);
-        ack.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.LOGIN_FAILURE).
+            new MessageBuffer(1 + stringSize);
+        ack.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(LOGIN_REFUSED_REASON);
         return ack.getBuffer();
     }
