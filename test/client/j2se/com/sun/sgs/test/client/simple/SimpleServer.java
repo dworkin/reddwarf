@@ -58,10 +58,6 @@ public class SimpleServer implements ConnectionListener {
     private Acceptor<SocketAddress> acceptor;
 
     private int port = 10002;
-
-    private long sequenceNumber;
-
-    private static final CompactId SERVER_ID = new CompactId(new byte[]{0});
     
     final String TEST_CHANNEL_NAME = "Test Channel";
     
@@ -150,7 +146,7 @@ public class SimpleServer implements ConnectionListener {
                 + buffer.length + ") " + HexDumper.format(buffer));
 
         if (buffer.length < 1) {
-            System.err.println("protocol message to short, length:" +
+            System.err.println("protocol message too short, length:" +
                 buffer.length);
             try {
                 conn.close();
