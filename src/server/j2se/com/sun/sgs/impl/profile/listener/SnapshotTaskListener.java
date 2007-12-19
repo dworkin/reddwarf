@@ -173,7 +173,7 @@ public class SnapshotTaskListener implements ProfileListener {
 	    formatter.format(" avgOps=%2.2f", avgOps);
 	    formatter.format(" [%d/%d]", count, retries);
             if (opCount > 0)
-		formatter.format("\n  ");
+		formatter.format("%n  ");
 	    for (ProfileOperation op : ops.keySet()) {
 		formatter.format(
 		    "%s=%2.2f%% ",
@@ -197,10 +197,10 @@ public class SnapshotTaskListener implements ProfileListener {
             synchronized (map) {
                 for (Entry<String,TaskDetail> entry : map.entrySet())
 		    reportStr.format(
-			"%s%s\n", entry.getKey(), entry.getValue());
+			"%s%s%n", entry.getKey(), entry.getValue());
                 map.clear();
             }
-            reportStr.format("\n");
+            reportStr.format("%n");
             networkReporter.report(reportStr.toString());
         }
     }

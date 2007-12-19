@@ -37,6 +37,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
+import java.util.Formatter;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -178,12 +179,13 @@ public class SnapshotProfileListener implements ProfileListener {
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));
 
-            String reportStr = "Snapshot[period=" + reportPeriod + "ms]:\n";
+            Formatter reportStr = new Formatter();
+	    reportStr.format("Snapshot[period=%dms]:%n", reportPeriod);
             try {
-                reportStr += "  Threads=" + threadCount + "  Tasks=" +
-                    successCount + "/" + totalCount + "\n";
-                reportStr += "  AverageQueueSize=" +
-                    ((double)readyCount / (double)totalCount) + " tasks\n\n";
+                reportStr.format("  Threads=%d", threadCount);
+		reportStr.format("  Tasks=%d/%d%n", successCount, totalCount);
+                reportStr.format("  AverageQueueSize=%2.2f%n%n",
+				 ((double)readyCount / (double)totalCount));
             } finally {
                 successCount = 0;
                 totalCount = 0;
@@ -191,7 +193,7 @@ public class SnapshotProfileListener implements ProfileListener {
                 flag.set(false);
             }
 
-            networkReporter.report(reportStr);
+            networkReporter.report(reportStr.toString());
         }
     }
 

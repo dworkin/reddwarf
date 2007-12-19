@@ -176,10 +176,10 @@ public class AggregateTaskListener implements ProfileListener {
 	    formatter.format(" avgRetries=%2.2f",
 			     (double)retries / (double)count);
             if (opCount > 0)
-                formatter.format("\n  ");
+                formatter.format("%n  ");
 	    for (ProfileOperation op : ops.keySet()) {
 		formatter.format(
-		    "%s=%2.2f%%", op,
+		    "%s=%2.2f%% ", op,
 		    100.0 * (double)(ops.get(op).longValue()) /
 		    (double)opCount);
 	    }
@@ -201,9 +201,9 @@ public class AggregateTaskListener implements ProfileListener {
             synchronized (map) {
                 for (Entry<String,TaskDetail> entry : map.entrySet())
                     reportStr.format(
-			"%s%s\n", entry.getKey(), entry.getValue());
+			"%s%s%n", entry.getKey(), entry.getValue());
             }
-            reportStr.format("\n");
+            reportStr.format("%n");
             networkReporter.report(reportStr.toString());
         }
     }

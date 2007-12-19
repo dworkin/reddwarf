@@ -1187,6 +1187,7 @@
 	  depends="example-classes, -maybe-delete-hack-app-datastore"
           description="Runs the example HackApp (server)">
     <mkdir dir="${build.dir}/example"/>
+    <mkdir dir="${build.dir}/example/HackApp/data"/>
     <mkdir dir="${build.dir}/example/HackApp/dsdb"/>
     <copy todir="${build.dir}/example/HackApp/gameData">
       <fileset dir="example/hack/gameData"/>

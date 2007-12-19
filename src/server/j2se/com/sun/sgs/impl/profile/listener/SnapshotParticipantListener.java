@@ -194,16 +194,16 @@ public class SnapshotParticipantListener implements ProfileListener {
 	    Formatter reportStr = new Formatter();
 	    synchronized (participantMap) {
 		reportStr.format(
-		    "Participants for last %d transactional tasks:\n",
+		    "Participants for last %d transactional tasks:%n",
 		    taskCount);
                 for (Entry<String,ParticipantCounts> entry :
 			 participantMap.entrySet())
 		    reportStr.format(
-			"%s%s\n", entry.getKey(), entry.getValue());
+			"%s%s%n", entry.getKey(), entry.getValue());
 		participantMap.clear();
 		taskCount = 0;
 	    }
-	    reportStr.format("\n");
+	    reportStr.format("%n");
 	    networkReporter.report(reportStr.toString());
 	}
     }

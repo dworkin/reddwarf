@@ -205,23 +205,23 @@ public class ProfileSummaryListener implements ProfileListener {
 	    double successful = taskCount - failedCount;
 	    double lifetimeSuccessful = lifetimeCount - lifetimeFailed;
 
-	    System.out.printf("past %d tasks:\n"
+	    System.out.printf("past %d tasks:%n"
 			      + "  mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%)," 
-			      + "\n  mean ready count: %.2f,"
+			      + "%n  mean ready count: %.2f,"
 			      + "  mean lag time: %.2fms,"
-			      + "\n  parallelism factor: %.2f"
-			      + "\n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn\n"
-			      + "all %d tasks:\n"
+			      + "%n  parallelism factor: %.2f"
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n"
+			      + "all %d tasks:%n"
 			      + "  mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%),"
-			      + "\n  mean ready count: %.2f,"
+			      + "%n  mean ready count: %.2f,"
 			      + "  mean lag time: %.2fms"
-			      + "\n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn\n",
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n",
 			      taskCount, 
 			      runTime/ successful,
 			      maxRunTime, 

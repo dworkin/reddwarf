@@ -245,19 +245,19 @@ public class AggregateProfileListener implements ProfileListener {
                 (double)fTaskOpCount / (double)fTaskCount;
 
 	    Formatter reportStr = new Formatter();
-	    reportStr.format("TaskCounts:\n");
+	    reportStr.format("TaskCounts:%n");
             reportStr.format("  TotalTasks=%d", totalTasks);
-	    reportStr.format("  AvgLength=%dms\n", totalAvgLength);
+	    reportStr.format("  AvgLength=%2.2fms%n", totalAvgLength);
             reportStr.format("  Transactional=%d", tTaskCount);
-	    reportStr.format("  AvgLength=%dms\n", transactionalAvgLength);
+	    reportStr.format("  AvgLength=%2.2fms%n", transactionalAvgLength);
             reportStr.format("  Successful=%d", sTaskCount);
-	    reportStr.format("  AvgLength=%dms", avgSuccessfulLength);
-	    reportStr.format("  AvgStartDelay=%dms", avgSuccessfulDelay);
-	    reportStr.format("  AvgRetries=%d\n", avgRetries);
-            reportStr.format("  AvgOpCountOnSuccess=%d", avgSuccessfulOps);
-	    reportStr.format("  AvgOpCountOnFailure=%d\n", avgFailedOps);
+	    reportStr.format("  AvgLength=%2.2fms", avgSuccessfulLength);
+	    reportStr.format("  AvgStartDelay=%2.2fms", avgSuccessfulDelay);
+	    reportStr.format("  AvgRetries=%2.2f%n", avgRetries);
+            reportStr.format("  AvgOpCountOnSuccess=%2.2f", avgSuccessfulOps);
+	    reportStr.format("  AvgOpCountOnFailure=%2.2f%n", avgFailedOps);
 
-            reportStr.format("OpCounts:\n");
+            reportStr.format("OpCounts:%n");
 	    int j, k = 0;
             //for (int i = 1; i < maxOp + 1; i++) {
 	    for (Integer i : registeredOps.keySet()) {
@@ -268,25 +268,25 @@ public class AggregateProfileListener implements ProfileListener {
 				 j + fOpCounts.get(i));
                 //if (((i.intValue % 3) == 0) || (i.intValue() == (maxOp)))
 		if (++k % 3 == 0)
-                    reportStr.format("\n");
+                    reportStr.format("%n");
             }
-	    reportStr.format("\n");
+	    reportStr.format("%n");
 
 	    if (! aggregateCounters.isEmpty()) {
-		reportStr.format("AggregateCounters (total):\n");
+		reportStr.format("AggregateCounters (total):%n");
 		for (Entry<String,Long> entry : aggregateCounters.entrySet())
 		    reportStr.format(
-			"  %s=%d\n", entry.getKey(), entry.getValue());
+			"  %s=%d%n", entry.getKey(), entry.getValue());
 	    }
 	    if (! localCounters.isEmpty()) {
-		reportStr.format("LocalCounters (avg per task):\n");
+		reportStr.format("LocalCounters (avg per task):%n");
 		for (Entry<String,Long> entry : localCounters.entrySet())
 		    reportStr.format(
-			"  %s=%d\n", entry.getKey(),
+			"  %s=%2.2f%n", entry.getKey(),
 			entry.getValue() / (double)totalTasks);
 	    }
 
-            reportStr.format("\n");
+            reportStr.format("%n");
 
             networkReporter.report(reportStr.toString());
         }

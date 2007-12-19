@@ -138,11 +138,11 @@ public class ProfileSampleListener implements ProfileListener {
 	if (taskCount % windowSize == 0) {
 
 	    if (profileSamples.size() > 0) {
-		System.out.printf("Profile samples for the past %d tasks:\n", 
+		System.out.printf("Profile samples for the past %d tasks:%n", 
 				  taskCount);
 		
 		for (Map.Entry<String,Histogram> e : profileSamples.entrySet()) 
-		    System.out.printf("%s: (%d samples)\n%s\n", e.getKey(), 
+		    System.out.printf("%s: (%d samples)%n%s%n", e.getKey(), 
 				      e.getValue().size(), e.getValue());
 		
 

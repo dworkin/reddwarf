@@ -51,10 +51,10 @@ import java.util.logging.Logger;
  * <p>
  * This listener logs its findings at level <code>FINE</code> to the
  * logger named <code>
- * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener</code>.
+ * com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener</code>.
  * <p>
  * The <code>
- * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
+ * com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener.logOps
  * </code> property may be used to set the interval between reports.
  */
 public class OperationLoggingProfileOpListener implements ProfileListener {
@@ -163,23 +163,25 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
                 Formatter opCountTally = new Formatter();
                 for (int i = 0; i <= maxOp; i++) {
                     if (i != 0)
-                        opCountTally.format("\n");
+                        opCountTally.format("%n");
+		    Long count = opCounts.get(i);
                     opCountTally.format(
-			"  %s: %d\n", registeredOps.get(i), opCounts.get(i));
+			"  %s: %d", registeredOps.get(i),
+			(count == null) ? 0 : count.longValue());
                     opCounts.put(i,0L);
                 }
 
 		Formatter counterTally = new Formatter();
 		if (! localCounters.isEmpty()) {
-		    counterTally.format("[task counters]\n");
+		    counterTally.format("[task counters]%n");
 		    for (Entry<String,Long> entry : localCounters.entrySet())
 			counterTally.format(
-			    "  %s: %d\n", entry.getKey(), entry.getValue());
+			    "  %s: %d%n", entry.getKey(), entry.getValue());
 		}
 
                 logger.log(Level.FINE, "Operations [logOps=" + logOps +"]:\n" +
                            "  succeeded: " + commitCount +
-                           "  failed:" + abortCount + "\n" +
+                           "  failed: " + abortCount + "\n" +
                            "  elapsed time: " + (now - lastReport) + " ms\n" +
                            "  running time: " + totalRunningTime + " ms " +
                            "[threads=" + threadCount + "]\n" +

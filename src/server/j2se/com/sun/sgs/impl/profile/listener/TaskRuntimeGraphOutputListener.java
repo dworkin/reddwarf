@@ -97,7 +97,7 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
 		}
 	    }
 	    detail.count++;
-	    detail.printStream.printf("%d %d\n", detail.count,
+	    detail.printStream.printf("%d %d%n", detail.count,
 				      profileReport.getRunningTime());
 	    if (detail.count % 100 == 0) {
 		detail.printStream.flush();
