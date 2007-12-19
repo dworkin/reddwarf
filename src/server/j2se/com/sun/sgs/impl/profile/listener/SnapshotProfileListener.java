@@ -184,7 +184,7 @@ public class SnapshotProfileListener implements ProfileListener {
             try {
                 reportStr.format("  Threads=%d", threadCount);
 		reportStr.format("  Tasks=%d/%d%n", successCount, totalCount);
-                reportStr.format("  AverageQueueSize=%2.2f%n%n",
+                reportStr.format("  AverageQueueSize=%2.2f tasks%n%n",
 				 ((double)readyCount / (double)totalCount));
             } finally {
                 successCount = 0;
