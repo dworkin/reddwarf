@@ -818,7 +818,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-	    StandardProperties.APP_LISTENER, AppListener.class);
+	    StandardProperties.APP_LISTENER);
     }
     
 
@@ -1268,9 +1268,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
-	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
+	private final
+	    Map<ClientSession, ManagedReference<DummyClientSessionListener>>
+		sessions = Collections.synchronizedMap(
+		new HashMap<ClientSession,
+		    ManagedReference<DummyClientSessionListener>>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -1285,7 +1287,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
 		DataManager dataManager = AppContext.getDataManager();
-		ManagedReference listenerRef =
+		ManagedReference<DummyClientSessionListener> listenerRef =
 		    dataManager.createReference(listener);
 		dataManager.markForUpdate(this);
 		sessions.put(session, listenerRef);
@@ -1305,13 +1307,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	DummyClientSessionListener getClientSessionListener(String name) {
 
-	    for (Map.Entry<ClientSession,ManagedReference> entry :
-		     sessions.entrySet()) {
+	    for (Map.Entry<ClientSession,
+		     ManagedReference<DummyClientSessionListener>> entry :
+			sessions.entrySet()) {
 
 		ClientSession session = entry.getKey();
-		ManagedReference listenerRef = entry.getValue();
+		ManagedReference<DummyClientSessionListener> listenerRef =
+		    entry.getValue();
 		if (session.getName().equals(name)) {
-		    return listenerRef.get(DummyClientSessionListener.class);
+		    return listenerRef.get();
 		}
 	    }
 	    return null;

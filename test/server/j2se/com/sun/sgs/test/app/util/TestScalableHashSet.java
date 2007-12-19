@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -379,9 +380,9 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    Iterator<Object> iter = (Iterator<Object>)
-			dataService.getBinding("iter",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Iterator<Object>> msIter =
+			uncheckedCast(dataService.getBinding("iter"));
+		    Iterator<Object> iter = msIter.get();
 		    int count = 0;
 		    while (iter.hasNext()) {
 			iter.next();
@@ -414,9 +415,9 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    Iterator<Object> iter = (Iterator<Object>)
-			dataService.getBinding("iter",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Iterator<Object>> msIter =
+			uncheckedCast(dataService.getBinding("iter"));
+		    Iterator<Object> iter = msIter.get();
 		    try {
 			iter.next();
 			fail("Expected ObjectNotFoundException");
@@ -462,9 +463,9 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    Iterator<Object> iter = (Iterator<Object>)
-			dataService.getBinding("iter",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Iterator<Object>> msIter =
+			uncheckedCast(dataService.getBinding("iter"));
+		    Iterator<Object> iter = msIter.get();
 		    int count = 0;
 		    while (iter.hasNext()) {
 			try {
@@ -504,9 +505,9 @@ public class TestScalableHashSet extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    Iterator<Object> iter = (Iterator<Object>)
-			dataService.getBinding("iter",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Iterator<Object>> msIter =
+			uncheckedCast(dataService.getBinding("iter"));
+		    Iterator<Object> iter = msIter.get();
 		    while (iter.hasNext()) {
 			Object next = iter.next();
 			if (one.equals(next)) {
@@ -909,12 +910,12 @@ public class TestScalableHashSet extends Assert {
     @SuppressWarnings("unchecked")
     private void startTransaction() throws Exception {
 	try {
-	    set = dataService.getBinding("set", ScalableHashSet.class);
+	    set = (ScalableHashSet) dataService.getBinding("set");
 	} catch (ObjectNotFoundException e) {
 	    set = null;
 	}
 	try {
-	    one = dataService.getBinding("one", Int.class);
+	    one = (Int) dataService.getBinding("one");
 	} catch (ObjectNotFoundException e) {
 	    one = null;
 	}
@@ -971,8 +972,7 @@ public class TestScalableHashSet extends Assert {
 		break;
 	    }
 	    try {
-		ManagedObject obj = dataService.createReferenceForId(id).get(
-		    ManagedObject.class);
+		ManagedObject obj = dataService.createReferenceForId(id).get();
 		System.err.println(id + ": (" + obj.getClass().getName() +
 				   ") " + obj);
 	    } catch (Exception e) {

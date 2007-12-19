@@ -1400,8 +1400,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    for (DummyClient client : clients.values()) {
 		String sessionKey = getSessionKey(client.getSessionId());
 		try {
-		    dataService.getServiceBinding(
-			sessionKey, ManagedObject.class);
+		    dataService.getServiceBinding(sessionKey);
 		    if (!exists) {
 			fail("ClientGroup.checkChannelSets set exists: " +
 			     client.name);
@@ -1665,7 +1664,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-	    "com.sun.sgs.app.AppListener", AppListener.class);
+	    "com.sun.sgs.app.AppListener");
     }
 
     /**
@@ -2242,9 +2241,11 @@ public class TestChannelServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
-	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
+	private final Map<ClientSession,
+	    ManagedReference<DummyClientSessionListener>>
+		sessions = Collections.synchronizedMap(
+		    new HashMap<ClientSession,
+			ManagedReference<DummyClientSessionListener>>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -2253,7 +2254,7 @@ public class TestChannelServiceImpl extends TestCase {
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.markForUpdate(this);
-	    ManagedReference listenerRef =
+	    ManagedReference<DummyClientSessionListener> listenerRef =
 		dataManager.createReference(listener);
 	    sessions.put(session, listenerRef);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
@@ -2270,13 +2271,15 @@ public class TestChannelServiceImpl extends TestCase {
 
 	DummyClientSessionListener getClientSessionListener(String name) {
 
-	    for (Map.Entry<ClientSession,ManagedReference> entry :
-		     sessions.entrySet()) {
+	    for (Map.Entry<ClientSession,
+		     ManagedReference<DummyClientSessionListener>> entry :
+			sessions.entrySet()) {
 
 		ClientSession session = entry.getKey();
-		ManagedReference listenerRef = entry.getValue();
+		ManagedReference<DummyClientSessionListener> listenerRef =
+		    entry.getValue();
 		if (session.getName().equals(name)) {
-		    return listenerRef.get(DummyClientSessionListener.class);
+		    return listenerRef.get();
 		}
 	    }
 	    return null;

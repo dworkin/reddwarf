@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -132,7 +133,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(6, getMaxTreeDepth(test));
 		    assertEquals(6, getMinTreeDepth(test));
 		}
@@ -219,7 +220,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(control, test);
 		}
 	    }, taskOwner);
@@ -437,10 +438,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.put(Boolean.TRUE, Boolean.FALSE);
 			fail("Expected ObjectNotFoundException");
@@ -453,7 +453,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.put(Boolean.TRUE, Boolean.FALSE);
 			fail("Expected ObjectNotFoundException");
@@ -480,11 +480,10 @@ public class TestScalableHashMap extends Assert {
 	    taskScheduler.runTransactionalTask(
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
-			dataService.removeObject(dataService.
-						 getBinding("bar", Bar.class));
+			dataService.removeObject(
+			    dataService.getBinding("bar"));
 			ScalableHashMap test =
-			    dataService.getBinding("test",
-						   ScalableHashMap.class);
+			    (ScalableHashMap) dataService.getBinding("test");
 			assertEquals(null, test.put(new Bar(1), Boolean.FALSE));
 			assertEquals(Boolean.FALSE, test.get(new Bar(1)));
 			throw new RuntimeException("Intentional Abort");
@@ -494,17 +493,16 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		}
 	    }, taskOwner);
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(null, test.put(new Bar(1), Boolean.FALSE));
 		    assertEquals(Boolean.FALSE, test.get(new Bar(1)));
 		}
@@ -527,9 +525,7 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    assertEquals(control,
-				 dataService.getBinding("test",
-							ScalableHashMap.class));
+		    assertEquals(control, dataService.getBinding("test"));
 		}
 	    }, taskOwner);	    
     }
@@ -551,8 +547,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(control,
-				 dataService.getBinding("test",
-							ScalableHashMap.class));
+				 dataService.getBinding("test"));
 		}
 	    }, taskOwner);
     }
@@ -590,10 +585,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.get(Boolean.TRUE);
 			fail("Expected ObjectNotFoundException");
@@ -606,7 +600,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.get(Boolean.TRUE);
 			fail("Expected ObjectNotFoundException");
@@ -632,10 +626,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(null, test.get(new Bar(1)));
 		}
 	    }, taskOwner);
@@ -643,7 +636,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(null, test.get(new Bar(1)));
 		}
 	    }, taskOwner);
@@ -663,10 +656,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    assertEquals(new Integer(0),
-				 dataService.
-				 getBinding("test", ScalableHashMap.class).
-				 get(null));
+		    assertEquals(
+			new Integer(0),
+			((Map) dataService.getBinding("test")).get(null));
 		}
 	    }, taskOwner);
     }
@@ -686,9 +678,8 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(null,
-				 dataService.
-				 getBinding("test", ScalableHashMap.class).
-				 get(0));
+				 ((Map) dataService.getBinding(
+				     "test")).get(0));
 		}
 	    }, taskOwner);
     }
@@ -725,9 +716,8 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    assertTrue(dataService.
-			       getBinding("test", ScalableHashMap.class).
-			       containsKey(null));
+		    assertTrue(((Map) dataService.getBinding(
+				    "test")).containsKey(null));
 		}
 	    }, taskOwner);
     }
@@ -745,9 +735,8 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    assertFalse(dataService.
-				getBinding("test", ScalableHashMap.class).
-				containsKey(null));
+		    assertFalse(((Map) dataService.getBinding(
+				     "test")).containsKey(null));
 		}
 	    }, taskOwner);
     }
@@ -768,10 +757,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertFalse(test.containsKey(new Bar(1)));
 		    assertEquals(2, test.size());
 		}
@@ -780,7 +768,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertFalse(test.containsKey(new Bar(1)));
 		    assertEquals(2, test.size());
 		}
@@ -803,10 +791,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertTrue(test.containsKey(1));
 		    assertEquals(2, test.size());
 		}
@@ -815,7 +802,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertTrue(test.containsKey(1));
 		    assertEquals(2, test.size());
 		}
@@ -880,7 +867,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			uncheckedCast(dataService.getBinding("test"));
 		    assertTrue(test.containsValue(null));
 		}
 	    }, taskOwner);
@@ -901,7 +888,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			uncheckedCast(dataService.getBinding("test"));
 		    assertFalse(test.containsValue(null));
 		}
 	    }, taskOwner);
@@ -923,10 +910,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertFalse(test.containsValue(new Bar(1)));
 		    assertEquals(2, test.size());
 		}
@@ -935,7 +921,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertFalse(test.containsValue(new Bar(1)));
 		    assertEquals(2, test.size());
 		}
@@ -958,10 +944,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.getBinding("bar",
-								    Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertTrue(test.containsValue(1));
 		    assertEquals(2, test.size());
 		}
@@ -970,7 +955,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertTrue(test.containsValue(1));
 		    assertEquals(2, test.size());
 		}
@@ -1072,9 +1057,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Collection<Integer> values = (Collection)
-			dataService.getBinding("values",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Collection<Integer>> ms =
+			uncheckedCast(dataService.getBinding("values"));
+		    Collection<Integer> values = ms.get();
 		    assertEquals(50, values.size());
 		    assertTrue(controlValues.containsAll(values));
 		    assertIteratorContains(controlValues, values.iterator());
@@ -1135,9 +1120,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Set keys = (Set)
-			dataService.getBinding("keys",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Set> ms =
+			uncheckedCast(dataService.getBinding("keys"));
+		    Set keys = ms.get();
 		    assertEquals(controlKeys, keys);
 		    assertIteratorContains(controlKeys, keys.iterator());
 		    assertEquals(controlKeys.hashCode(), keys.hashCode());
@@ -1176,9 +1161,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Set entries = (Set)
-			dataService.getBinding("entries",
-					       ManagedSerializable.class).get();
+		    ManagedSerializable<Set> ms =
+			uncheckedCast(dataService.getBinding("entries"));
+		    Set entries = ms.get();
 		    assertEquals(controlEntries, entries);
 		    assertEquals(controlEntries.hashCode(), entries.hashCode());
 		}
@@ -1214,7 +1199,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertTrue(test.equals(control));
 		    assertEquals(test.hashCode(), control.hashCode());
 		}
@@ -1290,10 +1275,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.remove(1);
 			fail("Expected ObjectNotFoundException");
@@ -1306,7 +1290,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    try {
 			test.remove(1);
 			fail("Expected ObjectNotFoundException");
@@ -1332,10 +1316,9 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    dataService.removeObject(dataService.
-					     getBinding("bar", Bar.class));
+		    dataService.removeObject(dataService.getBinding("bar"));
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(null, test.remove(new Bar(1)));
 		    assertEquals(null, test.remove(1));
 		    assertEquals(null, test.remove(new Bar(2)));
@@ -1345,7 +1328,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			(ScalableHashMap) dataService.getBinding("test");
 		    assertEquals(null, test.remove(new Bar(1)));
 		    assertEquals(null, test.remove(1));
 		    assertEquals(null, test.remove(new Bar(2)));
@@ -1411,7 +1394,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			uncheckedCast(dataService.getBinding("test"));
 		    // add just a few elements
 		    for (int i = 0; i < 33; i++) {
 			int j = RANDOM.nextInt();
@@ -1427,7 +1410,7 @@ public class TestScalableHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
-			dataService.getBinding("test", ScalableHashMap.class);
+			uncheckedCast(dataService.getBinding("test"));
 
 		    // add just enough elements to force a split
 		    for (int i = 0; i < 1024; i++) {
@@ -2209,8 +2192,7 @@ public class TestScalableHashMap extends Assert {
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			ScalableHashMap test =
-			    dataService.getBinding("test",
-						   ScalableHashMap.class);
+			    (ScalableHashMap) dataService.getBinding("test");
 			dataService.setBinding("valuesIter",
 			    new ManagedSerializable(test.values().iterator()));
 		    }
@@ -2219,14 +2201,12 @@ public class TestScalableHashMap extends Assert {
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			if (local == 0) {
-			    dataService.
-				removeObject(dataService.
-					     getBinding("bar", Bar.class));
+			    dataService.removeObject(
+				dataService.getBinding("bar"));
 			}
-			Iterator valuesIter = (Iterator)
-			    dataService.getBinding("valuesIter",
-						   ManagedSerializable.
-						   class).get();
+			ManagedSerializable<Iterator> ms = uncheckedCast(
+			    dataService.getBinding("valuesIter"));
+			Iterator valuesIter = ms.get();
 			int count = 0;
 			while (valuesIter.hasNext()) {
 			    count++;

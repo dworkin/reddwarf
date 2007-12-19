@@ -139,7 +139,6 @@ public final class AdaptiveField<T> implements Serializable {
      *
      * @return the value of the field
      */
-    @SuppressWarnings("unchecked")
     public T get() {
 	if (isLocal) {
 	    return local;

@@ -23,6 +23,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableHashMap;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TaskOwner;
@@ -185,7 +186,7 @@ public class TestScalableHashMapStress extends Assert {
      */
     private static class Value extends Int {
 	private static final long serialVersionUID = 1;
-	private ManagedReference key;
+	private ManagedReference<ManagedKey> key;
 	static Value create(int i) {
 	    return random.nextBoolean() ? new Value(i) : new ManagedValue(i);
 	}
@@ -201,12 +202,11 @@ public class TestScalableHashMapStress extends Assert {
 	    setKey(key);
 	}
 	Key getKey() {
-	    return (key == null) ? null : key.get(Key.class);
+	    return (key == null) ? null : key.get();
 	}
 	void setKey(Key key) {
-	    this.key = (key instanceof ManagedObject)
-		? AppContext.getDataManager().createReference(
-		    (ManagedObject) key)
+	    this.key = (key instanceof ManagedKey)
+		? AppContext.getDataManager().createReference((ManagedKey) key)
 		: null;
 	}
 	public boolean equals(Object object) {
@@ -308,9 +308,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !keys.hasNext();
 	    if (startAgain) {
 		keys = map.keySet().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Key>> ms =
-		    dataService.getBinding("keys", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("keys"));
 		ms.set(keys);
 		keysSeen.clear();
 		currentKey = -1;
@@ -363,10 +362,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !values.hasNext();
 	    if (startAgain) {
 		values = map.values().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Value>> ms =
-		    dataService.getBinding(
-			"values", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("values"));
 		ms.set(values);
 		valuesSeen.clear();
 		currentValue = -1;
@@ -418,10 +415,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !entries.hasNext();
 	    if (startAgain) {
 		entries = map.entrySet().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Entry<Key, Value>>> ms =
-		    dataService.getBinding(
-			"entries", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("entries"));
 		ms.set(entries);
 		entriesSeen.clear();
 		currentEntry = -1;
@@ -524,10 +519,8 @@ public class TestScalableHashMapStress extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    initTxnState();
-		    dataService.
-			removeObject(dataService.
-				     getBinding("entries",
-						ManagedSerializable.class));
+		    dataService.removeObject(
+			dataService.getBinding("entries"));
 		    entries = map.entrySet().iterator();
 		    dataService.setBinding("entries",
 		        new ManagedSerializable<Iterator<Entry<Key, Value>>>
@@ -559,18 +552,10 @@ public class TestScalableHashMapStress extends Assert {
 		    initTxnState();
 		    DoneRemoving.init();
 		    dataService.removeObject(map);
-		    dataService.
-			removeObject(dataService.
-				     getBinding("keys",
-						ManagedSerializable.class));
-		    dataService.
-			removeObject(dataService.
-				     getBinding("values",
-						ManagedSerializable.class));
-		    dataService.
-			removeObject(dataService.
-				     getBinding("entries",
-						ManagedSerializable.class));
+		    dataService.removeObject(dataService.getBinding("keys"));
+		    dataService.removeObject(dataService.getBinding("values"));
+		    dataService.removeObject(
+			dataService.getBinding("entries"));
 		}
 	    }, taskOwner);
 	DoneRemoving.await(1);
@@ -632,13 +617,16 @@ public class TestScalableHashMapStress extends Assert {
      */
     @SuppressWarnings("unchecked")
     private void initTxnState() throws Exception {
-	map = dataService.getBinding("map", ScalableHashMap.class);
-	keys = (Iterator<Key>)
-	    dataService.getBinding("keys", ManagedSerializable.class).get();
-	values = (Iterator<Value>)
-	    dataService.getBinding("values", ManagedSerializable.class).get();
-	entries = (Iterator<Entry<Key, Value>>)
-	    dataService.getBinding("entries", ManagedSerializable.class).get();
+	map = (ScalableHashMap) dataService.getBinding("map");
+	ManagedSerializable<Iterator<Key>> msKeys =
+	    uncheckedCast(dataService.getBinding("keys"));
+	keys = msKeys.get();
+	ManagedSerializable<Iterator<Value>> msValues =
+	    uncheckedCast(dataService.getBinding("values"));
+	values = msValues.get();
+	ManagedSerializable<Iterator<Entry<Key, Value>>> msEntries =
+	    uncheckedCast(dataService.getBinding("entries"));
+	entries = msEntries.get();
 	if (debug) {
 	    System.err.println("new transaction");
 	}
@@ -719,8 +707,7 @@ public class TestScalableHashMapStress extends Assert {
 		break;
 	    }
 	    try {
-		ManagedObject obj = dataService.createReferenceForId(id).get(
-		    ManagedObject.class);
+		ManagedObject obj = dataService.createReferenceForId(id).get();
 		System.err.println(id + ": (" + obj.getClass().getName() +
 				   ") " + obj);
 	    } catch (Exception e) {

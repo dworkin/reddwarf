@@ -315,21 +315,25 @@ public class TestBoundNamesUtil extends TestCase {
     {
 	private static final long serialVersionUID = 1;
 	/* -- Stubs for DataManager -- */
-	public <T> T getBinding(String name, Class<T> type) { return null; }
+	public ManagedObject getBinding(String name) { return null; }
 	public void setBinding(String name, ManagedObject object) { }
 	public void removeBinding(String name) { }
 	public String nextBoundName(String name) { return null; }
 	public void removeObject(ManagedObject object) { }
 	public void markForUpdate(ManagedObject object) { }
-	public ManagedReference createReference(ManagedObject object) {
+	public <T extends ManagedObject> ManagedReference<T> createReference(
+	    T object)
+	{
 	    return null;
 	}
 	/* -- Stubs for DataService -- */
-	public <T> T getServiceBinding(String name, Class<T> type) {
+	public ManagedObject getServiceBinding(String name) {
 	    return null;
 	}
 	public void setServiceBinding(String name, ManagedObject object) { }
-	public ManagedReference createReferenceForId(BigInteger id) {
+	public ManagedReference<? extends ManagedObject> createReferenceForId(
+	    BigInteger id)
+	{
 	    return null;
 	}
 	public BigInteger nextObjectId(BigInteger objectId) { return null; }

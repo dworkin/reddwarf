@@ -574,7 +574,7 @@ public class TestTaskServiceImpl extends TestCase {
                     while ((name != null) && (name.startsWith("runHandle."))) {
                         System.out.println("Removing: " + name);
                         ManagedHandle mHandle =
-                            dataService.getBinding(name, ManagedHandle.class);
+                            (ManagedHandle) dataService.getBinding(name);
                         mHandle.cancel();
                         dataService.removeObject(mHandle);
                         dataService.removeBinding(name);
@@ -613,9 +613,8 @@ public class TestTaskServiceImpl extends TestCase {
         taskScheduler.runTransactionalTask(
             new AbstractKernelRunnable() {
                 public void run() {
-                    ManagedHandle mHandle =
-                        dataService.getBinding("TestTaskServiceImpl.handle",
-                                               ManagedHandle.class);
+                    ManagedHandle mHandle = (ManagedHandle)
+			dataService.getBinding("TestTaskServiceImpl.handle");
                     try {
                         mHandle.cancel();
                     } catch (Exception e) {
@@ -733,9 +732,8 @@ public class TestTaskServiceImpl extends TestCase {
     private class GetManagedHandleTask extends AbstractKernelRunnable {
         ManagedHandle mHandle;
         public void run() {
-            mHandle =
-                dataService.getBinding("TestTaskServiceImpl.handle",
-                                   ManagedHandle.class);
+            mHandle = (ManagedHandle) dataService.getBinding(
+		"TestTaskServiceImpl.handle");
             mHandle.cancel(); 
         }
     }
@@ -757,10 +755,8 @@ public class TestTaskServiceImpl extends TestCase {
          taskScheduler.runTransactionalTask(
             new AbstractKernelRunnable() {
                 public void run() {
-                    dataService.
-                        removeObject(dataService.
-                                     getBinding("TestTaskServiceImpl.task",
-                                                ManagedObject.class));
+                    dataService.removeObject(
+			dataService.getBinding("TestTaskServiceImpl.task"));
                 }
          }, taskOwner);
 
@@ -768,8 +764,8 @@ public class TestTaskServiceImpl extends TestCase {
             new AbstractKernelRunnable() {
                 public void run() {
                     ManagedHandle mHandle =
-                        dataService.getBinding("TestTaskServiceImpl.handle",
-                                               ManagedHandle.class);
+                        (ManagedHandle) dataService.getBinding(
+			    "TestTaskServiceImpl.handle");
                     try {
                         mHandle.cancel();
                     } catch (ObjectNotFoundException e) {
@@ -917,8 +913,7 @@ public class TestTaskServiceImpl extends TestCase {
                 public void run() {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
                     while ((name != null) && (name.startsWith(PENDING_NS))) {
-                        ManagedObject obj =
-                            dataService.getBinding(name, ManagedObject.class);
+                        ManagedObject obj = dataService.getBinding(name);
                         dataService.removeObject(obj);
                         dataService.removeBinding(name);
                     }
@@ -927,14 +922,14 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     private Counter getClearedCounter() {
-        Counter counter = dataService.getBinding("counter", Counter.class);
+        Counter counter = (Counter) dataService.getBinding("counter");
         dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }
 
     private void assertCounterClear(String message) {
-        Counter counter = dataService.getBinding("counter", Counter.class);
+        Counter counter = (Counter) dataService.getBinding("counter");
         if (! counter.isZero()) {
             System.out.println("Counter assert failed: " + counter);
             fail(message);
@@ -969,7 +964,7 @@ public class TestTaskServiceImpl extends TestCase {
     public static abstract class AbstractTask implements Task, Serializable {
         public void run() throws Exception {
             DataManager dataManager = AppContext.getDataManager();
-            Counter counter = dataManager.getBinding("counter", Counter.class);
+            Counter counter = (Counter) dataManager.getBinding("counter");
             dataManager.markForUpdate(counter);
             counter.decrement();
         }
