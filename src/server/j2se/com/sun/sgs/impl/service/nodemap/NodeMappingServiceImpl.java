@@ -585,9 +585,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	synchronized (stateLock) {
 	    switch (state) {
             case CONSTRUCTED:
-                break;
 	    case RUNNING:
-		break;
 	    case SHUTTING_DOWN:
 		break;
 	    case SHUTDOWN:

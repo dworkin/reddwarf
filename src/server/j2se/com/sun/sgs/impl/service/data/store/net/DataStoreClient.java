@@ -24,6 +24,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.sharedutil.Exceptions;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -908,8 +909,13 @@ public final class DataStoreClient
 	    } else {
 		re = (TransactionNotActiveException) e;
 	    }
-	} else {
+	} else if (e instanceof RuntimeException) {
 	    re = (RuntimeException) e;
+	} else {
+	    throw Exceptions.initCause(
+		new AssertionError(
+		    "Expected IOException or RuntimeException: " + e),
+		e);
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was
