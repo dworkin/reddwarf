@@ -921,7 +921,6 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    case UNINITIALIZED:
 		throw new IllegalStateException("Service is not constructed");
 	    case RUNNING:
-		break;
 	    case SHUTTING_DOWN:
 		break;
 	    case SHUTDOWN:

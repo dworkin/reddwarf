@@ -164,11 +164,6 @@
 		      value="${checkstyle.unusedImports}"
 		      default="warning"/>
 	</module>
-	<!-- DARKSTAR: Make sure imports are ordered -->
-	<module name="ImportOrder">
-	    <property name="severity"
-		      value="warning"/>
-	</module>
 
 
         <!-- Checks for Size Violations.                    -->

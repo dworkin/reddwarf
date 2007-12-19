@@ -12,8 +12,8 @@ import java.util.Properties;
  * {@link MapPutTask}s to insert random integers into it.  By default, the
  * number of tasks scheduled equals the number of available processors, as
  * returned by {@link Runtime#availableProcessors Runtime.availableProcessors},
- * but the value can be specified with the {@value #TASKS_KEY} system
- * property.
+ * but the value can be specified with the {@value
+ * com.sun.sgs.analysis.task.BasicScheduleTasks#TASKS_KEY} system property.
  */
 public class ScheduleMapPutsTask extends BasicScheduleTasks {
 
