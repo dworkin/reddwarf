@@ -60,12 +60,8 @@ public interface DataManager {
      * ManagedReference.getForUpdate} before modifying the returned object or
      * any of the non-managed objects it refers to.
      *
-     * @param	<T> the type of the object
      * @param	name the name
-     * @param	type a class representing the type of the object
      * @return	the object bound to the name
-     * @throws	ClassCastException if the object bound to the name is not of
-     *		the specified type
      * @throws	NameNotBoundException if no object is bound to the name
      * @throws	ObjectNotFoundException if the object bound to the name is not
      *		found
@@ -74,7 +70,7 @@ public interface DataManager {
      * @see	#markForUpdate markForUpdate
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate
      */
-    <T> T getBinding(String name, Class<T> type);
+    ManagedObject getBinding(String name);
 
     /**
      * Binds an object to a name, replacing any previous binding.  The object,
@@ -187,6 +183,7 @@ public interface DataManager {
      * managed references when a managed object refers to another managed
      * object, either directly or indirectly through non-managed objects.
      *
+     * @param	<T> the type of the object
      * @param	object the object
      * @return	the managed reference
      * @throws	IllegalArgumentException if <code>object</code> does not
@@ -195,5 +192,5 @@ public interface DataManager {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    ManagedReference createReference(ManagedObject object);
+    <T extends ManagedObject> ManagedReference<T> createReference(T object);
 }

@@ -44,9 +44,10 @@ import java.math.BigInteger;
  * produce performance improvements regardless of whether modifications are
  * detected automatically.
  *
+ * @param	<T> the type of the referenced object
  * @see		DataManager#createReference DataManager.createReference
  */
-public interface ManagedReference {
+public interface ManagedReference<T extends ManagedObject> {
 
     /**
      * Obtains the object associated with this reference.  For implementations
@@ -55,11 +56,7 @@ public interface ManagedReference {
      * DataManager#markForUpdate DataManager.markForUpdate} before modifying
      * the returned object or any of the non-managed objects it refers to.
      *
-     * @param	<T> the type of the referenced object
-     * @param	type a class representing the type of the referenced object
      * @return	the associated object
-     * @throws	ClassCastException if the object associated with this reference
-     *		is not of the specified type
      * @throws	ObjectNotFoundException if the object associated with this
      *		reference is not found
      * @throws	TransactionException if the operation failed because of a
@@ -67,24 +64,20 @@ public interface ManagedReference {
      * @see	#getForUpdate getForUpdate
      * @see	DataManager#markForUpdate DataManager.markForUpdate
      */
-    <T> T get(Class<T> type);
+    T get();
 
     /**
      * Obtains the managed object associated with this reference, and notifies
      * the system that the object is going to be modified.
      *
-     * @param	<T> the type of the referenced object
-     * @param	type a class representing the type of the referenced object
      * @return	the associated object
-     * @throws	ClassCastException if the object associated with this reference
-     *		is not of the specified type
      * @throws	ObjectNotFoundException if the object associated with this
      *		reference is not found
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      * @see	DataManager#markForUpdate DataManager.markForUpdate
      */
-    <T> T getForUpdate(Class<T> type);
+    T getForUpdate();
 
     /**
      * Returns a unique identifier for the object associated with this

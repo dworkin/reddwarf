@@ -399,9 +399,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 			public void run() {
 			    DataServiceHeader header;
 			    try {
-				header = getServiceBinding(
-				    CLASSNAME + ".header",
-				    DataServiceHeader.class);
+				header = (DataServiceHeader) 
+				    getServiceBinding(CLASSNAME + ".header");
 				logger.log(Level.CONFIG,
 					   "Found existing header {0}",
 					   header);
@@ -439,8 +438,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Implement DataManager -- */
 
     /** {@inheritDoc} */
-    public <T> T getBinding(String name, Class<T> type) {
-	return getBindingInternal(name, type, false);
+    public ManagedObject getBinding(String name) {
+	return getBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
@@ -541,7 +540,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public ManagedReference createReference(ManagedObject object) {
+    public <T extends ManagedObject> ManagedReference<T> createReference(
+	T object)
+    {
 	Context context = null;
 	try {
 	    if (object == null) {
@@ -551,7 +552,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    "The object must be serializable");
 	    }
 	    context = getContext();
-	    ManagedReference result = context.getReference(object);
+	    ManagedReference<T> result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -575,8 +576,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
-    public <T> T getServiceBinding(String name, Class<T> type) {
-	return getBindingInternal(name, type, true);
+    public ManagedObject getServiceBinding(String name) {
+	return getBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
@@ -595,11 +596,14 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public ManagedReference createReferenceForId(BigInteger id) {
+    public ManagedReference<? extends ManagedObject> createReferenceForId(
+	BigInteger id)
+    {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReference result = context.getReference(getOid(id));
+	    ManagedReference<? extends ManagedObject> result =
+		context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
@@ -642,20 +646,19 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Generic binding methods -- */
 
     /** Implement getBinding and getServiceBinding. */
-    private <T> T getBindingInternal(
-	 String name, Class<T> type, boolean serviceBinding)
+    private ManagedObject getBindingInternal(
+	String name, boolean serviceBinding)
     {
 	Context context = null;
 	try {
-	    if (name == null || type == null) {
-		throw new NullPointerException(
-		    "The arguments must not be null");
+	    if (name == null) {
+		throw new NullPointerException("The name must not be null");
 	    }
 	    context = getContext();
-	    T result;
+	    ManagedObject result;
 	    try {
 		result = context.getBinding(
-		    getInternalName(name, serviceBinding), type);
+		    getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -663,19 +666,18 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, type:{3} returns {4}",
+		    "{0} tid:{1,number,#}, name:{2}, returns {3}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, type,
-		    Objects.fastToString(result));
+		    contextTxnId(context), name, Objects.fastToString(result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e,
-		    "{0} tid:{1,number,#}, name:{2}, type:{3} throws",
+		    "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, type);
+		    contextTxnId(context), name);
 	    }
 	    throw e;
 	}

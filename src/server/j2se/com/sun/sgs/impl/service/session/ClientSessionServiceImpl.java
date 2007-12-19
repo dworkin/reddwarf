@@ -794,8 +794,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
-			    dataService.getServiceBinding(
-				listenerKey, ManagedObject.class);
+			    dataService.getServiceBinding(listenerKey);
 			 boolean isWrapped =
 			     obj instanceof ClientSessionListenerWrapper;
 			 ClientSessionListener listener =

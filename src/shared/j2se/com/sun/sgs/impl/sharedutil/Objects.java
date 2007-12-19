@@ -93,4 +93,19 @@ public final class Objects {
 		Integer.toHexString(System.identityHashCode(object));
 	}
     }
+
+    /**
+     * Casts an object to the required type with no unchecked warnings.  Use
+     * this method instead of the @SuppressWarnings("unchecked") annotation if
+     * there is no way to perform a safe check, for example because the type is
+     * generic.
+     *
+     * @param <T> the result type
+     * @param object the object to cast
+     * @return the object cast to type {@code T}
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T uncheckedCast(Object object) {
+	return (T) object;
+    }
 }

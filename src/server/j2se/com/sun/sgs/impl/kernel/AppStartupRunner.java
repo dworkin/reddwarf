@@ -77,8 +77,7 @@ class AppStartupRunner implements KernelRunnable {
         DataService dataService = appContext.getService(DataService.class);
         try {
             // test to see if this name if the listener is already bound...
-            dataService.getServiceBinding(StandardProperties.APP_LISTENER,
-                                          AppListener.class);
+            dataService.getServiceBinding(StandardProperties.APP_LISTENER);
         } catch (NameNotBoundException nnbe) {
             // ...if it's not, create and then bind the listener
             String appClass =

@@ -173,7 +173,7 @@ public class ScalableHashSet<E>
      *
      * @serial
      */
-    private final ManagedReference map;
+    private final ManagedReference<ScalableHashMap<E,Marker>> map;
 
     /**
      * Creates an empty set; the backing {@code ScalableHashMap} has the
@@ -229,9 +229,8 @@ public class ScalableHashSet<E>
      * @throws IllegalArgumentException if the argument is not {@code null} and
      *	       does not implement {@code Serializable}
      */
-    @SuppressWarnings("unchecked")
     public boolean add(E e) {
-	return map.get(ScalableHashMap.class).put(e, PRESENT) == null;
+	return map.get().put(e, PRESENT) == null;
     }
 
     /**
@@ -240,7 +239,7 @@ public class ScalableHashSet<E>
      * O(n*log(n))} time.
      */
     public void clear() {
-	map.get(ScalableHashMap.class).clear();
+	map.get().clear();
     }
 
     /**
@@ -251,7 +250,7 @@ public class ScalableHashSet<E>
      * @return {@code true} if this set contains the specified element
      */
     public boolean contains(Object o) {
-	return map.get(ScalableHashMap.class).containsKey(o);
+	return map.get().containsKey(o);
     }
 
     /**
@@ -260,7 +259,7 @@ public class ScalableHashSet<E>
      * @return {@code true} if this set contains no elements
      */
     public boolean isEmpty() {
-	return map.get(ScalableHashMap.class).isEmpty();
+	return map.get().isEmpty();
     }
 
     /**
@@ -269,9 +268,8 @@ public class ScalableHashSet<E>
      *
      * @return an iterator over the elements in this set
      */
-    @SuppressWarnings("unchecked")
     public Iterator<E> iterator() {
-	return map.get(ScalableHashMap.class).keySet().iterator();
+	return map.get().keySet().iterator();
     }
 
     /**
@@ -282,7 +280,7 @@ public class ScalableHashSet<E>
      * @return {@code true} if the element was initially present in this set
      */
     public boolean remove(Object o) {
-	return map.get(ScalableHashMap.class).remove(o) == PRESENT;
+	return map.get().remove(o) == PRESENT;
     }
 
     /**
@@ -293,7 +291,7 @@ public class ScalableHashSet<E>
      * @return the number of elements in this set
      */
     public int size() {
-	return map.get(ScalableHashMap.class).size();
+	return map.get().size();
     }
 
     /**
@@ -334,7 +332,7 @@ public class ScalableHashSet<E>
      */
     public void removingObject() {
 	AppContext.getDataManager().removeObject(
-	    map.get(ScalableHashMap.class));
+	    map.get());
     }
 
     /**

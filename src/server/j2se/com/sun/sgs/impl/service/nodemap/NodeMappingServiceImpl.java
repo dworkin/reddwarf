@@ -705,7 +705,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         public void run() throws UnknownIdentityException { 
             // Exceptions thrown by getServiceBinding are handled by caller.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(idKey, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(idKey);
             
             if (active) {
                 dataService.setServiceBinding(statusKey, idmo);
@@ -777,7 +777,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // We look up the identity in the data service. Most applications
             // will use a customized Identity object.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(key, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(key);
             return idmo.getIdentity();
         }
         
@@ -976,7 +976,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	    String key = NodeMapUtil.getIdentityKey(identity);
 	    try {                
 		IdentityMO idmo = 
-                        dataService.getServiceBinding(key, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(key);
                 node = watchdogService.getNode(idmo.getNodeId());
                 if (node == null) {
                     // The identity is on a failed node, where the node has

@@ -826,9 +826,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	ClientSessionListener get() {
-	    ManagedObject obj = 
-		    dataService.getServiceBinding(
-			listenerKey, ManagedObject.class);
+	    ManagedObject obj = dataService.getServiceBinding(listenerKey);
 	    return
 		(isManaged) ?
 		((ClientSessionListener) obj) :
@@ -838,8 +836,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	void remove() {
 	    if (!isManaged) {
 		ClientSessionListenerWrapper wrapper =
-		    dataService.getServiceBinding(
-			listenerKey, ClientSessionListenerWrapper.class);
+		    (ClientSessionListenerWrapper)
+		    dataService.getServiceBinding(listenerKey);
 		dataService.removeObject(wrapper);
 	    }
 	    dataService.removeServiceBinding(listenerKey);
@@ -894,8 +892,8 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	 */
 	public void run() {
 	    AppListener appListener =
-		dataService.getServiceBinding(
-		    StandardProperties.APP_LISTENER, AppListener.class);
+		(AppListener) dataService.getServiceBinding(
+		    StandardProperties.APP_LISTENER);
 	    logger.log(
 		Level.FINEST,
 		"LoginTask.run invoking AppListener.loggedIn session:{0}",

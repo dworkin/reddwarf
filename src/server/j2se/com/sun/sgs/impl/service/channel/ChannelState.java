@@ -84,7 +84,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
 	this.delivery = delivery;
-	ManagedReference ref = dataService.createReference(this);
+	ManagedReference<ChannelState> ref = dataService.createReference(this);
 	idBytes = ref.getId().toByteArray();
 	id = new CompactId(idBytes);
     }
@@ -175,19 +175,13 @@ final class ChannelState implements ManagedObject, Serializable {
     }
 
     ChannelListener getListener() {
-	return
-	    channelListener != null  ?
-	    channelListener.get(ChannelListener.class) :
-	    null;
+	return channelListener != null ? channelListener.get() : null;
     }
 
     ChannelListener getListener(ClientSession session) {
 	WrappedSerializable<ChannelListener> listener =
 	    listeners.get(session);
-	return
-	    listener != null ?
-	    listener.get(ChannelListener.class) :
-	    null;
+	return listener != null ? listener.get() : null;
     }
     
     /* -- Serialization methods -- */

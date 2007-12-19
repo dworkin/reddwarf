@@ -37,6 +37,7 @@ import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
@@ -585,7 +586,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    assert name != null;
 	    String key = getChannelKey(name);
 	    try {
-		dataService.getServiceBinding(key, ChannelState.class);
+		dataService.getServiceBinding(key);
 		throw new NameExistsException(name);
 	    } catch (NameNotBoundException e) {
 	    }
@@ -611,9 +612,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    if (channel == null) {
 		ChannelState channelState;
 		try {
-		    channelState =
-		    	dataService.getServiceBinding(
-			    getChannelKey(name), ChannelState.class);
+		    channelState = (ChannelState)
+			dataService.getServiceBinding(getChannelKey(name));
 		} catch (NameNotBoundException e) {
 		    throw new NameNotBoundException(name);
 		}
@@ -640,9 +640,9 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		ChannelState channelState;
 		try {
 		    BigInteger refId = new BigInteger(1, channelId.getId());
-		    ManagedReference stateRef =
-			dataService.createReferenceForId(refId);
-		    channelState = stateRef.get(ChannelState.class);
+		    ManagedReference<ChannelState> stateRef =
+			uncheckedCast(dataService.createReferenceForId(refId));
+		    channelState = stateRef.get();
 		} catch (ObjectNotFoundException e) {
 		    throw new NameNotBoundException(name);
 		}
@@ -738,7 +738,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    try {
 		String key = getChannelKey(name);
 		ChannelState channelState =
-		    dataService.getServiceBinding(key, ChannelState.class);
+		    (ChannelState) dataService.getServiceBinding(key);
 		dataService.removeServiceBinding(key);
 		dataService.removeObject(channelState);
 		
@@ -758,7 +758,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
+		    (ChannelSet) dataService.getServiceBinding(key);
 		dataService.markForUpdate(set);
 		set.add(channel);
 	    } catch (NameNotBoundException e) {
@@ -776,7 +776,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
+		    (ChannelSet) dataService.getServiceBinding(key);
 		dataService.markForUpdate(set);
 		set.remove(channel);
 	    } catch (NameNotBoundException e) {
@@ -793,7 +793,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
+		    (ChannelSet) dataService.getServiceBinding(key);
 		Set<Channel> channels = set.removeAll();
 		dataService.removeServiceBinding(key);
 		dataService.removeObject(set);
@@ -881,8 +881,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 
 	while (iter.hasNext()) {
 	    String key = iter.next();
-	    ChannelSet set =
-		dataService.getServiceBinding(key, ChannelSet.class);
+	    ChannelSet set = (ChannelSet) dataService.getServiceBinding(key);
 	    dataService.removeObject(set);
 	    iter.remove();
 	}
@@ -898,7 +897,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
  				dataService, CHANNEL_PREFIX))
 	{
 	    ChannelState channelState =
-		dataService.getServiceBinding(key, ChannelState.class);
+		(ChannelState) dataService.getServiceBinding(key);
 	    dataService.markForUpdate(channelState);
 	    channelState.removeAllSessions();
 	}

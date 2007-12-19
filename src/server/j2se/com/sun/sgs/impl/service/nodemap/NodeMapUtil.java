@@ -82,8 +82,8 @@ final class NodeMapUtil {
         boolean ok = true;
         VersionMO currentVersion = new VersionMO(major_version, minor_version);
         try {
-            VersionMO oldVersion = 
-                    dataService.getServiceBinding(VERSION_KEY, VersionMO.class);
+            VersionMO oldVersion =
+		(VersionMO) dataService.getServiceBinding(VERSION_KEY);
             logger.log(Level.CONFIG, "Found version " + oldVersion);
             ok = currentVersion.equals(oldVersion);
             if (!ok) {

@@ -81,8 +81,8 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public <T> T getBinding(String name, Class<T> type) {
-        return backingManager.getBinding(name, type);
+    public ManagedObject getBinding(String name) {
+        return backingManager.getBinding(name);
     }
 
     /**
@@ -126,7 +126,9 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
      * Note that this method is the only one that is directly reported by
      * this manager, if profiling is enabled.
      */
-    public ManagedReference createReference(ManagedObject object) {
+    public <T extends ManagedObject> ManagedReference<T> createReference(
+	T object)
+    {
         if (createReferenceOp != null)
             createReferenceOp.report();
         return backingManager.createReference(object);

@@ -49,19 +49,15 @@ public interface DataService extends DataManager, Service {
      * markForUpdate} or {@link ManagedReference#getForUpdate
      * ManagedReference.getForUpdate} before making the modifications.
      *
-     * @param	<T> the type of the object
      * @param	name the name
-     * @param	type a class representing the type of the object
      * @return	the object associated with the service binding of the name
-     * @throws	ClassCastException if the object bound to the name is not of
-     *		the specified type
      * @throws	NameNotBoundException if no object is bound to the name
      * @throws	ObjectNotFoundException if the object bound to the name is not
      *		found
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T> T getServiceBinding(String name, Class<T> type);
+    ManagedObject getServiceBinding(String name);
 
     /**
      * Specifies an object for the service binding of a name, replacing any
@@ -138,7 +134,8 @@ public interface DataService extends DataManager, Service {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    ManagedReference createReferenceForId(BigInteger id);
+    ManagedReference<? extends ManagedObject> createReferenceForId(
+	BigInteger id);
 
     /**
      * Returns a unique identifier for the next object after the object with
