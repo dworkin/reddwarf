@@ -202,7 +202,10 @@
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal JavaDoc -->
-  <target name="javadoc-internal" depends="build, project-version"
+  <target name="javadoc-internal"
+	  depends="build, -test-shared.classes, -test-server.classes,
+		   -test-client.classes, analysis-classes,
+		   project-version"
           description="Builds internal (full) javadoc">
     <javadoc destdir="${build.dir}/javadoc/internal"
              packagenames="com.sun.*"
@@ -215,6 +218,7 @@
         <pathelement location="${build.dir}/test/classes/client"/>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <pathelement location="${build.dir}/example/classes"/>
+	<pathelement location="${build.dir}/analysis/classes"/>
         <path refid="server.classpath"/>
         <path refid="client.classpath"/>
         <pathelement location="lib/junit-4.1.jar"/>
@@ -223,6 +227,7 @@
         <dirset dir="src" includes="*/j2se"/>
         <dirset dir="test" includes="*/j2se"/>
         <dirset dir="example" includes="*/src"/>
+	<dirset dir="analysis" includes="*/j2se"/>
       </sourcepath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
@@ -695,7 +700,8 @@
   <target name="findbugs-client" depends="build-client, -findbugs.init"
 	  description="Checks for bugs in the client">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/client/j2se"/>
       <class location="${build.dir}/classes/client"/>
       <auxClasspath>
@@ -708,7 +714,8 @@
   <target name="findbugs-server" depends="build-server, -findbugs.init"
 	  description="Checks for bugs in the server">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/server/j2se"/>
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
@@ -723,7 +730,8 @@
   <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
 	  description="Checks for bugs in shared code">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" sort="true" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/shared/j2se"/>
       <class location="${build.dir}/classes/shared"/>
       <auxClasspath>
@@ -1175,10 +1183,11 @@
   </target>
 
   <!-- Runs the example HackApp (server) -->
-  <target name="example-hack-app" depends="example-classes"
+  <target name="example-hack-app"
+	  depends="example-classes, -maybe-delete-hack-app-datastore"
           description="Runs the example HackApp (server)">
     <mkdir dir="${build.dir}/example"/>
-    <delete dir="${build.dir}/example/HackApp"/>
+    <mkdir dir="${build.dir}/example/HackApp/data"/>
     <mkdir dir="${build.dir}/example/HackApp/dsdb"/>
     <copy todir="${build.dir}/example/HackApp/gameData">
       <fileset dir="example/hack/gameData"/>
@@ -1204,6 +1213,13 @@
       </classpath>
       <arg value="example/hack/HackApp.properties"/>
     </java>
+  </target>
+
+  <!-- Deletes the Hack example data store files unless the
+       hack.server.retain.datastore property is set. -->
+  <target name="-maybe-delete-hack-app-datastore"
+	  unless="hack.server.retain.datastore">
+    <delete dir="${build.dir}/example/HackApp"/>
   </target>
 
   <!-- Runs the example HackClient (GUI client) -->

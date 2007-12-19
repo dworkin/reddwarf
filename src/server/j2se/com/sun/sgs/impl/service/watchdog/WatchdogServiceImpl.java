@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
@@ -324,7 +325,8 @@ public class WatchdogServiceImpl implements WatchdogService {
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
                     throw new IllegalArgumentException(
-                        "registerNode returned improper array: " + values);
+                        "registerNode returned improper array: " +
+			Arrays.toString(values));
                 }
                 localNodeId = values[0];
                 renewInterval = values[1];
