@@ -134,7 +134,7 @@ public class SimpleClient implements ServerSession {
      * {@link SimpleClientListener#getPasswordAuthentication
      * getPasswordAuthentication} method with a login prompt.
      * <p>
-     * Next, if a connection with the server is successfuly established and
+     * Next, if a connection with the server is successfully established and
      * the client's login credential (as obtained above) is verified, then
      * the client listener's {@link SimpleClientListener#loggedIn loggedIn}
      * method is invoked. If, however, the login fails due to a connection
