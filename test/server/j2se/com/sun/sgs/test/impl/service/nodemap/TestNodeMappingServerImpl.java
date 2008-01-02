@@ -369,7 +369,7 @@ public class TestNodeMappingServerImpl extends TestCase {
                 Class.forName("com.sun.sgs.impl.service.watchdog.NodeImpl");
         Method setFailedMethod = NodeImplClass.getDeclaredMethod(
                 "setFailed",
-                new Class[] {DataService.class});
+                new Class[] {DataService.class, NodeImplClass});
         setFailedMethod.setAccessible(true);
         
         Identity id = new DummyIdentity();
@@ -381,7 +381,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         // Mark the node as failed
         createTransaction();
         Node node = watchdogService.getNode(nodeId);
-        setFailedMethod.invoke(node, dataService);
+        setFailedMethod.invoke(node, dataService, null);
         commitTransaction();
         
         nodeMappingServer.assignNode(DataService.class, id);

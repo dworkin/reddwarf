@@ -35,7 +35,7 @@ import java.io.Serializable;
 public class IdGenerator {
 
     /** The minimum number of IDs to reserve. */
-    public static int MIN_BLOCK_SIZE = 8;
+    public static final int MIN_BLOCK_SIZE = 8;
 
     private final String name;
     private final int blockSize;

@@ -1055,8 +1055,15 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * within a transaction.
      */
     private void restartTask(String objName) {
-        PendingTask ptask =
-            dataService.getServiceBinding(objName, PendingTask.class);
+        PendingTask ptask = null;
+        try {
+            ptask = dataService.getServiceBinding(objName, PendingTask.class);
+        } catch (NameNotBoundException nnbe) {
+            // this happens when a task is scheduled for an identity that
+            // hasn't yet been mapped or is in the process of being mapped,
+            // so we can just return, since the task has already been run
+            return;
+        }
 
         // check that the task is supposed to run here, or if not, that
         // we were able to hand it off
@@ -1386,13 +1393,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         if (isShutdown)
             return;
 
-        // check that the identity isn't already mapped here
-        if (isMappedLocally(id))
-            return;
-
-        // keep track of the new identity
+        // keep track of the new identity, returning if the identity was
+        // already mapped to this node
         synchronized (mappedIdentitySet) {
-            mappedIdentitySet.add(id);
+            if (! mappedIdentitySet.add(id))
+                return;
         }
 
         // start-up the pending tasks for this identity

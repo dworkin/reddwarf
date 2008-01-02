@@ -92,7 +92,6 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null name");
 	}
 	this.server = server;
-	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	registry = LocateRegistry.createRegistry(port, null, ssf);
 	proxy = type.cast(
@@ -118,7 +117,6 @@ public class Exporter<T extends Remote> {
 	    throw new NullPointerException("null server");
 	}
 	this.server = server;
-	assert server != null;
 	ServerSocketFactory ssf = new ServerSocketFactory();
 	proxy =
 	    type.cast(UnicastRemoteObject.exportObject(server, port, null, ssf));
@@ -160,15 +158,13 @@ public class Exporter<T extends Remote> {
 		return false;
 	    }
 	}
-	if (server != null) {
-	    try {
-		UnicastRemoteObject.unexportObject(server, true);
-		server = null;
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(
-		    Level.FINE, e, "Problem unexporting server");
-		return false;
-	    }
+	try {
+	    UnicastRemoteObject.unexportObject(server, true);
+	    server = null;
+	} catch (NoSuchObjectException e) {
+	    logger.logThrow(
+		Level.FINE, e, "Problem unexporting server");
+	    return false;
 	}
 	return true;
     }

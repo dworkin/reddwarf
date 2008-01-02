@@ -149,7 +149,7 @@ public class SgsTestNode {
      * @param clean if {@code true}, make sure the data store directory is 
      *                     fresh
      */
-    protected SgsTestNode(String appName, 
+    public SgsTestNode(String appName, 
                 SgsTestNode serverNode,
                 Class listenerClass,
                 Properties properties,
@@ -182,7 +182,7 @@ public class SgsTestNode {
                 isServerNode ?
                 0 :
                 ((WatchdogServiceImpl)(serverNode.getWatchdogService())).
-		getServer().getPort();
+                    getServer().getPort();
 
             int requestedNodeMapPort =
                 isServerNode ?

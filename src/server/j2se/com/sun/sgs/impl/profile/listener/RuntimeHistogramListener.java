@@ -135,9 +135,9 @@ public class RuntimeHistogramListener implements ProfileListener {
 	if (count % windowSize == 0) {
 	    
 	    // print out the results
-	    System.out.printf("past %d tasks:\n%s", windowSize,
+	    System.out.printf("past %d tasks:%n%s", windowSize,
 			      windowHistogram.toString("ms"));
-	    System.out.printf("lifetime of %d tasks:\n%s", count,
+	    System.out.printf("lifetime of %d tasks:%n%s", count,
 			      lifetimeHistogram.toString("ms"));
 
 	    windowHistogram.clear();

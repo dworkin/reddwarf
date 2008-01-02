@@ -136,7 +136,7 @@ public class PowerOfTwoHistogram implements Histogram {
      * Bins that have at least one sample will have a bar displayed.
      * All leading and trailing empty bins are truncated.  The final
      * line will have a newline at the end.
-     * 
+     *
      * @return the histogram
      */
     public String toString() {

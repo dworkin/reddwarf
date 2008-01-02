@@ -605,7 +605,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    throws IOException
 	{
 	    remote = new DataStoreServerRemote(server, port);
-	    return remote.serverSocket.getLocalPort();
+	    return remote.getLocalPort();
 	}
 	public boolean unexport() {
 	    if (remote == null) {

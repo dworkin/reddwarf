@@ -29,15 +29,24 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import junit.framework.TestCase;
 
@@ -45,32 +54,32 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** The name of the WatchdogServerImpl class. */
     private static final String WatchdogServerPropertyPrefix =
 	"com.sun.sgs.impl.service.watchdog.server";
-    
+
     /* The number of additional nodes to create if tests need them */
     private static final int NUM_WATCHDOGS = 5;
-    
+
     /** The node that creates the servers */
     private SgsTestNode serverNode;
     /** Any additional nodes, for tests needing more than one node */
     private SgsTestNode additionalNodes[];
-    
+
     /** System components found from the serverNode */
     private TransactionProxy txnProxy;
     private ComponentRegistry systemRegistry;
     private Properties serviceProps;
-    
+
     /** A specific property we started with */
     private int renewTime;
-    
+
     /** The task scheduler. */
     private TaskScheduler taskScheduler;
-    
+
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
-    
+
     /** The watchdog service for serverNode */
     private WatchdogServiceImpl watchdogService;
-    
+
     /** Constructs a test instance. */
     public TestWatchdogServiceImpl(String name) {
 	super(name);
@@ -79,25 +88,25 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** Test setup. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-        setUp(null);
+        setUp(null, true);
     }
 
-    protected void setUp(Properties props) throws Exception {
-        serverNode = new SgsTestNode("TestWatchdogServiceImpl", null, props);
+    protected void setUp(Properties props, boolean clean) throws Exception {
+        serverNode = new SgsTestNode("TestWatchdogServiceImpl", 
+				     null, null, props, clean);
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.renew.interval"));
-        
+
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
-        
-        watchdogService =
-	    (WatchdogServiceImpl)(serverNode.getWatchdogService());
+
+        watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
     }
-    
+
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
@@ -108,7 +117,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private void addNodes(Properties props, int num) throws Exception {
         // Create the other nodes
         additionalNodes = new SgsTestNode[num];
-        
+
         for (int i = 0; i < num; i++) {
             SgsTestNode node = new SgsTestNode(serverNode, null, props); 
             additionalNodes[i] = node;
@@ -119,18 +128,18 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /** Shut down the nodes. */
-    protected void tearDown() throws Exception {
+    protected void tearDown(boolean clean) throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes) {
                 node.shutdown(false);
             }
             additionalNodes = null;
         }
-        serverNode.shutdown(true);
+        serverNode.shutdown(clean);
     }
-    
+
     /* -- Test constructor -- */
-    
+
     public void testConstructor() throws Exception {
         WatchdogServiceImpl watchdog = null;
         try {
@@ -192,13 +201,12 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
-    public void testConstructorZeroPort() throws Exception {
+
+    public void testConstructorNegativePort() throws Exception {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "false",
-	    WatchdogServerPropertyPrefix + ".port", Integer.toString(0));
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    watchdog = 
                 new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
@@ -225,7 +233,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             if (watchdog != null) watchdog.shutdown();
         }
     }
-    
+
     public void testConstructorStartServerRenewIntervalTooSmall()
 	throws Exception
     {
@@ -276,7 +284,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -317,7 +325,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -334,7 +342,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    watchdogService.shutdown();
 	    // wait for watchdog's renew to fail...
 	    Thread.currentThread().sleep(renewTime * 4);
-            
+
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
@@ -381,7 +389,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -435,7 +443,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         CountNodesTask task = new CountNodesTask();
         taskScheduler.runTransactionalTask(task, taskOwner);
         int numNodes = task.numNodes;
-            
+
         int expectedNodes = NUM_WATCHDOGS + 1;
         if (numNodes != expectedNodes) {
             fail("Expected " + expectedNodes +
@@ -458,13 +466,13 @@ public class TestWatchdogServiceImpl extends TestCase {
             }
         }
     }
-    
-    
+
+
     public void testGetNodesServiceShuttingDown() throws Exception {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-        
+
         taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
@@ -490,10 +498,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testGetNode() throws Exception {
         addNodes(null, NUM_WATCHDOGS);
-        
+
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog =
-		(WatchdogServiceImpl)(node.getWatchdogService());
+            WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -551,7 +558,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /* -- Test addNodeListener -- */
-    
+
     public void testAddNodeListenerServiceShuttingDown() throws Exception {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
@@ -581,7 +588,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         DummyNodeListener listener = new DummyNodeListener();
 	watchdogService.addNodeListener(listener);
         addNodes(null, NUM_WATCHDOGS);
-          
+
         // wait for all nodes to get notified...
         Thread.currentThread().sleep(renewTime * 4);
 
@@ -604,8 +611,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	watchdogService.addNodeListener(listener);
         addNodes(null, NUM_WATCHDOGS);
         for (SgsTestNode node : additionalNodes) {
-            WatchdogServiceImpl watchdog =
-		(WatchdogServiceImpl)(node.getWatchdogService());
+            WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -655,7 +661,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
 	try {
@@ -692,9 +698,416 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
+    /* -- test addRecoveryListener -- */
+
+    public void testAddRecoveryListenerServiceShuttingDown() throws Exception {
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	watchdog.shutdown();
+	try {
+	    watchdog.addRecoveryListener(new DummyRecoveryListener());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testAddRecoveryListenerNullListener() throws Exception {
+	try {
+	    watchdogService.addRecoveryListener(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- test recovery -- */
+
+    public void testRecovery() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+
+	int totalWatchdogs = 5;
+	int numWatchdogsToShutdown = 3;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down a few watchdog services
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		if (numWatchdogsToShutdown == 0) {
+		    break;
+		}
+		numWatchdogsToShutdown--;
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+		watchdogs.remove(id);
+	    }
+
+	    // pause for watchdog server to detect failure and
+	    // send notifications
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(shutdownIds.size());
+	    checkNodesFailed(shutdownIds, true);
+	    listener.notifyFutures();
+	    checkNodesRemoved(shutdownIds);
+	    checkNodesAlive(watchdogs.keySet());
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testRecoveryWithBackupFailureDuringRecovery() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int totalWatchdogs = 8;
+	int numWatchdogsToShutdown = 3;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down a few watchdog services
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		if (numWatchdogsToShutdown == 0) {
+		    break;
+		}
+		numWatchdogsToShutdown--;
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+		watchdogs.remove(id);
+	    }
+
+	    // pause for watchdog server to detect failure and
+	    // send notifications
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(shutdownIds.size());
+	    Set<Node> backups = checkNodesFailed(shutdownIds, true);
+
+	    // shutdown backups
+	    for (Node backup : backups) {
+		long backupId = backup.getId();
+		WatchdogServiceImpl watchdog = watchdogs.get(backupId);
+		if (watchdog != null) {
+		    System.err.println("shutting down backup: " + backupId);
+		    shutdownIds.add(backupId);
+		    watchdog.shutdown();
+		    watchdogs.remove(backupId);
+		}
+	    }
+
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(shutdownIds.size());
+	    listener.notifyFutures();
+	    checkNodesRemoved(shutdownIds);
+	    checkNodesAlive(watchdogs.keySet());
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testRecoveryWithDelayedBackupAssignment() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int totalWatchdogs = 5;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down all watchdog services.
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+	    }
+
+	    watchdogs.clear();
+
+	    // pause for watchdog server to detect failure and
+	    // reassign backups.
+	    Thread.sleep(3 * renewTime);
+
+	    checkNodesFailed(shutdownIds, false);
+
+	    // Create new node to be (belatedly) assigned as backup
+	    // for failed nodes.
+	    WatchdogServiceImpl watchdog = createWatchdog(listener);
+	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+
+	    // pause for watchdog server to reassign new node as
+	    // backup to exising nodes.
+	    
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(shutdownIds.size());
+	    listener.notifyFutures();
+	    checkNodesRemoved(shutdownIds);
+	    checkNodesAlive(watchdogs.keySet());
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testRecoveryAfterServerCrash() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int totalWatchdogs = 5;
+	WatchdogServiceImpl newWatchdog = null;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+	    
+	    // simulate crash
+	    System.err.println("simulate watchdog server crash...");
+	    tearDown(false);
+	    setUp(null, false);
+
+	    checkNodesFailed(watchdogs.keySet(), false);
+	    
+	    // Create new node to be (belatedly) assigned as backup
+	    // for failed nodes.
+	    newWatchdog = createWatchdog(listener);
+
+	    // pause for watchdog server to reassign new node as
+	    // backup to exising nodes.
+	    
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(totalWatchdogs + 1);
+	    listener.notifyFutures();
+	    checkNodesRemoved(watchdogs.keySet());
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	    if (newWatchdog != null) {
+		newWatchdog.shutdown();
+	    }
+	}
+    }
+
+    public void testRecoveryAfterAllNodesAndServerCrash() throws Exception {
+	Map<Long, WatchdogServiceImpl> watchdogs =
+	    new ConcurrentHashMap<Long, WatchdogServiceImpl>();
+	List<Long> shutdownIds = new ArrayList<Long>();
+	int totalWatchdogs = 5;
+
+	DummyRecoveryListener listener = new DummyRecoveryListener();
+	try {
+	    for (int i = 0; i < totalWatchdogs; i++) {
+		WatchdogServiceImpl watchdog = createWatchdog(listener);
+		watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+	    }
+
+	    // shut down all watchdog services.
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		long id = watchdog.getLocalNodeId();
+		System.err.println("shutting down node: " + id);
+		shutdownIds.add(id);
+		watchdog.shutdown();
+	    }
+
+	    watchdogs.clear();
+
+	    // simulate crash
+	    System.err.println("simulate watchdog server crash...");
+	    tearDown(false);
+	    setUp(null, false);
+
+	    // pause for watchdog server to detect failure and
+	    // reassign backups.
+	    Thread.sleep(3 * renewTime);
+
+	    checkNodesFailed(shutdownIds, false);
+
+	    // Create new node to be (belatedly) assigned as backup
+	    // for failed nodes.
+	    WatchdogServiceImpl watchdog = createWatchdog(listener); 
+	    watchdogs.put(watchdog.getLocalNodeId(), watchdog);
+
+	    // pause for watchdog server to reassign new node as
+	    // backup to exising nodes.
+	    
+	    Thread.sleep(3 * renewTime);
+	    listener.checkRecoveryNotifications(shutdownIds.size() + 1);
+	    listener.notifyFutures();
+
+	    checkNodesRemoved(shutdownIds);
+	    checkNodesAlive(watchdogs.keySet());
+
+	} finally {
+	    for (WatchdogServiceImpl watchdog : watchdogs.values()) {
+		watchdog.shutdown();
+	    }
+	}
+    }
+
+    /** Creates a watchdog service with the specified recovery listener. */
+    private WatchdogServiceImpl createWatchdog(RecoveryListener listener)
+	throws Exception
+    {
+	Properties props = createProperties(
+ 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            WatchdogServerPropertyPrefix + ".start", "false",
+	    WatchdogServerPropertyPrefix + ".port",
+	    Integer.toString(watchdogService.getServer().getPort()));
+	WatchdogServiceImpl watchdog = 
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	watchdog.addRecoveryListener(listener);
+	watchdog.ready();
+	System.err.println("Created node (" + watchdog.getLocalNodeId() + ")");
+	return watchdog;
+    }
+
+    private Set<Node> checkNodesFailed(Collection<Long> ids, boolean hasBackup)
+	throws Exception
+    {
+        CheckNodesFailedTask task = new CheckNodesFailedTask(ids, hasBackup);
+        taskScheduler.runTransactionalTask(task, taskOwner);
+        return task.backups;
+    }
+
+    private class CheckNodesFailedTask extends AbstractKernelRunnable {
+	Set<Node> backups = new HashSet<Node>();
+        Collection<Long> ids;
+        boolean hasBackup;
+
+        CheckNodesFailedTask(Collection<Long> ids, boolean hasBackup) {
+            this.ids = ids;
+            this.hasBackup = hasBackup;
+        }
+        public void run() {
+	    System.err.println("Get shutdown nodes (should be marked failed)");
+	    for (Long longId : ids) {
+	        long id = longId.longValue();
+	        Node node = watchdogService.getNode(id);
+	        System.err.println("node (" + id + "):" +
+			           (node == null ? "(removed)" : node));
+	        if (node == null) {
+		    fail("Node removed before recovery complete: " + id);
+	        }
+	        if (node.isAlive()) {
+		    fail("Node not marked as failed: " + id);
+	        }
+	        Node backup = watchdogService.getBackup(id);
+	        if (hasBackup) {
+		    if (backup == null) {
+		        fail("failed node (" + id + ") has no backup");
+		    } else {
+		        backups.add(backup);
+		    }
+	        } else if (!hasBackup && backup != null) {
+		    fail("failed node (" + id + ") assigned backup: " +
+		         backup);
+	        }
+	    }
+        }
+    }
+
+    private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
+	System.err.println("Get shutdown nodes (should be removed)...");
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+	        for (Long longId : ids) {
+	            long id = longId.longValue();
+	            Node node = watchdogService.getNode(id);
+	            System.err.println("node (" + id + "):" +
+			               (node == null ? "(removed)" : node));
+	            if (node != null) {
+		        fail("Expected node to be removed: " + node);
+	            }
+	        }
+            }
+        }, taskOwner);
+    }
+
+    private void checkNodesAlive(final Collection<Long> ids) throws Exception {
+	System.err.println("Get live nodes...");
+        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            public void run() throws Exception {
+	        for (Long longId : ids) {
+	            long id = longId.longValue();
+	            Node node = watchdogService.getNode(id);
+	            System.err.println("node (" + id + "): " + node);
+	            if (node == null || !node.isAlive()) {
+		        fail("Expected alive node");
+	            }
+	        }
+            }
+        }, taskOwner);
+    }
+
+    private static class DummyRecoveryListener implements RecoveryListener {
+
+	private final Map<Node, RecoveryCompleteFuture> nodes =
+	    Collections.synchronizedMap(
+		new HashMap<Node, RecoveryCompleteFuture>());
+
+	DummyRecoveryListener() {}
+
+	public void recover(Node node, RecoveryCompleteFuture future) {
+            assert(node != null);
+            assert(future != null);
+	    
+	    if (nodes.get(node) == null) {
+		System.err.println(
+		    "DummyRecoveryListener.recover: adding node: " + node);
+	    } else {
+		System.err.println(
+		    "DummyRecoveryListener.recover: REPLACING node: " + node);
+	    }
+	    nodes.put(node, future);
+	}
+
+	void checkRecoveryNotifications(int expectedSize) {
+	    if (nodes.size() != expectedSize) {
+		fail("Expected " + expectedSize + " recover requests, " +
+		     "received: " + nodes.size());
+	    }
+	}
+
+	void notifyFutures() {
+	    for (RecoveryCompleteFuture future : nodes.values()) {
+		future.done();
+	    }
+	}
+    }
+
     /* -- other methods -- */
-    
+
     private static class DummyNodeListener implements NodeListener {
 
 	private final Set<Node> failedNodes = new HashSet<Node>();
