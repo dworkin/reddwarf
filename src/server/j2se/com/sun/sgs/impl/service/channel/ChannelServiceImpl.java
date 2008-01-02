@@ -25,6 +25,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.service.session.IdentityAssignment;
@@ -416,7 +417,8 @@ public class ChannelServiceImpl
 
 		for (BigInteger sessionId : localMembers) {
 		    ClientSession session =
-			sessionService.getLocalClientSession(sessionId.toByteArray());
+			sessionService.getLocalClientSession(
+			    sessionId.toByteArray());
 		    if (session == null) {
 			// TBD: session probably got disconnected, so
 			// remove from list here?
@@ -484,24 +486,24 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Checks that the specified context is currently active, throwing
-     * TransactionNotActiveException if it isn't.
+     * Returns the currently active transaction, or throws {@code
+     * TransactionNotActiveException} if no transaction is active.
      */
-    static void checkContext(Context context) {
-	getContextMap().checkContext(context);
+    static Transaction getTransaction() {
+	return txnProxy.getCurrentTransaction();
     }
 
     /**
-     * Returns the transaction context map.
-     *
-     * @return the transaction context map
+     * Checks that the specified context is currently active, throwing
+     * TransactionNotActiveException if it isn't.
      */
-    private synchronized static TransactionContextMap<Context> getContextMap()
-    {
-	if (contextMap == null) {
-	    throw new IllegalStateException("Service not configured");
+    static void checkTransaction(Transaction txn) {
+	Transaction currentTxn = txnProxy.getCurrentTransaction();
+	if (currentTxn != txn) {
+	    throw new TransactionNotActiveException(
+ 		"mismatched transaction; expected " + currentTxn + ", got " +
+		txn);
 	}
-	return contextMap;
     }
 
     final class Context extends TransactionContext {
@@ -732,14 +734,6 @@ public class ChannelServiceImpl
      */
     static long getLocalNodeId() {
 	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
-    }
-
-    /**
-     * Throws {@code TransactionNotActiveException} if a transaction
-     * is not currently active.
-     */
-    static void checkContext() {
-	txnProxy.getCurrentTransaction();
     }
 
     /**

@@ -47,6 +47,7 @@ import java.io.Serializable;
  * its session's {@link #disconnect disconnect} method
  * <li> the client becomes disconnected due to a network failure, and
  * a connection to the client cannot be re-established in a timely manner
+ * <li> the {@code ClientSession} object is removed
  * </ul>
  *
  * <p>If a client associated with a {@code ClientSession} becomes
@@ -57,7 +58,7 @@ import java.io.Serializable;
  * if {@code true} indicates the client logged out gracefully.
  *
  * <p>If the application removes a {@code ClientSession} object from
- * the data store, that session will be forcibly disconnected.
+ * the data manager, that session will be forcibly disconnected.
  *
  * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that

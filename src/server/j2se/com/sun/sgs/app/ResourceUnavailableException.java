@@ -22,10 +22,6 @@ package com.sun.sgs.app;
 /**
  * Thrown when an operation fails because a resource, necessary for
  * the operation, is unavailable.
- *
- * @see ClientSession#send
- * @see Channel#send
- * @see ClientSessionListener#receivedMessage
  */
 public class ResourceUnavailableException
     extends RuntimeException

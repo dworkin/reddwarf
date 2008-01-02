@@ -57,7 +57,7 @@ import java.util.Set;
  * IllegalStateException} if invoked.
  *
  * <p>If the application removes a {@code Channel} object from the
- * data store, that channel will be closed.
+ * data manager, that channel will be closed.
  *
  * @see ChannelManager#createChannel ChannelManager.createChannel
  */
@@ -83,8 +83,10 @@ public interface Channel extends ManagedObject {
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws ResourceUnavailableException if there are not enough resources
+     *	       to join the channel
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Channel join(ClientSession session);
 
@@ -96,8 +98,10 @@ public interface Channel extends ManagedObject {
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws ResourceUnavailableException if there are not enough resources
+     *	       to join the channel
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Channel join(Set<ClientSession> sessions);
     
@@ -116,7 +120,9 @@ public interface Channel extends ManagedObject {
     Channel leave(ClientSession session);
 
     /**
-     * Removes the specified client sessions from this channel,
+     * Removes the specified client sessions from this channel, If a
+     * session in the specified set is not joined to this channel,
+     * then no action for that session is taken.
      *
      * @param sessions a set of client sessions
      *

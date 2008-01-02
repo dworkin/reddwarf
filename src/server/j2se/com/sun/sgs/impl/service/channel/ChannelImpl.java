@@ -38,6 +38,7 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Transaction;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -98,6 +99,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
      */
     private long coordNodeId;
 
+    /** The transaction. */
+    private transient Transaction txn;
+    
     /** The data service. */
     private transient DataService dataService;
 
@@ -112,6 +116,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      */
     protected ChannelImpl(Delivery delivery) {
 	this.delivery = delivery;
+	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference ref = dataService.createReference(this);
 	this.channelId = ref.getId().toByteArray();
@@ -268,9 +273,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue join request.
 	     */
-	    ManagedReference sessionRef = dataService.createReference(session);
-	    addEvent(new ChannelEvent(EventType.JOIN,
-				      getSessionIdBytes(session)));
+	    addEvent(new JoinEvent(session));
 	    
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
 	    return this;
@@ -288,8 +291,18 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    if (sessions == null) {
 		throw new NullPointerException("null sessions");
 	    }
-
-	    throw new AssertionError("not implemented");
+	    
+	    /*
+	     * Enqueue join requests.
+	     *
+	     * TBD: (optimization) add a single event instead of one for
+	     * each session.
+	     */
+	    for (ClientSession session : sessions) {
+		addEvent(new JoinEvent(session));
+	    }
+	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
+	    return this;
 	    
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "join throws");
@@ -327,14 +340,18 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		        try {
 			    coordinator.serviceEventQueue(channelId);
 			} catch (IOException e) {
-			    // It is likely that the coordinator's node failed
-			    // and hasn't recovered yet.  This operation needs
-			    // to be retried after a period of time to allow
-			    // recovery to complete, so throw a retryable
-			    // exception here.  It would be nice to indicate
-			    // in the exception that this task should be
-			    // retried after a specific interval which relates
-			    // to the recovery time period.
+			    /*
+			     * It is likely that the coordinator's node failed
+			     * and hasn't recovered yet.  This operation needs
+			     * to be retried after a period of time to allow
+			     * recovery to complete, so throw a retryable
+			     * exception here.
+			     *
+			     * TBD: It would be nice to indicate in the
+			     * exception that this task should be retried
+			     * after a specific interval which relates to the
+			     * recovery time period.
+			     */
 			    throw new ResourceUnavailableException(
 				"channel coordinator node unavailable: " +
 				nodeId);
@@ -358,9 +375,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue leave request.
 	     */
-	    addEvent(new ChannelEvent(EventType.LEAVE,
-				      getSessionIdBytes(session)));
-	    
+	    addEvent(new LeaveEvent(session));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 	    return this;
 	    
@@ -375,10 +390,20 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	try {
 	    checkClosed();
 	    if (sessions == null) {
-		throw new NullPointerException("null client session");
+		throw new NullPointerException("null sessions");
 	    }
 
-	    throw new AssertionError("not implemented");
+	    /*
+	     * Enqueue leave requests.
+	     *
+	     * TBD: (optimization) add a single event instead of one for
+	     * each session.
+	     */
+	    for (ClientSession session : sessions) {
+		addEvent(new LeaveEvent(session));
+	    }
+	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
+	    return this;
 	    
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "leave throws");
@@ -394,7 +419,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue leaveAll request.
 	     */
-	    addEvent(new ChannelEvent(EventType.LEAVE_ALL, channelId));
+	    addEvent(new LeaveAllEvent());
 			    
 	    logger.log(Level.FINEST, "leaveAll returns");
 	    return this;
@@ -420,7 +445,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue send request.
 	     */
-	    addEvent(new ChannelEvent(EventType.SEND, message));
+	    addEvent(new SendEvent(message));
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
@@ -445,7 +470,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue close event.
 	     */
-	    addEvent(new ChannelEvent(EventType.CLOSE, channelId));
+	    addEvent(new CloseEvent());
 	    isClosed = true;
 	}
 	
@@ -483,6 +508,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	throws IOException, ClassNotFoundException
     {
 	in.defaultReadObject();
+	txn = ChannelServiceImpl.getTransaction();
 	dataService = ChannelServiceImpl.getDataService();
     }
 
@@ -663,11 +689,11 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Checks that this channel's context is currently active,
+     * Checks that this channel's transaction is currently active,
      * throwing TransactionNotActiveException if it isn't.
      */
     private void checkContext() {
-	ChannelServiceImpl.checkContext();
+	ChannelServiceImpl.checkTransaction(txn);
     }
 
     /**
@@ -889,6 +915,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
+     * Removes all sessions from this channel and then removes the
+     * channel object from the data store.  This method should be called
+     * when the channel is closed.
+     */
+    private void removeChannel() {
+	removeAllSessions();
+	dataService.removeObject(this);
+    }
+
+    /**
      * Returns an iterator for the sessions that are joined to this
      * channel.  This method is for testing purposes only.
      */
@@ -1102,6 +1138,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	ChannelImpl getChannel() {
 	    return channelRef.get(ChannelImpl.class);
 	}
+
+	/**
+	 * Returns the channel ID for this queue.
+	 */
+	BigInteger getChannelRefId() {
+	    return channelRef.getId();
+	}
 	
 	/**
 	 * Returns the managed queue object.
@@ -1115,7 +1158,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * Throws a retryable exception if the event queue is not in a
 	 * state to process the next event (e.g., it hasn't received
 	 * an expected acknowledgment that all channel servers have
-	 * received a specified 'send' request.
+	 * received a specified 'send' request).
 	 */
 	void checkState() {
 	    // FIXME: This needs to be implemented in order to
@@ -1125,10 +1168,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	/**
 	 * Processes (at least) the first event in the queue.
 	 *
-	 * TBD: (optimization) if the coordinator for this channel is
-	 * the local node, we could short-circuit the remote
-	 * invocation on the channel server proxy and instead invoke
-	 * the local channel server implementation directly.
+	 * TBD: (optimization for all events) if the coordinator for
+	 * this channel is the local node, we could short-circuit the
+	 * remote invocation on the channel server proxy and instead
+	 * invoke the local channel server implementation directly.
 	 */
 	void serviceEvent(Context context) {
 	    checkState();
@@ -1138,130 +1181,261 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    logger.log(Level.FINEST, "processing event:{0}", event);
-	    
-	    switch (event.type) {
-		
-	    case JOIN: {
-		ClientSession session =
-		    getObjectForId(event.data, ClientSession.class);
-		final ChannelImpl channel = getChannel();
-		channel.addSession(session);
-		final long nodeId = getNodeId(session);
-		final ChannelServer server = getChannelServer(nodeId);
-		context.addChannelTask(channelRef.getId(), new Runnable() {
-		    public void run() {
-			try {
-			    server.join(channel.channelId, event.data);
-			} catch (IOException e) {
-			    // TBD: what is the right thing to do here?
-			    logger.logThrow(
-				Level.WARNING, e,
-				"unable to contact channel server:{0} to " +
-				"handle event:{1}", nodeId, event);
-			    throw new RuntimeException(
-				"unable to contact server", e);
-			}
-		    }});
-		break;
-	    }
-		
-	    case LEAVE: {
-		ClientSession session =
-		    getObjectForId(event.data, ClientSession.class);
-		final ChannelImpl channel = getChannel();
-		channel.removeSession(session);
-		final ChannelServer server =
-		    getChannelServer(getNodeId(session));
-		context.addChannelTask(channelRef.getId(), new Runnable() {
-		    public void run() {
-			try {
-			    server.leave(channel.channelId, event.data);
-			} catch (IOException e) {
-			    throw new RuntimeException(
-				"unable to contact server", e);
-			}
-		    }});
-		break;
 
-	    }
-	    case LEAVE_ALL: {
-		final ChannelImpl channel = getChannel();
-		channel.removeAllSessions();
-		final Set<ChannelServer> servers = channel.getChannelServers();
-		context.addChannelTask(channelRef.getId(), new Runnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
-			    try {
-				server.leaveAll(channel.channelId);
-			    } catch (IOException e) {
-				throw new RuntimeException(
-				    "unable to contact server", e);
-			    }
-			}
-		    }});
-		break;
-	    }
-	    case SEND: {
-		/*
-		 * TBD: (optimization) this should handle sending
-		 * multiple messages to a given channel.  Here, we
-		 * could peek at the next event in the queue, and if
-		 * it is a send, that event could be batched with this
-		 * send event.  This could be repeated for multiple
-		 * send events appearing in the queue.
-		 */
-		final ChannelImpl channel = getChannel();
-		final Set<ChannelServer> servers = channel.getChannelServers();
-		final byte[] message = channel.getChannelMessage(event.data);
-		context.addChannelTask(channelRef.getId(), new Runnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
-			    try {
-				server.send(channel.channelId, message);
-			    } catch (IOException e) {
-				throw new RuntimeException(
-				    "unable to contact server", e);
-			    }
-			    // TBD: need to update queue that all
-			    // channel servers have been notified of
-			    // the 'send'.
-			}
-		    }});
-		break;
-	    }
-	    case CLOSE:
-		break;
-	    }
+	    event.serviceEvent(context, this);
 	}
-    }
-
-    private static enum EventType {
-	JOIN, LEAVE, SEND, LEAVE_ALL, CLOSE;
     }
 
     /**
      * Represents an event on a channel.
      */
-    private static class ChannelEvent implements ManagedObject, Serializable {
+    private static abstract class ChannelEvent
+	implements ManagedObject, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
 	private final static long serialVersionUID = 1L;
 
-	/** The event type. */
-	EventType type;
-	/** The event data (e.g., session ID). */
-	byte[] data;
+	/**
+	 * Services this event, taken from the head of the given {@code
+	 * eventQueue}, using the specified {@code context}.
+	 */
+	public abstract void serviceEvent(
+	    Context context, EventQueue eventQueue);
 
-	ChannelEvent(EventType type, byte[] data) {
-	    this.type = type;
-	    this.data = data;
+    }
+
+    /**
+     * A channel join event.
+     */
+    private static class JoinEvent extends ChannelEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	private final byte[] sessionId;
+
+	/**
+	 * Constructs a join event with the specified {@code session}.
+	 */
+	JoinEvent(ClientSession session) {
+	    sessionId = getSessionIdBytes(session);
 	}
 
+	/** {@inheritDoc} */
+	public void serviceEvent(Context context, EventQueue eventQueue) {
+
+	    ClientSession session;
+	    try {
+		session = getObjectForId(sessionId, ClientSession.class);
+	    } catch (ObjectNotFoundException e) {
+		logger.logThrow(
+		    Level.FINE, e,
+		    "unable to obtain client session for ID:{0}", this);
+		return;
+	    }
+	    final ChannelImpl channel = eventQueue.getChannel();
+	    channel.addSession(session);
+	    final long nodeId = getNodeId(session);
+	    final ChannelServer server = getChannelServer(nodeId);
+	    context.addChannelTask(eventQueue.getChannelRefId(), new Runnable() {
+		public void run() {
+		    try {
+			server.join(channel.channelId, sessionId);
+		    } catch (IOException e) {
+			// TBD: what is the right thing to do here?
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "unable to contact channel server:{0} to " +
+			    "handle event:{1}", nodeId, this);
+			throw new RuntimeException(
+			    "unable to contact server", e);
+		    }
+		}});
+	}
+
+	/** {@inheritDoc} */
 	public String toString() {
-	    return type.toString() + ": " + HexDumper.toHexString(data);
+	    return getClass().getName() + ": " +
+		HexDumper.toHexString(sessionId);
 	}
     }
 
+    /**
+     * A channel leave event.
+     */
+    private static class LeaveEvent extends ChannelEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	private final byte[] sessionId;
+
+	/**
+	 * Constructs a leave event with the specified {@code session}.
+	 */
+	LeaveEvent(ClientSession session) {
+	    sessionId = getSessionIdBytes(session);
+	}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(Context context, EventQueue eventQueue) {
+
+	    ClientSession session;
+	    try {
+		session = getObjectForId(sessionId, ClientSession.class);
+	    } catch (ObjectNotFoundException e) {
+		logger.logThrow(
+		    Level.FINE, e,
+		    "unable to obtain client session for ID:{0}", this);
+		return;
+	    }
+	    final ChannelImpl channel = eventQueue.getChannel();
+	    channel.removeSession(session);
+	    final ChannelServer server = getChannelServer(getNodeId(session));
+	    context.addChannelTask(eventQueue.getChannelRefId(), new Runnable() {
+		public void run() {
+		    try {
+			server.leave(channel.channelId, sessionId);
+		    } catch (IOException e) {
+			throw new RuntimeException(
+			"unable to contact server", e);
+		    }
+		}});
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return getClass().getName() + ": " +
+		HexDumper.toHexString(sessionId);
+	}
+    }
+    
+    /**
+     * A channel leaveAll event.
+     */
+    private static class LeaveAllEvent extends ChannelEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/**
+	 * Constructs a leaveAll event.
+	 */
+	LeaveAllEvent() {
+	}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(Context context, EventQueue eventQueue) {
+
+	    final ChannelImpl channel = eventQueue.getChannel();
+	    channel.removeAllSessions();
+	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    context.addChannelTask(eventQueue.getChannelRefId(), new Runnable() {
+		public void run() {
+		    for (ChannelServer server : servers) {
+			try {
+			    server.leaveAll(channel.channelId);
+			} catch (IOException e) {
+			    throw new RuntimeException(
+				"unable to contact server", e);
+			}
+		    }
+		}});
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return getClass().getName();
+	}
+    }
+    
+    /**
+     * A channel send event.
+     */
+    private static class SendEvent extends ChannelEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	private final byte[] message;
+	/**
+	 * Constructs a send event with the given {@code message}.
+	 */
+	SendEvent(byte[] message) {
+	    this.message = message;
+	}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(Context context, EventQueue eventQueue) {
+
+	    /*
+	     * TBD: (optimization) this should handle sending
+	     * multiple messages to a given channel.  Here, we
+	     * could peek at the next event in the queue, and if
+	     * it is a send, that event could be batched with this
+	     * send event.  This could be repeated for multiple
+	     * send events appearing in the queue.
+	     */
+	    final ChannelImpl channel = eventQueue.getChannel();
+	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    final byte[] channelMessage = channel.getChannelMessage(message);
+	    context.addChannelTask(eventQueue.getChannelRefId(), new Runnable() {
+		public void run() {
+		    for (ChannelServer server : servers) {
+			try {
+			    server.send(channel.channelId, channelMessage);
+			} catch (IOException e) {
+			    throw new RuntimeException(
+				"unable to contact server", e);
+			}
+			// TBD: need to update queue that all
+			// channel servers have been notified of
+			// the 'send'.
+		    }
+		}});
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return getClass().getName();
+	}
+    }
+    
+    /**
+     * A channel close event.
+     */
+    private static class CloseEvent extends ChannelEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/**
+	 * Constructs a close event.
+	 */
+	CloseEvent() {
+	}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(Context context, EventQueue eventQueue) {
+
+	    final ChannelImpl channel = eventQueue.getChannel();
+	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    channel.removeChannel();
+	    context.addChannelTask(eventQueue.getChannelRefId(), new Runnable() {
+		public void run() {
+		    for (ChannelServer server : servers) {
+			try {
+			    server.close(channel.channelId);
+			} catch (IOException e) {
+			    throw new RuntimeException(
+				"unable to contact server", e);
+			}
+		    }
+		}});
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return getClass().getName();
+	}
+    }
+    
     /**
      * Returns the event queue for the channel that has the specified
      * {@code channelId} and coordinator {@code nodeId}.

@@ -42,6 +42,8 @@ public interface ChannelManager {
      *
      * @return	a new channel
      *
+     * @throws	ResourceUnavailableException if there are not enough
+     *		resources to create the channel
      * @throws	TransactionException if the operation failed because of
      *		a problem with the current transaction
      */

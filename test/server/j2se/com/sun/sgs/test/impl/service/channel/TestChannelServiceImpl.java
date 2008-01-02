@@ -478,7 +478,7 @@ public class TestChannelServiceImpl extends TestCase {
 		return;
 	    } catch (junit.framework.AssertionFailedError e) {
 	    }
-	    Thread.currentThread().sleep(100);
+	    Thread.sleep(100);
 	}
     }
     
@@ -614,6 +614,21 @@ public class TestChannelServiceImpl extends TestCase {
 			fail("test failed with exception: " + e);
 		    }
 		    
+		}
+ 	    }, taskOwner);
+
+	    Thread.sleep(100);
+	    
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = getChannel(channelName);
+	
+		    ClientSession moe =
+			dataService.getBinding("moe", ClientSession.class);
+
+		    ClientSession larry =
+			dataService.getBinding("larry", ClientSession.class);
+		    
 		    Set<ClientSession> sessions = getSessions(channel);
 		    if (sessions.size() != 1) {
 			fail("Expected 1 session, got " +
@@ -641,15 +656,29 @@ public class TestChannelServiceImpl extends TestCase {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
 
+	    for (final String user : someUsers) {
+		
+		taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		    public void run() {
+			Channel channel = getChannel(channelName);
+			ClientSession session = getSession(user);
+			channel.leave(session);
+		    }}, taskOwner);
+
+		Thread.sleep(100);
+		
+		taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		    public void run() {
+			Channel channel = getChannel(channelName);
+			ClientSession session = getSession(user);
+			if (getSessions(channel).contains(session)) {
+			    fail("Failed to remove session: " + session);
+			}}}, taskOwner);
+	    }
+	    
 	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
-		    for (ClientSession session : getSessions(channel)) {
-			channel.leave(session);
-			if (getSessions(channel).contains(session)) {
-			    fail("Failed to remove session: " + session);
-			}
-		    }
 
 		    int numJoinedSessions = getSessions(channel).size();
 		    if (numJoinedSessions != 0) {
@@ -658,9 +687,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    System.err.println("All sessions left");
 		    
 		    channel.close();
-		}
-	    }, taskOwner);
-			
+		}}, taskOwner);
 
 	} finally {
 	    group.disconnect(false);
@@ -721,6 +748,14 @@ public class TestChannelServiceImpl extends TestCase {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    channel.leaveAll();
+		}
+	    }, taskOwner);
+	    
+	    Thread.sleep(100);
+	    
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = getChannel(channelName);
 		    int numJoinedSessions = getSessions(channel).size();
 		    if (numJoinedSessions != 0) {
 			fail("Expected no sessions, got " + numJoinedSessions);
@@ -729,7 +764,6 @@ public class TestChannelServiceImpl extends TestCase {
 		    channel.close();
 		}
 	    }, taskOwner);
-	    
 	} finally {
 	    group.disconnect(false);
 	}
@@ -864,6 +898,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		channel.close();
+	    }
+	}, taskOwner);
+	Thread.sleep(100);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = getChannel(channelName);
 		if (getChannel(channelName) != null) {
 		    fail("obtained closed channel");
 		}
@@ -880,11 +920,16 @@ public class TestChannelServiceImpl extends TestCase {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		channel.close();
+		channel.close();
+		System.err.println("Channel closed twice");
+	    }
+	}, taskOwner);
+	Thread.sleep(100);
+	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
 		if (getChannel(channelName) != null) {
 		    fail("obtained closed channel");
 		}
-		channel.close();
-		System.err.println("Channel closed twice");
 	    }
 	}, taskOwner);
     }
@@ -896,6 +941,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	try {
 	    joinUsers(channelName, someUsers);
+	    Thread.sleep(100);
 	    group.checkMembership(channelName, true);
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
@@ -918,6 +964,7 @@ public class TestChannelServiceImpl extends TestCase {
 	
 	try {
 	    joinUsers(channelName, someUsers);
+	    Thread.sleep(100);
 	    group.checkMembership(channelName, true);
 	    group.checkChannelSets(true);
 	    printServiceBindings();
@@ -943,6 +990,7 @@ public class TestChannelServiceImpl extends TestCase {
 	
 	try {
 	    joinUsers(channelName, someUsers);
+	    Thread.sleep(100);
 	    group.checkMembership(channelName, true);
 	    group.checkChannelSets(true);
 	    printServiceBindings();
@@ -1114,6 +1162,14 @@ public class TestChannelServiceImpl extends TestCase {
 
 	Channel getChannel() {
 	    return channel;
+	}
+    }
+
+    private ClientSession getSession(String name) {
+	try {
+	    return dataService.getBinding(name, ClientSession.class);
+	} catch (ObjectNotFoundException e) {
+	    return null;
 	}
     }
 

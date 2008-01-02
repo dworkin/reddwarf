@@ -22,6 +22,10 @@ package com.sun.sgs.app;
 /**
  * Thrown when an operation fails because there are not enough
  * resources to send or receive a message.
+ *
+ * @see ClientSession#send
+ * @see Channel#send
+ * @see ClientSessionListener#receivedMessage
  */
 public class MessageRejectedException
     extends ResourceUnavailableException
