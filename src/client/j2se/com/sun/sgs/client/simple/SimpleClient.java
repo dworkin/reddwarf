@@ -35,12 +35,7 @@ package com.sun.sgs.client.simple;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -231,9 +226,9 @@ public class SimpleClient implements ServerSession {
     /**
      * {@inheritDoc}
      */
-    public void send(byte[] message) throws IOException {
+    public void send(ByteBuffer message) throws IOException {
         checkConnected();
-        ByteBuffer msg = ByteBuffer.allocate(1 + message.length);
+        ByteBuffer msg = ByteBuffer.allocate(1 + message.remaining());
         msg.put(SimpleSgsProtocol.SESSION_MESSAGE)
            .put(message)
            .flip();
@@ -385,11 +380,14 @@ public class SimpleClient implements ServerSession {
                 clientListener.loginFailed("unimplemented, want redirect to " + msg.getString());
                 break;
 
-            case SimpleSgsProtocol.SESSION_MESSAGE:
+            case SimpleSgsProtocol.SESSION_MESSAGE: {
                 logger.log(Level.FINEST, "Direct receive");
                 checkLoggedIn();
-                clientListener.receivedMessage(msg.getBytes(msg.limit() - msg.position()));
+                byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
+                ByteBuffer buf = ByteBuffer.wrap(msgBytes);
+                clientListener.receivedMessage(buf);
                 break;
+            }
 
             case SimpleSgsProtocol.RECONNECT_SUCCESS:
                 logger.log(Level.FINER, "Reconnected");

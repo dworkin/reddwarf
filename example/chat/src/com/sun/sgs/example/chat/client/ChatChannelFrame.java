@@ -24,7 +24,7 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -104,7 +104,7 @@ public class ChatChannelFrame extends JInternalFrame
      * as well as server notifications about other clients joining and
      * leaving this channel.
      */
-    void receivedMessage(SessionId sender, byte[] message) {
+    void receivedMessage(SessionId sender, ByteBuffer message) {
         try {
             String messageString = ChatClient.fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",

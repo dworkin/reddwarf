@@ -42,6 +42,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import javax.swing.*;
@@ -126,7 +127,7 @@ public class SimpleClientTestUI extends JFrame {
 
     private void sendServerMessage(String message) {
         try {
-            sendMessage(message.getBytes("UTF-8"));
+            sendMessage(ByteBuffer.wrap(message.getBytes("UTF-8")));
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -156,7 +157,7 @@ public class SimpleClientTestUI extends JFrame {
         return p;
     }
 
-    private void sendMessage(byte[] message) {
+    private void sendMessage(ByteBuffer message) {
         try {
             client.send(message);
         } catch (IOException e) {
@@ -246,8 +247,10 @@ public class SimpleClientTestUI extends JFrame {
         /**
          * {@inheritDoc}
          */
-        public void receivedMessage(byte[] message) {
-            addMessage(new String(message));
+        public void receivedMessage(ByteBuffer buf) {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
+            addMessage(new String(bytes));
         }
 
         /**

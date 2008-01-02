@@ -34,6 +34,7 @@ package com.sun.sgs.test.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import com.sun.sgs.client.simple.SimpleClient;
@@ -105,7 +106,8 @@ public class ClientTest implements SimpleClientListener
     public void loggedIn() {
         System.out.println("Logged In");
         try {
-            client.send("Join Channel".getBytes());
+            ByteBuffer message = ByteBuffer.wrap("Join Channel".getBytes());
+            client.send(message);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -122,22 +124,24 @@ public class ClientTest implements SimpleClientListener
      * {@inheritDoc}
      */
     public void reconnected() {
-        // TODO Auto-generated method stub
+        // TODO
     }
 
     /**
      * {@inheritDoc}
      */
     public void reconnecting() {
-        // TODO Auto-generated method stub
+        // TODO
     }
 
    /**
     * {@inheritDoc}
     */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer buf) {
+        byte[] bytes = new byte[buf.remaining()];
+        buf.get(bytes);
         System.out.println("Received general server message size "
-                + message.length + " "
-                + new String(message));
+                + bytes.length + " "
+                + new String(bytes));
     }
 }

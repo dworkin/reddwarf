@@ -189,7 +189,7 @@ public class TestSimpleClientListener
 
         public void disconnected(boolean graceful, String reason) { }
 
-        public void receivedMessage(byte[] message) { }
+        public void receivedMessage(ByteBuffer message) { }
 
         public void reconnected() { }
 

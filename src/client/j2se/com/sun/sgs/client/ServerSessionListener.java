@@ -32,6 +32,8 @@
 
 package com.sun.sgs.client;
 
+import java.nio.ByteBuffer;
+
 /**
  * A client's listener for handling messages sent from server to client and
  * for handling other connection-related events.
@@ -56,7 +58,7 @@ public interface ServerSessionListener {
      * 
      * @param message a message
      */
-    void receivedMessage(byte[] message);
+    void receivedMessage(ByteBuffer message);
 
     /**
      * Notifies this listener that its associated server session is in the

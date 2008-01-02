@@ -36,6 +36,7 @@ import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -81,7 +82,7 @@ public class TestSimpleClient extends TestCase {
 	public void loginFailed(String reason) {
 	}
 
-	public void receivedMessage(byte[] message) {
+	public void receivedMessage(ByteBuffer message) {
 	}
 
 	public void reconnecting() {

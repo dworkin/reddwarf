@@ -38,6 +38,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Random;
 
@@ -211,14 +212,14 @@ public class HelloUserClient extends JFrame
     }
 
     /**
-     * Encodes a {@code String} into an array of bytes.
+     * Encodes a {@code String} into a {@link ByteBuffer}.
      *
      * @param s the string to encode
-     * @return the byte array which encodes the given string
+     * @return the {@code ByteBuffer} which encodes the given string
      */
-    protected static byte[] encodeString(String s) {
+    protected static ByteBuffer encodeString(String s) {
         try {
-            return s.getBytes(MESSAGE_CHARSET);
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required character set " + MESSAGE_CHARSET +
                 " not found", e);
@@ -226,13 +227,15 @@ public class HelloUserClient extends JFrame
     }
 
     /**
-     * Decodes an array of bytes into a {@code String}.
+     * Decodes a {@link ByteBuffer} into a {@code String}.
      *
-     * @param bytes the bytes to decode
+     * @param buf the {@code ByteBuffer} to decode
      * @return the decoded string
      */
-    protected static String decodeString(byte[] bytes) {
+    protected static String decodeString(ByteBuffer buf) {
         try {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required character set " + MESSAGE_CHARSET +
@@ -304,7 +307,7 @@ public class HelloUserClient extends JFrame
      * <p>
      * Decodes the message data and adds it to the display.
      */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         appendOutput("Server: " + decodeString(message));
     }
 

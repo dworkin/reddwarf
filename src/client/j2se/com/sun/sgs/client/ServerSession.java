@@ -33,6 +33,7 @@
 package com.sun.sgs.client;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Represents a client's view of a login session with the server. Each time
@@ -50,22 +51,18 @@ import java.io.IOException;
 public interface ServerSession {
 
     /**
-     * Sends the message contained in the specified byte array to the
-     * server. The specified message is sent asynchronously to the server;
+     * Sends the message contained in the specified {@code ByteBuffer} to
+     * the server. The specified message is sent asynchronously to the server;
      * therefore, a successful invocation of this method does not indicate
      * that the given message was successfully sent. Messages that are
      * received by the server are delivered in sending order.
-     * <p>
-     * The specified byte array must not be modified after invoking this
-     * method; if the byte array is modified, then this method may have
-     * unpredictable results.
      *
      * @param message a message
      *
      * @throws IOException if this session is disconnected or an IO error
      *         occurs
      */
-    void send(byte[] message) throws IOException;
+    void send(ByteBuffer message) throws IOException;
 
     /**
      * Returns {@code true} if this session is connected, otherwise

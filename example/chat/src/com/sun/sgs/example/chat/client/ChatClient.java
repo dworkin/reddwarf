@@ -33,6 +33,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -600,7 +601,7 @@ public class ChatClient extends JFrame
      * <p>
      * Handles the direct {@code /pong} reply.
      */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         String messageString = fromMessageBytes(message);
         System.err.format("Recv direct: %s\n", messageString);
         String[] args = messageString.split(" ", 2);
@@ -615,7 +616,7 @@ public class ChatClient extends JFrame
 
     // FIXME use this!  Look up the appropriate ChatChannelFrame and call it!
     private void receivedChannelMessage(String channelName, SessionId sender,
-            byte[] message)
+            ByteBuffer message)
     {
         try {
             String messageString = fromMessageBytes(message);
@@ -738,13 +739,15 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Decodes the given {@code bytes} into a message string.
+     * Decodes the given {@code ByteBuffer} into a message string.
      *
-     * @param bytes the encoded message
+     * @param buf the encoded message
      * @return the decoded message string
      */
-    static String fromMessageBytes(byte[] bytes) {
+    static String fromMessageBytes(ByteBuffer buf) {
         try {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset UTF-8 not found", e);
@@ -757,9 +760,9 @@ public class ChatClient extends JFrame
      * @param s the message string to encode
      * @return the encoded message as a byte array
      */
-    static byte[] toMessageBytes(String s) {
+    static ByteBuffer toMessageBytes(String s) {
         try {
-            return s.getBytes(MESSAGE_CHARSET);
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset UTF-8 not found", e);
         }

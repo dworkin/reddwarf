@@ -35,6 +35,7 @@ package com.sun.sgs.tutorial.client.lesson2;
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,7 +143,7 @@ public class HelloChannelClient extends HelloUserClient
 
         try {
             String text = getInputText();
-            byte[] message = encodeString(text);
+            ByteBuffer message = encodeString(text);
             String channelName =
                 (String) channelSelector.getSelectedItem();
             if (channelName.equalsIgnoreCase("<DIRECT>")) {
@@ -193,7 +194,7 @@ public class HelloChannelClient extends HelloUserClient
          * Formats and displays messages received on a channel.
          */
         public void receivedMessage(UtilChannel channel,
-                BigInteger sender, byte[] message)
+                BigInteger sender, ByteBuffer message)
         {
             appendOutput("[" + channel.getName() + "/ " + channelNumber +
                 "] " + sender + ": " + decodeString(message));
