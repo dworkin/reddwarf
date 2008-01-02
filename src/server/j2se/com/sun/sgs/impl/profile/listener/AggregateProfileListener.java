@@ -104,7 +104,7 @@ public class AggregateProfileListener implements ProfileListener {
     // the supported properties and their default values
     private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
     private static final int DEFAULT_PORT = 43005;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "report.period.";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
     private static final long DEFAULT_PERIOD = 5000;
 
     /**
