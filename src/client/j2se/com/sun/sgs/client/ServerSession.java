@@ -51,7 +51,7 @@ public interface ServerSession {
 
     /**
      * Sends the message contained in the specified byte array to the
-     * server. The specified message is sent asychronously to the server;
+     * server. The specified message is sent asynchronously to the server;
      * therefore, a successful invocation of this method does not indicate
      * that the given message was successfully sent. Messages that are
      * received by the server are delivered in sending order.
@@ -88,8 +88,8 @@ public interface ServerSession {
      * ServerSessionListener} passing a {@code boolean} indicating
      * whether the disconnection was graceful.
      * <p>
-     * If this server session is already disconnected, then no action is
-     * taken.
+     * If this server session is already disconnected, then an
+     * {@code IllegalStateException} is thrown.
      * 
      * @param force if {@code true}, this session is forcibly
      *        terminated; otherwise the session is gracefully disconnected
