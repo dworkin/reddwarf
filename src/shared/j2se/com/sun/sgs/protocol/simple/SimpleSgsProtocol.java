@@ -55,8 +55,8 @@ public interface SimpleSgsProtocol {
      */
     final int MAX_PAYLOAD_LENGTH = 8000;
 
-    /** The version number, currently {@code 0x05}. */
-    final byte VERSION = 0x05;
+    /** The version number, currently {@code 0x03}. */
+    final byte VERSION = 0x03;
 
     /**
      * Login request from a client to a server.
@@ -65,7 +65,7 @@ public interface SimpleSgsProtocol {
      * <br>
      * Payload:
      * <ul>
-     * <li>(byte)   version
+     * <li>(byte)   protocol version
      * <li>(String) name
      * <li>(String) password
      * </ul>
@@ -115,6 +115,7 @@ public interface SimpleSgsProtocol {
      * <br>
      * Payload:
      * <ul>
+     * <li> (byte)      protocol version
      * <li> (ByteArray) reconnectionKey
      * </ul>
      */
@@ -152,14 +153,14 @@ public interface SimpleSgsProtocol {
      * Larger messages require fragmentation and reassembly above
      * this protocol layer.
      * <br>
-     * Opcode: {@code 0x00}
+     * Opcode: {@code 0x30}
      * <br>
      * Payload:
      * <ul>
      * <li> (ByteArray) message
      * </ul>
      */
-    final byte SESSION_MESSAGE = 0x00;
+    final byte SESSION_MESSAGE = 0x30;
 
 
     /**
