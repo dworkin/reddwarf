@@ -25,14 +25,14 @@ public abstract class BasicScheduleTasks
 
     /** The configuration property for the number of tasks to run. */
     public static final String TASKS_KEY =
-	BasicScheduleTasks.class.getName() + ".tasks";
+	"com.sun.sgs.analysis.task.BasicScheduleTasks.tasks";
 
     /**
      * The configuration property for the total number times to run the
      * tasks.
      */
     public static final String TOTAL_COUNT_KEY =
-	BasicScheduleTasks.class.getName() + ".total.count";
+	"com.sun.sgs.analysis.task.BasicScheduleTasks.total.count";
 
     /** The default total number of times to the tasks. */
     public static final int DEFAULT_TOTAL_COUNT = 10000;

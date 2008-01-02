@@ -58,7 +58,7 @@ public class PowerOfTwoHistogram implements Histogram {
     private int size;
 
     /**
-     * Creates a new power-of-2 frequency histogram
+     * Creates a new power-of-2 frequency histogram.
      */
     public PowerOfTwoHistogram() {
 
@@ -73,7 +73,7 @@ public class PowerOfTwoHistogram implements Histogram {
     /**
      * {@inheritDoc}
      *
-     * Values are binned in the largest bin that is <i>less than<i>
+     * Values are binned in the largest bin that is <i>less than</i>
      * the element is incremented.  Note that this histogram supports
      * only <i>non-negative</i> values; negative values will not be
      * counted.
@@ -136,6 +136,8 @@ public class PowerOfTwoHistogram implements Histogram {
      * Bins that have at least one sample will have a bar displayed.
      * All leading and trailing empty bins are truncated.  The final
      * line will have a newline at the end.
+     *
+     * @return the histogram
      */
     public String toString() {
 	return toString("");
@@ -151,6 +153,7 @@ public class PowerOfTwoHistogram implements Histogram {
      * </pre>
      * 
      * @param binLabel the label to append to each of the bins
+     * @return the histogram
      */
     public String toString(String binLabel) {
 	// get the length of the longest string version of the integer
