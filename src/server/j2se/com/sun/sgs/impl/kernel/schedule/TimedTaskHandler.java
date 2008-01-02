@@ -36,8 +36,8 @@ class TimedTaskHandler {
      */
     public static final int FUTURE_THRESHOLD = 15;
 
-    // the consumer for all future tasks
-    private final ApplicationScheduler consumer;
+    // the scheduler for all future tasks
+    private final ApplicationScheduler scheduler;
 
     // the timer used for future execution
     private Timer timer;
@@ -47,14 +47,14 @@ class TimedTaskHandler {
      * effect of creating a new <code>Timer</code> which involves creating
      * at least one new thread.
      *
-     * @param consumer the <code>ApplicationScheduler</code> that will consume
-     *                 the task when its time comes
+     * @param scheduler the <code>ApplicationScheduler</code> that will consume
+     *                 the task when its time comes, causing it to be executed
      */
-    public TimedTaskHandler(ApplicationScheduler consumer) {
-        if (consumer == null)
-            throw new NullPointerException("Consumer cannot be null");
+    public TimedTaskHandler(ApplicationScheduler scheduler) {
+        if (scheduler == null)
+            throw new NullPointerException("Scheduler cannot be null");
 
-        this.consumer = consumer;
+        this.scheduler = scheduler;
         timer = new Timer();
     }
 
@@ -124,7 +124,7 @@ class TimedTaskHandler {
         /** {@inheritDoc} */
         public synchronized void run() {
             if (! cancelled)
-                consumer.timedTaskReady(task);
+                scheduler.timedTaskReady(task);
             cancelled = true;
         }
     }

@@ -20,9 +20,7 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
-
 import com.sun.sgs.auth.Identity;
-
 import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -36,13 +34,12 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
+
 import com.sun.sgs.profile.ProfileReport;
-
 import com.sun.sgs.service.TransactionRunner;
-
 import java.beans.PropertyChangeEvent;
-
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -57,9 +54,9 @@ import java.util.logging.Logger;
 /**
  * This is the root scheduler class that is used by the rest of the system
  * to schedule tasks. It handles incoming tasks and profiling data, and
- * passes these on to a <code>ApplicationScheduler</code>. Essentially, this root
- * scheduler handles basic configuration and marshalling, but leaves all
- * the real work to its children.
+ * passes these on to an <code>ApplicationScheduler</code>. Essentially, this 
+ * root scheduler handles basic configuration and marshalling, but leaves all
+ * the real work to its child scheduler.
  */
 public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
 
@@ -130,11 +127,23 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
             properties.getProperty(ApplicationScheduler.
                                    APPLICATION_SCHEDULER_PROPERTY,
                                    DEFAULT_APPLICATION_SCHEDULER);
-        Class<?> schedulerClass = Class.forName(schedulerName);
-        Constructor<?> schedulerCtor = 
-                schedulerClass.getConstructor(Properties.class);
-        scheduler = 
-                (ApplicationScheduler) (schedulerCtor.newInstance(properties));
+        try {
+            Class<?> schedulerClass = Class.forName(schedulerName);
+            Constructor<?> schedulerCtor = 
+                    schedulerClass.getConstructor(Properties.class);
+            scheduler = 
+                    (ApplicationScheduler) (schedulerCtor.newInstance(properties));
+        } catch (InvocationTargetException e) {
+            if (logger.isLoggable(Level.CONFIG)) 
+ 	        logger.logThrow(Level.CONFIG, e.getCause(), "Scheduler {0} " +
+ 	                        "failed to initialize", schedulerName);
+            throw e;
+ 	} catch (Exception e) {
+            if (logger.isLoggable(Level.CONFIG))
+                logger.logThrow(Level.CONFIG, e, "Scheduler {0} unavailable",
+                                schedulerName);
+            throw e;
+        }
         
         int startingThreads =
             Integer.parseInt(properties.

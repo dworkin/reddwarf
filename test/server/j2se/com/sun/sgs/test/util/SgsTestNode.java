@@ -55,8 +55,7 @@ public class SgsTestNode {
             kernelClass =
                 Class.forName("com.sun.sgs.impl.kernel.Kernel");
             kernelCtor =  
-                kernelClass.getDeclaredConstructor(
-                    new Class[] {Properties.class, Properties.class});
+                kernelClass.getDeclaredConstructor(Properties.class);
             kernelCtor.setAccessible(true);
 
             kernelShutdownMethod = 
@@ -229,7 +228,7 @@ public class SgsTestNode {
             createDirectory(dbDirectory);
         }
         
-        kernel = kernelCtor.newInstance(props, props);
+        kernel = kernelCtor.newInstance(props);
 
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);

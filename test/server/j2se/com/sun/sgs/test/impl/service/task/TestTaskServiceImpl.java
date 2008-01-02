@@ -173,54 +173,6 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    public void testConstructorNoDataService() throws Exception {
-        // Need to convince the kernel that there is no data service
-        // in this context
-        Class kernelClass =
-                Class.forName("com.sun.sgs.impl.kernel.Kernel");
-        Field taskHandlerField =
-                kernelClass.getDeclaredField("taskHandler");
-        taskHandlerField.setAccessible(true);
-        
-        Class taskHandlerClass =
-                Class.forName("com.sun.sgs.impl.kernel.TaskHandler");
-        Field ctxField = taskHandlerClass.getDeclaredField("ctx");
-        ctxField.setAccessible(true);
-        
-        Field kernelField =
-                SgsTestNode.class.getDeclaredField("kernel");
-        kernelField.setAccessible(true);
-        
-        Class appKernelClass = 
-                Class.forName("com.sun.sgs.impl.kernel.AppKernelAppContext");
-        Field servicesField = 
-                appKernelClass.getDeclaredField("serviceComponents");
-        servicesField.setAccessible(true);
-        ComponentRegistry services = (ComponentRegistry) servicesField.get(
-            ctxField.get(taskHandlerField.get(kernelField.get(serverNode))));
-        Object dataService = services.getComponent(DataService.class);
-
-        Class compRegClass = 
-                Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
-        Field componentField =
-                compRegClass.getDeclaredField("componentSet");
-        componentField.setAccessible(true);
-        LinkedHashSet componentSet = (LinkedHashSet)(componentField.
-                                                     get(services));
-        Object setClone = componentSet.clone();
-        componentSet.remove(dataService);
-        
-        try {
-            new TaskServiceImpl(new Properties(), systemRegistry, txnProxy);
-            fail("Expected MissingResourceException");
-        } catch (MissingResourceException e) {
-            System.err.println(e);
-        } finally {
-            // restore the data service
-            componentField.set(services, setClone);
-        }
-    }
-
     public void testConstructorPendingSingleTasks() throws Exception {
         //clearPendingTasksInStore();
         // FIXME: implement this once service shutdown is available

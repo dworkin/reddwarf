@@ -67,7 +67,7 @@ public final class TaskHandler {
 
     // The context we'll be using, which allows code in tasks to
     // easily find the managers
-    private AppKernelAppContext ctx;
+    private KernelContext ctx;
     
     /**
      * Package-private constructor used by the kernel to create the single
@@ -133,7 +133,13 @@ public final class TaskHandler {
         }
     }
 
-    void setContext(AppKernelAppContext ctx) {
+    /**
+     * Sets the context of this handler, used primarily to allow
+     * multiple kernels to run in a single VM, which is useful for testing.
+     * 
+     * @param ctx the context
+     */
+    void setContext(KernelContext ctx) {
         this.ctx = ctx;
     }
     

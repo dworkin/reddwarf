@@ -284,7 +284,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         
         // note that the application is always active locally, so there's
         // no chance of voting the application as inactive
-        activeIdentityMap.put(transactionProxy.getCurrentOwner(), 1);
+        activeIdentityMap.put(appOwner, 1);
 
         // register for identity mapping updates
         nodeMappingService.addNodeMappingListener(this);

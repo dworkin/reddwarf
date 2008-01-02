@@ -44,7 +44,7 @@ import java.util.MissingResourceException;
  */
 
 // Cannot be final because tests extend it
-class AppKernelAppContext {
+class KernelContext {
 
     // the application's name and cached hash code
     private final String applicationName;
@@ -63,16 +63,16 @@ class AppKernelAppContext {
     private final TaskManager taskManager;
 
     /**
-     * Creates an instance of <code>AppKernelAppContext</code>.
+     * Creates an instance of <code>KernelContext</code>.
      *
      * @param applicationName the name of the application represented by
      *                        this context
      * @param serviceComponents the services available in this context
      * @param managerComponents the managers available in this context
      */
-    AppKernelAppContext (String applicationName,
-                         ComponentRegistry serviceComponents,
-                         ComponentRegistry managerComponents) {
+    KernelContext (String applicationName,
+                   ComponentRegistry serviceComponents,
+                   ComponentRegistry managerComponents) {
         this.applicationName = applicationName;
 
         // the hash code is the hash of the application name, which never
@@ -220,16 +220,16 @@ class AppKernelAppContext {
      * <code>AppKernelAppContext</code> that represents the same
      * application context.
      *
-     * @param o an instance of <code>ApptKernelAppContext</code>
+     * @param o an instance of <code>KernelContext</code>
      *
      * @return <code>true</code> if the provided object represents the same
      *         context as this object, <code>false</code> otherwise
      */
     public boolean equals(Object o) {
-        if ((o == null) || (! (o instanceof AppKernelAppContext)))
+        if ((o == null) || (! (o instanceof KernelContext)))
             return false;
 
-        AppKernelAppContext other = (AppKernelAppContext)o;
+        KernelContext other = (KernelContext)o;
 
         return other.applicationName.equals(applicationName);
     }
