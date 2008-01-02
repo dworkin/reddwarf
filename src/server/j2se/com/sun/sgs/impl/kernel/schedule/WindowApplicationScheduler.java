@@ -182,6 +182,7 @@ class WindowApplicationScheduler implements ApplicationScheduler {
 
         // make sure that we're only scheduling one task for a given user,
         // so that we get a consistant view on the user's window counter
+        assert(user != null);
         synchronized (user) {
             // see what window we're currently on, which will be the user's
             // next counter if there's nothing in the queue...this does
@@ -253,6 +254,15 @@ class WindowApplicationScheduler implements ApplicationScheduler {
 
             return ((window == other.window) &&
                     (timestamp == other.timestamp));
+        }
+        
+        /** {@inheritDoc} */
+        public int hashCode() {
+            // Recipe from Effective Java
+            int result = 17;
+            result = 37*result + (int) (window ^ (window >>>32));
+            result = 37*result + (int) (timestamp ^ (timestamp >>>32));
+            return result;
         }
     }
 

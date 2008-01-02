@@ -50,6 +50,25 @@
     <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
   </Match>
 
+  <!-- Package com.sun.sgs.impl.kernel -->
+
+  <!-- Currently unused fields. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.IdentityCoordinatorImpl"/>
+    <Field name="authenticatorSet"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.kernel.schedule -->
+
+  <!-- Currently unused fields. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.schedule.WindowApplicationScheduler$QueueUser"/>
+    <Field name="lastScheduled"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+
   <!-- Package com.sun.sgs.impl.service.data -->
 
   <!-- OK if version field is not currently being read, it should still

@@ -98,7 +98,13 @@ public final class TaskHandler {
                     new IllegalStateException("wrong transactionCoordinator");
             }
             
-            TaskHandler.profileCollector = profileCollector;
+            if (TaskHandler.profileCollector == null) {
+                TaskHandler.profileCollector = profileCollector;
+            } else if 
+                (TaskHandler.profileCollector != profileCollector) {
+                throw 
+                    new IllegalStateException("wrong profileCollector");
+            }
         }
     }
 

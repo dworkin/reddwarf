@@ -60,7 +60,8 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
     // the available authenticators
     private final HashMap<String,List<IdentityAuthenticator>> authenticatorMap;
 
-    // a unique collection of the authenticators, for management purposes
+    // a unique collection of the authenticators, for management purposes,
+    // and currently unused
     private final HashSet<IdentityAuthenticator> authenticatorSet;
 
     /**

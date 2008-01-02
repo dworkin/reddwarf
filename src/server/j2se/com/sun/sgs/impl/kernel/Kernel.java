@@ -58,6 +58,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -321,6 +322,12 @@ class Kernel {
                                                     resourceCoordinator);
                 ProfileListener listener = (ProfileListener)obj;
                 profileCollector.addListener(listener);
+            } catch (InvocationTargetException e) {
+                if (logger.isLoggable(Level.WARNING))
+                    logger.logThrow(Level.WARNING, e.getCause(), 
+                            "Failed to load ProfileListener {0} ... " +
+                            "it will not be available for profiling",
+                            listenerClassName);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, e, "Failed to load " +
@@ -484,13 +491,8 @@ class Kernel {
             appProperties.getProperty(StandardProperties.WATCHDOG_SERVICE,
                                       DEFAULT_WATCHDOG_SERVICE);
         Service watchdogService =
-            createService(Class.forName(watchdogServiceClass));
+            setupServiceNoManager(watchdogServiceClass);
         services.addComponent(watchdogService);
-        if (watchdogService instanceof ProfileProducer) {
-            if (profileRegistrar != null)
-                ((ProfileProducer) watchdogService).
-                    setProfileRegistrar(profileRegistrar);
-        }
 
         // load the node mapping service, which has no associated manager
 
@@ -502,13 +504,8 @@ class Kernel {
             appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
                                       DEFAULT_NODE_MAPPING_SERVICE);
         Service nodemapService =
-            createService(Class.forName(nodemapServiceClass));
+                setupServiceNoManager(nodemapServiceClass);
         services.addComponent(nodemapService);
-        if (nodemapService instanceof ProfileProducer) {
-            if (profileRegistrar != null)
-                ((ProfileProducer) nodemapService).
-                    setProfileRegistrar(profileRegistrar);
-        }
 
         // load the task service
 
@@ -536,13 +533,8 @@ class Kernel {
                                       CLIENT_SESSION_SERVICE,
                                       DEFAULT_CLIENT_SESSION_SERVICE);
         Service clientSessionService =
-            createService(Class.forName(clientSessionServiceClass));
+                setupServiceNoManager(clientSessionServiceClass);
         services.addComponent(clientSessionService);
-        if (clientSessionService instanceof ProfileProducer) {
-            if (profileRegistrar != null)
-                ((ProfileProducer)clientSessionService).
-                    setProfileRegistrar(profileRegistrar);
-        }
 
         // load the channel service
 
@@ -579,18 +571,26 @@ class Kernel {
                                                        managerClassNames[i],
                                                        managerSet));
                 } else {
-                    Class<?> serviceClass = Class.forName(serviceClassNames[i]);
-                    Service service = createService(serviceClass);
+                    Service service = 
+                        setupServiceNoManager(serviceClassNames[i]);
                     services.addComponent(service);
-                    if ((profileRegistrar != null) &&
-                        (service instanceof ProfileProducer))
-                        ((ProfileProducer)service).
-                            setProfileRegistrar(profileRegistrar);
                 }
             }
         }
     }
 
+    /**
+     * Sets up a service with no manager based on fully qualified class name.
+     */
+    private Service setupServiceNoManager(String className) throws Exception {
+        Class<?> serviceClass = Class.forName(className);
+        Service service = createService(serviceClass);
+        if ((profileRegistrar != null) &&
+            (service instanceof ProfileProducer))
+            ((ProfileProducer)service).
+                setProfileRegistrar(profileRegistrar);
+        return service;
+    }
     /**
      * Creates a service with no manager based on fully qualified class names.
      */

@@ -20,7 +20,9 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
+
 import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -34,10 +36,12 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
-
 import com.sun.sgs.profile.ProfileReport;
+
 import com.sun.sgs.service.TransactionRunner;
+
 import java.beans.PropertyChangeEvent;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
