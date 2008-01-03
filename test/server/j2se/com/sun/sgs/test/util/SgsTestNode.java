@@ -131,7 +131,7 @@ public class SgsTestNode {
 
     /** Services. */
     private final DataServiceImpl dataService;
-    private final WatchdogServiceImpl watchdogService;
+    private final WatchdogService watchdogService;
     private final NodeMappingService nodeMappingService;
     private final TaskService taskService;
     private final ClientSessionServiceImpl sessionService;
@@ -273,7 +273,7 @@ public class SgsTestNode {
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
 
         dataService = txnProxy.getService(DataServiceImpl.class);
-        watchdogService = txnProxy.getService(WatchdogServiceImpl.class);
+        watchdogService = txnProxy.getService(WatchdogService.class);
         nodeMappingService = txnProxy.getService(NodeMappingService.class);
         taskService = txnProxy.getService(TaskService.class);
         sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
@@ -342,7 +342,7 @@ public class SgsTestNode {
     /**
      * Returns the watchdog service.
      */
-    public WatchdogServiceImpl getWatchdogService() {
+    public WatchdogService getWatchdogService() {
 	return watchdogService;
     }
 
@@ -400,7 +400,8 @@ public class SgsTestNode {
         int requestedWatchdogPort =
             isServerNode ?
             0 :
-            serverNode.getWatchdogService().getServer().getPort();
+            ((WatchdogServiceImpl) serverNode.getWatchdogService()).
+	    	getServer().getPort();
 
         int requestedNodeMapPort =
             isServerNode ?
