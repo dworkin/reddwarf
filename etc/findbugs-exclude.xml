@@ -68,6 +68,13 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
+  <!-- Synchronization is OK.  Task reads/writes are protected by the cancelled 
+       field and synchronization on the handle itself. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.schedule.RecurringTaskHandleImpl"/>
+    <Field name="task"/>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+  </Match>
 
   <!-- Package com.sun.sgs.impl.service.data -->
 
