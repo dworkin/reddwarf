@@ -38,6 +38,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
@@ -69,7 +70,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.start
  *	</b></code><br>
- *	<i>Default:</i> {@code false} <br>
+ *	<i>Default:</i> {@code true} <br>
  *	Specifies whether the watchdog server should be started by this service.
  *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
@@ -99,7 +100,7 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.watchdog.server.start} property
  *	is {@code true}, then the value must be greater than or equal to
  *	{@code 0} and no greater than {@code 65535}, otherwise the value
- *	must be non-zero, positive, and no greater than	{@code 65535}.<p>
+ *	must be greater than {@code 0}, and no greater than {@code 65535}.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.host
@@ -268,36 +269,38 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    " property must be specified");
 	    }
 	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY, false);
+ 		START_SERVER_PROPERTY, true);
 	    localHost = InetAddress.getLocalHost().getHostName();
-	    String host;
-	    int serverPort;
-	    if (startServer) {
-		serverImpl = new WatchdogServerImpl(
-		    properties, systemRegistry, txnProxy);
-		host = localHost;
-		serverPort = serverImpl.getPort();
-	    } else {
-		serverImpl = null;
-		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
-		serverPort = wrappedProps.getIntProperty(
-		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
-	    }
-
+            
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
 
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
 
-	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
-	    serverProxy = (WatchdogServer)
-		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
-	    
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
 	    exporter.export(clientImpl, clientPort);
 	    clientProxy = exporter.getProxy();
+            
+	    String host;
+	    int serverPort;
+	    if (startServer) {
+		serverImpl = new WatchdogServerImpl(
+		    properties, systemRegistry, txnProxy, 
+                    clientHost, clientProxy);
+		host = localHost;
+		serverPort = serverImpl.getPort();
+	    } else {
+		serverImpl = null;
+		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
+		serverPort = wrappedProps.getIntProperty(
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
+	    }
+
+	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
+	    serverProxy = (WatchdogServer)
+		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 	    
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
@@ -313,19 +316,23 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    // contains the system context.
 	    taskOwner = txnProxy.getCurrentOwner();
 
-	    // TBD: should the watchdog service that starts the
-	    // watchdog server register itself as a node?
-	    long[] values = serverProxy.registerNode(clientHost, clientProxy);
-	    
-	    if (values == null || values.length < 2) {
-		setFailedThenNotify(false);
-		throw new IllegalArgumentException(
-		    "registerNode returned improper array: " + values);
-	    }
-	    localNodeId = values[0];
-	    renewInterval = values[1];
-	    renewThread.start();
-
+            if (startServer) {
+                localNodeId = serverImpl.localNodeId;
+                renewInterval = serverImpl.renewInterval;
+            } else {
+                long[] values = serverProxy.registerNode(clientHost, 
+                                                         clientProxy);
+                if (values == null || values.length < 2) {
+                    setFailedThenNotify(false);
+                    throw new IllegalArgumentException(
+                        "registerNode returned improper array: " +
+			Arrays.toString(values));
+                }
+                localNodeId = values[0];
+                renewInterval = values[1];
+            }
+            renewThread.start();
+            
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
 			   "node registered, host:{0}, localNodeId:{1}",
@@ -590,6 +597,7 @@ public class WatchdogServiceImpl implements WatchdogService {
      * node listener.
      *
      * @param	node a node
+     * @throws  IllegalStateException if this service is shutting down
      */
     private void notifyNodeListeners(final Node node) {
 
@@ -599,7 +607,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		new AbstractKernelRunnable() {
 		    public void run() {
 			if (! shuttingDown() &&
-			    isLocalNodeAliveNonTransactional()) 
+                            isLocalNodeAliveNonTransactional()) 
 			{
 			    if (node.isAlive()) {
 				nodeListener.nodeStarted(node);

@@ -244,7 +244,8 @@ class RoundRobinPolicy implements NodeAssignPolicy {
         }
         
         /** 
-         * The node for nodeId.
+         * The node for nodeId, or null if the node has failed and been
+         * removed from the data store.
          * @return the Node 
          */
         public Node getNode() {

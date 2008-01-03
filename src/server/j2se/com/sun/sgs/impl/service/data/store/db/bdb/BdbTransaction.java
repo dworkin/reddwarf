@@ -46,12 +46,9 @@ class BdbTransaction implements DbTransaction {
 	}
 	try {
 	    txn = env.beginTransaction(null, null);
-	    long timeoutMicros = 1000 * timeout;
-	    if (timeoutMicros < 0) {
-		/* Berkeley DB treats a zero timeout as unlimited */
-		timeoutMicros = 0;
-	    }
-	    txn.setLockTimeout(timeoutMicros);
+	    /* Avoid overflow -- BDB treats 0 as unlimited */
+	    long timeoutMicros =
+		(timeout < (Long.MAX_VALUE / 1000)) ? 1000 * timeout : 0;
 	    txn.setTxnTimeout(timeoutMicros);
 	} catch (DatabaseException e) {
 	    throw BdbEnvironment.convertException(e, false);

@@ -166,6 +166,15 @@ underlying Berkeley DB database.
   will be maintained.  Flushing changes to disk avoids data loss but
   introduces a significant reduction in performance.
 
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.lock.timeout
+<span class="default" style="font-family: serif"><code>0.1</code> times
+  the value of the <code>com.sun.sgs.txn.timeout</code> property, if
+  specified, otherwise <code>10</code></span>
+<dd>The maximum amount of time in milliseconds that an attempt to obtain
+  a lock will be allowed to continue before being aborted.  The value
+  must be greater than <code>0</code>, and should be less than the
+  transaction timeout.
+
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.remove.logs
 <span class="default">false</span>
 <dd>Whether to automatically remove database log files that are no

@@ -45,33 +45,31 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A text-output listener that generates task-periodic summary reports
- * about the performance of tasks being exexcuted by a server.  Each
+ * about the performance of tasks being executed by a server.  Each
  * report summaries a fixed number of tasks.  The number of tasks
  * summarized can be modified by setting the {@code
- * com.sun.sgs.kernel.profile.summary.window} property in the system
+ * com.sun.sgs.profile.listener.window.size} property in the system
  * properties.  The default number of tasks is {@code 5000}.
  *
  * <p>
  * 
- * Each report is structed like the following example:
+ * Each report is structured like the following example:
  * <p><pre>
  * past 5000 tasks:
  *   mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
  *   mean ready count: 4.09,  mean lag time: 11.87ms, 
  *   parallelism factor: 0.99
+ *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
  * all 104302000 tasks:
  *   mean: 2.64ms,  max: 1010ms,  failed 1713 (0.62%),
  *   mean ready count: 3.98,  mean lag time: 9.75ms
+ *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
  * </pre>
  *
  * <p>
  *
- * Note that this class uses a fixed number of tasks between outputs,
- * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.profile.listener.window.size} property in the
- * application properties file.  The default window size for this
- * class is {@code 5000}.
+ * Note that the mean, max, mean throughput, and mean latency reports only
+ * apply to successful tasks.
  *
  * @see ProfileProperties
  */
@@ -108,6 +106,7 @@ public class ProfileSummaryListener implements ProfileListener {
      private long lifetimeRunTime;
      private long lifetimeLagTime;
      private long lifetimeReadyCountSum;
+     private long lifetimeWindowTime;
 
     /**
      * Creates an instance of {@code ProfileSummaryListener}.
@@ -140,6 +139,7 @@ public class ProfileSummaryListener implements ProfileListener {
 	lifetimeLagTime = 0;
 	lifetimeMax     = 0;
 	lifetimeReadyCountSum = 0;
+	lifetimeWindowTime = 0;
 
 	windowSize = new PropertiesWrapper(properties).
 	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
@@ -160,11 +160,9 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	taskCount++;
 	readyCountSum += profileReport.getReadyCount();
-	lagTimeSum += (profileReport.getActualStartTime() -
-		    profileReport.getScheduledStartTime());
 
 
-	// calculate the run-time only if it was successful
+	// calculate the run-time and lag-time only if it was successful
 	if (profileReport.wasTaskSuccessful()) {
 
 	    long r = profileReport.getRunningTime();
@@ -173,6 +171,9 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	    if (r > maxRunTime)
 		maxRunTime = r;
+
+	    lagTimeSum += (profileReport.getActualStartTime() -
+			   profileReport.getScheduledStartTime());
 	}
 	else {
 	    failedCount++;
@@ -187,6 +188,7 @@ public class ProfileSummaryListener implements ProfileListener {
 	    lifetimeRunTime += runTime;
 	    lifetimeLagTime += lagTimeSum;
 	    lifetimeReadyCountSum += readyCountSum;
+	    lifetimeWindowTime += (windowEndTime - lastWindowStart);
 	    
 	    if (maxRunTime > lifetimeMax)
 		lifetimeMax = maxRunTime;
@@ -194,19 +196,23 @@ public class ProfileSummaryListener implements ProfileListener {
 	    double successful = taskCount - failedCount;
 	    double lifetimeSuccessful = lifetimeCount - lifetimeFailed;
 
-	    System.out.printf("past %d tasks:\n"
+	    System.out.printf("past %d tasks:%n"
 			      + "  mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%)," 
-			      + "\n  mean ready count: %.2f,"
+			      + "%n  mean ready count: %.2f,"
 			      + "  mean lag time: %.2fms,"
-			      + "\n  parallelism factor: %.2f\n"
-			      + "all %d tasks:\n"
+			      + "%n  parallelism factor: %.2f"
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n"
+			      + "all %d tasks:%n"
 			      + "  mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%),"
-			      + "\n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms\n",
+			      + "%n  mean ready count: %.2f,"
+			      + "  mean lag time: %.2fms"
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n",
 			      taskCount, 
 			      runTime/ successful,
 			      maxRunTime, 
@@ -216,13 +222,21 @@ public class ProfileSummaryListener implements ProfileListener {
 			      lagTimeSum / successful,
 			      ((double)runTime / 
 			       (double)(windowEndTime - lastWindowStart)),	
+			      ((successful*1000) /
+			       (double)(windowEndTime - lastWindowStart)),
+			      (runTime + lagTimeSum) / successful,
 			      lifetimeCount, 
 			      lifetimeRunTime / lifetimeSuccessful,
 			      lifetimeMax, 
 			      lifetimeFailed, 
 			      (lifetimeFailed*100) / (double)lifetimeCount,
 			      lifetimeReadyCountSum / (double)lifetimeCount,
-			      lifetimeLagTime / lifetimeSuccessful);
+			      lifetimeLagTime / lifetimeSuccessful,
+			      ((lifetimeSuccessful*1000) /
+			       (double)lifetimeWindowTime),
+			      ((lifetimeRunTime + lifetimeLagTime) /
+			       lifetimeSuccessful)
+		);
 
  	    maxRunTime = 0;
  	    failedCount = 0;

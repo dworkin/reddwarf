@@ -32,7 +32,11 @@ public interface WatchdogClient extends Remote {
      * information in the {@code ids}, {@code hosts}, {@code status},
      * and {@code backups} arrays have a status change ({@code true}
      * for alive, and {@code false} for failed) and may need to
-     * recover (if the backup ID is equal to the local node ID).
+     * recover (if the backup ID is equal to the local node ID). The
+     * {@code backups} array is only only consulted if the corresponding
+     * element in {@code status} is {@code false}.  If no node has been
+     * assigned as a backup, it is indicated by 
+     * {@value com.sun.sgs.impl.service.watchdog.NodeImpl#INVALID_ID}.
      *
      * @param	ids an array of node IDs
      * @param	hosts an array of host names

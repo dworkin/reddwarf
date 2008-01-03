@@ -476,6 +476,20 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	
 	logger.log(Level.FINEST, "close returns");
     }
+    
+    /* -- Public methods *-- */
+    
+    /**
+     * Returns the ID for this channel.
+     *
+     * @return the ID for this channel.
+     */
+    public byte[] getChannelId() {
+	int len = channelId.length;
+	byte[] idBytes = new byte[len];
+	System.arraycopy(channelId, 0, idBytes, 0, len);
+	return idBytes;
+    }
 
     /* -- Implement Object -- */
 

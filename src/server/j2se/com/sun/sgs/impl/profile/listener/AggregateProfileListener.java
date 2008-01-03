@@ -37,6 +37,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,11 +56,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * users may connect to that socket to watch the reports. The default
  * port used is 43005.
  * <p>
- * The
- * <code>com.sun.sgs.impl.profile.listener.AggregateProfileListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
+ * The <code>com.sun.sgs.impl.profile.listener.AggregateProfileListener.</code>
+ * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
+ * data. The <code>report.period</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
 public class AggregateProfileListener implements ProfileListener {
@@ -102,9 +102,9 @@ public class AggregateProfileListener implements ProfileListener {
         AggregateProfileListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
+    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
     private static final int DEFAULT_PORT = 43005;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
     private static final long DEFAULT_PERIOD = 5000;
 
     /**
@@ -167,8 +167,7 @@ public class AggregateProfileListener implements ProfileListener {
             tryCount += profileReport.getRetryCount();
             for (ProfileOperation op : ops) {
                 Long i = sOpCounts.get(op.getId());
-		sOpCounts.put(op.getId(), (i == null) 
-			      ? new Long(1) : i.longValue() + 1);
+		sOpCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
 	    }
         } else {
             fTaskCount++;
@@ -176,8 +175,7 @@ public class AggregateProfileListener implements ProfileListener {
             fRunTime += profileReport.getRunningTime();
             for (ProfileOperation op : ops) {
                 Long i = fOpCounts.get(op.getId());
-		fOpCounts.put(op.getId(), (i == null)
-			      ? new Long(1) : i.longValue() + 1);
+		fOpCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
 	    }
         }
 
@@ -246,49 +244,51 @@ public class AggregateProfileListener implements ProfileListener {
             double avgFailedOps = (fTaskCount == 0) ? 0 :
                 (double)fTaskOpCount / (double)fTaskCount;
 
-            String reportStr = "TaskCounts:\n";
-            reportStr += "  TotalTasks=" + totalTasks +
-                "  AvgLength=" + totalAvgLength + "ms\n";
-            reportStr += "  Transactional=" + tTaskCount +
-                "   AvgLength=" + transactionalAvgLength + "\n";
-            reportStr += "  Successful=" + sTaskCount +
-                "  AvgLength=" + avgSuccessfulLength + "ms" +
-                "  AvgStartDelay=" + avgSuccessfulDelay + "ms" +
-                "  AvgRetries=" + avgRetries + "\n";
-            reportStr += "  AvgOpCountOnSuccess=" + avgSuccessfulOps +
-                "  AvgOpCountOnFailure=" + avgFailedOps + "\n";
+	    Formatter reportStr = new Formatter();
+	    reportStr.format("TaskCounts:%n");
+            reportStr.format("  TotalTasks=%d", totalTasks);
+	    reportStr.format("  AvgLength=%2.2fms%n", totalAvgLength);
+            reportStr.format("  Transactional=%d", tTaskCount);
+	    reportStr.format("  AvgLength=%2.2fms%n", transactionalAvgLength);
+            reportStr.format("  Successful=%d", sTaskCount);
+	    reportStr.format("  AvgLength=%2.2fms", avgSuccessfulLength);
+	    reportStr.format("  AvgStartDelay=%2.2fms", avgSuccessfulDelay);
+	    reportStr.format("  AvgRetries=%2.2f%n", avgRetries);
+            reportStr.format("  AvgOpCountOnSuccess=%2.2f", avgSuccessfulOps);
+	    reportStr.format("  AvgOpCountOnFailure=%2.2f%n", avgFailedOps);
 
-            reportStr += "OpCounts:\n";
+            reportStr.format("OpCounts:%n");
 	    int j, k = 0;
             //for (int i = 1; i < maxOp + 1; i++) {
 	    for (Integer i : registeredOps.keySet()) {
 		//System.out.println("registeredOps: " + registeredOps);
 		//System.out.printf("registeredOps.get(%s) = %s\n",i, registeredOps.get(i));
-                reportStr += "   " + registeredOps.get(i) + "=" +
-                    (j = sOpCounts.get(i).intValue()) + "/" + 
-		    (j + fOpCounts.get(i).intValue());
+		j = sOpCounts.get(i).intValue();
+                reportStr.format("   %s=%d/%d", registeredOps.get(i), j,
+				 j + fOpCounts.get(i));
                 //if (((i.intValue % 3) == 0) || (i.intValue() == (maxOp)))
 		if (++k % 3 == 0)
-                    reportStr += "\n";
+                    reportStr.format("%n");
             }
-	    reportStr += "\n";
+	    reportStr.format("%n");
 
 	    if (! aggregateCounters.isEmpty()) {
-		reportStr += "AggregateCounters (total):\n";
+		reportStr.format("AggregateCounters (total):%n");
 		for (Entry<String,Long> entry : aggregateCounters.entrySet())
-		    reportStr += "  " + entry.getKey() + "=" +
-			entry.getValue() + "\n";
+		    reportStr.format(
+			"  %s=%d%n", entry.getKey(), entry.getValue());
 	    }
 	    if (! localCounters.isEmpty()) {
-		reportStr += "LocalCounters (avg per task):\n";
+		reportStr.format("LocalCounters (avg per task):%n");
 		for (Entry<String,Long> entry : localCounters.entrySet())
-		    reportStr += "  " + entry.getKey() + "=" +
-			(entry.getValue() / (double)totalTasks) + "\n";
+		    reportStr.format(
+			"  %s=%2.2f%n", entry.getKey(),
+			entry.getValue() / (double)totalTasks);
 	    }
 
-            reportStr += "\n";
+            reportStr.format("%n");
 
-            networkReporter.report(reportStr);
+            networkReporter.report(reportStr.toString());
         }
     }
 

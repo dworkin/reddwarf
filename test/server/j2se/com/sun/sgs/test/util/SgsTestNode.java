@@ -28,11 +28,16 @@ import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
@@ -127,8 +132,8 @@ public class SgsTestNode {
     /** Services. */
     private final DataServiceImpl dataService;
     private final WatchdogServiceImpl watchdogService;
-    private final NodeMappingServiceImpl nodeMappingService;
-    private final TaskServiceImpl taskService;
+    private final NodeMappingService nodeMappingService;
+    private final TaskService taskService;
     private final ClientSessionServiceImpl sessionService;
     private final ChannelServiceImpl channelService;
 
@@ -180,7 +185,9 @@ public class SgsTestNode {
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
-     *                     defaults
+     *                     defaults which will cause an exception to be
+     *                     thrown if the standard services have been
+     *                     replaced by custom implementations
      */
     public SgsTestNode(SgsTestNode firstNode,
                        Class listenerClass,
@@ -201,11 +208,13 @@ public class SgsTestNode {
      * @param listenerClass the class of the listener object, or null if a
      *                     simple dummy listener should be used
      * @param properties serverProperties to be used, or {@code null} for 
-     *                     defaults
+     *                     defaults which will cause an exception to be
+     *                     thrown if the standard services have been
+     *                     replaced by custom implementations
      * @param clean if {@code true}, make sure the data store directory is 
      *                     fresh
      */
-    protected SgsTestNode(String appName, 
+    public SgsTestNode(String appName, 
                 SgsTestNode serverNode,
                 Class listenerClass,
                 Properties properties,
@@ -225,14 +234,14 @@ public class SgsTestNode {
         }
 	
         boolean isServerNode = serverNode == null;
-        if (properties == null) {  
-            props = getDefaultProperties(appName, serverNode, listenerClass);
+        if (properties == null) {
+	    props = getDefaultProperties(appName, serverNode, listenerClass);
         } else {
             props = properties;
         }
-        dbDirectory = 
-            props.getProperty("com.sun.sgs.impl.service.data.store.DataStoreImpl.directory");
 
+	dbDirectory = 
+	    props.getProperty("com.sun.sgs.impl.service.data.store.DataStoreImpl.directory");
         assert(dbDirectory != null);
         if (clean) {
             deleteDirectory(dbDirectory);
@@ -265,8 +274,8 @@ public class SgsTestNode {
 
         dataService = txnProxy.getService(DataServiceImpl.class);
         watchdogService = txnProxy.getService(WatchdogServiceImpl.class);
-        nodeMappingService = txnProxy.getService(NodeMappingServiceImpl.class);
-        taskService = txnProxy.getService(TaskServiceImpl.class);
+        nodeMappingService = txnProxy.getService(NodeMappingService.class);
+        taskService = txnProxy.getService(TaskService.class);
         sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
 
@@ -274,7 +283,7 @@ public class SgsTestNode {
             // restore the old owner
             setCurrentOwnerMethod.invoke(null, oldOwner);
         }
-        appPort = sessionService.getListenPort();
+	appPort = sessionService.getListenPort();
     }
 
     /**
@@ -340,14 +349,14 @@ public class SgsTestNode {
     /**
      * Returns the node mapping service.
      */
-    public NodeMappingServiceImpl getNodeMappingService() {
+    public NodeMappingService getNodeMappingService() {
 	return nodeMappingService;
     }
 
     /**
      * Returns the task service.
      */
-    public TaskServiceImpl getTaskService() {
+    public TaskService getTaskService() {
 	return taskService;
     }
     /**
@@ -396,7 +405,8 @@ public class SgsTestNode {
         int requestedNodeMapPort =
             isServerNode ?
             0 :
-            getNodeMapServerPort(serverNode.getNodeMappingService());
+            getNodeMapServerPort((NodeMappingServiceImpl)
+				 serverNode.getNodeMappingService());
 
         String dir = System.getProperty("java.io.tmpdir") +
                                 File.separator +  appName + ".db";
@@ -427,6 +437,13 @@ public class SgsTestNode {
 
         return retProps;
     }
+    
+    /**
+     * Returns the nodeId for this test node.
+     */
+    public long getNodeId() {
+        return getWatchdogService().getLocalNodeId();
+    }
 
     /**
      * Returns the bound app port.
@@ -434,7 +451,7 @@ public class SgsTestNode {
     public int getAppPort() {
 	return appPort;
     }
-
+    
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
         Properties props = new Properties();
@@ -477,7 +494,7 @@ public class SgsTestNode {
     /**
      * Returns the bound port for the data server.
      */
-    private static int getDataServerPort(DataServiceImpl service) 
+    public static int getDataServerPort(DataServiceImpl service) 
         throws Exception
     {
         Field storeField = DataServiceImpl.class.getDeclaredField("store");
@@ -487,7 +504,6 @@ public class SgsTestNode {
         Field serverPortField = DataStoreClient.class.getDeclaredField("serverPort");
         serverPortField.setAccessible(true);
         return (Integer) serverPortField.get(dsClient);
-
     }
 
     /**

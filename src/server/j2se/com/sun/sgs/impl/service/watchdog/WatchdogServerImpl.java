@@ -31,13 +31,13 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.WatchdogService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,14 +85,14 @@ import java.util.logging.Logger;
  *	Specifies the block size to use when reserving node IDs.  The value
  *	must be greater than {@code 8}.<p>
  * </dl> <p>
-
+ * 
+ * Note that this server caches NodeImpls outside the data service to
+ * maintain state.
  */
 public class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** Server state. */
     private static enum State {
-        /** The service is initialized */
-	INITIALIZED,
         /** The service is ready */
         READY,
         /** The service is shutting down */
@@ -159,7 +159,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     final long renewInterval;
 
     /** The node ID for this server. */
-    private volatile long localNodeId;
+    final long localNodeId;
 
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
@@ -189,9 +189,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The ID generator. */
     private final IdGenerator idGenerator;
 
-    /** Failed nodes that were detected by the constructor. */
-    private final Collection<NodeImpl> failedNodes;
-
     /** The map of registered nodes that are alive, keyed by node ID. */
     private final ConcurrentMap<Long, NodeImpl> aliveNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
@@ -204,12 +201,15 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     private final ConcurrentMap<Long, NodeImpl> recoveringNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
     
+    /** A random number generator, for choosing backup nodes. */
+    private final Random backupChooser = new Random();
+    
     /** The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned.. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
 
     /** The server state. */
-    private State state;
+    private State state = State.READY;
     
     /** The count of calls in progress. */
     private int callsInProgress = 0;
@@ -222,12 +222,16 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * @param	properties server properties
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
+     * @param	hostname  the local hostname
+     * @param	client the local watchdog client
      *
      * @throws	Exception if there is a problem starting the server
      */
     public WatchdogServerImpl(Properties properties,
 			      ComponentRegistry systemRegistry,
-			      TransactionProxy txnProxy)
+			      TransactionProxy txnProxy,
+                              String hostname, 
+                              WatchdogClient client)
 	throws Exception
     {
 	logger.log(Level.CONFIG, "Creating WatchdogServerImpl properties:{0}",
@@ -264,12 +268,19 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			    idBlockSize,
 			    txnProxy,
 			    taskScheduler);
-	setState(State.INITIALIZED);
-	
+
 	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
 	runTransactionally(failedNodesRunnable);
-	failedNodes = failedNodesRunnable.nodes;
-	
+	Collection<NodeImpl> failedNodes = failedNodesRunnable.nodes;
+        statusChangedNodes.addAll(failedNodes);
+        for (NodeImpl failedNode : failedNodes) {
+	    recoveringNodes.put(failedNode.getId(), failedNode);
+	}
+ 
+        // register our local id
+        long[] values = registerNode(hostname, client);
+        localNodeId = values[0];
+        
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -277,7 +288,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
 	
 	checkExpirationThread.start();
-	notifyClientsThread.start();
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
@@ -295,31 +305,10 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     
     /** {@inheritDoc} */
     public void ready() {
-	synchronized (lock) {
-	    switch (state) {
-		
-	    case INITIALIZED:
-		setState(State.READY);
-		break;
-		
-	    case READY:
-		return;
-		
-	    case SHUTTING_DOWN:
-	    case SHUTDOWN:
-		throw new IllegalStateException("service shutting down");
-	    }
-	}
-	localNodeId = txnProxy.getService(WatchdogService.class).
-	    getLocalNodeId();
-	for (NodeImpl failedNode : failedNodes) {
-	    recoveringNodes.put(failedNode.getId(), failedNode);
-	}
-	if (!failedNodes.isEmpty()) {
-	    notifyClients(failedNodes, failedNodes);
-	    notifyClients(aliveNodes.values(), failedNodes);
-	    failedNodes.clear();
-	}
+        assert(!notifyClientsThread.isAlive());
+        // Don't notify clients until other services have had a chance
+        // to register themselves with the watchdog.
+        notifyClientsThread.start();      
     }
 
     /** {@inheritDoc} */
@@ -460,24 +449,6 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		return true;
 	    }
 
-	} finally {
-	    callFinished();
-	}
-    }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public boolean isAlive(long nodeId) {
-	callStarted();
-
-	try {
-	    NodeImpl node = aliveNodes.get(nodeId);
-	    if (node == null || node.isExpired()) {
-		return false;
-	    } else {
-		return node.isAlive();
-	    }
 	} finally {
 	    callFinished();
 	}
@@ -675,7 +646,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		    }
 		}
 
-		// TBD: should reminders notifications be sent to
+		// TBD: should reminder notifications be sent to
 		// nodes that haven't recovered yet?
 
 		/*
@@ -699,7 +670,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 			expirationSet.first().getExpiration() - now;
 		}
 		try {
-		    Thread.currentThread().sleep(sleepTime);
+		    Thread.sleep(sleepTime);
 		} catch (InterruptedException e) {
 		    return;
 		}
@@ -742,34 +713,41 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	
 	/**
 	 * Chooses a backup for the specified {@code node} from the
-	 * map of "alive" nodes.  For now, the choice is the first
-	 * node encountered (returned arbitrarily from iterating
-	 * through the "alive" nodes).  Before this method is invoked,
-	 * the specified {@code node} as well as other currently
-	 * detected failed nodes should not be present in the "alive"
+	 * map of "alive" nodes.  The backup is picked randomly. Before this 
+         * method is invoked, the specified {@code node} as well as other 
+         * currently detected failed nodes should not be present in the "alive"
 	 * nodes map.
 	 */
 	private NodeImpl chooseBackup(NodeImpl node) {
-	    long nodeId = node.getId();
 	    NodeImpl choice = null;
+            // Copy of the alive nodes
+            NodeImpl[] values;
 	    synchronized (aliveNodes) {
-		if (aliveNodes.size() > 1) {
-		    for (NodeImpl backupCandidate : aliveNodes.values()) {
-			// TBD: the watchdog server's node should not be
-			// assigned as a backup because it may not contain
-			// a full stack.  If it is the only "alive" node,
-			// then a backup for this node will remain
-			// unassigned until a new node is registered.
-			// This will delay recovery. -- ann (9/7/07)
-			
-			// assert backupCandidate.getId() !=  nodeId
-			if (backupCandidate.getId() != localNodeId) {
-			    choice = backupCandidate;
-			    break;
-			}
-		    }
-		}
-	    }
+                values = aliveNodes.values().toArray(new NodeImpl[0]);
+            }
+            int numAliveNodes = values.length;       
+            if (numAliveNodes > 1) {
+                int random = backupChooser.nextInt(numAliveNodes);
+                for (int i = 0; i < numAliveNodes; i++) {
+                    // Choose one of the values[] elements randomly. If we
+                    // chose the localNodeId, loop again, choosing the next
+                    // array element.
+                    int tryNode = (random + i) % numAliveNodes;
+                    NodeImpl backupCandidate = values[tryNode];
+                    // TBD: the watchdog server's node should not be
+                    // assigned as a backup because it may not contain
+                    // a full stack.  If it is the only "alive" node,
+                    // then a backup for this node will remain
+                    // unassigned until a new node is registered.
+                    // This will delay recovery. -- ann (9/7/07)
+
+                    // assert backupCandidate.getId() !=  node.getId()
+                    if (backupCandidate.getId() != localNodeId) {
+                        choice = backupCandidate;
+                        break;
+                    }
+                }
+            }
 	    return choice;
 	}
 
@@ -797,7 +775,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * This thread informs all currently known clients of node status
      * changes (either nodes started or failed) as they occur.  This
-     * thread is notified by {@link #registerNode registerNode) when
+     * thread is notified by {@link #registerNode registerNode} when
      * nodes are registered, or by the {@code CheckExpirationThread}
      * when nodes fail to renew before their expiration time has
      * lapsed.

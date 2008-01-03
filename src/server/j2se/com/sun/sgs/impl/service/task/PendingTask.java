@@ -41,12 +41,6 @@ import java.util.logging.Logger;
  * have not yet run to completion or been dropped. This class maintains all
  * of the meta-data associated with these pending tasks, and if needed, makes
  * sure that the {@code Task} itself is persisted.
- * <p>
- * FIXME: The identity is being kept here only because we need it given the
- * current APIs. When notification of node joins is added, the Identity will
- * be provided, and we will no longer need to have it in the pending data
- * for this purpose. We need to figure out if it's still useful for other
- * applications (e.g., handoff on cancelled periodic tasks).
  */
 class PendingTask implements ManagedObject, Serializable {
 
@@ -65,6 +59,9 @@ class PendingTask implements ManagedObject, Serializable {
 
     // whether this task has been marked as cancelled
     private boolean cancelled = false;
+
+    // if this is a periodic task, where it's currently running
+    private long runningNode = -1;
 
     /**
      * Creates an instance of {@code PendingTask}, handling the task
@@ -138,9 +135,35 @@ class PendingTask implements ManagedObject, Serializable {
         cancelled = true;
     }
 
+    /**
+     * Returns the node where the associated task is running if the task
+     * is periodic, or -1 if the task is non-periodic or the node hasn't
+     * been assigned.
+     */
+    long getRunningNode() {
+        return runningNode;
+    }
+
+    /**
+     * Sets the node where the associated task is running if the task is
+     * periodic. If the task is not periodic, {@code IllegalStateException}
+     * is thrown.
+     */
+    void setRunningNode(long nodeId) {
+        if (! isPeriodic())
+            throw new IllegalStateException("Cannot assign running node " +
+                                            "for a non-periodic task");
+        runningNode = nodeId;
+    }
+
     /** Checks if this task has been marked as cancelled. */
     boolean isCancelled() {
         return cancelled;
+    }
+
+    /** Checks if this is a periodic task. */
+    boolean isPeriodic() {
+        return (period != TaskServiceImpl.PERIOD_NONE);
     }
 
     /** Returns the identity that owns this task. */

@@ -45,7 +45,8 @@ class NodeImpl
     /** The serialVersionUID of this class. */
     private static final long serialVersionUID = 1L;
 
-    private static final long INVALID_ID = -1L;
+    /** The ID for an unknown node. */
+    static final long INVALID_ID = -1L;
 
     /** The name of this class. */
     private static final String PKG_NAME =
@@ -70,7 +71,7 @@ class NodeImpl
     private long backupId = INVALID_ID;
 
     /** The set of primaries for which this node is a backup. */
-    private Set<Long> primaryIds = new HashSet<Long>();
+    private final Set<Long> primaryIds = new HashSet<Long>();
 
     /**
      * The expiration time for this node. A value of {@code 0} means
@@ -234,7 +235,7 @@ class NodeImpl
      * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
      * dataService}.  Subsequent calls to {@link #isAlive isAlive}
-     * will return {@code false}
+     * will return {@code false}.
      *
      * @param	dataService a data service
      * @param	backup a chosen backup
@@ -271,6 +272,7 @@ class NodeImpl
 	nodeImpl.primaryIds.add(primaryId);
     }
 
+    /** Returns the set of primary nodes for which this node is a backup. */
     synchronized Set<Long> getPrimaries() {
 	return primaryIds;
     }
@@ -281,10 +283,8 @@ class NodeImpl
     }
 
     /**
-     * Returns the backup for this node.  If no backup is assigned to
-     * this node, then {@code IllegalStateException} is thrown.  This
-     * method should only be invoked if {@code hasBackup} returns
-     * {@code true}.
+     * Returns the backup for this node, or {@value INVALID_ID} if there
+     * is no backup.
      */
     synchronized long getBackupId() {
 	return backupId;
