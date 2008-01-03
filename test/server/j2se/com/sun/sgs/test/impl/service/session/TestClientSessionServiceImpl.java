@@ -304,7 +304,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		clients.add(client);
 	    }
 	    
-	    int expectedRedirects = users.length - 1;
+	    int expectedRedirects = users.length;
 	    if (redirectCount != expectedRedirects) {
 		failed = true;
 		System.err.println("Expected " + expectedRedirects +
