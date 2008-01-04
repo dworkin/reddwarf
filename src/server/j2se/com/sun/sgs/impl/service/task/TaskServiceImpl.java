@@ -417,9 +417,18 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                         return NAME + ".HandoffCleanupRunner";
                     }
                     public void run() throws Exception {
-                        StringHashSet set =
-                            dataService.getServiceBinding(handoffSpace,
-                                                          StringHashSet.class);
+                        StringHashSet set = null;
+                        try {    
+                            set = dataService.
+                                getServiceBinding(handoffSpace,
+                                                  StringHashSet.class);
+                        } catch (NameNotBoundException nnbe) {
+                            // this only happens when this recover method
+                            // is called more than once, and just means that
+                            // this cleanup has already happened, so we can
+                            // quietly ignore this case
+                            return;
+                        }
                         dataService.removeObject(set);
                         dataService.removeServiceBinding(handoffSpace);
                         if (logger.isLoggable(Level.INFO))
@@ -428,8 +437,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                    }
                 }, appOwner);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.INFO))
-                logger.logThrow(Level.INFO, e, "Failed to cleanup handoff " +
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e, "Failed to cleanup handoff " +
                                 "set for failed node: " + failedNodeId);
         }
 
