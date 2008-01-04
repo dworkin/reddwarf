@@ -48,7 +48,7 @@ This page documents the configuration properties supported by the
 current implementation of the Project Darkstar Server.  Configuration
 properties may be specified by system properties
 (using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
-the application properties files named on the command line.
+the application properties file named on the command line.
 
 <h2>General Properties</h2>
 
@@ -74,13 +74,6 @@ Server.
 <span class="required"></span>
 <dd>The TCP port on which to listen for client connections.
 
-<dt>com.sun.sgs.app.config.file
-<span class="nodefault"></span>
-<dd>The pathname of a file containing system properties.  If specified,
-  each property within that file is provided to the system and to all
-  applications. Each property may be overridden by a system property
-  provided at startup, or by a property for an individual application.
-
 <dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
 <span class="default">100</span>
 <dd>The maximum amount of time in milliseconds that a transaction will
@@ -92,6 +85,13 @@ Server.
   transaction will be permitted to run before it is a candidate for
   being aborted.
 
+<dt>com.sun.sgs.config.file
+<span class="nodefault"></span>
+<span class="deprecated"></span>
+<dd>The pathname of a file containing properties.  This property is
+  deprecated, but allowed for backward compatibility.
+  Each property may be overridden by a system property
+  provided at startup, or by a property for an individual application.
 </dl>
 
 <a name="DataService"></a>

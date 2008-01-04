@@ -255,6 +255,10 @@ class Kernel {
             // create the system registry for use in setting up the services
             systemRegistry = new ComponentRegistryImpl(systemComponents);
             
+            if (logger.isLoggable(Level.INFO)) {
+                logger.log(Level.INFO, "The Kernel is ready, version: {0}",
+                        Version.getVersion());
+            }
             // now start up the application
             createAndStartApplication();
 
@@ -265,11 +269,6 @@ class Kernel {
             shutdown();
             throw e;
         }
-
-	if (logger.isLoggable(Level.INFO)) {
-	    logger.log(Level.INFO, "The Kernel is ready, version: {0}",
-		       Version.getVersion());
-	}
     }
 
     /**
@@ -875,7 +874,9 @@ class Kernel {
      * provided by the application's configuration, then the system
      * property value, if specified (typically provided on the command-line
      * using a "-D" flag) is used. Failing this, the value from the system
-     * config file (if a file is specified) is used. If no value is specified
+     * config file (if a file is specified) is used. Note that the system
+     * config file is deprecated, but used for backward compatibility.
+     * If no value is specified
      * for a given property in any of these places, then a default is used
      * or an <code>Exception</code> is thrown (depending on whether a default
      * value is available).
@@ -896,6 +897,7 @@ class Kernel {
         // start by loading from a config file (if one was provided), and
         // then merge in the system properties
         Properties systemProperties = null;
+        @SuppressWarnings("deprecation")
         String propertiesFile =
             System.getProperty(StandardProperties.CONFIG_FILE);
         if (propertiesFile != null)
