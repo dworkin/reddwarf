@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.io;
+package com.sun.sgs.impl.service.session;
 
 import java.io.IOException;
 import java.nio.BufferOverflowException;

@@ -59,6 +59,13 @@ class DataStoreClientRemote implements DataStoreServer {
 	    return h;
 	}
 	Socket socket = new Socket(host, port);
+	setSocketOptions(socket);
+	return new DataStoreProtocol(
+	    socket.getInputStream(), socket.getOutputStream());
+    }
+
+    /** Sets TcpNoDelay and KeepAlive options, if possible. */
+    private void setSocketOptions(Socket socket) {
 	try {
 	    socket.setTcpNoDelay(true);
 	} catch (Exception e) {
@@ -67,21 +74,20 @@ class DataStoreClientRemote implements DataStoreServer {
 	    socket.setKeepAlive(true);
 	} catch (Exception e) {
 	}
-	return new DataStoreProtocol(
-	    socket.getInputStream(), socket.getOutputStream());
     }
 
     /** Returns a handler that is no longer in use. */
     private void returnHandler(DataStoreProtocol h) {
-	handlers.offer(h);
+	boolean ok = handlers.offer(h);
+	assert ok;
     }
 
     /* -- Implement DataStoreServer -- */
 
-    public long allocateObjects(long tid, int count) throws IOException {
+    public long createObject(long tid) throws IOException {
 	DataStoreProtocol h = getHandler();
 	try {
-	    return h.allocateObjects(tid, count);
+	    return h.createObject(tid);
 	} finally {
 	    returnHandler(h);
 	}

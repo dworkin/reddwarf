@@ -36,7 +36,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
-import com.sun.sgs.io.AsynchronousMessageChannel;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;

@@ -32,6 +32,7 @@ import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -142,8 +143,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 
         for (ProfileOperation op : profileReport.getReportedOperations()) {
 	    Long i = opCounts.get(op.getId());
-	    opCounts.put(op.getId(), (i == null)
-			 ? new Long(1) : i.longValue() + 1);	    
+	    opCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
 	}
 
 	Map<String,Long> counterMap = profileReport.getUpdatedTaskCounters();
@@ -160,30 +160,33 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
         if ((commitCount + abortCount) >= logOps) {
             if (logger.isLoggable(Level.FINE)) {
                 long now = System.currentTimeMillis();
-                String opCountTally = "";
+                Formatter opCountTally = new Formatter();
                 for (int i = 0; i <= maxOp; i++) {
                     if (i != 0)
-                        opCountTally += "\n";
-                    opCountTally += "  " + registeredOps.get(i) + ": " +
-                        opCounts.get(i);
+                        opCountTally.format("%n");
+		    Long count = opCounts.get(i);
+                    opCountTally.format(
+			"  %s: %d", registeredOps.get(i),
+			(count == null) ? 0 : count.longValue());
                     opCounts.put(i,0L);
                 }
 
-		String counterTally = "";
+		Formatter counterTally = new Formatter();
 		if (! localCounters.isEmpty()) {
-		    counterTally += "[task counters]\n";
+		    counterTally.format("[task counters]%n");
 		    for (Entry<String,Long> entry : localCounters.entrySet())
-			counterTally += "  " + entry.getKey() + ": " +
-			    entry.getValue() + "\n";
+			counterTally.format(
+			    "  %s: %d%n", entry.getKey(), entry.getValue());
 		}
 
                 logger.log(Level.FINE, "Operations [logOps=" + logOps +"]:\n" +
                            "  succeeded: " + commitCount +
-                           "  failed:" + abortCount + "\n" +
+                           "  failed: " + abortCount + "\n" +
                            "  elapsed time: " + (now - lastReport) + " ms\n" +
                            "  running time: " + totalRunningTime + " ms " +
-                           "[threads=" + threadCount + "]\n" + opCountTally +
-			   "\n" + counterTally);
+                           "[threads=" + threadCount + "]\n" +
+			   opCountTally.toString() + "\n" +
+			   counterTally.toString());
             } else {
                 for (int i = 0; i <= maxOp; i++)
                     opCounts.put(i,0L);

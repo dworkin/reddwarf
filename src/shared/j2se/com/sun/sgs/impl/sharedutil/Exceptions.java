@@ -22,7 +22,7 @@ package com.sun.sgs.impl.sharedutil;
 /**
  * Utility methods for working with {@link Exception}s.
  */
-public class Exceptions {
+public final class Exceptions {
 
     /** Prevents instantiation of this class. */
     private Exceptions() { }

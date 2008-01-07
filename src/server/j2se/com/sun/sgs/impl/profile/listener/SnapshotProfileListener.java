@@ -37,6 +37,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
+import java.util.Formatter;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,9 +60,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * port used is 43007.
  * <p>
  * The <code>com.sun.sgs.impl.profile.listener.SnapshotProfileListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
+ * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
+ * data. The <code>report.period</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  *
  * @see AggregateTaskListener
@@ -93,9 +94,9 @@ public class SnapshotProfileListener implements ProfileListener {
         SnapshotProfileListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
+    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
     private static final int DEFAULT_PORT = 43007;
-    private static final String PERIOD_PROPERTY = PROP_BASE + ".reportPeriod";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
     private static final long DEFAULT_PERIOD = 10000;
 
     /**
@@ -178,12 +179,13 @@ public class SnapshotProfileListener implements ProfileListener {
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));
 
-            String reportStr = "Snapshot[period=" + reportPeriod + "ms]:\n";
+            Formatter reportStr = new Formatter();
+	    reportStr.format("Snapshot[period=%dms]:%n", reportPeriod);
             try {
-                reportStr += "  Threads=" + threadCount + "  Tasks=" +
-                    successCount + "/" + totalCount + "\n";
-                reportStr += "  AverageQueueSize=" +
-                    ((double)readyCount / (double)totalCount) + " tasks\n\n";
+                reportStr.format("  Threads=%d", threadCount);
+		reportStr.format("  Tasks=%d/%d%n", successCount, totalCount);
+                reportStr.format("  AverageQueueSize=%2.2f tasks%n%n",
+				 ((double)readyCount / (double)totalCount));
             } finally {
                 successCount = 0;
                 totalCount = 0;
@@ -191,7 +193,7 @@ public class SnapshotProfileListener implements ProfileListener {
                 flag.set(false);
             }
 
-            networkReporter.report(reportStr);
+            networkReporter.report(reportStr.toString());
         }
     }
 

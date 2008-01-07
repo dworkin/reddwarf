@@ -41,8 +41,7 @@ public interface ProtocolMessageListener {
      * @return  {@code true} if IO reads should resume immediately,
      *          {@code false} if they will be resumed by the listener
      */
-    boolean receivedMessage(
-        SgsClientSession session, byte[] message);
+    boolean receivedMessage(SgsClientSession session, byte[] message);
 
     /**
      * Notifies this listener that the specified client session has
