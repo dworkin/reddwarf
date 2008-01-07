@@ -33,6 +33,9 @@ package com.sun.sgs.protocol.simple;
  * <ul>
  * <li> (byte[]) the bytes in the array
  * </ul>
+ * <b>Note:</b> {@code ByteArray} no longer contains a length prefix as
+ * it did in earlier protocol versions.  Messages may need to include
+ * explicit array length fields if they include more than one ByteArray.
  * <p>
  * A {@code String} is encoded as follows:
  * <ul>
