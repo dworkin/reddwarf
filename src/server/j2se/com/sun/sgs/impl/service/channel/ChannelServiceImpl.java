@@ -354,10 +354,9 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     {
 	/** {@inheritDoc} */
 	public boolean receivedMessage(
-            SgsClientSession session, byte[] message)
+            SgsClientSession session, byte opcode, byte[] message)
         {
 	    MessageBuffer buf = new MessageBuffer(message);
-            byte opcode = buf.getByte();
 
 	    switch (opcode) {
 
