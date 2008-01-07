@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -1002,6 +1003,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     idmo = dataService.getServiceBinding(key, IdentityMO.class);
                 }
             } catch (Exception e) {
+                // TODO: this kind of check may need to be applied to more
+                // of the exceptions in the class, so all exception handling
+                // should be reviewed
+                if ((e instanceof ExceptionRetryStatus) &&
+                    (((ExceptionRetryStatus)e).shouldRetry()))
+                    return;
                 done = true;
                 logger.logThrow(Level.WARNING, e, 
                         "Failed to get key or binding for {0}", nodekey);
