@@ -875,7 +875,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
                 byte version = message.get();
                 byte serviceId = message.get();
-                byte opcode = message.get();
                 byte[] payload = new byte[message.remaining()];
                 message.get(payload);
 
@@ -884,7 +883,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 
                 // Dispatch
                 boolean keepReading =
-                    bytesReceived(version, serviceId, opcode, payload);
+                    bytesReceived(version, serviceId, payload);
 
                 if (keepReading)
                     read();
@@ -911,7 +910,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
         }
 
 	private boolean bytesReceived(
-            byte version, byte serviceId, byte opcode, byte[] buffer)
+            byte version, byte serviceId, byte[] buffer)
         {
 
 	    /*
@@ -932,7 +931,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	     * Dispatch message to service.
 	     */
 	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
-		return handleApplicationServiceMessage(opcode, buffer);
+		return handleApplicationServiceMessage(buffer);
 	    } else {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
@@ -949,7 +948,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }
 		    
 		    return serviceListener.receivedMessage(
-			ClientSessionImpl.this, opcode, buffer);
+			ClientSessionImpl.this, buffer);
 
                 } else {
 		    if (logger.isLoggable(Level.SEVERE)) {
@@ -972,9 +971,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
 	 * version and service ID have already been processed by the
 	 * caller.
 	 */
-	private boolean handleApplicationServiceMessage(byte opcode, byte[] payload) {
+	private boolean handleApplicationServiceMessage(byte[] payload) {
 
             MessageBuffer msg = new MessageBuffer(payload);
+            byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
