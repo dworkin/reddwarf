@@ -184,14 +184,4 @@ public class StandardProperties {
      */
     public static final String AUTHENTICATORS = NS + "app.authenticators";
 
-    
-    /**
-     * An optional key specifying a file containing properties.
-     * This file is combined with the application properties, and is present 
-     * for backward compatibility only.  If set, this must point to the 
-     * location of a properties file. 
-     * @deprecated use single application properties file instead
-     */
-    @Deprecated
-    public static final String CONFIG_FILE = NS + "config.file";
 }

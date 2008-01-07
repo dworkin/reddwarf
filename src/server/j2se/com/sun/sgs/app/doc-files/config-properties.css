@@ -78,20 +78,3 @@ span.nodefault:before {
   font-style: italic;
   content: "No default";
 }
-
-/*
- * Define a span for a property that is deprecated.  Use serif bold
- * and start on a new line.
- */
-span.deprecated { 
-  font-family: serif;
-  font-style: normal;
-  font-weight: bold;
-  display: block;
-}
-
-/* Put <i>Deprecated</i> when a property is deprecated. */
-span.deprecated:before { 
-  font-style: normal;
-  content: "Deprecated";
-}

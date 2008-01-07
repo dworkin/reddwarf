@@ -709,13 +709,6 @@ class Kernel {
     }
 
     /**
-     * Helper method for loading properties files.
-     */
-    private static Properties getProperties(String filename) throws Exception {
-        return getProperties(filename, null);
-    }
-
-    /**
      * Helper method for loading properties files with backing properties.
      */
     private static Properties getProperties(String filename,
@@ -872,12 +865,9 @@ class Kernel {
      * provided for a given property key by the application's configuration,
      * then that value takes precedence over any others. If no value is
      * provided by the application's configuration, then the system
-     * property value, if specified (typically provided on the command-line
-     * using a "-D" flag) is used. Failing this, the value from the system
-     * config file (if a file is specified) is used. Note that the system
-     * config file is deprecated, but used for backward compatibility.
-     * If no value is specified
-     * for a given property in any of these places, then a default is used
+     * property value, if specified (provided on the command-line
+     * using a "-D" flag) is used. If no value is specified for a given
+     * property in either of these places, then a default is used
      * or an <code>Exception</code> is thrown (depending on whether a default
      * value is available).
      * 
@@ -894,19 +884,11 @@ class Kernel {
             System.exit(0);
         }
 
-        // start by loading from a config file (if one was provided), and
-        // then merge in the system properties
-        Properties systemProperties = null;
-        @SuppressWarnings("deprecation")
-        String propertiesFile =
-            System.getProperty(StandardProperties.CONFIG_FILE);
-        if (propertiesFile != null)
-            systemProperties = getProperties(propertiesFile);
-        else
-            systemProperties = new Properties();
-        systemProperties.putAll(System.getProperties());
-        
-        Properties appProperties = getProperties(args[0], systemProperties);
+        // Get the properties, merging properties given on the command line
+        // with the first argument, which is the application config file.
+        // The config file properties have precedence.
+        Properties appProperties = getProperties(args[0], 
+                                                 System.getProperties());
         
         // check the standard properties
         checkProperties(appProperties, args[0]);
