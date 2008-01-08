@@ -52,11 +52,11 @@ limitations:
   the documentation of the network protocol to develop other
   implementations, including ones to support different languages.
 
-- I/O throttling has not been implemented in this release, so it is
-  possible for clients to overwhelm the server with network traffic and
-  cause the server to run out of memory.  As a temporary workaround,
-  developers must ensure that clients do not send network traffic faster
-  than the server application can process it.
+- This release supports only limited I/O throttling, so it is possible
+  for clients to overwhelm the server with network traffic and cause the
+  server to run out of memory.  As a temporary workaround, developers
+  must ensure that clients do not send network traffic faster than the
+  server application can process it.
 
 
 MORE INFORMATION
