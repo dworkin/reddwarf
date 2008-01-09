@@ -24,7 +24,7 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -36,10 +36,6 @@ import javax.swing.WindowConstants;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
-
 /**
  * ChatChannelFrame presents a GUI so that a user can interact with
  * a channel. The users connected to the channel are displayed in a list
@@ -47,7 +43,7 @@ import com.sun.sgs.client.SessionId;
  * area on the bottom of the left side.
  */
 public class ChatChannelFrame extends JInternalFrame
-        implements ActionListener, ClientChannelListener
+        implements ActionListener
 {
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
@@ -55,8 +51,8 @@ public class ChatChannelFrame extends JInternalFrame
     /** The {@code ChatClient} that is the parent of this frame. */
     private final ChatClient myChatClient;
 
-    /** The {@code ClientChannel} associated with this frame. */
-    private final ClientChannel myChannel;
+    /** The channel name associated with this frame. */
+    private final String myChannelName;
 
     /** The {@code MultiList} containing this channel's members. */
     private final MultiList<SessionId> multiList;
@@ -71,13 +67,13 @@ public class ChatChannelFrame extends JInternalFrame
      * Constructs a new {@code ChatChannelFrame} as a wrapper around the given
      * channel.
      *
-     * @param client the parent {@code ChatClient} of this frame.
-     * @param channel the channel that this class will manage.
+     * @param client the parent {@code ChatClient} of this frame
+     * @param channelName the name of the channel to manage
      */
-    public ChatChannelFrame(ChatClient client, ClientChannel channel) {
-        super("Channel: " + channel.getName());
+    public ChatChannelFrame(ChatClient client, String channelName) {
+        super("Channel: " + channelName);
         myChatClient = client;
-        myChannel = channel;
+        myChannelName = channelName;
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
         JPanel eastPanel = new JPanel();
@@ -104,19 +100,15 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Handles messages received from other clients on this channel,
      * as well as server notifications about other clients joining and
      * leaving this channel.
      */
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-            byte[] message)
-    {
+    void receivedMessage(SessionId sender, ByteBuffer message) {
         try {
             String messageString = ChatClient.fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
-                    channel.getName(), sender, messageString);
+                myChannelName, sender, messageString);
             String[] args = messageString.split(" ", 2);
             String command = args[0];
 
@@ -145,11 +137,9 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Closes this frame.
      */
-    public void leftChannel(ClientChannel channel) {
+    void closeFrame() {
         dispose();
         if (getDesktopPane() != null) {
             getDesktopPane().remove(this);
@@ -171,15 +161,7 @@ public class ChatChannelFrame extends JInternalFrame
      * Broadcasts on this channel the text entered by the user.
      */
     public void actionPerformed(ActionEvent action) {
-        try {
-            String message = inputField.getText();
-            byte[] msgBytes = ChatClient.toMessageBytes(message);
-            myChannel.send(msgBytes);
-            // Deliver to our own receivedMessage, since server won't echo.
-            receivedMessage(myChannel, myChatClient.getSessionId(), msgBytes);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        myChatClient.broadcast(myChannelName, inputField.getText());
         inputField.setText("");
     }
 
@@ -208,7 +190,7 @@ public class ChatChannelFrame extends JInternalFrame
          */
         @Override
         public void internalFrameClosing(InternalFrameEvent event) {
-            frame.myChatClient.leaveChannel(frame.myChannel);
+            frame.myChatClient.leaveChannel(frame.myChannelName);
         }        
     }
 }

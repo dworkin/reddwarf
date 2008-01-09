@@ -34,6 +34,8 @@ package com.sun.sgs.tutorial.client.lesson2;
 
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,9 +44,8 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
+import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.client.util.UtilChannelListener;
 import com.sun.sgs.tutorial.client.lesson1.HelloUserClient;
 
 /**
@@ -63,9 +64,9 @@ public class HelloChannelClient extends HelloUserClient
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
-    /** Map that associates a channel name with a {@link ClientChannel}. */
-    protected final Map<String, ClientChannel> channelsByName =
-        new HashMap<String, ClientChannel>();
+    /** Map that associates a channel name with a {@link UtilChannel}. */
+    protected final Map<String, UtilChannel> channelsByName =
+        new HashMap<String, UtilChannel>();
 
     /** The UI selector among direct messaging and different channels. */
     protected JComboBox channelSelector;
@@ -115,13 +116,13 @@ public class HelloChannelClient extends HelloUserClient
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Returns a listener that formats and displays received channel
      * messages in the output text pane.
      */
-    @Override
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
+    public UtilChannelListener joinedChannel(UtilChannel channel) {
+
+        // FIXME need infrastructure to call this on channel join
+
         channelsByName.put(channel.getName(), channel);
         appendOutput("Joined to channel " + channel.getName());
         channelSelectorModel.addElement(channel.getName());
@@ -142,13 +143,13 @@ public class HelloChannelClient extends HelloUserClient
 
         try {
             String text = getInputText();
-            byte[] message = encodeString(text);
+            ByteBuffer message = encodeString(text);
             String channelName =
                 (String) channelSelector.getSelectedItem();
             if (channelName.equalsIgnoreCase("<DIRECT>")) {
                 simpleClient.send(message);
             } else {
-                ClientChannel channel = channelsByName.get(channelName);
+                UtilChannel channel = channelsByName.get(channelName);
                 channel.send(message);
             }
         } catch (Exception e) {
@@ -160,7 +161,7 @@ public class HelloChannelClient extends HelloUserClient
      * A simple listener for channel events.
      */
     public class HelloChannelListener
-        implements ClientChannelListener
+        implements UtilChannelListener
     {
         /**
          * An example of per-channel state, recording the number of
@@ -183,7 +184,7 @@ public class HelloChannelClient extends HelloUserClient
          * <p>
          * Displays a message when this client leaves a channel.
          */
-        public void leftChannel(ClientChannel channel) {
+        public void leftChannel(UtilChannel channel) {
             appendOutput("Removed from channel " + channel.getName());
         }
 
@@ -192,8 +193,8 @@ public class HelloChannelClient extends HelloUserClient
          * <p>
          * Formats and displays messages received on a channel.
          */
-        public void receivedMessage(ClientChannel channel,
-                SessionId sender, byte[] message)
+        public void receivedMessage(UtilChannel channel,
+                BigInteger sender, ByteBuffer message)
         {
             appendOutput("[" + channel.getName() + "/ " + channelNumber +
                 "] " + sender + ": " + decodeString(message));

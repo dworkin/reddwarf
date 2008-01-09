@@ -33,6 +33,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,9 +58,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ListCellRenderer;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.client.simple.SimpleClient;
 
@@ -88,8 +86,7 @@ import com.sun.sgs.client.simple.SimpleClient;
  * </ul>
  */
 public class ChatClient extends JFrame
-    implements ActionListener, ListCellRenderer,
-               SimpleClientListener, ClientChannelListener
+    implements ActionListener, ListCellRenderer, SimpleClientListener
 {
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
@@ -118,9 +115,6 @@ public class ChatClient extends JFrame
 
     /** The name of the login property */
     public static final String LOGIN_PROPERTY = "ChatClient.login";
-
-    /** The global channel, also used to send a private message (PM) */
-    private ClientChannel globalChannel;
 
     /** The {@link Charset} encoding for client/server messages */
     public static final String MESSAGE_CHARSET = "UTF-8";
@@ -247,15 +241,6 @@ public class ChatClient extends JFrame
         return pmMouseListener;
     }
 
-    /**
-     * Returns the {@link SessionId} for this client.
-     *
-     * @return the {@code SessionId} for this client
-     */
-    SessionId getSessionId() {
-        return client.getSessionId();
-    }
-
     // Main window GUI actions
 
     private void doLogin() {
@@ -319,6 +304,17 @@ public class ChatClient extends JFrame
         }
     }
 
+    void broadcast(String channelName, String message) {
+        try {
+            client.send(toMessageBytes(
+                "/broadcast " + channelName + " " + message));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // Deliver to our own receivedMessage, since server won't echo.
+        // TODO
+        //receivedMessage(channelName, getSessionId(), message);
+    }
     private void doMultiPrivateMessage() {
 	Set<SessionId> targets = new HashSet<SessionId>();
         targets.addAll(userList.getAllSelected());
@@ -344,9 +340,16 @@ public class ChatClient extends JFrame
             return;
         }
 
-        String message = "/pm " + input;
+        StringBuffer s = new StringBuffer();
+        s.append("/pm");
+        for (SessionId target : targets) {
+            s.append(" ");
+            s.append(target);
+        }
+        s.append("::");
+        s.append(input);
         try {
-            globalChannel.send(targets, toMessageBytes(message));
+            client.send(toMessageBytes(s.toString()));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -367,8 +370,8 @@ public class ChatClient extends JFrame
         }
     }
  
-    void leaveChannel(ClientChannel chan) {
-	String cmd = "/leave " + chan.getName();
+    void leaveChannel(String channelName) {
+	String cmd = "/leave " + channelName;
         try {
             client.send(toMessageBytes(cmd));
         } catch (IOException e) {
@@ -487,7 +490,11 @@ public class ChatClient extends JFrame
      */
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        SessionId session = client.getSessionId();
+    }
+
+    // FIXME: call this with a special "logged in" app message
+    private void reallyLoggedIn(SessionId id) {
+        SessionId session = id;
         sessionNames.put(session, userName);
         setTitle("Chat Test Client: " + formatSession(session));
         loginButton.setText("Logout");
@@ -542,9 +549,6 @@ public class ChatClient extends JFrame
 
             // Reset title bar
             setTitle("Chat Test Client: [disconnected]");
-            
-            // Reset the global channel
-            globalChannel = null;
 
             // Close all channel frames
             for (JInternalFrame frame : desktop.getAllFrames()) {
@@ -582,22 +586,13 @@ public class ChatClient extends JFrame
         statusMessage.setText("Status: Reconnected");
         setSessionButtonsEnabled(true);
     }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
-        // ChatClient handles the global channel
-        if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
-            globalChannel = channel;
-            return this;
-        }
 
+    // FIXME use this!
+    private void joinedChannel(String channelName) {
         // Other channels are handled by a new ChatChannelFrame
-        ChatChannelFrame cframe = new ChatChannelFrame(this, channel);
+        ChatChannelFrame cframe = new ChatChannelFrame(this, channelName);
         desktop.add(cframe);
         desktop.repaint();
-        return cframe;
     }
 
 
@@ -606,7 +601,7 @@ public class ChatClient extends JFrame
      * <p>
      * Handles the direct {@code /pong} reply.
      */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         String messageString = fromMessageBytes(message);
         System.err.format("Recv direct: %s\n", messageString);
         String[] args = messageString.split(" ", 2);
@@ -619,18 +614,14 @@ public class ChatClient extends JFrame
         }
     }
 
-    // Implement ClientChannelListener
-
-    /**
-     * {@inheritDoc}
-     */
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-            byte[] message)
+    // FIXME use this!  Look up the appropriate ChatChannelFrame and call it!
+    private void receivedChannelMessage(String channelName, SessionId sender,
+            ByteBuffer message)
     {
         try {
             String messageString = fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
-                    channel.getName(), sender, messageString);
+                channelName, sender, messageString);
             String[] args = messageString.split(" ", 2);
             String command = args[0];
 
@@ -665,14 +656,6 @@ public class ChatClient extends JFrame
         JOptionPane.showMessageDialog(this,
             message, "Message from " + formatSession(sender),
             JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void leftChannel(ClientChannel channel) {
-	System.err.format("ChatClient: Error, kicked off channel [%s]\n",
-                channel.getName());
     }
 
     // Implement ActionListener
@@ -756,13 +739,15 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Decodes the given {@code bytes} into a message string.
+     * Decodes the given {@code ByteBuffer} into a message string.
      *
-     * @param bytes the encoded message
+     * @param buf the encoded message
      * @return the decoded message string
      */
-    static String fromMessageBytes(byte[] bytes) {
+    static String fromMessageBytes(ByteBuffer buf) {
         try {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset UTF-8 not found", e);
@@ -775,9 +760,9 @@ public class ChatClient extends JFrame
      * @param s the message string to encode
      * @return the encoded message as a byte array
      */
-    static byte[] toMessageBytes(String s) {
+    static ByteBuffer toMessageBytes(String s) {
         try {
-            return s.getBytes(MESSAGE_CHARSET);
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset UTF-8 not found", e);
         }

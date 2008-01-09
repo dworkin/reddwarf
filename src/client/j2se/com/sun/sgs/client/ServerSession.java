@@ -33,6 +33,7 @@
 package com.sun.sgs.client;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Represents a client's view of a login session with the server. Each time
@@ -50,31 +51,23 @@ import java.io.IOException;
 public interface ServerSession {
 
     /**
-     * Returns the session identifier for this server session.
-     * 
-     * @return the session identifier for this server session
-     *
-     * @throws IllegalStateException if this session is disconnected
-     */
-    SessionId getSessionId();
-
-    /**
-     * Sends the message contained in the specified byte array to the
-     * server. The specified message is sent asychronously to the server;
+     * Sends the message contained in the specified {@code ByteBuffer} to
+     * the server, starting at the current position of the buffer.
+     * The specified message is sent asynchronously to the server;
      * therefore, a successful invocation of this method does not indicate
      * that the given message was successfully sent. Messages that are
      * received by the server are delivered in sending order.
      * <p>
-     * The specified byte array must not be modified after invoking this
-     * method; if the byte array is modified, then this method may have
-     * unpredictable results.
+     * The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the server by this invocation.
      *
      * @param message a message
      *
      * @throws IOException if this session is disconnected or an IO error
      *         occurs
      */
-    void send(byte[] message) throws IOException;
+    void send(ByteBuffer message) throws IOException;
 
     /**
      * Returns {@code true} if this session is connected, otherwise
@@ -97,8 +90,8 @@ public interface ServerSession {
      * ServerSessionListener} passing a {@code boolean} indicating
      * whether the disconnection was graceful.
      * <p>
-     * If this server session is already disconnected, then no action is
-     * taken.
+     * If this server session is already disconnected, then an
+     * {@code IllegalStateException} is thrown.
      * 
      * @param force if {@code true}, this session is forcibly
      *        terminated; otherwise the session is gracefully disconnected
