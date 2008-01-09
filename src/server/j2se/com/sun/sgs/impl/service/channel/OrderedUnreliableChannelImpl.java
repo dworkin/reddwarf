@@ -19,26 +19,23 @@
 
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.sharedutil.HexDumper;
-import java.util.Set;
-import java.util.logging.Level;
 
+/**
+ * Represents an ordered unreliable channel.  This is currently a
+ * placeholder that will eventually handle message delivery details in the
+ * subclass instead of handling them in the {@code ChannelImpl} superclass.
+ */
 class OrderedUnreliableChannelImpl extends ChannelImpl {
     
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
 
+    /**
+     * Constructs an instance with the specified {@code delivery}
+     * requirement.
+     */
     OrderedUnreliableChannelImpl(Delivery delivery) {
 	super(delivery);
-    }
-    
-    protected void sendToAllMembers(final byte[] channelMessage) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "sendToAllMembers channel:{0}, message:{1}",
-		this, HexDumper.format(channelMessage));
-	}
     }
 }

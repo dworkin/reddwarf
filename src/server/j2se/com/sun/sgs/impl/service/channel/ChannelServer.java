@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -33,18 +32,34 @@ public interface ChannelServer extends Remote {
      * Notifies this server that it should service the event queue of
      * the channel with the specified {@code channelId}.
      *
-     * @param	channeId a channelID
+     * @param	channelId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
     void serviceEventQueue(byte[] channelId) throws IOException;
 
+    /**
+     * Notifies this server that it should reread the channel
+     * membership list of the specified {@code channelId} for
+     * sessions connected to this node before processing any other
+     * events on the channel.  {@code refresh} requests are sent
+     * when a node performs recovery operations for a channel
+     * coordinator failure.  When a channel coordinator fails, a
+     * {@code join}, {@code leave}, or other event notification may
+     * be lost, so any local channel membership information that is
+     * cached may be stale and needs to be reread before processing
+     * any more events.
+     *
+     * @param	channelId a channel ID
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
     void refresh(byte[] channelId) throws IOException;
 
     /**
-     * Notifies this server that locally-connected session with the
-     * specified {@code sessionId} has joined the channel with the
-     * specified {@code channelId}.
+     * Notifies this server that the locally-connected session with
+     * the specified {@code sessionId} has joined the channel with
+     * the specified {@code channelId}.
      *
      * @param	channelId a channel ID
      * @param	sessionId a session ID

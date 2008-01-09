@@ -205,14 +205,13 @@ public class ClientSessionImpl
 	return identity;
     }
 
-    /**
-     * Returns the ID of this client session as a {@code BigInteger}.
-     */
+    /** {@inheritDoc} */
     public BigInteger getId() {
 	logger.log(Level.FINEST, "getSessionId returns {0}", id);
         return id;
     }
 
+    /** {@inheritDoc} */
     public byte[] getIdBytes() {
 	return idBytes;
     }

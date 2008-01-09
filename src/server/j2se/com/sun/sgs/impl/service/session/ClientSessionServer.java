@@ -53,6 +53,7 @@ public interface ClientSessionServer extends Remote {
      * is not sent, and {@code false} is returned.
      *
      * @param	sessionId a session ID
+     * @param	seq a sequence number
      * @param	message a protocol message
      * @param	delivery a delivery requirement
      * @return	{@code true} if the client session with the specified
@@ -75,6 +76,7 @@ public interface ClientSessionServer extends Remote {
      * returned.
      *
      * @param	sessionId a session ID
+     * @param	seq a sequence number
      * @param	messages an array of protocol messages, each contained
      *		in a byte array
      * @param	delivery an array of delivery requirements

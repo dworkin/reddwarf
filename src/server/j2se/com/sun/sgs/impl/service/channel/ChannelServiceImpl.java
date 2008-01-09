@@ -31,7 +31,6 @@ import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.service.session.IdentityAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -79,6 +78,7 @@ public class ChannelServiceImpl
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
+    /** The package name. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.channel";
 
     /** The prefix of a session key which maps to its channel membership. */
@@ -136,8 +136,9 @@ public class ChannelServiceImpl
     private final Object taskHandlerLock = new Object();
 
     /** The local channel membership lists, keyed by channel ID. */
-    private final Map<BigInteger, Set<BigInteger>> localChannelMembersMap =
-	Collections.synchronizedMap(new HashMap<BigInteger, Set<BigInteger>>());
+    private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
+	localChannelMembersMap =
+	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
     /** The map of channel coordinator task queues, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
@@ -270,7 +271,16 @@ public class ChannelServiceImpl
 
     private final class ChannelServerImpl implements ChannelServer {
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * The service event queue request is enqueued in the given
+	 * channel's coordinator task queue so that the requests can be
+	 * performed serially, rather than concurrently.  If tasks to
+	 * service a given channel's event queue were processed
+	 * concurrently, there would be many transaction conflicts because
+	 * servicing a channel event accesses a single per-channel data
+	 * structure (the channel's event queue).
+	 */
 	public void serviceEventQueue(final byte[] channelId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -303,7 +313,11 @@ public class ChannelServiceImpl
 	    }
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: This method is not yet implemented, but will be when
+	 * channel coordinator recovery is implemented.
+	 */
 	public void refresh(byte[] channelId) {
 	    callStarted();
 	    try {
@@ -313,7 +327,11 @@ public class ChannelServiceImpl
 	    }
 	}
 	
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * Adds the specified {@code sessionId} to the per-channel cache
+	 * for the given channel's local member sessions.
+	 */
 	public void join(byte[] channelId, byte[] sessionId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -323,13 +341,15 @@ public class ChannelServiceImpl
 	    }
 	    try {
 		BigInteger channelRefId = new BigInteger(1, channelId);
-		Set<BigInteger> localMembers;
-		synchronized (localChannelMembersMap) {
-		    localMembers = localChannelMembersMap.get(channelRefId);
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    Set<BigInteger> newLocalMembers =
+			Collections.synchronizedSet(new HashSet<BigInteger>());
+		    localMembers = localChannelMembersMap.
+			putIfAbsent(channelRefId, newLocalMembers);
 		    if (localMembers == null) {
-			localMembers = Collections.synchronizedSet(
-			    new HashSet<BigInteger>());
-			localChannelMembersMap.put(channelRefId, localMembers);
+			localMembers = newLocalMembers;
 		    }
 		}
 		localMembers.add(new BigInteger(1, sessionId));
@@ -339,7 +359,11 @@ public class ChannelServiceImpl
 	    }
 	}
 	
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * Removes the specified {@code sessionId} from the per-channel
+	 * cache for the given channel's local member sessions.
+	 */
 	public void leave(byte[] channelId, byte[] sessionId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -350,11 +374,9 @@ public class ChannelServiceImpl
 	    try {
 		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers;
-		synchronized (localChannelMembersMap) {
-		    localMembers = localChannelMembersMap.get(channelRefId);
-		    if (localMembers == null) {
-			return;
-		    }
+		localMembers = localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    return;
 		}
 		localMembers.remove(new BigInteger(1, sessionId));
 		
@@ -363,7 +385,11 @@ public class ChannelServiceImpl
 	    }
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * Removes all session IDs from the per-channel cache for the given
+	 * channel's local member sessions.
+	 */
 	public void leaveAll(byte[] channelId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -373,12 +399,11 @@ public class ChannelServiceImpl
 	    try {
 		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers;
-		synchronized (localChannelMembersMap) {
-		    localMembers = localChannelMembersMap.get(channelRefId);
-		    if (localMembers == null) {
-			return;
-		    }
+		localMembers = localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    return;
 		}
+		// TBD: remove the entry instead of clearing the membership?
 		localMembers.clear();
 		
 	    } finally {
@@ -387,6 +412,9 @@ public class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc}
+	 *
+	 * Sends the given {@code message} to all local members of the
+	 * specified channel.
 	 *
 	 * TBD: (optimization) this method should handle sending multiple
 	 * messages to a given channel.
@@ -432,17 +460,17 @@ public class ChannelServiceImpl
 	    }
 	}
 	
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * Removes the specified channel from the per-channel cache of
+	 * local members.
+	 */
 	public void close(byte[] channelId) {
 	    callStarted();
 	    try {
 		BigInteger channelRefId = new BigInteger(1, channelId);
-		synchronized (localChannelMembersMap) {
-		    localChannelMembersMap.remove(channelRefId);
-		}
-		synchronized (coordinatorTaskQueues) {
-		    coordinatorTaskQueues.remove(channelRefId);
-		}
+		localChannelMembersMap.remove(channelRefId);
+		coordinatorTaskQueues.remove(channelRefId);
 
 	    } finally {
 		callFinished();
@@ -506,6 +534,17 @@ public class ChannelServiceImpl
 	}
     }
 
+    /* -- Implement TransactionContext -- */
+
+    /**
+     * This transaction context maintains a per-channel list of
+     * non-transactional tasks to perform when the transaction commits. A
+     * task is added to the context by a {@code ChannelImpl} via the {@code
+     * addChannelTask} method.  Such non-transactional tasks include
+     * sending a notification to a channel server to modify the channel
+     * membership list, or forwarding a send request to a set of channel
+     * servers.
+     */
     final class Context extends TransactionContext {
 
 	private final Map<BigInteger, List<Runnable>> internalTaskLists =
@@ -519,8 +558,10 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Adds the specified {@code task} to the task list of the
-	 * given {@code channel}.
+	 * Adds the specified {@code task} to the task list of the given
+	 * {@code channelId}.  If the transaction commits, the task will be
+	 * added tp the task handler's per-channel map of tasks to service.
+	 * The tasks are serviced by the TaskHandlerThread.
 	 */
 	public void addChannelTask(BigInteger channelId, Runnable task) {
 	    List<Runnable> taskList = internalTaskLists.get(channelId);
@@ -594,6 +635,12 @@ public class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Adds the tasks in the specified {@code taskList} to the
+     * task handler's per-channel map of tasks to process.  The tasks will
+     * be serviced by the TaskHandlerThread.  This method is invoked when a
+     * context is flushed during transaction commit.
+     */
     private void addChannelTasks(
 	BigInteger channelId, List<Runnable> taskList)
 	
@@ -682,7 +729,12 @@ public class ChannelServiceImpl
     private final class ChannelProtocolMessageListener
 	implements ProtocolMessageListener
     {
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 * 
+	 * Note: This method is unused and should eventually go away, along
+	 * with the ProtocolMessageListener API.  The ClientSessionService
+	 * no longer dispatches messages to protocol message listeners.
+	 */
 	public void receivedMessage(final ClientSession session, byte[] message) {
 	    if (logger.isLoggable(Level.SEVERE)) {
 		logger.log(
@@ -692,7 +744,14 @@ public class ChannelServiceImpl
 	    }
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: Currently the ChannelService is notified by the
+	 * ClientSessionService when a client session disconnects.  This
+	 * should be changed to a notification scheme where the
+	 * ChannelService can register interest in receiving notification
+	 * when the client session is removed.
+	 */
 	public void disconnected(final ClientSession session) {
 	    /*
 	     * Schedule a transactional task to remove the
@@ -714,6 +773,8 @@ public class ChannelServiceImpl
 	    }
 	}
     }
+
+    /* -- Other methods and classes -- */
     
     /**
      * Returns the client session service.
@@ -794,11 +855,19 @@ public class ChannelServiceImpl
     /**
      * The {@code RecoveryListener} for handling requests to recover
      * for a failed {@code ChannelService}.
+     *
+     * TBD: recovery also needs to re-assign channel coordinators assigned
+     * to the failed node.
      */
     private class ChannelServiceRecoveryListener
 	implements RecoveryListener
     {
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: Recovery (due to being possibly-lengthy) should not be
+	 * performed in this remote method.  Recovery operations should
+	 * be performed in a separate thread.
+	 */
 	public void recover(Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    try {

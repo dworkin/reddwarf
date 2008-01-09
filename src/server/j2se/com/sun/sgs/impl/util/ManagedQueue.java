@@ -32,6 +32,8 @@ import java.util.Iterator;
  * A simple implementation of a persistent queue.  When an element is
  * removed from the queue, that element is also removed from the data
  * store.
+ *
+ * @param <E>	the type for elements in the queue
  */
 public class ManagedQueue<E>
     extends AbstractQueue<E>
