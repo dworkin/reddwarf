@@ -20,30 +20,14 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.auth.Identity;
-import java.math.BigInteger;
 
 /**
- * Contains the {@code Identity} assigned to a {@code ManagedObject} as
- * well as its ID.
+ * Contains the {@code Identity} assigned to a {@code ManagedObject}.
  *
  * TBD: should this be combined with NodeAssignment?  Also, should this
  * class be moved to the com.sun.sgs.service package?
  */
 public interface IdentityAssignment {
-
-    /**
-     * Returns the ID of this instance as a {@code BigInteger}.
-     *
-     * @return	the ID of this instance as a {@code BigInteger}
-     */
-    BigInteger getId();
-    
-    /**
-     * Returns the ID of this instance in a byte array.
-     *
-     * @return	the ID of this instance in a byte array
-     */
-    byte[] getIdBytes();
 
     /**
      * Returns the identity of this instance.

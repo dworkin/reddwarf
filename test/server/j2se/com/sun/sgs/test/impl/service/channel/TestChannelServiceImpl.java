@@ -1761,20 +1761,12 @@ public class TestChannelServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
-	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
-
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.markForUpdate(this);
-	    ManagedReference listenerRef =
-		dataManager.createReference(listener);
-	    sessions.put(session, listenerRef);
 	    dataManager.setBinding(session.getName(), session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
@@ -1782,24 +1774,6 @@ public class TestChannelServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void initialize(Properties props) {
-	}
-
-	private Set<ClientSession> getSessions() {
-	    return sessions.keySet();
-	}
-
-	DummyClientSessionListener getClientSessionListener(String name) {
-
-	    for (Map.Entry<ClientSession,ManagedReference> entry :
-		     sessions.entrySet()) {
-
-		ClientSession session = entry.getKey();
-		ManagedReference listenerRef = entry.getValue();
-		if (session.getName().equals(name)) {
-		    return listenerRef.get(DummyClientSessionListener.class);
-		}
-	    }
-	    return null;
 	}
     }
 
@@ -1811,10 +1785,11 @@ public class TestChannelServiceImpl extends TestCase {
 	boolean receivedDisconnectedCallback = false;
 	boolean wasGracefulDisconnect = false;
 	
-	private final ClientSession session;
+	private final ManagedReference sessionRef;
 	
 	DummyClientSessionListener(ClientSession session) {
-	    this.session = session;
+	    DataManager dataManager = AppContext.getDataManager();
+	    this.sessionRef = dataManager.createReference(session);
 	    this.name = session.getName();
 	}
 
@@ -1834,13 +1809,14 @@ public class TestChannelServiceImpl extends TestCase {
 	public void receivedMessage(byte[] message) {
 	    MessageBuffer buf = new MessageBuffer(message);
 	    String action = buf.getString();
+	    DataManager dataManager = AppContext.getDataManager();
+	    ClientSession session = sessionRef.get(ClientSession.class);
 	    if (action.equals("join")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: join request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.join(session);
 		session.send(message);
@@ -1849,8 +1825,7 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("DummyClientSessionListener: leave request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.leave(session);
 		session.send(message);
@@ -1860,8 +1835,7 @@ public class TestChannelServiceImpl extends TestCase {
 				   "channel name: " + channelName +
 				   ", user: " + name);
 		byte[] channelMessage = buf.getByteArray();
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.send(message);
 	    }

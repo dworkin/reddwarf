@@ -38,7 +38,7 @@ import javax.security.auth.login.LoginException;
 class ClientSessionHandler {
 
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private final static long serialVersionUID =1L;
     
     /** Connection state. */
     private static enum State {
@@ -63,11 +63,6 @@ class ClientSessionHandler {
     /** The LOGIN_FAILURE protocol message. */
     private static final byte[] loginFailureMessage = getLoginFailureMessage();
 
-    /** The client session associated with this session handler,
-     * or {@code null} if the session hasn't completed login.
-     */
-    private final ClientSessionImpl sessionImpl;
-
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
@@ -80,8 +75,8 @@ class ClientSessionHandler {
     /** The Connection for sending messages to the client. */
     private volatile Connection sessionConnection;
 
-    /** The session ID bytes. */
-    private volatile BigInteger id;
+    /** The session ID as a BigInteger. */
+    private volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
     private volatile Identity identity;
@@ -112,7 +107,6 @@ class ClientSessionHandler {
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.connectionListener = new Listener();
-	this.sessionImpl = new ClientSessionImpl(sessionService);
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -122,22 +116,6 @@ class ClientSessionHandler {
     }
 
     /* -- Instance methods -- */
-
-    /**
-     * Returns the client session.
-     *
-     * @return	the client session
-     */
-    ClientSessionImpl getClientSession() {
-	return sessionImpl;
-    }
-
-    /**
-     * Returns the ID for the client session.
-     */
-    BigInteger getId() {
-	return id;
-    }
 
     /**
      * Returns the {@code ConnectionListener} for this session.
@@ -229,7 +207,7 @@ class ClientSessionHandler {
 	    }
 	}
 
-	sessionService.disconnected(sessionImpl);
+	sessionService.disconnected(sessionRefId);
 	
 	if (identity != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
@@ -269,8 +247,8 @@ class ClientSessionHandler {
 	scheduleTask(new AbstractKernelRunnable() {
 	    public void run() throws IOException {
 		ClientSessionImpl sessionImpl = null;
-		if (id != null) {
-		    sessionImpl = ClientSessionImpl.getSession(dataService, id);
+		if (sessionRefId != null) {
+		    sessionImpl = ClientSessionImpl.getSession(dataService, sessionRefId);
 		}
 		if (sessionImpl != null) {
 		    sessionImpl.
@@ -304,7 +282,7 @@ class ClientSessionHandler {
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + id;
+	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -445,7 +423,8 @@ class ClientSessionHandler {
 			}
 		    }
 		    
-		    serviceListener.receivedMessage(sessionImpl, buffer);
+		    serviceListener.receivedMessage(
+			sessionRefId.toByteArray(), buffer);
 		    
 		} else {
 		    if (logger.isLoggable(Level.SEVERE)) {
@@ -497,9 +476,17 @@ class ClientSessionHandler {
 		final byte[] clientMessage = msg.getBytes(size);
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
-			if (isConnected()) {
-			    sessionImpl.getClientSessionListener(dataService).
-				receivedMessage(clientMessage);
+			ClientSessionImpl sessionImpl =
+			    ClientSessionImpl.getSession(
+				dataService, sessionRefId);
+			if (sessionImpl != null) {
+			    if (isConnected()) {
+				sessionImpl.getClientSessionListener(dataService).
+				    receivedMessage(clientMessage);
+			    }
+			} else {
+			    // Session has been removed; disconnect session.
+			    // TBD...
 			}
 		    }});
 		break;
@@ -595,16 +582,11 @@ class ClientSessionHandler {
 			sessionService.getTransactionProxy(),
 			sessionService.nonDurableTaskScheduler,
 			authenticatedIdentity);
-		sessionImpl.setIdentityAndNodeId(
-		    authenticatedIdentity, assignedNodeId);
 		identity = authenticatedIdentity;
+		CreateClientSessionTask createTask =
+		    new CreateClientSessionTask();
 		try {
-		    sessionService.runTransactionalTask(
-		    	new AbstractKernelRunnable() {
-			    public void run() {
-				sessionImpl.putSession(dataService);
-			    }
-			}, identity);
+		    sessionService.runTransactionalTask(createTask, identity);
 		} catch (Exception e) {
 		    logger.logThrow(
 			Level.WARNING, e,
@@ -612,8 +594,8 @@ class ClientSessionHandler {
 		    sendLoginFailureAndDisconnect();
 		    return;
 		}
-		id = sessionImpl.getId();
-		sessionService.connected(ClientSessionHandler.this);
+		sessionService.connected(
+		    sessionRefId, ClientSessionHandler.this);
 		scheduleTask(new LoginTask());
 		
 	    } else {
@@ -743,6 +725,18 @@ class ClientSessionHandler {
 	    return node;
 	}
     }
+
+    /**
+     * Constructs the ClientSession.
+     */
+    private class CreateClientSessionTask extends AbstractKernelRunnable {
+	
+	public void run() {
+	    ClientSessionImpl sessionImpl =
+		new ClientSessionImpl(sessionService, identity);
+	    sessionRefId = sessionImpl.getId();
+	}
+    }
     
     /**
      * This is a transactional task to notify the application's
@@ -778,7 +772,7 @@ class ClientSessionHandler {
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    CompactId compactId = new CompactId(id.toByteArray());
+	    CompactId compactId = new CompactId(sessionRefId.toByteArray());
 	    MessageBuffer ack =
 		new MessageBuffer(3 + compactId.getExternalFormByteCount());
 	    ack.putByte(SimpleSgsProtocol.VERSION).
@@ -788,7 +782,9 @@ class ClientSessionHandler {
 		
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
-	    
+
+	    ClientSessionImpl sessionImpl =
+		ClientSessionImpl.getSession(dataService, sessionRefId);
 	    try {
 		returnedListener = appListener.loggedIn(sessionImpl);
 	    } catch (RuntimeException e) {

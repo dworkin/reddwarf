@@ -78,7 +78,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"throw RuntimeException";
 
     private static final String SESSION_PREFIX =
-	"com.sun.sgs.impl.service.session.proxy";
+	"com.sun.sgs.impl.service.session.impl";
 
     private static final String SESSION_NODE_PREFIX =
 	"com.sun.sgs.impl.service.session.node";
@@ -1086,9 +1086,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
+	private final Map<ManagedReference, ManagedReference> sessions =
 	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
+		new HashMap<ManagedReference, ManagedReference>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -1103,10 +1103,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
 		DataManager dataManager = AppContext.getDataManager();
+		ManagedReference sessionRef =
+		    dataManager.createReference(session);
 		ManagedReference listenerRef =
 		    dataManager.createReference(listener);
 		dataManager.markForUpdate(this);
-		sessions.put(session, listenerRef);
+		sessions.put(sessionRef, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
 		return listener;
@@ -1118,7 +1120,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	private Set<ClientSession> getSessions() {
-	    return sessions.keySet();
+	    Set<ClientSession> sessionSet =
+		new HashSet<ClientSession>();
+	    for (ManagedReference sessionRef : sessions.keySet()) {
+		sessionSet.add(sessionRef.get(ClientSession.class));
+	    }
+	    return sessionSet;
 	}
     }
 

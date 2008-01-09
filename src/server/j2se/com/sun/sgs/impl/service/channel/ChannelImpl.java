@@ -603,19 +603,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Returns the ID for the specified {@code session}.
-     *
-     * TBD: This method should probably just obtain the ID from the managed
-     * reference to the client session (i.e., call 'getManagedRefBytes' to
-     * obtain ID).  This is more efficient though.
      */
     private static byte[] getSessionIdBytes(ClientSession session) {
-	if (session instanceof IdentityAssignment) {
-	    return ((IdentityAssignment) session).getIdBytes();
-	} else {
-	    throw new IllegalArgumentException(
-		"session does not implement IdentityAssignment: " +
-		session.getClass());
-	} 
+	return ChannelServiceImpl.getDataService().
+	    createReference(session).getId().toByteArray();
     }
 
     /**

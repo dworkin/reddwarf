@@ -56,7 +56,7 @@ public class ClientSessionImpl
     private static final String PKG_NAME = "com.sun.sgs.impl.service.session.";
 
     /** The prefix to add before a client session ID in a session key. */
-    private static final String SESSION_COMPONENT = "proxy.";
+    private static final String SESSION_COMPONENT = "impl.";
 
     /** The prefix to add before a client session listener in a listener key. */
     private static final String LISTENER_COMPONENT = "listener.";
@@ -64,9 +64,6 @@ public class ClientSessionImpl
     /** The node component session node keys. */
     private static final String NODE_COMPONENT = "node.";
 
-    /** The message queue component of a key. */
-    private static final String MSGQ_COMPONENT = "msgq";
-	
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "impl"));
@@ -75,16 +72,16 @@ public class ClientSessionImpl
     private transient ClientSessionServiceImpl sessionService;
 
     /** The session ID. */
-    private volatile BigInteger id;
+    private transient BigInteger id;
 
     /** The session ID bytes. */
-    private volatile byte[] idBytes;
+    private final byte[] idBytes;
     
     /** The identity for this session. */
-    private volatile Identity identity;
+    private final Identity identity;
 
-    /** The node ID for this session. */
-    private volatile long nodeId;
+    /** The node ID for this session (final because sessions can't move yet). */
+    private final long nodeId;
 
     /** The client session server (possibly remote) for this client session. */
     private final ClientSessionServer sessionServer;
@@ -98,39 +95,43 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}.  The session's ID, identity, and nodeId are
-     * set when this instance is persisted.
+     * sessionService}, {@code identity}. and the local node ID, and 
+     * stores the state associated with this instance in the specified
+     * {@code dataService} with the following bindings:<p>
+     *
+     * <pre>
+     * com.sun.sgs.impl.service.session.impl.<idBytes>
+     * com.sun.sgs.impl.service.session.node.<nodeId>.impl.<idBytes>
+     *</pre>
+     * This method should only be called within a transaction.
      *
      * @param	sessionService a client session service
+     * @throws TransactionException if there is a problem with the
+     * 		current transaction
      */
-    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+    ClientSessionImpl(ClientSessionServiceImpl sessionService,
+		      Identity identity)
+    {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
 	}
+	if (identity == null) {
+	    throw new IllegalStateException("session's identity is not set");
+	}
 	this.sessionService = sessionService;
 	this.sessionServer = sessionService.getServerProxy();
+	this.identity = identity;
+	this.nodeId = sessionService.getLocalNodeId();
+	DataService dataService = sessionService.getDataService();
+	ManagedReference sessionRef = dataService.createReference(this);
+	id = sessionRef.getId();
+	idBytes = id.toByteArray();
+	dataService.setServiceBinding(getSessionKey(idBytes), this);
+	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
+	logger.log(Level.FINEST, "Stored session, identity:{0} id:{1}",
+		   identity, id);
     }
 
-    /**
-     * Constructs an instance from the specified fields in the
-     * external form.
-     */
-    private ClientSessionImpl(ClientSessionServiceImpl sessionService,
-			      byte[] idBytes,
-			      Identity identity,
-			      long nodeId,
-			      ClientSessionServer sessionServer,
-			      boolean connected)
-    {
-	this.sessionService = sessionService;
-	this.idBytes = idBytes;
-	this.id = new BigInteger(1, idBytes);
-	this.identity = identity;
-	this.nodeId = nodeId;
-	this.sessionServer = sessionServer;
-	this.connected = connected;
-    }
-    
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
@@ -205,17 +206,6 @@ public class ClientSessionImpl
 	return identity;
     }
 
-    /** {@inheritDoc} */
-    public BigInteger getId() {
-	logger.log(Level.FINEST, "getSessionId returns {0}", id);
-        return id;
-    }
-
-    /** {@inheritDoc} */
-    public byte[] getIdBytes() {
-	return idBytes;
-    }
-    
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
@@ -258,95 +248,26 @@ public class ClientSessionImpl
     
     /* -- Serialization methods -- */
 
-    private Object writeReplace() {
-	return
-	    new External(idBytes, identity, nodeId, sessionServer, connected);
-    }
-
-    /**
-     * Represents the persistent form of a client session.
-     */
-    private final static class External implements Serializable {
-
-	private final static long serialVersionUID = 1L;
-
-	private final byte[] idBytes;
-        private final Identity identity;
-	private final long nodeId;
-	private final ClientSessionServer sessionServer;
-	private final boolean connected;
-
-	External(byte[] idBytes,
-		 Identity identity,
-		 long nodeId,
-		 ClientSessionServer sessionServer,
-		 boolean connected)
-	{
-	    this.idBytes = idBytes;
-            this.identity = identity;
-	    this.nodeId = nodeId;
-	    this.sessionServer = sessionServer;
-	    this.connected = connected;
-	}
-
-	private void writeObject(ObjectOutputStream out) throws IOException {
-	    out.defaultWriteObject();
-	}
-
-	private void readObject(ObjectInputStream in)
-	    throws IOException, ClassNotFoundException
-	{
-	    in.defaultReadObject();
-	}
-
-	private Object readResolve() throws ObjectStreamException {
-	    ClientSessionServiceImpl sessionService =
-		ClientSessionServiceImpl.getInstance();
-	    ClientSessionImpl sessionImpl = null;
-	    if (nodeId == sessionService.getLocalNodeId()) {
-		sessionImpl =
-		    sessionService.getLocalClientSessionImpl(idBytes);
-	    }
-	    if (sessionImpl == null) {
-		sessionImpl = new ClientSessionImpl(
-		    sessionService, idBytes, identity, nodeId,
-		    sessionServer, connected);
-	    }
-	    return sessionImpl;
-	}
+    private void readObject(ObjectInputStream in)
+	throws IOException, ClassNotFoundException
+    {
+	in.defaultReadObject();
+	sessionService = ClientSessionServiceImpl.getInstance();
+	this.id = new BigInteger(1, idBytes);
     }
 
     /* -- Other methods -- */
 
     /**
-     * Stores the state associated with this instance in the specified
-     * {@code dataService} with the following bindings:<p>
+     * Returns the ID of this instance as a {@code BigInteger}.
      *
-     * <pre>
-     * com.sun.sgs.impl.service.session.proxy.<idBytes>
-     * com.sun.sgs.impl.service.session.node.<nodeId>.proxy.<idBytes>
-     *</pre>
-     * This method should only be called within a transaction.
-     *
-     * @param	dataService a data service
-     * @throws TransactionException if there is a problem with the
-     * 		current transaction
+     * @return	the ID of this instance as a {@code BigInteger}
      */
-    void putSession(DataService dataService) {
-	if (identity == null) {
-	    throw new IllegalStateException("session's identity is not set");
-	}
-	ManagedReference sessionRef = dataService.createReference(this);
-	id = sessionRef.getId();
-	idBytes = id.toByteArray();
-	dataService.setServiceBinding(getSessionKey(idBytes), this);
-	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
-	dataService.setServiceBinding(getMessageQueueKey(idBytes),
-				      new ManagedQueue<ProtocolMessage>());
-	logger.log(Level.FINEST, "Stored session, identity:{0} id:{1}",
-		   identity, id);
+    BigInteger getId() {
+	logger.log(Level.FINEST, "getSessionId returns {0}", id);
+        return id;
     }
-
+    
     /**
      * Returns the {@code ClientSession} instance for the given {@code
      * id}, retrieved from the specified {@code dataService}, or
@@ -373,18 +294,6 @@ public class ClientSessionImpl
 	return sessionImpl;
     }
 
-    @SuppressWarnings("unchecked")
-    private ManagedQueue<ProtocolMessage>
-	getMessageQueue(DataService dataService)
-    {
-	try {
-	    return dataService.getBinding(
-		getMessageQueueKey(idBytes), ManagedQueue.class);
-	} catch (NameNotBoundException e) {
-	    return null;
-	}
-    }
-    
     /**
      * Invokes the {@code disconnected} callback on this session's
      * {@code ClientSessionListener} (if present), removes the
@@ -406,7 +315,6 @@ public class ClientSessionImpl
 	String sessionKey = getSessionKey(idBytes);
 	String sessionNodeKey = getSessionNodeKey(nodeId, idBytes);
 	String listenerKey = getListenerKey(idBytes);
-
 
 	/*
 	 * Get ClientSessionListener, and remove its binding and
@@ -444,22 +352,6 @@ public class ClientSessionImpl
 	}
 
 	/*
-	 * Remove message queue.
-	 */
-	ManagedQueue<ProtocolMessage> mqueue = getMessageQueue(dataService);
-	if (mqueue != null) {
-	    try {
-		dataService.removeServiceBinding(getMessageQueueKey(idBytes));
-		dataService.removeObject(mqueue);
-	    } catch (NameNotBoundException e) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "removing message queue binding for session:{0} throws",
-		    this);
-	    }
-	}
-	
-	/*
 	 * Remove this session's state and bindings.
 	 */
 	try {
@@ -480,19 +372,6 @@ public class ClientSessionImpl
 	return sessionServer;
     }
 	    
-    /**
-     * Sets the identity to the specified one.  This method should be
-     * called outside of a transaction to set the non-final fields of
-     * this instance before it is stored in the data service.
-     */
-    void setIdentityAndNodeId(Identity identity, long nodeId) {
-	if (identity == null) {
-	    throw new NullPointerException("null identity");
-	}
-	this.identity = identity;
-	this.nodeId = nodeId;
-    }
-
     /**
      * Sets this session's state to disconnected.
      */
@@ -526,11 +405,6 @@ public class ClientSessionImpl
     private static String getListenerKey(byte[] idBytes) {
 	return
 	    PKG_NAME + LISTENER_COMPONENT + HexDumper.toHexString(idBytes);
-    }
-
-    private static String getMessageQueueKey(byte[] idBytes) {
-	return
-	    PKG_NAME + MSGQ_COMPONENT + HexDumper.toHexString(idBytes);
     }
 
     /**

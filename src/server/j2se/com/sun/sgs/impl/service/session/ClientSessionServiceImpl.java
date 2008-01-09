@@ -335,24 +335,9 @@ public class ClientSessionServiceImpl
 	}
 	// TBD: is this method invocation necessary?
 	checkLocalNodeAlive();
-	ClientSession session = getLocalClientSession(sessionId);
 	return
-	    (session != null) ?
-	    session :
 	    ClientSessionImpl.getSession(
 		dataService, new BigInteger(1, sessionId));
-    }
-
-    /** {@inheritDoc} */
-    public ClientSession getLocalClientSession(byte[] sessionId) {
-	if (sessionId == null) {
-	    throw new NullPointerException("null sessionId");
-	}
-	ClientSessionHandler handler = getHandler(sessionId);
-	return
-	    (handler != null) ?
-	    handler.getClientSession() :
-	    null;
     }
 
     /** {@inheritDoc} */
@@ -362,15 +347,6 @@ public class ClientSessionServiceImpl
 	checkContext().addMessage(
 	    getClientSessionImpl(session), message, delivery);
     }
-
-    /** {@inheritDoc} */
-    public void runTask(ClientSession session, Runnable task)
-    {
-	checkContext().addTask(
-	    (session == null ? null : getClientSessionImpl(session)),
-	    task);
-    }
-
 
     /**
      * Checks if the local node is considered alive, and throws an
@@ -408,10 +384,10 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void sendProtocolMessageNonTransactional(
-	ClientSession session, byte[] message, Delivery delivery)
+	byte[] sessionId, byte[] message, Delivery delivery)
     {
-	BigInteger sessionId = ((IdentityAssignment) session).getId();
-	ClientSessionHandler handler = handlers.get(sessionId);
+	BigInteger sessionRefId = new BigInteger(1, sessionId);
+	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
 	 * If a local handler exists, forward message to local handler
 	 * to send to client session.
@@ -422,7 +398,7 @@ public class ClientSessionServiceImpl
 	    logger.log(
 		Level.FINE,
 		"Discarding messages for unknown session:{0}",
-		session);
+		sessionRefId);
 		return;
 	}
     }
@@ -486,9 +462,6 @@ public class ClientSessionServiceImpl
         private final Map<ClientSessionImpl, CommitActions> sessionCommitActions =
 	    new HashMap<ClientSessionImpl, CommitActions>();
 
-	private final CommitActions otherCommitActions =
-	    new CommitActions(null);
-
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
@@ -514,32 +487,6 @@ public class ClientSessionServiceImpl
 	    ClientSessionImpl session, byte[] message, Delivery delivery)
 	{
 	    addMessage0(session, message, delivery, true);
-	}
-
-	void addTask(ClientSessionImpl session, Runnable task) {
-	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"Context.addTask session:{0}, task:{1}",
-			session, task);
-		}
-		checkPrepared();
-
-		if (session != null) {
-		    getCommitActions(session).addTask(task);
-		} else {
-		    otherCommitActions.addTask(task);
-		}
-	    
-	    } catch (RuntimeException e) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(
-			Level.FINE, e,
-			"Context.addMessage exception");
-                }
-                throw e;
-            }
 	}
 
 	/**
@@ -621,9 +568,7 @@ public class ClientSessionServiceImpl
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly =
-		sessionCommitActions.values().isEmpty() &&
-		otherCommitActions.isEmpty();
+	    boolean readOnly = sessionCommitActions.values().isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
 	    }
@@ -676,7 +621,6 @@ public class ClientSessionServiceImpl
 		for (CommitActions actions : sessionCommitActions.values()) {
 		    actions.flush();
 		}
-		otherCommitActions.flush();
 		return true;
 	    } else {
 		return false;
@@ -723,10 +667,6 @@ public class ClientSessionServiceImpl
 	    
 	}
 	
-	void addTask(Runnable task) {
-	    actions.add(new RunTaskAction(task));
-	}
-
 	void setDisconnect() {
 	    if (sessionImpl == null) {
 		throw new UnsupportedOperationException(
@@ -836,30 +776,7 @@ public class ClientSessionServiceImpl
 		}
 	    }
 	}
-
-	private class RunTaskAction extends Action {
-
-	    private final Runnable task;
-
-	    RunTaskAction(Runnable task) {
-		this.task = task;
-	    }
-
-	    void doAction() {
-		try {
-		    task.run();
-		} catch (Exception e) {
-		    logger.logThrow(
- 			Level.WARNING, e,
-			"Running task:{0} for session:{1} throws",
-			task, sessionImpl);
-		}
-	    }
-	}
     }
-
-
-    
 
     /**
      * Thread to process the context queue, in order, to flush any
@@ -1023,18 +940,6 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Returns the {@code ClientSessionImpl} for the specified session
-     * {@code idBytes}.
-     *
-     * @param	idBytes a session ID
-     * @return	a client session impl
-     */
-    ClientSessionImpl getLocalClientSessionImpl(byte[] idBytes) {
-	ClientSessionHandler handler = getHandler(idBytes);
-	return (handler != null) ? handler.getClientSession() : null;
-    }
-
-    /**
      * Returns the local node's ID.
      * @return	the local node's ID
      */
@@ -1102,14 +1007,14 @@ public class ClientSessionServiceImpl
      * Adds the handler for the specified sessions to the internal
      * session map.
      */
-    void connected(ClientSessionHandler handler) {
-	handlers.put(handler.getId(), handler);
+    void connected(BigInteger sessionRefid, ClientSessionHandler handler) {
+	handlers.put(sessionRefid, handler);
     }
     
     /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(ClientSessionImpl session) {
+    void disconnected(BigInteger sessionRefId) {
 	if (shuttingDown()) {
 	    return;
 	}
@@ -1117,9 +1022,9 @@ public class ClientSessionServiceImpl
 	for (ProtocolMessageListener serviceListener :
 		 serviceListeners.values())
 	{
-	    serviceListener.disconnected(session);
+	    serviceListener.disconnected(sessionRefId.toByteArray());
 	}
-	handlers.remove(session.getId());
+	handlers.remove(sessionRefId);
     }
 
     /**

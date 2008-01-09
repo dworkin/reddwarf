@@ -19,7 +19,6 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.app.ClientSession;
 
 /**
  * Listener for protocol messages and session disconnection events.  A
@@ -38,16 +37,16 @@ public interface ProtocolMessageListener {
      * Notifies this listener that the specified protocol
      * message has been received by the specified client session.
      *
-     * @param	session a client session
+     * @param	sessionId a client session ID
      * @param	message a protocol message
      */
-    void receivedMessage(ClientSession session, byte[] message);
+    void receivedMessage(byte[] sessionId, byte[] message);
 
     /**
      * Notifies this listener that the specified client session has
      * become disconnected.
      *
-     * @param	session a client session
+     * @param	sessionId a client session ID
      */
-    void disconnected(ClientSession session);
+    void disconnected(byte[] sessionId);
 }

@@ -444,17 +444,10 @@ public class ChannelServiceImpl
 		}
 
 		for (BigInteger sessionId : localMembers) {
-		    ClientSession session =
-			sessionService.getLocalClientSession(
-			    sessionId.toByteArray());
-		    if (session == null) {
-			// TBD: session probably got disconnected, so
-			// remove from list here?
-		    } else {
-			sessionService.sendProtocolMessageNonTransactional(
-			    session, message, Delivery.RELIABLE);
-		    }
+		    sessionService.sendProtocolMessageNonTransactional(
+ 			sessionId.toByteArray(), message, Delivery.RELIABLE);
 		}
+
 	    } finally {
 		callFinished();
 	    }
@@ -735,12 +728,13 @@ public class ChannelServiceImpl
 	 * with the ProtocolMessageListener API.  The ClientSessionService
 	 * no longer dispatches messages to protocol message listeners.
 	 */
-	public void receivedMessage(final ClientSession session, byte[] message) {
+	public void receivedMessage(byte[] sessionId, byte[] message) {
 	    if (logger.isLoggable(Level.SEVERE)) {
 		logger.log(
 		    Level.SEVERE,
 		    "unexpected message: session:{0} message:{1}",
-		    session, HexDumper.format(message));
+		    HexDumper.toHexString(sessionId),
+		    HexDumper.format(message));
 	    }
 	}
 
@@ -752,25 +746,21 @@ public class ChannelServiceImpl
 	 * ChannelService can register interest in receiving notification
 	 * when the client session is removed.
 	 */
-	public void disconnected(final ClientSession session) {
+	public void disconnected(final byte[] sessionId) {
 	    /*
 	     * Schedule a transactional task to remove the
 	     * disconnected session from all channels that it is
-	     * currently a member of (unless the session has a null
-	     * identity, which means the session was not logged in, so
-	     * it can't be a member of any channel).
+	     * currently a member of.
 	     */
-	    Identity identity = ((IdentityAssignment) session).getIdentity();
-	    if (identity != null) {
-		taskScheduler.scheduleTask(
- 		     new TransactionRunner(
-			new AbstractKernelRunnable() {
-			    public void run() {
-				ChannelImpl.removeSessionFromAllChannels(session);
+	    taskScheduler.scheduleTask(
+ 		 new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    ChannelImpl.removeSessionFromAllChannels(
+				localNodeId, sessionId);
 			    }
-			}),
-		     new TaskOwnerImpl(identity, taskOwner.getContext()));
-	    }
+		    }),
+		 taskOwner);
 	}
     }
 
