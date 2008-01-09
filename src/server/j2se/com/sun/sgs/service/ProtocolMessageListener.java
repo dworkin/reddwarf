@@ -19,6 +19,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.app.ClientSession;
+
 /**
  * Listener for protocol messages and session disconnection events.  A
  * service can register a {@code ProtocolMessageListener} and
@@ -39,7 +41,7 @@ public interface ProtocolMessageListener {
      * @param	session a client session
      * @param	message a protocol message
      */
-    void receivedMessage(SgsClientSession session, byte[] message);
+    void receivedMessage(ClientSession session, byte[] message);
 
     /**
      * Notifies this listener that the specified client session has
@@ -47,5 +49,5 @@ public interface ProtocolMessageListener {
      *
      * @param	session a client session
      */
-    void disconnected(SgsClientSession session);
+    void disconnected(ClientSession session);
 }
