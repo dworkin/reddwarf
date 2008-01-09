@@ -47,7 +47,7 @@ import java.util.logging.Logger;
  * Implements a client session (proxy).
  */
 public class ClientSessionImpl
-    implements ClientSession, NodeAssignment, IdentityAssignment, Serializable
+    implements ClientSession, NodeAssignment, Serializable
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -198,14 +198,6 @@ public class ClientSessionImpl
 	return nodeId;
     }
     
-    /* -- Implement IdentityAssignment -- */
-
-    /** {@inheritDoc} */
-    public Identity getIdentity() {
-        logger.log(Level.FINEST, "getIdentity returns {0}", identity);
-	return identity;
-    }
-
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
