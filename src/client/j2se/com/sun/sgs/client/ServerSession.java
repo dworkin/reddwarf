@@ -52,10 +52,15 @@ public interface ServerSession {
 
     /**
      * Sends the message contained in the specified {@code ByteBuffer} to
-     * the server. The specified message is sent asynchronously to the server;
+     * the server, starting at the current position of the buffer.
+     * The specified message is sent asynchronously to the server;
      * therefore, a successful invocation of this method does not indicate
      * that the given message was successfully sent. Messages that are
      * received by the server are delivered in sending order.
+     * <p>
+     * The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the server by this invocation.
      *
      * @param message a message
      *

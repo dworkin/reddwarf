@@ -56,7 +56,7 @@ public interface ServerSessionListener {
      * Notifies this listener that the specified message was sent by the
      * server.
      * 
-     * @param message a message
+     * @param message a read-only {@link ByteBuffer} containing the message
      */
     void receivedMessage(ByteBuffer message);
 

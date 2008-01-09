@@ -385,7 +385,7 @@ public class SimpleClient implements ServerSession {
                 checkLoggedIn();
                 byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
                 ByteBuffer buf = ByteBuffer.wrap(msgBytes);
-                clientListener.receivedMessage(buf);
+                clientListener.receivedMessage(buf.asReadOnlyBuffer());
                 break;
             }
 
