@@ -223,7 +223,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2008 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -251,7 +251,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2008 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -282,7 +282,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2008 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
