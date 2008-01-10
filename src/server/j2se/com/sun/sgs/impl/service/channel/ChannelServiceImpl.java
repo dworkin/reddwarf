@@ -21,12 +21,10 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -200,14 +198,14 @@ public class ChannelServiceImpl
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
-	    runTransactionally(
+	    taskScheduler.runTransactionalTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
 			    new ChannelServerWrapper(serverProxy));
-		    }}
-		);
+		    }},
+		taskOwner);
 
 	    /*
 	     * Add listeners for handling recovery and for handling
@@ -868,7 +866,7 @@ public class ChannelServiceImpl
 		 * given session from all channels it is a member of.
 		 */
 		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
-		runTransactionally(task);
+		taskScheduler.runTransactionalTask(task, taskOwner);
 		
 		for (final byte[] sessionId : task.getSessionIds()) {
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -878,24 +876,26 @@ public class ChannelServiceImpl
 			    HexDumper.toHexString(sessionId));
 		    }
 		    
-		    runTransactionally(
+		    taskScheduler.runTransactionalTask(
 			new AbstractKernelRunnable() {
 			    public void run() {
 				ChannelImpl.removeSessionFromAllChannels(
 				    nodeId, sessionId);
 			    }
-			});
+			},
+			taskOwner);
 		}
 		/*
 		 * Remove binding to channel server proxy for failed
 		 * node, and remove proxy's wrapper.
 		 */
-		runTransactionally(
+		taskScheduler.runTransactionalTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    removeChannelServerProxy(nodeId);
 			}
-		    });
+		    },
+		    taskOwner);
 		
 		future.done();
 

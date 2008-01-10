@@ -207,7 +207,9 @@ class ClientSessionHandler {
 	    }
 	}
 
-	sessionService.disconnected(sessionRefId);
+	if (sessionRefId != null) {
+	    sessionService.disconnected(sessionRefId);
+	}
 	
 	if (identity != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
@@ -244,17 +246,16 @@ class ClientSessionHandler {
 	    }
 	}
 
-	scheduleTask(new AbstractKernelRunnable() {
-	    public void run() throws IOException {
-		ClientSessionImpl sessionImpl = null;
-		if (sessionRefId != null) {
-		    sessionImpl = ClientSessionImpl.getSession(dataService, sessionRefId);
-		}
-		if (sessionImpl != null) {
+	if (sessionRefId != null) {
+	    scheduleTask(new AbstractKernelRunnable() {
+		public void run() throws IOException {
+		    ClientSessionImpl sessionImpl = 
+			ClientSessionImpl.getSession(dataService, sessionRefId);
 		    sessionImpl.
 			notifyListenerAndRemoveSession(dataService, graceful);
 		}
-	    }});
+	    });
+	}
     }
 
     /**

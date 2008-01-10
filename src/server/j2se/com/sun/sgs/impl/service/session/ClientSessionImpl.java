@@ -30,13 +30,10 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -95,9 +92,8 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}. and the local node ID, and 
-     * stores the state associated with this instance in the specified
-     * {@code dataService} with the following bindings:<p>
+     * sessionService}, {@code identity}. and the local node ID, and stores
+     * this instance with the following bindings:<p>
      *
      * <pre>
      * com.sun.sgs.impl.service.session.impl.<idBytes>
@@ -106,6 +102,7 @@ public class ClientSessionImpl
      * This method should only be called within a transaction.
      *
      * @param	sessionService a client session service
+     * @param	identity tbe session's identity
      * @throws TransactionException if there is a problem with the
      * 		current transaction
      */
@@ -368,6 +365,7 @@ public class ClientSessionImpl
      * Sets this session's state to disconnected.
      */
     void setDisconnected() {
+	sessionService.getDataService().markForUpdate(this);
 	connected = false;
     }
 	

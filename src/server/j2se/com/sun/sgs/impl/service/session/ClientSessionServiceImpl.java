@@ -349,18 +349,6 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Checks if the local node is considered alive, and throws an
-     * {@code IllegalStateException} if the node is no loger alive.
-     * This method should be called within a transaction.
-     */
-    private void checkLocalNodeAlive() {
-	if (! watchdogService.isLocalNodeAlive()) {
-	    throw new IllegalStateException(
-		"local node is not considered alive");
-	}
-    }
-
-    /**
      * Sends the specified protocol {@code message} to the specified
      * client {@code session} with the specified {@code delivery}
      * guarantee.  This method must be called within a transaction.
@@ -459,7 +447,7 @@ public class ClientSessionServiceImpl
 
 	/** Map of client sessions to an object containing a list of
 	 * actions to make upon transaction commit. */
-        private final Map<ClientSessionImpl, CommitActions> sessionCommitActions =
+        private final Map<ClientSessionImpl, CommitActions> commitActions =
 	    new HashMap<ClientSessionImpl, CommitActions>();
 
 	/**
@@ -540,12 +528,15 @@ public class ClientSessionServiceImpl
             }
 	}
 
+	/**
+	 * Returns the commit actions for the given {@code session}.
+	 */
 	private CommitActions getCommitActions(ClientSessionImpl session) {
 
-	    CommitActions actions = sessionCommitActions.get(session);
+	    CommitActions actions = commitActions.get(session);
 	    if (actions == null) {
 		actions = new CommitActions(session);
-		sessionCommitActions.put(session, actions);
+		commitActions.put(session, actions);
 	    }
 	    return actions;
 	}
@@ -568,7 +559,7 @@ public class ClientSessionServiceImpl
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly = sessionCommitActions.values().isEmpty();
+	    boolean readOnly = commitActions.values().isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
 	    }
@@ -618,7 +609,7 @@ public class ClientSessionServiceImpl
 	    if (shuttingDown()) {
 		return false;
 	    } else if (isCommitted) {
-		for (CommitActions actions : sessionCommitActions.values()) {
+		for (CommitActions actions : commitActions.values()) {
 		    actions.flush();
 		}
 		return true;
@@ -643,6 +634,9 @@ public class ClientSessionServiceImpl
 	private boolean disconnect = false;
 
 	CommitActions(ClientSessionImpl sessionImpl) {
+	    if (sessionImpl == null) {
+		throw new NullPointerException("null session");
+	    }
 	    this.sessionImpl = sessionImpl;
 	}
 
@@ -651,12 +645,8 @@ public class ClientSessionServiceImpl
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {
-	    if (sessionImpl == null) {
-		throw new UnsupportedOperationException(
-		    "addMessage not supported if sessionImpl is null");
-	    }
-	    if (isFirst) {
-		actions.add(new SendMessageAction(message));
+ 	    if (isFirst) {
+		actions.add(0, new SendMessageAction(message));
 	    } else {
 		if (actions.isEmpty() ||
 		    ! actions.get(actions.size()-1).addMessage(message))
@@ -691,16 +681,17 @@ public class ClientSessionServiceImpl
 	    }
 	}
 
+	/**
+	 * Represents an action.
+	 *
+	 
+	 */
 	private abstract class Action {
 
 	    boolean addMessage(byte[] message) {
 		return false;
 	    }
-
-	    boolean addTask(KernelRunnable task) {
-		return false;
-	    }
-
+	    
 	    abstract void doAction();
 	}
 
@@ -733,6 +724,7 @@ public class ClientSessionServiceImpl
 			  Level.FINE,
 			    "Discarding messages for disconnected session:{0}",
 			handler);
+			return;
 		    }
 		    for (byte[] message : messages) {
 			handler.sendProtocolMessage(message, Delivery.RELIABLE);
@@ -857,12 +849,6 @@ public class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-	public boolean isConnected(byte[] sessionId) {
-	    ClientSessionHandler handler = getHandler(sessionId);
-	    return handler != null && handler.isConnected();
-	}
-
-	/** {@inheritDoc} */
 	public boolean sendProtocolMessage(
  	    byte[] idBytes, long seq, byte[] message, Delivery delivery)
 	{
@@ -968,6 +954,18 @@ public class ClientSessionServiceImpl
 	}
     }
     
+    /**
+     * Checks if the local node is considered alive, and throws an
+     * {@code IllegalStateException} if the node is no loger alive.
+     * This method should be called within a transaction.
+     */
+    private void checkLocalNodeAlive() {
+	if (! watchdogService.isLocalNodeAlive()) {
+	    throw new IllegalStateException(
+		"local node is not considered alive");
+	}
+    }
+
    /**
      * Obtains information associated with the current transaction,
      * throwing TransactionNotActiveException if there is no current
@@ -1004,15 +1002,18 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Adds the handler for the specified sessions to the internal
-     * session map.
+     * Adds the handler for the specified session to the internal
+     * session handler map.  This method is invoked by the handler once the
+     * client has succesfully logged in.
      */
-    void connected(BigInteger sessionRefid, ClientSessionHandler handler) {
-	handlers.put(sessionRefid, handler);
+    void connected(BigInteger sessionRefId, ClientSessionHandler handler) {
+	handlers.put(sessionRefId, handler);
     }
     
     /**
-     * Removes the specified session from the internal session map.
+     * Removes the specified session from the internal session  handler
+     * map.  This method is invoked by the handler when the session becomes
+     * disconnected.
      */
     void disconnected(BigInteger sessionRefId) {
 	if (shuttingDown()) {
@@ -1076,7 +1077,12 @@ public class ClientSessionServiceImpl
     private class ClientSessionServiceRecoveryListener
 	implements RecoveryListener
     {
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: Recovery (due to being possibly-lengthy) should not be
+	 * performed in this remote method.  Recovery operations should
+	 * be performed in a separate thread.
+	 */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    try {
 		taskScheduler.runTransactionalTask(

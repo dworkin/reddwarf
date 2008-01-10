@@ -30,21 +30,6 @@ import java.rmi.Remote;
 public interface ClientSessionServer extends Remote {
 
     /**
-     * Returns {@code true} if the client session with the
-     * specified {@code sessionId} is connected, otherwise returns
-     * {@code false}.
-     *
-     * @param	sessionId a session ID
-     * @return	{@code true} if the client session with the specified
-     * 		{@code sessionId} is connected to this server, otherwise
-     *		{@code false}
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    boolean isConnected(byte[] sessionId)
-	throws IOException;
-    
-    /**
      * If a client session with the specified {@code sessionId} is
      * connected to this server, sends the specified protocol {@code
      * message} according to the specified {@code delivery} and
