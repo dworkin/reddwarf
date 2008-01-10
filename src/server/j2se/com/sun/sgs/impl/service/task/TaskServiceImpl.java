@@ -28,6 +28,8 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.app.util.ScalableHashSet;
+
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -52,6 +54,8 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -116,7 +120,7 @@ import java.util.logging.Logger;
  * The delay may be changed using the property {@code VOTE_DELAY_PROPERTY}.
  */
 public class TaskServiceImpl implements ProfileProducer, TaskService,
-                                        NodeMappingListener {
+                                        NodeMappingListener, RecoveryListener {
 
     /**
      * The identifier used for this {@code Service}.
@@ -289,10 +293,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         // register for identity mapping updates
         nodeMappingService.addNodeMappingListener(this);
 
-        // get the current node id for the hand-off namespace
-        nodeId = transactionProxy.getService(WatchdogService.class).
-            getLocalNodeId();
+        // get the current node id for the hand-off namespace, and register
+        // for recovery notices to manage cleanup of hand-off bindings
+        WatchdogService watchdogService =
+            transactionProxy.getService(WatchdogService.class);
+        nodeId = watchdogService.getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
+        watchdogService.addRecoveryListener(this);
 
         // get the start delay and the length of time between hand-off checks
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -389,30 +396,49 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         handoffTaskHandle.cancel();
         statusUpdateTimer.cancel();
 
-        // remove the node-local handoff set and binding
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void recover(Node node, RecoveryCompleteFuture future) {
+        final long failedNodeId =  node.getId();
+        final String handoffSpace = DS_HANDOFF_SPACE + failedNodeId;
+
+        // remove the handoff set and binding for the failed node
         try {
-            taskScheduler.runTask(new TransactionRunner(new KernelRunnable() {
+            taskScheduler.runTransactionalTask(new KernelRunnable() {
                     public String getBaseTaskType() {
                         return NAME + ".HandoffCleanupRunner";
                     }
                     public void run() throws Exception {
-                        StringHashSet set =
-                            dataService.getServiceBinding(localHandoffSpace,
-                                                          StringHashSet.class);
+                        StringHashSet set = null;
+                        try {    
+                            set = dataService.
+                                getServiceBinding(handoffSpace,
+                                                  StringHashSet.class);
+                        } catch (NameNotBoundException nnbe) {
+                            // this only happens when this recover method
+                            // is called more than once, and just means that
+                            // this cleanup has already happened, so we can
+                            // quietly ignore this case
+                            return;
+                        }
                         dataService.removeObject(set);
-                        dataService.removeServiceBinding(localHandoffSpace);
-                    }
-                }), appOwner, true);
+                        dataService.removeServiceBinding(handoffSpace);
+                        if (logger.isLoggable(Level.INFO))
+                            logger.log(Level.INFO, "Cleaned up handoff set " +
+                                       "for failed node: " + failedNodeId);
+                   }
+                }, appOwner);
         } catch (Exception e) {
-            logger.logThrow(Level.WARNING, e, "Failed to remove handoff " +
-                            "entry during shutdown");
-            return false;
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e, "Failed to cleanup handoff " +
+                                "set for failed node: " + failedNodeId);
         }
 
-        // FIXME: when the recovery service is ready, use it to do the same
-        // removal so that we cleanup after failed nodes too
-
-        return true;
+        future.done();
     }
 
     /**
@@ -1130,15 +1156,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     }
 
     /** A private extension of HashSet to provide type info. */
-    // TODO: this was originally a ScalableHashSet, but these can't be
-    // removed from the data store on shutdown because they want to use
-    // the Task Service to schedule cleanup tasks, and the Recovery
-    // Service isn't available yet to move the removal to recovery
-    // notifications...when the Recovery Service is available, this
-    // hand-off structure should be updated
-    private static class StringHashSet extends HashSet<String>
-        implements ManagedObject
-    {
+    private static class StringHashSet extends ScalableHashSet<String> {
         private static final long serialVersionUID = 1;
     }
 

@@ -32,15 +32,15 @@ import java.util.Properties;
 
 /**
  * A text-output listener that generates task-periodic summary reports
- * about the performance of tasks being exexcuted by a server.  Each
+ * about the performance of tasks being executed by a server.  Each
  * report summaries a fixed number of tasks.  The number of tasks
  * summarized can be modified by setting the {@code
- * com.sun.sgs.kernel.profile.summary.window} property in the system
+ * com.sun.sgs.profile.listener.window.size} property in the system
  * properties.  The default number of tasks is {@code 5000}.
  *
  * <p>
  * 
- * Each report is structed like the following example:
+ * Each report is structured like the following example:
  * <p><pre>
  * past 5000 tasks:
  *   mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
@@ -52,15 +52,6 @@ import java.util.Properties;
  *   mean ready count: 3.98,  mean lag time: 9.75ms
  *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
  * </pre>
- *
- * <p>
- *
- * Note that this class uses a fixed number of tasks between outputs,
- * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.profile.listener.window.size} property in the
- * application properties file.  The default window size for this
- * class is {@code 5000}.
  *
  * <p>
  *
