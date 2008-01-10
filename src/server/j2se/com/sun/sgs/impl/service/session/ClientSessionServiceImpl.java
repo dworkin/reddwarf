@@ -28,6 +28,7 @@ import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -559,7 +560,7 @@ public class ClientSessionServiceImpl
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly = commitActions.values().isEmpty();
+	    boolean readOnly = commitActions.isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
 	    }
@@ -624,94 +625,55 @@ public class ClientSessionServiceImpl
      */
     private class CommitActions {
 
-	/** The client session. */
-	private final ClientSessionImpl sessionImpl;
+	/** The client session ID as a BigInteger. */
+	private final BigInteger sessionRefId;
+
+	/** The client session server for the session. */
+	private final ClientSessionServer sessionServer;
 	
 	/** List of protocol messages to send on commit. */
-	private List<Action> actions = new ArrayList<Action>();
+	private List<byte[]> messages = new ArrayList<byte[]>();
 
 	/** If true, disconnect after sending messages. */
 	private boolean disconnect = false;
 
 	CommitActions(ClientSessionImpl sessionImpl) {
 	    if (sessionImpl == null) {
-		throw new NullPointerException("null session");
-	    }
-	    this.sessionImpl = sessionImpl;
-	}
-
-	boolean isEmpty() {
-	    return actions.isEmpty();
+		throw new NullPointerException("null sessionImpl");
+	    } 
+	    this.sessionRefId = sessionImpl.getId();
+	    this.sessionServer = sessionImpl.getClientSessionServer();
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {
  	    if (isFirst) {
-		actions.add(0, new SendMessageAction(message));
+		messages.add(0, message);
 	    } else {
-		if (actions.isEmpty() ||
-		    ! actions.get(actions.size()-1).addMessage(message))
-		{
-		    actions.add(new SendMessageAction(message));
-		}
+		messages.add(message);
 	    }
 	    
 	}
 	
 	void setDisconnect() {
-	    if (sessionImpl == null) {
-		throw new UnsupportedOperationException(
-		    "setDisconnect not supported if sessionImpl is null");
-	    }
 	    disconnect = true;
 	}
 
 	void flush() {
-	    for (Action action : actions) {
-		action.doAction();
-	    }
+	    sendMessages();
 	    if (disconnect) {
-		BigInteger sessionId = sessionImpl.getId();
-		ClientSessionHandler handler = handlers.get(sessionId);
+		ClientSessionHandler handler = handlers.get(sessionRefId);
 		if (handler != null) {
 		    handler.handleDisconnect(false);
 		} else {
-		    // TBD: handle remote disconnect here...
+		    // TBD: This needs to be implemented.
 		    throw new AssertionError("not implemented");
 		}
 	    }
 	}
 
-	/**
-	 * Represents an action.
-	 *
-	 
-	 */
-	private abstract class Action {
+	void sendMessages() {
 
-	    boolean addMessage(byte[] message) {
-		return false;
-	    }
-	    
-	    abstract void doAction();
-	}
-
-	private class SendMessageAction extends Action {
-
-	    private final List<byte[]> messages = new ArrayList<byte[]>();
-
-	    SendMessageAction(byte[] message) {
-		messages.add(message);
-	    }
-	
-	    boolean addMessage(byte[] message) {
-		messages.add(message);
-		return true;
-	    }
-
-	    void doAction() {
-
-		BigInteger sessionId = sessionImpl.getId();
-		ClientSessionHandler handler = handlers.get(sessionId);
+		ClientSessionHandler handler = handlers.get(sessionRefId);
 		/*
 		 * If a local handler exists, forward messages to
 		 * local handler to send to client session; otherwise
@@ -731,14 +693,6 @@ public class ClientSessionServiceImpl
 		    }
 
 		} else {
-		    if (! sessionImpl.isConnected()) {
-			logger.log(
-			  Level.FINE,
-			    "Discarding messages for disconnected session:{0}",
-			sessionImpl);
-			return;
-		    }
-
 		    int size = messages.size();
 		    byte[][] messageData = new byte[size][];
 		    Delivery[] deliveryData = new Delivery[size];
@@ -748,26 +702,21 @@ public class ClientSessionServiceImpl
 			deliveryData[i] = Delivery.RELIABLE;
 			i++;
 		    }
-		
+
+		    byte[] sessionId = sessionRefId.toByteArray();
 		    try {
-			boolean connected = sessionImpl.getClientSessionServer().
-			    sendProtocolMessages(sessionId.toByteArray(), null,
-						 messageData,
-						 deliveryData);
-			if (! connected) {
-			    sessionImpl.setDisconnected();
-			}
+			sessionServer.sendProtocolMessages(
+			    sessionId, null, messageData, deliveryData);
+
 		    } catch (IOException e) {
 			logger.logThrow(
 		    	    Level.FINE, e,
 			    "Sending messages to session:{0} throws",
-			    sessionImpl);
-			// TBD: set the session as disconnected?
-			// sessionImpl.setDisconnected();
+			    HexDumper.toHexString(sessionId));
+			// TBD: retry?
 		    }
 		}
 	    }
-	}
     }
 
     /**
@@ -847,30 +796,6 @@ public class ClientSessionServiceImpl
      * forward messages to or disconnect local client sessions.
      */
     private class SessionServerImpl implements ClientSessionServer {
-
-	/** {@inheritDoc} */
-	public boolean sendProtocolMessage(
- 	    byte[] idBytes, long seq, byte[] message, Delivery delivery)
-	{
-	    BigInteger id = new BigInteger(1, idBytes);
-	    ClientSessionHandler handler = handlers.get(id);
-	    if (handler != null) {
-		if (handler.isConnected()) {
-		    handler.sendProtocolMessage(message, delivery);
-		    return true;
-		} else {
-		    logger.log (
-		    	Level.FINER,
-			"Unable to send message to disconnected session:{0}",
-			id);
-		}
-	    } else {
-		logger.log(
-		    Level.FINER,
-		    "Unable to send message to unknown session:{0}", id);
-	    }
-	    return false;
-	}
 
 	/** {@inheritDoc} */
 	public boolean sendProtocolMessages(byte[] sessionId,
@@ -1006,7 +931,7 @@ public class ClientSessionServiceImpl
      * session handler map.  This method is invoked by the handler once the
      * client has succesfully logged in.
      */
-    void connected(BigInteger sessionRefId, ClientSessionHandler handler) {
+    void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
 	handlers.put(sessionRefId, handler);
     }
     
@@ -1015,7 +940,7 @@ public class ClientSessionServiceImpl
      * map.  This method is invoked by the handler when the session becomes
      * disconnected.
      */
-    void disconnected(BigInteger sessionRefId) {
+    void removeHandler(BigInteger sessionRefId) {
 	if (shuttingDown()) {
 	    return;
 	}

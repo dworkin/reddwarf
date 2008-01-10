@@ -208,7 +208,7 @@ class ClientSessionHandler {
 	}
 
 	if (sessionRefId != null) {
-	    sessionService.disconnected(sessionRefId);
+	    sessionService.removeHandler(sessionRefId);
 	}
 	
 	if (identity != null) {
@@ -595,7 +595,7 @@ class ClientSessionHandler {
 		    sendLoginFailureAndDisconnect();
 		    return;
 		}
-		sessionService.connected(
+		sessionService.addHandler(
 		    sessionRefId, ClientSessionHandler.this);
 		scheduleTask(new LoginTask());
 		
