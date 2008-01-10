@@ -322,7 +322,9 @@
     <delete dir="${build.dir}/sgs-client-src"/>
     <copy todir="${build.dir}/sgs-client-src">
       <fileset dir="."
-	       excludes="**/.svn"
+	       excludes="**/.svn
+			 src/shared/j2se/com/sun/sgs/nio/**,
+			 src/shared/j2se/com/sun/sgs/impl/nio/**"
 	       includes="doc/ClientTutorial.*,
 			 example/c-client/**,
 			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
@@ -560,7 +562,9 @@
     <mkdir dir="${build.dir}/lib"/>
     <jar destfile="${build.dir}/lib/sgs-client.jar">
       <fileset dir="${build.dir}/classes/client"/>
-      <fileset dir="${build.dir}/classes/shared"/>
+      <fileset dir="${build.dir}/classes/shared"
+	       excludes="com/sun/sgs/nio/**,
+			 com/sun/sgs/impl/nio/**"/>
       <manifest>
         <attribute name="Class-Path"
 		   value="mina-core-1.1.jar
