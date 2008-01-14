@@ -377,22 +377,6 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(dummy, result);
     }
 
-    public void testGetBindingWrongType() throws Exception {
-	testGetBindingWrongType(true);
-    }
-    public void testGetServiceBindingWrongType() throws Exception {
-	testGetBindingWrongType(false);
-    }
-    private void testGetBindingWrongType(boolean app) throws Exception {
-	setBinding(app, service, "dummy", dummy);
-	try {
-	    getBinding(app, service, "dummy");
-	    fail("Expected ClassCastException");
-	} catch (ClassCastException e) {
-	    System.err.println(e);
-	}
-    }
-
     public void testGetBindingNotFound() throws Exception {
 	testGetBindingNotFound(true);
     }

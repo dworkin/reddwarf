@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.JUnit4TestAdapter;
@@ -842,7 +843,6 @@ public class TestScalableHashSet extends Assert {
     /* Test calling DataManager.removeObject on the set */
 
     @Test public void testRemoveObjectSet() throws Exception {
-	final AtomicInteger count = new AtomicInteger(0);
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
@@ -852,16 +852,11 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	DoneRemoving.await(1);
+	int count = getObjectCount();
 	taskScheduler.runTransactionalTask(
 	    new TestTask(new AbstractKernelRunnable() {
 		public void run() {
-		    count.set(getObjectCount());
 		    set = new ScalableHashSet<Object>();
-		}
-	    }), taskOwner);
-	taskScheduler.runTransactionalTask(
-	    new TestTask(new AbstractKernelRunnable() {
-		public void run() {
 		    for (int i = 0; i < 50; i++) {
 			set.add(random.nextInt());
 		    }
@@ -875,12 +870,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	DoneRemoving.await(1);
-	taskScheduler.runTransactionalTask(
-	    new TestTask(new AbstractKernelRunnable() {
-		public void run() {
-		    assertEquals(count.get(), getObjectCount());
-		}
-	    }), taskOwner);
+	assertEquals(count, getObjectCount());
     }
 
     /* -- Utilities -- */
@@ -949,19 +939,31 @@ public class TestScalableHashSet extends Assert {
 	}
     }
 
-    /** Returns the current number of objects. */
-    private int getObjectCount() {
-	int count = 0;
-	BigInteger last = null;
-	while (true) {
-	    BigInteger next = dataService.nextObjectId(last);
-	    if (next == null) {
-		break;
-	    }
-	    last = next;
-	    count++;
+    /** Returns the current number of objects, using its own transactions. */
+    private int getObjectCount() throws Exception {
+	final AtomicInteger countRef = new AtomicInteger(0);
+	final AtomicReference<BigInteger> lastRef =
+	    new AtomicReference<BigInteger>();
+	final AtomicBoolean done = new AtomicBoolean();
+	while (!done.get()) {
+	    taskScheduler.runTransactionalTask(
+		new TestTask(new AbstractKernelRunnable() {
+		    public void run() {
+			BigInteger last = lastRef.get();
+			int count;
+			for (count = 0; count < 50; count++) {
+			    BigInteger next = dataService.nextObjectId(last);
+			    if (next == null) {
+				done.set(true);
+			    }
+			    last = next;
+			}
+			countRef.addAndGet(count);
+			lastRef.set(last);
+		    }
+		}), taskOwner);
 	}
-	return count;
+	return countRef.get();
     }
 
     /** Prints the current objects above the specified value, for debugging. */
