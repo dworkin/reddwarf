@@ -21,12 +21,11 @@ package com.sun.sgs.example.hack.client;
 
 //import com.sun.gi.comm.users.client.ClientChannel;
 
-import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.util.UtilChannel;
 
 //import com.sun.gi.utils.SGSUUID;
 
-import com.sun.sgs.client.SessionId;
-
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 import java.util.HashSet;
@@ -43,8 +42,8 @@ public class ChatManager implements ChatListener
     // the set of listeners
     private HashSet<ChatListener> listeners;
 
-    // the chanel for both directions of communications
-    private ClientChannel channel;
+    // the channel for both directions of communications
+    private UtilChannel channel;
 
     /**
      * Creates an instance of <code>ChatManager</code>.
@@ -59,7 +58,7 @@ public class ChatManager implements ChatListener
      *
      * @param channel the communications channel
      */
-    public void setChannel(ClientChannel channel) {
+    public void setChannel(UtilChannel channel) {
         this.channel = channel;
     }
 
@@ -82,7 +81,7 @@ public class ChatManager implements ChatListener
     public void sendMessage(String message) {
         try {
             if (channel != null)
-                channel.send(message.getBytes());
+                channel.send(ByteBuffer.wrap(message.getBytes()));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -94,7 +93,7 @@ public class ChatManager implements ChatListener
      *
      * @param uid the identifier for the player
      */
-    public void playerJoined(SessionId uid) {
+    public void playerJoined(BigInteger uid) {
         for (ChatListener listener : listeners)
             listener.playerJoined(uid);
     }
@@ -105,7 +104,7 @@ public class ChatManager implements ChatListener
      *
      * @param uid the identifier for the player
      */
-    public void playerLeft(SessionId uid) {
+    public void playerLeft(BigInteger uid) {
         for (ChatListener listener : listeners)
             listener.playerLeft(uid);
     }
@@ -115,9 +114,9 @@ public class ChatManager implements ChatListener
      * the registered listeners.
      *
      * @param sender the id of the sender
-     * @param message the messsage itself
+     * @param message the message itself
      */
-    public void messageArrived(SessionId sender, String message) {
+    public void messageArrived(BigInteger sender, String message) {
         for (ChatListener listener : listeners)
             listener.messageArrived(sender, message);
     }
@@ -126,7 +125,7 @@ public class ChatManager implements ChatListener
      * Notifies the manager about some set of mappings from identifier
      * to user name. This notifies all of the registered listeners.
      */
-    public void addUidMappings(Map<SessionId,String> uidMap) {
+    public void addUidMappings(Map<BigInteger,String> uidMap) {
         for (ChatListener listener : listeners)
             listener.addUidMappings(uidMap);
     }

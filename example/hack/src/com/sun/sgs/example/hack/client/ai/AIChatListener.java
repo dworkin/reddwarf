@@ -19,11 +19,10 @@
 
 package com.sun.sgs.example.hack.client.ai;
 
-import com.sun.sgs.client.SessionId;
-
 import com.sun.sgs.example.hack.client.ChatListener;
 import com.sun.sgs.example.hack.client.ChatManager;
 
+import java.math.BigInteger;
 import java.util.Map;
 import java.util.Random;
 
@@ -56,9 +55,9 @@ public class AIChatListener implements ChatListener {
         }
     }
 
-    public void playerJoined(SessionId uid) {}
-    public void playerLeft(SessionId uid) {}
-    public void messageArrived(SessionId sender, String message) {}
-    public void addUidMappings(Map<SessionId,String> uidMap) {}
+    public void playerJoined(BigInteger uid) {}
+    public void playerLeft(BigInteger uid) {}
+    public void messageArrived(BigInteger sender, String message) {}
+    public void addUidMappings(Map<BigInteger,String> uidMap) {}
 
 }

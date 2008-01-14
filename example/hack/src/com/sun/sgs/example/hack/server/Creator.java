@@ -20,12 +20,13 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.util.UtilChannel;
+import com.sun.sgs.app.util.UtilChannelManager;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
@@ -48,10 +49,14 @@ public class Creator implements Game, Serializable {
     public static final String IDENTIFIER = NAME_PREFIX + "creator";
 
     // the channel used for all players currently in the lobby
-    private Channel channel;
+    private ManagedReference channelRef;
 
     // the number of players interacting with the creator
     private int playerCount = 0;
+
+    private UtilChannel channel() {
+        return channelRef.get(UtilChannel.class);
+    }
 
     /**
      * Creates an instance of <code>Creator</code>. In practice there should
@@ -62,10 +67,13 @@ public class Creator implements Game, Serializable {
      * @param task the task this is running in
      */
     private Creator() {
+        DataManager dataManager = AppContext.getDataManager();
         // create a channel for all clients in the creator, but lock it so
         // that we control who can enter and leave the channel
-        channel = AppContext.getChannelManager().
+        UtilChannel channel = UtilChannelManager.instance().
             createChannel(IDENTIFIER, null, Delivery.RELIABLE);
+
+        channelRef = dataManager.createReference(channel);
     }
 
     /**
@@ -106,9 +114,9 @@ public class Creator implements Game, Serializable {
         playerCount++;
 
         // add the player to the channel
-        channel.join(player.getCurrentSession(), null);
-        player.userJoinedChannel(channel);
-        Messages.sendPlayerJoined(player.getCurrentSession(), channel);
+        channel().join(player.getCurrentSession(), null);
+        player.userJoinedChannel(channel());
+        Messages.sendPlayerJoined(player.getCurrentSession(), channel());
 
         // NOTE: the idea of this "game" is that it should be used to
         // manage existing characters, create new ones, and delete ones
@@ -127,10 +135,10 @@ public class Creator implements Game, Serializable {
 
         playerCount--;
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channel);
+        Messages.sendPlayerLeft(player.getCurrentSession(), channel());
 
         // remove the player from the channel
-        channel.leave(player.getCurrentSession());
+        channel().leave(player.getCurrentSession());
     }
 
     /**

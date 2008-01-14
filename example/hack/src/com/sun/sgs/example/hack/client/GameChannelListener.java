@@ -24,9 +24,8 @@ package com.sun.sgs.example.hack.client;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;*/
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
+import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.client.util.UtilChannelListener;
 
 import com.sun.sgs.impl.sharedutil.HexDumper;
 
@@ -34,6 +33,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 import java.util.Collections;
@@ -44,7 +44,7 @@ import java.util.Map;
 /**
  * This abstract class is the base for all game-specific listeners.
  */
-public abstract class GameChannelListener implements ClientChannelListener
+public abstract class GameChannelListener implements UtilChannelListener
 {
 
     // the chat listener that accepts all incoming chat messages
@@ -62,7 +62,7 @@ public abstract class GameChannelListener implements ClientChannelListener
      * under the EA APIs for this client, so for now it's just implemented
      * here and ignored..
      */
-    public void leftChannel(ClientChannel channel) {
+    public void leftChannel(UtilChannel channel) {
         
     }
 
@@ -72,7 +72,7 @@ public abstract class GameChannelListener implements ClientChannelListener
     protected void notifyJoinOrLeave(ByteBuffer data, boolean joined) {
         byte [] bytes = new byte[data.remaining()];
         data.get(bytes);
-        SessionId sessionId = SessionId.fromBytes(bytes);
+        BigInteger sessionId = new BigInteger(1, bytes);
         if (joined)
             chatListener.playerJoined(sessionId);
         else
@@ -86,7 +86,7 @@ public abstract class GameChannelListener implements ClientChannelListener
      * @param playerID the player's identifier
      * @param data the chat message
      */
-    protected void notifyChatMessage(SessionId session, ByteBuffer data) {
+    protected void notifyChatMessage(BigInteger session, ByteBuffer data) {
         byte [] bytes = new byte[data.remaining()];
         data.get(bytes);
         String message = new String(bytes);
@@ -101,10 +101,11 @@ public abstract class GameChannelListener implements ClientChannelListener
     protected void addUidMappings(ByteBuffer data) throws IOException {
         @SuppressWarnings("unchecked")
         Map<String,String> map = (Map<String,String>)(getObject(data));
-        HashMap<SessionId,String> sessionMap = new HashMap<SessionId,String>();
+        HashMap<BigInteger,String> sessionMap = new HashMap<BigInteger,String>();
         for (String hexString : map.keySet()) {
-            SessionId sid = SessionId.fromBytes(HexDumper.fromHexString(hexString));
-            sessionMap.put(sid, map.get(hexString));
+            BigInteger sessionId =
+                new BigInteger(1, HexDumper.fromHexString(hexString));
+            sessionMap.put(sessionId, map.get(hexString));
         }
         chatListener.addUidMappings(sessionMap);
     }

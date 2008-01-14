@@ -19,9 +19,7 @@
 
 package com.sun.sgs.example.hack.client;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.SessionId;
-
+import com.sun.sgs.client.util.UtilChannel;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
@@ -31,6 +29,7 @@ import java.awt.Image;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 import java.util.Collection;
@@ -41,7 +40,7 @@ import javax.imageio.ImageIO;
 
 
 /**
- * This class listens for all nessages from a dungeon.
+ * This class listens for all messages from a dungeon.
  */
 public class DungeonChannelListener extends GameChannelListener
 {
@@ -78,12 +77,8 @@ public class DungeonChannelListener extends GameChannelListener
      * @param reliable true if this packet was sent reliably
      */
     //public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-                                byte [] message) {
-        ByteBuffer data = ByteBuffer.allocate(message.length);
-        data.put(message);
-        data.rewind();
-        
+    public void receivedMessage(UtilChannel channel, BigInteger sender,
+                                ByteBuffer data) {
         if (sender == null) {
             // if this is a message from the server, then it's some
             // command that we need to process, so get the command code

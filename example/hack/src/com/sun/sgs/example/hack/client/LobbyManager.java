@@ -92,11 +92,8 @@ public class LobbyManager implements LobbyListener
         bb.put(characterName.getBytes());
         bb.rewind();
 
-        byte [] bytes = new byte[5 + gameName.length() +
-                                 characterName.length()];
-        bb.get(bytes);
         try {
-            client.send(bytes);
+            client.send(bb);
         } catch (Exception e) {
             e.printStackTrace();
         }

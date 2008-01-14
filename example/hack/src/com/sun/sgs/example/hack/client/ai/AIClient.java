@@ -19,11 +19,10 @@
 
 package com.sun.sgs.example.hack.client.ai;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
+import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.client.util.UtilChannelListener;
 
 import com.sun.sgs.example.hack.client.ChatManager;
 import com.sun.sgs.example.hack.client.CreatorChannelListener;
@@ -37,6 +36,7 @@ import com.sun.sgs.example.hack.client.LobbyManager;
 import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -109,7 +109,7 @@ public class AIClient implements SimpleClientListener {
         return new PasswordAuthentication(name, "".toCharArray());
     }
 
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
+    public UtilChannelListener joinedChannel(UtilChannel channel) {
         chatManager.setChannel(channel);
         if (channel.getName().equals("game:lobby")) {
             aiDungeonListener.leftDungeon();
@@ -147,7 +147,7 @@ public class AIClient implements SimpleClientListener {
     public void disconnected(boolean graceful, String reason) {}
     public void reconnecting() {}
     public void reconnected() {}
-    public void receivedMessage(byte [] message) {}
+    public void receivedMessage(ByteBuffer message) {}
 
     public static void main(String [] args) throws Exception {
         if (args.length != 1) {

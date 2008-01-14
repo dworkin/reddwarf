@@ -21,10 +21,11 @@ package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.util.UtilChannel;
+import com.sun.sgs.app.util.UtilChannelManager;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
@@ -45,7 +46,7 @@ public class Dungeon implements Game, Serializable {
     private static final long serialVersionUID = 1;
 
     // the channel used for all players currently in this dungeon
-    private Channel channel;
+    private ManagedReference channelRef;
 
     // the name of this particular dungeon
     private String name;
@@ -61,6 +62,10 @@ public class Dungeon implements Game, Serializable {
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
+
+    private UtilChannel channel() {
+        return channelRef.get(UtilChannel.class);
+    }
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
@@ -79,8 +84,10 @@ public class Dungeon implements Game, Serializable {
 
         // create a channel for all clients in this dungeon, but lock it so
         // that we control who can enter and leave the channel
-        channel = AppContext.getChannelManager().
+        UtilChannel channel = UtilChannelManager.instance().
             createChannel(NAME_PREFIX + name, null, Delivery.RELIABLE);
+
+        channelRef = dataManager.createReference(channel);
 
         // initialize the player list
         playerMap = new HashMap<ClientSession,String>();
@@ -106,14 +113,14 @@ public class Dungeon implements Game, Serializable {
         String playerName = player.getName();
         ClientSession [] users = playerMap.keySet().
             toArray(new ClientSession[playerMap.size()]);
-        Messages.sendUidMap(session, playerName, channel, users);
+        Messages.sendUidMap(session, playerName, channel(), users);
 
         // add the player to the dungeon channel and the local map
-        channel.join(session, null);
+        channel().join(session, null);
         playerMap.put(session, playerName);
 
         // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(playerMap, channel, session);
+        Messages.sendUidMap(playerMap, channel(), session);
 
         // notify the manager that our membership count changed
         sendCountChanged();
@@ -122,16 +129,16 @@ public class Dungeon implements Game, Serializable {
         SpriteMap spriteMap =
             dataManager.getBinding(SpriteMap.NAME_PREFIX + spriteMapId,
                                    SpriteMap.class);
-        Messages.sendSpriteMap(spriteMap, channel, session);
+        Messages.sendSpriteMap(spriteMap, channel(), session);
 
-        Messages.sendPlayerJoined(player.getCurrentSession(), channel);
+        Messages.sendPlayerJoined(player.getCurrentSession(), channel());
 
         // finally, throw the player into the game through the starting
         // connection point ... the only problem is that the channel info
         // won't be there when we try to send a board (because we still have
         // the lock on the Player, so its userJoinedChannel method can't
         // have been called yet), so set the channel directly
-        player.userJoinedChannel(channel);
+        player.userJoinedChannel(channel());
         PlayerCharacter pc =
             (PlayerCharacter)(player.getCharacterManager().
                               getCurrentCharacter());
@@ -148,11 +155,11 @@ public class Dungeon implements Game, Serializable {
     public void leave(Player player) {
         AppContext.getDataManager().markForUpdate(this);
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channel);
+        Messages.sendPlayerLeft(player.getCurrentSession(), channel());
 
         // remove the player from the dungeon channel and the player map
         ClientSession session = player.getCurrentSession();
-        channel.leave(player.getCurrentSession());
+        channel().leave(player.getCurrentSession());
         playerMap.remove(session);
 
         // just to be paranoid, we should make sure that they're out of

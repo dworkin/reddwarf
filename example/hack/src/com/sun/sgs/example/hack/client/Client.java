@@ -29,11 +29,10 @@ import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 
 import com.sun.gi.utils.SGSUUID;*/
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
+import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.client.util.UtilChannelListener;
 
 import com.sun.sgs.example.hack.client.gui.ChatPanel;
 import com.sun.sgs.example.hack.client.gui.CreatorPanel;
@@ -49,7 +48,9 @@ import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+import java.math.BigInteger;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 
 import java.util.Properties;
 
@@ -65,7 +66,7 @@ import javax.swing.JPanel;
 
 /**
  * This is the main class for the client app. It creates the connection
- * with the server, sets up the GUI elements, and listenes for the major
+ * with the server, sets up the GUI elements, and listens for the major
  * events from the server game app.
  */
 public class Client extends JFrame implements SimpleClientListener {
@@ -94,7 +95,7 @@ public class Client extends JFrame implements SimpleClientListener {
     private GamePanel gamePanel;
     private DungeonChannelListener dlistener;
 
-    // the card layour manager for swapping between different panels
+    // the card layout manager for swapping between different panels
     private CardLayout managerLayout;
     private JPanel managerPanel;
 
@@ -153,7 +154,7 @@ public class Client extends JFrame implements SimpleClientListener {
     /**
      * Tries to connect to the game server.
      *
-     * @throws Exception if the connection failes
+     * @throws Exception if the connection fails
      */
     public void connect() throws Exception {
         client.login(System.getProperties());
@@ -168,7 +169,7 @@ public class Client extends JFrame implements SimpleClientListener {
     }
 
     public void loggedIn() {
-        chatPanel.setSessionId(client.getSessionId());
+        System.err.println("logged in");
     }
 
     public void loginFailed(String reason) {
@@ -177,9 +178,7 @@ public class Client extends JFrame implements SimpleClientListener {
 
     public void disconnected(boolean graceful, String reason) {}
     public void reconnecting() {}
-    public void reconnected() {
-        chatPanel.setSessionId(client.getSessionId());
-    }
+    public void reconnected() {}
 
 
     /**
@@ -189,7 +188,7 @@ public class Client extends JFrame implements SimpleClientListener {
      *
      * @param channel the channel that we joined
      */
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
+    public UtilChannelListener joinedChannel(UtilChannel channel) {
         // clear the chat area each time we join a new area
         chatPanel.clearMessages();
 
@@ -221,10 +220,18 @@ public class Client extends JFrame implements SimpleClientListener {
         }
     }
 
-    public void receivedMessage(byte [] message) {
+    public void receivedMessage(ByteBuffer message) {
         // NOTE: This wasn't available in the EA API, so the Hack code
-        // currently sends all messages from server to client on a
+        // currently sends almost all messages from server to client on a
         // specific channel, but that design should probably change now
+
+        // The only "direct" message is sent to the client to inform it
+        // that of its session id. -JM
+
+        byte[] bytes = new byte[message.remaining()];
+        message.get(bytes);
+        BigInteger sessionId = new BigInteger(1, bytes);
+        chatPanel.setSessionId(sessionId);
     }
 
     /**
