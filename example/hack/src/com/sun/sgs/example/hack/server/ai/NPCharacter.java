@@ -52,7 +52,7 @@ public class NPCharacter extends AICharacter implements Serializable {
     private String [] messages;
 
     // a reference to our manager
-    private ManagedReference mgrRef;
+    private ManagedReference<AICharacterManager> mgrRef;
 
     // our stats, which are used only as a placeholder
     private CharacterStats stats;
@@ -143,7 +143,7 @@ public class NPCharacter extends AICharacter implements Serializable {
         // there's a 1-in-2 chance that we'll decide to move
         if (NSidedDie.rollNSided(2) == 1) {
             // get the level we're on now
-            AICharacterManager mgr = mgrRef.get(AICharacterManager.class);
+            AICharacterManager mgr = mgrRef.get();
             Level level = mgr.getCurrentLevel();
 
             // pick a direction, and try to move in that direction

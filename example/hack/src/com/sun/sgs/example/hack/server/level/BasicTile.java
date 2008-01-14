@@ -44,10 +44,10 @@ public abstract class BasicTile implements Tile, Serializable {
     private int id;
 
     // the character that is currently on this space, if any
-    private ManagedReference mgrRef;
+    private ManagedReference<CharacterManager> mgrRef;
 
     // the item on this space, if any
-    private ManagedReference itemRef;
+    private ManagedReference<Item> itemRef;
 
     /**
      * Creates an instance of <code>BasicTile</code>.
@@ -88,7 +88,7 @@ public abstract class BasicTile implements Tile, Serializable {
         if (itemRef == null)
             ids = new int [] {id};
         else
-            ids = new int [] {id, itemRef.get(Item.class).getID()};
+            ids = new int [] {id, itemRef.get().getID()};
 
         // if there is a character here, create a new array that's 1 index
         // bigger, and put the character at the end
@@ -96,8 +96,7 @@ public abstract class BasicTile implements Tile, Serializable {
             int [] tmp = new int [ids.length + 1];
             for (int i = 0; i < ids.length; i++)
                 tmp[i] = ids[i];
-            tmp[ids.length] = mgrRef.get(CharacterManager.class).
-                getCurrentCharacter().getID();
+            tmp[ids.length] = mgrRef.get().getCurrentCharacter().getID();
             ids = tmp;
         }
 
@@ -167,7 +166,7 @@ public abstract class BasicTile implements Tile, Serializable {
         if (! this.mgrRef.equals(AppContext.getDataManager().
                                  createReference(mgr))) {
             System.out.println("not equal on removal: " +
-                               mgrRef.get(CharacterManager.class).toString() +
+                               mgrRef.get().toString() +
                                " != " + mgr.toString());
             return false;
         }
@@ -231,7 +230,7 @@ public abstract class BasicTile implements Tile, Serializable {
         // if there is currently a character on this tile, then do the
         // collision
         if (mgrRef != null)
-            return mgrRef.get(CharacterManager.class).getCurrentCharacter().
+            return mgrRef.get().getCurrentCharacter().
                 collidedFrom(characterManager.getCurrentCharacter());
 
         // if there's no character here, then we always succeed
@@ -253,7 +252,7 @@ public abstract class BasicTile implements Tile, Serializable {
 
         // give this item the chance to react (most items are passive,
         // but you could immediately affect the user here)
-        return itemRef.get(Item.class).giveTo(characterManager);
+        return itemRef.get().giveTo(characterManager);
     }
 
 }

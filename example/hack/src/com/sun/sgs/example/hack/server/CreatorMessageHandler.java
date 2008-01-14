@@ -131,8 +131,8 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
      *
      */
     private void moveToLobby(Player player) {
-        Lobby lobby = AppContext.getDataManager().
-            getBinding(Lobby.IDENTIFIER, Lobby.class);
+        Lobby lobby = (Lobby) AppContext.getDataManager().
+            getBinding(Lobby.IDENTIFIER);
         AppContext.getTaskManager().
             scheduleTask(new MoveGameTask(player, lobby));
     }

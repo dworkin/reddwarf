@@ -40,10 +40,10 @@ public class GameConnector implements Connector, Serializable {
     private static final long serialVersionUID = 1;
 
     // the game at one end of the connection
-    private ManagedReference connectedGame;
+    private ManagedReference<Game> connectedGame;
 
     // the level at the other end of the connection
-    private ManagedReference connectedLevel;
+    private ManagedReference<Level> connectedLevel;
 
     // the position on the level where we connect
     private int startX;
@@ -80,7 +80,7 @@ public class GameConnector implements Connector, Serializable {
         if (level == null) {
             // they're not currently on a level, which means that they're
             // not yet playing a game, so move them in
-            connectedLevel.get(Level.class).addCharacter(mgr, startX, startY);
+            connectedLevel.get().addCharacter(mgr, startX, startY);
         } else {
             // they're leaving the game for the lobby...only players can
             // move into the lobby, so make sure there are no AIs trying

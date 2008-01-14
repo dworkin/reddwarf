@@ -54,7 +54,7 @@ public class SwordWorldPlayer
     private ClientSession currentSession = null;
 
     /** The {@link SwordWorldRoom} this player is in, or null if none. */
-    private ManagedReference currentRoomRef = null;
+    private ManagedReference<SwordWorldRoom> currentRoomRef = null;
 
     /**
      * Find or create the player object for the given session, and mark
@@ -71,7 +71,7 @@ public class SwordWorldPlayer
         SwordWorldPlayer player;
 
         try {
-            player = dataMgr.getBinding(playerBinding, SwordWorldPlayer.class);
+            player = (SwordWorldPlayer) dataMgr.getBinding(playerBinding);
         } catch (NameNotBoundException ex) {
             // this is a new player
             player = new SwordWorldPlayer(playerBinding);
@@ -159,7 +159,7 @@ public class SwordWorldPlayer
         if (currentRoomRef == null)
             return null;
 
-        return currentRoomRef.get(SwordWorldRoom.class);
+        return currentRoomRef.get();
     }
 
     /**

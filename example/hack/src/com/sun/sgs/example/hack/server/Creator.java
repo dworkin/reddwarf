@@ -84,7 +84,7 @@ public class Creator implements Game, Serializable {
         // try to get an existing reference
         Creator creator = null;
         try {
-            creator = dataManager.getBinding(IDENTIFIER, Creator.class);
+            creator = (Creator) dataManager.getBinding(IDENTIFIER);
         } catch (NameNotBoundException e) {
             creator = new Creator();
             dataManager.setBinding(IDENTIFIER, creator);

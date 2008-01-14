@@ -56,12 +56,12 @@ import java.io.Serializable;
  * <pre>
  * public class MyPlayerObj {
  *     String name;
- *     Collection&lt;Item&gt; inventory;
+ *     {@literal Collection<Item>} inventory;
  *     MapArea currentLocation;
  *
  *     public MyPlayerObj(...) {
  *         ...
- *         inventory = new ArrayList&lt;Item&gt;();
+ *         inventory = new {@literal ArrayList<Item>}();
  *     }
  *
  *     ...
@@ -79,25 +79,23 @@ import java.io.Serializable;
  * public class MyPlayerObj {
  *     String name;
  *
- *     // a reference of type ManagedSerializable&lt;Collection&lt;Item&gt;&gt;
- *     ManagedReference inventoryRef;
+ *     {@literal ManagedReference<ManagedSerializable<Collection<Item>>>} inventoryRef;
  *
- *     // a reference of type ManagedSerializable&lt;MapArea&gt;
- *     ManagedReference currentLocationRef;
+ *     {@literal ManagedReference<ManagedSerializable<MapArea>>} currentLocationRef;
  *
  *     public MyPlayerObj(...) {
  *         ...
- *         Collection&lt;Item&gt; inventory = new ArrayList&lt;Item&gt;();
+ *         {@literal Collection<Item>} inventory = new {@literal ArrayList<Item>}();
  *         inventoryRef = AppContext.getDataManager().
  *             createReference(
- *                 new ManagedSerializable&lt;Collection&lt;Item&gt;&gt;(inventory));
+ *                 new {@literal ManagedSerializable<Collection<Item>>}(inventory));
  *     }
  *
  *     ...
  *
  *     public void findNearbyPlayers() {
- *         ManagedSerializable&lt;MapArea&gt; curLocWrapper =
- *             currentLocationRef.get(ManagerSerializable.class);
+ *         {@literal ManagedSerializable<MapArea>} curLocWrapper =
+ *             currentLocationRef.get();
  *         MapArea currentLocation = curLocWrapper.get();
  *
  *         for (Player p : currentLocation.getPlayers())

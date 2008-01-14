@@ -45,7 +45,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
     private static final long serialVersionUID = 1;
 
     // a reference to the owning player
-    private ManagedReference playerRef;
+    private ManagedReference<Player> playerRef;
 
     // the characters currently owned by this manager
     private HashMap<String,PlayerCharacter> characterMap;
@@ -73,7 +73,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return the owning <code>Player</code>
      */
     public Player getPlayer() {
-        return playerRef.get(Player.class);
+        return playerRef.get();
     }
 
     /**
@@ -155,7 +155,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @param board the board to send
      */
     public void sendBoard(Board board) {
-        playerRef.get(Player.class).sendBoard(board);
+        playerRef.get().sendBoard(board);
     }
 
     /**
@@ -164,14 +164,14 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @param updates the updates to send
      */
     public void sendUpdate(Collection<BoardSpace> updates) {
-        playerRef.get(Player.class).sendUpdate(updates);
+        playerRef.get().sendUpdate(updates);
     }
 
     /**
      * Sends the current character's stats to the player.
      */
     public void sendCharacter() {
-        playerRef.get(Player.class).sendCharacter(currentCharacter);
+        playerRef.get().sendCharacter(currentCharacter);
     }
 
 }

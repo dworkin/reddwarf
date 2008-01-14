@@ -73,10 +73,10 @@ public class GameSimBoot implements AppListener, Serializable {
     public static final int CHANGE_MANAGER_FREQUENCY = 4000;
 
     // the lobby reference
-    private ManagedReference lobbyRef = null;
+    private ManagedReference<Lobby> lobbyRef = null;
 
     // the creator reference
-    private ManagedReference creatorRef = null;
+    private ManagedReference<Creator> creatorRef = null;
 
     /**
      * Called by the game server to actually start this game application.
@@ -144,13 +144,13 @@ public class GameSimBoot implements AppListener, Serializable {
         // unless they have no characters, in which case they need to go
         // to the creator first
 
-        ManagedReference gameRef = null;
+        ManagedReference<? extends Game> gameRef = null;
         if (player.getCharacterManager().getCharacterCount() == 0)
             gameRef = creatorRef;
         else
             gameRef = lobbyRef;
         AppContext.getTaskManager().
-            scheduleTask(new MoveGameTask(player, gameRef.get(Game.class)));
+            scheduleTask(new MoveGameTask(player, gameRef.get()));
 
         // NOTE WELL: At this point, the Player is being passed off to a
         // game, but until the moveToGame method is invoked, this Player is

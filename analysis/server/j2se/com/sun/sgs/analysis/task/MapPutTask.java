@@ -19,10 +19,10 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     private static final Random random = new Random();
 
     /** A reference to the object to notify when done. */
-    private final ManagedReference schedulerRef;
+    private final ManagedReference<ScheduleMapPutsTask> schedulerRef;
 
     /** A reference to the map. */
-    private final ManagedReference mapRef;
+    private final ManagedReference<ManagedObject> mapRef;
 
     /** The remaining number of operations to run. */
     private int count;
@@ -44,11 +44,11 @@ public class MapPutTask implements ManagedObject, Serializable, Task {
     /** Puts a random integer into the map and reschedules this task. */
     public void run() {
 	if (--count <= 0) {
-	    schedulerRef.get(ScheduleMapPutsTask.class).taskDone();
+	    schedulerRef.get().taskDone();
 	    return;
 	}
 	@SuppressWarnings("unchecked")
-	Map<Object, Object> map = mapRef.get(Map.class);
+	Map<Object, Object> map = (Map) mapRef.get();
 	int i = random.nextInt();
 	map.put(i, i);
 	AppContext.getTaskManager().scheduleTask(this);
