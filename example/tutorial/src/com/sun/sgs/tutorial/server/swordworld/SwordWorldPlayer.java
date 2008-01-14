@@ -51,7 +51,7 @@ public class SwordWorldPlayer
     protected static final String PLAYER_BIND_PREFIX = "Player.";
 
     /** The {@code ClientSession} for this player, or null if logged out. */
-    private ClientSession currentSession = null;
+    private ManagedReference currentSessionRef = null;
 
     /** The {@link SwordWorldRoom} this player is in, or null if none. */
     private ManagedReference currentRoomRef = null;
@@ -92,14 +92,27 @@ public class SwordWorldPlayer
     }
 
     /**
+     * Returns the session for this listener.
+     * 
+     * @return the session for this listener
+     */
+    protected ClientSession getSession() {
+        if (currentSessionRef == null)
+            return null;
+
+        return currentSessionRef.get(ClientSession.class);
+    }
+
+    /**
      * Mark this player as logged in on the given session.
      *
      * @param session the session this player is logged in on
      */
     protected void setSession(ClientSession session) {
-        AppContext.getDataManager().markForUpdate(this);
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.markForUpdate(this);
 
-        currentSession = session;
+        currentSessionRef = dataMgr.createReference(session);
 
         logger.log(Level.INFO,
             "Set session for {0} to {1}",
@@ -130,7 +143,7 @@ public class SwordWorldPlayer
 
         if (command.equalsIgnoreCase("look")) {
             String reply = getRoom().look(this);
-            currentSession.send(encodeString(reply));
+            getSession().send(encodeString(reply));
         } else {
             logger.log(Level.WARNING,
                 "{0} unknown command: {1}",
@@ -185,10 +198,10 @@ public class SwordWorldPlayer
     public String toString() {
         StringBuilder buf = new StringBuilder(getName());
         buf.append('@');
-        if (currentSession == null) {
+        if (getSession() == null) {
             buf.append("null");
         } else {
-            buf.append(currentSession.getSessionId());
+            buf.append(currentSessionRef.getId());
         }
         return buf.toString();
     }

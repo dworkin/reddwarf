@@ -22,6 +22,7 @@ package com.sun.sgs.example.chat.app;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -31,7 +32,9 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
 /**
@@ -64,8 +67,11 @@ public class ChatClientSessionListener
     private static final String COMMAND_PREFIX = "/";
 
     /** The {@link ClientSession} this listener receives events for. */
-    private final ClientSession session;
+    private final ManagedReference sessionRef;
 
+    private ClientSession session() {
+        return sessionRef.get(ClientSession.class);
+    }
     /**
      * Creates a new listener for the given {@code ClientSession}.
      * Immediately joins the session to the global notification channel,
@@ -76,7 +82,9 @@ public class ChatClientSessionListener
      * @see #addToChannel
      */
     public ChatClientSessionListener(ClientSession session) {
-        this.session = session;
+        if (session == null)
+            throw new NullPointerException("null session");
+        sessionRef = AppContext.getDataManager().createReference(session);
         addToChannel(GLOBAL_CHANNEL_NAME);
     }
 
@@ -91,7 +99,7 @@ public class ChatClientSessionListener
             String grace = graceful ? "graceful" : "forced";
             logger.log(Level.FINE,
                 "{0} {1} disconnect",
-                new Object[] { session, grace });
+                new Object[] { session(), grace });
         }
         removeFromChannel(GLOBAL_CHANNEL_NAME);
     }
@@ -128,12 +136,12 @@ public class ChatClientSessionListener
                 break;
 
             case DISCONNECT:
-                logger.log(Level.INFO, "Disconnect request from {0}", session);
-                session.disconnect();
+                logger.log(Level.INFO, "Disconnect request from {0}", session());
+                session().disconnect();
                 break;
 
             case SHUTDOWN:
-                logger.log(Level.CONFIG, "Shutdown request from {0}", session);
+                logger.log(Level.CONFIG, "Shutdown request from {0}", session());
                 System.exit(0);
                 break;
             }
@@ -142,11 +150,11 @@ public class ChatClientSessionListener
                 LogRecord rec = new LogRecord(Level.INFO,
                     "While processing command from {0}, disconnecting:");
                 rec.setThrown(e);
-                rec.setParameters(new Object[] { session });
+                rec.setParameters(new Object[] { session() });
                 logger.log(rec);
             }
             
-            session.disconnect();
+            session().disconnect();
         }
     }
 
@@ -176,43 +184,50 @@ public class ChatClientSessionListener
 
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE,
-                    "Join " + session + " to " + channelName);
+                    "Join " + session() + " to " + channelName);
         }
 
         ChannelManager channelMgr = AppContext.getChannelManager();
+        DataManager dataMgr = AppContext.getDataManager();
         Channel channel;
         try {
-            channel = channelMgr.getChannel(channelName);
+            channel = dataMgr.getBinding(channelName, Channel.class);
         } catch (NameNotBoundException e) {
-            channel = channelMgr.createChannel(
-                    channelName, null, Delivery.RELIABLE);
+            channel = channelMgr.createChannel(Delivery.RELIABLE);
+            dataMgr.setBinding(channelName, channel);
         }
 
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(toHexString(session.getSessionId().getBytes()));
+        changeMsg.append(toHexString(sessionRef.getId().toByteArray()));
         if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
             changeMsg.append(':');
-            changeMsg.append(session.getName());
+            changeMsg.append(session().getName());
         }
         channel.send(toMessageBytes(changeMsg.toString()));
 
         // Now add the joiner and tell it about all the members on
         // the channel, the joiner included.
-        channel.join(session, null);
+        channel.join(session());
+
+        // TODO update our membership map
 
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members");
-        for (ClientSession member : channel.getSessions()) {
+        Iterator<ManagedReference> memberRefs = channelMemberRefs(channel);
+        while (memberRefs.hasNext()) {
+            ManagedReference memberRef = memberRefs.next();
+            ClientSession member = memberRef.get(ClientSession.class);
             listMessage.append(' ');
-            listMessage.append(toHexString(member.getSessionId().getBytes()));
+            listMessage.append(toHexString(memberRef.getId().toByteArray()));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
                 listMessage.append(':');
                 listMessage.append(member.getName());
             }
         }
-        channel.send(session, toMessageBytes(listMessage.toString()));
+
+        session().send(toMessageBytes(listMessage.toString()));
     }
 
     /**
@@ -227,40 +242,52 @@ public class ChatClientSessionListener
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE,
                     "Leave {0} from {1}",
-                    new Object[] { session, channelName });
+                    new Object[] { session(), channelName });
         }
 
-        ChannelManager channelMgr = AppContext.getChannelManager();
+        DataManager dataMgr = AppContext.getDataManager();
         Channel channel;
         
         try {
-            channel = channelMgr.getChannel(channelName);
+            channel = dataMgr.getBinding(channelName, Channel.class);
         } catch (NameNotBoundException e) {
             // The channel has been closed, so there's nothing to do.
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINE,
                         "Leave {0} from {1}: channel is closed",
-                        new Object[] { session, channelName });
+                        new Object[] { session(), channelName });
             }
             return;
         }
 
-        if (session.isConnected()) {
+        if (session().isConnected()) {
             // Remove the member first, so it doesn't get the membership
             // change message for its own departure.
-            channel.leave(session);
+            
+            // TODO update our membership map
+            channel.leave(session());
         }
 
         // If the channel has no more sessions, close it.
-        if (! channel.hasSessions()) {
+        if (! channelHasMembers(channel)) {
             channel.close();
             return;
         }
 
         // Tell the rest of the channel about the removal.
         String changeMessage = "/left " +
-            toHexString(session.getSessionId().getBytes());
+            toHexString(sessionRef.getId().toByteArray());
         channel.send(toMessageBytes(changeMessage));
+    }
+
+    private boolean channelHasMembers(Channel channel) {
+        // FIXME
+        return false;
+    }
+
+    private Iterator<ManagedReference> channelMemberRefs(Channel channel) {
+        // FIXME
+        return null;
     }
 
     /**
@@ -272,11 +299,11 @@ public class ChatClientSessionListener
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER,
                 "Echo request from {0}, contents: {1}",
-                new Object[] { session, message });
+                new Object[] { session(), message });
         }
 
         String reply = "/pong " + message;
-        session.send(toMessageBytes(reply));
+        session().send(toMessageBytes(reply));
     }
 
     /**
