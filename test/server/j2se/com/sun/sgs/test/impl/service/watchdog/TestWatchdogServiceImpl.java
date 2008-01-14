@@ -128,6 +128,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /** Shut down the nodes. */
+    protected void tearDown() throws Exception {
+        tearDown(true);
+    }
+
     protected void tearDown(boolean clean) throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes) {
