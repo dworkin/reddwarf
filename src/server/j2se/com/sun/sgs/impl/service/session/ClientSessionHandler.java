@@ -23,7 +23,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.ProtocolMessageListener;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -38,7 +37,7 @@ import javax.security.auth.login.LoginException;
 class ClientSessionHandler {
 
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private final static long serialVersionUID =1L;
     
     /** Connection state. */
     private static enum State {
@@ -63,11 +62,6 @@ class ClientSessionHandler {
     /** The LOGIN_FAILURE protocol message. */
     private static final byte[] loginFailureMessage = getLoginFailureMessage();
 
-    /** The client session associated with this session handler,
-     * or {@code null} if the session hasn't completed login.
-     */
-    private final ClientSessionImpl sessionImpl;
-
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
@@ -80,8 +74,8 @@ class ClientSessionHandler {
     /** The Connection for sending messages to the client. */
     private volatile Connection sessionConnection;
 
-    /** The session ID bytes. */
-    private volatile BigInteger id;
+    /** The session ID as a BigInteger. */
+    private volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
     private volatile Identity identity;
@@ -112,7 +106,6 @@ class ClientSessionHandler {
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.connectionListener = new Listener();
-	this.sessionImpl = new ClientSessionImpl(sessionService);
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -122,22 +115,6 @@ class ClientSessionHandler {
     }
 
     /* -- Instance methods -- */
-
-    /**
-     * Returns the client session.
-     *
-     * @return	the client session
-     */
-    ClientSessionImpl getClientSession() {
-	return sessionImpl;
-    }
-
-    /**
-     * Returns the ID for the client session.
-     */
-    BigInteger getId() {
-	return id;
-    }
 
     /**
      * Returns the {@code ConnectionListener} for this session.
@@ -229,7 +206,9 @@ class ClientSessionHandler {
 	    }
 	}
 
-	sessionService.disconnected(sessionImpl);
+	if (sessionRefId != null) {
+	    sessionService.removeHandler(sessionRefId);
+	}
 	
 	if (identity != null) {
 	    // TBD: Due to the scheduler's behavior, this notification
@@ -246,12 +225,9 @@ class ClientSessionHandler {
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
-		MessageBuffer buf = new MessageBuffer(3);
-		buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
-	    
-		sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
+	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
+
+	        sendProtocolMessage(msg, Delivery.RELIABLE);
 	    }
 
 	    try {
@@ -266,17 +242,16 @@ class ClientSessionHandler {
 	    }
 	}
 
-	scheduleTask(new AbstractKernelRunnable() {
-	    public void run() throws IOException {
-		ClientSessionImpl sessionImpl = null;
-		if (id != null) {
-		    sessionImpl = ClientSessionImpl.getSession(dataService, id);
-		}
-		if (sessionImpl != null) {
+	if (sessionRefId != null) {
+	    scheduleTask(new AbstractKernelRunnable() {
+		public void run() throws IOException {
+		    ClientSessionImpl sessionImpl = 
+			ClientSessionImpl.getSession(dataService, sessionRefId);
 		    sessionImpl.
 			notifyListenerAndRemoveSession(dataService, graceful);
 		}
-	    }});
+	    });
+	}
     }
 
     /**
@@ -304,7 +279,7 @@ class ClientSessionHandler {
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + id;
+	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -395,7 +370,7 @@ class ClientSessionHandler {
 		}
 	    }
 	    
-	    if (buffer.length < 3) {
+	    if (buffer.length < 1) {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
 		        Level.SEVERE,
@@ -407,55 +382,7 @@ class ClientSessionHandler {
 	    }
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
-		
-	    /*
-	     * Handle version.
-	     */
-	    byte version = msg.getByte();
-	    if (version != SimpleSgsProtocol.VERSION) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"Handler.messageReceived protocol version:{0}, " +
-			"expected {1}", version, SimpleSgsProtocol.VERSION);
-		}
-		    // TBD: should the connection be disconnected?
-		return;
-	    }
-
-	    /*
-	     * Dispatch message to service.
-	     */
-	    byte serviceId = msg.getByte();
-
-	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
-		handleApplicationServiceMessage(msg);
-	    } else {
-		ProtocolMessageListener serviceListener =
-		    sessionService.getProtocolMessageListener(serviceId);
-		if (serviceListener != null) {
-		    if (identity == null) {
-			if (logger.isLoggable(Level.WARNING)) {
-			    logger.log(
-			        Level.WARNING,
-				"session:{0} received message for " +
-				"service ID:{1} before successful login",
-				this, serviceId);
-			    return;
-			}
-		    }
-		    
-		    serviceListener.receivedMessage(sessionImpl, buffer);
-		    
-		} else {
-		    if (logger.isLoggable(Level.SEVERE)) {
-		    	logger.log(
-			    Level.SEVERE,
-			    "session:{0} unknown service ID:{1}",
-			    this, serviceId);
-		    }
-		}
-	    }
+	    handleApplicationServiceMessage(msg);
 	}
 
 	/**
@@ -478,12 +405,24 @@ class ClientSessionHandler {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST:
+	    case SimpleSgsProtocol.LOGIN_REQUEST: {
+
+	        byte version = msg.getByte();
+	        if (version != SimpleSgsProtocol.VERSION) {
+	            if (logger.isLoggable(Level.SEVERE)) {
+	                logger.log(
+	                    Level.SEVERE,
+	                    "got protocol version:{0}, " +
+	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+	            }
+	            break;
+	        }
 
 		String name = msg.getString();
 		String password = msg.getString();
 		handleLoginRequest(name, password);
 		break;
+	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		if (identity == null) {
@@ -497,9 +436,17 @@ class ClientSessionHandler {
 		final byte[] clientMessage = msg.getBytes(size);
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
-			if (isConnected()) {
-			    sessionImpl.getClientSessionListener(dataService).
-				receivedMessage(clientMessage);
+			ClientSessionImpl sessionImpl =
+			    ClientSessionImpl.getSession(
+				dataService, sessionRefId);
+			if (sessionImpl != null) {
+			    if (isConnected()) {
+				sessionImpl.getClientSessionListener(dataService).
+				    receivedMessage(clientMessage);
+			    }
+			} else {
+			    // Session has been removed; disconnect session.
+			    // TBD...
 			}
 		    }});
 		break;
@@ -595,16 +542,11 @@ class ClientSessionHandler {
 			sessionService.getTransactionProxy(),
 			sessionService.nonDurableTaskScheduler,
 			authenticatedIdentity);
-		sessionImpl.setIdentityAndNodeId(
-		    authenticatedIdentity, assignedNodeId);
 		identity = authenticatedIdentity;
+		CreateClientSessionTask createTask =
+		    new CreateClientSessionTask();
 		try {
-		    sessionService.runTransactionalTask(
-		    	new AbstractKernelRunnable() {
-			    public void run() {
-				sessionImpl.putSession(dataService);
-			    }
-			}, identity);
+		    sessionService.runTransactionalTask(createTask, identity);
 		} catch (Exception e) {
 		    logger.logThrow(
 			Level.WARNING, e,
@@ -612,8 +554,8 @@ class ClientSessionHandler {
 		    sendLoginFailureAndDisconnect();
 		    return;
 		}
-		id = sessionImpl.getId();
-		sessionService.connected(ClientSessionHandler.this);
+		sessionService.addHandler(
+		    sessionRefId, ClientSessionHandler.this);
 		scheduleTask(new LoginTask());
 		
 	    } else {
@@ -637,7 +579,7 @@ class ClientSessionHandler {
 			    // FIXME: this is a hack to make sure that
 			    // the client receives the login redirect
 			    // message before disconnect.
-			    Thread.currentThread().sleep(100);
+			    Thread.sleep(100);
 			} catch (InterruptedException e) {
 			}
 			handleDisconnect(false);
@@ -743,6 +685,18 @@ class ClientSessionHandler {
 	    return node;
 	}
     }
+
+    /**
+     * Constructs the ClientSession.
+     */
+    private class CreateClientSessionTask extends AbstractKernelRunnable {
+	
+	public void run() {
+	    ClientSessionImpl sessionImpl =
+		new ClientSessionImpl(sessionService, identity);
+	    sessionRefId = sessionImpl.getId();
+	}
+    }
     
     /**
      * This is a transactional task to notify the application's
@@ -778,17 +732,17 @@ class ClientSessionHandler {
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    CompactId compactId = new CompactId(id.toByteArray());
+	    CompactId compactId = new CompactId(sessionRefId.toByteArray());
 	    MessageBuffer ack =
-		new MessageBuffer(3 + compactId.getExternalFormByteCount());
-	    ack.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
+		new MessageBuffer(1 + compactId.getExternalFormByteCount());
+	    ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 		putBytes(compactId.getExternalForm());
 		
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
-	    
+
+	    ClientSessionImpl sessionImpl =
+		ClientSessionImpl.getSession(dataService, sessionRefId);
 	    try {
 		returnedListener = appListener.loggedIn(sessionImpl);
 	    } catch (RuntimeException e) {
@@ -848,10 +802,8 @@ class ClientSessionHandler {
      */
     private static byte[] getLoginFailureMessage() {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
-        MessageBuffer ack = new MessageBuffer(3 + stringSize);
-        ack.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.LOGIN_FAILURE).
+        MessageBuffer ack = new MessageBuffer(1 + stringSize);
+        ack.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(LOGIN_REFUSED_REASON);
         return ack.getBuffer();
     }
@@ -862,10 +814,8 @@ class ClientSessionHandler {
      */
     private static byte[] getLoginRedirectMessage(String hostname) {
 	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(3 + hostStringSize);
-        ack.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
+	MessageBuffer ack = new MessageBuffer(1 + hostStringSize);
+        ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
             putString(hostname);
         return ack.getBuffer();
     }	

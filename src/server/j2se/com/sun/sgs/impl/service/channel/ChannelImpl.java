@@ -29,7 +29,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
 import com.sun.sgs.impl.service.session.NodeAssignment;
-import com.sun.sgs.impl.service.session.IdentityAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -603,19 +602,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Returns the ID for the specified {@code session}.
-     *
-     * TBD: This method should probably just obtain the ID from the managed
-     * reference to the client session (i.e., call 'getManagedRefBytes' to
-     * obtain ID).  This is more efficient though.
      */
     private static byte[] getSessionIdBytes(ClientSession session) {
-	if (session instanceof IdentityAssignment) {
-	    return ((IdentityAssignment) session).getIdBytes();
-	} else {
-	    throw new IllegalArgumentException(
-		"session does not implement IdentityAssignment: " +
-		session.getClass());
-	} 
+	return ChannelServiceImpl.getDataService().
+	    createReference(session).getId().toByteArray();
     }
 
     /**
@@ -1390,12 +1380,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
      */
     private byte[] getChannelMessage(byte[] message) {
 
-        MessageBuffer buf = new MessageBuffer(13 + message.length);
+        MessageBuffer buf = new MessageBuffer(1 + message.length);
         buf.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-            putLong(0). // this sequence number is bogus
-	    putByteArray(message);
+	    putBytes(message);
 
         return buf.getBuffer();
     }

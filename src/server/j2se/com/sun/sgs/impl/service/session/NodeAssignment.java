@@ -22,8 +22,7 @@ package com.sun.sgs.impl.service.session;
 /**
  * Contains the node ID assigment for a {@code ManagedObject}.
  *
- * TBD: should this be combined with IdentityAssignment?  Also, should this
- * class be moved to the com.sun.sgs.service package?
+ * TBD: should this * class be moved to the com.sun.sgs.service package?
  */
 public interface NodeAssignment {
 

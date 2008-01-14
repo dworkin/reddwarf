@@ -19,11 +19,9 @@
 
 package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
@@ -268,24 +266,6 @@ public abstract class AbstractService implements Service {
     protected State getState() {
 	synchronized (lock) {
 	    return state;
-	}
-    }
-
-    /** Note: this is a hack that can be removed. */
-    protected void runTransactionally(KernelRunnable task) throws Exception {
-	for (;;) {
-	    try {
-		taskScheduler.runTransactionalTask(task, taskOwner);
-		return;
-	    } catch (Exception e) {
-		if (e instanceof ExceptionRetryStatus &&
-		    ((ExceptionRetryStatus) e).shouldRetry())
-		{
-		    continue;
-		} else {
-		    throw e;
-		}
-	    }
 	}
     }
     

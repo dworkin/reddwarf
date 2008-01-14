@@ -21,14 +21,10 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
-import com.sun.sgs.impl.service.session.IdentityAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -40,10 +36,8 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
@@ -202,14 +196,14 @@ public class ChannelServiceImpl
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
-	    runTransactionally(
+	    taskScheduler.runTransactionalTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
 			    new ChannelServerWrapper(serverProxy));
-		    }}
-		);
+		    }},
+		taskOwner);
 
 	    /*
 	     * Add listeners for handling recovery and for handling
@@ -217,9 +211,6 @@ public class ChannelServiceImpl
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
-	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE,
-		new ChannelProtocolMessageListener());
 
 	    taskHandlerThread.start();
 
@@ -353,7 +344,10 @@ public class ChannelServiceImpl
 		    }
 		}
 		localMembers.add(new BigInteger(1, sessionId));
-		    
+
+		sessionService.registerProtocolMessageListener(
+		    new ChannelSessionDisconnectListener(sessionId));
+
 	    } finally {
 		callFinished();
 	    }
@@ -444,17 +438,10 @@ public class ChannelServiceImpl
 		}
 
 		for (BigInteger sessionId : localMembers) {
-		    ClientSession session =
-			sessionService.getLocalClientSession(
-			    sessionId.toByteArray());
-		    if (session == null) {
-			// TBD: session probably got disconnected, so
-			// remove from list here?
-		    } else {
-			sessionService.sendProtocolMessageNonTransactional(
-			    session, message, Delivery.RELIABLE);
-		    }
+		    sessionService.sendProtocolMessageNonTransactional(
+ 			sessionId.toByteArray(), message, Delivery.RELIABLE);
 		}
+
 	    } finally {
 		callFinished();
 	    }
@@ -726,25 +713,17 @@ public class ChannelServiceImpl
     
     /* -- Implement ProtocolMessageListener -- */
 
-    private final class ChannelProtocolMessageListener
-	implements ProtocolMessageListener
+    private final class ChannelSessionDisconnectListener
+	implements Runnable
     {
-	/** {@inheritDoc}
-	 * 
-	 * Note: This method is unused and should eventually go away, along
-	 * with the ProtocolMessageListener API.  The ClientSessionService
-	 * no longer dispatches messages to protocol message listeners.
-	 */
-	public void receivedMessage(final ClientSession session, byte[] message) {
-	    if (logger.isLoggable(Level.SEVERE)) {
-		logger.log(
-		    Level.SEVERE,
-		    "unexpected message: session:{0} message:{1}",
-		    session, HexDumper.format(message));
-	    }
-	}
+        private final byte[] sessionId;
 
-	/** {@inheritDoc}
+        ChannelSessionDisconnectListener(byte[] sessionId) {
+            this.sessionId = sessionId;
+        }
+
+        /**
+         * {@inheritDoc}
 	 *
 	 * TBD: Currently the ChannelService is notified by the
 	 * ClientSessionService when a client session disconnects.  This
@@ -752,25 +731,21 @@ public class ChannelServiceImpl
 	 * ChannelService can register interest in receiving notification
 	 * when the client session is removed.
 	 */
-	public void disconnected(final ClientSession session) {
+	public void run() {
 	    /*
 	     * Schedule a transactional task to remove the
 	     * disconnected session from all channels that it is
-	     * currently a member of (unless the session has a null
-	     * identity, which means the session was not logged in, so
-	     * it can't be a member of any channel).
+	     * currently a member of.
 	     */
-	    Identity identity = ((IdentityAssignment) session).getIdentity();
-	    if (identity != null) {
-		taskScheduler.scheduleTask(
- 		     new TransactionRunner(
-			new AbstractKernelRunnable() {
-			    public void run() {
-				ChannelImpl.removeSessionFromAllChannels(session);
+	    taskScheduler.scheduleTask(
+ 		 new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    ChannelImpl.removeSessionFromAllChannels(
+				localNodeId, sessionId);
 			    }
-			}),
-		     new TaskOwnerImpl(identity, taskOwner.getContext()));
-	    }
+		    }),
+		 taskOwner);
 	}
     }
 
@@ -880,7 +855,7 @@ public class ChannelServiceImpl
 		 * given session from all channels it is a member of.
 		 */
 		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
-		runTransactionally(task);
+		taskScheduler.runTransactionalTask(task, taskOwner);
 		
 		for (final byte[] sessionId : task.getSessionIds()) {
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -890,24 +865,26 @@ public class ChannelServiceImpl
 			    HexDumper.toHexString(sessionId));
 		    }
 		    
-		    runTransactionally(
+		    taskScheduler.runTransactionalTask(
 			new AbstractKernelRunnable() {
 			    public void run() {
 				ChannelImpl.removeSessionFromAllChannels(
 				    nodeId, sessionId);
 			    }
-			});
+			},
+			taskOwner);
 		}
 		/*
 		 * Remove binding to channel server proxy for failed
 		 * node, and remove proxy's wrapper.
 		 */
-		runTransactionally(
+		taskScheduler.runTransactionalTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    removeChannelServerProxy(nodeId);
 			}
-		    });
+		    },
+		    taskOwner);
 		
 		future.done();
 

@@ -78,7 +78,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"throw RuntimeException";
 
     private static final String SESSION_PREFIX =
-	"com.sun.sgs.impl.service.session.proxy";
+	"com.sun.sgs.impl.service.session.impl";
 
     private static final String SESSION_NODE_PREFIX =
 	"com.sun.sgs.impl.service.session.node";
@@ -798,11 +798,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    this.password = password;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(name) +
+		new MessageBuffer(2 + MessageBuffer.getSize(name) +
 				  MessageBuffer.getSize(password));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
 		putString(name).
 		putString(password);
 	    loginAck = false;
@@ -861,12 +860,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
-		putByteArray(message);
+		new MessageBuffer(1+ message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -904,10 +900,8 @@ public class TestClientSessionServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -962,23 +956,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
-		    System.err.println(
-			"bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
-
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
@@ -1023,8 +1000,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    byte[] message = buf.getBytes(buf.getUnsignedShort());
+		    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
 			System.err.println("message received: " + message);
@@ -1086,9 +1062,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
+	private final Map<ManagedReference, ManagedReference> sessions =
 	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
+		new HashMap<ManagedReference, ManagedReference>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -1103,10 +1079,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
 		DataManager dataManager = AppContext.getDataManager();
+		ManagedReference sessionRef =
+		    dataManager.createReference(session);
 		ManagedReference listenerRef =
 		    dataManager.createReference(listener);
 		dataManager.markForUpdate(this);
-		sessions.put(session, listenerRef);
+		sessions.put(sessionRef, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
 		return listener;
@@ -1118,7 +1096,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	private Set<ClientSession> getSessions() {
-	    return sessions.keySet();
+	    Set<ClientSession> sessionSet =
+		new HashSet<ClientSession>();
+	    for (ManagedReference sessionRef : sessions.keySet()) {
+		sessionSet.add(sessionRef.get(ClientSession.class));
+	    }
+	    return sessionSet;
 	}
     }
 

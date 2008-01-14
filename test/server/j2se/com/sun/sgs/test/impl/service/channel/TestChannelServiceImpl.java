@@ -1371,11 +1371,10 @@ public class TestChannelServiceImpl extends TestCase {
 	    this.name = user;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(user) +
+		new MessageBuffer(2 + MessageBuffer.getSize(user) +
 				  MessageBuffer.getSize(pass));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
 		putString(user).
 		putString(pass);
 	    loginAck = false;
@@ -1435,12 +1434,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
-		putByteArray(message);
+		new MessageBuffer(1 + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1549,10 +1545,8 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -1594,28 +1588,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"[" + name + "] bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		switch (serviceId) {
-		    
-		case SimpleSgsProtocol.APPLICATION_SERVICE:
-		    processAppProtocolMessage(buf);
-		    break;
-
-		default:
-		    System.err.println(
-			"[" + name + "] bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
+		processAppProtocolMessage(buf);
 	    }
 
 	    private void processAppProtocolMessage(MessageBuffer buf) {
@@ -1663,9 +1636,7 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.notifyAll();
 		    } break;
 
-		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    buf = new MessageBuffer(buf.getByteArray());
+		case SimpleSgsProtocol.SESSION_MESSAGE: {
 		    String action = buf.getString();
 		    if (action.equals("join")) {
 			String channelName = buf.getString();
@@ -1701,6 +1672,7 @@ public class TestChannelServiceImpl extends TestCase {
 			    action);
 		    }
 		    break;
+		}
 
 		default:
 		    System.err.println(	
@@ -1761,20 +1733,12 @@ public class TestChannelServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession, ManagedReference> sessions =
-	    Collections.synchronizedMap(
-		new HashMap<ClientSession, ManagedReference>());
-
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.markForUpdate(this);
-	    ManagedReference listenerRef =
-		dataManager.createReference(listener);
-	    sessions.put(session, listenerRef);
 	    dataManager.setBinding(session.getName(), session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
@@ -1782,24 +1746,6 @@ public class TestChannelServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void initialize(Properties props) {
-	}
-
-	private Set<ClientSession> getSessions() {
-	    return sessions.keySet();
-	}
-
-	DummyClientSessionListener getClientSessionListener(String name) {
-
-	    for (Map.Entry<ClientSession,ManagedReference> entry :
-		     sessions.entrySet()) {
-
-		ClientSession session = entry.getKey();
-		ManagedReference listenerRef = entry.getValue();
-		if (session.getName().equals(name)) {
-		    return listenerRef.get(DummyClientSessionListener.class);
-		}
-	    }
-	    return null;
 	}
     }
 
@@ -1811,10 +1757,11 @@ public class TestChannelServiceImpl extends TestCase {
 	boolean receivedDisconnectedCallback = false;
 	boolean wasGracefulDisconnect = false;
 	
-	private final ClientSession session;
+	private final ManagedReference sessionRef;
 	
 	DummyClientSessionListener(ClientSession session) {
-	    this.session = session;
+	    DataManager dataManager = AppContext.getDataManager();
+	    this.sessionRef = dataManager.createReference(session);
 	    this.name = session.getName();
 	}
 
@@ -1834,13 +1781,14 @@ public class TestChannelServiceImpl extends TestCase {
 	public void receivedMessage(byte[] message) {
 	    MessageBuffer buf = new MessageBuffer(message);
 	    String action = buf.getString();
+	    DataManager dataManager = AppContext.getDataManager();
+	    ClientSession session = sessionRef.get(ClientSession.class);
 	    if (action.equals("join")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: join request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.join(session);
 		session.send(message);
@@ -1849,8 +1797,7 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("DummyClientSessionListener: leave request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.leave(session);
 		session.send(message);
@@ -1860,10 +1807,9 @@ public class TestChannelServiceImpl extends TestCase {
 				   "channel name: " + channelName +
 				   ", user: " + name);
 		byte[] channelMessage = buf.getByteArray();
-		Channel channel =
-		    AppContext.getDataManager().
+		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
-		channel.send(message);
+		channel.send(channelMessage);
 	    }
 	}
     }
