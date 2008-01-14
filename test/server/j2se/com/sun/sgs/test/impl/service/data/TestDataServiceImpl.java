@@ -45,13 +45,20 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.PackageReadResolve;
+import com.sun.sgs.test.util.PrivateReadResolve;
+import com.sun.sgs.test.util.ProtectedReadResolve;
+import com.sun.sgs.test.util.PublicReadResolve;
+import com.sun.sgs.test.util.PackageWriteReplace;
+import com.sun.sgs.test.util.PrivateWriteReplace;
+import com.sun.sgs.test.util.ProtectedWriteReplace;
+import com.sun.sgs.test.util.PublicWriteReplace;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Properties;
@@ -588,26 +595,6 @@ public class TestDataServiceImpl extends TestCase {
 	createTransaction();
 	try {
 	    getBinding(app, service, "dummy", DeserializationFails.class);
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testGetBindingDeserializeAsNull() throws Exception {
-	testGetBindingDeserializeAsNull(true);
-    }
-    public void testGetServiceBindingDeserializeAsNull() throws Exception {
-	testGetBindingDeserializeAsNull(false);
-    }
-    private void testGetBindingDeserializeAsNull(boolean app)
-	throws Exception
-    {
-	setBinding(app, service, "dummy", new DeserializeAsNull());
-	txn.commit();
-	createTransaction();
-	try {
-	    getBinding(app, service, "dummy", DeserializeAsNull.class);
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
 	    System.err.println(e);
@@ -2031,19 +2018,6 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testGetReferenceDeserializeAsNull() throws Exception {
-	dummy.setNext(new DeserializeAsNull());
-	txn.commit();
-	createTransaction();
-	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	try {
-	    dummy.getNext();
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-    }
-
     public void testGetReferenceOldTxn() throws Exception {
 	dummy.setNext(new DummyManagedObject());
 	txn.commit();
@@ -2096,6 +2070,235 @@ public class TestDataServiceImpl extends TestCase {
 	    DeserializationDelayed.delay = 0;
 	    txn = null;
 	}
+    }
+
+    /**
+     * Test detecting managed objects with readResolve and writeReplace
+     * methods.
+     */
+    public void testManagedObjectReadResolveWriteReplace() throws Exception {
+	objectIOExceptionOnCommit(new MOPublicReadResolve());
+	objectIOExceptionOnCommit(new MOPublicWriteReplace());
+	objectIOExceptionOnCommit(new MOPublicReadResolveHere());
+	objectIOExceptionOnCommit(new MOPublicWriteReplaceHere());
+	objectIOExceptionOnCommit(new MOProtectedReadResolve());
+	objectIOExceptionOnCommit(new MOProtectedWriteReplace());
+	objectIOExceptionOnCommit(new MOProtectedReadResolveHere());
+	objectIOExceptionOnCommit(new MOProtectedWriteReplaceHere());
+	okOnCommit(new MOPackageReadResolve());
+	okOnCommit(new MOPackageWriteReplace());
+	objectIOExceptionOnCommit(new MOPackageReadResolveHere());
+	objectIOExceptionOnCommit(new MOPackageWriteReplaceHere());
+	okOnCommit(new MOPrivateReadResolve());
+	okOnCommit(new MOPrivateWriteReplace());
+	objectIOExceptionOnCommit(new MOPrivateReadResolveHere());
+	objectIOExceptionOnCommit(new MOPrivateWriteReplaceHere());
+	okOnCommit(new MOStaticReadResolve());
+	okOnCommit(new MOStaticWriteReplace());
+	okOnCommit(new MOReadResolveWrongReturn());
+	okOnCommit(new MOWriteReplaceWrongReturn());
+	objectIOExceptionOnCommit(new MOLocalPackageReadResolve());
+	objectIOExceptionOnCommit(new MOLocalPackageWriteReplace());
+	okOnCommit(new MOLocalPrivateReadResolve());
+	okOnCommit(new MOLocalPrivateWriteReplace());
+	okOnCommit(new AbstractReadResolveField());
+	okOnCommit(new AbstractWriteReplaceField());
+    }
+
+    static class MOPublicReadResolve extends PublicReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOPublicReadResolveHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	public Object readResolve() { return this; }
+    }
+
+    static class MOPublicWriteReplace extends PublicWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOProtectedReadResolve extends ProtectedReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOPublicWriteReplaceHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	public Object writeReplace() { return this; }
+    }
+
+    static class MOProtectedReadResolveHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	protected Object readResolve() { return this; }
+    }
+
+    static class MOProtectedWriteReplace extends ProtectedWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOPackageReadResolve extends PackageReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOProtectedWriteReplaceHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	protected Object writeReplace() { return this; }
+    }
+
+    static class MOPackageReadResolveHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	Object readResolve() { return this; }
+    }
+
+    static class MOPackageWriteReplace extends PackageWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOPrivateReadResolve extends PrivateReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOPackageWriteReplaceHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	Object writeReplace() { return this; }
+    }
+
+    static class MOPrivateReadResolveHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	private Object readResolve() { return this; }
+    }
+
+    static class MOPrivateWriteReplace extends PrivateWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOStaticReadResolve implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 0;
+	public static Object readResolve() { return null; }
+    }
+
+    static class MOPrivateWriteReplaceHere
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	private Object writeReplace() { return this; }
+    }
+
+    static class MOStaticWriteReplace implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 0;
+	public static Object writeReplace() { return null; }
+    }
+
+    static class MOReadResolveWrongReturn
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	public static String readResolve() { return "hi"; }
+    }
+
+    static class MOWriteReplaceWrongReturn
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	public static String writeReplace() { return "hi"; }
+    }
+
+    static class LocalPackageReadResolve {
+	Object readResolve() { return this; }
+    }
+
+    static class LocalPackageWriteReplace {
+	Object writeReplace() { return this; }
+    }
+
+    static class MOLocalPackageReadResolve extends LocalPackageReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOLocalPackageWriteReplace extends LocalPackageWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class LocalPrivateReadResolve {
+	private Object readResolve() { return this; }
+    }
+
+    static class LocalPrivateWriteReplace {
+	private Object writeReplace() { return this; }
+    }
+
+    static class MOLocalPrivateReadResolve extends LocalPrivateReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class MOLocalPrivateWriteReplace extends LocalPrivateWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class AbstractReadResolveField
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	Class<?> cl = AbstractReadResolve.class;
+    }
+
+    abstract static class AbstractReadResolve
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	abstract Object readResolve();
+    }
+
+    static class AbstractWriteReplaceField
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	Class<?> cl = AbstractWriteReplace.class;
+    }
+
+    abstract static class AbstractWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+	abstract Object writeReplace();
     }
 
     /* -- Test ManagedReference.getForUpdate -- */
@@ -2191,19 +2394,6 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
 	dummy.setNext(new DeserializationFails());
-	txn.commit();
-	createTransaction();
-	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	try {
-	    dummy.getNextForUpdate();
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testGetReferenceUpdateDeserializeAsNull() throws Exception {
-	dummy.setNext(new DeserializeAsNull());
 	txn.commit();
 	createTransaction();
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
@@ -2336,6 +2526,8 @@ public class TestDataServiceImpl extends TestCase {
 	service.setBinding("dummy", new DummyManagedObject());
 	txn.commit();
 	txn = null;
+	new ShutdownAction().waitForDone();
+	service = null;
     }
 
     public void testConcurrentShutdownInterrupt() throws Exception {
@@ -2949,14 +3141,6 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /** A managed object that deserializes as null. */
-    static class DeserializeAsNull extends DummyManagedObject {
-        private static final long serialVersionUID = 1L;
-	private Object readResolve() throws ObjectStreamException {
-	    return null;
-	}
-    }
-
     /** A managed object that uses content equality. */
     static class ContentEquals implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
@@ -3359,5 +3543,32 @@ public class TestDataServiceImpl extends TestCase {
 	    count++;
 	}
 	return count;
+    }
+
+    /**
+     * Check that committing throws ObjectIOException after setting a name
+     * binding to the specified object.
+     */
+    private void objectIOExceptionOnCommit(ManagedObject object)
+	throws Exception
+    {
+	service.setBinding("foo", object);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+	createTransaction();
+    }
+
+    /**
+     * Check that committing succeeds after setting a name binding to the
+     * specified object.
+     */
+    private void okOnCommit(ManagedObject object) throws Exception {
+	service.setBinding("foo", object);
+	txn.commit();
+	createTransaction();
     }
 }

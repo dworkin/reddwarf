@@ -127,6 +127,11 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
+    /** Test cleanup. */
+    protected void tearDown() throws Exception {
+	tearDown(true);
+    }
+
     /** Shut down the nodes. */
     protected void tearDown(boolean clean) throws Exception {
         if (additionalNodes != null) {

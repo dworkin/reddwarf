@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -312,6 +313,78 @@ public class TestDataStoreServerImpl extends TestCase {
 		    notifyAll();
 		}
 	    }
+	}
+    }
+
+    /* -- Test specifying negative transaction IDs -- */
+
+    public void testNegativeTxnIds() {
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.createObject(Long.MIN_VALUE); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.markForUpdate(-1, oid); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.getObject(-2, oid, true); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() {
+		    server.setObject(-3, oid, new byte[0]); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() {
+		    server.setObjects(
+			-4, new long[] { oid }, new byte[][] { new byte[0] });
+		} });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.removeObject(-5, oid); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.getBinding(-6, "foo"); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.setBinding(-7, "foo", oid); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.removeBinding(-8, "foo"); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.getClassId(-9, new byte[0]); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() {
+		    try {
+			server.getClassInfo(-10, 3);
+		    } catch (ClassInfoNotFoundException e) {
+			fail("Unexpected exception: " + e);
+		    }
+		}
+	    });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.nextObjectId(-11, 4); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() { public void run() { server.prepare(-12); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() { public void run() { server.commit(-13); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() {
+		public void run() { server.prepareAndCommit(-14); } });
+	assertThrowsIllegalArgumentException(
+	    new Runnable() { public void run() { server.abort(-15); } });
+     }
+
+    private void assertThrowsIllegalArgumentException(Runnable action) {
+	try {
+	    action.run();
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	} catch (Exception e) {
+	    fail("Expected IllegalArgumentException: " + e);
 	}
     }
 
