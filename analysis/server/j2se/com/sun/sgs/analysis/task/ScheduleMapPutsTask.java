@@ -1,6 +1,7 @@
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.util.ScalableHashMap;
@@ -21,7 +22,7 @@ public class ScheduleMapPutsTask extends BasicScheduleTasks {
     private static final long serialVersionUID = 1;
 
     /** A reference to the map or null. */
-    private ManagedReference<ManagedObject> mapRef;
+    private ManagedReference<? extends ManagedObject> mapRef;
 
     /**
      * Creates an instance of this class using the specified configuration

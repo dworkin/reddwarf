@@ -418,7 +418,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                     public void run() throws Exception {
                         StringHashSet set = null;
                         try {    
-                            set = dataService.getServiceBinding(handoffSpace);
+                            set = (StringHashSet)
+				dataService.getServiceBinding(handoffSpace);
                         } catch (NameNotBoundException nnbe) {
                             // this only happens when this recover method
                             // is called more than once, and just means that

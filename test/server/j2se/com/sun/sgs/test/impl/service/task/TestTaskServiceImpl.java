@@ -913,7 +913,7 @@ public class TestTaskServiceImpl extends TestCase {
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
-                        dataService.getServiceBinding(name, Object.class);
+                        dataService.getServiceBinding(name);
                     } catch (NameNotBoundException nnbe) {
                         node.shutdown(false);
                         node2.shutdown(false);
@@ -931,7 +931,7 @@ public class TestTaskServiceImpl extends TestCase {
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
-                        dataService.getServiceBinding(name, Object.class);
+                        dataService.getServiceBinding(name);
                         fail("Expected NameNotBoundException");
                     } catch (NameNotBoundException nnbe) {}
                 }
