@@ -58,8 +58,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Note that this class uses a fixed number of tasks between outputs,
  * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * configured by defining the {@code
+ * com.sun.sgs.profile.listener.window.size} property in the
  * application properties file.  The default window size for this
  * class is {@code 5000}.
  *

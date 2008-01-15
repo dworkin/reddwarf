@@ -23,6 +23,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
@@ -572,7 +573,6 @@ public class TestTaskServiceImpl extends TestCase {
                 public void run() {
                     String name = dataService.nextBoundName("runHandle.");
                     while ((name != null) && (name.startsWith("runHandle."))) {
-                        System.out.println("Removing: " + name);
                         ManagedHandle mHandle =
                             (ManagedHandle) dataService.getBinding(name);
                         mHandle.cancel();
@@ -903,6 +903,42 @@ public class TestTaskServiceImpl extends TestCase {
             fail("Some pending non-durable tasks did not run");
     }
 
+    public void testRecoveryCleanup() throws Exception {
+        final SgsTestNode node = new SgsTestNode(serverNode, null, null);
+        final SgsTestNode node2 = new SgsTestNode(serverNode, null, null);
+        final String name =
+            TaskServiceImpl.DS_PREFIX + "Handoff." + node.getNodeId();
+        // verify that the handoff binding exists
+        taskScheduler.runTransactionalTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    try {
+                        dataService.getServiceBinding(name, Object.class);
+                    } catch (NameNotBoundException nnbe) {
+                        node.shutdown(false);
+                        node2.shutdown(false);
+                        throw nnbe;
+                    }
+                }
+        }, taskOwner);
+        // shutdown the node and verify that the handoff removal happens
+        node.shutdown(false);
+        String interval = serverNode.getServiceProperties().
+            getProperty("com.sun.sgs.impl.service.watchdog.renew.interval",
+                        "500");
+        Thread.sleep(2 * Long.valueOf(interval));
+        taskScheduler.runTransactionalTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    try {
+                        dataService.getServiceBinding(name, Object.class);
+                        fail("Expected NameNotBoundException");
+                    } catch (NameNotBoundException nnbe) {}
+                }
+        }, taskOwner);
+        node2.shutdown(false);
+    }
+
     /**
      * Utility routines.
      */
@@ -931,7 +967,7 @@ public class TestTaskServiceImpl extends TestCase {
     private void assertCounterClear(String message) {
         Counter counter = (Counter) dataService.getBinding("counter");
         if (! counter.isZero()) {
-            System.out.println("Counter assert failed: " + counter);
+            System.err.println("Counter assert failed: " + counter);
             fail(message);
         }
     }
