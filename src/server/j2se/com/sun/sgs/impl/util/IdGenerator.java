@@ -36,7 +36,7 @@ import java.io.Serializable;
 public class IdGenerator {
 
     /** The minimum number of IDs to reserve. */
-    public static int MIN_BLOCK_SIZE = 8;
+    public static final int MIN_BLOCK_SIZE = 8;
 
     private final String name;
     private final int blockSize;
@@ -98,8 +98,7 @@ public class IdGenerator {
 	synchronized (lock) {
 	    if (nextId > lastReservedId) {
 		ReserveIdBlockTask reserveTask = new ReserveIdBlockTask();
-		scheduler.runTask(
-		    new TransactionRunner(reserveTask), owner, true);
+		scheduler.runTransactionalTask(reserveTask, owner);
 		nextId = reserveTask.firstId;
 		lastReservedId = reserveTask.lastId;
 	    }

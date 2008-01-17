@@ -107,7 +107,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
 	tid = server.createTransaction(1000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
     }
 
     /** Sets passed if the test passes. */
@@ -228,7 +228,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	for (int i = 0; i < 5; i++) {
 	    threads.add(new TestReaperConcurrencyThread(server, i));
 	}
-	Thread.sleep(10000);
+	Thread.sleep(5000);
 	TestReaperConcurrencyThread.setDone();
 	for (TestReaperConcurrencyThread thread : threads) {
 	    Throwable t = thread.getResult();
@@ -271,12 +271,12 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
 	public void run() {
 	    try {
-		long tid = server.createTransaction(1000);
+		long tid = server.createTransaction(2);
 		int succeeds = 0;
 		int aborted = 0;
 		int notActive = 0;
 		while (!getDone()) {
-		    long wait = 1 + random.nextInt(4);
+		    long wait = 1 + random.nextInt(3);
 		    try {
 			Thread.sleep(wait);
 		    } catch (InterruptedException e) {
@@ -288,6 +288,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			    server.abort(tid);
 			} else {
 			    server.getBinding(tid, "dummy");
+			    server.prepareAndCommit(tid);
 			}
 			succeeds++;
 		    } catch (TransactionAbortedException e) {
@@ -297,9 +298,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			abort = true;
 			notActive++;
 		    }
-		    if (abort) {
-			tid = server.createTransaction(1000);
-		    }
+		    tid = server.createTransaction(2);
 		}
 		System.err.println(getName() +
 				   ": succeeds:" + succeeds +
@@ -327,7 +326,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
 	server = getDataStoreServer();
 	tid = server.createTransaction(2000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
 	Thread.sleep(1000);
 	try {
 	    server.getObject(tid, oid, false);
@@ -537,15 +536,19 @@ public class TestDataStoreServerImpl extends TestCase {
 		try {
 		    flag.release();
 		    server.getObject(tid, oid, false);
-		    flag.release();
+		} catch (TransactionAbortedException e) {
+		    System.err.println(e);
+		    tid = -1;
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
+		} finally {
+		    flag.release();
 		}
 	    }
 	};
 	thread.start();
 	/* Wait for thread to block */
-	assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	Thread.sleep(10);
 	/* Concurrent access */
 	try {
@@ -556,7 +559,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	} finally {
 	    /* Clean up */
 	    server.abort(tid2);
-	    assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	    assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
 	}
     }
 }

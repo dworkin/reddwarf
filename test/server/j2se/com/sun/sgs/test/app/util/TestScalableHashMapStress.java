@@ -20,29 +20,16 @@
 package com.sun.sgs.test.app.util;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.util.ScalableHashMap;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TaskService;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyProfileCoordinator;
-import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.NameRunner;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import java.io.File;
-import java.io.IOException;
+import com.sun.sgs.test.util.SgsTestNode;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -51,8 +38,9 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
 import org.junit.Assert;
@@ -101,27 +89,16 @@ public class TestScalableHashMapStress extends Assert {
     /** The random number generator that drives the test. */
     static final Random random = new Random(seed);
 
-    /** The location for the database files. */
-    private static String directory = System.getProperty("test.directory");
-
-    /** The transaction proxy. */
-    private static final DummyTransactionProxy txnProxy =
-	MinimalTestKernel.getTransactionProxy();
-
-    /** The data service. */
-    static DataService dataService;
-
-    /** The task service. */
-    private static TaskService taskService;
+    private static SgsTestNode serverNode;
+    private static TaskScheduler taskScheduler;
+    private static TaskOwner taskOwner;
+    private static DataService dataService;
 
     /** A list of the operations to perform. */
     final List<Op> ops = new ArrayList<Op>();
 
     /** A set that records the entries that should appear in the map. */
     final BitSet control = new BitSet(maxEntries);
-
-    /** The current transaction. */
-    private DummyTransaction txn;
 
     /** The number of objects before creating the map. */
     private int initialObjectCount;
@@ -510,99 +487,137 @@ public class TestScalableHashMapStress extends Assert {
 	new EntrySetNext(1);
 	new EntrySetNextRemove(1);
 
-	DummyAbstractKernelAppContext appContext =
-	    MinimalTestKernel.createContext();
-	DummyComponentRegistry systemRegistry =
-	    MinimalTestKernel.getSystemRegistry(appContext);
-	DummyComponentRegistry serviceRegistry =
-	    MinimalTestKernel.getServiceRegistry(appContext);
-	dataService = new DataServiceImpl(
-	    createProperties(
-		DataStoreImpl.class.getName() + ".directory",
-		createDirectory(), StandardProperties.APP_NAME,
-		"TestScalableHashMapStress"),
-	    systemRegistry, txnProxy);
-	if (dataService instanceof ProfileProducer) {
-	    DummyProfileCoordinator.startProfiling(
-		(ProfileProducer) dataService);
-	}
-	txnProxy.setComponent(DataService.class, dataService);
-	serviceRegistry.setComponent(DataManager.class, dataService);
-	serviceRegistry.setComponent(DataService.class, dataService);
-	taskService = new TaskServiceImpl(
-	    new Properties(), systemRegistry, txnProxy);
-	serviceRegistry.setComponent(TaskManager.class, taskService);
-	txn = createTransaction();
-	initialObjectCount = getObjectCount();
-	map = new ScalableHashMap<Key, Value>();
-	dataService.setBinding("map", map);
-	keys = map.keySet().iterator();
-	dataService.setBinding(
-	    "keys", new ManagedSerializable<Iterator<Key>>(keys));
-	values = map.values().iterator();
-	dataService.setBinding(
-	    "values", new ManagedSerializable<Iterator<Value>>(values));
-	entries = map.entrySet().iterator();
-	dataService.setBinding(
-	    "entries",
-	    new ManagedSerializable<Iterator<Entry<Key, Value>>>(entries));
-    }	
+	serverNode = new SgsTestNode("TestScalableHashMapStress", null, null);
+        taskScheduler = serverNode.getSystemRegistry().
+            getComponent(TaskScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
+        dataService = serverNode.getDataService();
+
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    initialObjectCount = getObjectCount();
+		    map = new ScalableHashMap<Key, Value>();
+		    dataService.setBinding("map", map);
+		    keys = map.keySet().iterator();
+		    dataService.
+			setBinding("keys",
+				   new ManagedSerializable<Iterator<Key>>
+				   (keys));
+		    values = map.values().iterator();
+		    dataService.
+			setBinding("values",
+				   new ManagedSerializable<Iterator<Value>>
+				   (values));
+		    entries = map.entrySet().iterator();
+		    dataService.
+			setBinding("entries",
+				   new ManagedSerializable<Iterator<Entry
+				   <Key, Value>>>(entries));
+		}
+	    }, taskOwner);
+    }
 
     /** Teardown. */
     @After public void tearDown() throws Exception {
-	newTransaction();
-	dataService.removeObject(
-	    dataService.getBinding("entries", ManagedSerializable.class));
-	entries = map.entrySet().iterator();
-	dataService.setBinding(
-	    "entries",
-	    new ManagedSerializable<Iterator<Entry<Key, Value>>>(entries));
-	int count = 0;
-	while (entries.hasNext()) {
-	    if (count % 100 == 0) {
-		newTransaction();
-	    }
-	    Entry<Key, Value> entry = entries.next();
-	    maybeRemoveObject(entry.getKey());
-	    maybeRemoveObject(entry.getValue());
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    initTxnState();
+		    dataService.
+			removeObject(dataService.
+				     getBinding("entries",
+						ManagedSerializable.class));
+		    entries = map.entrySet().iterator();
+		    dataService.setBinding("entries",
+		        new ManagedSerializable<Iterator<Entry<Key, Value>>>
+					   (entries));
+
+		}
+	    }, taskOwner);
+	final AtomicBoolean isDone = new AtomicBoolean(false);
+	while (! isDone.get()) {
+	    taskScheduler.runTransactionalTask(
+	        new AbstractKernelRunnable() {
+		    public void run() throws Exception {
+			initTxnState();
+			int count = 0;
+			while (entries.hasNext()) {
+			    if (++count % 100 == 0)
+				return;
+			    Entry<Key, Value> entry = entries.next();
+			    maybeRemoveObject(entry.getKey());
+			    maybeRemoveObject(entry.getValue());
+			}
+			isDone.set(true);
+		    }
+	    }, taskOwner);
 	}
-	newTransaction();
-	DoneRemoving.init();
-	dataService.removeObject(map);
-	dataService.removeObject(
-	    dataService.getBinding("keys", ManagedSerializable.class));
-	dataService.removeObject(
-	    dataService.getBinding("values", ManagedSerializable.class));
-	dataService.removeObject(
-	    dataService.getBinding("entries", ManagedSerializable.class));
-	txn.commit();
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    initTxnState();
+		    DoneRemoving.init();
+		    dataService.removeObject(map);
+		    dataService.
+			removeObject(dataService.
+				     getBinding("keys",
+						ManagedSerializable.class));
+		    dataService.
+			removeObject(dataService.
+				     getBinding("values",
+						ManagedSerializable.class));
+		    dataService.
+			removeObject(dataService.
+				     getBinding("entries",
+						ManagedSerializable.class));
+		}
+	    }, taskOwner);
 	DoneRemoving.await(1);
-	txn = createTransaction();
-	assertEquals(initialObjectCount, getObjectCount());
-	txn.abort(null);
+	taskScheduler.runTransactionalTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    assertEquals(initialObjectCount, getObjectCount());
+		}
+	    }, taskOwner);
+        serverNode.shutdown(true);
     }
 
     /* Tests */
 
     /** Performs a random stress test on the scalable hash map. */
     @Test public void testStress() throws Exception {
+	final long start = System.currentTimeMillis();
 	System.err.println("test.entries=" + maxEntries);
 	System.err.println("test.operations=" + operations);
 	System.err.println("test.collisions=" + collisions);
 	System.err.println("test.seed=" + seed);
-	long start = System.currentTimeMillis();
-	int opsPerTxn = getRandomOpsPerTxn();
-	for (int opnum = 0; opnum < operations; opnum++) {
-	    if (opnum > 0 && opnum % 5000 == 0) {
-		System.err.println("opnum=" + opnum);
-	    }
-	    if (opsPerTxn == 0) {
-		newTransaction();
-		opsPerTxn = getRandomOpsPerTxn();
-	    } else {
-		opsPerTxn--;
-	    }
-	    getRandomOp().run();
+
+	final AtomicBoolean isDone = new AtomicBoolean(false);
+	final AtomicInteger opsPerTxn = new AtomicInteger(getRandomOpsPerTxn());
+	final AtomicInteger opnum = new AtomicInteger(0);
+	while (! isDone.get()) {
+	    taskScheduler.runTransactionalTask(
+	        new AbstractKernelRunnable() {
+		    public void run() throws Exception {
+			initTxnState();
+			getRandomOp().run();
+			int num;
+			while ((num = opnum.getAndIncrement()) < operations) {
+			    if (num > 0 && num % 5000 == 0) {
+				System.err.println("opnum=" + num);
+			    }
+			    if (opsPerTxn.get() == 0) {
+				opsPerTxn.set(getRandomOpsPerTxn());
+				return;
+			    } else {
+				opsPerTxn.decrementAndGet();
+			    }
+			    getRandomOp().run();
+			}
+			isDone.set(true);
+		    }
+	    }, taskOwner);
 	}
 	long stop = System.currentTimeMillis();
 	System.err.println(
@@ -613,12 +628,10 @@ public class TestScalableHashMapStress extends Assert {
     /* Utilities */
 
     /**
-     * Creates a new transaction and updates fields from data manager bindings.
+     * Updates fields from data manager bindings for a new transaction.
      */
     @SuppressWarnings("unchecked")
-    private void newTransaction() throws Exception {
-	txn.commit();
-	txn = createTransaction();
+    private void initTxnState() throws Exception {
 	map = dataService.getBinding("map", ScalableHashMap.class);
 	keys = (Iterator<Key>)
 	    dataService.getBinding("keys", ManagedSerializable.class).get();
@@ -644,32 +657,6 @@ public class TestScalableHashMapStress extends Assert {
     /** Returns a random operation. */
     private Op getRandomOp() {
 	return ops.get(random.nextInt(ops.size()));
-    }
-
-    /** Creates a transaction with the default timeout. */
-    private DummyTransaction createTransaction() {
-	DummyTransaction txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
-
-    /** Creates the directory for database files. */
-    private String createDirectory() throws IOException {
-	if (directory != null) {
-	    new File(directory).mkdir();
-	} else {
-	    File dir = File.createTempFile(
-		"TestScalableHashMapStress", "dbdir");
-	    if (!dir.delete()) {
-		throw new RuntimeException("Problem deleting file: " + dir);
-	    }
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Failed to create directory: " + dir);
-	    }
-	    directory = dir.getPath();
-	}
-	return directory;
     }
 
     /** Notes that the key for the specified object number has been removed. */

@@ -1,4 +1,7 @@
 /**
+ Defines asynchronous channels that are connected to a stream-oriented
+ connecting or listening socket, or a datagram-oriented socket. <p>
+
  <a name="async"></a>
  <blockquote><table cellspacing=1 cellpadding=0
  summary="Lists asynchronous channels and their descriptions">

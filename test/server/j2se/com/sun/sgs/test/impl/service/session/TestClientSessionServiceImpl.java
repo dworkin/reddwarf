@@ -439,9 +439,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(name, "test");
 	    client.logout();
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
 	    synchronized (disconnectedCallbackLock) {
-		DummyClientSessionListener sessionListener =
-		    getClientSessionListener(name);
 		if (sessionListener == null ||
 		    !sessionListener.receivedDisconnectedCallback)
 		{
