@@ -28,12 +28,11 @@ import java.io.Serializable;
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
- * invoked with a new {@code ClientSession} instance which
- * represents the current connection between that client and the
- * server.  The application should register a {@link
- * ClientSessionListener} for each session logged in, so that it can
- * receive notification when a client session sends a message, is
- * disconnected, or logs out.
+ * invoked with a new {@code ClientSession} instance which represents the
+ * current connection between that client and the server.  By returning a
+ * unique {@link ClientSessionListener} from the {@code loggedIn} method
+ * for each given client session, the application will receive notification
+ * when a client session sends a message, is disconnected, or logs out.
  *
  * <p>A {@code ClientSession} is used to identify a client that is
  * logged in, to send messages to that client, to register a listener

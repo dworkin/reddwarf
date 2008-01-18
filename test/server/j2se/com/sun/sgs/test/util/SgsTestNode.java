@@ -19,6 +19,7 @@
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -130,12 +131,12 @@ public class SgsTestNode {
     private final ComponentRegistry systemRegistry;
 
     /** Services. */
-    private final DataServiceImpl dataService;
+    private final DataService dataService;
     private final WatchdogService watchdogService;
     private final NodeMappingService nodeMappingService;
     private final TaskService taskService;
-    private final ClientSessionServiceImpl sessionService;
-    private final ChannelServiceImpl channelService;
+    private final ClientSessionService sessionService;
+    private final ChannelManager channelService;
 
     /** The listen port for the client session service. */
     private int appPort;
@@ -272,18 +273,18 @@ public class SgsTestNode {
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
 
-        dataService = txnProxy.getService(DataServiceImpl.class);
+        dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);
         nodeMappingService = txnProxy.getService(NodeMappingService.class);
         taskService = txnProxy.getService(TaskService.class);
-        sessionService = txnProxy.getService(ClientSessionServiceImpl.class);
+        sessionService = txnProxy.getService(ClientSessionService.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
 
         if (!isServerNode) {
             // restore the old owner
             setCurrentOwnerMethod.invoke(null, oldOwner);
         }
-	appPort = sessionService.getListenPort();
+	appPort = ((ClientSessionServiceImpl) sessionService).getListenPort();
     }
 
     /**
@@ -335,7 +336,7 @@ public class SgsTestNode {
     /**
      * Returns the data service.
      */
-    public DataServiceImpl getDataService() {
+    public DataService getDataService() {
 	return dataService;
     }
 
@@ -362,14 +363,14 @@ public class SgsTestNode {
     /**
      * Returns the client session service.
      */
-    public ClientSessionServiceImpl getClientSessionService() {
+    public ClientSessionService getClientSessionService() {
 	return sessionService;
     }
 
     /**
      * Returns the channel service.
      */
-    public ChannelServiceImpl getChannelService() {
+    public ChannelManager getChannelService() {
 	return channelService;
     }
 
@@ -395,7 +396,7 @@ public class SgsTestNode {
         int requestedDataPort =
             isServerNode ?
             0 :
-            getDataServerPort(serverNode.getDataService());
+            getDataServerPort((DataServiceImpl) serverNode.getDataService());
 
         int requestedWatchdogPort =
             isServerNode ?
@@ -453,18 +454,6 @@ public class SgsTestNode {
 	return appPort;
     }
     
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-        Properties props = new Properties();
-        if (args.length % 2 != 0) {
-            throw new RuntimeException("Odd number of arguments");
-	        }
-	        for (int i = 0; i < args.length; i += 2) {
-	            props.setProperty(args[i], args[i + 1]);
-	        }
-	        return props;
-	    }
-
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
         File dir = new File(directory);

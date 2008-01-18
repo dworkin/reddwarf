@@ -254,6 +254,7 @@ public class ClientSessionServiceImpl
 		    Level.CONFIG, e,
 		    "Failed to create ClientSessionServiceImpl");
 	    }
+	    doShutdown();
 	    throw e;
 	}
     }
@@ -266,6 +267,9 @@ public class ClientSessionServiceImpl
 	// reject connections until ready is invoked.  Need to
 	// implement interlock for this.  -- ann (8/29/07)
 
+	// Note: When the kernel simplification changes go in, an interlock
+	// might not be necessary.
+
         nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
 		    taskScheduler, taskOwner,
@@ -275,15 +279,21 @@ public class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public void doShutdown() {
 	try {
-	    acceptor.shutdown();
-	    logger.log(Level.FINEST, "acceptor shutdown");
+	    if (acceptor != null) {
+		acceptor.shutdown();
+
+		logger.log(Level.FINEST, "acceptor shutdown");
+	    }
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
 	    // swallow exception
 	}
 
 	try {
-	    exporter.unexport();
+	    if (exporter != null) {
+		exporter.unexport();
+		logger.log(Level.FINEST, "client session server unexported");
+	    }
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
@@ -563,6 +573,8 @@ public class ClientSessionServiceImpl
 	    boolean readOnly = commitActions.isEmpty();
 	    if (! readOnly) {
 		contextQueue.add(this);
+	    } else {
+		isCommitted = true;
 	    }
             return readOnly;
         }
@@ -588,7 +600,7 @@ public class ClientSessionServiceImpl
 	/**
 	 * Wakes up the thread to process committed contexts in the
 	 * context queue if the queue is non-empty and the first
-	 * context in the queue is committed, .
+	 * context in the queue is committed.
 	 */
 	private void checkFlush() {
 	    Context context = contextQueue.peek();
@@ -662,11 +674,25 @@ public class ClientSessionServiceImpl
 	    sendMessages();
 	    if (disconnect) {
 		ClientSessionHandler handler = handlers.get(sessionRefId);
+		/*
+		 * If session is local, disconnect session, otherwise schedule
+		 * a task to disconnect the remote client session.
+		 */
 		if (handler != null) {
 		    handler.handleDisconnect(false);
 		} else {
-		    // TBD: This needs to be implemented.
-		    throw new AssertionError("not implemented");
+		    byte[] sessionId = sessionRefId.toByteArray();
+		    try {
+			sessionServer.disconnect(sessionId);
+		    } catch (Exception e) {
+			logger.logThrow(
+			    Level.FINE, e,
+			    "invoking ClientSessionServer.disconnect " +
+			    "for session:{0} throws",
+			    HexDumper.toHexString(sessionId));
+			// TBD: retry?
+					
+		    }
 		}
 	    }
 	}
@@ -708,7 +734,7 @@ public class ClientSessionServiceImpl
 			sessionServer.sendProtocolMessages(
 			    sessionId, null, messageData, deliveryData);
 
-		    } catch (IOException e) {
+		    } catch (Exception e) {
 			logger.logThrow(
 		    	    Level.FINE, e,
 			    "Sending messages to session:{0} throws",
@@ -798,49 +824,60 @@ public class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-	public boolean sendProtocolMessages(byte[] sessionId,
-					    long [] seq,
-					    byte[][] messages,
-					    Delivery[] delivery)
+	public void sendProtocolMessages(byte[] sessionId,
+					 long [] seq,
+					 byte[][] messages,
+					 Delivery[] delivery)
 	{
-	    BigInteger id = new BigInteger(1, sessionId);
-	    ClientSessionHandler handler = handlers.get(id);
-	    if (handler == null || ! handler.isConnected()) {
-		logger.log (
-		    Level.FINE,
-		    "Unable to send message to unknown or " +
-		    "disconnected session:{0}", id);
-		return false;
-	    }
+	    callStarted();
+	    try {
+		BigInteger id = new BigInteger(1, sessionId);
+		ClientSessionHandler handler = handlers.get(id);
+		if (handler == null || ! handler.isConnected()) {
+		    logger.log (
+			Level.FINE,
+			"Unable to send message to unknown or " +
+			"disconnected session:{0}", id);
+		    return;
+		}
 
-	    if (messages.length != delivery.length) {
-		throw new IllegalArgumentException(
-		    "length of messages and delivery arrays must match");
-	    }
+		if (messages.length != delivery.length) {
+		    throw new IllegalArgumentException(
+			"length of messages and delivery arrays must match");
+		}
 
-	    for (int i = 0; i < messages.length; i++) {
-		handler.sendProtocolMessage(messages[i], delivery[i]);
+		for (int i = 0; i < messages.length; i++) {
+		    handler.sendProtocolMessage(messages[i], delivery[i]);
+		}
+	    } finally {
+		callFinished();
 	    }
-	    return true;
 	}
 
 	/** {@inheritDoc} */
 	public boolean disconnect(byte[] sessionId) {
-	    BigInteger id = new BigInteger(1, sessionId);
-	    ClientSessionHandler handler = handlers.get(id);
-	    if (handler != null) {
-		if (handler.isConnected()) {
-		    handler.handleDisconnect(false);
-		    return true;
+	    callStarted();
+	    try {
+		BigInteger id = new BigInteger(1, sessionId);
+		ClientSessionHandler handler = handlers.get(id);
+		if (handler != null) {
+		    if (handler.isConnected()) {
+			handler.handleDisconnect(false);
+			return true;
+		    } else {
+			logger.log (
+		    	    Level.FINE,
+			    "Session:{0} already disconnected", id);
+		    }
 		} else {
-		    logger.log (
-		    	Level.FINE, "Session:{0} already disconnected", id);
+		    logger.log(
+			Level.FINE,
+			"Unable to disconnect unknown session:{0}", id);
 		}
-	    } else {
-		logger.log(
-		    Level.FINE, "Unable to disconnect unknown session:{0}", id);
+		return false;
+	    } finally {
+		callFinished();
 	    }
-	    return false;
 	}
     }
     
@@ -858,14 +895,6 @@ public class ClientSessionServiceImpl
 	return localNodeId;
     }
     
-    /**
-     * Returns the client session handler for the specified session
-     * {@code idBytes}.
-     */
-    private ClientSessionHandler getHandler(byte[] idBytes) {
-	return handlers.get(new BigInteger(1, idBytes));
-    }
-
     /**
      * Returns the {@code ClientSessionImpl} corresponding to the
      * specified client {@code session}.

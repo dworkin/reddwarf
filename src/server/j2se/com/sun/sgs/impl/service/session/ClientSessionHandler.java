@@ -86,7 +86,7 @@ class ClientSessionHandler {
      */
     private final Object lock = new Object();
     
-    /** The connection state, accessed. */
+    /** The connection state. */
     private State state = State.CONNECTING;
 
     /** Indicates whether session disconnection has been handled. */
@@ -183,12 +183,18 @@ class ClientSessionHandler {
      * the following:
      *
      * a) sending a disconnect acknowledgment (LOGOUT_SUCCESS)
-     * if 'graceful' is true
+     *    if 'graceful' is true
      *
      * b) closing this session's connection
      *
      * c) submitting a transactional task to call the 'disconnected'
-     * callback on the listener for this session.
+     *    callback on the listener for this session.
+     *
+     * d) notifying the identity (if non-null) that the session has
+     *    logged out.
+     *
+     * e) notifying the node mapping service that the identity (if
+     *    non-null) is no longer active.
      *
      * @param graceful if the disconnection was graceful (i.e., due to
      * a logout request).
@@ -222,6 +228,8 @@ class ClientSessionHandler {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
 		    }});
+
+	    deactivateIdentity(identity);
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
@@ -398,7 +406,6 @@ class ClientSessionHandler {
 			"Handler.messageReceived protocol version:{0}, " +
 			"expected {1}", version, SimpleSgsProtocol.VERSION);
 		}
-		    // TBD: should the connection be disconnected?
 		return;
 	    }
 
@@ -570,13 +577,12 @@ class ClientSessionHandler {
 	    if (assignedNodeId == sessionService.getLocalNodeId()) {
 		/*
 		 * Handle this login request locally: Set the client
-		 * session's node ID and identity, store the client
-		 * session in the data store (which assigns it an
-		 * ID--the ID of the reference to the client session
-		 * object), inform the session service that this
-		 * handler is "connected:", and schedule a task to
-		 * perform client login (call the AppListener.loggedIn
-		 * method).
+		 * session's identity, store the client session in the data
+		 * store (which assigns it an ID--the ID of the reference
+		 * to the client session object), inform the session
+		 * service that this handler is available (by invoking
+		 * "addHandler", and schedule a task to perform client
+		 * login (call the AppListener.loggedIn method).
 		 */
 		taskQueue =
 		    new NonDurableTaskQueue(
@@ -626,30 +632,7 @@ class ClientSessionHandler {
 			handleDisconnect(false);
 		    }});
 
-		try {
-		    /*
-		     * Set identity's status for this class to 'false'.
-		     *
-		     * TBD: Should this handler wait before invoking
-		     * 'setStatus' to ensure that the node assignment
-		     * for the identity remains in the node map so the
-		     * assingment doesn't change before the login
-		     * redirect can be handled by the client? -- ann (8/29/07)
-		     */
-		    sessionService.nodeMapService.setStatus(
-			ClientSessionHandler.class, authenticatedIdentity,
-			false);
-		    
-		} catch (Exception e) {
-		    // TBD: Is it OK to assume that node map service
-		    // will handle retries of 'setStatus' if they fail, or
-		    // does this handler need to retry 'setStatus' until
-		    // it succeeds? -- ann (8/29/07)
-		    logger.logThrow(
-		       Level.WARNING, e,
-		       "setting status for identity:{0} throws", name);
-
-		}
+		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 
@@ -668,6 +651,27 @@ class ClientSessionHandler {
 
     /* -- other private methods and classes -- */
 
+    /**
+     * Invokes the {@code setStatus} method on the node mapping service
+     * with the given {@code inactiveIdentity} and {@code false} to mark
+     * the identity as inactive.  This method is invoked when a login is
+     * redirected and also when a this client session is disconnected.
+     */
+    private void deactivateIdentity(Identity inactiveIdentity) {
+	try {
+	    /*
+	     * Set identity's status for this class to 'false'.
+	     */
+	    sessionService.nodeMapService.setStatus(
+		ClientSessionHandler.class, inactiveIdentity, false);
+	} catch (Exception e) {
+	    logger.logThrow(
+		Level.WARNING, e,
+		"setting status for identity:{0} throws",
+		inactiveIdentity.getName());
+	}
+    }
+    
     /**
      * Returns the current state.
      */

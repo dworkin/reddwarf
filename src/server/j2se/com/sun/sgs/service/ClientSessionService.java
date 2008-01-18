@@ -51,21 +51,6 @@ public interface ClientSessionService extends Service {
 	byte serviceId, ProtocolMessageListener listener);
 
     /**
-     * Returns the client session corresponding to the specified
-     * session ID, or (@code null} if there is no existing client
-     * session for the specified ID.  This method should be called
-     * within a transaction.
-     *
-     * @param	sessionId a session ID
-     *
-     * @return	a client session, or <code>null</code>
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    ClientSession getClientSession(byte[] sessionId);
-
-    /**
      * Sends the specified protocol {@code message} to the specified
      * client {@code session} with the specified {@code delivery}
      * guarantee.  This method must be called within a transaction.

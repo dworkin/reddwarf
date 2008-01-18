@@ -53,6 +53,9 @@ import java.util.logging.Logger;
 
 /**
  * Channel implementation for use within a single transaction.
+ *
+ * <p>TODO: service bindings should be versioned, and old bindings should be
+ * converted to the new scheme (or removed if applicable).
  */
 public abstract class ChannelImpl implements Channel, Serializable {
 
@@ -444,7 +447,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
     public boolean equals(Object obj) {
 	return
 	    (this == obj) ||
-	    (obj.getClass() == this.getClass() &&
+	    (obj != null && obj.getClass() == this.getClass() &&
 	     Arrays.equals(((ChannelImpl) obj).channelId, channelId));
     }
 
@@ -591,15 +594,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /* -- Other methods -- */
     
-    /**
-     * Returns a byte array containing the ID for the specified client
-     * {@code session}.
-     */
-    private byte[] getManagedRefBytes(ManagedObject object) {
-	ManagedReference ref = dataService.createReference(object);
-	return ref.getId().toByteArray();
-    }
-
     /**
      * Returns the ID for the specified {@code session}.
      */
@@ -763,21 +757,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes the specified client {@code session} from all channels
-     * that it is currently a member of.  This method is invoked when
-     * a session is disconnected from this node, gracefully or
-     * otherwise, or if this node is recovering for a failed node
-     * whose sessions all became disconnected.
-     *
-     * This method should be call within a transaction.
-     */
-    static void removeSessionFromAllChannels(ClientSession session) {
-	long nodeId = getNodeId(session);
-	byte[] sessionIdBytes = getSessionIdBytes(session);
-	removeSessionFromAllChannels(nodeId, sessionIdBytes);
-    }
-
-    /**
      * Removes the client session with the specified {@code
      * sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId} from all channels that it is currently
@@ -896,13 +875,17 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes all sessions from this channel and then removes the
-     * channel object from the data store.  This method should be called
-     * when the channel is closed.
+     * Removes all sessions from this channel, removes the channel object
+     * from the data store, and removes the event queue and associated
+     * binding from the data store.  This method should be called when the
+     * channel is closed.
      */
     private void removeChannel() {
 	removeAllSessions();
 	dataService.removeObject(this);
+	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
+	dataService.removeServiceBinding(getEventQueueKey());
+	dataService.removeObject(eventQueue);
     }
 
     /**
@@ -1060,7 +1043,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	public boolean equals(Object obj) {
-	    return Arrays.equals(((IdWrapper) obj).idBytes, idBytes);
+	    return obj instanceof IdWrapper &&
+		Arrays.equals(((IdWrapper) obj).idBytes, idBytes);
 	}
 
 	public int hashCode() {
@@ -1532,9 +1516,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
 	/** The underlying iterator for service bound names. */
 	protected final Iterator<String> iterator;
-
-	/** The client session to be returned by {@code next}. */
-	private ClientSession nextSession = null;
 
 	/**
 	 * Constructs an instance of this class with the specified

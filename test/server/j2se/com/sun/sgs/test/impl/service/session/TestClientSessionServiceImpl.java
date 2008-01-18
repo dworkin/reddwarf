@@ -30,7 +30,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -41,6 +40,7 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
@@ -58,9 +58,9 @@ import java.util.Set;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import junit.framework.TestCase;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 public class TestClientSessionServiceImpl extends TestCase {
 
@@ -103,10 +103,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private TaskOwner taskOwner;
 
     /** The shared data service. */
-    private DataServiceImpl dataService;
-
-    /** True if test passes. */
-    private boolean passed;
+    private DataService dataService;
 
     /** The test clients, keyed by user name. */
     private static Map<String, DummyClient> dummyClients;
@@ -117,7 +114,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        passed = false;
         dummyClients = new HashMap<String, DummyClient>();
         System.err.println("Testcase: " + getName());
         setUp(true);
@@ -163,7 +159,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
         Thread.sleep(100);
-	passed = true;
     }
 
     protected void tearDown() throws Exception {
@@ -671,18 +666,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     /* -- other methods -- */
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
 
     /** Find the app listener */
     private DummyAppListener getAppListener() {

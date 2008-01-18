@@ -41,7 +41,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implements a client session (proxy).
+ * Implements a client session.
+ *
+ * <p>TODO: service bindings should be versioned, and old bindings should be
+ * converted to the new scheme (or removed if applicable).
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable
@@ -80,7 +83,13 @@ public class ClientSessionImpl
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
 
-    /** The client session server (possibly remote) for this client session. */
+    /** The client session server (possibly remote) for this client
+     * session.
+     *
+     * TBD: the session server for each node should be bound in the data
+     * service instead of holding a copy in each ClientSessionImpl
+     * instance.
+     */
     private final ClientSessionServer sessionServer;
 
     /** The sequence number for ordered messages sent from this client. */
@@ -90,9 +99,14 @@ public class ClientSessionImpl
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
+    /*
+     * Should a managed reference to the ClientSessionListener be cached in
+     * the ClientSessionImpl for efficiency?
+     */
+
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}. and the local node ID, and stores
+     * sessionService}, {@code identity}, and the local node ID, and stores
      * this instance with the following bindings:<p>
      *
      * <pre>
@@ -201,7 +215,7 @@ public class ClientSessionImpl
     public boolean equals(Object obj) {
 	if (this == obj) {
 	    return true;
-	} else if (obj.getClass() == this.getClass()) {
+	} else if (obj != null && obj.getClass() == this.getClass()) {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return
 		equalsInclNull(identity, session.identity) &&
@@ -232,7 +246,8 @@ public class ClientSessionImpl
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@" + id;
+	return getClass().getName() + "[" + getName() + "]@[id:" +
+	    id + ",node:" + nodeId + "]";
     }
     
     /* -- Serialization methods -- */

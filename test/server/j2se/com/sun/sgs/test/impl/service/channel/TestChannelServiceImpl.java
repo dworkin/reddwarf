@@ -19,8 +19,6 @@
 
 package com.sun.sgs.test.impl.service.channel;
 
-import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
@@ -33,7 +31,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
@@ -41,14 +38,9 @@ import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -61,6 +53,7 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -77,7 +70,6 @@ import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -92,14 +84,10 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static final String APP_NAME = "TestChannelServiceImpl";
     
-    private static final String CHANNEL_NAME = "three stooges";
-    
     private static final int WAIT_TIME = 5000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
-    private static final Set<CompactId> ALL_MEMBERS = new HashSet<CompactId>();
-    
     private static Object disconnectedCallbackLock = new Object();
 
     private static final List<String> sevenDwarfs =
@@ -121,13 +109,13 @@ public class TestChannelServiceImpl extends TestCase {
     private TaskOwner taskOwner;
 
     /** The shared data service. */
-    private DataServiceImpl dataService;
+    private DataService dataService;
 
     /** The channel service on the server node. */
-    private ChannelServiceImpl channelService;
+    private ChannelManager channelService;
 
     /** The client session service on the server node. */
-    private ClientSessionServiceImpl sessionService;
+    private ClientSessionService sessionService;
 
     /** True if test passes. */
     private boolean passed;
@@ -1075,9 +1063,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    Set<ClientSession> sessions = getSessions(channel);
 		    for (DummyClient client : clients.values()) {
 
-			ClientSession session =
-			    sessionService.getClientSession(
-				client.getSessionId());
+			ClientSession session = getClientSession(client.name);
 
 			if (session != null && sessions.contains(session)) {
 			    if (!isMember) {
@@ -1140,6 +1126,14 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     /* -- other methods -- */
+
+    private ClientSession getClientSession(String name) {
+	try {
+	    return dataService.getBinding(name, ClientSession.class);
+	} catch (ObjectNotFoundException e) {
+	    return null;
+	}
+    }
 
     private static final String CHANNEL_SET_PREFIX =
 	"com.sun.sgs.impl.service.channel.set.";
