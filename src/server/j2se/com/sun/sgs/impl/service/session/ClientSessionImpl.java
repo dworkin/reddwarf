@@ -74,7 +74,9 @@ public class ClientSessionImpl
     /** The session ID. */
     private transient BigInteger id;
 
-    /** The session ID bytes. */
+    /** The session ID bytes.
+     * TODO: this should be a transient field.
+     */
     private final byte[] idBytes;
     
     /** The identity for this session. */
@@ -110,13 +112,13 @@ public class ClientSessionImpl
      * this instance with the following bindings:<p>
      *
      * <pre>
-     * com.sun.sgs.impl.service.session.impl.<idBytes>
-     * com.sun.sgs.impl.service.session.node.<nodeId>.impl.<idBytes>
+     * com.sun.sgs.impl.service.session.impl.&lt;idBytes&gt;
+     * com.sun.sgs.impl.service.session.node.&lt;nodeId&gt;.impl.&lt;idBytes&gt;
      *</pre>
      * This method should only be called within a transaction.
      *
      * @param	sessionService a client session service
-     * @param	identity tbe session's identity
+     * @param	identity the session's identity
      * @throws TransactionException if there is a problem with the
      * 		current transaction
      */
@@ -137,8 +139,8 @@ public class ClientSessionImpl
 	ManagedReference sessionRef = dataService.createReference(this);
 	id = sessionRef.getId();
 	idBytes = id.toByteArray();
-	dataService.setServiceBinding(getSessionKey(idBytes), this);
-	dataService.setServiceBinding(getSessionNodeKey(nodeId, idBytes), this);
+	dataService.setServiceBinding(getSessionKey(), this);
+	dataService.setServiceBinding(getSessionNodeKey(), this);
 	logger.log(Level.FINEST, "Stored session, identity:{0} id:{1}",
 		   identity, id);
     }
@@ -151,13 +153,11 @@ public class ClientSessionImpl
 	    throw new IllegalStateException("session identity not initialized");
 	}
         String name = identity.getName();
-	logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
     }
 
     /** {@inheritDoc} */
     public boolean isConnected() {
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -198,6 +198,8 @@ public class ClientSessionImpl
     public void disconnect() {
 	if (isConnected()) {
 	    sessionService.disconnect(this);
+	    sessionService.getDataService().markForUpdate(this);
+	    connected = false;
 	}
 	logger.log(Level.FINEST, "disconnect returns");
     }
@@ -268,7 +270,6 @@ public class ClientSessionImpl
      * @return	the ID of this instance as a {@code BigInteger}
      */
     BigInteger getId() {
-	logger.log(Level.FINEST, "getSessionId returns {0}", id);
         return id;
     }
     
@@ -316,9 +317,9 @@ public class ClientSessionImpl
     void notifyListenerAndRemoveSession(
 	DataService dataService, boolean graceful)
     {
-	String sessionKey = getSessionKey(idBytes);
-	String sessionNodeKey = getSessionNodeKey(nodeId, idBytes);
-	String listenerKey = getListenerKey(idBytes);
+	String sessionKey = getSessionKey();
+	String sessionNodeKey = getSessionNodeKey();
+	String listenerKey = getListenerKey();
 
 	/*
 	 * Get ClientSessionListener, and remove its binding and
@@ -339,7 +340,6 @@ public class ClientSessionImpl
 	    } else {
 		listener = (ClientSessionListener) obj;
 	    }
-	    // TBD: should the listener be removed too?
 	    
 	} catch (NameNotBoundException e) {
 	    logger.logThrow(
@@ -375,52 +375,37 @@ public class ClientSessionImpl
     ClientSessionServer getClientSessionServer() {
 	return sessionServer;
     }
-	    
+    
     /**
-     * Sets this session's state to disconnected.
-     */
-    void setDisconnected() {
-	sessionService.getDataService().markForUpdate(this);
-	connected = false;
-    }
-	
-    /**
-     * Returns the key to access from the data service the {@code
-     * ClientSessionImpl} instance with the specified session {@code
-     * idBytes}.
+     * Returns the key to access this instance from the data service.
      *
-     * @param	idBytes a session ID
-     * @return	a key for acessing the {@code ClientSessionImpl} instance
+     * @return	a key for accessing this {@code ClientSessionImpl} instance
      */
-    private static String getSessionKey(byte[] idBytes) {
+    private String getSessionKey() {
 	return
 	    PKG_NAME + SESSION_COMPONENT + HexDumper.toHexString(idBytes);
     }
 
     /**
      * Returns the key to access from the data service the {@code
-     * ClientSessionListener} instance for the specified session
-     * {@code idBytes}. If the {@code ClientSessionListener} does not
-     * implement {@code ManagedObject}, then the key will be bound to
-     * a {@code ListenerWrapper}.
+     * ClientSessionListener} instance for this instance. If the {@code
+     * ClientSessionListener} does not implement {@code ManagedObject},
+     * then the key will be bound to a {@code ListenerWrapper}.
      *
-     * @param	idBytes a session ID
-     * @return	a key for acessing the {@code ClientSessionListener} instance
+     * @return	a key for accessing the {@code ClientSessionListener} instance
      */
-    private static String getListenerKey(byte[] idBytes) {
+    private String getListenerKey() {
 	return
 	    PKG_NAME + LISTENER_COMPONENT + HexDumper.toHexString(idBytes);
     }
 
     /**
-     * Returns the key to access from the data service the {@code
-     * ClientSessionImpl} instance with the specified {@code nodeId} and
-     * session {@code idBytes}.
+     * Returns the key to access this instance from the data service (by
+     * {@code nodeId} and session {@code idBytes}).
      *
-     * @param	idBytes a session ID
-     * @return	a key for acessing the {@code ClientSessionImpl} instance
+     * @return	a key for accessing the {@code ClientSessionImpl} instance
      */
-    private static String getSessionNodeKey(long nodeId, byte[] idBytes) {
+    private String getSessionNodeKey() {
 	return getNodePrefix(nodeId) + HexDumper.toHexString(idBytes);
     }
 
@@ -436,7 +421,7 @@ public class ClientSessionImpl
      * Stores the specified client session listener in the specified
      * {@code dataService} with following binding:
      * <pre>
-     * com.sun.sgs.impl.service.session.listener.<idBytes>
+     * com.sun.sgs.impl.service.session.listener.&lt;idBytes&gt;
      * </pre>
      * This method should only be called within a transaction.
      *
@@ -452,7 +437,7 @@ public class ClientSessionImpl
 	    (listener instanceof ManagedObject) ?
 	    (ManagedObject) listener :
 	    new ListenerWrapper(listener);
-	String listenerKey = getListenerKey(idBytes);
+	String listenerKey = getListenerKey();
 	dataService.setServiceBinding(listenerKey, managedObject);
     }
 
@@ -467,7 +452,7 @@ public class ClientSessionImpl
      * 		current transaction
      */
     ClientSessionListener getClientSessionListener(DataService dataService) {
-	String listenerKey = getListenerKey(idBytes);
+	String listenerKey = getListenerKey();
 	ManagedObject obj =
 	    dataService.getServiceBinding(
 		listenerKey, ManagedObject.class);

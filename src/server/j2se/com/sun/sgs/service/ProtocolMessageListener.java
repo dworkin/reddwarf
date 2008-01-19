@@ -29,6 +29,12 @@ package com.sun.sgs.service;
  * disconnected, all registered {@code ProtocolMessageListener}s are
  * notified that that session is disconnected.
  *
+ * <p>TODO: This interface will eventually go away.
+ * ProtocolMessageListener is only used to receive 'disconnected'
+ * notifications.  The use of ProtocolMessageListener will be replaced with
+ * a scheme for registering interested in notification of a ClientSession
+ * managed object removal.
+ *
  * @see ClientSessionService#registerProtocolMessageListener
  */
 public interface ProtocolMessageListener {

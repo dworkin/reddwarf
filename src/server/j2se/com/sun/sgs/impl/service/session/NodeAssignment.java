@@ -21,6 +21,8 @@ package com.sun.sgs.impl.service.session;
 
 /**
  * Contains a node ID assignment.
+ *
+ * TBD: add a service-level interface for ClientSession?
  */
 public interface NodeAssignment {
 

@@ -36,7 +36,7 @@ public interface ClientSessionServer extends Remote {
      * requirements.
      *
      * @param	sessionId a session ID
-     * @param	seq a sequence number
+     * @param	seq an array of message sequence numbers
      * @param	messages an array of protocol messages, each contained
      *		in a byte array
      * @param	delivery an array of delivery requirements

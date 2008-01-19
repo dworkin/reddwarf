@@ -37,9 +37,6 @@ import javax.security.auth.login.LoginException;
  */
 class ClientSessionHandler {
 
-    /** The serialVersionUID for this class. */
-    private final static long serialVersionUID =1L;
-    
     /** Connection state. */
     private static enum State {
         /** A connection is in progress */
@@ -151,7 +148,7 @@ class ClientSessionHandler {
     void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
-	    if (getCurrentState() != State.DISCONNECTED) {
+	    if (isConnected()) {
 		sessionConnection.sendBytes(message);
 	    } else {
 		if (logger.isLoggable(Level.FINER)) {
@@ -256,7 +253,7 @@ class ClientSessionHandler {
 
 	if (sessionRefId != null) {
 	    scheduleTask(new AbstractKernelRunnable() {
-		public void run() throws IOException {
+		public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
 		    sessionImpl.
@@ -266,6 +263,20 @@ class ClientSessionHandler {
 	}
     }
 
+    /**
+     * Schedule a non-transactional task for disconnecting the client.
+     *
+     * @param	graceful if {@code true}, disconnection is graceful (i.e.,
+     * 		a LOGOUT_SUCCESS protocol message is sent before
+     * 		disconnecting the client session)
+     */
+    private void scheduleHandleDisconnect(final boolean graceful) {
+	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+	    public void run() {
+		handleDisconnect(graceful);
+	    }});
+    }
+    
     /**
      * Flags this session as shut down, and closes the connection.
      */
@@ -341,17 +352,18 @@ class ClientSessionHandler {
 		}
 
 		if (!disconnectHandled) {
-		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-			public void run() {
-			    handleDisconnect(false);
-			}});
+		    scheduleHandleDisconnect(false);
 		}
 
 		state = State.DISCONNECTED;
 	    }
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * NOTE: if the exception thrown is an instance of IOException,
+	 * MINA will close the connection when this callback returns.
+	 */
 	public void exceptionThrown(Connection conn, Throwable exception) {
 
 	    if (logger.isLoggable(Level.WARNING)) {
@@ -493,17 +505,13 @@ class ClientSessionHandler {
 				    receivedMessage(clientMessage);
 			    }
 			} else {
-			    // Session has been removed; disconnect session.
-			    // TBD...
+			    scheduleHandleDisconnect(false);
 			}
 		    }});
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-	        scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-	            public void run() {
-	                handleDisconnect(isConnected());
-	            }});
+		scheduleHandleDisconnect(isConnected());
 		break;
 		
 	    default:
@@ -513,11 +521,7 @@ class ClientSessionHandler {
 			"Handler.messageReceived unknown operation code:{0}",
 			opcode);
 		}
-
-		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
-		    public void run() {
-			handleDisconnect(false);
-		    }});
+		scheduleHandleDisconnect(false);
 		break;
 	    }
 	}
@@ -626,7 +630,7 @@ class ClientSessionHandler {
 			    // FIXME: this is a hack to make sure that
 			    // the client receives the login redirect
 			    // message before disconnect.
-			    Thread.currentThread().sleep(100);
+			    Thread.sleep(100);
 			} catch (InterruptedException e) {
 			}
 			handleDisconnect(false);
@@ -805,7 +809,7 @@ class ClientSessionHandler {
 		    dataService, returnedListener);
 
 		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE);
+		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, false);
 		
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
@@ -838,8 +842,8 @@ class ClientSessionHandler {
 		    throw ex;
 		}
 		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, loginFailureMessage, Delivery.RELIABLE);
-		sessionService.disconnect(sessionImpl);
+		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, true);
+		sessionImpl.disconnect();
 	    }
 	}
     }

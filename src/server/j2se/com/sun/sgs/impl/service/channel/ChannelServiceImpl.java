@@ -62,7 +62,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Simple ChannelService implementation. <p>
+ * ChannelService implementation. <p>
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
@@ -99,7 +99,7 @@ public class ChannelServiceImpl
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
-    /** List of contexts that have been prepared (non-readonly) or commited. */
+    /** List of contexts that have been prepared (non-readonly) or committed. */
     private final List<Context> contextList = new LinkedList<Context>();
 
     /** The client session service. */
@@ -205,8 +205,9 @@ public class ChannelServiceImpl
 		taskOwner);
 
 	    /*
-	     * Add listeners for handling recovery and for handling
-	     * protocol messages for the channel service.
+	     * Add listeners for handling recovery and for receiving
+	     * notification of client session disconnection (via a
+	     * ProtocolMessageListener).
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
@@ -251,7 +252,6 @@ public class ChannelServiceImpl
     public Channel createChannel(Delivery delivery) {
 	try {
 	    Channel channel = ChannelImpl.newInstance(delivery);
-	    logger.log(Level.FINEST, "createChannel returns {0}", channel);
 	    return channel;
 	    
 	} catch (RuntimeException e) {
@@ -437,9 +437,9 @@ public class ChannelServiceImpl
 		    return;
 		}
 
-		for (BigInteger sessionId : localMembers) {
+		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionId.toByteArray(), message, Delivery.RELIABLE);
+ 			sessionRefId, message, Delivery.RELIABLE);
 		}
 
 	    } finally {
@@ -547,7 +547,7 @@ public class ChannelServiceImpl
 	/**
 	 * Adds the specified {@code task} to the task list of the given
 	 * {@code channelId}.  If the transaction commits, the task will be
-	 * added tp the task handler's per-channel map of tasks to service.
+	 * added to the task handler's per-channel map of tasks to service.
 	 * The tasks are serviced by the TaskHandlerThread.
 	 */
 	public void addChannelTask(BigInteger channelId, Runnable task) {
@@ -801,7 +801,6 @@ public class ChannelServiceImpl
 	// rather than the channel server proxy. -- ann (12/11/07)
 	String channelServerKey =
 	    ChannelServiceImpl.getChannelServerKey(nodeId);
-	ChannelServer server = null;
 	try {
 	    return getDataService().getServiceBinding(
 		channelServerKey, ChannelServerWrapper.class).get();
@@ -853,6 +852,8 @@ public class ChannelServiceImpl
 	 * TBD: Recovery (due to being possibly-lengthy) should not be
 	 * performed in this remote method.  Recovery operations should
 	 * be performed in a separate thread.
+	 *
+	 * TODO: use persistent tasks instead?
 	 */
 	public void recover(Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
@@ -864,6 +865,9 @@ public class ChannelServiceImpl
 		/*
 		 * For each session on the failed node, remove the
 		 * given session from all channels it is a member of.
+		 *
+		 * TODO:  This transactional task may take too long.  It
+		 * probably should be broken up into more tasks.
 		 */
 		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
 		taskScheduler.runTransactionalTask(task, taskOwner);
@@ -875,7 +879,11 @@ public class ChannelServiceImpl
 			    "Removing session:{0} from all channels",
 			    HexDumper.toHexString(sessionId));
 		    }
-		    
+
+		    /*
+		     * TODO:  This transactional task may take too long.  It
+		     * probably should be broken up into more tasks.
+		     */
 		    taskScheduler.runTransactionalTask(
 			new AbstractKernelRunnable() {
 			    public void run() {

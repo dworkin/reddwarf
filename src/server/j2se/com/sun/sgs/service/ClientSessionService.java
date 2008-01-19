@@ -21,6 +21,8 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
+import java.math.BigInteger;
 
 /**
  * The client session service manages client sessions.
@@ -43,6 +45,12 @@ public interface ClientSessionService extends Service {
      * <li> <code>0x01</code>, application service
      * <li> <code>0x02</code>, channel service
      * </ul>
+     *
+     * TODO: This method will go away when ProtocolMessageListener is
+     * removed.  ProtocolMessageListener is only used to receive
+     * 'disconnected' notifications.  The use of ProtocolMessageListener
+     * will be replaced with a scheme for registering interest in
+     * notification of a ClientSession's managed object removal.
      *
      * @param serviceId a service ID
      * @param listener a protocol message listener
@@ -68,22 +76,19 @@ public interface ClientSessionService extends Service {
 
     /**
      * Sends the specified protocol {@code message} to the <i>local</i>
-     * client session with the specified {@code sessionId}.  If the
+     * client session with the specified {@code sessionRefId}. If the
      * specified client session is not connected to the local node, the
      * message is dropped.  This method is non-transactional, and therefore
      * this message send cannot be aborted.
      *
-     * @param	sessionId a client session ID
+     * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
+     * ManagedReference#getId getId} on a {@link ManagedReference} to the
+     * associated {@code ClientSession}.
+     *
+     * @param	sessionRefId a client session ID, as a {@code BigInteger}
      * @param	message a complete protocol message
      * @param	delivery a delivery requirement
      */
     void sendProtocolMessageNonTransactional(
-	byte[] sessionId, byte[] message, Delivery delivery);
-    
-    /**
-     * Disconnects the specified client {@code session}.
-     *
-     * @param	session a client session
-     */
-    void disconnect(ClientSession session);
+	BigInteger sessionRefId, byte[] message, Delivery delivery);
 }

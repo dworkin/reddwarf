@@ -32,7 +32,7 @@ import java.util.logging.Level;
 
 /**
  * An abstract implementation of a service.  It manages state
- * transitions (i.e., intialized, ready, shutting down, shutdown), in
+ * transitions (i.e., initialized, ready, shutting down, shutdown), in
  * progress call tracking for services with embedded remote servers,
  * and shutdown support.
  */

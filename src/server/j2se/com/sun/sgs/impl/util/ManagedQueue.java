@@ -33,7 +33,13 @@ import java.util.Iterator;
  * removed from the queue, that element is also removed from the data
  * store.
  *
+ * <p>Note: The {@code size} and {@code iterator} methods are not
+ * supported.
+ *
  * @param <E>	the type for elements in the queue
+ *
+ * TODO: The element type should not be required to be a managed object,
+ * but should just be serializable.  Should it handle both?
  */
 public class ManagedQueue<E>
     extends AbstractQueue<E>
@@ -95,7 +101,7 @@ public class ManagedQueue<E>
 	if (tailRef == null) {
 	    headRef = tailRef = entryRef;
 	} else {
-	    Entry tail = tailRef.getForUpdate(Entry.class);
+	    Entry<?> tail = tailRef.getForUpdate(Entry.class);
 	    tail.nextEntryRef = entryRef;
 	    tailRef = entryRef;
 	}
@@ -114,7 +120,7 @@ public class ManagedQueue<E>
     public E poll() {
 	E element = null;
 	if (headRef != null) {
-	    Entry<E> head = getHead();
+	    Entry<E> head = getHeadForUpdate();
 	    element = head.getElement();
 	    headRef = head.nextEntryRef;
 	    if (headRef == null) {
@@ -128,9 +134,12 @@ public class ManagedQueue<E>
 	return element;
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * <p> This method is not supported.
+     */
     public int size() {
-	throw new AssertionError("not implemented");
+	throw new UnsupportedOperationException("size not supported");
     }
 
     /** {@inheritDoc} */ 
@@ -138,9 +147,12 @@ public class ManagedQueue<E>
 	return headRef == null;
     }
     
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * <p> This method is not supported.
+     */
     public Iterator<E> iterator() {
-	throw new AssertionError("not implemented");
+	throw new UnsupportedOperationException("iterator not supported");
     }
 
     /* -- Implement Object.toString -- */
@@ -167,5 +179,10 @@ public class ManagedQueue<E>
     @SuppressWarnings("unchecked")
     private Entry<E> getHead() {
 	return headRef.get(Entry.class);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private Entry<E> getHeadForUpdate() {
+	return headRef.getForUpdate(Entry.class);
     }
 }

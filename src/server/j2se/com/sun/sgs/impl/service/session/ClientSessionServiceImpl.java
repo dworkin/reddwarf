@@ -195,6 +195,10 @@ public class ClientSessionServiceImpl
 		throw new IllegalArgumentException(
 		    "The " + StandardProperties.APP_PORT +
 		    " property can't be negative: " + appPort);
+	    } else if (appPort > 65535) {
+		throw new IllegalArgumentException(
+		    "The " + StandardProperties.APP_PORT +
+		    " property can be greater than 65535: " + appPort);
 	    }
 
 	    int serverPort = wrappedProps.getIntProperty(
@@ -371,21 +375,27 @@ public class ClientSessionServiceImpl
      * @param	session	a client session
      * @param	message a complete protocol message
      * @param	delivery a delivery requirement
+     * @param	clearMessages if true, clear message queue of any other
+     *		messages
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
     void sendProtocolMessageFirst(
-	ClientSessionImpl session, byte[] message, Delivery delivery)
+ 	ClientSessionImpl session, byte[] message,
+	Delivery delivery, boolean clearMessages)
     {
-	checkContext().addMessageFirst(session, message, delivery);
+	Context context = checkContext();
+	if (clearMessages) {
+	    context.clearMessages(session);
+	}
+	context.addMessageFirst(session, message, delivery);
     }
 
     /** {@inheritDoc} */
     public void sendProtocolMessageNonTransactional(
-	byte[] sessionId, byte[] message, Delivery delivery)
+	BigInteger sessionRefId, byte[] message, Delivery delivery)
     {
-	BigInteger sessionRefId = new BigInteger(1, sessionId);
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
 	 * If a local handler exists, forward message to local handler
@@ -402,8 +412,16 @@ public class ClientSessionServiceImpl
 	}
     }
 
-    /** {@inheritDoc} */
-    public void disconnect(ClientSession session) {
+    /**
+     * Disconnects the specified client {@code session}.  This method must
+     * be invoked within a transaction.
+     *
+     * @param	session a client session
+     *
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    void disconnect(ClientSession session) {
 	checkContext().requestDisconnect(getClientSessionImpl(session));
     }
 
@@ -486,6 +504,18 @@ public class ClientSessionServiceImpl
 	    ClientSessionImpl session, byte[] message, Delivery delivery)
 	{
 	    addMessage0(session, message, delivery, true);
+	}
+
+	/**
+	 * Clears the message queue for the given client session.  This
+	 * method is invoked when a login failure happens due to the
+	 * AppListener.loggedIn method either throwing a non-retryable
+	 * exception, or returning a null or non-serializable client
+	 * session listener.  It those cases, no messages other than the
+	 * LOGIN_FAILED protocol message should reach the client.
+	 */
+	void clearMessages(ClientSessionImpl session) {
+	    getCommitActions(session).clearMessages();
 	}
 
 	/**
@@ -665,6 +695,10 @@ public class ClientSessionServiceImpl
 	    }
 	    
 	}
+
+	void clearMessages() {
+	    messages.clear();
+	}
 	
 	void setDisconnect() {
 	    disconnect = true;
@@ -719,15 +753,12 @@ public class ClientSessionServiceImpl
 		    }
 
 		} else {
-		    int size = messages.size();
-		    byte[][] messageData = new byte[size][];
-		    Delivery[] deliveryData = new Delivery[size];
-		    int i = 0;
-		    for (byte[] message : messages) {
-			messageData[i] = message;
-			deliveryData[i] = Delivery.RELIABLE;
-			i++;
-		    }
+		    byte[][] messageData = null;
+		    messageData = messages.toArray(messageData);
+		    Delivery[] deliveryData = null;
+		    deliveryData =
+			Collections.nCopies(messages.size(), Delivery.RELIABLE).
+			    toArray(deliveryData);
 
 		    byte[] sessionId = sessionRefId.toByteArray();
 		    try {
@@ -910,7 +941,7 @@ public class ClientSessionServiceImpl
     
     /**
      * Checks if the local node is considered alive, and throws an
-     * {@code IllegalStateException} if the node is no loger alive.
+     * {@code IllegalStateException} if the node is no longer alive.
      * This method should be called within a transaction.
      */
     private void checkLocalNodeAlive() {
@@ -958,7 +989,7 @@ public class ClientSessionServiceImpl
     /**
      * Adds the handler for the specified session to the internal
      * session handler map.  This method is invoked by the handler once the
-     * client has succesfully logged in.
+     * client has successfully logged in.
      */
     void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
 	handlers.put(sessionRefId, handler);

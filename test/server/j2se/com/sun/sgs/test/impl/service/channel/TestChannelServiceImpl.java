@@ -1005,21 +1005,6 @@ public class TestChannelServiceImpl extends TestCase {
 	
     }
 
-    /* -- Test ChannelImpl.getChannelId -- */
-
-    public void testChannelImplGetChannelId() throws Exception {
-	Channel channel = createChannel("testy");
-	byte[] channelId = ((ChannelImpl) channel).getChannelId();
-
-	if (channelId == null) {
-	    fail("channelId is null");
-	} else if (channelId.length == 0) {
-	    fail("channelId has zero length");
-	}
-	
-	System.err.println("channelId: " + HexDumper.toHexString(channelId));
-    }
-
     private class ClientGroup {
 
 	final List<String> users;
@@ -1828,7 +1813,6 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("DummyClientSessionListener: send request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		byte[] channelMessage = buf.getByteArray();
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.send(message);
