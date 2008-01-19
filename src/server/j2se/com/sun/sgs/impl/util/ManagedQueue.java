@@ -36,6 +36,12 @@ import java.util.Iterator;
  * <p>Note: The {@code size} and {@code iterator} methods are not
  * supported.
  *
+ * <p>Note: If a given instance of {@code ManagedQueue} contains a large
+ * number of elements, invoking the {@code clear} method on the queue may
+ * be a lengthy operation.  Therefore, the queue should either contain a
+ * smaller number of elements, or elements should be removed from the queue
+ * a few at at time.
+ *
  * @param <E>	the type for elements in the queue
  *
  * TODO: The element type should not be required to be a managed object,
@@ -62,7 +68,7 @@ public class ManagedQueue<E>
 	private static final long serialVersionUID = 1L;
 	
 	/** The element. */
-	ManagedReference elementRef;
+	final ManagedReference elementRef;
 	/** The reference to the next queue entry, or null. */
 	ManagedReference nextEntryRef = null;
 
@@ -158,6 +164,12 @@ public class ManagedQueue<E>
     /* -- Implement Object.toString -- */
 
     /** {@inheritDoc} */
+    public int hashCode() {
+	DataManager dataManager = AppContext.getDataManager();
+	return dataManager.createReference(this).getId().hashCode();
+    }
+
+    /** {@inheritDoc} */
     public String toString() {
 	return getClass().getName() + '@' + Integer.toHexString(hashCode());
     }
@@ -169,6 +181,10 @@ public class ManagedQueue<E>
      *
      * <p>This implementation clears all elements from the queue,
      * thus removing all elements from the data store.
+     *
+     * TODO: For queues with a large number of elements, removing the
+     * enqueueed elements should be performed in a separate task (or
+     * tasks).
      */
     public void removingObject() {
 	clear();

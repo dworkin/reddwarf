@@ -36,6 +36,9 @@ public interface ChannelManager {
 
     /**
      * Creates a new channel with the specified delivery requirement.
+     * The caller may want to associate the returned channel with a
+     * binding in the {@link DataManager} or store a {@link
+     * ManagedReference} to the returned channel.
      *
      * @param	delivery a delivery requirement
      *

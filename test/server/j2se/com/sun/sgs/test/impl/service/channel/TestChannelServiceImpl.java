@@ -249,7 +249,7 @@ public class TestChannelServiceImpl extends TestCase {
 	try {
 	    new ChannelServiceImpl(
 		new Properties(), new DummyComponentRegistry(),
-		new DummyTransactionProxy());
+		serverNode.getProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);

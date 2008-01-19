@@ -35,6 +35,10 @@ import java.util.logging.Level;
  * transitions (i.e., initialized, ready, shutting down, shutdown), in
  * progress call tracking for services with embedded remote servers,
  * and shutdown support.
+ *
+ * <p>The {@link getName getName} method invokes the instance's {@code
+ * toString} method, so a concrete subclass of {@code AbstractService}
+ * should provide an implementation of the {@code toString} method.
  */
 public abstract class AbstractService implements Service {
 
@@ -112,6 +116,8 @@ public abstract class AbstractService implements Service {
 	synchronized (AbstractService.class) {
 	    if (AbstractService.txnProxy == null) {
 		AbstractService.txnProxy = txnProxy;
+	    } else {
+		assert AbstractService.txnProxy == txnProxy;
 	    }
 	}
 	appName = properties.getProperty(StandardProperties.APP_NAME);
@@ -208,8 +214,6 @@ public abstract class AbstractService implements Service {
 		    try {
 			lock.wait();
 		    } catch (InterruptedException e) {
-			// TBD: should the state be set back to 'ready' 
-			// so that shutdown can be re-initiated?
 			return false;
 		    }
 		}
@@ -228,8 +232,6 @@ public abstract class AbstractService implements Service {
 	try {
 	    shutdownThread.join();
 	} catch (InterruptedException e) {
-	    // TBD: should the state be set back to 'ready'
-	    // so that shutdown can be re-initiated?
 	    return false;
 	}
 
@@ -243,17 +245,6 @@ public abstract class AbstractService implements Service {
      * service.
      */
     protected abstract void doShutdown();
-
-    /**
-     * Sets this service's state to {@code newState}.
-     *
-     * @param	newState a new state.
-     */
-    protected void setState(State newState) {
-	synchronized (lock) {
-	    state = newState;
-	}
-    }
 
     /**
      * Returns this service's state.
@@ -326,14 +317,24 @@ public abstract class AbstractService implements Service {
     }
 
     /**
+     * Sets this service's state to {@code newState}.
+     *
+     * @param	newState a new state.
+     */
+    private void setState(State newState) {
+	synchronized (lock) {
+	    state = newState;
+	}
+    }
+
+    /**
      * Thread for shutting down service/server.
      */
     private final class ShutdownThread extends Thread {
 
 	/** Constructs an instance of this class as a daemon thread. */
 	ShutdownThread() {
-	    super(AbstractService.this.getClass().getName() +
-		  "$ShutdownThread");
+	    super(ShutdownThread.class.getName());
 	    setDaemon(true);
 	}
 
