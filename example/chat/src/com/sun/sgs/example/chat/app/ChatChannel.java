@@ -71,7 +71,7 @@ public class ChatChannel
     }
 
     public void send(byte[] message) {
-        channel().send(message);        
+        channel().send(message);
     }
 
     public boolean join(ClientSession session) {

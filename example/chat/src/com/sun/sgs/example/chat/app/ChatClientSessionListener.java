@@ -22,9 +22,6 @@ package com.sun.sgs.example.chat.app;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -32,7 +29,6 @@ import java.util.logging.Logger;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
@@ -81,6 +77,7 @@ public class ChatClientSessionListener
         if (session == null)
             throw new NullPointerException("null session");
         sessionRef = AppContext.getDataManager().createReference(session);
+        sendId();
         addToChannel(GLOBAL_CHANNEL_NAME);
     }
 
@@ -162,6 +159,12 @@ public class ChatClientSessionListener
         }
     }
 
+    private void sendId() {
+        String message = "/login " + getSessionIdString() +
+                         ":" +  session().getName();
+        session().send(toMessageBytes(message));
+    }
+
     /**
      * TODO
      * 
@@ -175,7 +178,8 @@ public class ChatClientSessionListener
                 new Object[] { session(), channelName, message });
         }
 
-        ChatChannel.find(channelName).send(toMessageBytes(message));
+        String bcastMsg = channelName + " " + message;
+        ChatChannel.find(channelName).send(toMessageBytes(bcastMsg));
     }
 
     /**
@@ -209,19 +213,12 @@ public class ChatClientSessionListener
         }
 
         ChatChannel channel = ChatChannel.findOrCreate(channelName);
-        
-        if (channel.memberRefs().contains(sessionRef)) {
-            if (logger.isLoggable(Level.INFO)) {
-                logger.log(Level.INFO,
-                        "Session " + session() +
-                        " is already a member of channel " + channelName);
-            }
-            return;
-        }
 
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
+        changeMsg.append(channelName);
+        changeMsg.append(' ');
         changeMsg.append(getSessionIdString());
         if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
             changeMsg.append(':');
@@ -234,7 +231,8 @@ public class ChatClientSessionListener
         channel.join(session());
 
         // Send the membership list to the joining session.
-        StringBuilder listMessage = new StringBuilder("/members");
+        StringBuilder listMessage = new StringBuilder("/members ");
+        listMessage.append(channelName);
         for (ManagedReference memberRef : channel.memberRefs()) {
             ClientSession member = memberRef.get(ClientSession.class);
             listMessage.append(' ');
@@ -285,7 +283,8 @@ public class ChatClientSessionListener
         }
 
         // Tell the rest of the channel about the removal.
-        String changeMessage = "/left " + getSessionIdString();
+        String changeMessage = "/left " + channelName +
+                               " " + getSessionIdString();
         channel.send(toMessageBytes(changeMessage));
     }
 

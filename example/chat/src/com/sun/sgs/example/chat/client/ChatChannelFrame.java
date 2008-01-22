@@ -55,7 +55,7 @@ public class ChatChannelFrame extends JInternalFrame
     private final String myChannelName;
 
     /** The {@code MultiList} containing this channel's members. */
-    private final MultiList<SessionId> multiList;
+    private final MultiList<ChatMember> multiList;
 
     /** The input field. */
     private final JTextField inputField;
@@ -80,7 +80,7 @@ public class ChatChannelFrame extends JInternalFrame
         eastPanel.setLayout(new BorderLayout());
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        multiList = new MultiList<SessionId>(SessionId.class, client);
+        multiList = new MultiList<ChatMember>(ChatMember.class, client);
         multiList.addMouseListener(myChatClient.getPMMouseListener());
         eastPanel.add(new JScrollPane(multiList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
@@ -104,7 +104,7 @@ public class ChatChannelFrame extends JInternalFrame
      * as well as server notifications about other clients joining and
      * leaving this channel.
      */
-    void receivedMessage(SessionId sender, ByteBuffer message) {
+    void receivedMessage(ChatMember sender, ByteBuffer message) {
         try {
             String messageString = ChatClient.fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
@@ -113,23 +113,20 @@ public class ChatChannelFrame extends JInternalFrame
             String command = args[0];
 
             if (command.equals("/joined")) {
-                multiList.addItem(SessionId.fromBytes(
-                    ChatClient.fromHexString(args[1])));
+                //multiList.addItem(ChatClient.findMember(args[1]));
             } else if (command.equals("/left")) {
-                memberLeft(SessionId.fromBytes(
-                        ChatClient.fromHexString(args[1])));
+                //memberLeft(ChatClient.findMember(args[1]));
             } else if (command.equals("/members")) {
                 String[] members = args[1].split("\\s+");
                 for (String member : members) {
-                    multiList.addItem(SessionId.fromBytes(
-                        ChatClient.fromHexString(member)));
+                    //multiList.addItem(ChatClient.findMember(args[1]));
                 }
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
             } else {
-                outputArea.append(String.format("%s: %s\n",
-                        myChatClient.getSessionName(sender),
-                        messageString));
+                //outputArea.append(String.format("%s: %s\n",
+                //        myChatClient.getSessionName(sender),
+                //        messageString));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -151,7 +148,7 @@ public class ChatChannelFrame extends JInternalFrame
      *
      * @param member the member who left this channel
      */
-    void memberLeft(SessionId member) {
+    void memberLeft(ChatMember member) {
         multiList.removeItem(member);        
     }
 
