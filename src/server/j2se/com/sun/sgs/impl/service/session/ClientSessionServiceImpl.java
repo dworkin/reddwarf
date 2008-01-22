@@ -44,6 +44,7 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
@@ -114,9 +115,9 @@ public class ClientSessionServiceImpl
     /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
 
-    /** The registered service listeners. */
-    private final Set<Runnable> serviceListeners =
-	Collections.synchronizedSet(new HashSet<Runnable>());
+    /** The registered session disconnect listeners. */
+    private final Set<ClientSessionDisconnectListener> sessionDisconnectListeners =
+	Collections.synchronizedSet(new HashSet<ClientSessionDisconnectListener>());
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
@@ -130,7 +131,7 @@ public class ClientSessionServiceImpl
     /** Thread for flushing committed contexts. */
     private final Thread flushContextsThread = new FlushContextsThread();
     
-    /** Lock for notifying the thread that flushes commmitted contexts. */
+    /** Lock for notifying the thread that flushes committed contexts. */
     private final Object flushContextsLock = new Object();
 
     /** The Acceptor for listening for new connections. */
@@ -334,13 +335,13 @@ public class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    public void registerProtocolMessageListener(
-	Runnable listener)
+    public void registerSessionDisconnectListener(
+        ClientSessionDisconnectListener listener)
     {
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
-	serviceListeners.add(listener);
+        if (listener == null)
+            throw new NullPointerException("null listener");
+        
+        this.sessionDisconnectListeners.add(listener);
     }
 
     /** {@inheritDoc} */
@@ -998,8 +999,8 @@ public class ClientSessionServiceImpl
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (Runnable serviceListener : serviceListeners) {
-	    serviceListener.run();
+	for (ClientSessionDisconnectListener serviceListener : sessionDisconnectListeners) {
+	    serviceListener.disconnected(sessionRefId);
 	}
 	handlers.remove(sessionRefId);
     }

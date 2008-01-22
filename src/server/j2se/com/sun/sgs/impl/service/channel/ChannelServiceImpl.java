@@ -36,6 +36,7 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -204,13 +205,15 @@ public class ChannelServiceImpl
 
 	    /*
 	     * Add listeners for handling recovery and for receiving
-	     * notification of client session disconnection (via a
-	     * ProtocolMessageListener).
+	     * notification of client session disconnection.
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
 
-	    taskHandlerThread.start();
+            sessionService.registerSessionDisconnectListener(
+                new ChannelSessionDisconnectListener());
+
+            taskHandlerThread.start();
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -341,9 +344,6 @@ public class ChannelServiceImpl
 		    }
 		}
 		localMembers.add(new BigInteger(1, sessionId));
-
-		sessionService.registerProtocolMessageListener(
-		    new ChannelSessionDisconnectListener(sessionId));
 
 	    } finally {
 		callFinished();
@@ -714,14 +714,8 @@ public class ChannelServiceImpl
     /* -- Implement ProtocolMessageListener -- */
 
     private final class ChannelSessionDisconnectListener
-	implements Runnable
+	implements ClientSessionDisconnectListener
     {
-        private final byte[] sessionId;
-
-        ChannelSessionDisconnectListener(byte[] sessionId) {
-            this.sessionId = sessionId;
-        }
-
         /**
          * {@inheritDoc}
 	 *
@@ -731,7 +725,7 @@ public class ChannelServiceImpl
 	 * ChannelService can register interest in receiving notification
 	 * when the client session is removed.
 	 */
-	public void run() {
+	public void disconnected(final BigInteger sessionRefId) {
 	    /*
 	     * Schedule a transactional task to remove the
 	     * disconnected session from all channels that it is
@@ -742,7 +736,7 @@ public class ChannelServiceImpl
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    ChannelImpl.removeSessionFromAllChannels(
-				localNodeId, sessionId);
+				localNodeId, sessionRefId.toByteArray());
 			    }
 		    }),
 		 taskOwner);
