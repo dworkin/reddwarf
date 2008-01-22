@@ -21,7 +21,8 @@ package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.util.UtilChannel;
+
+import com.sun.sgs.example.hack.server.util.UtilChannel;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;

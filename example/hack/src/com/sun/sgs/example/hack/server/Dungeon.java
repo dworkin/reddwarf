@@ -24,8 +24,8 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.util.UtilChannel;
-import com.sun.sgs.app.util.UtilChannelManager;
+import com.sun.sgs.example.hack.server.util.UtilChannel;
+import com.sun.sgs.example.hack.server.util.UtilChannelManager;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;

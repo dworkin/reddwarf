@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.app.util;
+package com.sun.sgs.example.hack.server.util;
 
 import java.io.Serializable;
 
