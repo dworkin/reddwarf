@@ -131,4 +131,22 @@ public class NonDurableTaskScheduler {
     public void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
 	taskService.scheduleNonDurableTask(task);
     }
+
+    /**
+     * Returns the {@code TaskScheduler} for this instance.
+     *
+     * @return	the {@code TaskScheduler} for this instance
+     */
+    TaskScheduler getTaskScheduler() {
+	return taskScheduler;
+    }
+
+    /**
+     * Returns the {@code TaskOwner} for this instance.
+     *
+     * @return	the {@code TaskOwner} for this instance
+     */
+    TaskOwner getTaskOwner() {
+	return owner;
+    }
 }

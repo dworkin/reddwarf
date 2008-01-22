@@ -25,6 +25,8 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Service;
 
+import com.sun.sgs.test.util.DummyIdentity;
+
 /**
  * Define an implementation of AbstractKernelAppContext that obtains components
  * from a specified component registry and registers itself as the context for
@@ -47,6 +49,7 @@ public class DummyAbstractKernelAppContext extends AbstractKernelAppContext {
 	}
 	this.componentRegistry = componentRegistry;
 	ContextResolver.setContext(this);
+	ThreadState.setCurrentOwner(new TaskOwnerImpl(new DummyIdentity(), this));
     }
 
     public ChannelManager getChannelManager() {
