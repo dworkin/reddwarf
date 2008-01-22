@@ -87,7 +87,7 @@ public class TestScalableHashMapStress extends Assert {
     private static final int maxOpsPerTxn = 10;
 
     /** The random number generator that drives the test. */
-    static final Random random = new Random(seed);
+    static final Random random = new UndoableRandom(seed);
 
     private static SgsTestNode serverNode;
     private static TaskScheduler taskScheduler;
@@ -98,7 +98,7 @@ public class TestScalableHashMapStress extends Assert {
     final List<Op> ops = new ArrayList<Op>();
 
     /** A set that records the entries that should appear in the map. */
-    final BitSet control = new BitSet(maxEntries);
+    final UndoableBitSet control = new UndoableBitSet(maxEntries);
 
     /** The number of objects before creating the map. */
     private int initialObjectCount;
@@ -110,7 +110,7 @@ public class TestScalableHashMapStress extends Assert {
     Iterator<Key> keys;
 
     /** The entries already seen by the keys iterator. */
-    final BitSet keysSeen = new BitSet(maxEntries);
+    final UndoableBitSet keysSeen = new UndoableBitSet(maxEntries);
 
     /** The current entry of the keys iterator or -1. */
     int currentKey = -1;
@@ -119,7 +119,7 @@ public class TestScalableHashMapStress extends Assert {
     Iterator<Value> values;
 
     /** The entries already seen by the values iterator. */
-    final BitSet valuesSeen = new BitSet(maxEntries);
+    final UndoableBitSet valuesSeen = new UndoableBitSet(maxEntries);
 
     /** The current entry of the values iterator or -1. */
     int currentValue = -1;
@@ -128,7 +128,7 @@ public class TestScalableHashMapStress extends Assert {
     Iterator<Entry<Key, Value>> entries;
 
     /** The entries already seen by the entries iterator. */
-    final BitSet entriesSeen = new BitSet(maxEntries);
+    final UndoableBitSet entriesSeen = new UndoableBitSet(maxEntries);
 
     /** The current entry of the entries iterator or -1. */
     int currentEntry = -1;
@@ -522,8 +522,9 @@ public class TestScalableHashMapStress extends Assert {
     @After public void tearDown() throws Exception {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
+		private int attempts = 0;
 		public void run() throws Exception {
-		    initTxnState();
+		    initTxnState(++attempts);
 		    dataService.
 			removeObject(dataService.
 				     getBinding("entries",
@@ -539,8 +540,9 @@ public class TestScalableHashMapStress extends Assert {
 	while (! isDone.get()) {
 	    taskScheduler.runTransactionalTask(
 	        new AbstractKernelRunnable() {
+		    private int attempts = 0;
 		    public void run() throws Exception {
-			initTxnState();
+			initTxnState(++attempts);
 			int count = 0;
 			while (entries.hasNext()) {
 			    if (++count % 100 == 0)
@@ -555,8 +557,9 @@ public class TestScalableHashMapStress extends Assert {
 	}
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
+		private int attempts = 0;
 		public void run() throws Exception {
-		    initTxnState();
+		    initTxnState(++attempts);
 		    DoneRemoving.init();
 		    dataService.removeObject(map);
 		    dataService.
@@ -599,8 +602,9 @@ public class TestScalableHashMapStress extends Assert {
 	while (! isDone.get()) {
 	    taskScheduler.runTransactionalTask(
 	        new AbstractKernelRunnable() {
+		    private int attempts = 0;
 		    public void run() throws Exception {
-			initTxnState();
+			initTxnState(++attempts);
 			getRandomOp().run();
 			int num;
 			while ((num = opnum.getAndIncrement()) < operations) {
@@ -631,7 +635,12 @@ public class TestScalableHashMapStress extends Assert {
      * Updates fields from data manager bindings for a new transaction.
      */
     @SuppressWarnings("unchecked")
-    private void initTxnState() throws Exception {
+    private void initTxnState(int attempts) throws Exception {
+	if (attempts == 1) {
+	    AbstractUndoable.clearAllUndos();
+	} else {
+	    AbstractUndoable.undoAll();
+	}
 	map = dataService.getBinding("map", ScalableHashMap.class);
 	keys = (Iterator<Key>)
 	    dataService.getBinding("keys", ManagedSerializable.class).get();
@@ -726,6 +735,188 @@ public class TestScalableHashMapStress extends Assert {
 	    } catch (Exception e) {
 		System.err.println(id + ": " + e);
 	    }
+	}
+    }
+
+    /** Defines an interface for objects whose operations can be undone. */
+    interface Undoable {
+
+	/** Undo the current set of operations. */
+	void undo();
+
+	/**
+	 * Clear the current set of operations, so that they will not be undone
+	 * by the next call to undo.
+	 */
+	void clearUndo();
+    }
+
+    /** A base class for undoable objects. */
+    static abstract class AbstractUndoable implements Undoable {
+
+	/** All undoable objects. */
+	private static final List<Undoable> allUndoable =
+	    new ArrayList<Undoable>();
+
+	/** Create an instance. */
+	AbstractUndoable() {
+	    register(this);
+	}
+
+	/** Register an undoable object on the list of all undoable objects. */
+	static void register(Undoable undoable) {
+	    allUndoable.add(undoable);
+	}
+
+	/** Undo all operations on all registered undoable objects. */
+	static void undoAll() {
+	    for (Undoable undoable : allUndoable) {
+		undoable.undo();
+	    }
+	}
+
+	/** Clear the set of operations for all registered undoable objects. */
+	static void clearAllUndos() {
+	    for (Undoable undoable : allUndoable) {
+		undoable.clearUndo();
+	    }
+	}	    
+    }
+
+    /** An undoable random number generator. */
+    private static class UndoableRandom extends Random implements Undoable {
+
+	/** The version of the serialized form. */
+	private static final long serialVersionUID = 1;
+
+	/** The seed for the current set of operations. */
+	private long seed;
+
+	/** Create an instance with the specified seed. */
+	UndoableRandom(long seed) {
+	    super(seed);
+	    this.seed = seed;
+	    AbstractUndoable.register(this);
+	}
+
+	/** Reset to the current seed. */
+	public void undo() {
+	    setSeed(seed);
+	}
+
+	/** Set the seed for the next set of operations. */
+	public void clearUndo() {
+	    seed = nextLong();
+	    setSeed(seed);
+	}
+    }
+
+    /** An undoable bit set. */
+    private static class UndoableBitSet extends AbstractUndoable {
+
+	/** The backing bit set. */
+	private BitSet bitSet;
+
+	/** The set of operations. */
+	private final List<Op> undoOps = new ArrayList<Op>();
+
+	/** An operation. */
+	private abstract class Op {
+	    Op() {
+		undoOps.add(0, this);
+	    }
+	    abstract void undo();
+	}
+
+	/** The operation for setting a bit. */
+	private class SetOp extends Op {
+	    private final int bit;
+	    private boolean wasClear;
+	    SetOp(int bit) {
+		this.bit = bit;
+		if (!bitSet.get(bit)) {
+		    wasClear = true;
+		    bitSet.set(bit);
+		}
+	    }
+	    void undo() {
+		if (wasClear) {
+		    bitSet.clear(bit);
+		}
+	    }
+	}
+
+	/** The operation for clearing a bit. */
+	private class ClearOp extends Op {
+	    private final int bit;
+	    private boolean wasSet;
+	    ClearOp(int bit) {
+		this.bit = bit;
+		if (bitSet.get(bit)) {
+		    wasSet = true;
+		    bitSet.clear(bit);
+		}
+	    }
+	    void undo() {
+		if (wasSet) {
+		    bitSet.set(bit);
+		}
+	    }
+	}
+
+	/** The operation for clearing all bits. */
+	private class ClearAllOp extends Op {
+	    private BitSet saved;
+	    ClearAllOp() {
+		saved = (BitSet) bitSet.clone();
+		bitSet.clear();
+	    }
+	    void undo() {
+		bitSet = saved;
+	    }
+	}
+
+	/** Create an instance with the specified initial number of bits. */
+	UndoableBitSet(int nbits) {
+	    bitSet = new BitSet(nbits);
+	}
+
+	/** Check if the specified bit is set. */
+	boolean get(int b) {
+	    return bitSet.get(b);
+	}
+
+	/** Set the specified bit. */
+	void set(int b) {
+	    new SetOp(b);
+	}
+
+	/** Clear the specified bit. */
+	void clear(int b) {
+	    new ClearOp(b);
+	}
+
+	/** Clear all bits. */
+	void clear() {
+	    new ClearAllOp();
+	}
+
+	/** Get the number of bits set. */
+	int cardinality() {
+	    return bitSet.cardinality();
+	}
+
+	/* -- Implement Undoable -- */
+
+	public void undo() {
+	    for (Op op : undoOps) {
+		op.undo();
+	    }
+	    undoOps.clear();
+	}
+
+	public void clearUndo() {
+	    undoOps.clear();
 	}
     }
 
