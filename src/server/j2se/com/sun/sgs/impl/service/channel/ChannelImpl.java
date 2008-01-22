@@ -44,6 +44,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -53,6 +54,9 @@ import java.util.logging.Logger;
 
 /**
  * Channel implementation for use within a single transaction.
+ *
+ * <p>TODO: service bindings should be versioned, and old bindings should be
+ * converted to the new scheme (or removed if applicable).
  */
 public abstract class ChannelImpl implements Channel, Serializable {
 
@@ -149,9 +153,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      */
     private static ChannelImpl getInstance(byte[] channelId) {
 	try {
-	    ChannelImpl channel = getObjectForId(channelId, ChannelImpl.class);
-	    channel.dataService = ChannelServiceImpl.getDataService();
-	    return channel;
+	    return getObjectForId(channelId, ChannelImpl.class);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -271,7 +273,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    
 	} else {
 	    throw new ResourceUnavailableException(
-	   	"not enough resources to join");
+	   	"not enough resources to add channel event");
 	}
     }
 
@@ -404,32 +406,19 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    addEvent(new CloseEvent());
 	    isClosed = true;
 	}
-	
-	logger.log(Level.FINEST, "close returns");
     }
     
     /* -- Public methods *-- */
     
     /**
-     * Returns the ID for this channel.
-     *
-     * TBD: This method is unused in this implementation and should probably
-     * be removed.
-     *
-     * @return	the ID for this channel
-     */
-    public byte[] getChannelId() {
-	int len = channelId.length;
-	byte[] idBytes = new byte[len];
-	System.arraycopy(channelId, 0, idBytes, 0, len);
-	return idBytes;
-    }
- 
-    /**
      * Returns an iterator for the sessions that are joined to this
      * channel.
      *
      * <p>Note: This method is for testing purposes only.
+     *
+     * <p>TODO:  This method should be changed to package-private and then
+     * it can be exposed using a class in the same package but in the test
+     * area. 
      *
      * @return	an iterator for the sessions that are joined to this channel
      */
@@ -442,9 +431,11 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /** {@inheritDoc} */
     public boolean equals(Object obj) {
+	// TBD: Because this is a managed object, does an "==" check
+	// suffice here? 
 	return
 	    (this == obj) ||
-	    (obj.getClass() == this.getClass() &&
+	    (obj != null && obj.getClass() == this.getClass() &&
 	     Arrays.equals(((ChannelImpl) obj).channelId, channelId));
     }
 
@@ -591,15 +582,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /* -- Other methods -- */
     
-    /**
-     * Returns a byte array containing the ID for the specified client
-     * {@code session}.
-     */
-    private byte[] getManagedRefBytes(ManagedObject object) {
-	ManagedReference ref = dataService.createReference(object);
-	return ref.getId().toByteArray();
-    }
-
     /**
      * Returns the ID for the specified {@code session}.
      */
@@ -763,21 +745,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes the specified client {@code session} from all channels
-     * that it is currently a member of.  This method is invoked when
-     * a session is disconnected from this node, gracefully or
-     * otherwise, or if this node is recovering for a failed node
-     * whose sessions all became disconnected.
-     *
-     * This method should be call within a transaction.
-     */
-    static void removeSessionFromAllChannels(ClientSession session) {
-	long nodeId = getNodeId(session);
-	byte[] sessionIdBytes = getSessionIdBytes(session);
-	removeSessionFromAllChannels(nodeId, sessionIdBytes);
-    }
-
-    /**
      * Removes the client session with the specified {@code
      * sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId} from all channels that it is currently
@@ -859,10 +826,12 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    // ignore; session may not be a member of any channel
 	}
 
-	return
-	    (channelSet != null) ?
-	    channelSet.getChannelIds() :
-	    new HashSet<byte[]>();
+	if (channelSet != null) {
+	    return channelSet.getChannelIds();
+	} else {
+	    Set<byte[]> emptySet = Collections.emptySet();
+	    return emptySet;
+	}
     }
 
     /**
@@ -896,13 +865,17 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes all sessions from this channel and then removes the
-     * channel object from the data store.  This method should be called
-     * when the channel is closed.
+     * Removes all sessions from this channel, removes the channel object
+     * from the data store, and removes the event queue and associated
+     * binding from the data store.  This method should be called when the
+     * channel is closed.
      */
     private void removeChannel() {
 	removeAllSessions();
 	dataService.removeObject(this);
+	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
+	dataService.removeServiceBinding(getEventQueueKey());
+	dataService.removeObject(eventQueue);
     }
 
     /**
@@ -1012,63 +985,31 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	
 	private final static long serialVersionUID = 1L;
 
-	/** The set of channel IDs that the client session is a member of.
-	 *
-	 * TBD: this could be a set of BigInteger instead, and the IdWrapper
-	 * class can be eliminated.
-	 */
-	private final Set<IdWrapper> set = new HashSet<IdWrapper>();
+	/** The set of channel IDs that the client session is a member of. */
+	private final Set<BigInteger> set = new HashSet<BigInteger>();
 
 	ChannelSet(DataService dataService, ClientSession session) {
 	    super(dataService, session);
 	}
 
 	boolean add(ChannelImpl channel) {
-	    return set.add(new IdWrapper(channel.channelId));
+	    return set.add(new BigInteger(1,channel.channelId));
 	}
 
 	boolean remove(ChannelImpl channel) {
-	    return set.remove(new IdWrapper(channel.channelId));
+	    return set.remove(new BigInteger(1, channel.channelId));
 	}
 
 	Set<byte[]> getChannelIds() {
 	    HashSet<byte[]> ids = new HashSet<byte[]>();
-	    for (IdWrapper idWrapper : set) {
-		ids.add(idWrapper.get());
+	    for (BigInteger refId : set) {
+		ids.add(refId.toByteArray());
 	    }
 	    return ids;
 	}
 
 	boolean isEmpty() {
 	    return set.isEmpty();
-	}
-    }
-
-    /**
-     * Wraps a client session ID byte array so that it can be used as
-     * a key in a hashtable.
-     */
-    private static class IdWrapper implements Serializable {
-
-	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
-	
-	private final byte[] idBytes;
-
-	IdWrapper(byte[] idBytes) {
-	    this.idBytes = idBytes;
-	}
-
-	public boolean equals(Object obj) {
-	    return Arrays.equals(((IdWrapper) obj).idBytes, idBytes);
-	}
-
-	public int hashCode() {
-	    return Arrays.hashCode(idBytes);
-	}
-
-	byte[] get() {
-	    return idBytes;
 	}
     }
 
@@ -1529,9 +1470,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
 	/** The underlying iterator for service bound names. */
 	protected final Iterator<String> iterator;
-
-	/** The client session to be returned by {@code next}. */
-	private ClientSession nextSession = null;
 
 	/**
 	 * Constructs an instance of this class with the specified

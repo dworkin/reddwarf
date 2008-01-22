@@ -22,9 +22,8 @@ package com.sun.sgs.app;
 import java.io.Serializable;
 
 /**
- * Manager for creating and obtaining channels.  A {@link Channel} is
- * a communication group consisting of multiple client sessions and
- * the server.
+ * Manager for creating channels.  A {@link Channel} is a communication
+ * group consisting of multiple client sessions and the server.
  *
  * <p>A Channel is created with a {@link Delivery} requirement.
  * Messages sent on a channel are delivered according to the
@@ -37,6 +36,9 @@ public interface ChannelManager {
 
     /**
      * Creates a new channel with the specified delivery requirement.
+     * The caller may want to associate the returned channel with a
+     * binding in the {@link DataManager} or store a {@link
+     * ManagedReference} to the returned channel.
      *
      * @param	delivery a delivery requirement
      *
@@ -48,10 +50,4 @@ public interface ChannelManager {
      *		a problem with the current transaction
      */
     Channel createChannel(Delivery delivery);
-    
-    // TBD: should we add this method?
-    /*
-    Channel createChannel(Delivery delivery, ClientSession[] sessions);
-    */
-    
 }

@@ -43,7 +43,7 @@ public enum Delivery {
     ORDERED_UNRELIABLE,
 	
     /**
-     * Unordered reliable delivery: Message delivery is guarateed
+     * Unordered reliable delivery: Message delivery is guaranteed
      * unless there is a node or network failure.  No message order is
      * preserved.
      */

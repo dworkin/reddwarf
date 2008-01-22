@@ -33,26 +33,20 @@ public interface ClientSessionServer extends Remote {
      * If a client session with the specified {@code sessionId} is
      * connected to this server, sends the specified protocol {@code
      * messages} according to the specified {@code delivery}
-     * requirements, and returns {@code true}.  If a client session
-     * with the specified {@code sessionId} is not connected to this
-     * server, the messages are not sent, and {@code false} is
-     * returned.
+     * requirements.
      *
      * @param	sessionId a session ID
-     * @param	seq a sequence number
+     * @param	seq an array of message sequence numbers
      * @param	messages an array of protocol messages, each contained
      *		in a byte array
      * @param	delivery an array of delivery requirements
-     * @return	{@code true} if the client session with the specified
-     * 		{@code sessionId} is connected to this server, otherwise
-     *		{@code false}
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    boolean sendProtocolMessages(byte[] sessionId,
-				 long[] seq,
-				 byte[][] messages,
-				 Delivery[] delivery)
+    void sendProtocolMessages(byte[] sessionId,
+			      long[] seq,
+			      byte[][] messages,
+			      Delivery[] delivery)
 	throws IOException;
     
     /**

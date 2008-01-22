@@ -24,6 +24,9 @@ import java.io.Serializable;
 
 /**
  * A {@code ManagedObject} wrapper for a {@code ChannelServer}.
+ *
+ * TBD: unexport the server somehow if the wrapper gets removed from the
+ * data service?
  */
 public class ChannelServerWrapper implements ManagedObject, Serializable {
 

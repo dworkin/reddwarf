@@ -20,9 +20,9 @@
 package com.sun.sgs.impl.service.session;
 
 /**
- * Contains the node ID assigment for a {@code ManagedObject}.
+ * Contains a node ID assignment.
  *
- * TBD: should this * class be moved to the com.sun.sgs.service package?
+ * TBD: add a service-level interface for ClientSession?
  */
 public interface NodeAssignment {
 

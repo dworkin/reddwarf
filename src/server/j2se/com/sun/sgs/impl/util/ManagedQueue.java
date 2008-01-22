@@ -33,7 +33,19 @@ import java.util.Iterator;
  * removed from the queue, that element is also removed from the data
  * store.
  *
+ * <p>Note: The {@code size} and {@code iterator} methods are not
+ * supported.
+ *
+ * <p>Note: If a given instance of {@code ManagedQueue} contains a large
+ * number of elements, invoking the {@code clear} method on the queue may
+ * be a lengthy operation.  Therefore, the queue should either contain a
+ * smaller number of elements, or elements should be removed from the queue
+ * a few at at time.
+ *
  * @param <E>	the type for elements in the queue
+ *
+ * TODO: The element type should not be required to be a managed object,
+ * but should just be serializable.  Should it handle both?
  */
 public class ManagedQueue<E>
     extends AbstractQueue<E>
@@ -56,7 +68,7 @@ public class ManagedQueue<E>
 	private static final long serialVersionUID = 1L;
 	
 	/** The element. */
-	ManagedReference elementRef;
+	final ManagedReference elementRef;
 	/** The reference to the next queue entry, or null. */
 	ManagedReference nextEntryRef = null;
 
@@ -95,7 +107,7 @@ public class ManagedQueue<E>
 	if (tailRef == null) {
 	    headRef = tailRef = entryRef;
 	} else {
-	    Entry tail = tailRef.getForUpdate(Entry.class);
+	    Entry<?> tail = tailRef.getForUpdate(Entry.class);
 	    tail.nextEntryRef = entryRef;
 	    tailRef = entryRef;
 	}
@@ -114,7 +126,7 @@ public class ManagedQueue<E>
     public E poll() {
 	E element = null;
 	if (headRef != null) {
-	    Entry<E> head = getHead();
+	    Entry<E> head = getHeadForUpdate();
 	    element = head.getElement();
 	    headRef = head.nextEntryRef;
 	    if (headRef == null) {
@@ -128,9 +140,12 @@ public class ManagedQueue<E>
 	return element;
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * <p> This method is not supported.
+     */
     public int size() {
-	throw new AssertionError("not implemented");
+	throw new UnsupportedOperationException("size not supported");
     }
 
     /** {@inheritDoc} */ 
@@ -138,12 +153,21 @@ public class ManagedQueue<E>
 	return headRef == null;
     }
     
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * <p> This method is not supported.
+     */
     public Iterator<E> iterator() {
-	throw new AssertionError("not implemented");
+	throw new UnsupportedOperationException("iterator not supported");
     }
 
     /* -- Implement Object.toString -- */
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	DataManager dataManager = AppContext.getDataManager();
+	return dataManager.createReference(this).getId().hashCode();
+    }
 
     /** {@inheritDoc} */
     public String toString() {
@@ -157,6 +181,10 @@ public class ManagedQueue<E>
      *
      * <p>This implementation clears all elements from the queue,
      * thus removing all elements from the data store.
+     *
+     * TODO: For queues with a large number of elements, removing the
+     * enqueued elements should be performed in a separate task (or
+     * tasks).
      */
     public void removingObject() {
 	clear();
@@ -167,5 +195,10 @@ public class ManagedQueue<E>
     @SuppressWarnings("unchecked")
     private Entry<E> getHead() {
 	return headRef.get(Entry.class);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private Entry<E> getHeadForUpdate() {
+	return headRef.getForUpdate(Entry.class);
     }
 }
