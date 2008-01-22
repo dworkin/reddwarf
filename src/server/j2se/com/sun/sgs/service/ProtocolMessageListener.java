@@ -19,6 +19,7 @@
 
 package com.sun.sgs.service;
 
+
 /**
  * Listener for protocol messages and session disconnection events.  A
  * service can register a {@code ProtocolMessageListener} and
@@ -28,6 +29,12 @@ package com.sun.sgs.service;
  * disconnected, all registered {@code ProtocolMessageListener}s are
  * notified that that session is disconnected.
  *
+ * <p>TODO: This interface will eventually go away.
+ * ProtocolMessageListener is only used to receive 'disconnected'
+ * notifications.  The use of ProtocolMessageListener will be replaced with
+ * a scheme for registering interested in notification of a ClientSession
+ * managed object removal.
+ *
  * @see ClientSessionService#registerProtocolMessageListener
  */
 public interface ProtocolMessageListener {
@@ -36,16 +43,16 @@ public interface ProtocolMessageListener {
      * Notifies this listener that the specified protocol
      * message has been received by the specified client session.
      *
-     * @param	session a client session
+     * @param	sessionId a client session ID
      * @param	message a protocol message
      */
-    void receivedMessage(SgsClientSession session, byte[] message);
+    void receivedMessage(byte[] sessionId, byte[] message);
 
     /**
      * Notifies this listener that the specified client session has
      * become disconnected.
      *
-     * @param	session a client session
+     * @param	sessionId a client session ID
      */
-    void disconnected(SgsClientSession session);
+    void disconnected(byte[] sessionId);
 }
