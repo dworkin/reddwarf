@@ -450,9 +450,7 @@ class ClientSessionHandler {
 			"session message received before login:{0}", this);
 		    break;
 		}
-                msg.getLong(); // TODO Check sequence num
-		int size = msg.getUnsignedShort();
-		final byte[] clientMessage = msg.getBytes(size);
+		final byte[] clientMessage = msg.getBytes(msg.limit() - msg.position());
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ClientSessionImpl sessionImpl =

@@ -1322,7 +1322,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
     private byte[] getChannelMessage(byte[] message) {
 
         MessageBuffer buf = new MessageBuffer(1 + message.length);
-        buf.putByte(SimpleSgsProtocol.VERSION).
+        buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 	    putBytes(message);
 
         return buf.getBuffer();
