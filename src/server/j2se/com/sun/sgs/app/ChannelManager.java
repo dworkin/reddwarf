@@ -50,10 +50,4 @@ public interface ChannelManager {
      *		a problem with the current transaction
      */
     Channel createChannel(Delivery delivery);
-    
-    // TBD: should we add this method?
-    /*
-    Channel createChannel(Delivery delivery, ClientSession[] sessions);
-    */
-    
 }

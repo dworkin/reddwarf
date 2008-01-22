@@ -183,7 +183,7 @@ public class ManagedQueue<E>
      * thus removing all elements from the data store.
      *
      * TODO: For queues with a large number of elements, removing the
-     * enqueueed elements should be performed in a separate task (or
+     * enqueued elements should be performed in a separate task (or
      * tasks).
      */
     public void removingObject() {

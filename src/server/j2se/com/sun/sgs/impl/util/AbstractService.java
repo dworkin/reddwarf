@@ -199,6 +199,8 @@ public abstract class AbstractService implements Service {
      * to complete or while waiting for the shutdown thread to finish,
      * this method returns {@code false}.
      *
+     * TODO: If shutdown is interrupted, it should be possible to
+     * re-initiate shutdown.
      */
     public boolean shutdown() {
 	logger.log(Level.FINEST, "shutdown");
