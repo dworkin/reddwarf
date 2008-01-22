@@ -22,18 +22,17 @@ package com.sun.sgs.example.chat.app;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
@@ -69,9 +68,6 @@ public class ChatClientSessionListener
     /** The {@link ClientSession} this listener receives events for. */
     private final ManagedReference sessionRef;
 
-    private ClientSession session() {
-        return sessionRef.get(ClientSession.class);
-    }
     /**
      * Creates a new listener for the given {@code ClientSession}.
      * Immediately joins the session to the global notification channel,
@@ -104,12 +100,14 @@ public class ChatClientSessionListener
         removeFromChannel(GLOBAL_CHANNEL_NAME);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public void receivedMessage(byte[] message) {
         try {
             String messageString = fromMessageBytes(message);
 
-            // Check that the command begins with a foward-slash
+            // Check that the command begins with a forward-slash
             if (! messageString.startsWith(COMMAND_PREFIX)) {
                 throw new IllegalArgumentException(
                     "Command must start with " + COMMAND_PREFIX);
@@ -118,7 +116,7 @@ public class ChatClientSessionListener
             // Split at the first run of whitespace, if any
             String[] args = messageString.split("\\s+", 2);
 
-            // Find the ChatCommand enum for this command
+            // Find the ChatCommand for this command
             String commandString = args[0].substring(1).toUpperCase();
             ChatCommand command = ChatCommand.valueOf(commandString);
 
@@ -130,6 +128,12 @@ public class ChatClientSessionListener
             case LEAVE:
                 removeFromChannel(args[1]);
                 break;
+
+            case BROADCAST: {
+                String[] broadcastArgs = args[1].split(":", 2);
+                broadcastOnChannel(broadcastArgs[0], broadcastArgs[1]);
+                break;
+            }
 
             case PING:
                 echo(args[1]);
@@ -159,18 +163,35 @@ public class ChatClientSessionListener
     }
 
     /**
-     * Returns a string constructed with the contents of the byte
-     * array converted to hex format.
-     *
-     * @param bytes a byte array to convert
-     * @return the converted byte array as a hex-formatted string
+     * TODO
+     * 
+     * @param channelName
+     * @param message
      */
-    private static String toHexString(byte[] bytes) {
-        StringBuilder buf = new StringBuilder(2 * bytes.length);
-        for (byte b : bytes) {
-            buf.append(String.format("%02X", b));
+    private void broadcastOnChannel(String channelName, String message) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                "Broadcast request from {0} on {1}, contents: {2}",
+                new Object[] { session(), channelName, message });
         }
-        return buf.toString();
+
+        ChatChannel.find(channelName).send(toMessageBytes(message));
+    }
+
+    /**
+     * Echos the given string back to the sending session as a direct message.
+     *
+     * @param message the message to echo
+     */
+    private void echo(String message) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                "Echo request from {0}, contents: {1}",
+                new Object[] { session(), message });
+        }
+
+        String reply = "/pong " + message;
+        session().send(toMessageBytes(reply));
     }
 
     /**
@@ -187,20 +208,21 @@ public class ChatClientSessionListener
                     "Join " + session() + " to " + channelName);
         }
 
-        ChannelManager channelMgr = AppContext.getChannelManager();
-        DataManager dataMgr = AppContext.getDataManager();
-        Channel channel;
-        try {
-            channel = dataMgr.getBinding(channelName, Channel.class);
-        } catch (NameNotBoundException e) {
-            channel = channelMgr.createChannel(Delivery.RELIABLE);
-            dataMgr.setBinding(channelName, channel);
+        ChatChannel channel = ChatChannel.findOrCreate(channelName);
+        
+        if (channel.memberRefs().contains(sessionRef)) {
+            if (logger.isLoggable(Level.INFO)) {
+                logger.log(Level.INFO,
+                        "Session " + session() +
+                        " is already a member of channel " + channelName);
+            }
+            return;
         }
 
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(toHexString(sessionRef.getId().toByteArray()));
+        changeMsg.append(getSessionIdString());
         if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
             changeMsg.append(':');
             changeMsg.append(session().getName());
@@ -211,16 +233,12 @@ public class ChatClientSessionListener
         // the channel, the joiner included.
         channel.join(session());
 
-        // TODO update our membership map
-
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members");
-        Iterator<ManagedReference> memberRefs = channelMemberRefs(channel);
-        while (memberRefs.hasNext()) {
-            ManagedReference memberRef = memberRefs.next();
+        for (ManagedReference memberRef : channel.memberRefs()) {
             ClientSession member = memberRef.get(ClientSession.class);
             listMessage.append(' ');
-            listMessage.append(toHexString(memberRef.getId().toByteArray()));
+            listMessage.append(getIdString(memberRef));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
                 listMessage.append(':');
                 listMessage.append(member.getName());
@@ -245,11 +263,9 @@ public class ChatClientSessionListener
                     new Object[] { session(), channelName });
         }
 
-        DataManager dataMgr = AppContext.getDataManager();
-        Channel channel;
-        
+        ChatChannel channel;
         try {
-            channel = dataMgr.getBinding(channelName, Channel.class);
+            channel = ChatChannel.find(channelName);
         } catch (NameNotBoundException e) {
             // The channel has been closed, so there's nothing to do.
             if (logger.isLoggable(Level.FINE)) {
@@ -260,50 +276,47 @@ public class ChatClientSessionListener
             return;
         }
 
-        if (session().isConnected()) {
-            // Remove the member first, so it doesn't get the membership
-            // change message for its own departure.
-            
-            // TODO update our membership map
-            channel.leave(session());
-        }
+        channel.leave(session());
 
         // If the channel has no more sessions, close it.
-        if (! channelHasMembers(channel)) {
+        if (! channel.hasMembers()) {
             channel.close();
             return;
         }
 
         // Tell the rest of the channel about the removal.
-        String changeMessage = "/left " +
-            toHexString(sessionRef.getId().toByteArray());
+        String changeMessage = "/left " + getSessionIdString();
         channel.send(toMessageBytes(changeMessage));
     }
 
-    private boolean channelHasMembers(Channel channel) {
-        // FIXME
-        return false;
-    }
 
-    private Iterator<ManagedReference> channelMemberRefs(Channel channel) {
-        // FIXME
-        return null;
+    /**
+     * Returns the session this listener receives events for.
+     * 
+     * @return the session this listener receives events for
+     */
+    private ClientSession session() {
+        // No null-check needed
+        return sessionRef.get(ClientSession.class);
     }
 
     /**
-     * Echos the given string back to the sending session as a direct message.
-     *
-     * @param message the message to echo
+     * TODO doc
+     * 
+     * @return
      */
-    private void echo(String message) {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER,
-                "Echo request from {0}, contents: {1}",
-                new Object[] { session(), message });
-        }
+    private String getSessionIdString() {
+        return getIdString(sessionRef);
+    }
 
-        String reply = "/pong " + message;
-        session().send(toMessageBytes(reply));
+    /**
+     * TODO doc
+     * 
+     * @param ref
+     * @return
+     */
+    private static String getIdString(ManagedReference ref) {
+        return ref.getId().toString(16);
     }
 
     /**

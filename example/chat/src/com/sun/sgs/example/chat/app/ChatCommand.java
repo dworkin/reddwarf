@@ -41,6 +41,14 @@ public enum ChatCommand {
     LEAVE,
 
     /**
+     * Broadcasts a message on the named channel.
+     * <pre>
+     *    /broadcast channelName:message
+     * </pre>
+     */
+    BROADCAST,
+
+    /**
      * Echos the given message back to the sender.
      * <pre>
      *    /ping message
@@ -57,7 +65,7 @@ public enum ChatCommand {
     DISCONNECT,
 
     /**
-     * Join this session to the named channel.
+     * Shuts down the server.
      * <pre>
      *    /shutdown
      * </pre>
