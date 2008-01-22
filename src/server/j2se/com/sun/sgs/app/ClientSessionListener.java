@@ -52,7 +52,18 @@ public interface ClientSessionListener {
      * Notifies this listener that the specified message, sent by the
      * associated session's client, was received.
      *
-     * @param message a message
+     * <p>If this listener needs to delay processing the given message
+     * for any reason, including until more resources become
+     * available, this listener may throw {@code MessageRejectedException}.
+     * If this listener does throw {@code MessageRejectedException}, it
+     * will be as if this invocation never happened; that is, the
+     * transaction associated with this invocation is aborted, so it is not
+     * possible to save any partial processing result before {@code
+     * MessageRejectedException} is thrown.
+     *
+     * @param	message a message
+     * @throws	MessageRejectedException if there are not enough resources
+     *		to process the specified message
      */
     void receivedMessage(byte[] message);
 

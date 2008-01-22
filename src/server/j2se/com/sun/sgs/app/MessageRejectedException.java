@@ -20,11 +20,17 @@
 package com.sun.sgs.app;
 
 /**
- * Thrown when an attempt to schedule a task fails because the {@link
- * TaskManager} refuses to accept the task due to resource limitations.
+ * Thrown when an operation fails because there are not enough
+ * resources to send or receive a message.
+ *
+ * @see ClientSession#send
+ * @see Channel#send
+ * @see ClientSessionListener#receivedMessage
  */
-public class TaskRejectedException extends ResourceUnavailableException {
-    
+public class MessageRejectedException
+    extends ResourceUnavailableException
+{
+
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
@@ -33,7 +39,7 @@ public class TaskRejectedException extends ResourceUnavailableException {
      *
      * @param	message the detail message or <code>null</code>
      */
-    public TaskRejectedException(String message) {
+    public MessageRejectedException(String message) {
 	super(message);
     }
 
@@ -44,7 +50,7 @@ public class TaskRejectedException extends ResourceUnavailableException {
      * @param	message the detail message or <code>null</code>
      * @param	cause the cause or <code>null</code>
      */
-    public TaskRejectedException(String message, Throwable cause) {
+    public MessageRejectedException(String message, Throwable cause) {
 	super(message, cause);
     }
 }

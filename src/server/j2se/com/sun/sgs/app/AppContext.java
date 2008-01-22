@@ -28,33 +28,33 @@ import com.sun.sgs.impl.kernel.ContextResolver;
 public final class AppContext {
 
     /**
-     * Returns the <code>ChannelManager</code> for use by the current
+     * Returns the {@code ChannelManager} for use by the current
      * application.  The object returned is not serializable, and should not be
      * stored as part of a managed object.
      *
-     * @return	the <code>ChannelManager</code> for the current application
+     * @return	the {@code ChannelManager} for the current application
      */
     public static ChannelManager getChannelManager() {
         return ContextResolver.getChannelManager();
     }
 
     /**
-     * Returns the <code>DataManager</code> for use by the current application.
+     * Returns the {@code DataManager} for use by the current application.
      * The object returned is not serializable, and should not be stored as
      * part of a managed object.
      *
-     * @return	the <code>DataManager</code> for the current application
+     * @return	the {@code DataManager} for the current application
      */
     public static DataManager getDataManager() {
         return ContextResolver.getDataManager();
     }
 
     /**
-     * Returns the <code>TaskManager</code> for use by the current application.
+     * Returns the {@code TaskManager} for use by the current application.
      * The object returned is not serializable, and should not be stored as
      * part of a managed object.
      *
-     * @return	the <code>TaskManager</code> for the current application
+     * @return	the {@code TaskManager} for the current application
      */
     public static TaskManager getTaskManager() {
         return ContextResolver.getTaskManager();
