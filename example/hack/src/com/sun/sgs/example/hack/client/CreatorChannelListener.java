@@ -20,7 +20,7 @@
 
 package com.sun.sgs.example.hack.client;
 
-import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
@@ -63,7 +63,7 @@ public class CreatorChannelListener extends GameChannelListener
      * @param reliable true if this packet was sent reliably
      */
     //public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-    public void receivedMessage(UtilChannel channel, BigInteger sender,
+    public void receivedMessage(ClientChannel channel, BigInteger sender,
                                 ByteBuffer data) {
         if (sender == null) {
             // if this is a message from the server, then it's some

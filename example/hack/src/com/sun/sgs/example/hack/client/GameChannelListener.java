@@ -24,10 +24,10 @@ package com.sun.sgs.example.hack.client;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;*/
 
-import com.sun.sgs.client.util.UtilChannel;
-import com.sun.sgs.client.util.UtilChannelListener;
-
 import com.sun.sgs.impl.sharedutil.HexDumper;
+
+import com.sun.sgs.example.hack.client.util.ClientChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannelListener;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -44,7 +44,7 @@ import java.util.Map;
 /**
  * This abstract class is the base for all game-specific listeners.
  */
-public abstract class GameChannelListener implements UtilChannelListener
+public abstract class GameChannelListener implements ClientChannelListener
 {
 
     // the chat listener that accepts all incoming chat messages
@@ -62,7 +62,7 @@ public abstract class GameChannelListener implements UtilChannelListener
      * under the EA APIs for this client, so for now it's just implemented
      * here and ignored..
      */
-    public void leftChannel(UtilChannel channel) {
+    public void leftChannel(ClientChannel channel) {
         
     }
 

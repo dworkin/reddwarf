@@ -31,14 +31,14 @@ import com.sun.gi.utils.SGSUUID;*/
 
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
-import com.sun.sgs.client.util.UtilChannel;
-import com.sun.sgs.client.util.UtilChannelListener;
 
 import com.sun.sgs.example.hack.client.gui.ChatPanel;
 import com.sun.sgs.example.hack.client.gui.CreatorPanel;
 import com.sun.sgs.example.hack.client.gui.GamePanel;
 import com.sun.sgs.example.hack.client.gui.LobbyPanel;
 import com.sun.sgs.example.hack.client.gui.PasswordDialog;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannelListener;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -188,7 +188,7 @@ public class Client extends JFrame implements SimpleClientListener {
      *
      * @param channel the channel that we joined
      */
-    public UtilChannelListener joinedChannel(UtilChannel channel) {
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
         // clear the chat area each time we join a new area
         chatPanel.clearMessages();
 

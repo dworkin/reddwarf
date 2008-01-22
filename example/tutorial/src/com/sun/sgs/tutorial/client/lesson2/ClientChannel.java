@@ -1,8 +1,8 @@
-package com.sun.sgs.client.util;
+package com.sun.sgs.tutorial.client.lesson2;
 
 import java.nio.ByteBuffer;
 
-public interface UtilChannel {
+public interface ClientChannel {
 
     // FIXME need a dispatcher / manager to tell the client when it has
     // joined a channel

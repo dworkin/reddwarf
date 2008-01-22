@@ -21,7 +21,7 @@ package com.sun.sgs.example.hack.client;
 
 //import com.sun.gi.comm.users.client.ClientChannel;
 
-import com.sun.sgs.client.util.UtilChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
 
 //import com.sun.gi.utils.SGSUUID;
 
@@ -43,7 +43,7 @@ public class ChatManager implements ChatListener
     private HashSet<ChatListener> listeners;
 
     // the channel for both directions of communications
-    private UtilChannel channel;
+    private ClientChannel channel;
 
     /**
      * Creates an instance of <code>ChatManager</code>.
@@ -58,7 +58,7 @@ public class ChatManager implements ChatListener
      *
      * @param channel the communications channel
      */
-    public void setChannel(UtilChannel channel) {
+    public void setChannel(ClientChannel channel) {
         this.channel = channel;
     }
 

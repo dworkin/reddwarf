@@ -21,8 +21,6 @@ package com.sun.sgs.example.hack.client.ai;
 
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
-import com.sun.sgs.client.util.UtilChannel;
-import com.sun.sgs.client.util.UtilChannelListener;
 
 import com.sun.sgs.example.hack.client.ChatManager;
 import com.sun.sgs.example.hack.client.CreatorChannelListener;
@@ -32,6 +30,8 @@ import com.sun.sgs.example.hack.client.DungeonChannelListener;
 import com.sun.sgs.example.hack.client.GameManager;
 import com.sun.sgs.example.hack.client.LobbyChannelListener;
 import com.sun.sgs.example.hack.client.LobbyManager;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannelListener;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
@@ -109,7 +109,7 @@ public class AIClient implements SimpleClientListener {
         return new PasswordAuthentication(name, "".toCharArray());
     }
 
-    public UtilChannelListener joinedChannel(UtilChannel channel) {
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
         chatManager.setChannel(channel);
         if (channel.getName().equals("game:lobby")) {
             aiDungeonListener.leftDungeon();
