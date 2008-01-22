@@ -547,9 +547,11 @@ public class TestDataStoreServerImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	/* Wait for thread to block */
-	assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
-	Thread.sleep(10);
+	/* Wait for thread to start */
+	assertTrue("Blocking thread did not start",
+		   flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	/* Wait for the operation to block */
+	Thread.sleep(100);
 	/* Concurrent access */
 	try {
 	    action.run();
@@ -559,7 +561,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	} finally {
 	    /* Clean up */
 	    server.abort(tid2);
-	    assertTrue(flag.tryAcquire(10, TimeUnit.MILLISECONDS));
+	    assertTrue("Blocking thread didn't complete",
+		       flag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	}
     }
 }
