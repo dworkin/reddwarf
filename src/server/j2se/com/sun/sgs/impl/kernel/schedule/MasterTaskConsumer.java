@@ -39,8 +39,8 @@ class MasterTaskConsumer implements Runnable {
     // the master scheduler that created this consumer
     private final MasterTaskScheduler masterScheduler;
 
-    // the system scheduler that provides tasks
-    private final SystemScheduler scheduler;
+    // the scheduler that provides tasks
+    private final ApplicationScheduler scheduler;
 
     // the task executor used to run each task
     private final TaskExecutor taskExecutor;
@@ -50,11 +50,11 @@ class MasterTaskConsumer implements Runnable {
      *
      * @param masterScheduler the <code>MasterTaskScheduler</code> that
      *                        created this consumer
-     * @param scheduler the <code>SystemScheduler</code> that provides tasks
+     * @param scheduler the <code>ApplicationScheduler</code> that provides tasks
      * @param taskExecutor the <code>TaskExecutor</code> used to execute tasks
      */
     MasterTaskConsumer(MasterTaskScheduler masterScheduler,
-                       SystemScheduler scheduler,
+                       ApplicationScheduler scheduler,
                        TaskExecutor taskExecutor) {
         logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
 
@@ -76,7 +76,7 @@ class MasterTaskConsumer implements Runnable {
             while (true) {
                 // wait for the next task, which is the only point at which
                 // we might get interrupted, which in turn ends execution
-                ScheduledTask task = scheduler.getNextTask();
+                ScheduledTask task = scheduler.getNextTask(true);
                 taskExecutor.runTask(task, true, false);
 
                 // if this is a recurring task, schedule the next run

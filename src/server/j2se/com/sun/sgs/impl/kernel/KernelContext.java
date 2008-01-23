@@ -42,8 +42,14 @@ import java.util.MissingResourceException;
  * FIXME:  the context should check that it isn't shutdown before
  *  handing out services and managers
  */
-class AppKernelAppContext extends AbstractKernelAppContext {
 
+// Cannot be final because tests extend it
+class KernelContext {
+
+    // the application's name and cached hash code
+    private final String applicationName;
+    private final int applicationCode;
+    
     // the managers available in this context
     private final ComponentRegistry managerComponents;
 
@@ -57,17 +63,21 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     private final TaskManager taskManager;
 
     /**
-     * Creates an instance of <code>AppKernelAppContext</code>.
+     * Creates an instance of <code>KernelContext</code>.
      *
      * @param applicationName the name of the application represented by
      *                        this context
      * @param serviceComponents the services available in this context
      * @param managerComponents the managers available in this context
      */
-    AppKernelAppContext (String applicationName,
-                         ComponentRegistry serviceComponents,
-                         ComponentRegistry managerComponents) {
-        super(applicationName);
+    KernelContext (String applicationName,
+                   ComponentRegistry serviceComponents,
+                   ComponentRegistry managerComponents) {
+        this.applicationName = applicationName;
+
+        // the hash code is the hash of the application name, which never
+        // changes, so the hash code gets pre-cached here
+        applicationCode = applicationName.hashCode();
 
         this.serviceComponents = serviceComponents;
         this.managerComponents = managerComponents;
@@ -102,7 +112,9 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>ChannelManager</code> used in this context.
+     *
+     * @return the context's <code>ChannelManager</code>
      */
     ChannelManager getChannelManager() {
         if (channelManager == null)
@@ -112,7 +124,9 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>DataManager</code> used in this context.
+     *
+     * @return the context's <code>DataManager</code>
      */
     DataManager getDataManager() {
         if (dataManager == null)
@@ -122,7 +136,9 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the <code>TaskManager</code> used in this context.
+     *
+     * @return the context's <code>TaskManager</code>
      */
     TaskManager getTaskManager() {
         if (taskManager == null)
@@ -132,7 +148,18 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns a manager based on the given type. If the manager type is
+     * unknown, or if there is more than one manager of the given type,
+     * <code>ManagerNotFoundException</code> is thrown. This may be used
+     * to find any available manager, including the three standard
+     * managers.
+     *
+     * @param type the <code>Class</code> of the requested manager
+     *
+     * @return the requested manager
+     *
+     * @throws ManagerNotFoundException if there wasn't exactly one match to
+     *                                  the requested type
      */
     <T> T getManager(Class<T> type) {
         try {
@@ -144,7 +171,19 @@ class AppKernelAppContext extends AbstractKernelAppContext {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns a <code>Service</code> based on the given type. If the type is
+     * unknown, or if there is more than one <code>Service</code> of the
+     * given type, <code>MissingResourceException</code> is thrown. This is
+     * the only way to resolve service components directly, and should be
+     * used with care, as <code>Service</code>s should not be resolved and
+     * invoked directly outside of a transactional context.
+     *
+     * @param type the <code>Class</code> of the requested <code>Service</code>
+     *
+     * @return the requested <code>Service</code>
+     *
+     * @throws MissingResourceException if there wasn't exactly one match to
+     *                                  the requested type
      */
     <T extends Service> T getService(Class<T> type) {
         return serviceComponents.getComponent(type);
@@ -164,5 +203,41 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         for (Object service: list) {
             ((Service) service).shutdown();
         }
+    }
+    
+    /**
+     * Returns a unique representation of this context, in this case the
+     * name of the application.
+     *
+     * @return a <code>String</code> representation of the context
+     */
+    public String toString() {
+        return applicationName;
+    }
+
+    /**
+     * Returns <code>true</code> if the provided object is an instance of
+     * <code>AppKernelAppContext</code> that represents the same
+     * application context.
+     *
+     * @param o an instance of <code>KernelContext</code>
+     *
+     * @return <code>true</code> if the provided object represents the same
+     *         context as this object, <code>false</code> otherwise
+     */
+    public boolean equals(Object o) {
+        if ((o == null) || (! (o instanceof KernelContext)))
+            return false;
+
+        KernelContext other = (KernelContext)o;
+
+        return other.applicationName.equals(applicationName);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return applicationCode;
     }
 }

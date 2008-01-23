@@ -286,7 +286,7 @@ public class ChannelServiceImpl
 		if (taskQueue == null) {
 		    NonDurableTaskQueue newTaskQueue =
 			new NonDurableTaskQueue(txnProxy, taskScheduler,
-						taskOwner, null);
+						taskOwner);
 		    taskQueue = coordinatorTaskQueues.
 			putIfAbsent(channelIdRef, newTaskQueue);
 		    if (taskQueue == null) {

@@ -21,8 +21,7 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
-
-import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.auth.Identity;
 
 
 /**
@@ -50,9 +49,9 @@ public interface TransactionProxy {
      * Returns the owner of the task that is executing the current
      * transaction.
      *
-     * @return the current transaction's <code>TaskOwner</code>
+     * @return the current transaction owner's <code>Identity</code>
      */
-    public TaskOwner getCurrentOwner();
+    public Identity getCurrentOwner();
 
     /**
      * Returns a <code>Service</code>, based on the given type, that is

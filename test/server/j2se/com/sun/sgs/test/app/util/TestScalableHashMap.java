@@ -22,10 +22,10 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
@@ -69,7 +69,7 @@ public class TestScalableHashMap extends Assert {
 
     private static SgsTestNode serverNode;
     private static TaskScheduler taskScheduler;
-    private static TaskOwner taskOwner;
+    private static Identity taskOwner;
     private static DataService dataService;
 
     /** A fixed random number generator for use in the test. */

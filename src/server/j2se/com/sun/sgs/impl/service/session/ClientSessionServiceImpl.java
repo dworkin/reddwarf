@@ -27,7 +27,6 @@ import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -43,7 +42,6 @@ import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
@@ -138,7 +136,7 @@ public class ClientSessionServiceImpl
     private final Acceptor<SocketAddress> acceptor;
 
     /** The task scheduler for non-durable tasks. */
-    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
+    final NonDurableTaskScheduler nonDurableTaskScheduler;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -229,7 +227,13 @@ public class ClientSessionServiceImpl
 
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
+            
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
+            nonDurableTaskScheduler =
+		new NonDurableTaskScheduler(
+		    taskScheduler, taskOwner,
+		    txnProxy.getService(TaskService.class));
+            
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
@@ -268,17 +272,7 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void doReady() {
-	// TBD: the AcceptorListener.newConnection method needs to
-	// reject connections until ready is invoked.  Need to
-	// implement interlock for this.  -- ann (8/29/07)
 
-	// Note: When the kernel simplification changes go in, an interlock
-	// might not be necessary.
-
-        nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner,
-		    txnProxy.getService(TaskService.class));
     }
 
     /** {@inheritDoc} */
@@ -1039,10 +1033,10 @@ public class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	TaskOwner owner =
+	Identity owner =
 	    (ownerIdentity == null) ?
 	    taskOwner :
-	    new TaskOwnerImpl(ownerIdentity, taskOwner.getContext());
+	    ownerIdentity;
 	    
 	taskScheduler.runTransactionalTask(task, owner);
     }
