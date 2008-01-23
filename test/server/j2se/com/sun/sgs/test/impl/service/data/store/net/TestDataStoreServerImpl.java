@@ -22,7 +22,6 @@ package com.sun.sgs.test.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -316,75 +315,61 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
-    /* -- Test specifying negative transaction IDs -- */
-
+    /**
+     * Test specifying negative transaction IDs to all server methods with
+     * transaction ID parameters.
+     */
     public void testNegativeTxnIds() {
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.createObject(Long.MIN_VALUE); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.markForUpdate(-1, oid); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.getObject(-2, oid, true); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() {
-		    server.setObject(-3, oid, new byte[0]); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() {
-		    server.setObjects(
-			-4, new long[] { oid }, new byte[][] { new byte[0] });
-		} });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.removeObject(-5, oid); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.getBinding(-6, "foo"); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.setBinding(-7, "foo", oid); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.removeBinding(-8, "foo"); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.getClassId(-9, new byte[0]); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() {
-		    try {
-			server.getClassInfo(-10, 3);
-		    } catch (ClassInfoNotFoundException e) {
-			fail("Unexpected exception: " + e);
-		    }
-		}
-	    });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.nextObjectId(-11, 4); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() { public void run() { server.prepare(-12); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() { public void run() { server.commit(-13); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() {
-		public void run() { server.prepareAndCommit(-14); } });
-	assertThrowsIllegalArgumentException(
-	    new Runnable() { public void run() { server.abort(-15); } });
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.createObject(Long.MIN_VALUE); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.markForUpdate(-1, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getObject(-2, oid, true); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObject(-3, oid, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObjects(
+		-4, new long[] { oid }, new byte[][] { new byte[0] }); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeObject(-5, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getBinding(-6, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setBinding(-7, "foo", oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeBinding(-8, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextBoundName(-9, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getClassId(-10, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() {
+	    void run() throws Exception {
+		server.getClassInfo(-11, 3); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextObjectId(-12, 4); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepare(-13); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.commit(-14); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepareAndCommit(-15); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.abort(-16); } };
      }
 
-    private void assertThrowsIllegalArgumentException(Runnable action) {
-	try {
-	    action.run();
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	} catch (Exception e) {
-	    fail("Expected IllegalArgumentException: " + e);
+    /** Run the action and check that it throws IllegalArgumentException. */
+    private abstract static class AssertThrowsIllegalArgumentException {
+	abstract void run() throws Exception;
+	AssertThrowsIllegalArgumentException() {
+	    try {
+		run();
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(e);
+	    } catch (Exception e) {
+		fail("Expected IllegalArgumentException: " + e);
+	    }
 	}
     }
 
