@@ -850,6 +850,7 @@ public final class DataStoreClient
 	    }
 	} finally {
 	    if (!joined) {
+		decrementTxnCount();
 		if (tid != -1) {
 		    try {
 			server.abort(tid);
@@ -863,7 +864,6 @@ public final class DataStoreClient
 			}
 		    }
 		}
-		decrementTxnCount();
 	    }
 	}
 	TxnInfo txnInfo = new TxnInfo(txn, tid);

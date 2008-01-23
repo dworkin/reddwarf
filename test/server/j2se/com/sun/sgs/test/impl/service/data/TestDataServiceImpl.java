@@ -2111,23 +2111,17 @@ public class TestDataServiceImpl extends TestCase {
 	private static final long serialVersionUID = 0;
     }
 
-    static class MOPublicReadResolveHere
-	implements ManagedObject, Serializable
-    {
-	private static final long serialVersionUID = 0;
-	public Object readResolve() { return this; }
-    }
-
     static class MOPublicWriteReplace extends PublicWriteReplace
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
     }
 
-    static class MOProtectedReadResolve extends ProtectedReadResolve
+    static class MOPublicReadResolveHere
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
+	public Object readResolve() { return this; }
     }
 
     static class MOPublicWriteReplaceHere
@@ -2137,11 +2131,10 @@ public class TestDataServiceImpl extends TestCase {
 	public Object writeReplace() { return this; }
     }
 
-    static class MOProtectedReadResolveHere
+    static class MOProtectedReadResolve extends ProtectedReadResolve
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
-	protected Object readResolve() { return this; }
     }
 
     static class MOProtectedWriteReplace extends ProtectedWriteReplace
@@ -2150,10 +2143,11 @@ public class TestDataServiceImpl extends TestCase {
 	private static final long serialVersionUID = 0;
     }
 
-    static class MOPackageReadResolve extends PackageReadResolve
+    static class MOProtectedReadResolveHere
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
+	protected Object readResolve() { return this; }
     }
 
     static class MOProtectedWriteReplaceHere
@@ -2163,11 +2157,10 @@ public class TestDataServiceImpl extends TestCase {
 	protected Object writeReplace() { return this; }
     }
 
-    static class MOPackageReadResolveHere
+    static class MOPackageReadResolve extends PackageReadResolve
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
-	Object readResolve() { return this; }
     }
 
     static class MOPackageWriteReplace extends PackageWriteReplace
@@ -2176,10 +2169,11 @@ public class TestDataServiceImpl extends TestCase {
 	private static final long serialVersionUID = 0;
     }
 
-    static class MOPrivateReadResolve extends PrivateReadResolve
+    static class MOPackageReadResolveHere
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
+	Object readResolve() { return this; }
     }
 
     static class MOPackageWriteReplaceHere
@@ -2189,11 +2183,10 @@ public class TestDataServiceImpl extends TestCase {
 	Object writeReplace() { return this; }
     }
 
-    static class MOPrivateReadResolveHere
+    static class MOPrivateReadResolve extends PrivateReadResolve
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
-	private Object readResolve() { return this; }
     }
 
     static class MOPrivateWriteReplace extends PrivateWriteReplace
@@ -2202,9 +2195,11 @@ public class TestDataServiceImpl extends TestCase {
 	private static final long serialVersionUID = 0;
     }
 
-    static class MOStaticReadResolve implements ManagedObject, Serializable {
+    static class MOPrivateReadResolveHere
+	implements ManagedObject, Serializable
+    {
 	private static final long serialVersionUID = 0;
-	public static Object readResolve() { return null; }
+	private Object readResolve() { return this; }
     }
 
     static class MOPrivateWriteReplaceHere
@@ -2212,6 +2207,11 @@ public class TestDataServiceImpl extends TestCase {
     {
 	private static final long serialVersionUID = 0;
 	private Object writeReplace() { return this; }
+    }
+
+    static class MOStaticReadResolve implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 0;
+	public static Object readResolve() { return null; }
     }
 
     static class MOStaticWriteReplace implements ManagedObject, Serializable {
@@ -2233,21 +2233,27 @@ public class TestDataServiceImpl extends TestCase {
 	public static String writeReplace() { return "hi"; }
     }
 
-    static class LocalPackageReadResolve {
-	Object readResolve() { return this; }
-    }
-
-    static class LocalPackageWriteReplace {
-	Object writeReplace() { return this; }
-    }
-
     static class MOLocalPackageReadResolve extends LocalPackageReadResolve
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
     }
 
+    static class LocalPackageReadResolve {
+	Object readResolve() { return this; }
+    }
+
     static class MOLocalPackageWriteReplace extends LocalPackageWriteReplace
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 0;
+    }
+
+    static class LocalPackageWriteReplace {
+	Object writeReplace() { return this; }
+    }
+
+    static class MOLocalPrivateReadResolve extends LocalPrivateReadResolve
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
@@ -2257,20 +2263,14 @@ public class TestDataServiceImpl extends TestCase {
 	private Object readResolve() { return this; }
     }
 
-    static class LocalPrivateWriteReplace {
-	private Object writeReplace() { return this; }
-    }
-
-    static class MOLocalPrivateReadResolve extends LocalPrivateReadResolve
-	implements ManagedObject, Serializable
-    {
-	private static final long serialVersionUID = 0;
-    }
-
     static class MOLocalPrivateWriteReplace extends LocalPrivateWriteReplace
 	implements ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 0;
+    }
+
+    static class LocalPrivateWriteReplace {
+	private Object writeReplace() { return this; }
     }
 
     static class AbstractReadResolveField

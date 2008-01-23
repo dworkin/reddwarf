@@ -24,6 +24,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import com.sun.sgs.impl.service.data.store.net.NetworkException;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.util.Properties;
@@ -284,7 +285,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	server.shutdown();
 	try {
 	    store.createObject(txn);
-	} catch (Exception e) {
+	} catch (NetworkException e) {
 	    System.err.println(e);
 	}
 	try {

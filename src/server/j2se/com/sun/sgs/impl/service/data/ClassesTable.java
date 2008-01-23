@@ -387,6 +387,6 @@ final class ClassesTable {
 	    name = name.substring(pos + 2);
 	}
 	pos = name.lastIndexOf('.');
-	return (pos < 0) ? name : name.substring(0, pos);
+	return (pos < 0) ? "" : name.substring(0, pos);
     }
 }
