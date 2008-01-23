@@ -19,8 +19,9 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.List;
 import java.util.Map;
@@ -43,9 +44,9 @@ public interface ProfileReport {
     /**
      * Returns the owner of the run task.
      *
-     * @return the <code>TaskOwner</code> for the task
+     * @return the <code>Identity</code> of the task owner
      */
-    public TaskOwner getTaskOwner();
+    public Identity getTaskOwner();
 
     /**
      * Returns whether any of the task was transactional.

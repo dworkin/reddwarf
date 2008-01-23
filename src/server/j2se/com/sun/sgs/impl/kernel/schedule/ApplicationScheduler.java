@@ -135,6 +135,13 @@ interface ApplicationScheduler {
     public RecurringTaskHandle addRecurringTask(ScheduledTask task);
 
     /**
+     * Called when a delayed task has reached its time to run.
+     *
+     * @param task the <code>ScheduledTask</code> that is ready to run
+     */
+    public void timedTaskReady(ScheduledTask task);
+    
+    /**
      * Notifies the scheduler that the given task has been cancelled. This
      * typically happens with recurring tasks when their associated handles
      * are cancelled. The scheduler does not need to do anything in reaction

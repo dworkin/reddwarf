@@ -22,13 +22,14 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionNotActiveException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.profile.ProfileCollector;
 
@@ -64,6 +65,10 @@ public final class TaskHandler {
     // the single instance used to collect profile data
     private static ProfileCollector profileCollector = null;
 
+    // The context we'll be using, which allows code in tasks to
+    // easily find the managers
+    private KernelContext ctx;
+    
     /**
      * Package-private constructor used by the kernel to create the single
      * instance of <code>TaskHandler</code>.
@@ -93,32 +98,39 @@ public final class TaskHandler {
                     new IllegalStateException("wrong transactionCoordinator");
             }
             
-            TaskHandler.profileCollector = profileCollector;
+            if (TaskHandler.profileCollector == null) {
+                TaskHandler.profileCollector = profileCollector;
+            } else if 
+                (TaskHandler.profileCollector != profileCollector) {
+                throw 
+                    new IllegalStateException("wrong profileCollector");
+            }
         }
     }
 
     /**
-     * Changes context to that of the given <code>TaskOwner</code> and
+     * Changes context to that of the given <code>Identity</code> and
      * runs the given <code>KernelRunnable</code>. This is a non-static
      * method, and so only trusted components that have a reference to the
      * valid <code>TaskHandler</code> may run tasks as different owners.
      *
      * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>TaskOwner</code> for the given task
+     * @param owner the <code>Identity</code> for the given task's owner
      *
      * @throws Exception if there are any failures running the task
      */
-    public void runTaskAsOwner(KernelRunnable task, TaskOwner owner)
+    public void runTaskAsOwner(KernelRunnable task, Identity owner)
         throws Exception
     {
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "running a task as {0}", owner);
 
         // get the current owner
-        TaskOwner parent = ThreadState.getCurrentOwner();
+        Identity parent = ThreadState.getCurrentOwner();
 
         // change to the context of the new owner and run the task
         ThreadState.setCurrentOwner(owner);
+        ContextResolver.setContext(ctx);
         try {
             task.run();
         } finally {
@@ -127,6 +139,16 @@ public final class TaskHandler {
         }
     }
 
+    /**
+     * Sets the context of this handler, used primarily to allow
+     * multiple kernels to run in a single VM, which is useful for testing.
+     * 
+     * @param ctx the context
+     */
+    void setContext(KernelContext ctx) {
+        this.ctx = ctx;
+    }
+    
     /**
      * Runs the given task in a transactional state. If no transaction is
      * currently active then one is created, attempting to commit on

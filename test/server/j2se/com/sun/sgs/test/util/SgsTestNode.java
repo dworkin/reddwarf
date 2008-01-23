@@ -31,7 +31,6 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
@@ -59,20 +58,12 @@ public class SgsTestNode {
 
     /** kernel constructor */
     private static Constructor kernelCtor;
-    /** application startup method */
-    private static Method kernelStartupMethod;
     /** kernel shutdown */
     private static Method kernelShutdownMethod;
     /** transaction proxy */
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
-    /** application context */
-    private static Field kernelLastOwner;
-    /** set current owner method */
-    private static Method setCurrentOwnerMethod;
-    /** get current owner method */
-    private static Method getCurrentOwnerMethod;
 
     static {
         try {
@@ -82,33 +73,15 @@ public class SgsTestNode {
                 kernelClass.getDeclaredConstructor(Properties.class);
             kernelCtor.setAccessible(true);
 
-            kernelStartupMethod = 
-                    kernelClass.getDeclaredMethod("startupApplication", 
-                                                  Properties.class);
-            kernelStartupMethod.setAccessible(true);
-
             kernelShutdownMethod = 
                     kernelClass.getDeclaredMethod("shutdown");
             kernelShutdownMethod.setAccessible(true);
 
-            kernelProxy = kernelClass.getDeclaredField("transactionProxy");
+            kernelProxy = kernelClass.getDeclaredField("proxy");
             kernelProxy.setAccessible(true);
 
-            kernelReg = kernelClass.getDeclaredField("lastSystemRegistry");
+            kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
-
-            kernelLastOwner = kernelClass.getDeclaredField("lastOwner");
-            kernelLastOwner.setAccessible(true);
-
-            Class tsClass =
-                Class.forName("com.sun.sgs.impl.kernel.ThreadState");
-            setCurrentOwnerMethod =
-                tsClass.getDeclaredMethod("setCurrentOwner", TaskOwner.class);
-            setCurrentOwnerMethod.setAccessible(true);
-
-            getCurrentOwnerMethod =
-                tsClass.getDeclaredMethod("getCurrentOwner");
-            getCurrentOwnerMethod.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -250,26 +223,6 @@ public class SgsTestNode {
         }
 
         kernel = kernelCtor.newInstance(props);
-        kernelStartupMethod.invoke(kernel, props);
-
-        // Wait for the application context to finish.  
-        //
-        // Note that if we could run the tests from within the system 
-        // (i.e. from within a test service), we would not have to do this.
-        // We'd simply wait for the test service's ready method to be called.
-        // However, we also want to use the JUnit framework.  We'd probably 
-        // want to use the JUnit version with annotations so it could find
-        // the tests, and would need to coordinate JUnit's setup call and
-        // our ready() call.
-        TaskOwner owner = (TaskOwner) kernelLastOwner.get(kernel);
-        while (owner == null) {
-            Thread.currentThread().sleep(500);
-            owner = (TaskOwner) kernelLastOwner.get(kernel);
-        }
-
-        TaskOwner oldOwner = (TaskOwner) getCurrentOwnerMethod.invoke(null);
-        setCurrentOwnerMethod.invoke(null, owner);
-
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
 
@@ -280,10 +233,6 @@ public class SgsTestNode {
         sessionService = txnProxy.getService(ClientSessionService.class);
         channelService = txnProxy.getService(ChannelServiceImpl.class);
 
-        if (!isServerNode) {
-            // restore the old owner
-            setCurrentOwnerMethod.invoke(null, oldOwner);
-        }
 	appPort = ((ClientSessionServiceImpl) sessionService).getListenPort();
     }
 

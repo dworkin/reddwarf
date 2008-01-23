@@ -25,8 +25,6 @@ import com.sun.sgs.auth.IdentityCredentials;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
 
-import com.sun.sgs.kernel.KernelAppContext;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -76,8 +74,6 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
     // the instance used to hash passwords
     private MessageDigest digest;
 
-    // the context
-    private volatile KernelAppContext context = null;
 
     /**
      * Creates an instance of <code>NamePasswordAuthenticator</code>.
@@ -167,17 +163,6 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
      */
     public String [] getSupportedCredentialTypes() {
         return new String [] { NamePasswordCredentials.TYPE_IDENTIFIER };
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void assignContext(KernelAppContext ctx) {
-        if (ctx == null)
-            throw new NullPointerException("Null context not allowed");
-        if (context != null)
-            throw new IllegalStateException("Context was already assigned");
-        context = ctx;
     }
 
     /**
