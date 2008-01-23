@@ -30,15 +30,12 @@ import java.math.BigInteger;
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified protocol message listener for the
-     * specified service ID.  This method is non-transactional and
+     * Registers the specified disconnect listener with this service.
+     * This method is non-transactional and
      * should be called outside of a transaction.
      * 
-     * TODO: This method will go away when ProtocolMessageListener is
-     * removed.  ProtocolMessageListener is only used to receive
-     * 'disconnected' notifications.  The use of ProtocolMessageListener
-     * will be replaced with a scheme for registering interest in
-     * notification of a ClientSession's managed object removal.
+     * TBD: This approach may be replaced with a scheme for registering
+     * interest in notification of a ClientSession's managed object removal.
      *
      * @param   listener a listener to notify when a session disconnects
      */
