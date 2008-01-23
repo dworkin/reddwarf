@@ -20,10 +20,14 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,10 +55,10 @@ public class NonDurableTaskQueue {
     private final TransactionContextFactory<Context> contextFactory;
     
     /** The task scheduler. */
-    private final NonDurableTaskScheduler nonDurableTaskScheduler;
+    private final TaskScheduler taskScheduler;
 
-    /** The identity for tasks. */
-    private final Identity identity;
+    /** The task owner. */
+    private final TaskOwner taskOwner;
 
     /** The lock for accessing state. */
     private final Object lock = new Object();
@@ -67,25 +71,50 @@ public class NonDurableTaskQueue {
     private ProcessQueueTask processQueueTask = null;
 
     /**
-     * Constructs a {@code NonDurableTaskQueue} with the given {@code
-     * scheduler} and {@code identity}.
+     * Constructs an instance with the given transaction {@code
+     * proxy}, {@code nonDurableTaskScheduler}, and {@code identity}.
      *
      * @param	proxy the transaction proxy
-     * @param	scheduler a {@code NonDurableTaskScheduler}
-     * @param	identity an identity
+     * @param	nonDurableTaskScheduler a {@code NonDurableTaskScheduler}
+     * @param	identity an identity, or {@code null}
      */
     public NonDurableTaskQueue(
 	TransactionProxy proxy,
-	NonDurableTaskScheduler scheduler,
+	NonDurableTaskScheduler nonDurableTaskScheduler,
 	Identity identity)		       
     {
-	if (proxy == null || scheduler == null || identity == null) {
+	this(proxy,
+	     nonDurableTaskScheduler.getTaskScheduler(),
+	     nonDurableTaskScheduler.getTaskOwner(),
+	     identity);
+    }
+
+    /**
+     * Constructs an instance with the given transaction {@code
+     * proxy}, {@code taskScheduler}, {@code taskOwner}, and {@code
+     * identity}.
+     *
+     * @param	proxy the transaction proxy
+     * @param	taskScheduler a task scheduler
+     * @param	taskOwner a task owner
+     * @param	identity an identity, or {@code null}
+     */
+    public NonDurableTaskQueue(
+	TransactionProxy proxy,
+	TaskScheduler taskScheduler,
+	TaskOwner taskOwner,
+	Identity identity)		       
+    {
+	if (proxy == null || taskScheduler == null || taskOwner == null) {
 	    throw new NullPointerException("null argument");
 	}
 	this.txnProxy = proxy;
 	this.contextFactory = new ContextFactory(txnProxy);
-	this.nonDurableTaskScheduler = scheduler;
-	this.identity = identity;
+	this.taskScheduler = taskScheduler;
+	this.taskOwner =
+	    identity == null ?
+	    taskOwner :
+	    new TaskOwnerImpl(identity, taskOwner.getContext());
     }
 
     /**
@@ -105,8 +134,9 @@ public class NonDurableTaskQueue {
 	    tasks.add(task);
 	    if (processQueueTask == null) {
 		processQueueTask = new ProcessQueueTask();
-		nonDurableTaskScheduler.
-		    scheduleTask(processQueueTask, identity);
+		taskScheduler.scheduleTask(
+		    new TransactionRunner(processQueueTask),
+		    taskOwner);
 	    }
 	}
     }
@@ -240,8 +270,9 @@ public class NonDurableTaskQueue {
 	    if (tasks.isEmpty()) {
 		processQueueTask = null;
 	    } else {
-		nonDurableTaskScheduler.scheduleTask(
-		    processQueueTask, identity);
+		taskScheduler.scheduleTask(
+		    new TransactionRunner(processQueueTask),
+		    taskOwner);
 	    }
 	}
     }
