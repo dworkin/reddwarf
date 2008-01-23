@@ -24,21 +24,20 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
@@ -87,7 +86,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     private DummyNodeMappingService mappingServiceZero;
     private DummyNodeMappingService mappingServiceOne;
 
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
 
     private static AtomicLong lastNodeUsed;
 
@@ -150,7 +149,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testMoveImmediateTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         taskSchedulerZero.runTransactionalTask(
@@ -160,7 +158,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     taskServiceZero.scheduleTask(new TestTask());
                     counter.increment();
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(500);
         assertCounterClearXAction("An immediate task did not run");
@@ -169,7 +167,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testMoveDelayedTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         taskSchedulerZero.runTransactionalTask(
@@ -179,7 +176,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
                     counter.increment();
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(500);
         assertCounterClearXAction("A delayed task did not run");
@@ -188,7 +185,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testMoveAfterScheduledDelayedTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         taskSchedulerZero.runTransactionalTask(
@@ -198,7 +194,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
                     counter.increment();
                 }
-            }, owner);
+            }, id);
 
         long expectedNode = additionalNodes[0].getNodeId();
         mappingServiceZero.moveIdentity(getClass(), id, expectedNode);
@@ -210,7 +206,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testMovePeriodicTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         long expectedNode = serverNode.getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         taskSchedulerZero.runTransactionalTask(
@@ -222,7 +217,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     counter.increment();
                     counter.increment();
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(250);
         assertEquals(expectedNode, lastNodeUsed.get());
@@ -236,7 +231,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testMoveAfterScheduledPeriodicTask() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         taskSchedulerZero.runTransactionalTask(
@@ -247,7 +241,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                                                          500L);
                     counter.increment();
                 }
-            }, owner);
+            }, id);
 
         long expectedNode = additionalNodes[0].getNodeId();
         mappingServiceZero.moveIdentity(getClass(), id, expectedNode);
@@ -259,7 +253,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testCancelPeriodicHandle() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         taskSchedulerZero.runTransactionalTask(
@@ -271,7 +264,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                                                              250L, 500L);
                     dataServiceZero.setBinding("handle", new ManagedHandle(h));
                 }
-            }, owner);
+            }, id);
 
         taskSchedulerOne.runTransactionalTask(
             new AbstractKernelRunnable() {
@@ -283,7 +276,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                         fail("Did not expect exception: " + e);
                     }
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(500);
         assertCounterClearXAction("Unexpected run of a periodic task");
@@ -291,7 +284,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     public void testActiveCountBasic() throws Exception {
         IdentityImpl id = new IdentityImpl("fred");
-        TaskOwnerImpl owner = new TaskOwnerImpl(id, taskOwner.getContext());
         assertEquals(DummyNodeMappingService.getActiveCount(id), 0);
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
@@ -302,7 +294,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     Counter counter = getClearedCounter();
                     taskServiceZero.scheduleTask(new TestTask(), 300L);
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
@@ -317,7 +309,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                     for (int i = 0; i < 5; i++)
                         taskServiceZero.scheduleTask(new TestTask(), 300L);
                 }
-            }, owner);
+            }, id);
 
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);

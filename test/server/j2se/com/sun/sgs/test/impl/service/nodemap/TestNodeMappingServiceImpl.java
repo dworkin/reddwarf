@@ -10,7 +10,6 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -73,7 +72,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     private TaskScheduler taskScheduler;
     
     /** The owner for tasks I initiate. */
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
     
     private NodeMappingService nodeMappingService;
     

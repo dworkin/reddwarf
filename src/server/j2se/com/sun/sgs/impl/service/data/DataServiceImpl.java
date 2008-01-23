@@ -19,12 +19,11 @@
 
 package com.sun.sgs.impl.service.data;
 
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -39,12 +38,10 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -281,9 +278,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	private final TaskScheduler taskScheduler;
 
 	/** The task owner. */
-	private final TaskOwner taskOwner;
+	private final Identity taskOwner;
 
-	DelegatingScheduler(TaskScheduler taskScheduler, TaskOwner taskOwner) {
+	DelegatingScheduler(TaskScheduler taskScheduler, Identity taskOwner) {
 	    this.taskScheduler = taskScheduler;
 	    this.taskOwner = taskOwner;
 	}
@@ -373,7 +370,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		DATA_STORE_CLASS_PROPERTY);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
-	    TaskOwner taskOwner = txnProxy.getCurrentOwner();
+	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
 	    if (dataStoreClassName == null) {
 		store = new DataStoreImpl(properties, scheduler);
