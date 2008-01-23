@@ -19,10 +19,10 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
@@ -70,7 +70,7 @@ public abstract class AbstractService implements Service {
     protected final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    protected volatile TaskOwner taskOwner;
+    protected volatile Identity taskOwner;
 
     /** The lock for {@code state} and {@code callsInProgress} fields. */
     private final Object lock = new Object();
@@ -169,7 +169,6 @@ public abstract class AbstractService implements Service {
 		throw new IllegalStateException("service shutting down");
 	    }
 	}
-	taskOwner = txnProxy.getCurrentOwner();
 	doReady();
     }
 

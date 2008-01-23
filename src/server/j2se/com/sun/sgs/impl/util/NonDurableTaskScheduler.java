@@ -143,7 +143,7 @@ public class NonDurableTaskScheduler {
      *
      * @return	the {@code TaskOwner} for this instance
      */
-    TaskOwner getTaskOwner() {
+    Identity getTaskOwner() {
 	return owner;
     }
 }

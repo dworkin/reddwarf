@@ -27,12 +27,9 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-<<<<<<< .working
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
-=======
->>>>>>> .merge-right.r3659
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
@@ -41,7 +38,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
@@ -90,20 +86,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String LISTENER_PREFIX =
 	"com.sun.sgs.impl.service.session.listener";
 
-<<<<<<< .working
-    private DummyComponentRegistry systemRegistry;
-    private DummyComponentRegistry serviceRegistry;
-    private DummyTransaction txn;
-    
-    private DataServiceImpl dataService;
-    private ChannelServiceImpl channelService;
-    private ClientSessionServiceImpl sessionService;
-    private TaskServiceImpl taskService;
-    private static DummyIdentityCoordinator identityCoordinator;
-=======
     private static final String NODE_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.node";
->>>>>>> .merge-right.r3659
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
@@ -116,7 +100,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private TaskScheduler taskScheduler;
 
     /** The owner for tasks I initiate. */
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
 
     /** The shared data service. */
     private DataService dataService;
@@ -145,23 +129,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
-<<<<<<< .working
-	MinimalTestKernel.create();
-	systemRegistry = MinimalTestKernel.getSystemRegistry();
-	serviceRegistry = MinimalTestKernel.getServiceRegistry();
-	    
-	// create data service
-	dataService = createDataService(systemRegistry);
-        txnProxy.setComponent(DataService.class, dataService);
-        txnProxy.setComponent(DataServiceImpl.class, dataService);
-        serviceRegistry.setComponent(DataManager.class, dataService);
-        serviceRegistry.setComponent(DataService.class, dataService);
-        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-=======
         taskScheduler = 
             serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
->>>>>>> .merge-right.r3659
 
         dataService = serverNode.getDataService();
     }
@@ -202,31 +172,8 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
             additionalNodes = null;
         }
-<<<<<<< .working
-        if (channelService != null) {
-            channelService.shutdown();
-            channelService = null;
-        }
-        if (sessionService != null) {
-            sessionService.shutdown();
-            sessionService = null;
-        }
-        if (taskService != null) {
-            taskService.shutdown();
-            taskService = null;
-        }
-        if (dataService != null) {
-            dataService.shutdown();
-            dataService = null;
-        }
-        if (clean) {
-            deleteDirectory(DB_DIRECTORY);
-        }
-        MinimalTestKernel.destroy();
-=======
         serverNode.shutdown(clean);
         serverNode = null;
->>>>>>> .merge-right.r3659
     }
 
     /* -- Test constructor -- */

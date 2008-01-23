@@ -20,10 +20,8 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -58,7 +56,7 @@ public class NonDurableTaskQueue {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    private final TaskOwner taskOwner;
+    private final Identity taskOwner;
 
     /** The lock for accessing state. */
     private final Object lock = new Object();
@@ -85,25 +83,21 @@ public class NonDurableTaskQueue {
     {
 	this(proxy,
 	     nonDurableTaskScheduler.getTaskScheduler(),
-	     nonDurableTaskScheduler.getTaskOwner(),
 	     identity);
     }
 
     /**
      * Constructs an instance with the given transaction {@code
-     * proxy}, {@code taskScheduler}, {@code taskOwner}, and {@code
-     * identity}.
+     * proxy}, {@code taskScheduler}, and {@code taskOwner}.
      *
      * @param	proxy the transaction proxy
      * @param	taskScheduler a task scheduler
-     * @param	taskOwner a task owner
-     * @param	identity an identity, or {@code null}
+     * @param	taskOwner an identity, to own the tasks
      */
     public NonDurableTaskQueue(
 	TransactionProxy proxy,
 	TaskScheduler taskScheduler,
-	TaskOwner taskOwner,
-	Identity identity)		       
+	Identity taskOwner)		       
     {
 	if (proxy == null || taskScheduler == null || taskOwner == null) {
 	    throw new NullPointerException("null argument");
@@ -111,10 +105,7 @@ public class NonDurableTaskQueue {
 	this.txnProxy = proxy;
 	this.contextFactory = new ContextFactory(txnProxy);
 	this.taskScheduler = taskScheduler;
-	this.taskOwner =
-	    identity == null ?
-	    taskOwner :
-	    new TaskOwnerImpl(identity, taskOwner.getContext());
+	this.taskOwner = taskOwner;
     }
 
     /**
