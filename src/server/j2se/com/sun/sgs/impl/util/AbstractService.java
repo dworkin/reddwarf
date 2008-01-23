@@ -70,7 +70,7 @@ public abstract class AbstractService implements Service {
     protected final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    protected volatile Identity taskOwner;
+    protected final Identity taskOwner;
 
     /** The lock for {@code state} and {@code callsInProgress} fields. */
     private final Object lock = new Object();
