@@ -49,7 +49,7 @@ public enum ChatCommand {
     PING,
 
     /**
-     * Forcibly disconnects this session to the named channel.
+     * Forcibly disconnects this session.
      * <pre>
      *    /disconnect
      * </pre>
