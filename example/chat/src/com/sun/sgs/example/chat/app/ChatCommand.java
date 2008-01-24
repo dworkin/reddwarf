@@ -27,7 +27,7 @@ public enum ChatCommand {
     /**
      * Joins this session to the named channel.
      * <pre>
-     *    /join channelName
+     *    /join #channelName
      * </pre>
      */
     JOIN,
@@ -35,18 +35,10 @@ public enum ChatCommand {
     /**
      * Removes this session from the named channel.
      * <pre>
-     *    /leave channelName
+     *    /leave #channelName
      * </pre>
      */
     LEAVE,
-
-    /**
-     * Broadcasts a message on the named channel.
-     * <pre>
-     *    /broadcast channelName:message
-     * </pre>
-     */
-    BROADCAST,
 
     /**
      * Echos the given message back to the sender.
@@ -57,7 +49,7 @@ public enum ChatCommand {
     PING,
 
     /**
-     * Forcibly disconnects this session to the named channel.
+     * Forcibly disconnects this session.
      * <pre>
      *    /disconnect
      * </pre>

@@ -134,7 +134,7 @@ public class ChatChannel
      * @return
      */
     protected static String channelKey(String channelName) {
-        return "chatChannel." + channelName;
+        return "ChatApp.ChatChannel." + channelName;
     }
 
 }

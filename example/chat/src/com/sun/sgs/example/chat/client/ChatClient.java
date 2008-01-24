@@ -94,13 +94,9 @@ public class ChatClient extends JFrame
 
     private final JButton loginButton;
     private final JButton openChannelButton;
-    private final JButton multiPmButton;
     private final JButton serverSendButton;
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
-
-    /** The name of the global channel */
-    public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The name of the host property */
     public static final String HOST_PROPERTY = "ChatClient.host";
@@ -189,15 +185,9 @@ public class ChatClient extends JFrame
         serverSendButton.addActionListener(this);
         serverSendButton.setEnabled(false);
 
-        multiPmButton = new JButton("Send Multi-PM");
-        multiPmButton.setActionCommand("multiPm");
-        multiPmButton.addActionListener(this);
-        multiPmButton.setEnabled(false);
-
         buttonPanel.add(loginButton);
         buttonPanel.add(openChannelButton);
         buttonPanel.add(serverSendButton);
-        buttonPanel.add(multiPmButton);
 
         addWindowListener(new QuitWindowListener(this));
         setSize(1000, 720);
@@ -224,7 +214,6 @@ public class ChatClient extends JFrame
     
     private void setSessionButtonsEnabled(boolean enable) {
         openChannelButton.setEnabled(enable);
-        multiPmButton.setEnabled(enable);
         serverSendButton.setEnabled(enable);
     }
 
@@ -306,8 +295,7 @@ public class ChatClient extends JFrame
 
     void broadcast(String channelName, String message) {
         try {
-            client.send(toMessageBytes(
-                "/broadcast " + channelName + " " + message));
+            client.send(toMessageBytes("#" + channelName + " " + message));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -315,24 +303,13 @@ public class ChatClient extends JFrame
         // TODO
         //receivedMessage(channelName, getSessionId(), message);
     }
-    private void doMultiPrivateMessage() {
-	Set<ChatMember> targets = new HashSet<ChatMember>();
-        targets.addAll(userList.getAllSelected());
-    	if (targets.isEmpty()) {
-    	    return;
-    	}
-        doPrivateMessage(targets);
-    }
 
-    private void doSinglePrivateMessage() {
+    private void doPrivateMessage() {
 	ChatMember target = userList.getSelected();
 	if (target == null) {
 	    return;
 	}
-        doPrivateMessage(Collections.singleton(target));
-    }
 
-    private void doPrivateMessage(Set<ChatMember> targets) {
         String input = getUserInput("Enter private message:");
 
         if ((input == null) || input.matches("^\\s*$")) {
@@ -340,13 +317,9 @@ public class ChatClient extends JFrame
             return;
         }
 
-        StringBuffer s = new StringBuffer();
-        s.append("/pm");
-        for (ChatMember target : targets) {
-            s.append(" ");
-            s.append(target);
-        }
-        s.append("::");
+        StringBuffer s = new StringBuffer("@");
+        s.append(target.getIdString());
+        s.append(" ");
         s.append(input);
         try {
             client.send(toMessageBytes(s.toString()));
@@ -357,12 +330,15 @@ public class ChatClient extends JFrame
 
     void joinChannel(String channelName) {
 
-        if ((channelName == null) || channelName.matches("^\\s*$")) {
-            // Ignore empty channel name
+        if ((channelName == null) ||
+             channelName.matches("^\\s*$") ||
+             channelName.matches("\\s+"))
+        {
+            // Ignore invalid channel name
             return;
         }
 
-	String cmd = "/join " + channelName;
+	String cmd = "/join #" + channelName;
         try {
             client.send(toMessageBytes(cmd));
         } catch (IOException e) {
@@ -401,7 +377,7 @@ public class ChatClient extends JFrame
      * @return the formatted string
      */
     private String formatSession(ChatMember member) {
-        return member.toString();
+        return member.getName();
     }
 
     /**
@@ -572,52 +548,64 @@ public class ChatClient extends JFrame
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Handles the direct {@code /pong} reply.
      */
     public void receivedMessage(ByteBuffer message) {
         String messageString = fromMessageBytes(message);
-        System.err.format("Recv direct: %s\n", messageString);
+        System.err.format("Recv: %s\n", messageString);
         String[] args = messageString.split(" ", 2);
         String command = args[0];
 
-        if (command.equals("/pong")) {
-            System.out.println(args[1]);            
+        if (command.startsWith("#")) {
+            // Handle channel broadcast recv
+            String[] channelArgs = args[1].split(" ", 2);
+            String channelName = command.substring(1);
+            String senderId = channelArgs[0];
+            ChatMember sender = findMemberById(senderId);
+            findChannelFrame(channelName).
+                receivedMessage(sender, channelArgs[1]);
+        } else if (command.startsWith("@")) {
+            String senderId = command.substring(1);
+            ChatMember sender = findMemberById(senderId);
+            pmReceived(sender, args[1]);
+        } else if (command.equals("/login")) {
+            String[] loginArgs = args[1].split(" ", 2);
+            String memberId = loginArgs[0];
+            String memberName = loginArgs[1];
+            chatMember = new ChatMember(memberName, idFromString(memberId));
+            reallyLoggedIn(chatMember);
+        } else if (command.equals("/joined")) {
+            String[] joinedArgs = args[1].split(" ", 2);
+            String memberId = joinedArgs[0];
+            String memberName = joinedArgs[1];
+            userLogin(args[1]);
+        } else if (command.equals("/left")) {
+            String[] channelArgs = args[1].split(" ", 2);
+            String channelName = channelArgs[0];
+            ChatMember member = findMemberById(channelArgs[1]);
+            findChannelFrame(channelName).memberLeft(member);
+        } else if (command.equals("/members")) {
+            String[] channelArgs = args[1].split(" ", 2);
+            String channelName = channelArgs[0];
+            List<String> members = Arrays.asList(args[1].split(" "));
+            if (! members.isEmpty()) {
+                addUsers(members);
+            }
+            
+        } else if (command.equals("/pong")) {
+            System.out.println(args[1]);          
         } else {
             System.err.format("Unknown command: %s\n", messageString);
         }
     }
 
-    // FIXME use this!  Look up the appropriate ChatChannelFrame and call it!
-    private void receivedChannelMessage(String channelName, ChatMember sender,
-            ByteBuffer message)
-    {
-        try {
-            String messageString = fromMessageBytes(message);
-            System.err.format("Recv on %s from %s: %s\n",
-                channelName, sender, messageString);
-            String[] args = messageString.split(" ", 2);
-            String command = args[0];
+    private ChatMember findMemberById(String memberId) {
+        // FIXME
+        return null;
+    }
 
-            if (command.equals("/joined")) {
-                userLogin(args[1]);
-            } else if (command.equals("/left")) {
-                userLogout(args[1]);
-            } else if (command.equals("/members")) {
-                List<String> members = Arrays.asList(args[1].split(" "));
-                if (! members.isEmpty()) {
-                    addUsers(members);
-                }
-            } else if (command.equals("/pm")) {
-                pmReceived(sender, args[1]);
-            } else if (command.startsWith("/")) {
-                System.err.format("Unknown command: %s\n", command);
-            } else {
-                System.err.format("Not a command: %s\n", messageString);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    private ChatChannelFrame findChannelFrame(String channelName) {
+        // FIXME
+        return null;
     }
 
     /**
@@ -647,8 +635,6 @@ public class ChatClient extends JFrame
             doOpenChannel();
         } else if (command.equals("directSend")) {
             doServerMessage();
-        } else if (command.equals("multiPm")) {
-            doMultiPrivateMessage();
         } else {
             System.err.format("ChatClient: Error, unknown GUI command [%s]\n",
                     command);
@@ -681,7 +667,7 @@ public class ChatClient extends JFrame
         @Override
         public void mouseClicked(MouseEvent evt) {
             if (evt.getClickCount() == 2) {
-                client.doSinglePrivateMessage();
+                client.doPrivateMessage();
             }
         }
     }

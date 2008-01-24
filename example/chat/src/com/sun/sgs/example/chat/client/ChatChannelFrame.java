@@ -104,12 +104,11 @@ public class ChatChannelFrame extends JInternalFrame
      * as well as server notifications about other clients joining and
      * leaving this channel.
      */
-    void receivedMessage(ChatMember sender, ByteBuffer message) {
+    void receivedMessage(ChatMember sender, String message) {
         try {
-            String messageString = ChatClient.fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
-                myChannelName, sender, messageString);
-            String[] args = messageString.split(" ", 2);
+                myChannelName, sender, message);
+            String[] args = message.split(" ", 2);
             String command = args[0];
 
             if (command.equals("/joined")) {
@@ -126,7 +125,7 @@ public class ChatChannelFrame extends JInternalFrame
             } else {
                 //outputArea.append(String.format("%s: %s\n",
                 //        myChatClient.getSessionName(sender),
-                //        messageString));
+                //        message));
             }
         } catch (Exception e) {
             e.printStackTrace();

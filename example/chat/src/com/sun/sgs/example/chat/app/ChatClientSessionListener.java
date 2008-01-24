@@ -29,6 +29,7 @@ import java.util.logging.Logger;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
@@ -52,14 +53,17 @@ public class ChatClientSessionListener
     private static final Logger logger =
         Logger.getLogger(ChatClientSessionListener.class.getName());
 
-    /** The name of the global channel. */
-    private static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
-
     /** The {@link Charset} encoding for client/server messages. */
     private static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The command prefix: "{@value #COMMAND_PREFIX}" */
     private static final String COMMAND_PREFIX = "/";
+
+    /** The channel prefix: "{@value #CHANNEL_PREFIX}" */
+    private static final String CHANNEL_PREFIX = "#";
+
+    /** The session prefix: "{@value #SESSION_PREFIX}" */
+    private static final String SESSION_PREFIX = "@";
 
     /** The {@link ClientSession} this listener receives events for. */
     private final ManagedReference sessionRef;
@@ -76,9 +80,19 @@ public class ChatClientSessionListener
     public ChatClientSessionListener(ClientSession session) {
         if (session == null)
             throw new NullPointerException("null session");
-        sessionRef = AppContext.getDataManager().createReference(session);
-        sendId();
-        addToChannel(GLOBAL_CHANNEL_NAME);
+
+        DataManager dataMgr = AppContext.getDataManager();
+        sessionRef = dataMgr.createReference(session);
+
+        dataMgr.setBinding(sessionKey(getSessionIdString()), session);
+
+        String sessionIdAndName =
+            getSessionIdString() + " " + session.getName();
+
+        ChatApp.globalChannel().join(session);
+
+        String loginMessage = "/login " + sessionIdAndName;
+        ChatApp.globalChannel().send(toMessageBytes(loginMessage));
     }
 
     /**
@@ -94,7 +108,12 @@ public class ChatClientSessionListener
                 "{0} {1} disconnect",
                 new Object[] { session(), grace });
         }
-        removeFromChannel(GLOBAL_CHANNEL_NAME);
+
+        String disconnectMessage = "/disconnected " + getSessionIdString();
+        ChatApp.globalChannel().send(toMessageBytes(disconnectMessage));
+
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.removeBinding(sessionKey(getSessionIdString()));
     }
 
     /**
@@ -104,14 +123,23 @@ public class ChatClientSessionListener
         try {
             String messageString = fromMessageBytes(message);
 
+            // Split at the first run of whitespace, if any
+            String[] args = messageString.split("\\s+", 2);
+
+            if (messageString.startsWith(CHANNEL_PREFIX)) {
+                broadcastOnChannel(args[0].substring(1), args[1]);
+                return;
+            }
+
+            if (messageString.startsWith(SESSION_PREFIX)) {
+                sendToSession(args[0].substring(1), args[1]);
+            }
+
             // Check that the command begins with a forward-slash
             if (! messageString.startsWith(COMMAND_PREFIX)) {
                 throw new IllegalArgumentException(
                     "Command must start with " + COMMAND_PREFIX);
             }
-
-            // Split at the first run of whitespace, if any
-            String[] args = messageString.split("\\s+", 2);
 
             // Find the ChatCommand for this command
             String commandString = args[0].substring(1).toUpperCase();
@@ -119,30 +147,24 @@ public class ChatClientSessionListener
 
             switch (command) {
             case JOIN:
-                addToChannel(args[1]);
+                addToChannel(args[1].substring(1));
                 break;
 
             case LEAVE:
-                removeFromChannel(args[1]);
+                removeFromChannel(args[1].substring(1));
                 break;
-
-            case BROADCAST: {
-                String[] broadcastArgs = args[1].split(":", 2);
-                broadcastOnChannel(broadcastArgs[0], broadcastArgs[1]);
-                break;
-            }
 
             case PING:
                 echo(args[1]);
                 break;
 
             case DISCONNECT:
-                logger.log(Level.INFO, "Disconnect request from {0}", session());
+                logger.log(Level.INFO, "Disconnect {0}", session());
                 session().disconnect();
                 break;
 
             case SHUTDOWN:
-                logger.log(Level.CONFIG, "Shutdown request from {0}", session());
+                logger.log(Level.CONFIG, "Shutdown from {0}", session());
                 System.exit(0);
                 break;
             }
@@ -159,12 +181,6 @@ public class ChatClientSessionListener
         }
     }
 
-    private void sendId() {
-        String message = "/login " + getSessionIdString() +
-                         ":" +  session().getName();
-        session().send(toMessageBytes(message));
-    }
-
     /**
      * TODO
      * 
@@ -178,9 +194,53 @@ public class ChatClientSessionListener
                 new Object[] { session(), channelName, message });
         }
 
-        String bcastMsg = channelName + " " + message;
+        String bcastMsg = "#" + channelName +
+                          " @" + getSessionIdString() + " " +
+                          message;
         ChatChannel.find(channelName).send(toMessageBytes(bcastMsg));
     }
+
+    /**
+     * TODO
+     * 
+     * @param recipientId
+     * @param message
+     */
+    private void sendToSession(String recipientId, String message) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                "Unicast request from {0} to {1}, contents: {2}",
+                new Object[] { session(), recipientId, message });
+        }
+
+        ClientSession recipient = findSession(recipientId);
+
+        String privMsg = "@" + getSessionIdString() + " " + message;
+        recipient.send(toMessageBytes(privMsg));
+    }
+
+    /**
+     * TODO
+     * 
+     * @param sessionId
+     * @return
+     */
+    private static ClientSession findSession(String sessionId) {
+        DataManager dataMgr = AppContext.getDataManager();
+        String key = sessionKey(sessionId);
+        return dataMgr.getBinding(key, ClientSession.class);
+    }
+
+    /**
+     * TODO
+     * 
+     * @param channelName
+     * @return
+     */
+    private static String sessionKey(String sessionId) {
+        return "ChatApp.Session." + sessionId;
+    }
+
 
     /**
      * Echos the given string back to the sending session as a direct message.
@@ -211,36 +271,28 @@ public class ChatClientSessionListener
             logger.log(Level.FINE,
                     "Join " + session() + " to " + channelName);
         }
+        
+        if (channelName.matches("\\s+")) {
+            throw new IllegalArgumentException(
+                "channel name must not contain whitespace");
+        }
 
         ChatChannel channel = ChatChannel.findOrCreate(channelName);
 
-        // Send the membership change first, so the new session doesn't
-        // receive its own join message.
-        StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(channelName);
-        changeMsg.append(' ');
-        changeMsg.append(getSessionIdString());
-        if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
-            changeMsg.append(':');
-            changeMsg.append(session().getName());
-        }
-        channel.send(toMessageBytes(changeMsg.toString()));
-
-        // Now add the joiner and tell it about all the members on
-        // the channel, the joiner included.
         channel.join(session());
+
+        String changeMessage = "/joined " +
+                               channelName + " " +
+                               getSessionIdString();
+        channel.send(toMessageBytes(changeMessage));
 
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members ");
         listMessage.append(channelName);
         for (ManagedReference memberRef : channel.memberRefs()) {
             ClientSession member = memberRef.get(ClientSession.class);
-            listMessage.append(' ');
+            listMessage.append(" ");
             listMessage.append(getIdString(memberRef));
-            if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
-                listMessage.append(':');
-                listMessage.append(member.getName());
-            }
         }
 
         session().send(toMessageBytes(listMessage.toString()));
@@ -283,8 +335,9 @@ public class ChatClientSessionListener
         }
 
         // Tell the rest of the channel about the removal.
-        String changeMessage = "/left " + channelName +
-                               " " + getSessionIdString();
+        String changeMessage = "/left " +
+                               channelName + " " +
+                               getSessionIdString();
         channel.send(toMessageBytes(changeMessage));
     }
 

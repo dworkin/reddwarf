@@ -33,8 +33,12 @@ public class ChatMember {
         return id;
     }
 
+    public String getIdString() {
+        return getId().toString(16);
+    }
+
     @Override
     public String toString() {
-        return getName() + " [" + getId().toString(16) + "]";
+        return "ChatMember@" + getIdString() + "/" + getName();
     }
 }

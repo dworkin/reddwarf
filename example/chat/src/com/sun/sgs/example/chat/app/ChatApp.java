@@ -24,9 +24,12 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.Delivery;
 
 /**
  * A simple chat application.  The application logic for this example
@@ -42,7 +45,15 @@ public class ChatApp
     private static final Logger logger =
         Logger.getLogger(ChatApp.class.getName());
 
-    /**
+    /** The name of the global channel. */
+   private  static final String GLOBAL_CHANNEL_NAME = "ChatApp.globalChannel";
+
+   static Channel globalChannel() {
+       return AppContext.getDataManager().getBinding(GLOBAL_CHANNEL_NAME,
+                                                     Channel.class);
+   }
+
+   /**
      * The default constructor.
      */
     public ChatApp() {
@@ -58,6 +69,10 @@ public class ChatApp
      */
     public void initialize(Properties props) {
         logger.log(Level.CONFIG, "ChatApp starting up");
+
+        Channel channel = 
+            AppContext.getChannelManager().createChannel(Delivery.RELIABLE);
+        AppContext.getDataManager().setBinding(GLOBAL_CHANNEL_NAME, channel);
     }
 
     /**
