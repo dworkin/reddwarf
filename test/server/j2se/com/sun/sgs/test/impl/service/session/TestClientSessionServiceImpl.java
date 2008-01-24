@@ -48,6 +48,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -781,11 +782,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    this.password = password;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(name) +
+		new MessageBuffer(2 + MessageBuffer.getSize(name) +
 				  MessageBuffer.getSize(password));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
 		putString(name).
 		putString(password);
 	    loginAck = false;
@@ -831,25 +831,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the next sequence number for this session.
-	 */
-	private long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
-
-	/**
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
-		putByteArray(message);
+		new MessageBuffer(1+ message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -887,10 +877,8 @@ public class TestClientSessionServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -945,23 +933,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
-		    System.err.println(
-			"bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
-
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
@@ -1006,8 +977,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    byte[] message = buf.getBytes(buf.getUnsignedShort());
+		    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
 			System.err.println("message received: " + message);
@@ -1120,7 +1090,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
+	public void receivedMessage(ByteBuffer message) {
 	}
     }
 
@@ -1152,9 +1122,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
-	    MessageBuffer buf = new MessageBuffer(message);
-	    int num = buf.getInt();
+	public void receivedMessage(ByteBuffer message) {
+            byte[] bytes = new byte[message.remaining()];
+            message.asReadOnlyBuffer().get(bytes);
+	    int num = message.getInt();
 	    DummyClient client = dummyClients.get(name);
 	    System.err.println("receivedMessage: " + num + 
 			       "\nthrowException: " + client.throwException);
@@ -1163,7 +1134,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    "expected message greater than " + seq + ", got " + num);
 	    }
 	    AppContext.getDataManager().markForUpdate(this);
-	    client.messages.add(message);
+	    client.messages.add(bytes);
 	    seq = num;
 	    if (client.throwException != null) {
 		RuntimeException re = client.throwException;
