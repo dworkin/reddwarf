@@ -32,12 +32,9 @@ public final class ContextResolver {
 
     // the thread local that caches the context, so we don't need to cast
     // the task thread with each query to find the context
-    private static ThreadLocal<AbstractKernelAppContext> context =
-        new ThreadLocal<AbstractKernelAppContext>() {
-            protected AbstractKernelAppContext initialValue() {
-                return SystemKernelAppContext.CONTEXT;
-            }
-        };
+    private static ThreadLocal<KernelContext> context =
+            new ThreadLocal<KernelContext>();
+
 
     /**
      * Returns the <code>ChannelManager</code> used in this context.
@@ -99,18 +96,18 @@ public final class ContextResolver {
      * Package-private method used to set the context. This is called each
      * time the <code>TaskHandler</code> is invoked to run under a new owner.
      *
-     * @param appContext the current context
+     * @param ctx the current context
      */
-    static void setContext(AbstractKernelAppContext appContext) {
-        context.set(appContext);
+    static void setContext(KernelContext ctx) {
+        context.set(ctx);
     }
 
     /**
      * Package-private method used to get the current context.
      *
-     * @return the current {@code AbstractKernelAppContext}
+     * @return the current {@code AppKernelAppContext}
      */
-    static AbstractKernelAppContext getContext() {
+    public static KernelContext getContext() {
         return context.get();
     }
 

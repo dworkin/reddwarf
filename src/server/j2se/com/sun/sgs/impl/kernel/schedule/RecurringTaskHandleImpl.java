@@ -38,7 +38,8 @@ class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
     // the associated timer task
     private TimerTask currentTimerTask = null;
 
-    // whether or not this task has been cancelled
+    // whether or not this task has been cancelled;  synchronize on this
+    // handle before using this field
     private boolean cancelled = false;
 
     // whether or not this task has been started

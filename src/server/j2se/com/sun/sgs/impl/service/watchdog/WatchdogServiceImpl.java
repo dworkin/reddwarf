@@ -19,13 +19,13 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -188,7 +188,7 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final TaskScheduler taskScheduler;
 
     /** The task owner. */
-    volatile TaskOwner taskOwner;
+    volatile Identity taskOwner;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;

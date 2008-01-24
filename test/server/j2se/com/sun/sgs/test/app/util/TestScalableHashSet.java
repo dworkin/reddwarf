@@ -23,9 +23,9 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
@@ -56,7 +56,7 @@ public class TestScalableHashSet extends Assert {
 
     private static SgsTestNode serverNode;
     private static TaskScheduler taskScheduler;
-    private static TaskOwner taskOwner;
+    private static Identity taskOwner;
     private static DataService dataService;
 
     /** A set to test. */

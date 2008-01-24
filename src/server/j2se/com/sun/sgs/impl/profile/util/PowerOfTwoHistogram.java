@@ -153,6 +153,7 @@ public class PowerOfTwoHistogram implements Histogram {
      * </pre>
      * 
      * @param binLabel the label to append to each of the bins
+     *
      * @return the histogram
      */
     public String toString(String binLabel) {

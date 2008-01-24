@@ -21,10 +21,11 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.Collection;
@@ -48,8 +49,7 @@ import java.util.logging.Logger;
  * may never submit tasks into windows that have already passed. See
  * SUN070191 for more details.
  */
-class WindowApplicationScheduler
-    implements ApplicationScheduler, TimedTaskConsumer {
+class WindowApplicationScheduler implements ApplicationScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -60,7 +60,7 @@ class WindowApplicationScheduler
     private PriorityBlockingQueue<QueueElement> queue;
 
     // the map of users to their windows
-    private ConcurrentHashMap<TaskOwner,QueueUser> userMap;
+    private ConcurrentHashMap<Identity,QueueUser> userMap;
 
     // the handler for all delayed tasks
     private final TimedTaskHandler timedTaskHandler;
@@ -77,7 +77,7 @@ class WindowApplicationScheduler
             throw new NullPointerException("Properties cannot be null");
 
         queue = new PriorityBlockingQueue<QueueElement>();
-        userMap = new ConcurrentHashMap<TaskOwner,QueueUser>();
+        userMap = new ConcurrentHashMap<Identity,QueueUser>();
         timedTaskHandler = new TimedTaskHandler(this);
     }
 
@@ -182,6 +182,7 @@ class WindowApplicationScheduler
 
         // make sure that we're only scheduling one task for a given user,
         // so that we get a consistant view on the user's window counter
+        assert(user != null);
         synchronized (user) {
             // see what window we're currently on, which will be the user's
             // next counter if there's nothing in the queue...this does
@@ -253,6 +254,15 @@ class WindowApplicationScheduler
 
             return ((window == other.window) &&
                     (timestamp == other.timestamp));
+        }
+        
+        /** {@inheritDoc} */
+        public int hashCode() {
+            // Recipe from Effective Java
+            int result = 17;
+            result = 37*result + (int) (window ^ (window >>>32));
+            result = 37*result + (int) (timestamp ^ (timestamp >>>32));
+            return result;
         }
     }
 
