@@ -66,6 +66,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -778,7 +779,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.send(testMessage);
+	    channel.send(ByteBuffer.wrap(testMessage));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -793,7 +794,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		channel.close();
 		try {
-		    channel.send(testMessage);
+		    channel.send(ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
 		} catch (IllegalStateException e) {
 		    System.err.println(e);
@@ -826,7 +827,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
-		    channel.send(buf.getBuffer());
+		    channel.send(ByteBuffer.wrap(buf.getBuffer()));
 		}
 	    }, taskOwner);
 
@@ -1749,8 +1750,10 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
-	    MessageBuffer buf = new MessageBuffer(message);
+	public void receivedMessage(ByteBuffer message) {
+            byte[] bytes = new byte[message.remaining()];
+            message.asReadOnlyBuffer().get(bytes);
+	    MessageBuffer buf = new MessageBuffer(bytes);
 	    String action = buf.getString();
 	    DataManager dataManager = AppContext.getDataManager();
 	    ClientSession session = sessionRef.get(ClientSession.class);
@@ -1762,7 +1765,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.join(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("leave")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: leave request, " +
@@ -1771,7 +1774,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.leave(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("message")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: send request, " +
@@ -1779,7 +1782,7 @@ public class TestChannelServiceImpl extends TestCase {
 				   ", user: " + name);
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
-		channel.send(message);
+		channel.send(message.asReadOnlyBuffer());
 	    }
 	}
     }

@@ -55,6 +55,7 @@ import com.sun.sgs.service.WatchdogService;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -351,10 +352,12 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void sendProtocolMessage(
-	ClientSession session, byte[] message, Delivery delivery)
+	ClientSession session, ByteBuffer message, Delivery delivery)
     {
+        byte[] bytes = new byte[message.remaining()];
+        message.get(bytes);
 	checkContext().addMessage(
-	    getClientSessionImpl(session), message, delivery);
+	    getClientSessionImpl(session), bytes, delivery);
     }
 
     /**
@@ -388,7 +391,7 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, byte[] message, Delivery delivery)
+	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
     {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
@@ -396,7 +399,9 @@ public class ClientSessionServiceImpl
 	 * to send to client session.
 	 */
 	if (handler != null) {
-	    handler.sendProtocolMessage(message, delivery);
+	    byte[] bytes = new byte[message.remaining()];
+	    message.get(bytes);
+	    handler.sendProtocolMessage(bytes, delivery);
 	} else {
 	    logger.log(
 		Level.FINE,

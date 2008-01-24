@@ -48,6 +48,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1096,7 +1097,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
+	public void receivedMessage(ByteBuffer message) {
 	}
     }
 
@@ -1128,7 +1129,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
+	public void receivedMessage(ByteBuffer byteBuf) {
+            byte[] message = new byte[byteBuf.remaining()];
+            byteBuf.get(message);
 	    MessageBuffer buf = new MessageBuffer(message);
 	    int num = buf.getInt();
 	    DummyClient client = dummyClients.get(name);

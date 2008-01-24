@@ -20,6 +20,7 @@
 package com.sun.sgs.tutorial.server.lesson5;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -75,7 +76,7 @@ class HelloEchoSessionListener
      * <p>
      * Logs when data arrives from the client, and echoes the message back.
      */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         ClientSession session = getSession();
 
         logger.log(Level.INFO, "Message from {0}", session.getName());

@@ -4,6 +4,7 @@
 package com.sun.sgs.example.chat.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -70,7 +71,7 @@ public class ChatChannel
         return Collections.unmodifiableSet(members());
     }
 
-    public void send(byte[] message) {
+    public void send(ByteBuffer message) {
         channel().send(message);
     }
 

@@ -47,6 +47,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -437,7 +438,7 @@ public class ChannelServiceImpl
 
 		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, message, Delivery.RELIABLE);
+ 			sessionRefId, ByteBuffer.wrap(message), Delivery.RELIABLE);
 		}
 
 	    } finally {

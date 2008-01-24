@@ -26,6 +26,7 @@ import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -438,7 +439,8 @@ class ClientSessionHandler {
 			"session message received before login:{0}", this);
 		    break;
 		}
-		final byte[] clientMessage = msg.getBytes(msg.limit() - msg.position());
+		final ByteBuffer clientMessage =
+		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
@@ -447,7 +449,7 @@ class ClientSessionHandler {
 			if (sessionImpl != null) {
 			    if (isConnected()) {
 				sessionImpl.getClientSessionListener(dataService).
-				    receivedMessage(clientMessage);
+				    receivedMessage(clientMessage.asReadOnlyBuffer());
 			    }
 			} else {
 			    scheduleHandleDisconnect(false);

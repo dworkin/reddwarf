@@ -43,6 +43,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -360,25 +361,27 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel send(byte[] message) {
+    public Channel send(ByteBuffer message) {
 	try {
 	    checkClosed();
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
-            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
                 throw new IllegalArgumentException(
-                    "message too long: " + message.length + " > " +
+                    "message too long: " + message.remaining() + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
 	    /*
 	     * Enqueue send request.
 	     */
-	    addEvent(new SendEvent(message));
+            byte[] bytes = new byte[message.remaining()];
+            message.get(bytes);
+	    addEvent(new SendEvent(bytes));
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
-			   this, HexDumper.format(message));
+			   this, HexDumper.format(bytes));
 	    }
 	    return this;
 	    

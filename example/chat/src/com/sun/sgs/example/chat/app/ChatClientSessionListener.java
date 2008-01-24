@@ -21,6 +21,7 @@ package com.sun.sgs.example.chat.app;
 
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -92,7 +93,7 @@ public class ChatClientSessionListener
         ChatApp.globalChannel().join(session);
 
         String loginMessage = "/login " + sessionIdAndName;
-        ChatApp.globalChannel().send(toMessageBytes(loginMessage));
+        ChatApp.globalChannel().send(toMessageBuffer(loginMessage));
     }
 
     /**
@@ -110,7 +111,7 @@ public class ChatClientSessionListener
         }
 
         String disconnectMessage = "/disconnected " + getSessionIdString();
-        ChatApp.globalChannel().send(toMessageBytes(disconnectMessage));
+        ChatApp.globalChannel().send(toMessageBuffer(disconnectMessage));
 
         DataManager dataMgr = AppContext.getDataManager();
         dataMgr.removeBinding(sessionKey(getSessionIdString()));
@@ -119,9 +120,9 @@ public class ChatClientSessionListener
     /**
      * {@inheritDoc}
      */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         try {
-            String messageString = fromMessageBytes(message);
+            String messageString = fromMessageBuffer(message);
 
             // Split at the first run of whitespace, if any
             String[] args = messageString.split("\\s+", 2);
@@ -197,7 +198,7 @@ public class ChatClientSessionListener
         String bcastMsg = "#" + channelName +
                           " @" + getSessionIdString() + " " +
                           message;
-        ChatChannel.find(channelName).send(toMessageBytes(bcastMsg));
+        ChatChannel.find(channelName).send(toMessageBuffer(bcastMsg));
     }
 
     /**
@@ -216,7 +217,7 @@ public class ChatClientSessionListener
         ClientSession recipient = findSession(recipientId);
 
         String privMsg = "@" + getSessionIdString() + " " + message;
-        recipient.send(toMessageBytes(privMsg));
+        recipient.send(toMessageBuffer(privMsg));
     }
 
     /**
@@ -255,7 +256,7 @@ public class ChatClientSessionListener
         }
 
         String reply = "/pong " + message;
-        session().send(toMessageBytes(reply));
+        session().send(toMessageBuffer(reply));
     }
 
     /**
@@ -284,7 +285,7 @@ public class ChatClientSessionListener
         String changeMessage = "/joined " +
                                channelName + " " +
                                getSessionIdString();
-        channel.send(toMessageBytes(changeMessage));
+        channel.send(toMessageBuffer(changeMessage));
 
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members ");
@@ -295,7 +296,7 @@ public class ChatClientSessionListener
             listMessage.append(getIdString(memberRef));
         }
 
-        session().send(toMessageBytes(listMessage.toString()));
+        session().send(toMessageBuffer(listMessage.toString()));
     }
 
     /**
@@ -338,7 +339,7 @@ public class ChatClientSessionListener
         String changeMessage = "/left " +
                                channelName + " " +
                                getSessionIdString();
-        channel.send(toMessageBytes(changeMessage));
+        channel.send(toMessageBuffer(changeMessage));
     }
 
 
@@ -372,13 +373,15 @@ public class ChatClientSessionListener
     }
 
     /**
-     * Decodes the given {@code bytes} into a message string.
+     * Decodes the given {@code message} into a string.
      *
-     * @param bytes the encoded message
+     * @param message the encoded message
      * @return the decoded message string
      */
-    static String fromMessageBytes(byte[] bytes) {
+    static String fromMessageBuffer(ByteBuffer message) {
         try {
+            byte[] bytes = new byte[message.remaining()];
+            message.get(bytes);
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset " +
@@ -392,9 +395,9 @@ public class ChatClientSessionListener
      * @param s the message string to encode
      * @return the encoded message as a byte array
      */
-    static byte[] toMessageBytes(String s) {
+    static ByteBuffer toMessageBuffer(String s) {
         try {
-            return s.getBytes(MESSAGE_CHARSET);
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset " +
                 MESSAGE_CHARSET + " not found", e);

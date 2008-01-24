@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -157,21 +158,21 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
-    public ClientSession send(final byte[] message) {
+    public ClientSession send(final ByteBuffer message) {
 	try {
-            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
                 throw new IllegalArgumentException(
-                    "message too long: " + message.length + " > " +
+                    "message too long: " + message.remaining() + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             } else if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
 	    }
-	    MessageBuffer buf =
-		new MessageBuffer(1 + message.length);
-	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putBytes(message);
+            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
+            buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
+               .put(message)
+               .flip();
 	    sessionService.sendProtocolMessage(
-		this, buf.getBuffer(), Delivery.RELIABLE);
+	        this, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
 	
 	    logger.log(Level.FINEST, "send message:{0} returns", message);
 	    return this;

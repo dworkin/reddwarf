@@ -36,6 +36,7 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 import java.util.Collection;
 
@@ -174,7 +175,7 @@ public class Player
         // for ease of porting -JM
         BigInteger sid = currentSessionRef.getId();
         byte[] bytes = sid.toByteArray();
-        session.send(bytes);
+        session.send(ByteBuffer.wrap(bytes));
     }
 
     /**
@@ -280,11 +281,13 @@ public class Player
      *            current uid
      * @param data the message
      */
-    public void receivedMessage(byte [] message) {
+    public void receivedMessage(ByteBuffer message) {
         // call the message handler to interpret the message ... note that the
         // proxy model here means that we're blocking the player, and not the
         // game itself, while we're handling the message
-        messageHandler.handleMessage(this, message);
+        byte[] messageBytes = new byte[message.remaining()];
+        message.get(messageBytes);
+        messageHandler.handleMessage(this, messageBytes);
     }
 
     public void disconnected(boolean graceful) {
