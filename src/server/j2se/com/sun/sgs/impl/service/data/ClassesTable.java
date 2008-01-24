@@ -354,7 +354,7 @@ final class ClassesTable {
 	Class<?> forClass, String methodName)
     {
 	Method method = null;
-	Class cl = forClass;
+	Class<?> cl = forClass;
 	while (cl != null) {
 	    try {
 		method = cl.getDeclaredMethod(methodName);

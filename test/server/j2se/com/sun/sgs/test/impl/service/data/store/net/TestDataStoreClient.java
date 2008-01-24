@@ -274,23 +274,25 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	txn.abort(null);
 	store.shutdown();
 	store = null;
-	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
-	props.setProperty(DataStoreNetPackage + ".server.port", "0");
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
 	DataStoreServerImpl server = new DataStoreServerImpl(props);
+	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(server.getPort()));
+	props.setProperty(DataStoreNetPackage + ".server.run", "false");
 	txn = new DummyTransaction();	
 	store = createDataStore(props);
 	server.shutdown();
 	try {
 	    store.createObject(txn);
+	    fail("Expected NetworkException");
 	} catch (NetworkException e) {
 	    System.err.println(e);
 	}
 	try {
 	    txn.abort(null);
+	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	}
 	txn = null;
 	store.shutdown();
