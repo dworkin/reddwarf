@@ -812,21 +812,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void commit() {
-            // use the reservations...
-            if (reservationSet != null)
-                for (TaskReservation reservation : reservationSet)
-                    reservation.use();
-            // ...start the periodic tasks...
-            if (addedRecurringMap != null) {
-                for (Entry<String,RecurringDetail> entry :
-                         addedRecurringMap.entrySet()) {
-                    RecurringDetail detail = entry.getValue();
-                    recurringMap.put(entry.getKey(), detail);
-                    addHandleForIdentity(detail.handle, detail.identity);
-                    detail.handle.start();
-                }
-            }
-            // ...cancel the cancelled periodic tasks...
+            // cancel the cancelled periodic tasks...
             if (cancelledRecurringSet != null) {
                 for (String objName : cancelledRecurringSet) {
                     RecurringDetail detail = recurringMap.remove(objName);
@@ -842,6 +828,20 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 int countChange = entry.getValue();
                 if (countChange != 0)
                     submitStatusChange(entry.getKey(), countChange);
+            }
+            // with the status counts updated, use the reservations...
+            if (reservationSet != null)
+                for (TaskReservation reservation : reservationSet)
+                    reservation.use();
+            // ... and start the periodic tasks
+            if (addedRecurringMap != null) {
+                for (Entry<String,RecurringDetail> entry :
+                         addedRecurringMap.entrySet()) {
+                    RecurringDetail detail = entry.getValue();
+                    recurringMap.put(entry.getKey(), detail);
+                    addHandleForIdentity(detail.handle, detail.identity);
+                    detail.handle.start();
+                }
             }
         }
         /** {@inheritDoc} */
@@ -1057,7 +1057,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      */
     private void restartTasks(String identityName) {
         // start iterating from the root of the pending task namespace
-        TxnState txnState = ctxFactory.joinTransaction();
         String prefix = DS_PENDING_SPACE + identityName + ".";
         String objName = dataService.nextServiceBoundName(prefix);
         int taskCount = 0;
