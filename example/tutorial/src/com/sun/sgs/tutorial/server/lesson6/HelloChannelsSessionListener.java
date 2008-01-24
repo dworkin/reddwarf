@@ -20,14 +20,16 @@
 package com.sun.sgs.tutorial.server.lesson6;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedReference;
 
 /**
  * Simple example {@link ClientSessionListener} for the Project Darkstar
@@ -47,7 +49,7 @@ class HelloChannelsSessionListener
         Logger.getLogger(HelloChannelsSessionListener.class.getName());
 
     /** The session this {@code ClientSessionListener} is listening to. */
-    private final ClientSession session;
+    private final ManagedReference sessionRef;
 
     /**
      * Creates a new {@code HelloChannelsSessionListener} for the given
@@ -55,22 +57,39 @@ class HelloChannelsSessionListener
      *
      * @param session the session this listener is associated with
      * @param channel1 a channel to join
-     * @param count the number of this login event
      */
     public HelloChannelsSessionListener(ClientSession session,
-            Channel channel1, int count)
+        Channel channel1)
     {
-        this.session = session;
+        if (session == null)
+            throw new NullPointerException("null session");
 
-        // channel1 does not get a per-session listener
-        channel1.join(session, null);
+        if (channel1 == null)
+            throw new NullPointerException("null channel1");
+
+        DataManager dataMgr = AppContext.getDataManager();
+
+        sessionRef = dataMgr.createReference(session);
+
+        // Join to channel1
+        channel1.join(session);
 
         // Lookup channel2 by name
-        ChannelManager channelMgr = AppContext.getChannelManager();
-        Channel channel2 = channelMgr.getChannel(HelloChannels.CHANNEL_2_NAME);
+        Channel channel2 =
+            dataMgr.getBinding(HelloChannels.CHANNEL_2_NAME, Channel.class);
 
-        // channel2 gets a per-session listener
-        channel2.join(session, new HelloChannelsChannelListener(count));
+        // Join to channel2
+        channel2.join(session);
+    }
+
+    /**
+     * Returns the session for this listener.
+     * 
+     * @return the session for this listener
+     */
+    protected ClientSession getSession() {
+        // We created the ref with a non-null session, so no need to check it.
+        return sessionRef.get(ClientSession.class);
     }
 
     /**
@@ -78,8 +97,10 @@ class HelloChannelsSessionListener
      * <p>
      * Logs when data arrives from the client, and echoes the message back.
      */
-    public void receivedMessage(byte[] message) {
-        logger.log(Level.INFO, "Direct message from {0}", session.getName());
+    public void receivedMessage(ByteBuffer message) {
+        ClientSession session = getSession();
+
+        logger.log(Level.INFO, "Message from {0}", session.getName());
 
         // Echo message back to sender
         session.send(message);
@@ -91,6 +112,7 @@ class HelloChannelsSessionListener
      * Logs when the client disconnects.
      */
     public void disconnected(boolean graceful) {
+        ClientSession session = getSession();
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO,
             "User {0} has logged out {1}",

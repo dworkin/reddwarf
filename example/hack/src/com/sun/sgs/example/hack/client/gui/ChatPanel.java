@@ -19,8 +19,6 @@
 
 package com.sun.sgs.example.hack.client.gui;
 
-import com.sun.sgs.client.SessionId;
-
 import com.sun.sgs.example.hack.client.ChatListener;
 import com.sun.sgs.example.hack.client.ChatManager;
 
@@ -29,6 +27,7 @@ import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -64,21 +63,21 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     private JComponent focusPanel;
 
     // the mapping from uid to name
-    private Map<SessionId,String> uidMap;
+    private Map<BigInteger,String> uidMap;
 
     // the client's current session id
-    private SessionId currentSession;
+    private BigInteger currentSession;
 
     /**
-     * Creates a <code>Chatmanager</code>.
+     * Creates a <code>ChatManager</code>.
      *
-     * @param chatManager the manager that recieves chat messages
+     * @param chatManager the manager that receives chat messages
      * @param focusPanel the panel that shares focus with us
      */
     public ChatPanel(ChatManager chatManager, JComponent focusPanel) {
         super(new BorderLayout(4, 4));
 
-        uidMap = new HashMap<SessionId,String>();
+        uidMap = new HashMap<BigInteger,String>();
 
         // track the manager, and add ourselves as a listener
         this.chatManager = chatManager;
@@ -103,7 +102,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     /**
      *
      */
-    public void setSessionId(SessionId session) {
+    public void setSessionId(BigInteger session) {
         uidMap.remove(currentSession);
         uidMap.put(session, "[You]");
         currentSession = session;
@@ -138,7 +137,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uid the identifier of the player that joined
      */
-    public void playerJoined(SessionId uid) {
+    public void playerJoined(BigInteger uid) {
         if (uidMap.containsKey(uid))
             textArea.append(uidMap.get(uid) + ": *joined*\n");
     }
@@ -148,7 +147,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uid the identifier of the player that left
      */
-    public void playerLeft(SessionId uid) {
+    public void playerLeft(BigInteger uid) {
         if (uidMap.containsKey(uid))
             textArea.append(uidMap.get(uid) + ": *left*\n");
     }
@@ -159,7 +158,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * @param sender the name of the sender
      * @param message the message itself
      */
-    public void messageArrived(SessionId sender, String message) {
+    public void messageArrived(BigInteger sender, String message) {
         if (uidMap.containsKey(sender))
             textArea.append(uidMap.get(sender) + ": " + message + "\n");
     }
@@ -170,7 +169,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uidMap the mapping from identifiers to names
      */
-    public void addUidMappings(Map<SessionId,String> uidMap) {
+    public void addUidMappings(Map<BigInteger,String> uidMap) {
         this.uidMap.putAll(uidMap);
     }
 
