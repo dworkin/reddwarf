@@ -20,6 +20,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Interface representing a single, connected login session between a
@@ -77,13 +78,13 @@ public interface ClientSession extends ManagedObject {
     String getName();
     
     /**
-     * Sends a message contained in the specified byte array to this
-     * session's client.
+     * Sends a message contained in the specified {@link ByteBuffer}
+     * to this session's client.
+     * <p>
+     * The specified buffer may be reused immediately, but changes
+     * to the buffer will have no effect on the message sent to the
+     * client by this invocation.
      *
-     * <p>The specified byte array must not be modified after invoking
-     * this method; if the byte array is modified, then this method
-     * may have unpredictable results.
-     
      * @param	message a message
      *
      * @return	this client session
@@ -94,7 +95,7 @@ public interface ClientSession extends ManagedObject {
      * @throws	TransactionException if the operation failed because of
      *		 a problem with the current transaction
      */
-    ClientSession send(byte[] message);
+    ClientSession send(ByteBuffer message);
 
     /**
      * Forcibly disconnects this client session.  If this session is

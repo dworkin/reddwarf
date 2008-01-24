@@ -19,8 +19,6 @@
 
 package com.sun.sgs.app;
 
-import java.io.Serializable;
-
 /**
  * Manager for creating channels.  A {@link Channel} is a communication
  * group consisting of multiple client sessions and the server.
