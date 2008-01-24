@@ -42,8 +42,8 @@ import java.nio.ByteBuffer;
  * server, to check if it is connected, or to log out.
  * <p>
  * A server session has an associated {@link ServerSessionListener} that is
- * notified of session communication events such as message receipt, channel
- * joins, reconnection, or disconnection. Once a server session is
+ * notified of session communication events such as message receipt,
+ * reconnection, or disconnection. Once a server session is
  * disconnected, it can no longer be used to send messages to the server. In
  * this case, a client must log in again to obtain a new server session to
  * communicate with the server.

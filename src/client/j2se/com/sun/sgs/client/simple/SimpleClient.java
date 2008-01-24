@@ -91,10 +91,10 @@ public class SimpleClient implements ServerSession {
      */
     private volatile boolean connectionStateChanging = false;
     
-    /** TODO */
+    /** Indicates whether this client expects a disconnect message. */
     private volatile boolean expectingDisconnect = false;
 
-    /** TODO */
+    /** Indicates whether this client is logged in. */
     private volatile boolean loggedIn = false;
 
     /** Reconnection key.  TODO reconnect not implemented */
@@ -368,16 +368,19 @@ public class SimpleClient implements ServerSession {
                 clientListener.loggedIn();
                 break;
 
-            case SimpleSgsProtocol.LOGIN_FAILURE:
-                logger.log(Level.FINER, "Login failed");
-                clientListener.loginFailed(msg.getString());
+            case SimpleSgsProtocol.LOGIN_FAILURE: {
+                String reason = msg.getString();
+                logger.log(Level.FINER, "Login failed: {0}", reason);
+                clientListener.loginFailed(reason);
                 break;
+            }
 
             case SimpleSgsProtocol.LOGIN_REDIRECT:
                 String hostname = msg.getString();
                 logger.log(Level.FINER, "Login redirect: {0}", hostname);
                 // TBI login redirect
-                clientListener.loginFailed("unimplemented, want redirect to " + msg.getString());
+                clientListener.loginFailed(
+                    "unimplemented, want redirect to " + hostname);
                 break;
 
             case SimpleSgsProtocol.SESSION_MESSAGE: {
@@ -392,12 +395,14 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.RECONNECT_SUCCESS:
                 logger.log(Level.FINER, "Reconnected");
                 loggedIn = true;
+                reconnectKey = msg.getBytes(msg.limit() - msg.position());
                 clientListener.reconnected();
                 break;
 
             case SimpleSgsProtocol.RECONNECT_FAILURE:
                 try {
-                    logger.log(Level.FINER, "Reconnect failed");
+                    String reason = msg.getString();
+                    logger.log(Level.FINER, "Reconnect failed: {0}", reason);
                     clientConnection.disconnect();
                 } catch (IOException e) {
                     if (logger.isLoggable(Level.FINE)) {

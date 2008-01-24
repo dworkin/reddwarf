@@ -402,18 +402,6 @@ class ClientSessionHandler {
 	    }
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
-	    handleApplicationServiceMessage(msg);
-	}
-
-	/**
-	 * Handles an APPLICATION_SERVICE message received by the
-	 * {@code bytesReceived} method.  When this method is invoked,
-	 * the specified message buffer's current position points to
-	 * the operation code of the protocol message.  The protocol
-	 * version and service ID have already been processed by the
-	 * caller.
-	 */
-	private void handleApplicationServiceMessage(MessageBuffer msg) {
 	    byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {

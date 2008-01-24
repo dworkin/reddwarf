@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -171,8 +170,6 @@ public class ClientSessionImpl
 		new MessageBuffer(1 + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
 		putBytes(message);
-	    // FIXME: The protocol message should be assembled at the
-	    // session server and the sequence number should be assigned there.
 	    sessionService.sendProtocolMessage(
 		this, buf.getBuffer(), Delivery.RELIABLE);
 	

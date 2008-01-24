@@ -50,7 +50,6 @@ import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
 import com.sun.sgs.impl.client.simple.SimpleConnectorFactory;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
@@ -158,7 +157,7 @@ public class TestSimpleClientListener
 
     void queueLoggedIn(long reconnectKey) {
         byte[] rkey = BigInteger.valueOf(reconnectKey).toByteArray();
-        mockConnection.mockLoggedIn(new CompactId(rkey));
+        mockConnection.mockLoggedIn(rkey);
     }
 
     static class ClientListenerBase implements SimpleClientListener
@@ -252,12 +251,10 @@ public class TestSimpleClientListener
             listener.receivedMessage(message);
         }
 
-        void mockLoggedIn(CompactId reconnectKey) {
-            MessageBuffer buf =
-                new MessageBuffer(1 +
-                    reconnectKey.getExternalFormByteCount());
+        void mockLoggedIn(byte[] reconnectKey) {
+            MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
             buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-                putBytes(reconnectKey.getExternalForm());
+                putBytes(reconnectKey);
             recvQueue.add(buf);
         }
 

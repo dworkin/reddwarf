@@ -1399,13 +1399,6 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the next sequence number for this session.
-	 */
-	private long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
-
-	/**
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {

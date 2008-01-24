@@ -711,7 +711,7 @@ public class ChannelServiceImpl
 	}
     }
     
-    /* -- Implement ProtocolMessageListener -- */
+    /* -- Implement ClientSessionDisconnectListener -- */
 
     private final class ChannelSessionDisconnectListener
 	implements ClientSessionDisconnectListener

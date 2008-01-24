@@ -52,7 +52,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -335,7 +334,7 @@ public class ClientSessionServiceImpl
         if (listener == null)
             throw new NullPointerException("null listener");
         
-        this.sessionDisconnectListeners.add(listener);
+        sessionDisconnectListeners.add(listener);
     }
 
     /** {@inheritDoc} */
