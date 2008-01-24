@@ -29,7 +29,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
