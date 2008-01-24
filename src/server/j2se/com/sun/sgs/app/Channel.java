@@ -153,7 +153,7 @@ public interface Channel extends ManagedObject {
      * <p>
      * The specified buffer may be reused immediately, but changes
      * to the buffer will have no effect on the message sent to the
-     * client by this invocation.
+     * channel by this invocation.
      *
      * @param	message a message
      *
