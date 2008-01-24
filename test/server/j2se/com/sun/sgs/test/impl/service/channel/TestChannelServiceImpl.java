@@ -66,6 +66,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -778,7 +779,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.send(testMessage);
+	    channel.send(ByteBuffer.wrap(testMessage));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -793,7 +794,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		channel.close();
 		try {
-		    channel.send(testMessage);
+		    channel.send(ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
 		} catch (IllegalStateException e) {
 		    System.err.println(e);
@@ -826,7 +827,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
-		    channel.send(buf.getBuffer());
+		    channel.send(ByteBuffer.wrap(buf.getBuffer()));
 		}
 	    }, taskOwner);
 
@@ -1349,11 +1350,10 @@ public class TestChannelServiceImpl extends TestCase {
 	    this.name = user;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(user) +
+		new MessageBuffer(2 + MessageBuffer.getSize(user) +
 				  MessageBuffer.getSize(pass));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
 		putString(user).
 		putString(pass);
 	    loginAck = false;
@@ -1400,25 +1400,15 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the next sequence number for this session.
-	 */
-	private long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
-
-	/**
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
-		putByteArray(message);
+		new MessageBuffer(1 + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1527,10 +1517,8 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -1572,28 +1560,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"[" + name + "] bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		switch (serviceId) {
-		    
-		case SimpleSgsProtocol.APPLICATION_SERVICE:
-		    processAppProtocolMessage(buf);
-		    break;
-
-		default:
-		    System.err.println(
-			"[" + name + "] bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
+		processAppProtocolMessage(buf);
 	    }
 
 	    private void processAppProtocolMessage(MessageBuffer buf) {
@@ -1641,9 +1608,7 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.notifyAll();
 		    } break;
 
-		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    buf = new MessageBuffer(buf.getByteArray());
+		case SimpleSgsProtocol.SESSION_MESSAGE: {
 		    String action = buf.getString();
 		    if (action.equals("join")) {
 			String channelName = buf.getString();
@@ -1679,6 +1644,7 @@ public class TestChannelServiceImpl extends TestCase {
 			    action);
 		    }
 		    break;
+		}
 
 		default:
 		    System.err.println(	
@@ -1784,8 +1750,10 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
-	    MessageBuffer buf = new MessageBuffer(message);
+	public void receivedMessage(ByteBuffer message) {
+            byte[] bytes = new byte[message.remaining()];
+            message.asReadOnlyBuffer().get(bytes);
+	    MessageBuffer buf = new MessageBuffer(bytes);
 	    String action = buf.getString();
 	    DataManager dataManager = AppContext.getDataManager();
 	    ClientSession session = sessionRef.get(ClientSession.class);
@@ -1797,7 +1765,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.join(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("leave")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: leave request, " +
@@ -1806,7 +1774,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
 		channel.leave(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("message")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: send request, " +
@@ -1814,7 +1782,7 @@ public class TestChannelServiceImpl extends TestCase {
 				   ", user: " + name);
 		Channel channel = dataManager.
 		    	getBinding(channelName, Channel.class);
-		channel.send(message);
+		channel.send(message.asReadOnlyBuffer());
 	    }
 	}
     }

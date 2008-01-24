@@ -29,14 +29,13 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -93,10 +92,6 @@ public class ClientSessionImpl
      * instance.
      */
     private final ClientSessionServer sessionServer;
-
-    /** The sequence number for ordered messages sent from this client. */
-    // FIXME: using this here is bogus.
-    private final AtomicLong sequenceNumber = new AtomicLong(0);
 
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
@@ -162,27 +157,21 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
-    public ClientSession send(final byte[] message) {
+    public ClientSession send(ByteBuffer message) {
 	try {
-            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
                 throw new IllegalArgumentException(
-                    "message too long: " + message.length + " > " +
+                    "message too long: " + message.remaining() + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             } else if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
 	    }
-	    MessageBuffer buf =
-		new MessageBuffer(3 + 8 + 2 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(sequenceNumber.getAndIncrement()).
-		putShort(message.length).
-		putBytes(message);
-	    // FIXME: The protocol message should be assembled at the
-	    // session server and the sequence number should be assigned there.
+            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
+            buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
+               .put(message)
+               .flip();
 	    sessionService.sendProtocolMessage(
-		this, buf.getBuffer(), Delivery.RELIABLE);
+	        this, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
 	
 	    logger.log(Level.FINEST, "send message:{0} returns", message);
 	    return this;

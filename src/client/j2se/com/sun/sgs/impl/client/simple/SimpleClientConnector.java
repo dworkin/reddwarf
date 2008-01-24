@@ -112,7 +112,7 @@ class SimpleClientConnector extends ClientConnector {
      */
     @Override
     public void cancel() throws IOException {
-        // TODO implement
+        // TODO implement cancel()
         throw new UnsupportedOperationException("Cancel not yet implemented");
     }
 

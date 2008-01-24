@@ -42,28 +42,30 @@ import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;   
 import java.util.Properties;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -111,10 +113,9 @@ public class ClientSessionServiceImpl
     /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
 
-    /** The registered service listeners. */
-    private final Map<Byte, ProtocolMessageListener> serviceListeners =
-	Collections.synchronizedMap(
-	    new HashMap<Byte, ProtocolMessageListener>());
+    /** The registered session disconnect listeners. */
+    private final Set<ClientSessionDisconnectListener> sessionDisconnectListeners =
+	Collections.synchronizedSet(new HashSet<ClientSessionDisconnectListener>());
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
@@ -128,7 +129,7 @@ public class ClientSessionServiceImpl
     /** Thread for flushing committed contexts. */
     private final Thread flushContextsThread = new FlushContextsThread();
     
-    /** Lock for notifying the thread that flushes commmitted contexts. */
+    /** Lock for notifying the thread that flushes committed contexts. */
     private final Object flushContextsLock = new Object();
 
     /** The Acceptor for listening for new connections. */
@@ -328,13 +329,13 @@ public class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    public void registerProtocolMessageListener(
-	byte serviceId, ProtocolMessageListener listener)
+    public void registerSessionDisconnectListener(
+        ClientSessionDisconnectListener listener)
     {
-	if (listener == null) {
-	    throw new NullPointerException("null listener");
-	}
-	serviceListeners.put(serviceId, listener);
+        if (listener == null)
+            throw new NullPointerException("null listener");
+        
+        sessionDisconnectListeners.add(listener);
     }
 
     /** {@inheritDoc} */
@@ -351,10 +352,12 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void sendProtocolMessage(
-	ClientSession session, byte[] message, Delivery delivery)
+	ClientSession session, ByteBuffer message, Delivery delivery)
     {
+        byte[] bytes = new byte[message.remaining()];
+        message.get(bytes);
 	checkContext().addMessage(
-	    getClientSessionImpl(session), message, delivery);
+	    getClientSessionImpl(session), bytes, delivery);
     }
 
     /**
@@ -388,7 +391,7 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, byte[] message, Delivery delivery)
+	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
     {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
@@ -396,7 +399,9 @@ public class ClientSessionServiceImpl
 	 * to send to client session.
 	 */
 	if (handler != null) {
-	    handler.sendProtocolMessage(message, delivery);
+	    byte[] bytes = new byte[message.remaining()];
+	    message.get(bytes);
+	    handler.sendProtocolMessage(bytes, delivery);
 	} else {
 	    logger.log(
 		Level.FINE,
@@ -974,13 +979,6 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Returns the service listener for the specified service id.
-     */
-    ProtocolMessageListener getProtocolMessageListener(byte serviceId) {
-	return serviceListeners.get(serviceId);
-    }
-
-    /**
      * Adds the handler for the specified session to the internal
      * session handler map.  This method is invoked by the handler once the
      * client has successfully logged in.
@@ -999,10 +997,8 @@ public class ClientSessionServiceImpl
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (ProtocolMessageListener serviceListener :
-		 serviceListeners.values())
-	{
-	    serviceListener.disconnected(sessionRefId.toByteArray());
+	for (ClientSessionDisconnectListener disconnectListener : sessionDisconnectListeners) {
+	    disconnectListener.disconnected(sessionRefId);
 	}
 	handlers.remove(sessionRefId);
     }

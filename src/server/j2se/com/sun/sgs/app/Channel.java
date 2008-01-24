@@ -20,6 +20,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.Set;
 
 /**
@@ -146,13 +147,13 @@ public interface Channel extends ManagedObject {
     Channel leaveAll();
 
     /**
-     * Sends the message contained in the specified byte array to all
+     * Sends the message contained in the specified buffer to all
      * client sessions joined to this channel.  If no sessions are
      * joined to this channel, then no action is taken.
-     *
-     * <p>The specified byte array must not be modified after invoking
-     * this method; if the byte array is modified, then this method
-     * may have unpredictable results.
+     * <p>
+     * The specified buffer may be reused immediately, but changes
+     * to the buffer will have no effect on the message sent to the
+     * channel by this invocation.
      *
      * @param	message a message
      *
@@ -164,7 +165,7 @@ public interface Channel extends ManagedObject {
      * @throws	TransactionException if the operation failed because of
      *		a problem with the current transaction
      */
-    Channel send(byte[] message);
+    Channel send(ByteBuffer message);
 
     /**
      * Closes this channel.  If this channel is already closed, then
