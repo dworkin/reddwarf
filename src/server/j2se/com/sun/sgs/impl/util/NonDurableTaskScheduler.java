@@ -20,9 +20,7 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionRunner;
@@ -33,7 +31,7 @@ import com.sun.sgs.service.TransactionRunner;
  */
 public class NonDurableTaskScheduler {
 
-    private final TaskOwner owner;
+    private final Identity owner;
     private final TaskScheduler taskScheduler;
     private final TaskService taskService;
 
@@ -47,7 +45,7 @@ public class NonDurableTaskScheduler {
      */
     public NonDurableTaskScheduler(
 	TaskScheduler taskScheduler,
-        TaskOwner owner,
+        Identity owner,
         TaskService taskService)
     {
 	if (taskScheduler == null || owner == null || taskService == null) {
@@ -108,8 +106,7 @@ public class NonDurableTaskScheduler {
             return;
         }
 
-        taskScheduler.scheduleTask(task,
-                new TaskOwnerImpl(identity, owner.getContext()));
+        taskScheduler.scheduleTask(task, identity);
     }
 
     /**
@@ -146,7 +143,7 @@ public class NonDurableTaskScheduler {
      *
      * @return	the {@code TaskOwner} for this instance
      */
-    TaskOwner getTaskOwner() {
+    Identity getTaskOwner() {
 	return owner;
     }
 }

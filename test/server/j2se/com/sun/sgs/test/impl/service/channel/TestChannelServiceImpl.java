@@ -49,7 +49,6 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -106,7 +105,7 @@ public class TestChannelServiceImpl extends TestCase {
     private TaskScheduler taskScheduler;
 
     /** The owner for tasks I initiate. */
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
 
     /** The shared data service. */
     private DataService dataService;

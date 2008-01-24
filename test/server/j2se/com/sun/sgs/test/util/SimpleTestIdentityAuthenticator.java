@@ -18,13 +18,10 @@
  */
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
-import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
-import com.sun.sgs.kernel.KernelAppContext;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,13 +43,6 @@ public class SimpleTestIdentityAuthenticator implements IdentityAuthenticator {
      */
     public SimpleTestIdentityAuthenticator(Properties properties) {
 
-    }
-
-    /**
-     * {@inheritDoc}
-     * This implementation does nothing.
-     */
-    public void assignContext(KernelAppContext kernelAppContext) {
     }
 
     /**

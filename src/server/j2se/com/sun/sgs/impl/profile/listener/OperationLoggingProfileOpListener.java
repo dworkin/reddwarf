@@ -19,15 +19,16 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -99,7 +100,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
      * Creates an instance of <code>OperationLoggingProfileOpListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
-     * @param owner the <code>TaskOwner</code> to use for all tasks run by
+     * @param owner the <code>Identity</code> to use for all tasks run by
      *              this listener
      * @param taskScheduler the <code>TaskScheduler</code> to use for
      *                      running short-lived or recurring tasks
@@ -107,7 +108,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
      *                      run any long-lived tasks
      */
     public OperationLoggingProfileOpListener(Properties properties,
-                                             TaskOwner owner,
+                                             Identity owner,
                                              TaskScheduler taskScheduler,
                                              ResourceCoordinator resourceCoord)
     {

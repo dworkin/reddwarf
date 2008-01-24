@@ -35,7 +35,6 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -64,7 +63,6 @@ import java.math.BigInteger;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
@@ -102,8 +100,7 @@ public class TestDataServiceImpl extends TestCase {
 	"TestDataServiceImpl.db";
 
     /** The component registry. */
-    private static final DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
+    private static DummyComponentRegistry componentRegistry;
 
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
@@ -143,17 +140,13 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	componentRegistry.setComponent(
-	    TaskScheduler.class, 
-	    MinimalTestKernel.getSystemRegistry(
-		MinimalTestKernel.createContext())
-	    .getComponent(TaskScheduler.class));
+        MinimalTestKernel.create();
+        componentRegistry = MinimalTestKernel.getSystemRegistry();
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
-	    componentRegistry.setComponent(DataManager.class, service);
 	}
-	componentRegistry.registerAppContext();
+        componentRegistry.setComponent(DataManager.class, service);
 	createTransaction();
 	dummy = new DummyManagedObject();
 	service.setBinding("dummy", dummy);
@@ -2875,7 +2868,6 @@ public class TestDataServiceImpl extends TestCase {
 			txn2 = new DummyTransaction(
 			    UsePrepareAndCommit.ARBITRARY, 1000);
 			txnProxy.setCurrentTransaction(txn2);
-			componentRegistry.registerAppContext();
 			service.getBinding("dummy2", DummyManagedObject.class);
 			flag.release();
 			service.getBinding("dummy", DummyManagedObject.class)
@@ -2897,7 +2889,7 @@ public class TestDataServiceImpl extends TestCase {
 		}
 	    }
 	    MyRunnable myRunnable = new MyRunnable();
-	    Thread thread = new Thread(myRunnable);
+            Thread thread = MinimalTestKernel.createThread(myRunnable);
 	    thread.start();
 	    Thread.sleep(i * 500);
 	    flag.acquire();
