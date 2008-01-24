@@ -992,8 +992,8 @@ public class ClientSessionServiceImpl
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (ClientSessionDisconnectListener serviceListener : sessionDisconnectListeners) {
-	    serviceListener.disconnected(sessionRefId);
+	for (ClientSessionDisconnectListener disconnectListener : sessionDisconnectListeners) {
+	    disconnectListener.disconnected(sessionRefId);
 	}
 	handlers.remove(sessionRefId);
     }

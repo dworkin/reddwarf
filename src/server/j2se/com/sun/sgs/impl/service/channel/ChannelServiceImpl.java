@@ -718,12 +718,6 @@ public class ChannelServiceImpl
     {
         /**
          * {@inheritDoc}
-	 *
-	 * TBD: Currently the ChannelService is notified by the
-	 * ClientSessionService when a client session disconnects.  This
-	 * should be changed to a notification scheme where the
-	 * ChannelService can register interest in receiving notification
-	 * when the client session is removed.
 	 */
 	public void disconnected(final BigInteger sessionRefId) {
 	    /*
