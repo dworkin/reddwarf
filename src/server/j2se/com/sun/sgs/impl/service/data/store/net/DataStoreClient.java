@@ -172,11 +172,14 @@ public final class DataStoreClient
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
 
-    /** Object to synchronize on when accessing txnCount. */
+    /** Object to synchronize on when accessing txnCount and shuttingDown. */
     private final Object txnCountLock = new Object();
 
     /** The number of currently active transactions. */
     private int txnCount = 0;
+
+    /** Whether the client is in the process of shutting down. */
+    private boolean shuttingDown = false;
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -525,6 +528,7 @@ public final class DataStoreClient
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
+		shuttingDown = true;
 		while (txnCount > 0) {
 		    try {
 			logger.log(Level.FINEST,
@@ -827,15 +831,17 @@ public final class DataStoreClient
 	synchronized (txnCountLock) {
 	    if (txnCount < 0) {
 		throw new IllegalStateException("Service is shut down");
+	    } else if (shuttingDown) {
+		throw new IllegalStateException("Service is shutting down");
 	    }
 	    txnCount++;
 	}
 	boolean joined = false;
-	long tid;
+	long tid = -1;
 	try {
+	    tid = server.createTransaction(txn.getTimeout());
 	    txn.join(this);
 	    joined = true;
-	    tid = server.createTransaction(txn.getTimeout());
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
 			   "Created server transaction stid:{0,number,#} " +
@@ -845,6 +851,19 @@ public final class DataStoreClient
 	} finally {
 	    if (!joined) {
 		decrementTxnCount();
+		if (tid != -1) {
+		    try {
+			server.abort(tid);
+		    } catch (RuntimeException e) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.logThrow(
+				Level.FINEST, e,
+				"Problem aborting server transaction " +
+				"stid:{0,number,#} for transaction {1}",
+				tid, txn);
+			}
+		    }
+		}
 	    }
 	}
 	TxnInfo txnInfo = new TxnInfo(txn, tid);
