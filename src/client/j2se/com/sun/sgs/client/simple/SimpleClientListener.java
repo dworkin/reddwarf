@@ -42,7 +42,7 @@ import java.net.PasswordAuthentication;
  * {@code SimpleClient} is constructed, is notified of
  * connection-related events generated during login session establishment,
  * client reconnection, and client logout, and also is notified of message
- * receipt and channel join events.
+ * receipt.
  * 
  * @see SimpleClient
  */

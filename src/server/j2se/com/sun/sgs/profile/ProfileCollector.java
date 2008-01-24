@@ -19,8 +19,9 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -63,13 +64,13 @@ public interface ProfileCollector {
      * context of this thread via a call to <code>finishTask</code>.
      *
      * @param task the <code>KernelRunnable</code> that is starting
-     * @param owner the <code>TaskOwner</code> of the task
+     * @param owner the <code>Identity</code> of the task owner
      * @param scheduledStartTime the requested starting time for the task
      * @param readyCount the number of ready tasks at the scheduler
      *
      * @throws IllegalStateException if a task is already bound to this thread
      */
-    public void startTask(KernelRunnable task, TaskOwner owner,
+    public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount);
 
     /**

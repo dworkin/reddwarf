@@ -21,10 +21,9 @@ package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
@@ -42,7 +41,7 @@ public class IdGenerator {
     private final int blockSize;
     private final TransactionProxy txnProxy;
     private final TaskScheduler scheduler;
-    private final TaskOwner owner;
+    private final Identity owner;
     private final Object lock = new Object();
     private long nextId = 1;
     private long lastReservedId = 0;

@@ -20,9 +20,9 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
+
+import com.sun.sgs.example.hack.server.util.UtilChannel;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
@@ -62,8 +62,8 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param users the set of users to send to
      */
-    public static void sendToClient(ByteBuffer data, Channel channel,
-                                    ClientSession [] users) {
+    public static void sendToClient(ByteBuffer data, UtilChannel channel,
+                                    ClientSession[] users) {
         /*for (UserId uid : users)
             task.sendData(channel, uid, data, true);*/
         // FIXME: Actually send the message here
@@ -86,7 +86,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param users the set of users to send to
      */
-    public static void sendToClient(int command, Object data, Channel channel,
+    public static void sendToClient(int command, Object data, UtilChannel channel,
                                     ClientSession [] users) {
         // get the bytes
         byte [] bytes = encodeObject(data);
@@ -120,7 +120,7 @@ public class Messages {
     /**
      *
      */
-    private static void sendChannelNotice(byte [] session, Channel channel,
+    private static void sendChannelNotice(byte [] session, UtilChannel channel,
                                           boolean joining) {
         byte [] message = new byte[session.length + 1];
         message[0] = joining ? (byte)8 : (byte)9;
@@ -129,20 +129,25 @@ public class Messages {
         channel.send(message);
     }
 
+    private static byte[] getSessionIdBytes(ClientSession session) {
+        return AppContext.getDataManager().
+            createReference(session).getId().toByteArray();
+    }
+
     /**
      *
      */
     public static void sendPlayerJoined(ClientSession session,
-                                        Channel channel) {
-        sendChannelNotice(session.getSessionId().getBytes(), channel, true);
+                                        UtilChannel channel) {
+        sendChannelNotice(getSessionIdBytes(session), channel, true);
     }
 
     /**
      *
      */
     public static void sendPlayerLeft(ClientSession session,
-                                      Channel channel) {
-        sendChannelNotice(session.getSessionId().getBytes(), channel, false);
+                                      UtilChannel channel) {
+        sendChannelNotice(getSessionIdBytes(session), channel, false);
     }
 
     /**
@@ -155,10 +160,10 @@ public class Messages {
      * @param uid the user to send to
      */
     public static void sendUidMap(Map<ClientSession,String> uidMap,
-                                  Channel channel, ClientSession uid) {
+                                  UtilChannel channel, ClientSession uid) {
         Map<String,String> map = new HashMap<String,String>();
         for (ClientSession session : uidMap.keySet())
-            map.put(HexDumper.toHexString(session.getSessionId().getBytes()), uidMap.get(session));
+            map.put(HexDumper.toHexString(getSessionIdBytes(session)), uidMap.get(session));
         sendToClient(0, map, channel, new ClientSession [] {uid});
     }
 
@@ -172,10 +177,9 @@ public class Messages {
      * @param users the users to send to
      */
     public static void sendUidMap(ClientSession uid, String name,
-                                  Channel channel, ClientSession [] users) {
+                                  UtilChannel channel, ClientSession [] users) {
         Map<String,String> map = new HashMap<String,String>();
-        ClientSessionId csid = uid.getSessionId();
-        map.put(HexDumper.toHexString(csid.getBytes()),name);
+        map.put(HexDumper.toHexString(getSessionIdBytes(uid)),name);
         sendToClient(0, map, channel, users);
     }
 
@@ -195,7 +199,7 @@ public class Messages {
      * @param uid the users to send to
      */
     public static void sendLobbyWelcome(Collection<GameMembershipDetail> games,
-                                        Channel channel, ClientSession uid) {
+                                        UtilChannel channel, ClientSession uid) {
         ClientSession [] uids = new ClientSession[] {uid};
 
         sendToClient(1, games, channel, uids);
@@ -212,7 +216,7 @@ public class Messages {
      * @param users the users to send to
      */
     public static void sendGameCountChanged(String name, int count,
-                                            Channel channel,
+                                            UtilChannel channel,
                                             ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(5 + name.length());
 
@@ -231,7 +235,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendGameAdded(String name, Channel channel,
+    public static void sendGameAdded(String name, UtilChannel channel,
                                      ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
 
@@ -249,7 +253,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendGameRemoved(String name, Channel channel,
+    public static void sendGameRemoved(String name, UtilChannel channel,
                                        ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
 
@@ -268,7 +272,7 @@ public class Messages {
      * @param uid the user to send to
      */
     public static void sendPlayerCharacters(Collection<CharacterStats> stats,
-                                            Channel channel,
+                                            UtilChannel channel,
                                             ClientSession uid) {
         sendToClient(5, stats, channel, new ClientSession [] {uid});
     }
@@ -286,7 +290,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendSpriteMap(SpriteMap spriteMap, Channel channel,
+    public static void sendSpriteMap(SpriteMap spriteMap, UtilChannel channel,
                                      ClientSession uid) {
         // get the bytes
         byte [] bytes = encodeObject(spriteMap.getSpriteMap());
@@ -307,7 +311,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendBoard(Board board, Channel channel,
+    public static void sendBoard(Board board, UtilChannel channel,
                                  ClientSession uid) {
         sendToClient(2, board, channel, new ClientSession [] {uid});
     }
@@ -321,12 +325,12 @@ public class Messages {
      * @param users the users to send to
      */
     public static void sendUpdate(Collection<BoardSpace> spaces,
-                                  Channel channel, ClientSession [] users) {
+                                  UtilChannel channel, ClientSession [] users) {
         sendToClient(3, spaces, channel, users);
     }
 
     /**
-     * Sends a text mesage to the client. These are messages generated by
+     * Sends a text message to the client. These are messages generated by
      * the game logic, not chat messages from other clients.
      *
      * @param task the task
@@ -334,7 +338,7 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendTextMessage(String message, Channel channel,
+    public static void sendTextMessage(String message, UtilChannel channel,
                                        ClientSession uid) {
         ByteBuffer bb = ByteBuffer.allocate(message.length() + 1);
 
@@ -358,7 +362,7 @@ public class Messages {
      * @param uid the user to send to
      */
     public static void sendCharacter(int id, CharacterStats stats,
-                                     Channel channel, ClientSession uid) {
+                                     UtilChannel channel, ClientSession uid) {
         byte [] bytes = encodeObject(stats);
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
 

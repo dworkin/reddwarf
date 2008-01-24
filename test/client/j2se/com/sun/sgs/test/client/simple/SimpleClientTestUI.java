@@ -42,13 +42,11 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import javax.swing.*;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -63,9 +61,7 @@ public class SimpleClientTestUI extends JFrame {
 
     private SimpleClient client;
 
-    private DefaultListModel channelModel;
-
-    private JTextArea channelField;
+    private JTextArea messageField;
 
     /**
      * Create a new GUI test client and start it running.
@@ -131,7 +127,7 @@ public class SimpleClientTestUI extends JFrame {
 
     private void sendServerMessage(String message) {
         try {
-            sendMessage(message.getBytes("UTF-8"));
+            sendMessage(ByteBuffer.wrap(message.getBytes("UTF-8")));
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -161,7 +157,7 @@ public class SimpleClientTestUI extends JFrame {
         return p;
     }
 
-    private void sendMessage(byte[] message) {
+    private void sendMessage(ByteBuffer message) {
         try {
             client.send(message);
         } catch (IOException e) {
@@ -172,26 +168,17 @@ public class SimpleClientTestUI extends JFrame {
     private JPanel doNorthLayout() {
         JPanel p = new JPanel(new BorderLayout());
 
-        JList channelList = new JList(channelModel = new DefaultListModel());
+        messageField = new JTextArea(5, 10);
+        messageField.setLineWrap(true);
+        messageField.setWrapStyleWord(true);
 
-        // JSplitPane splitPane = new JSplitPane();
-        // splitPane.setLeftComponent(new JScrollPane(channelList));
-
-        // p.add(splitPane);
-        p.add(new JScrollPane(channelList), BorderLayout.NORTH);
-
-        channelField = new JTextArea(5, 10);
-        channelField.setLineWrap(true);
-        channelField.setWrapStyleWord(true);
-
-        p.add(new JScrollPane(channelField), BorderLayout.CENTER);
+        p.add(new JScrollPane(messageField), BorderLayout.CENTER);
 
         return p;
     }
 
-    private void addChannelMessage(ClientChannel channel, String message) {
-        channelField.setText(channelField.getText() + "<"
-                + channel.getName() + ">: " + message + "\n");
+    private void addMessage(String message) {
+        messageField.setText(messageField.getText() + message + "\n");
     }
 
     private void shutdown() {
@@ -202,8 +189,7 @@ public class SimpleClientTestUI extends JFrame {
         setTitle(TITLE + " : " + status);
     }
 
-    private class TestSimpleClientListener implements SimpleClientListener,
-            ClientChannelListener
+    private class TestSimpleClientListener implements SimpleClientListener
     {
 
         /**
@@ -261,17 +247,10 @@ public class SimpleClientTestUI extends JFrame {
         /**
          * {@inheritDoc}
          */
-        public ClientChannelListener joinedChannel(ClientChannel channel) {
-            channelModel.addElement(channel.getName());
-
-            return this;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void receivedMessage(byte[] message) {
-
+        public void receivedMessage(ByteBuffer buf) {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
+            addMessage(new String(bytes));
         }
 
         /**
@@ -286,22 +265,6 @@ public class SimpleClientTestUI extends JFrame {
          */
         public void reconnecting() {
             setStatus("Reconnecting...");
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void leftChannel(ClientChannel channel) {
-            channelModel.removeElement(channel.getName());
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void receivedMessage(ClientChannel channel,
-                SessionId sender, byte[] message)
-        {
-            addChannelMessage(channel, new String(message));
         }
     }
     

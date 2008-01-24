@@ -22,9 +22,7 @@ package com.sun.sgs.service;
 
 /**
  * This is the base interface used for all services. Services support
- * specific funcationality and work in a transactional context. Each
- * service instance works on behalf of a single application, and can only
- * interact with other services working in the same application context.
+ * specific funcationality and work in a transactional context. 
  * See {@code TransactionParticipant} for details on when interaction
  * between {@code Service}s is allowed.
  * <p>
@@ -64,21 +62,11 @@ public interface Service {
     public String getName();
 
     /**
-     * Notifies this {@code Service} that the application context is fully
+     * Notifies this {@code Service} that the application is fully
      * configured and ready to start running. This means that all other {@code
      * Service}s associated with this application have been successfully
      * created. If the method throws an exception, then the application will be
      * shutdown.
-     * <p>
-     * Note that before this point, the available application context (provided
-     * by {@code TransactionProxy.getCurrentOwner}) will be incomplete.
-     * Specifically, {@code Manager}s and other facilities provided by the
-     * {@code AppContext} will be unavailable. If you need to use these aspects
-     * of the application context (e.g., for scheduling tasks that run
-     * application level code), or store it for future use, you should do so
-     * once {@code ready} is called, but not before. When your {@code Service}
-     * is constructed, the available context will only provide access to those
-     * services that have already been created.
      *
      * @throws Exception if an error occurs
      */

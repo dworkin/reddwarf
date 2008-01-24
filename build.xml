@@ -1171,8 +1171,6 @@
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  fork="true">
       <jvmarg line="${analysis.jvm.args}"/>
-      <sysproperty key="com.sun.sgs.config.file"
-		   file="analysis/System.properties"/>
       <sysproperty key="java.library.path" 
 		   file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
@@ -1223,8 +1221,6 @@
       <!--<sysproperty key="com.sun.management.jmxremote" value=""/>-->
       <sysproperty key="com.sun.sgs.app.root"
 		   file="${build.dir}/example/HackApp"/>
-      <sysproperty key="com.sun.sgs.config.file"
-		   file="example/hack/System.properties"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"

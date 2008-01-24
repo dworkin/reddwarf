@@ -20,45 +20,35 @@
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
-import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.session.ClientSessionImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.AbstractService;
+import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.ProtocolMessageListener;
-import com.sun.sgs.service.Service;
-import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.Node;
+import com.sun.sgs.service.RecoveryCompleteFuture;
+import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
-import java.io.Serializable;
+import com.sun.sgs.service.WatchdogService;
 import java.math.BigInteger;
 import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,85 +58,94 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Simple ChannelService implementation. <p>
+ * ChannelService implementation. <p>
  * 
- * The {@link #ChannelServiceImpl constructor} requires the <a
+ * <p>The {@link #ChannelServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> property. <p>
+ *
+ * <p>TODO: add summary comment about how the implementation works.
+ *
+ * <p>TODO: service bindings should be versioned, and old bindings should be
+ * converted to the new scheme (or removed if applicable).
  */
-public class ChannelServiceImpl implements ChannelManager, Service {
+public class ChannelServiceImpl
+    extends AbstractService implements ChannelManager
+{
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
-    /** The prefix of a session key which maps to its channel membership. */
-    private static final String SESSION_PREFIX = CLASSNAME + ".session.";
-    
-    /** The prefix of a channel key which maps to its channel state. */
-    private static final String CHANNEL_PREFIX = CLASSNAME + ".channel.";
-    
+    /** The package name. */
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.channel";
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
-    /**
-     * The transaction context map, or null if configure has not been called.
-     */
-    private static TransactionContextMap<Context> contextMap = null;
-
-    /** The transaction proxy, or null if configure has not been called. */    
-    private static TransactionProxy txnProxy = null;
-
-    /** List of contexts that have been prepared (non-readonly) or commited. */
-    private final List<Context> contextList = new LinkedList<Context>();
-
-    /** The name of this application. */
-    private final String appName;
-
-    /** The listener that receives incoming channel protocol messages. */
-    private final ProtocolMessageListener protocolMessageListener;
+    /** The name of the server port property. */
+    private static final String SERVER_PORT_PROPERTY =
+	PKG_NAME + ".server.port";
+	
+    /** The default server port. */
+    private static final int DEFAULT_SERVER_PORT = 0;
     
-    /** The data service. */
-    private final DataService dataService;
-
-    /** The client session service. */
-    private final ClientSessionService sessionService;
-
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-
-    /** The task scheduler for non-durable tasks. */
-    volatile NonDurableTaskScheduler nonDurableTaskScheduler;
+    /** The transaction context map. */
+    private static TransactionContextMap<Context> contextMap = null;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
-    /** Map (with weak keys) of client sessions to queues, each containing
-     * tasks to forward channel messages sent by the session (the key).
-     */
-    private final WeakHashMap<SgsClientSession, NonDurableTaskQueue>
-	taskQueues = new WeakHashMap<SgsClientSession, NonDurableTaskQueue>();
-    
-    /** The sequence number for channel messages originating from the server. */
-    private final AtomicLong sequenceNumber = new AtomicLong(0);
+    /** List of contexts that have been prepared (non-readonly) or committed. */
+    private final List<Context> contextList = new LinkedList<Context>();
 
-    /** A map of channel name to cached channel state, valid as of the
-     * last transaction commit. */
-    private Map<CompactId, CachedChannelState> channelStateCache =
-	Collections.synchronizedMap(
-	    new HashMap<CompactId, CachedChannelState>());
-    
+    /** The client session service. */
+    private final ClientSessionService sessionService;
+
+    /** The exporter for the ChannelServer. */
+    private final Exporter<ChannelServer> exporter;
+
+    /** The ChannelServer remote interface implementation. */
+    private final ChannelServerImpl serverImpl;
+	
+    /** The proxy for the ChannelServer. */
+    private final ChannelServer serverProxy;
+
+    /** The ID for the local node. */
+    private final long localNodeId;
+
+    /** The lists of channel tasks, keyed by channel ID. */
+    private final Map<BigInteger, List<Runnable>> channelTasksMap =
+	Collections.synchronizedMap(new HashMap<BigInteger, List<Runnable>>());
+
+    /** The thread to process tasks in the {@code channelTasksMap}. */
+    private final Thread taskHandlerThread = new TaskHandlerThread();
+
+    /** The lock for notifying the {@code taskHandlerThread} . */
+    private final Object taskHandlerLock = new Object();
+
+    /** The local channel membership lists, keyed by channel ID. */
+    private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
+	localChannelMembersMap =
+	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
+
+    /** The map of channel coordinator task queues, keyed by channel ID. */
+    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
+	coordinatorTaskQueues =
+	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
+
     /**
-     * Constructs an instance of this class with the specified properties.
+     * Constructs an instance of this class with the specified {@code
+     * properties}, {@code systemRegistry}, and {@code txnProxy}.
      *
-     * @param properties service properties
-     * @param systemRegistry system registry
-     * @param txnProxy transaction proxy
+     * @param	properties service properties
+     * @param	systemRegistry system registry
+     * @param	txnProxy transaction proxy
+     *
      * @throws Exception if a problem occurs when creating the service
      */
     public ChannelServiceImpl(Properties properties,
@@ -154,53 +153,69 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 			      TransactionProxy txnProxy)
 	throws Exception
     {
-	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(
-		Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
-		properties);
-	}
+	super(properties, systemRegistry, txnProxy, logger);
+	
+	logger.log(
+	    Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
+	    properties);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
 	try {
-	    if (systemRegistry == null) {
-		throw new NullPointerException("null systemRegistry");
-	    } else if (txnProxy == null) {
-		throw new NullPointerException("null txnProxy");
-	    }
-	    appName = properties.getProperty(StandardProperties.APP_NAME);
-	    if (appName == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_NAME +
-		    " property must be specified");
-	    }	
-	    protocolMessageListener = new ChannelProtocolMessageListener();
-	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    synchronized (ChannelServiceImpl.class) {
-		if (ChannelServiceImpl.txnProxy == null) {
-		    ChannelServiceImpl.txnProxy = txnProxy;
+		if (contextMap == null) {
 		    contextMap = new TransactionContextMap<Context>(txnProxy);
-		} else {
-		    assert ChannelServiceImpl.txnProxy == txnProxy;
 		}
 	    }
 	    contextFactory = new ContextFactory(contextMap);
-	    dataService = txnProxy.getService(DataService.class);
+	    WatchdogService watchdogService =
+		txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
+	    localNodeId = watchdogService.getLocalNodeId();
+	    
+	    /*
+	     * Export the ChannelServer.
+	     */
+	    int serverPort = wrappedProps.getIntProperty(
+		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
+	    serverImpl = new ChannelServerImpl();
+	    exporter = new Exporter<ChannelServer>(ChannelServer.class);
+	    try {
+		int port = exporter.export(serverImpl, serverPort);
+		serverProxy = exporter.getProxy();
+		logger.log(
+		    Level.CONFIG,
+		    "ChannelServer export successful. port:{0,number,#}", port);
+	    } catch (Exception e) {
+		try {
+		    exporter.unexport();
+		} catch (RuntimeException re) {
+		}
+		throw e;
+	    }
 
-	    taskScheduler.runTask(
-		new TransactionRunner(
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    /*
-			     * Remove all sessions from all channels since all
-			     * previously stored sessions have been
-			     * disconnected.
-			     */
-			    removeAllSessionsFromChannels();
-			    removeChannelSets();
-			}
-		    }),
-		txnProxy.getCurrentOwner(), true);
-	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
+	    /*
+	     * Store the ChannelServer proxy in the data store.
+	     */
+	    taskScheduler.runTransactionalTask(
+		new AbstractKernelRunnable() {
+		    public void run() {
+			dataService.setServiceBinding(
+			    getChannelServerKey(localNodeId),
+			    new ChannelServerWrapper(serverProxy));
+		    }},
+		taskOwner);
+
+	    /*
+	     * Add listeners for handling recovery and for receiving
+	     * notification of client session disconnection.
+	     */
+	    watchdogService.addRecoveryListener(
+		new ChannelServiceRecoveryListener());
+
+            sessionService.registerSessionDisconnectListener(
+                new ChannelSessionDisconnectListener());
+
+            taskHandlerThread.start();
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -211,81 +226,242 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
     }
  
-    /* -- Implement Service -- */
+    /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
-    public String getName() {
-	return toString();
+    protected void doReady() {
     }
 
     /** {@inheritDoc} */
-    public void ready() { 
-        nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, txnProxy.getCurrentOwner(),
-		    txnProxy.getService(TaskService.class));
-    }
+    protected void doShutdown() {
+	logger.log(Level.FINEST, "shutdown");
+	
+	try {
+	    exporter.unexport();
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "unexport server throws");
+	    // swallow exception
+	}
 
-    /** {@inheritDoc} */
-    public boolean shutdown() {
-        // FIXME implement this
-        return false;
+	taskHandlerThread.interrupt();
     }
-
+    
     /* -- Implement ChannelManager -- */
 
     /** {@inheritDoc} */
-    public Channel createChannel(String name,
-				 ChannelListener listener,
-				 Delivery delivery)
-    {
+    public Channel createChannel(Delivery delivery) {
 	try {
-	    if (name == null) {
-		throw new NullPointerException("null name");
-	    }
-	    if (listener != null && !(listener instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "listener is not serializable");
-	    }
-	    Context context = contextFactory.joinTransaction();
-	    Channel channel = context.createChannel(name, listener, delivery);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "createChannel name:{0} returns {1}",
-		    name, channel);
-	    }
+	    Channel channel = ChannelImpl.newInstance(delivery);
 	    return channel;
 	    
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "createChannel name:{0} throws", name);
-	    }
+	    logger.logThrow(Level.FINEST, e, "createChannel:{0} throws");
 	    throw e;
 	}
     }
 
-    /** {@inheritDoc} */
-    public Channel getChannel(String name) {
-	try {
-	    if (name == null) {
-		throw new NullPointerException("null name");
+    /* -- Implement ChannelServer -- */
+
+    private final class ChannelServerImpl implements ChannelServer {
+
+	/** {@inheritDoc}
+	 *
+	 * The service event queue request is enqueued in the given
+	 * channel's coordinator task queue so that the requests can be
+	 * performed serially, rather than concurrently.  If tasks to
+	 * service a given channel's event queue were processed
+	 * concurrently, there would be many transaction conflicts because
+	 * servicing a channel event accesses a single per-channel data
+	 * structure (the channel's event queue).
+	 */
+	public void serviceEventQueue(final byte[] channelId) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "serviceEventQueue channelId:{0}",
+			       HexDumper.toHexString(channelId));
+		}
+
+		BigInteger channelIdRef = new BigInteger(1, channelId);
+		NonDurableTaskQueue taskQueue =
+		    coordinatorTaskQueues.get(channelIdRef);
+		if (taskQueue == null) {
+		    NonDurableTaskQueue newTaskQueue =
+			new NonDurableTaskQueue(txnProxy, taskScheduler,
+						taskOwner);
+		    taskQueue = coordinatorTaskQueues.
+			putIfAbsent(channelIdRef, newTaskQueue);
+		    if (taskQueue == null) {
+			taskQueue = newTaskQueue;
+		    }
+		}
+		taskQueue.addTask(new AbstractKernelRunnable() {
+		    public void run() {
+			Context context = contextFactory.joinTransaction();
+			ChannelImpl.serviceEventQueue(channelId, context);
+		    }});
+					  
+	    } finally {
+		callFinished();
 	    }
-	    Context context = contextFactory.joinTransaction();
-	    Channel channel = context.getChannel(name);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "getChannel name:{0} returns {1}",
-		    name, channel);
+	}
+
+	/** {@inheritDoc}
+	 *
+	 * TBD: This method is not yet implemented, but will be when
+	 * channel coordinator recovery is implemented.
+	 */
+	public void refresh(byte[] channelId) {
+	    callStarted();
+	    try {
+		throw new AssertionError("not implemented");
+	    } finally {
+		callFinished();
 	    }
-	    return channel;
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "getChannel name:{0} throws", name);
+	}
+	
+	/** {@inheritDoc}
+	 *
+	 * Adds the specified {@code sessionId} to the per-channel cache
+	 * for the given channel's local member sessions.
+	 */
+	public void join(byte[] channelId, byte[] sessionId) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "join channelId:{0} sessionId:{1}",
+			       HexDumper.toHexString(channelId),
+			       HexDumper.toHexString(sessionId));
+		}
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    Set<BigInteger> newLocalMembers =
+			Collections.synchronizedSet(new HashSet<BigInteger>());
+		    localMembers = localChannelMembersMap.
+			putIfAbsent(channelRefId, newLocalMembers);
+		    if (localMembers == null) {
+			localMembers = newLocalMembers;
+		    }
+		}
+		localMembers.add(new BigInteger(1, sessionId));
+
+	    } finally {
+		callFinished();
 	    }
-	    throw e;
+	}
+	
+	/** {@inheritDoc}
+	 *
+	 * Removes the specified {@code sessionId} from the per-channel
+	 * cache for the given channel's local member sessions.
+	 */
+	public void leave(byte[] channelId, byte[] sessionId) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST, "leave channelId:{0} sessionId:{1}",
+			HexDumper.toHexString(channelId),
+			HexDumper.toHexString(sessionId));
+		}
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		Set<BigInteger> localMembers;
+		localMembers = localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    return;
+		}
+		localMembers.remove(new BigInteger(1, sessionId));
+		
+	    } finally {
+		callFinished();
+	    }
+	}
+
+	/** {@inheritDoc}
+	 *
+	 * Removes all session IDs from the per-channel cache for the given
+	 * channel's local member sessions.
+	 */
+	public void leaveAll(byte[] channelId) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "leaveAll channelId:{0}",
+			       HexDumper.toHexString(channelId));
+		}
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		Set<BigInteger> localMembers;
+		localMembers = localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    return;
+		}
+		// TBD: remove the entry instead of clearing the membership?
+		localMembers.clear();
+		
+	    } finally {
+		callFinished();
+	    }
+	}
+
+	/** {@inheritDoc}
+	 *
+	 * Sends the given {@code message} to all local members of the
+	 * specified channel.
+	 *
+	 * TBD: (optimization) this method should handle sending multiple
+	 * messages to a given channel.
+	 */
+	public void send(byte[] channelId, byte[] message) {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
+			       HexDumper.toHexString(channelId),
+			       HexDumper.format(message));
+		}
+		/*
+		 * TBD: (optimization) this should enqueue the send
+		 * request and return immediately so that the
+		 * coordinator can receive the acknowledgment and
+		 * continue processing of the event queue.  Right now,
+		 * process the send request inline here.
+		 */
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		Set<BigInteger> localMembers =
+		    localChannelMembersMap.get(channelRefId);
+		if (localMembers == null) {
+		    // TBD: there should be local channel members.
+		    // What error should be reported here?
+		    return;
+		}
+
+		for (BigInteger sessionRefId : localMembers) {
+		    sessionService.sendProtocolMessageNonTransactional(
+ 			sessionRefId, ByteBuffer.wrap(message), Delivery.RELIABLE);
+		}
+
+	    } finally {
+		callFinished();
+	    }
+	}
+	
+	/** {@inheritDoc}
+	 *
+	 * Removes the specified channel from the per-channel cache of
+	 * local members.
+	 */
+	public void close(byte[] channelId) {
+	    callStarted();
+	    try {
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		localChannelMembersMap.remove(channelRefId);
+		coordinatorTaskQueues.remove(channelRefId);
+
+	    } finally {
+		callFinished();
+	    }
 	}
     }
 
@@ -323,242 +499,43 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }
 	}
     }
-    
-    /* -- other methods -- */
+
+    /**
+     * Returns the currently active transaction, or throws {@code
+     * TransactionNotActiveException} if no transaction is active.
+     */
+    static Transaction getTransaction() {
+	return txnProxy.getCurrentTransaction();
+    }
 
     /**
      * Checks that the specified context is currently active, throwing
      * TransactionNotActiveException if it isn't.
      */
-    static void checkContext(Context context) {
-	getContextMap().checkContext(context);
+    static void checkTransaction(Transaction txn) {
+	Transaction currentTxn = txnProxy.getCurrentTransaction();
+	if (currentTxn != txn) {
+	    throw new TransactionNotActiveException(
+ 		"mismatched transaction; expected " + currentTxn + ", got " +
+		txn);
+	}
     }
+
+    /* -- Implement TransactionContext -- */
 
     /**
-     * Returns the transaction context map.
-     *
-     * @return the transaction context map
-     */
-    private synchronized static TransactionContextMap<Context> getContextMap()
-    {
-	if (contextMap == null) {
-	    throw new IllegalStateException("Service not configured");
-	}
-	return contextMap;
-    }
-    
-    /* -- Implement ProtocolMessageListener -- */
-
-    private final class ChannelProtocolMessageListener
-	implements ProtocolMessageListener
-    {
-	/** {@inheritDoc} */
-	public boolean receivedMessage(
-            SgsClientSession session, byte[] message)
-        {
-	    MessageBuffer buf = new MessageBuffer(message);
-            byte opcode = buf.getByte();
-
-	    switch (opcode) {
-
-	    case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
-	        return handleChannelSendRequest(session, buf);
-
-	    default:
-	        if (logger.isLoggable(Level.SEVERE)) {
-	            logger.log(
-	                Level.SEVERE,
-	                "receivedMessage session:{0} message:{1} " +
-	                "unknown opcode:{2}",
-	                session, HexDumper.format(message), opcode);
-	        }
-	        throw new RuntimeException("bad channel opcode: " + opcode);
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void disconnected(final SgsClientSession session) {
-	    nonDurableTaskScheduler.scheduleTask(
-		new AbstractKernelRunnable() {
-		    public void run() {
-			Context context = contextFactory.joinTransaction();
-			Set<Channel> channels = context.removeSession(session);
-			for (Channel channel : channels) {
-			    channel.leave(session);
-			}
-		    }},
-		session.getIdentity());
-	}
-    }
-
-    /**
-     * Handles a CHANNEL_SEND_REQUEST protocol message (in the given
-     * {@code buf} and sent by the given {@code sender}), forwarding
-     * the channel message (encapsulated in {@code buf}) to the
-     * appropriate recipients.  When this method is invoked, the
-     * specified message buffer's current position points to the
-     * channel ID in the protocol message.  The operation code has
-     * already been processed by the caller.
-     */
-    private boolean handleChannelSendRequest(
-	SgsClientSession sender, MessageBuffer buf)
-    {
-	CompactId channelId = CompactId.getCompactId(buf);
-	CachedChannelState cachedState = channelStateCache.get(channelId);
-	if (cachedState == null) {
-	    // TBD: is this the right logging level?
-	    logger.log(
-		Level.WARNING,
-		"non-existent channel:{0}, dropping message", channelId);
-	    return true;
-	}
-
-	// Ensure that sender is a channel member before continuing.
-	if (!cachedState.hasSession(sender)) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.log(
-		    Level.WARNING,
-		    "send attempt on channel:{0} by non-member session:{1}, " +
-		    "dropping message", channelId, sender);
-	    }
-            return true;
-	}
-	
-	long seq = buf.getLong(); // TODO Check sequence num
-	short numRecipients = buf.getShort();
-	if (numRecipients < 0) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.log(
-		    Level.WARNING,
-		    "bad CHANNEL_SEND_REQUEST " +
-		    "(negative number of recipients) " +
-		    "numRecipents:{0} session:{1}",
-		    numRecipients, sender);
-	    }
-            return true;
-	}
-
-	Set<ClientSession> recipients = new HashSet<ClientSession>();
-	if (numRecipients == 0) {
-	    // Recipients are all member sessions
-	    recipients = cachedState.sessions;
-	} else {
-	    // Look up recipient sessions and check for channel membership
-	    for (int i = 0; i < numRecipients; i++) {
-		CompactId recipientId = CompactId.getCompactId(buf);
-		SgsClientSession recipient =
-		    sessionService.getClientSession(recipientId.getId());
-		if (recipient != null && cachedState.hasSession(recipient)) {
-		    recipients.add(recipient);
-		}
-	    }
-	}
-
-	byte[] channelMessage = buf.getByteArray();
-	byte[] protocolMessage =
-	    getChannelMessage(
-		channelId, ((ClientSessionImpl) sender).getCompactSessionId(),
-		channelMessage, seq);
-	
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST,
-		"name:{0}, message:{1}",
-		cachedState.name, HexDumper.format(channelMessage));
-	}
-
-        Map<ClientSessionImpl, Object> sendReservations =
-            new HashMap<ClientSessionImpl, Object>();
-
-	ClientSessionId senderId = sender.getSessionId();
-	for (ClientSession session : recipients) {
-	    // Send channel protocol message, skipping the sender
-	    if (! senderId.equals(session.getSessionId())) {
-                ClientSessionImpl sgsSession = (ClientSessionImpl) session;
-                try {
-                    if (! sgsSession.isConnected())
-                        continue;
-
-                    Object reservation = sgsSession.reserveProtocolMessage(
-                        protocolMessage, cachedState.delivery);
-                    sendReservations.put(sgsSession, reservation);
-                } catch (BufferOverflowException e) {
-                    // Can't get the reservation for this session.
-                    // TODO use a policy here
-                    // For now, forcibly disconnect the slow recipient
-                    sgsSession.disconnected();
-
-                    // TODO for this disconnect-recipient policy, it might
-                    // be better to check whether *all* recipients are full
-                    // and in that case disconnect the sender.
-                }
-	    }
-        }
-
-        for (Map.Entry<ClientSessionImpl, Object> entry :
-                    sendReservations.entrySet())
-        {
-            entry.getKey().invokeReservation(entry.getValue());
-        }
-
-	if (cachedState.hasChannelListeners) {
-	    NonDurableTaskQueue queue = getTaskQueue(sender);
-	    // Notify listeners in the app in a transaction
-	    queue.addTask(
-		new NotifyTask(cachedState.name, channelId,
-			       senderId, channelMessage));
-
-            // TODO make read-resume part of the NotifyTask activity,
-            // and return false here.
-            return true;
-	}
-
-        // If there are no listeners, resume reading immediately.
-        //
-        // TODO this needs to depend on the policy (to be defined above)
-        // regarding recipients that cannot grant a send reservation.
-        return true;
-    }
-    
-    /**
-     * Returns the task queue for the specified {@code session}.
-     * If a queue does not already exist, one is created and returned.
-     */
-    private NonDurableTaskQueue getTaskQueue(SgsClientSession session) {
-	synchronized (taskQueues) {
-	    NonDurableTaskQueue queue = taskQueues.get(session);
-	    if (queue == null) {
-		queue =
-		    new NonDurableTaskQueue(
-			txnProxy, nonDurableTaskScheduler,
-			session.getIdentity());
-		taskQueues.put(session, queue);
-	    }
-	    return queue;
-	}
-    }
-    
-    /**
-     * Stores information relating to a specific transaction operating on
-     * channels.
-     *
-     * <p>This context maintains an internal table that maps (for the
-     * channels used in the context's associated transaction) channel name
-     * to channel implementation.  To create, obtain, or remove a channel
-     * within a transaction, the {@code createChannel},
-     * {@code getChannel}, or {@code removeChannel} methods
-     * (respectively) must be called on the context so that the proper
-     * channel instances are used.
+     * This transaction context maintains a per-channel list of
+     * non-transactional tasks to perform when the transaction commits. A
+     * task is added to the context by a {@code ChannelImpl} via the {@code
+     * addChannelTask} method.  Such non-transactional tasks include
+     * sending a notification to a channel server to modify the channel
+     * membership list, or forwarding a send request to a set of channel
+     * servers.
      */
     final class Context extends TransactionContext {
 
-	/**
-	 * Map of channel name to transient channel impl (for those
-	 * channels used during this context's associated
-	 * transaction).
-	 */
-	private final Map<String, ChannelImpl> internalTable =
-	    new HashMap<String, ChannelImpl>();
+	private final Map<BigInteger, List<Runnable>> internalTaskLists =
+	    new HashMap<BigInteger, List<Runnable>>();
 
 	/**
 	 * Constructs a context with the specified transaction. 
@@ -567,90 +544,21 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    super(txn);
 	}
 
-	/* -- ChannelManager methods -- */
-
 	/**
-	 * Creates a channel with the specified {@code name}, {@code
-	 * listener}, and {@code delivery} requirement.  The channel's
-	 * state is bound to a name composed of the channel service's
-	 * class name followed by ".channel." followed by the channel
-	 * name.
+	 * Adds the specified {@code task} to the task list of the given
+	 * {@code channelId}.  If the transaction commits, the task will be
+	 * added to the task handler's per-channel map of tasks to service.
+	 * The tasks are serviced by the TaskHandlerThread.
 	 */
-	private Channel createChannel(String name,
-				      ChannelListener listener,
-				      Delivery delivery)
-	{
-	    assert name != null;
-	    String key = getChannelKey(name);
-	    try {
-		dataService.getServiceBinding(key, ChannelState.class);
-		throw new NameExistsException(name);
-	    } catch (NameNotBoundException e) {
+	public void addChannelTask(BigInteger channelId, Runnable task) {
+	    List<Runnable> taskList = internalTaskLists.get(channelId);
+	    if (taskList == null) {
+		taskList = new LinkedList<Runnable>();
+		internalTaskLists.put(channelId, taskList);
 	    }
-	    
-	    ChannelState channelState =
-		new ChannelState(name, listener, delivery, dataService);
-	    dataService.setServiceBinding(key, channelState);
-	    ChannelImpl channel = new ChannelImpl(this, channelState);
-	    internalTable.put(name, channel);
-	    return channel;
+	    taskList.add(task);
 	}
-
-	/**
-	 * Returns a channel with the specified {@code name}.  If the
-	 * channel is already present in the internal channel table
-	 * for this transaction, then the channel is returned;
-	 * otherwise, this method gets the channel's state by looking
-	 * up the service binding for the channel.
-	 */
-	private Channel getChannel(String name) {
-	    assert name != null;
-	    ChannelImpl channel = internalTable.get(name);
-	    if (channel == null) {
-		ChannelState channelState;
-		try {
-		    channelState =
-		    	dataService.getServiceBinding(
-			    getChannelKey(name), ChannelState.class);
-		} catch (NameNotBoundException e) {
-		    throw new NameNotBoundException(name);
-		}
-		channel =  new ChannelImpl(this, channelState);
-		internalTable.put(name, channel);
-	    } else if (channel.isClosed) {
-		throw new NameNotBoundException(name);
-	    }
-	    return channel;
-	}
-
-	/**
-	 * Returns a channel with the specified {@code name} and
-	 * {@code channelId}.  If the channel is already present in the
-	 * internal channel table for this transaction, then the
-	 * channel is returned; otherwise, this method uses the {@code
-	 * channelId} as a {@code ManagedReference} ID to the
-	 * channel's state.
-	 */
-	private Channel getChannel(String name, CompactId channelId) {
-	    assert channelId != null;
-	    ChannelImpl channel = internalTable.get(name);
-	    if (channel == null) {
-		ChannelState channelState;
-		try {
-		    BigInteger refId = new BigInteger(1, channelId.getId());
-		    ManagedReference stateRef =
-			dataService.createReferenceForId(refId);
-		    channelState = stateRef.get(ChannelState.class);
-		} catch (ObjectNotFoundException e) {
-		    throw new NameNotBoundException(name);
-		}
-		channel = new ChannelImpl(this, channelState);
-		internalTable.put(name, channel);
-	    } else if (channel.isClosed) {
-		throw new NameNotBoundException(name);
-	    }
-	    return channel;
-	}
+	
 
 	/* -- transaction participant methods -- */
 	
@@ -662,19 +570,21 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 */
         public boolean prepare() {
 	    isPrepared = true;
-	    boolean readOnly = internalTable.isEmpty();
+	    boolean readOnly = internalTaskLists.isEmpty();
 	    if (! readOnly) {
 		synchronized (contextList) {
 		    contextList.add(this);
 		}
+	    } else {
+		isCommitted = true;
 	    }
             return readOnly;
         }
 
 	/**
-	 * Marks this transaction as aborted, removes the context from
-	 * the context list containing pending updates, and flushes
-	 * all committed contexts preceding prepared ones.
+	 * Removes the context from the context list containing pending
+	 * updates, and flushes all committed contexts preceding prepared
+	 * ones.
 	 */
 	public void abort(boolean retryable) {
 	    synchronized (contextList) {
@@ -693,296 +603,324 @@ public class ChannelServiceImpl implements ChannelManager, Service {
         }
 
 	/**
-	 * If the context is committed, flushes channel state updates
-	 * to the channel state cache and returns true; otherwise
-	 * returns false.
+	 * If the context is committed, flushes channel tasks (enqueued
+	 * during this transaction) to the task handler's map, notifies
+	 * the task handler that there are tasks to process, and
+	 * returns true; otherwise returns false.
 	 */
 	private boolean flush() {
 	    if (isCommitted) {
-		for (ChannelImpl channel : internalTable.values()) {
-		    if (channel.isClosed) {
-			channelStateCache.remove(channel.state.id);
-		    } else {
-			channelStateCache.put(
-			    channel.state.id,
-			    new CachedChannelState(channel));
-		    }
+		for (BigInteger channelId : internalTaskLists.keySet()) {
+		    addChannelTasks(
+			channelId, internalTaskLists.get(channelId));
+		}
+		synchronized (taskHandlerLock) {
+		    taskHandlerLock.notifyAll();
 		}
 		return true;
 	    } else {
 		return false;
 	    }
 	}
-
-	/* -- other methods -- */
-
-	/**
-	 * Removes the channel with the specified {@code name}.  This
-	 * method is called when the {@code close} method is invoked on a
-	 * {@code ChannelImpl}.
-	 */
-	void removeChannel(String name) {
-	    assert name != null;
-	    try {
-		String key = getChannelKey(name);
-		ChannelState channelState =
-		    dataService.getServiceBinding(key, ChannelState.class);
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(channelState);
-		
-	    } catch (NameNotBoundException e) {
-		// already removed
-	    }
-	}
-
-	/**
-	 * Adds {@code channel} to the set of channels for the given
-	 * client {@code session}.  The {@code ChannelSet} for a
-	 * session is bound to a name composed of the channel
-	 * service's class name followed by ".session." followed by
-	 * the hex representation of the session's identifier.
-	 */
-	void joinChannel(ClientSession session, Channel channel) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.markForUpdate(set);
-		set.add(channel);
-	    } catch (NameNotBoundException e) {
-		ChannelSet set = new ChannelSet();
-		set.add(channel);
-		dataService.setServiceBinding(key, set);
-	    }
-	}
-
-	/**
-	 * Removes {@code channel} from the set of channels for the
-	 * given client {@code session}.
-	 */
-	void leaveChannel(ClientSession session, Channel channel) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.markForUpdate(set);
-		set.remove(channel);
-	    } catch (NameNotBoundException e) {
-		// ignore
-	    }
-	}
-
-	/**
-	 * Removes the given {@code session}'s channel set and binding
-	 * from the data store, returning a set containing the
-	 * channels that the session is still a member of.
-	 */
-	private Set<Channel> removeSession(ClientSession session) {
-	    String key = getSessionKey(session);
-	    try {
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		Set<Channel> channels = set.removeAll();
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(set);
-		return channels;
-	    } catch (NameNotBoundException e) {
-		return new HashSet<Channel>();
-	    }
-	}
-
-	/**
-	 * Returns a service of the given {@code type}.
-	 */
-	<T extends Service> T getService(Class<T> type) {
-	    return txnProxy.getService(type);
-	}
-
-	/**
-	 * Returns the next sequence number for messages originating
-	 * from this service.
-	 */
-	long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
     }
 
     /**
-     * Returns a session key for the given {@code session}.
+     * Adds the tasks in the specified {@code taskList} to the
+     * task handler's per-channel map of tasks to process.  The tasks will
+     * be serviced by the TaskHandlerThread.  This method is invoked when a
+     * context is flushed during transaction commit.
      */
-    private static String getSessionKey(ClientSession session) {
-	return SESSION_PREFIX +
-            HexDumper.toHexString(session.getSessionId().getBytes());
-    }
-
-    /**
-     * Returns a channel key for the given channel {@code name}.
-     */
-    private static String getChannelKey(String name) {
-	return CHANNEL_PREFIX + name;
-    }
-
-    /**
-     * Contains a set of channels (names) that a session is a member of.
-     */
-    private static class ChannelSet implements ManagedObject, Serializable {
-	private final static long serialVersionUID = 1L;
-
-	private final HashSet<String> set = new HashSet<String>();
-
-	ChannelSet() {
-	}
-
-	void add(Channel channel) {
-	    set.add(channel.getName());
-	}
-
-	void remove(Channel channel) {
-	    set.remove(channel.getName());
-	}
+    private void addChannelTasks(
+	BigInteger channelId, List<Runnable> taskList)
 	
-	Set<Channel> removeAll() {
-	    Set<Channel> channels = new HashSet<Channel>();
-	    Context context = getContextMap().getContext();
-	    for (String name : set) {
-		try {
-		    channels.add(context.getChannel(name));
-		} catch (NameNotBoundException e) {
-		    // ignore
-		}
-	    }
-	    set.clear();
-	    return channels;
-	}
-    }
-    
-    /**
-     * Removes all channel sets from the data store.  This method is
-     * invoked when this service is configured to remove any existing
-     * channel sets since their corresponding sessions are
-     * disconnected.
-     */
-    private void removeChannelSets() {
-	Iterator<String> iter =
-	    BoundNamesUtil.getServiceBoundNamesIterator(
-		dataService, SESSION_PREFIX);
-
-	while (iter.hasNext()) {
-	    String key = iter.next();
-	    ChannelSet set =
-		dataService.getServiceBinding(key, ChannelSet.class);
-	    dataService.removeObject(set);
-	    iter.remove();
-	}
-    }
-
-    /**
-     * Removes all sessions from all channels.  This method is invoked
-     * when this service is configured to remove all sessions (which
-     * are now disconnected) from all channels in the channel table.
-     */
-    private void removeAllSessionsFromChannels() {
-	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
- 				dataService, CHANNEL_PREFIX))
-	{
-	    ChannelState channelState =
-		dataService.getServiceBinding(key, ChannelState.class);
-	    dataService.markForUpdate(channelState);
-	    channelState.removeAllSessions();
-	}
-    }
-
-    /**
-     * Task (transactional) for notifying channel listeners.
-     */
-    private final class NotifyTask extends AbstractKernelRunnable {
-
-	private final String name;
-	private final CompactId channelId;
-	private final ClientSessionId senderId;
-	private final byte[] message;
-
-        NotifyTask(String name,
-		   CompactId channelId,
-		   ClientSessionId senderId,
-		   byte[] message)
-	{
-	    this.name = name;
-	    this.channelId = channelId;
-	    this.senderId = senderId;
-	    this.message = message;
-	}
-
-        /** {@inheritDoc} */
-	public void run() {
-	    try {
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "NotifyTask.run name:{0}, message:{1}",
-                        name, HexDumper.format(message));
-                }
-		Context context = contextFactory.joinTransaction();
-		ChannelImpl channel =
-		    (ChannelImpl) context.getChannel(name, channelId);
-		channel.notifyListeners(senderId, message);
-
-	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.logThrow(
-			Level.FINER, e,
-			"NotifyTask.run name:{0}, message:{1} throws",
-			name, HexDumper.format(message));
-		}
-		throw e;
-	    }
-	}
-    }
-    
-    /**
-     * Contains cached channel state, stored in the {@code channelStateCache}
-     * map when a committed context is flushed.
-     */
-    private static class CachedChannelState {
-
-	private final String name;
-	private final Set<ClientSession> sessions;
-	private final boolean hasChannelListeners;
-	private final Delivery delivery;
-
-	CachedChannelState(ChannelImpl channelImpl) {
-	    this.name = channelImpl.state.name;
-	    this.sessions = channelImpl.state.getSessions();
-	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
-	    this.delivery = channelImpl.state.delivery;
-	}
-
-	boolean hasSession(ClientSession session) {
-	    return sessions.contains(session);
-	}
-    }
-
-    /**
-     * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
-     * message with this channel's name, and the specified sender,
-     * message, and sequence number.
-     */
-    static byte[] getChannelMessage(
-	CompactId channelId, CompactId senderId,
-	byte[] message, long sequenceNumber)
     {
-        MessageBuffer buf =
-            new MessageBuffer(13 + channelId.getExternalFormByteCount() +
-			      senderId.getExternalFormByteCount() +
-			      message.length);
-        buf.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putBytes(channelId.getExternalForm()).
-            putLong(sequenceNumber).
-            putBytes(senderId.getExternalForm()).
-	    putByteArray(message);
+	synchronized (channelTasksMap) {
+	    List<Runnable> prevTaskList = channelTasksMap.get(channelId);
+	    if (prevTaskList != null) {
+		prevTaskList.addAll(taskList);
+	    } else {
+		channelTasksMap.put(channelId, taskList);
+	    }
+	}
+    }
 
-        return buf.getBuffer();
+    /* -- Implement TaskHandlerThread -- */
+
+    /**
+     * Thread for processing channel tasks. A channel task is enqueued
+     * when a channel processes a channel event.  A typical channel
+     * task sends a message to one or more channel servers to notify
+     * the server(s) of a channel state change or that a message needs
+     * to be sent to the channel members connected to that channel
+     * server's node.
+     *
+     * Currently, the table is serviced by a single thread, but in the
+     * future, it could be serviced by more than one thread.
+     */
+    private final class TaskHandlerThread extends Thread {
+	
+	/** Constructs an instance of this class as a daemon thread. */
+	TaskHandlerThread() {
+	    super(CLASSNAME + "$TaskHandlerThread");
+	    setDaemon(true);
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+
+	    while (! shuttingDown()) {
+		/*
+		 * Wait for channel tasks to show up.
+		 */
+		synchronized (taskHandlerLock) {
+		    while (channelTasksMap.isEmpty()) {
+			try {
+			    taskHandlerLock.wait();
+			} catch (InterruptedException e) {
+			    return;
+			}
+		    }
+		}
+
+		/*
+		 * Get snapshot of current channel IDs with tasks.
+		 */
+		Set<BigInteger> channelIds = new HashSet<BigInteger>();
+		synchronized (channelTasksMap) {
+		    channelIds.addAll(channelTasksMap.keySet());
+		}
+		
+		/*
+		 * Process tasks for each channel, removing task list
+		 * from the table before processing.
+		 */
+		for (BigInteger channelId : channelIds) {
+		    List<Runnable> taskList =
+			channelTasksMap.remove(channelId);
+		    if (taskList == null) continue;
+		    for (Runnable task : taskList) {
+			try {
+			    task.run();
+			} catch (Exception e) {
+			    logger.logThrow(
+				Level.WARNING, e, "processing task:{0} throws",
+				task);
+			    // TBD: abandon the rest of the tasks here?
+			}
+		    }
+		}
+	    }
+	}
+    }
+    
+    /* -- Implement ClientSessionDisconnectListener -- */
+
+    private final class ChannelSessionDisconnectListener
+	implements ClientSessionDisconnectListener
+    {
+        /**
+         * {@inheritDoc}
+	 */
+	public void disconnected(final BigInteger sessionRefId) {
+	    /*
+	     * Schedule a transactional task to remove the
+	     * disconnected session from all channels that it is
+	     * currently a member of.
+	     */
+	    taskScheduler.scheduleTask(
+ 		 new TransactionRunner(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    ChannelImpl.removeSessionFromAllChannels(
+				localNodeId, sessionRefId.toByteArray());
+			    }
+		    }),
+		 taskOwner);
+	}
+    }
+
+    /* -- Other methods and classes -- */
+    
+    /**
+     * Returns the client session service.
+     */
+    static ClientSessionService getClientSessionService() {
+	return txnProxy.getService(ClientSessionService.class);
+    }
+
+    /**
+     * Returns the task service.
+     */
+    static TaskService getTaskService() {
+	return txnProxy.getService(TaskService.class);
+    }
+
+    /**
+     * Returns the local node ID.
+     */
+    static long getLocalNodeId() {
+	return txnProxy.getService(WatchdogService.class).getLocalNodeId();
+    }
+
+    /**
+     * Returns the key for accessing the {@code ChannelServer}
+     * instance (which is wrapped in a {@code ChannelServerWrapper})
+     * for the specified {@code nodeId}.
+     */
+    private static String getChannelServerKey(long nodeId) {
+	return PKG_NAME + ".server." + nodeId;
+    }
+
+    /**
+     * Returns the {@code ChannelServer} for the given {@code nodeId}.
+     */
+    static ChannelServer getChannelServer(long nodeId) {
+	// TBD: if the nodeId is the local nodeId, then this method
+	// should return a reference to the local channel server impl,
+	// rather than the channel server proxy. -- ann (12/11/07)
+	String channelServerKey =
+	    ChannelServiceImpl.getChannelServerKey(nodeId);
+	try {
+	    return getDataService().getServiceBinding(
+		channelServerKey, ChannelServerWrapper.class).get();
+	} catch (NameNotBoundException e) {
+	    logger.logThrow(
+		Level.SEVERE, e,
+		"ChannelServerWrapper binding:{0} doesn't exist",
+		channelServerKey);
+	    throw e;
+	} catch (ObjectNotFoundException e) {
+	    logger.logThrow(
+		Level.SEVERE, e,
+		"ChannelServerWrapper binding:{0} exists, " +
+		"but object removed", channelServerKey);
+	    throw e;
+	}
+    }
+
+    /**
+     * Removes channel server proxy and binding for the specified node.
+     */
+    private void removeChannelServerProxy(long nodeId) {
+	String channelServerKey = getChannelServerKey(nodeId);
+	try {
+	    ChannelServerWrapper proxyWrapper =
+		dataService.getServiceBinding(
+		    channelServerKey, ChannelServerWrapper.class);
+	    dataService.removeObject(proxyWrapper);
+	} catch (NameNotBoundException e) {
+	    // already removed
+	    return;
+	} catch (ObjectNotFoundException e) {
+	}
+	dataService.removeServiceBinding(channelServerKey);
+    }
+
+    /**
+     * The {@code RecoveryListener} for handling requests to recover
+     * for a failed {@code ChannelService}.
+     *
+     * TBD: recovery also needs to re-assign channel coordinators assigned
+     * to the failed node.
+     */
+    private class ChannelServiceRecoveryListener
+	implements RecoveryListener
+    {
+	/** {@inheritDoc}
+	 *
+	 * TBD: Recovery (due to being possibly-lengthy) should not be
+	 * performed in this remote method.  Recovery operations should
+	 * be performed in a separate thread.
+	 *
+	 * TODO: use persistent tasks instead?
+	 */
+	public void recover(Node node, RecoveryCompleteFuture future) {
+	    final long nodeId = node.getId();
+	    try {
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.log(Level.INFO, "Node:{0} recovering for node:{0}",
+			       localNodeId, nodeId);
+		}
+		/*
+		 * For each session on the failed node, remove the
+		 * given session from all channels it is a member of.
+		 *
+		 * TODO:  This transactional task may take too long.  It
+		 * probably should be broken up into more tasks.
+		 */
+		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
+		taskScheduler.runTransactionalTask(task, taskOwner);
+		
+		for (final byte[] sessionId : task.getSessionIds()) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Removing session:{0} from all channels",
+			    HexDumper.toHexString(sessionId));
+		    }
+
+		    /*
+		     * TODO:  This transactional task may take too long.  It
+		     * probably should be broken up into more tasks.
+		     */
+		    taskScheduler.runTransactionalTask(
+			new AbstractKernelRunnable() {
+			    public void run() {
+				ChannelImpl.removeSessionFromAllChannels(
+				    nodeId, sessionId);
+			    }
+			},
+			taskOwner);
+		}
+		/*
+		 * Remove binding to channel server proxy for failed
+		 * node, and remove proxy's wrapper.
+		 */
+		taskScheduler.runTransactionalTask(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    removeChannelServerProxy(nodeId);
+			}
+		    },
+		    taskOwner);
+		
+		future.done();
+
+	    } catch (Exception e) {
+		logger.logThrow(
+ 		    Level.WARNING, e,
+		    "Recovering for failed node:{0} throws", nodeId);
+		// TBD: what should it do if it can't recover?
+	    }
+	}
+    }
+
+    /**
+     * Task to obtain all sessions on a given node that are members
+     * of any channel.  This is used by the {@code
+     * ChannelServiceRecoveryListener} for obtaining all failed
+     * sessions that need to be removed from channels.
+     */
+    private class GetNodeSessionIdsTask extends AbstractKernelRunnable {
+
+	private final long nodeId;
+	private Set<byte[]> sessionIds = new HashSet<byte[]>();
+	
+	GetNodeSessionIdsTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    Iterator<byte[]> iter =
+		ChannelImpl.getSessionIdsAnyChannel(dataService, nodeId);
+	    while (iter.hasNext()) {
+		sessionIds.add(iter.next());
+	    }
+	}
+
+	Set<byte[]> getSessionIds() {
+	    return sessionIds;
+	}
     }
 }

@@ -31,6 +31,16 @@
  */
 
 /*
+ * FIXME
+ * FIXME
+ * FIXME
+ *
+ * This file is out-of-date with the new SGS protocol (post 0.9.5),
+ * and needs to be updated along with the channel code (gone) and
+ * details of protocol handling. -JM
+ */
+
+/*
  * SGS Protocol constants.
  *
  * A protocol message is constructed as follows:
@@ -87,8 +97,8 @@ extern "C" {
  */
 #define SGS_MSG_INIT_LEN 7
 
-/* The version number, currently 0x02. */
-#define SGS_MSG_VERSION 2
+/* The version number, currently 0x03. */
+#define SGS_MSG_VERSION 0x03
 
 typedef enum sgs_service_id {
     /* The Application service ID, 0x01. */
@@ -133,6 +143,17 @@ typedef enum sgs_opcode {
      *     (String) reason
      */
     SGS_OPCODE_LOGIN_FAILURE = 0x12,
+
+    /*
+     * Login redirect.  Server response to a client's LOGIN_REQUEST.
+     *
+     * ServiceId: 0x01 (Application)
+     * Opcode: 0x13
+     *
+     * Payload:
+     *     (String) hostname
+     */
+    SGS_OPCODE_LOGIN_REDIRECT = 0x13,
 
     /*
      * Reconnection request.  Client requesting reconnect to a server.

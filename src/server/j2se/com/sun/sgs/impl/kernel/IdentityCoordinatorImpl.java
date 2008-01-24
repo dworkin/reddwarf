@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
-import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.auth.IdentityCredentials;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
@@ -60,7 +60,8 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
     // the available authenticators
     private final HashMap<String,List<IdentityAuthenticator>> authenticatorMap;
 
-    // a unique collection of the authenticators, for management purposes
+    // a unique collection of the authenticators, for management purposes,
+    // and currently unused
     private final HashSet<IdentityAuthenticator> authenticatorSet;
 
     /**
@@ -93,17 +94,6 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
 
         // keep track of the collection
         authenticatorSet = new HashSet<IdentityAuthenticator>(authenticators);
-    }
-
-    /**
-     * Package-private method that assigns the context for this coordinator
-     * and its associated authenticators.
-     *
-     * @param appContext the context
-     */
-    void assignContext(AbstractKernelAppContext appContext) {
-        for (IdentityAuthenticator authenticator : authenticatorSet)
-            authenticator.assignContext(appContext);
     }
 
     /**
