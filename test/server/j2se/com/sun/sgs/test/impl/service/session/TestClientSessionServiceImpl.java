@@ -831,13 +831,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the next sequence number for this session.
-	 */
-	private long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
-
-	/**
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
@@ -1129,11 +1122,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(ByteBuffer byteBuf) {
-            byte[] message = new byte[byteBuf.remaining()];
-            byteBuf.get(message);
-	    MessageBuffer buf = new MessageBuffer(message);
-	    int num = buf.getInt();
+	public void receivedMessage(ByteBuffer message) {
+            byte[] bytes = new byte[message.remaining()];
+            message.asReadOnlyBuffer().get(bytes);
+	    int num = message.getInt();
 	    DummyClient client = dummyClients.get(name);
 	    System.err.println("receivedMessage: " + num + 
 			       "\nthrowException: " + client.throwException);
@@ -1142,7 +1134,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    "expected message greater than " + seq + ", got " + num);
 	    }
 	    AppContext.getDataManager().markForUpdate(this);
-	    client.messages.add(message);
+	    client.messages.add(bytes);
 	    seq = num;
 	    if (client.throwException != null) {
 		RuntimeException re = client.throwException;
