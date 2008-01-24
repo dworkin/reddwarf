@@ -39,6 +39,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Semaphore;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -1174,6 +1175,8 @@ public class TestDataStoreImpl extends TestCase {
 	    txn = null;
 	    System.err.println(e);
 	}
+	/* Wait for transaction to end on the server. */
+	Thread.sleep(1000);
     }
 
     /* -- Unusual states -- */
@@ -1236,6 +1239,8 @@ public class TestDataStoreImpl extends TestCase {
 	    txn = null;
 	    System.err.println(e);
 	}
+	/* Wait for transaction to end on the server. */
+	Thread.sleep(1000);
     }
 
     /* -- Unusual states -- */
@@ -1397,6 +1402,9 @@ public class TestDataStoreImpl extends TestCase {
 	store.setBinding(txn, "foo", id);
 	txn.commit();
 	txn = null;
+	/* Complete the shutdown */
+	new ShutdownAction().waitForDone();
+	store = null;
     }
 
     public void testConcurrentShutdownInterrupt() throws Exception {
@@ -1953,20 +1961,30 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     /** Tests running the action in a new transaction while shutting down. */
-    void testShuttingDownNewTxn(Action action) throws Exception {
+    void testShuttingDownNewTxn(final Action action) throws Exception {
 	action.setUp();
 	DummyTransaction originalTxn = txn;
 	ShutdownAction shutdownAction = new ShutdownAction();
 	shutdownAction.assertBlocked();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	try {
-	    action.run();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-	txn.abort(null);
-	txn = null;
+	final AtomicReference<Throwable> exceptionHolder =
+	    new AtomicReference<Throwable>();
+	Thread t = new Thread() {
+	    public void run() {
+		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		try {
+		    action.run();
+		} catch (Throwable t) {
+		    exceptionHolder.set(t);
+		}
+		txn.abort(null);
+		txn = null;
+	    }
+	};
+	t.start();
+	t.join(1000);
+	Throwable exception = exceptionHolder.get();
+	assertTrue("Expected IllegalStateException: " + exception,
+		   exception instanceof IllegalStateException);
 	originalTxn.abort(null);
 	shutdownAction.assertResult(true);
 	store = null;

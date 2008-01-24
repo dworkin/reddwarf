@@ -203,11 +203,17 @@ public class DataStoreImpl
     final List<ObjectIdInfo> freeObjectIds =
 	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
 
-    /** Object to synchronize on when accessing txnCount and allOps. */
+    /**
+     * Object to synchronize on when accessing txnCount, allOps and
+     * shuttingDown.
+     */
     private final Object txnCountLock = new Object();
 
     /** The number of currently active transactions. */
     private int txnCount = 0;
+
+    /** Whether the data store is in the process of shutting down. */
+    private boolean shuttingDown = false;
 
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;
@@ -1038,6 +1044,7 @@ public class DataStoreImpl
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
+		shuttingDown = true;
 		while (txnCount > 0) {
 		    try {
 			logger.log(Level.FINEST,
@@ -1479,6 +1486,8 @@ public class DataStoreImpl
 	synchronized (txnCountLock) {
 	    if (txnCount < 0) {
 		throw new IllegalStateException("Service is shut down");
+	    } else if (shuttingDown) {
+		throw new IllegalStateException("Service is shutting down");
 	    }
 	    txnCount++;
 	}
