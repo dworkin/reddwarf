@@ -20,12 +20,14 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+
+import com.sun.sgs.example.hack.server.util.UtilChannel;
+import com.sun.sgs.example.hack.server.util.UtilChannelManager;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
@@ -65,13 +67,17 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private ManagedReference gcmRef;
 
     // the channel used for all players currently in the lobby
-    private Channel channel;
+    private ManagedReference channelRef;
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
 
     // the map for player counts in each game
     private HashMap<String,GameMembershipDetail> countMap;
+
+    private UtilChannel channel() {
+        return channelRef.get(UtilChannel.class);
+    }
 
     /**
      * Creates an instance of <code>Lobby</code>. In practice there should
@@ -84,13 +90,17 @@ public class Lobby implements Game, GameChangeListener, Serializable {
      *               membership counts change
      */
     private Lobby(GameChangeManager gcm) {
+        DataManager dataManager = AppContext.getDataManager();
+
         // create a channel for all clients in the lobby, but lock it so
         // that we control who can enter and leave the channel
-        channel = AppContext.getChannelManager().
+        UtilChannel channel = UtilChannelManager.instance().
             createChannel(IDENTIFIER, null, Delivery.RELIABLE);
 
+        channelRef = dataManager.createReference(channel);
+
         // keep track of the MembershipChangeManager ref
-        gcmRef = AppContext.getDataManager().createReference(gcm);
+        gcmRef = dataManager.createReference(gcm);
 
         // initialize the player list
         playerMap = new HashMap<ClientSession,String>();
@@ -153,29 +163,29 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // update all existing members about the new uid's name
         ClientSession session = player.getCurrentSession();
         String playerName = player.getName();
-        Messages.sendUidMap(session, playerName, channel, getCurrentUsers());
+        Messages.sendUidMap(session, playerName, channel(), getCurrentUsers());
 
         // add the player to the lobby channel and the player map
-        channel.join(session, null);
+        channel().join(session, null);
         playerMap.put(session, playerName);
-        player.userJoinedChannel(channel);
+        player.userJoinedChannel(channel());
 
         // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(playerMap, channel, session);
+        Messages.sendUidMap(playerMap, channel(), session);
 
-        Messages.sendPlayerJoined(player.getCurrentSession(), channel);
+        Messages.sendPlayerJoined(player.getCurrentSession(), channel());
 
         // finally, send the player a welcome message...we need to create
         // a new set around the details because the backing collection
         // provided by Map.values() isn't serializable
         HashSet<GameMembershipDetail> set =
             new HashSet<GameMembershipDetail>(countMap.values());
-        Messages.sendLobbyWelcome(set, channel, session);
+        Messages.sendLobbyWelcome(set, channel(), session);
         HashSet<CharacterStats> characters = new HashSet<CharacterStats>();
         for (Character character :
                  player.getCharacterManager().getCharacters())
             characters.add(character.getStatistics());
-        Messages.sendPlayerCharacters(characters, channel, session);
+        Messages.sendPlayerCharacters(characters, channel(), session);
     }
 
     /**
@@ -186,11 +196,11 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     public void leave(Player player) {
         AppContext.getDataManager().markForUpdate(this);
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channel);
+        Messages.sendPlayerLeft(player.getCurrentSession(), channel());
 
         // remove the player from the lobby channel and the local map
         ClientSession session = player.getCurrentSession();
-        channel.leave(session);
+        channel().leave(session);
         playerMap.remove(session);
 
         // send an update about the new lobby membership count
@@ -251,7 +261,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // send out notice of the new games
         for (String game : games) {
             countMap.put(game, new GameMembershipDetail(game, 0));
-            Messages.sendGameAdded(game, channel, users);
+            Messages.sendGameAdded(game, channel(), users);
         }
     }
 
@@ -267,7 +277,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 
         // send out notice of the removed games
         for (String game : games) {
-            Messages.sendGameRemoved(game, channel, users);
+            Messages.sendGameRemoved(game, channel(), users);
             countMap.remove(game);
         }
     }
@@ -291,7 +301,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         for (GameMembershipDetail detail : details) {
             countMap.put(detail.getGame(), detail);
             Messages.sendGameCountChanged(detail.getGame(), detail.getCount(),
-                                          channel, users);
+                                          channel(), users);
         }
     }
 

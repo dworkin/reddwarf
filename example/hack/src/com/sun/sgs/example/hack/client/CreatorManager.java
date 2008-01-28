@@ -82,10 +82,8 @@ public class CreatorManager implements CreatorListener
         bb.putInt(charClass);
         bb.rewind();
 
-        byte [] bytes = new byte[5];
-        bb.get(bytes);
         try {
-            client.send(bytes);
+            client.send(bb);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -103,11 +101,9 @@ public class CreatorManager implements CreatorListener
         bb.put((byte)2);
         bb.put(name.getBytes());
         bb.rewind();
-        
-        byte [] bytes = new byte[1 + name.length()];
-        bb.get(bytes);
+
         try {
-            client.send(bytes);
+            client.send(bb);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -122,10 +118,8 @@ public class CreatorManager implements CreatorListener
         bb.put((byte)3);
         bb.rewind();
 
-        byte [] bytes = new byte[1];
-        bb.get(bytes);
         try {
-            client.send(bytes);
+            client.send(bb);
         } catch (Exception e) {
             e.printStackTrace();
         }

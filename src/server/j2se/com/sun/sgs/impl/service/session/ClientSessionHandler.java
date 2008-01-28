@@ -23,10 +23,10 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.ProtocolMessageListener;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -231,12 +231,9 @@ class ClientSessionHandler {
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
-		MessageBuffer buf = new MessageBuffer(3);
-		buf.putByte(SimpleSgsProtocol.VERSION).
-		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
-	    
-		sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
+	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
+
+	        sendProtocolMessage(msg, Delivery.RELIABLE);
 	    }
 
 	    try {
@@ -394,7 +391,7 @@ class ClientSessionHandler {
 		}
 	    }
 	    
-	    if (buffer.length < 3) {
+	    if (buffer.length < 1) {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
 		        Level.SEVERE,
@@ -406,66 +403,6 @@ class ClientSessionHandler {
 	    }
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
-		
-	    /*
-	     * Handle version.
-	     */
-	    byte version = msg.getByte();
-	    if (version != SimpleSgsProtocol.VERSION) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"Handler.messageReceived protocol version:{0}, " +
-			"expected {1}", version, SimpleSgsProtocol.VERSION);
-		}
-		return;
-	    }
-
-	    /*
-	     * Dispatch message to service.
-	     */
-	    byte serviceId = msg.getByte();
-
-	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
-		handleApplicationServiceMessage(msg);
-	    } else {
-		ProtocolMessageListener serviceListener =
-		    sessionService.getProtocolMessageListener(serviceId);
-		if (serviceListener != null) {
-		    if (identity == null) {
-			if (logger.isLoggable(Level.WARNING)) {
-			    logger.log(
-			        Level.WARNING,
-				"session:{0} received message for " +
-				"service ID:{1} before successful login",
-				this, serviceId);
-			    return;
-			}
-		    }
-		    
-		    serviceListener.receivedMessage(
-			sessionRefId.toByteArray(), buffer);
-		    
-		} else {
-		    if (logger.isLoggable(Level.SEVERE)) {
-		    	logger.log(
-			    Level.SEVERE,
-			    "session:{0} unknown service ID:{1}",
-			    this, serviceId);
-		    }
-		}
-	    }
-	}
-
-	/**
-	 * Handles an APPLICATION_SERVICE message received by the
-	 * {@code bytesReceived} method.  When this method is invoked,
-	 * the specified message buffer's current position points to
-	 * the operation code of the protocol message.  The protocol
-	 * version and service ID have already been processed by the
-	 * caller.
-	 */
-	private void handleApplicationServiceMessage(MessageBuffer msg) {
 	    byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -477,12 +414,23 @@ class ClientSessionHandler {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST:
+	    case SimpleSgsProtocol.LOGIN_REQUEST: {
+
+	        byte version = msg.getByte();
+	        if (version != SimpleSgsProtocol.VERSION) {
+	            if (logger.isLoggable(Level.SEVERE)) {
+	                logger.log(Level.SEVERE,
+	                    "got protocol version:{0}, " +
+	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+	            }
+	            break;
+	        }
 
 		String name = msg.getString();
 		String password = msg.getString();
 		handleLoginRequest(name, password);
 		break;
+	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		if (identity == null) {
@@ -491,9 +439,8 @@ class ClientSessionHandler {
 			"session message received before login:{0}", this);
 		    break;
 		}
-                msg.getLong(); // TODO Check sequence num
-		int size = msg.getUnsignedShort();
-		final byte[] clientMessage = msg.getBytes(size);
+		final ByteBuffer clientMessage =
+		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
@@ -502,7 +449,7 @@ class ClientSessionHandler {
 			if (sessionImpl != null) {
 			    if (isConnected()) {
 				sessionImpl.getClientSessionListener(dataService).
-				    receivedMessage(clientMessage);
+				    receivedMessage(clientMessage.asReadOnlyBuffer());
 			    }
 			} else {
 			    scheduleHandleDisconnect(false);
@@ -783,10 +730,8 @@ class ClientSessionHandler {
 
 	    CompactId compactId = new CompactId(sessionRefId.toByteArray());
 	    MessageBuffer ack =
-		new MessageBuffer(3 + compactId.getExternalFormByteCount());
-	    ack.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
+		new MessageBuffer(1 + compactId.getExternalFormByteCount());
+	    ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 		putBytes(compactId.getExternalForm());
 		
 	    ClientSessionListener returnedListener = null;
@@ -853,10 +798,8 @@ class ClientSessionHandler {
      */
     private static byte[] getLoginFailureMessage() {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
-        MessageBuffer ack = new MessageBuffer(3 + stringSize);
-        ack.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.LOGIN_FAILURE).
+        MessageBuffer ack = new MessageBuffer(1 + stringSize);
+        ack.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(LOGIN_REFUSED_REASON);
         return ack.getBuffer();
     }
@@ -867,10 +810,8 @@ class ClientSessionHandler {
      */
     private static byte[] getLoginRedirectMessage(String hostname) {
 	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(3 + hostStringSize);
-        ack.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
+	MessageBuffer ack = new MessageBuffer(1 + hostStringSize);
+        ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
             putString(hostname);
         return ack.getBuffer();
     }	

@@ -36,10 +36,9 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
@@ -48,6 +47,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -206,16 +206,15 @@ public class ChannelServiceImpl
 
 	    /*
 	     * Add listeners for handling recovery and for receiving
-	     * notification of client session disconnection (via a
-	     * ProtocolMessageListener).
+	     * notification of client session disconnection.
 	     */
 	    watchdogService.addRecoveryListener(
 		new ChannelServiceRecoveryListener());
-	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE,
-		new ChannelProtocolMessageListener());
 
-	    taskHandlerThread.start();
+            sessionService.registerSessionDisconnectListener(
+                new ChannelSessionDisconnectListener());
+
+            taskHandlerThread.start();
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -346,7 +345,7 @@ public class ChannelServiceImpl
 		    }
 		}
 		localMembers.add(new BigInteger(1, sessionId));
-		    
+
 	    } finally {
 		callFinished();
 	    }
@@ -439,7 +438,7 @@ public class ChannelServiceImpl
 
 		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, message, Delivery.RELIABLE);
+ 			sessionRefId, ByteBuffer.wrap(message), Delivery.RELIABLE);
 		}
 
 	    } finally {
@@ -713,36 +712,15 @@ public class ChannelServiceImpl
 	}
     }
     
-    /* -- Implement ProtocolMessageListener -- */
+    /* -- Implement ClientSessionDisconnectListener -- */
 
-    private final class ChannelProtocolMessageListener
-	implements ProtocolMessageListener
+    private final class ChannelSessionDisconnectListener
+	implements ClientSessionDisconnectListener
     {
-	/** {@inheritDoc}
-	 * 
-	 * Note: This method is unused and should eventually go away, along
-	 * with the ProtocolMessageListener API.  The ClientSessionService
-	 * no longer dispatches messages to protocol message listeners.
+        /**
+         * {@inheritDoc}
 	 */
-	public void receivedMessage(byte[] sessionId, byte[] message) {
-	    if (logger.isLoggable(Level.SEVERE)) {
-		logger.log(
-		    Level.SEVERE,
-		    "unexpected message: session:{0} message:{1}",
-		    HexDumper.toHexString(sessionId),
-		    HexDumper.format(message));
-	    }
-	}
-
-	/** {@inheritDoc}
-	 *
-	 * TBD: Currently the ChannelService is notified by the
-	 * ClientSessionService when a client session disconnects.  This
-	 * should be changed to a notification scheme where the
-	 * ChannelService can register interest in receiving notification
-	 * when the client session is removed.
-	 */
-	public void disconnected(final byte[] sessionId) {
+	public void disconnected(final BigInteger sessionRefId) {
 	    /*
 	     * Schedule a transactional task to remove the
 	     * disconnected session from all channels that it is
@@ -753,7 +731,7 @@ public class ChannelServiceImpl
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    ChannelImpl.removeSessionFromAllChannels(
-				localNodeId, sessionId);
+				localNodeId, sessionRefId.toByteArray());
 			    }
 		    }),
 		 taskOwner);

@@ -19,9 +19,6 @@
 
 package com.sun.sgs.example.hack.client.ai;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -33,10 +30,13 @@ import com.sun.sgs.example.hack.client.DungeonChannelListener;
 import com.sun.sgs.example.hack.client.GameManager;
 import com.sun.sgs.example.hack.client.LobbyChannelListener;
 import com.sun.sgs.example.hack.client.LobbyManager;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
+import com.sun.sgs.example.hack.client.util.ClientChannelListener;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -147,7 +147,7 @@ public class AIClient implements SimpleClientListener {
     public void disconnected(boolean graceful, String reason) {}
     public void reconnecting() {}
     public void reconnected() {}
-    public void receivedMessage(byte [] message) {}
+    public void receivedMessage(ByteBuffer message) {}
 
     public static void main(String [] args) throws Exception {
         if (args.length != 1) {

@@ -20,14 +20,14 @@
 
 package com.sun.sgs.example.hack.client;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.SessionId;
+import com.sun.sgs.example.hack.client.util.ClientChannel;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
 import java.io.IOException;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 
@@ -63,12 +63,8 @@ public class CreatorChannelListener extends GameChannelListener
      * @param reliable true if this packet was sent reliably
      */
     //public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-                                byte [] message) {
-        ByteBuffer data = ByteBuffer.allocate(message.length);
-        data.put(message);
-        data.rewind();
-
+    public void receivedMessage(ClientChannel channel, BigInteger sender,
+                                ByteBuffer data) {
         if (sender == null) {
             // if this is a message from the server, then it's some
             // command that we need to process, so get the command code
