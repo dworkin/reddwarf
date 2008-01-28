@@ -157,7 +157,7 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
-    public ClientSession send(final ByteBuffer message) {
+    public ClientSession send(ByteBuffer message) {
 	try {
             if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
                 throw new IllegalArgumentException(
