@@ -52,7 +52,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -336,19 +335,7 @@ public class ClientSessionServiceImpl
 	}
 	serviceListeners.put(serviceId, listener);
     }
-
-    /** {@inheritDoc} */
-    public ClientSession getClientSession(byte[] sessionId) {
-	if (sessionId == null) {
-	    throw new NullPointerException("null sessionId");
-	}
-	// TBD: is this method invocation necessary?
-	checkLocalNodeAlive();
-	return
-	    ClientSessionImpl.getSession(
-		dataService, new BigInteger(1, sessionId));
-    }
-
+    
     /** {@inheritDoc} */
     public void sendProtocolMessage(
 	ClientSession session, byte[] message, Delivery delivery)
@@ -630,7 +617,7 @@ public class ClientSessionServiceImpl
 	    Context context = contextQueue.peek();
 	    if ((context != null) && (context.isCommitted)) {
 		synchronized (flushContextsLock) {
-		    flushContextsLock.notify();
+		    flushContextsLock.notifyAll();
 		}
 	    }
 	}
@@ -747,12 +734,11 @@ public class ClientSessionServiceImpl
 		    }
 
 		} else {
-		    byte[][] messageData = null;
-		    messageData = messages.toArray(messageData);
-		    Delivery[] deliveryData = null;
-		    deliveryData =
-			Collections.nCopies(messages.size(), Delivery.RELIABLE).
-			    toArray(deliveryData);
+		    int numMessages = messages.size();
+		    byte[][] messageData = messages.toArray(new byte[numMessages][]);
+		    Delivery[] deliveryData =
+			Collections.nCopies(numMessages, Delivery.RELIABLE).
+			    toArray(new Delivery[numMessages]);
 
 		    byte[] sessionId = sessionRefId.toByteArray();
 		    try {
