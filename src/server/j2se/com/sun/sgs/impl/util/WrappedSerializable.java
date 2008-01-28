@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import java.io.Serializable;
@@ -118,6 +119,25 @@ public final class WrappedSerializable<T> implements Serializable {
 	ref = null;
     }
 
+    /**
+     * Marks this instance as removed, and if this instance contains a
+     * {@link ManagedObject} wrapper to the {@code object} specified
+     * during construction, then removes the wrapper using the specified
+     * {@code dataManager} as well.
+     *
+     * @param	dataManager
+     * @throws	IllegalStateException if {@link #remove remove} has
+     *		been invoked on this instance
+     */
+    public void remove(DataManager dataManager) {
+	checkRemoved();
+	ManagedObject obj = ref.get(ManagedObject.class);
+	if (obj instanceof Wrapper) {
+	    dataManager.removeObject(obj);
+	}
+	ref = null;
+    }
+    
     /**
      * Throws {@code IllegalStateException} if {@code remove} has
      * already been invoked.
