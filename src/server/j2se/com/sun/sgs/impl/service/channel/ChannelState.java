@@ -151,7 +151,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	WrappedSerializable<ChannelListener> listener =
 	    listeners.remove(session);
 	if (listener != null) {
-	    listener.remove();
+	    listener.remove(ChannelServiceImpl.getDataService());
 	}
 	sessions.remove(session);
     }
@@ -160,7 +160,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	for (WrappedSerializable<ChannelListener> listener :
 	     listeners.values())
 	{
-	    listener.remove();
+	    listener.remove(ChannelServiceImpl.getDataService());
 	}
 	listeners.clear();
 	sessions.clear();

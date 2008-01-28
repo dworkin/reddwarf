@@ -892,6 +892,13 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     }
 
     /**
+     * Returns the data service.
+     */
+    static DataService getDataService() {
+	return txnProxy.getService(DataService.class);
+    }
+
+    /**
      * Task (transactional) for notifying channel listeners.
      */
     private final class NotifyTask extends AbstractKernelRunnable {
