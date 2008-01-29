@@ -27,17 +27,17 @@ import java.util.logging.Logger;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
 
 /**
  * Simple example of channel operations in the Project Darkstar Server.
  * <p>
  * Extends the {@code HelloEcho} example by joining clients to two
- * channels, one of which has a {@link ChannelListener} set.
+ * channels.
  */
 public class HelloChannels
     implements Serializable, AppListener
@@ -49,9 +49,6 @@ public class HelloChannels
     private static final Logger logger =
         Logger.getLogger(HelloChannels.class.getName());
 
-    /** The total number of login events. */
-    private int loginCount = 0;
-
     /** The name of the first channel: {@value #CHANNEL_1_NAME} */
     public static final String CHANNEL_1_NAME = "Foo";
 
@@ -62,7 +59,17 @@ public class HelloChannels
      * The first {@link Channel}.
      * (The second channel is looked up by name only.)
      */
-    private Channel channel1 = null;
+    private ManagedReference channel1ref = null;
+
+    private Channel getChannel1() {
+        return (channel1ref == null) ? null : channel1ref.get(Channel.class);
+    }
+
+    private void setChannel1(Channel channel) {
+        channel1ref = (channel == null)
+            ? null
+            : AppContext.getDataManager().createReference(channel);
+    }
 
     /**
      * {@inheritDoc}
@@ -74,12 +81,14 @@ public class HelloChannels
         ChannelManager channelManager = AppContext.getChannelManager();
 
         // Create and keep a reference to the first channel.
-        channel1 = channelManager.createChannel(CHANNEL_1_NAME, null,
-                                                Delivery.RELIABLE);
+        Channel channel1 = channelManager.createChannel(Delivery.RELIABLE);
+        setChannel1(channel1);
 
         // We don't keep the second channel object around, to demonstrate
         // looking it up by name when needed.
-        channelManager.createChannel(CHANNEL_2_NAME, null, Delivery.RELIABLE);
+        Channel channel2 = channelManager.createChannel(Delivery.RELIABLE);
+        
+        AppContext.getDataManager().setBinding(CHANNEL_2_NAME, channel2);
     }
 
     /**
@@ -89,8 +98,7 @@ public class HelloChannels
      * logged-in session.
      */
     public ClientSessionListener loggedIn(ClientSession session) {
-        loginCount++;
         logger.log(Level.INFO, "User {0} has logged in", session.getName());
-        return new HelloChannelsSessionListener(session, channel1, loginCount);
+        return new HelloChannelsSessionListener(session, getChannel1());
     }
 }

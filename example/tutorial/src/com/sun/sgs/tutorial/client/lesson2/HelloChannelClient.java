@@ -34,6 +34,8 @@ package com.sun.sgs.tutorial.client.lesson2;
 
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,9 +44,6 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.tutorial.client.lesson1.HelloUserClient;
 
 /**
@@ -115,13 +114,13 @@ public class HelloChannelClient extends HelloUserClient
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Returns a listener that formats and displays received channel
      * messages in the output text pane.
      */
-    @Override
     public ClientChannelListener joinedChannel(ClientChannel channel) {
+
+        // FIXME need infrastructure to call this on channel join
+
         channelsByName.put(channel.getName(), channel);
         appendOutput("Joined to channel " + channel.getName());
         channelSelectorModel.addElement(channel.getName());
@@ -142,7 +141,7 @@ public class HelloChannelClient extends HelloUserClient
 
         try {
             String text = getInputText();
-            byte[] message = encodeString(text);
+            ByteBuffer message = encodeString(text);
             String channelName =
                 (String) channelSelector.getSelectedItem();
             if (channelName.equalsIgnoreCase("<DIRECT>")) {
@@ -193,7 +192,7 @@ public class HelloChannelClient extends HelloUserClient
          * Formats and displays messages received on a channel.
          */
         public void receivedMessage(ClientChannel channel,
-                SessionId sender, byte[] message)
+                BigInteger sender, ByteBuffer message)
         {
             appendOutput("[" + channel.getName() + "/ " + channelNumber +
                 "] " + sender + ": " + decodeString(message));

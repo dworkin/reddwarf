@@ -214,7 +214,7 @@ final class TransactionImpl implements Transaction {
 	case COMMITTING:
 	case COMMITTED:
 	    throw new IllegalStateException(
-		"Transaction is not active: " + state);
+		"Transaction is not active: " + state, cause);
 	default:
 	    throw new AssertionError();
 	}

@@ -96,12 +96,7 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
 
         SynchronousQueue<Runnable> backingQueue =
             new SynchronousQueue<Runnable>();
-        ThreadFactory threadFactory =
-            new ThreadFactory() {
-                public Thread newThread(Runnable r) {
-                    return new Thread(r);
-                }
-            };
+        ThreadFactory threadFactory = new SimpleThreadFactory();
 
         threadPool =
             new ThreadPoolExecutor(coreSize, maxSize, 120L,
@@ -121,4 +116,10 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
         threadPool.execute(task);
     }
 
+    /** A very simple ThreadFactory implementation. */
+    private static class SimpleThreadFactory implements ThreadFactory {
+        public Thread newThread(Runnable r) {
+            return new Thread(r);
+        }
+    }
 }

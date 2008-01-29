@@ -34,25 +34,16 @@ package com.sun.sgs.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.util.Collections;
+import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
-import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
-import com.sun.sgs.impl.client.simple.SimpleSessionId;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -64,31 +55,19 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
  * send messages to the server, and log out.
  * <p>
  * A {@code SimpleClient} is constructed with a {@link
- * SimpleClientListener} which receives connection-related events, receives
- * messages from the server, and also receives notification of each channel
- * the client is joined to.
+ * SimpleClientListener} which receives connection-related events as well
+ * as messages from the server application.
  * <p>
  * If the server session associated with a simple client becomes
- * disconnected, then its {@link #send send} and {@link #getSessionId
- * getSessionId} methods will throw {@code IllegalStateException}.
- * Additionally, when a client is disconnected, the server removes that
- * client from the channels that it had been joined to. A disconnected
+ * disconnected, then its {@link #send send} method will throw
+ * {@code IllegalStateException}.  A disconnected
  * client can use the {@link #login login} method to log in again.
- * <p>
- * Note that the session identifier of a client changes with each login
- * session; so if a server session is disconnected and then logs in again,
- * the {@link #getSessionId getSessionId} method will return a new
- * {@code SessionId}.
  */
 public class SimpleClient implements ServerSession {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SimpleClient.class.getName()));
-
-    /** The server's session ID. */
-    private static final CompactId SERVER_ID =
-	new CompactId(new byte[] { (byte) 0});
     
     /**
      * The listener for the {@code ClientConnection} the session
@@ -96,10 +75,6 @@ public class SimpleClient implements ServerSession {
      */
     private final ClientConnectionListener connListener =
         new SimpleClientConnectionListener();
-
-    /** The map of channels this client is a member of */
-    private final ConcurrentHashMap<CompactId, SimpleClientChannel> channels =
-        new ConcurrentHashMap<CompactId, SimpleClientChannel>();
 
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
@@ -116,14 +91,11 @@ public class SimpleClient implements ServerSession {
      */
     private volatile boolean connectionStateChanging = false;
     
-    /** TODO */
+    /** Indicates whether this client expects a disconnect message. */
     private volatile boolean expectingDisconnect = false;
-    
-    /** The current sessionId, if logged in. */
-    private SessionId sessionId;
 
-    /** The sequence number for ordered messages sent from this client. */
-    private AtomicLong sequenceNumber = new AtomicLong(0);
+    /** Indicates whether this client is logged in. */
+    private volatile boolean loggedIn = false;
 
     /** Reconnection key.  TODO reconnect not implemented */
     @SuppressWarnings("unused")
@@ -157,7 +129,7 @@ public class SimpleClient implements ServerSession {
      * {@link SimpleClientListener#getPasswordAuthentication
      * getPasswordAuthentication} method with a login prompt.
      * <p>
-     * Next, if a connection with the server is successfuly established and
+     * Next, if a connection with the server is successfully established and
      * the client's login credential (as obtained above) is verified, then
      * the client listener's {@link SimpleClientListener#loggedIn loggedIn}
      * method is invoked. If, however, the login fails due to a connection
@@ -207,14 +179,6 @@ public class SimpleClient implements ServerSession {
     /**
      * {@inheritDoc}
      */
-    public SessionId getSessionId() {
-        checkConnected();
-        return sessionId;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public boolean isConnected() {
         return (clientConnection != null);
     }
@@ -234,6 +198,7 @@ public class SimpleClient implements ServerSession {
         }
         if (force) {
             try {
+                loggedIn = false;
                 clientConnection.disconnect();
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During forced logout:");
@@ -241,14 +206,14 @@ public class SimpleClient implements ServerSession {
             }
         } else {
             try {
-                MessageBuffer msg = new MessageBuffer(3);
-                msg.putByte(SimpleSgsProtocol.VERSION).
-                    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                    putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-                sendRaw(msg.getBuffer());
+                ByteBuffer msg = 
+                    ByteBuffer.wrap(
+                        new byte[] { SimpleSgsProtocol.LOGOUT_REQUEST });
+                sendRaw(msg.asReadOnlyBuffer());
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During graceful logout:");
                 try {
+                    loggedIn = false;
                     clientConnection.disconnect();
                 } catch (IOException e2) {
                     logger.logThrow(Level.FINE, e2, "During forced logout:");
@@ -261,20 +226,17 @@ public class SimpleClient implements ServerSession {
     /**
      * {@inheritDoc}
      */
-    public void send(byte[] message) throws IOException {
+    public void send(ByteBuffer message) throws IOException {
         checkConnected();
-        MessageBuffer msg =
-            new MessageBuffer(3 + 8 + 2 + message.length);
-        msg.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-            putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-            putLong(sequenceNumber.getAndIncrement()).
-            putByteArray(message);
-        sendRaw(msg.getBuffer());
+        ByteBuffer msg = ByteBuffer.allocate(1 + message.remaining());
+        msg.put(SimpleSgsProtocol.SESSION_MESSAGE)
+           .put(message)
+           .flip();
+        sendRaw(msg);
     }
 
-    private void sendRaw(byte[] data) throws IOException {
-        clientConnection.sendMessage(data);
+    private void sendRaw(ByteBuffer buf) throws IOException {
+        clientConnection.sendMessage(buf);
     }
     
     private void checkConnected() {
@@ -287,7 +249,7 @@ public class SimpleClient implements ServerSession {
     }
 
     private void checkLoggedIn() {
-        if (getSessionId() == null) {
+        if (! loggedIn) {
             RuntimeException re =
                 new IllegalStateException("Client not logged in");
             logger.logThrow(Level.FINE, re, re.getMessage());
@@ -326,16 +288,15 @@ public class SimpleClient implements ServerSession {
             String user = authentication.getUserName();
             String pass = new String(authentication.getPassword());
             MessageBuffer msg =
-                new MessageBuffer(3 +
+                new MessageBuffer(2 +
                     MessageBuffer.getSize(user) +
                     MessageBuffer.getSize(pass));
-            msg.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+            msg.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
                 putString(user).
                 putString(pass);
             try {
-                sendRaw(msg.getBuffer());
+                sendRaw(ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer());
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During login request:");
                 logout(true);
@@ -354,27 +315,14 @@ public class SimpleClient implements ServerSession {
                 clientConnection = null;
                 connectionStateChanging = false;
             }
-            sessionId = null;
             String reason = null;
             if (message != null) {
                 MessageBuffer msg = new MessageBuffer(message);
                 reason = msg.getString();
             }
-            
-            for (SimpleClientChannel channel : channels.values()) {
-                try {
-                    channel.left();
-                } catch (RuntimeException e) {
-                    logger.logThrow(Level.FINE, e,
-                        "During leftChannel ({0}) on disconnect:",
-                        channel.getName());
-                    // ignore the exception
-                }
-            }
-            channels.clear();
 
-            // FIXME ignore graceful from connection for now (not implemented),
-            // instead look at the boolean we set when expecting disconnect
+            // TBI implement graceful disconnect.
+            // For now, look at the boolean we set when expecting disconnect
             clientListener.disconnected(expectingDisconnect, reason);
             expectingDisconnect = false;
         }
@@ -385,40 +333,15 @@ public class SimpleClient implements ServerSession {
         public void receivedMessage(byte[] message) {
             try {
                 MessageBuffer msg = new MessageBuffer(message);
-                byte version = msg.getByte();
-                if (version != SimpleSgsProtocol.VERSION) {
-                    throw new IOException(
-                        String.format("Bad version 0x%02X, wanted: 0x%02X",
-                            version,
-                            SimpleSgsProtocol.VERSION));
-                }
-                
-                byte service = msg.getByte();
                 
                 if (logger.isLoggable(Level.FINER)) {
                     String logMessage = String.format(
-                        "Message length:%d service:0x%02X",
-                        message.length,
-                        service);
+                        "Message length:%d", message.length);
                     logger.log(Level.FINER, logMessage);
                 }
-    
-                switch (service) {
 
-                // Handle "Application Service" messages
-                case SimpleSgsProtocol.APPLICATION_SERVICE:
-                    handleApplicationMessage(msg);
-                    break;
+                handleApplicationMessage(msg);
 
-                // Handle Channel Service messages
-                case SimpleSgsProtocol.CHANNEL_SERVICE:
-                    handleChannelMessage(msg);
-                    break;
-
-                default:
-                    throw new IOException(
-                        String.format("Unknown service 0x%02X", service));
-                }
             } catch (IOException e) {
                 logger.logThrow(Level.FINER, e, e.getMessage());
                 if (isConnected()) {
@@ -440,33 +363,46 @@ public class SimpleClient implements ServerSession {
             switch (command) {
             case SimpleSgsProtocol.LOGIN_SUCCESS:
                 logger.log(Level.FINER, "Logged in");
-		byte[] idBytes = CompactId.getCompactId(msg).getId();
-                sessionId = SessionId.fromBytes(idBytes);
-		idBytes = CompactId.getCompactId(msg).getId();
-                reconnectKey = idBytes;
+                reconnectKey = msg.getBytes(msg.limit() - msg.position());
+                loggedIn = true;
                 clientListener.loggedIn();
                 break;
 
-            case SimpleSgsProtocol.LOGIN_FAILURE:
-                logger.log(Level.FINER, "Login failed");
-                clientListener.loginFailed(msg.getString());
+            case SimpleSgsProtocol.LOGIN_FAILURE: {
+                String reason = msg.getString();
+                logger.log(Level.FINER, "Login failed: {0}", reason);
+                clientListener.loginFailed(reason);
+                break;
+            }
+
+            case SimpleSgsProtocol.LOGIN_REDIRECT:
+                String hostname = msg.getString();
+                logger.log(Level.FINER, "Login redirect: {0}", hostname);
+                // TBI login redirect
+                clientListener.loginFailed(
+                    "unimplemented, want redirect to " + hostname);
                 break;
 
-            case SimpleSgsProtocol.SESSION_MESSAGE:
+            case SimpleSgsProtocol.SESSION_MESSAGE: {
                 logger.log(Level.FINEST, "Direct receive");
                 checkLoggedIn();
-                msg.getLong(); // FIXME sequence number
-                clientListener.receivedMessage(msg.getByteArray());
+                byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
+                ByteBuffer buf = ByteBuffer.wrap(msgBytes);
+                clientListener.receivedMessage(buf.asReadOnlyBuffer());
                 break;
+            }
 
             case SimpleSgsProtocol.RECONNECT_SUCCESS:
                 logger.log(Level.FINER, "Reconnected");
+                loggedIn = true;
+                reconnectKey = msg.getBytes(msg.limit() - msg.position());
                 clientListener.reconnected();
                 break;
 
             case SimpleSgsProtocol.RECONNECT_FAILURE:
                 try {
-                    logger.log(Level.FINER, "Reconnect failed");
+                    String reason = msg.getString();
+                    logger.log(Level.FINER, "Reconnect failed: {0}", reason);
                     clientConnection.disconnect();
                 } catch (IOException e) {
                     if (logger.isLoggable(Level.FINE)) {
@@ -480,6 +416,7 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.LOGOUT_SUCCESS:
                 logger.log(Level.FINER, "Logged out gracefully");
                 expectingDisconnect = true;
+                loggedIn = false;
                 // Server should disconnect us
                 /*
                 try {
@@ -497,74 +434,6 @@ public class SimpleClient implements ServerSession {
             default:
                 throw new IOException(
                     String.format("Unknown session opcode: 0x%02X", command));
-            }
-        }
-        
-        private void handleChannelMessage(MessageBuffer msg)
-            throws IOException
-        {
-            byte command = msg.getByte();
-            switch (command) {
-
-            case SimpleSgsProtocol.CHANNEL_JOIN: {
-                logger.log(Level.FINER, "Channel join");
-                checkLoggedIn();
-                String channelName = msg.getString();
-		CompactId channelId = CompactId.getCompactId(msg);
-                SimpleClientChannel channel =
-                    new SimpleClientChannel(channelName, channelId);
-                if (channels.putIfAbsent(channelId, channel) == null) {
-                    channel.joined();
-                } else {
-                    logger.log(Level.WARNING,
-                        "Cannot join channel {0}: already a member",
-                        channelName);
-                }
-                break;
-            }
-
-            case SimpleSgsProtocol.CHANNEL_LEAVE: {
-                logger.log(Level.FINER, "Channel leave");
-                checkLoggedIn();
-                CompactId channelId = CompactId.getCompactId(msg);
-                SimpleClientChannel channel =
-                    channels.remove(channelId);
-                if (channel != null) {
-                    channel.left();
-                } else {
-                    logger.log(Level.WARNING,
-                        "Cannot leave channel {0}: not a member",
-                        channelId);
-                }
-                break;
-            }
-
-            case SimpleSgsProtocol.CHANNEL_MESSAGE:
-                logger.log(Level.FINEST, "Channel recv");
-                checkLoggedIn();
-                CompactId channelId = CompactId.getCompactId(msg);
-                SimpleClientChannel channel = channels.get(channelId);
-                if (channel == null) {
-                    logger.log(Level.WARNING,
-                        "Ignore message on channel {0}: not a member",
-                        channelId);
-                    return;
-                }
-
-                msg.getLong(); // FIXME sequence number
-                
-                CompactId compactSessionId = CompactId.getCompactId(msg);
-                SessionId sid =
-		    compactSessionId.equals(SERVER_ID) ?
-		    null :
-		    SessionId.fromBytes(compactSessionId.getId());
-                
-                channel.receivedMessage(sid, msg.getByteArray());
-                break;
-
-            default:
-                throw new IOException(
-                    String.format("Unknown channel opcode: 0x%02X", command));
             }
         }
 
@@ -599,146 +468,6 @@ public class SimpleClient implements ServerSession {
                         "Not supported by SimpleClient");
             logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
-        }
-    }
-
-    /**
-     * Simple ClientChannel implementation
-     */
-    final class SimpleClientChannel implements ClientChannel {
-
-        private final String channelName;
-	private final CompactId channelId;
-        
-        /**
-         * The listener for this channel if the client is a member,
-         * or null if the client is no longer a member of this channel.
-         */
-        private volatile ClientChannelListener listener = null;
-
-        private final AtomicBoolean isJoined = new AtomicBoolean(false);
-
-        SimpleClientChannel(String name, CompactId id) {
-            this.channelName = name;
-	    this.channelId = id;
-        }
-
-        // Implement ClientChannel
-
-        /**
-         * {@inheritDoc}
-         */
-        public String getName() {
-            return channelName;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void send(byte[] message) throws IOException {
-            sendInternal(null, message);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void send(SessionId recipient, byte[] message)
-            throws IOException
-        {
-            sendInternal(Collections.singleton(recipient), message);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        public void send(Set<SessionId> recipients, byte[] message)
-            throws IOException
-        {
-            sendInternal(recipients, message);
-        }
-
-        // Implementation details
-
-        void joined() {
-            if (! isJoined.compareAndSet(false, true)) {
-                throw new IllegalStateException(
-                    "Already joined to channel " + channelName);
-            }
-
-            assert listener == null;
-
-            try {
-                listener = clientListener.joinedChannel(this);
-
-                if (listener == null) {
-                    throw new NullPointerException(
-                        "The returned ClientChannelListener must not be null");
-                }
-            } catch (RuntimeException ex) {
-                isJoined.set(false);
-                throw ex;
-            }
-        }
-
-        void left() {
-            if (! isJoined.compareAndSet(true, false)) {
-                throw new IllegalStateException(
-                    "Cannot leave unjoined channel " + channelName);
-            }
-
-            final ClientChannelListener l = this.listener;
-            this.listener = null;
-
-            l.leftChannel(this);
-       }
-        
-        void receivedMessage(SessionId sid, byte[] message) {
-            if (!  isJoined.get()) {
-                throw new IllegalStateException(
-                    "Cannot receive on unjoined channel " + channelName);
-            }
-
-            listener.receivedMessage(this, sid, message);
-        }
-
-        void sendInternal(Set<SessionId> recipients, byte[] message)
-            throws IOException
-        {
-            if (! isJoined.get()) {
-                throw new IllegalStateException(
-                    "Cannot send on unjoined channel " + channelName);
-            }
-            int totalSessionLength = 0;
-            if (recipients != null) {
-                for (SessionId recipientId : recipients) {
-                    totalSessionLength +=
-			((SimpleSessionId) recipientId).getCompactId().
-			    getExternalFormByteCount();
-                }
-            }
-
-            MessageBuffer msg =
-                new MessageBuffer(3 +
-		    channelId.getExternalFormByteCount() +
-                    8 +
-                    2 + totalSessionLength +
-                    2 + message.length);
-            msg.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-                putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
-                putBytes(channelId.getExternalForm()).
-                putLong(sequenceNumber.getAndIncrement());
-            if (recipients == null) {
-                msg.putShort(0);
-            } else {
-                msg.putShort(recipients.size());
-                for (SessionId recipientId : recipients) {
-                    msg.putBytes(((SimpleSessionId) recipientId).
-                        getCompactId().getExternalForm());
-                }
-            }
-            msg.putByteArray(message);
-            sendRaw(msg.getBuffer());
         }
     }
 }

@@ -315,6 +315,64 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
+    /**
+     * Test specifying negative transaction IDs to all server methods with
+     * transaction ID parameters.
+     */
+    public void testNegativeTxnIds() {
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.createObject(Long.MIN_VALUE); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.markForUpdate(-1, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getObject(-2, oid, true); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObject(-3, oid, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObjects(
+		-4, new long[] { oid }, new byte[][] { new byte[0] }); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeObject(-5, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getBinding(-6, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setBinding(-7, "foo", oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeBinding(-8, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextBoundName(-9, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getClassId(-10, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() {
+	    void run() throws Exception {
+		server.getClassInfo(-11, 3); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextObjectId(-12, 4); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepare(-13); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.commit(-14); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepareAndCommit(-15); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.abort(-16); } };
+     }
+
+    /** Run the action and check that it throws IllegalArgumentException. */
+    private abstract static class AssertThrowsIllegalArgumentException {
+	abstract void run() throws Exception;
+	AssertThrowsIllegalArgumentException() {
+	    try {
+		run();
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(e);
+	    } catch (Exception e) {
+		fail("Expected IllegalArgumentException: " + e);
+	    }
+	}
+    }
+
     /* -- Other tests -- */
 
     /**

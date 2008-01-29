@@ -19,8 +19,9 @@
 
 package com.sun.sgs.impl.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
@@ -58,7 +59,7 @@ class ProfileReportImpl implements ProfileReport {
 
     // the final fields, set by the constructor
     final KernelRunnable task;
-    final TaskOwner owner;
+    final Identity owner;
     final long scheduledStartTime;
     final int readyCount;
     final long actualStartTime;
@@ -86,12 +87,12 @@ class ProfileReportImpl implements ProfileReport {
      * actual starting time being set to the current time.
      *
      * @param task the <code>KernelRunnable</code> being reported on
-     * @param owner the <code>TaskOwner</code> for the given task
+     * @param owner the <code>Identity</code> that owns the task
      * @param scheduledStartTime the time the task was scheduled to run
      * @param readyCount the number of tasks in the scheduler, ready to run,
      *                   that are associated with the same context as the task
      */
-    ProfileReportImpl(KernelRunnable task, TaskOwner owner,
+    ProfileReportImpl(KernelRunnable task, Identity owner,
                       long scheduledStartTime, int readyCount) {
         this.task = task;
         this.owner = owner;
@@ -194,7 +195,7 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public TaskOwner getTaskOwner() {
+    public Identity getTaskOwner() {
         return owner;
     }
 
