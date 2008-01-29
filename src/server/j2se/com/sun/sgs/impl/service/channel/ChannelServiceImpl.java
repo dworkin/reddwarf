@@ -33,6 +33,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
+import com.sun.sgs.impl.service.session.MessageRejectedException;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -58,7 +59,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.nio.BufferOverflowException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -481,7 +481,9 @@ public class ChannelServiceImpl implements ChannelManager, Service {
                     Object reservation = sgsSession.reserveProtocolMessage(
                         protocolMessage, cachedState.delivery);
                     sendReservations.put(sgsSession, reservation);
-                } catch (BufferOverflowException e) {
+                } catch (MessageRejectedException e) {
+                    // TODO log the exception
+
                     // Can't get the reservation for this session.
                     // TODO use a policy here
                     // For now, forcibly disconnect the slow recipient

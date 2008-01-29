@@ -52,7 +52,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.LinkedList;
@@ -684,7 +683,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             synchronized (lock) {
                 prevAvailable = availableToReserve;
                 if (prevAvailable < size)
-                    throw new BufferOverflowException();
+                    throw new MessageRejectedException(
+                        "Cannot reserve " + size +
+                        " bytes, only " + prevAvailable +
+                        " available");
 
                 availableToReserve = prevAvailable - size;
             }
