@@ -365,7 +365,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testAssignNodeTwiceFailed() throws Exception {
         commitTransaction();
         
-        Class NodeImplClass = 
+        Class<?> NodeImplClass = 
                 Class.forName("com.sun.sgs.impl.service.watchdog.NodeImpl");
         Method setFailedMethod = NodeImplClass.getDeclaredMethod(
                 "setFailed",
