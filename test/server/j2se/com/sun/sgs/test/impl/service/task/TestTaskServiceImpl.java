@@ -57,9 +57,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 
-import java.util.LinkedHashSet;
 import java.util.MissingResourceException;
 import java.util.Properties;
 
@@ -158,10 +156,10 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testConstructorNoScheduler() throws Exception {
-        Class criClass = 
+        Class<?> criClass = 
             Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
                 
-        Constructor criCtor =  criClass.getDeclaredConstructor(new Class[] {});
+        Constructor<?> criCtor =  criClass.getDeclaredConstructor(new Class[] {});
         criCtor.setAccessible(true);
         try {
             new TaskServiceImpl(new Properties(),

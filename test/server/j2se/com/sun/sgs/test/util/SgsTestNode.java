@@ -54,10 +54,10 @@ public class SgsTestNode {
     // Reflective stuff.
 
     /** Kernel class */
-    private static Class kernelClass;
+    private static Class<?> kernelClass;
 
     /** kernel constructor */
-    private static Constructor kernelCtor;
+    private static Constructor<?> kernelCtor;
     /** kernel shutdown */
     private static Method kernelShutdownMethod;
     /** transaction proxy */
@@ -125,7 +125,7 @@ public class SgsTestNode {
      *                     defaults
      */
     public SgsTestNode(String appName,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties) throws Exception
     {
         this(appName, null, listenerClass, properties, true);
@@ -145,7 +145,7 @@ public class SgsTestNode {
      *                     fresh
      */
     public SgsTestNode(String appName,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties,
                        boolean clean) throws Exception
     {
@@ -164,7 +164,7 @@ public class SgsTestNode {
      *                     replaced by custom implementations
      */
     public SgsTestNode(SgsTestNode firstNode,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties) throws Exception
     {
         this (firstNode.appName, firstNode, listenerClass, properties, false);
@@ -190,7 +190,7 @@ public class SgsTestNode {
      */
     public SgsTestNode(String appName, 
                 SgsTestNode serverNode,
-                Class listenerClass,
+                Class<?> listenerClass,
                 Properties properties,
                 boolean clean) 
         throws Exception
@@ -336,7 +336,7 @@ public class SgsTestNode {
      */
     public static Properties getDefaultProperties(String appName, 
                                            SgsTestNode serverNode,
-                                           Class listenerClass) 
+                                           Class<?> listenerClass) 
         throws Exception
     {
         boolean isServerNode = serverNode == null;

@@ -58,8 +58,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
-import static org.junit.Assert.*;
-
 
 /**
  * Test the {@code TaskServiceImpl} class for specific cases with multiple
