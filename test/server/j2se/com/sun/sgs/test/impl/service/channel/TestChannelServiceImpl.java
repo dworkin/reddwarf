@@ -1451,31 +1451,33 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(1);
-                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-                logoutAck = false;
-                awaitGraceful = true;
+            }
+            MessageBuffer buf = new MessageBuffer(1);
+            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+            logoutAck = false;
+            awaitGraceful = true;
+            try {
+                connection.sendBytes(buf.getBuffer());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            synchronized (lock) {
                 try {
-                    connection.sendBytes(buf.getBuffer());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (lock) {
-                    try {
-                        if (logoutAck == false) {
-                            lock.wait(WAIT_TIME);
-                        }
-                        if (logoutAck != true) {
-                            throw new RuntimeException(
-                                "DummyClient.disconnect[" + name + "] timed out");
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect[" + name + "] timed out", e);
+                    if (logoutAck == false) {
+                        lock.wait(WAIT_TIME);
                     }
+                    if (logoutAck != true) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect[" + name + "] timed out");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                        "DummyClient.disconnect[" + name + "] timed out", e);
+                } finally {
+                    if (! logoutAck)
+                        disconnect();
                 }
             }
-	    disconnect();
 	}
 
 	private class Listener implements ConnectionListener {

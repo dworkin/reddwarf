@@ -266,7 +266,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    throw e;
 	    
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -276,7 +276,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -325,7 +325,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} finally {
 	    for (DummyClient client : clients) {
 		try {
-		    client.disconnect(false);
+		    client.disconnect();
 		} catch (Exception e) {
 		    System.err.println(
 			"Exception disconnecting client: " + client);
@@ -349,7 +349,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -375,7 +375,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -401,7 +401,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -427,7 +427,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -442,7 +442,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    e.printStackTrace();
 	    fail("testLogout interrupted");
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -468,7 +468,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("notifyLoggedOut not invoked for identity: " + name);
 	    }
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -549,7 +549,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -607,7 +607,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 }
             }, taskOwner);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -637,7 +637,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 }
              }, taskOwner);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -670,7 +670,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login("dummypassword");
 	    client.sendMessages(numMessages, expectedMessages, exception);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -751,13 +751,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
 	}
 
-	void disconnect(boolean graceful) {
+	void disconnect() {
             System.err.println("DummyClient.disconnect: " + graceful);
-
-            if (graceful) {
-                logout();
-                return;
-            }
 
             synchronized (lock) {
                 if (connected == false) {
@@ -883,28 +878,31 @@ public class TestClientSessionServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(1);
-                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-                logoutAck = false;
-                awaitGraceful = true;
+            }
+            MessageBuffer buf = new MessageBuffer(1);
+            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+            logoutAck = false;
+            awaitGraceful = true;
+            try {
+                connection.sendBytes(buf.getBuffer());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            synchronized (lock) {
                 try {
-                    connection.sendBytes(buf.getBuffer());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (lock) {
-                    try {
-                        if (logoutAck == false) {
-                            lock.wait(WAIT_TIME);
-                        }
-                        if (logoutAck != true) {
-                            throw new RuntimeException(
-                                "DummyClient.disconnect timed out");
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect timed out", e);
+                    if (logoutAck == false) {
+                        lock.wait(WAIT_TIME);
                     }
+                    if (logoutAck != true) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect timed out");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                        "DummyClient.disconnect timed out", e);
+                } finally {
+                    if (! logoutAck)
+                        disconnect();
                 }
             }
 	}
