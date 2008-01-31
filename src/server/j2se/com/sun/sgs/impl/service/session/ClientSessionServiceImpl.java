@@ -181,14 +181,8 @@ public class ClientSessionServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-            if (! properties.containsKey(StandardProperties.APP_PORT)) {
-                throw new IllegalArgumentException(
-                    "The " + StandardProperties.APP_PORT +
-                    " property must be specified");
-            }
-
-            appPort = wrappedProps.getIntProperty(
-                StandardProperties.APP_PORT, 0, 1, 65535);
+            appPort = wrappedProps.getRequiredIntProperty(
+                StandardProperties.APP_PORT, 1, 65535);
 
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);

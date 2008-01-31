@@ -278,14 +278,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
 
-	    if (wrappedProps.getProperty(StandardProperties.APP_PORT) == null) {
-	        throw new IllegalArgumentException(
-                    "The " + StandardProperties.APP_PORT +
-                    " property must be specified");
-	    }
-
-	    int appPort = wrappedProps.getIntProperty(
-	        StandardProperties.APP_PORT, 0, 1, 65535);
+	    int appPort = wrappedProps.getRequiredIntProperty(
+	        StandardProperties.APP_PORT, 1, 65535);
 
 	    String nodeEndpoint = clientHost + ":" + appPort;
 
