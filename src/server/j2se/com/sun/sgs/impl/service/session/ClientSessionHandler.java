@@ -582,8 +582,6 @@ class ClientSessionHandler {
 			}
 			handleDisconnect(false);
 		    }});
-
-		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 

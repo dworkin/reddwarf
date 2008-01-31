@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -161,6 +162,14 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /** The node ID for this server. */
     final long localNodeId;
 
+    /**
+     * If {@code true}, this stack is a full stack, so the local node
+     * can be assigned as a backup node.  If {@code false}, this stack
+     * is a server stack only, so the local node can not be assigned as
+     * a backup node.
+     */
+    private final boolean isFullStack;
+
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
 
@@ -249,6 +258,13 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 		assert WatchdogServerImpl.txnProxy == txnProxy;
 	    }
 	}
+
+	String finalServiceProperty =
+	    wrappedProps.getProperty(StandardProperties.FINAL_SERVICE);
+	isFullStack =
+	    finalServiceProperty == null ||
+	    finalServiceProperty.equals(
+		StandardProperties.StandardService.LAST_SERVICE);
 	
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
@@ -726,28 +742,34 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
                 values = aliveNodes.values().toArray(new NodeImpl[0]);
             }
             int numAliveNodes = values.length;       
-            if (numAliveNodes > 1) {
-                int random = backupChooser.nextInt(numAliveNodes);
-                for (int i = 0; i < numAliveNodes; i++) {
-                    // Choose one of the values[] elements randomly. If we
-                    // chose the localNodeId, loop again, choosing the next
-                    // array element.
-                    int tryNode = (random + i) % numAliveNodes;
-                    NodeImpl backupCandidate = values[tryNode];
-                    // TBD: the watchdog server's node should not be
-                    // assigned as a backup because it may not contain
-                    // a full stack.  If it is the only "alive" node,
-                    // then a backup for this node will remain
-                    // unassigned until a new node is registered.
-                    // This will delay recovery. -- ann (9/7/07)
-
-                    // assert backupCandidate.getId() !=  node.getId()
-                    if (backupCandidate.getId() != localNodeId) {
+	    int random = backupChooser.nextInt(numAliveNodes);
+	    for (int i = 0; i < numAliveNodes; i++) {
+		// Choose one of the values[] elements randomly. If we
+		// chose the localNodeId, loop again, choosing the next
+		// array element.
+		int tryNode = (random + i) % numAliveNodes;
+		NodeImpl backupCandidate = values[tryNode];
+		/*
+		 * The local node can only be assigned as a backup
+		 * if this stack is a full stack (meaning that
+		 * this stack is running a single-node application).
+		 * If this node is the only "alive" node in a server
+		 * stack, then a backup for the failed node will remain
+		 * unassigned until a new node is registered and
+		 * recovery for the failed node will be delayed.
+		 */
+		// assert backupCandidate.getId() !=  node.getId()
+		if (isFullStack ||
+		    backupCandidate.getId() != localNodeId)
+		    {
                         choice = backupCandidate;
                         break;
                     }
-                }
-            }
+	    }
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE, "backup:{0} chosen for node:{1}",
+			   choice, node);
+	    }
 	    return choice;
 	}
 
