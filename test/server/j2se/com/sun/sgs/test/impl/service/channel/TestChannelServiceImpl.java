@@ -184,7 +184,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
-            props.put(StandardProperties.APP_PORT, serverNode.getAppPort());
+            props.put(StandardProperties.APP_PORT,
+                      Integer.toString(serverNode.getAppPort()));
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             String endpoint = host + ":" + node.getAppPort();
