@@ -732,11 +732,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    if (connected != true) {
 			throw new RuntimeException(
- 			    "DummyClient.connect timed out");
+ 			    "DummyClient.connect timed out to " + port);
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.connect timed out", e);
+			"DummyClient.connect timed out to " + port, e);
 		}
 	    }
 	    
