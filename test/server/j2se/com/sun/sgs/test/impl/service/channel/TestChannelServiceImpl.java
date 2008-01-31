@@ -789,7 +789,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName = "test";
 	createChannel(channelName);
 	ClientGroup group = new ClientGroup(sevenDwarfs);
-	
+
 	try {
 	    boolean failed = false;
 	    joinUsers(channelName, sevenDwarfs);

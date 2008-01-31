@@ -64,6 +64,17 @@ public class SocketConnection
     private final AtomicReference<IoFuture> lastWriteFuture =
         new AtomicReference<IoFuture>();
 
+    private static boolean lingerOnClose;
+
+    static {
+        try {
+            lingerOnClose =
+                Boolean.valueOf(System.getProperty("com.sun.sgs.io.lingerOnClose", "false"));
+        } catch (RuntimeException e) {
+            lingerOnClose = false;
+        }
+    }
+
     /**
      * Construct a new SocketConnection with the given listener, filter, and
      * session.
@@ -128,6 +139,10 @@ public class SocketConnection
         if (! closed.compareAndSet(false, true)) {
             checkConnected();
         }
+
+        if (! lingerOnClose) {
+            session.close();
+        }
     }
 
     // Implement FilterListener
@@ -162,7 +177,7 @@ public class SocketConnection
     public void operationComplete(IoFuture future) {
         if (lastWriteFuture.compareAndSet(future, null)) {
             // If this was the last write and we want to close, do so.
-            if (closed.get()) {
+            if (closed.get() && session.isConnected()) {
                 session.close();
             }
         }
