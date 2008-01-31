@@ -39,7 +39,7 @@ public interface WatchdogClient extends Remote {
      * {@value com.sun.sgs.impl.service.watchdog.NodeImpl#INVALID_ID}.
      *
      * @param	ids an array of node IDs
-     * @param	hosts an array of host names
+     * @param	hosts an array of host endpoints (hostname:port)
      * @param	status an array of node status
      * @param	backups an array of backup node IDs
      *

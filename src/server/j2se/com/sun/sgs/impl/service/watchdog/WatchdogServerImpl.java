@@ -222,7 +222,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
      * @param	properties server properties
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
-     * @param	hostname  the local hostname
+     * @param	nodeEndpoint the local node endpoint (hostname:port)
      * @param	client the local watchdog client
      *
      * @throws	Exception if there is a problem starting the server
@@ -230,7 +230,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     public WatchdogServerImpl(Properties properties,
 			      ComponentRegistry systemRegistry,
 			      TransactionProxy txnProxy,
-                              String hostname, 
+                              String nodeEndpoint, 
                               WatchdogClient client)
 	throws Exception
     {
@@ -278,7 +278,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	}
  
         // register our local id
-        long[] values = registerNode(hostname, client);
+        long[] values = registerNode(nodeEndpoint, client);
         localNodeId = values[0];
         
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
@@ -369,16 +369,20 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
     /**
      * {@inheritDoc}
      */
-    public long[] registerNode(String hostname, WatchdogClient client)
+    public long[] registerNode(String nodeEndpoint, WatchdogClient client)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
 
-	logger.log(Level.FINEST, "registering node for hostname:{0}", hostname);
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+	               "registering node for endpoint:{0}",
+	               nodeEndpoint);
+	}
 
 	try {
-	    if (hostname == null) {
-		throw new IllegalArgumentException("null hostname");
+	    if (nodeEndpoint == null) {
+		throw new IllegalArgumentException("null nodeEndpoint");
 	    } else if (client == null) {
 		throw new IllegalArgumentException("null client");
 	    }
@@ -390,11 +394,12 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "Failed to obtain node ID for host:{0}, throws", hostname);
+		    "Failed to obtain node ID for endpoint:{0}, throws",
+		    nodeEndpoint);
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, hostname, client);
+	    final NodeImpl node = new NodeImpl(nodeId, nodeEndpoint, client);
 	    assert ! aliveNodes.containsKey(nodeId);
 	
 	    // Persist node
@@ -838,7 +843,7 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	for (NodeImpl changedNode : changedNodes) {
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
-	    hosts[i] = changedNode.getHostName();
+	    hosts[i] = changedNode.getHostEndpoint();
 	    status[i] = changedNode.isAlive();
 	    backups[i] = changedNode.getBackupId();
 	    i++;

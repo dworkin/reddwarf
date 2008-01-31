@@ -39,7 +39,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.AcceptorListener;
@@ -60,8 +59,6 @@ public class SimpleServer implements ConnectionListener {
     private int port = 10002;
     
     final String TEST_CHANNEL_NAME = "Test Channel";
-    
-    final CompactId TEST_CHANNEL_ID = new CompactId(new byte[] { 0x22 });
 
     /**
      * Construct a new SimpleServer to accept incoming connections.
@@ -177,16 +174,14 @@ public class SimpleServer implements ConnectionListener {
             MessageBuffer reply;
             if (password.equals("guest")) {
 
-                byte[] reconnectKeyBytes = new byte[] {
+                byte[] reconnectKey = new byte[] {
                     0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
                 };
-		CompactId reconnectKey = new CompactId(reconnectKeyBytes);
 
                 reply =
-                    new MessageBuffer(1 +
-			reconnectKey.getExternalFormByteCount());
+                    new MessageBuffer(1 + reconnectKey.length);
                 reply.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		      putBytes(reconnectKey.getExternalForm());
+		      putBytes(reconnectKey);
             } else {
                 String reason = "Bad password";
                 reply =

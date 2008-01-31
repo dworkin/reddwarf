@@ -45,7 +45,7 @@ public class DummyWatchdogService implements WatchdogService {
 
     // the generator for all node identifiers
     private final static AtomicLong idGenerator = new AtomicLong(0);
-    // the map from node identitifer to Node instance
+    // the map from node identifier to Node instance
     private static ConcurrentHashMap<Long,Node> nodeMap;
     // the collection of listeners
     private static ConcurrentLinkedQueue<NodeListener> listeners;
@@ -146,8 +146,8 @@ public class DummyWatchdogService implements WatchdogService {
         public long getId() {
             return nodeId;
         }
-        public String getHostName() {
-            return "localhost";
+        public String getHostEndpoint() {
+            return "localhost:65535";
         }
         public boolean isAlive() {
             return isLocalNodeAlive();

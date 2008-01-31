@@ -181,24 +181,14 @@ public class ClientSessionServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-	    String portString =
-		wrappedProps.getProperty(StandardProperties.APP_PORT);
-	    if (portString == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property must be specified");
-	    }
-	    appPort = Integer.parseInt(portString);
-	    // TBD: do we want to restrict ports to > 1024?
-	    if (appPort < 0) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can't be negative: " + appPort);
-	    } else if (appPort > 65535) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can be greater than 65535: " + appPort);
-	    }
+            if (! properties.containsKey(StandardProperties.APP_PORT)) {
+                throw new IllegalArgumentException(
+                    "The " + StandardProperties.APP_PORT +
+                    " property must be specified");
+            }
+
+            appPort = wrappedProps.getIntProperty(
+                StandardProperties.APP_PORT, 0, 0, 65535);
 
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);

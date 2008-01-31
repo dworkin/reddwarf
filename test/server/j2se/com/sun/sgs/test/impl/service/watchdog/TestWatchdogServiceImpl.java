@@ -345,7 +345,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    watchdogService.shutdown();
 	    // wait for watchdog's renew to fail...
-	    Thread.currentThread().sleep(renewTime * 4);
+	    Thread.sleep(renewTime * 4);
 
             taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -404,7 +404,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	    watchdogService.shutdown();
 	    // wait for watchdog's renew to fail...
-	    Thread.currentThread().sleep(renewTime * 4);
+	    Thread.sleep(renewTime * 4);
 	    if (watchdog.isLocalNodeAliveNonTransactional()) {
 		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
 		     "to return false");
@@ -443,7 +443,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testGetNodes() throws Exception {
         addNodes(null, NUM_WATCHDOGS);
-        Thread.currentThread().sleep(renewTime);
+        Thread.sleep(renewTime);
         CountNodesTask task = new CountNodesTask();
         taskScheduler.runTransactionalTask(task, taskOwner);
         int numNodes = task.numNodes;
@@ -594,7 +594,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         addNodes(null, NUM_WATCHDOGS);
 
         // wait for all nodes to get notified...
-        Thread.currentThread().sleep(renewTime * 4);
+        Thread.sleep(renewTime * 4);
 
         Set<Node> nodes = listener.getStartedNodes();
         System.err.println("startedNodes: " + nodes);
@@ -642,7 +642,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
 
 	// wait for all nodes to fail...
-	Thread.currentThread().sleep(renewTime * 4);
+	Thread.sleep(renewTime * 4);
 
 	Set<Node> nodes = listener.getFailedNodes();
 	System.err.println("failedNodes: " + nodes);

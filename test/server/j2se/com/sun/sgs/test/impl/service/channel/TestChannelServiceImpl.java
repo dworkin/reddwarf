@@ -33,15 +33,11 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -51,7 +47,6 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -77,7 +72,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -114,15 +108,6 @@ public class TestChannelServiceImpl extends TestCase {
     /** The channel service on the server node. */
     private ChannelManager channelService;
 
-    /** The client session service on the server node. */
-    private ClientSessionService sessionService;
-
-    /** True if test passes. */
-    private boolean passed;
-
-    /** The test clients, keyed by user name. */
-    private static Map<String, DummyClient> dummyClients;
-
     /** The listen port for the client session service. */
     private int port;
 
@@ -140,8 +125,6 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Creates and configures the channel service. */
     protected void setUp() throws Exception {
-	passed = false;
-        dummyClients = new HashMap<String, DummyClient>();
 	System.err.println("Testcase: " + getName());
         setUp(true);
     }
@@ -161,7 +144,6 @@ public class TestChannelServiceImpl extends TestCase {
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
-	sessionService = serverNode.getClientSessionService();
 	channelService = serverNode.getChannelService();
 	
 	serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
@@ -171,7 +153,6 @@ public class TestChannelServiceImpl extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
         Thread.sleep(100);
-	passed = true;
     }
     
     /** Cleans up the transaction. */
@@ -193,19 +174,20 @@ public class TestChannelServiceImpl extends TestCase {
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
-     * @param hosts contains a host name for each additional node
+     * @param endpoints contains an endpoint for each additional node
      */
-    private void addNodes(String... hosts) throws Exception {
+    private void addNodes(String... endpoints) throws Exception {
         // Create the other nodes
         additionalNodes = new HashMap<String, SgsTestNode>();
 
-        for (String host : hosts) {
+        for (String endpoint : endpoints) {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
+	    String host = endpoint.split(":", 2)[0];
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
-	    additionalNodes.put(host, node);
+	    additionalNodes.put(endpoint, node);
         }
     }
 
@@ -862,7 +844,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelSendAllMultipleNodes() throws Exception {
-	addNodes("one", "two", "three");
+	addNodes("one:0", "two:0", "three:0");
 	testChannelSendAll();
     }
     
@@ -987,7 +969,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
 	    setUp(false);
-	    addNodes("recoveryNode");
+	    addNodes("recoveryNode:0");
 
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(channelName, false);
@@ -1187,60 +1169,12 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- other classes -- */
 
     /**
-     * Dummy identity coordinator for testing purposes.
-     */
-    private static class DummyIdentityCoordinator implements IdentityCoordinator {
-	public Identity authenticateIdentity(IdentityCredentials credentials) {
-	    return new DummyIdentity(credentials);
-	}
-    }
-    
-    /**
-     * Identity returned by the DummyIdentityCoordinator.
-     */
-    private static class DummyIdentity implements Identity, Serializable {
-
-        private static final long serialVersionUID = 1L;
-        private final String name;
-
-        DummyIdentity(String name) {
-            this.name = name;
-        }
-
-	DummyIdentity(IdentityCredentials credentials) {
-	    this.name = ((NamePasswordCredentials) credentials).getName();
-	}
-	
-	public String getName() {
-	    return name;
-	}
-
-	public void notifyLoggedIn() {}
-
-	public void notifyLoggedOut() {}
-        
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (! (o instanceof DummyIdentity))
-                return false;
-            return ((DummyIdentity)o).name.equals(name);
-        }
-        
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
-    }
-
-    /**
      * Dummy client code for testing purposes.
      */
     private class DummyClient {
 
 	String name;
-	CompactId sessionId;
+	byte[] sessionId;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -1257,17 +1191,16 @@ public class TestChannelServiceImpl extends TestCase {
 	//private String channelName = null;
 	//private CompactId channelId = null;
 	private String reason;	
-	private String redirectHost;
+	private String redirectEndpoint;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	private final AtomicLong sequenceNumber = new AtomicLong(0);
 
 	
 	DummyClient() {
 	}
 
 	byte[] getSessionId() {
-	    return sessionId.getId();
+	    return sessionId;
 	}
 
 	DummyClient connect(int port) {
@@ -1337,7 +1270,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-	    redirectHost = null;
+	    redirectEndpoint = null;
 	}
 
 	DummyClient login(String user, String pass) {
@@ -1362,7 +1295,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
-	    String host = null;
+	    String endpoint = null;
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
@@ -1375,7 +1308,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (loginSuccess) {
 			return this;
 		    } else if (loginRedirect) {
-			host = redirectHost;
+			endpoint = redirectEndpoint;
 		    } else {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
@@ -1387,7 +1320,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    // handle redirected login
 	    int redirectPort =
-		(additionalNodes.get(host)).getAppPort();
+		(additionalNodes.get(endpoint)).getAppPort();
 	    disconnect();
 	    connect(redirectPort);
 	    return login(user, pass);
@@ -1429,14 +1362,6 @@ public class TestChannelServiceImpl extends TestCase {
 		    null :
 		    channelMessages.remove(0);
 	    }
-	}
-
-	private int getSize(Set<CompactId> ids) {
-	    int size = 0;
-	    for (CompactId id : ids) {
-		size += id.getExternalFormByteCount();
-	    }
-	    return size;
 	}
 
 	/**
@@ -1570,7 +1495,7 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
+                    sessionId = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1599,12 +1524,12 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectHost = buf.getString();
+		    redirectEndpoint = buf.getString();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost);
+					   ", endpoint:" + redirectEndpoint);
 			lock.notifyAll();
 		    } break;
 

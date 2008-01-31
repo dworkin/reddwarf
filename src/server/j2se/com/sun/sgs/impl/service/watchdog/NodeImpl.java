@@ -58,7 +58,7 @@ class NodeImpl
     /** The node id. */
     private final long id;
     
-    /** The host name, or {@code null}. */
+    /** The host endpoint (hostname:port), or {@code null}. */
     private final String host;
 
     /** The watchdog client, or {@code null}. */
@@ -75,7 +75,7 @@ class NodeImpl
 
     /**
      * The expiration time for this node. A value of {@code 0} means
-     * that either the value has not been intialized or the value is
+     * that either the value has not been initialized or the value is
      * not meaningful because the node has failed.
      */
     private transient long expiration;
@@ -99,33 +99,33 @@ class NodeImpl
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code isAlive} status.  This
+     * nodeId}, {@code hostEndpoint}, and {@code isAlive} status.  This
      * instance's watchdog client is set to {@code null} and its
      * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
-     * @param 	hostName a host name, or {@code null}
+     * @param 	hostEndpoint a host endpoint, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostEndpoint, boolean isAlive) {
+	this(nodeId, hostEndpoint, isAlive, INVALID_ID);
     }
 	
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, {@code backupId}, and {@code
+     * nodeId}, {@code hostEndpoint}, {@code backupId}, and {@code
      * isAlive} status.  This instance's watchdog client is set to
      * {@code null}.
      *
      * @param 	nodeId a node ID
-     * @param 	hostName a host name, or {@code null}
+     * @param   hostEndpoint a host endpoint, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
+    NodeImpl(long nodeId, String hostEndpoint, boolean isAlive, long backupId) {
 	this.id = nodeId;
-	this.host = hostName;
+	this.host = hostEndpoint;
 	this.client = null;
 	this.isAlive = isAlive;
 	this.backupId = backupId;
@@ -139,7 +139,7 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String getHostName() {
+    public String getHostEndpoint() {
 	return host;
     }
 
@@ -200,7 +200,7 @@ class NodeImpl
     
     /**
      * Returns the expiration time.  A value of {@code 0} means that
-     * either the value has not been intialized or the value is not
+     * either the value has not been initialized or the value is not
      * meaningful because the node has failed.  If {@link #isAlive}
      * returns {@code false} the value returned from this method is
      * not meaningful.

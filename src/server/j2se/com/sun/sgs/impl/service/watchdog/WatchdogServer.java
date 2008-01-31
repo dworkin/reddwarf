@@ -28,7 +28,7 @@ import java.rmi.Remote;
 public interface WatchdogServer extends Remote {
 
     /**
-     * Registers a node with the corresponding {@code hostname} and
+     * Registers a node with the corresponding {@code nodeEndpoint} and
      * {@code client}, and returns and array containing two {@code
      * long} values consisting of:
      *
@@ -47,7 +47,7 @@ public interface WatchdogServer extends Remote {
      * client} will be notified of these status changes via its {@link
      * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *
-     * @param	hostname  a hostname
+     * @param	nodeEndpoint  a node endpoint (hostname + port)
      * @param	client a watchdog client
      *
      * @return 	an array containing two {@code long} values consisting of
@@ -58,7 +58,7 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String hostname, WatchdogClient client)
+    long[] registerNode(String nodeEndpoint, WatchdogClient client)
 	throws NodeRegistrationFailedException, IOException;
 
     /**

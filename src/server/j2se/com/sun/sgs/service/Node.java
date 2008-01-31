@@ -33,11 +33,12 @@ public interface Node {
     long getId();
 
     /** 
-     * Returns this node's hostname.
+     * Returns this node's endpoint as a string.  The endpoint is
+     * represented as <i>hostname</i>:<i>port</i>
      *
-     * @return	this node's hostname
+     * @return	this node's endpoint
      */
-    String getHostName();
+    String getHostEndpoint();
 
     /**
      * Returns {@code true} if the node is known to be alive, and

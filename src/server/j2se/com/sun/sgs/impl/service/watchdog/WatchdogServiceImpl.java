@@ -274,9 +274,20 @@ public class WatchdogServiceImpl implements WatchdogService {
             
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
-
+            
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
+
+	    if (wrappedProps.getProperty(StandardProperties.APP_PORT) == null) {
+	        throw new IllegalArgumentException(
+                    "The " + StandardProperties.APP_PORT +
+                    " property must be specified");
+	    }
+
+	    int appPort = wrappedProps.getIntProperty(
+	        StandardProperties.APP_PORT, 0, 0, 65535);
+
+	    String nodeEndpoint = clientHost + ":" + appPort;
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
@@ -288,7 +299,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-                    clientHost, clientProxy);
+		    nodeEndpoint, clientProxy);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -320,7 +331,7 @@ public class WatchdogServiceImpl implements WatchdogService {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(clientHost, 
+                long[] values = serverProxy.registerNode(nodeEndpoint, 
                                                          clientProxy);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
@@ -335,8 +346,8 @@ public class WatchdogServiceImpl implements WatchdogService {
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, localNodeId:{1}",
-			   clientHost, localNodeId);
+			   "node registered, endpoint:{0}, localNodeId:{1}",
+			   nodeEndpoint, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -485,7 +496,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    while (getIsAlive() == true && ! shuttingDown()) {
 
 		try {
-		    Thread.currentThread().sleep(nextRenewInterval);
+		    Thread.sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
 		    return;
 		}

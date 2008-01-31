@@ -375,13 +375,14 @@ public class SimpleClient implements ServerSession {
                 break;
             }
 
-            case SimpleSgsProtocol.LOGIN_REDIRECT:
-                String hostname = msg.getString();
-                logger.log(Level.FINER, "Login redirect: {0}", hostname);
+            case SimpleSgsProtocol.LOGIN_REDIRECT: {
+                String endpoint = msg.getString();
+                logger.log(Level.FINER, "Login redirect: {0}", endpoint);
                 // TBI login redirect
                 clientListener.loginFailed(
-                    "unimplemented, want redirect to " + hostname);
+                    "unimplemented, want redirect to " + endpoint);
                 break;
+            }
 
             case SimpleSgsProtocol.SESSION_MESSAGE: {
                 logger.log(Level.FINEST, "Direct receive");

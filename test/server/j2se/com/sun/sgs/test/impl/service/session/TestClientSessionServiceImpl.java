@@ -32,7 +32,6 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.io.Connector;
@@ -58,7 +57,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import junit.framework.TestCase;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -140,19 +138,20 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
-     * @param hosts contains a host name for each additional node
+     * @param endpoints contains an endpoint for each additional node
      */
-    private void addNodes(String... hosts) throws Exception {
+    private void addNodes(String... endpoints) throws Exception {
         // Create the other nodes
         additionalNodes = new HashMap<String, SgsTestNode>();
 
-        for (String host : hosts) {
-	    Properties props = SgsTestNode.getDefaultProperties(
-	        APP_NAME, serverNode, DummyAppListener.class);
-	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+        for (String endpoint : endpoints) {
+            Properties props = SgsTestNode.getDefaultProperties(
+                APP_NAME, serverNode, DummyAppListener.class);
+            String host = endpoint.split(":", 2)[0];
+            props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
-	    additionalNodes.put(host, node);
+            additionalNodes.put(endpoint, node);
         }
     }
 
@@ -274,10 +273,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
-	String[] hosts = new String[] { "one", "two", "three", "four"};
+	String[] endpoints = new String[] { "one:0", "two:0", "three:0", "four:0"};
 	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
 	Set<DummyClient> clients = new HashSet<DummyClient>();
-	addNodes(hosts);
+	addNodes(endpoints);
 	boolean failed = false;
 	int redirectCount = 0;
 	try {
@@ -513,7 +512,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
 		fail("Failed node key prematurely removed: " + failedNodeKey);
 	    }
-            addNodes("one");
+            addNodes("one:0");
 	    client.checkDisconnected(false);
 
 	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
@@ -696,9 +695,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitLoginFailure = false;
 	private String reason;
 	private String redirectHost;
-	private CompactId sessionId;
-	private CompactId reconnectionKey;
-	private final AtomicLong sequenceNumber = new AtomicLong(0);
+	private byte[] sessionId;
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -938,7 +935,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
+		    // FIXME: this is actually the reconnect key, but the
+		    // current implementation sends the sessionId to aid
+		    // this test.
+		    sessionId = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
