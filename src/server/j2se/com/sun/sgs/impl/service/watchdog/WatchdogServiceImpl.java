@@ -285,7 +285,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    }
 
 	    int appPort = wrappedProps.getIntProperty(
-	        StandardProperties.APP_PORT, 0, 0, 65535);
+	        StandardProperties.APP_PORT, 0, 1, 65535);
 
 	    String nodeEndpoint = clientHost + ":" + appPort;
 

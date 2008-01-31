@@ -58,6 +58,8 @@ import java.util.Set;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import junit.framework.TestCase;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
@@ -90,6 +92,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
+
+    /** The next port to use for a listen socket. */
+    private final AtomicInteger nextPort = new AtomicInteger(40000);
 
     /** Any additional nodes, keyed by node hostname (for tests
      * needing more than one node). */
@@ -125,6 +130,8 @@ public class TestClientSessionServiceImpl extends TestCase {
                                              DummyAppListener.class);
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+        props.setProperty(StandardProperties.APP_PORT,
+                          Integer.toString(nextPort.getAndIncrement()));
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
@@ -148,6 +155,8 @@ public class TestClientSessionServiceImpl extends TestCase {
             Properties props = SgsTestNode.getDefaultProperties(
                 APP_NAME, serverNode, DummyAppListener.class);
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+            props.setProperty(StandardProperties.APP_PORT,
+                              Integer.toString(nextPort.getAndIncrement()));
             SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             String endpoint = host + ":" + node.getAppPort();

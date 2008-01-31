@@ -188,7 +188,7 @@ public class ClientSessionServiceImpl
             }
 
             appPort = wrappedProps.getIntProperty(
-                StandardProperties.APP_PORT, 0, 0, 65535);
+                StandardProperties.APP_PORT, 0, 1, 65535);
 
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
