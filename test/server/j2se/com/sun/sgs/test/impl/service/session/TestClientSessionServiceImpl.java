@@ -148,6 +148,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             Properties props = SgsTestNode.getDefaultProperties(
                 APP_NAME, serverNode, DummyAppListener.class);
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+            props.put(StandardProperties.APP_PORT, serverNode.getAppPort());
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             String endpoint = host + ":" + node.getAppPort();
@@ -193,8 +194,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME,
-		    "com.sun.sgs.app.port", "0");
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "0");
 	    new ClientSessionServiceImpl(props, null,
 					 serverNode.getProxy());
 	    fail("Expected NullPointerException");
@@ -207,8 +208,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME,
-		    "com.sun.sgs.app.port", "0");
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "0");
 	    new ClientSessionServiceImpl(props,
 					 serverNode.getSystemRegistry(), null);
 	    fail("Expected NullPointerException");
@@ -232,7 +233,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME);
+		    StandardProperties.APP_NAME, APP_NAME);
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());

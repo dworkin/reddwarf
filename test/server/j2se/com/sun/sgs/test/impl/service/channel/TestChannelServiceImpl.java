@@ -184,6 +184,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+            props.put(StandardProperties.APP_PORT, serverNode.getAppPort());
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             String endpoint = host + ":" + node.getAppPort();
@@ -206,7 +207,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
 	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
+		createProperties(StandardProperties.APP_NAME, APP_NAME);
 	    new ChannelServiceImpl(props, null,
 				   new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
@@ -218,7 +219,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
 	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
+		createProperties(StandardProperties.APP_NAME, APP_NAME);
 	    new ChannelServiceImpl(props, new DummyComponentRegistry(),
 				   null);
 	    fail("Expected NullPointerException");
