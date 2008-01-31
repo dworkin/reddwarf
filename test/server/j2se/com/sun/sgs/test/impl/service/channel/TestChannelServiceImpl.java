@@ -174,19 +174,19 @@ public class TestChannelServiceImpl extends TestCase {
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
-     * @param endpoints contains an endpoint for each additional node
+     * @param hosts contains a host name for each additional node
      */
-    private void addNodes(String... endpoints) throws Exception {
+    private void addNodes(String... hosts) throws Exception {
         // Create the other nodes
         additionalNodes = new HashMap<String, SgsTestNode>();
 
-        for (String endpoint : endpoints) {
+        for (String host : hosts) {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
-	    String host = endpoint.split(":", 2)[0];
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
+            String endpoint = host + ":" + node.getAppPort();
 	    additionalNodes.put(endpoint, node);
         }
     }
@@ -844,7 +844,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelSendAllMultipleNodes() throws Exception {
-	addNodes("one:0", "two:0", "three:0");
+	addNodes("one", "two", "three");
 	testChannelSendAll();
     }
     
@@ -969,7 +969,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
 	    setUp(false);
-	    addNodes("recoveryNode:0");
+	    addNodes("recoveryNode");
 
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(channelName, false);
@@ -1320,7 +1320,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    // handle redirected login
 	    int redirectPort =
-		(additionalNodes.get(endpoint)).getAppPort();
+	        Integer.valueOf(redirectEndpoint.split(":", 2)[1]);
 	    disconnect();
 	    connect(redirectPort);
 	    return login(user, pass);

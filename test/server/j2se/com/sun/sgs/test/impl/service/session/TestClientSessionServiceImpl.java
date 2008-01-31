@@ -138,19 +138,19 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** 
      * Add additional nodes.  We only do this as required by the tests. 
      *
-     * @param endpoints contains an endpoint for each additional node
+     * @param hosts contains a host name for each additional node
      */
-    private void addNodes(String... endpoints) throws Exception {
+    private void addNodes(String... hosts) throws Exception {
         // Create the other nodes
         additionalNodes = new HashMap<String, SgsTestNode>();
 
-        for (String endpoint : endpoints) {
+        for (String host : hosts) {
             Properties props = SgsTestNode.getDefaultProperties(
                 APP_NAME, serverNode, DummyAppListener.class);
-            String host = endpoint.split(":", 2)[0];
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
+            String endpoint = host + ":" + node.getAppPort();
             additionalNodes.put(endpoint, node);
         }
     }
@@ -273,7 +273,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
-	String[] endpoints = new String[] { "one:0", "two:0", "three:0", "four:0"};
+	String[] endpoints = new String[] { "one", "two", "three", "four"};
 	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
 	Set<DummyClient> clients = new HashSet<DummyClient>();
 	addNodes(endpoints);
@@ -287,7 +287,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    // login redirected
 		    redirectCount++;
 		    int redirectPort =
-			(additionalNodes.get(client.redirectHost)).getAppPort();
+	                Integer.valueOf(client.redirectEndpoint.split(":", 2)[1]);
 		    client = new DummyClient(user);
 		    client.connect(redirectPort);
 		    if (!client.login("password")) {
@@ -512,7 +512,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
 		fail("Failed node key prematurely removed: " + failedNodeKey);
 	    }
-            addNodes("one:0");
+            addNodes("one");
 	    client.checkDisconnected(false);
 
 	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
@@ -694,7 +694,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;
-	private String redirectHost;
+	private String redirectEndpoint;
 	private byte[] sessionId;
 	
 	volatile boolean receivedDisconnectedCallback = false;
@@ -959,12 +959,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectHost = buf.getString();
+		    redirectEndpoint = buf.getString();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost);
+					   ", endpoint:" + redirectEndpoint);
 			lock.notifyAll();
 		    } break;
 
@@ -1100,9 +1100,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	private int seq = -1;
-	
+
 	private transient final ClientSession session;
-	
+
 	DummyClientSessionListener(ClientSession session) {
 	    this.session = session;
 	    this.name = session.getName();
