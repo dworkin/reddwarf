@@ -588,6 +588,9 @@ class ClientSessionHandler {
 			sendProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
                         try {
+                            // FIXME: this is a hack to make sure that 
+                            // the client receives the login redirect 
+                            // message before disconnect. 
                             Thread.sleep(100);
                         } catch (InterruptedException e) {
                             // ignore
