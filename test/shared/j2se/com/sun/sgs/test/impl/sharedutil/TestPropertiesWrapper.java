@@ -122,6 +122,7 @@ public class TestPropertiesWrapper extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
+        props.setProperty("p", "50");
         /* min > max */
         try {
             wrapper.getRequiredIntProperty("p", 100, 99);
