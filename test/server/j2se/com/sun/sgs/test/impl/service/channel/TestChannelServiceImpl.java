@@ -111,7 +111,7 @@ public class TestChannelServiceImpl extends TestCase {
     private ChannelManager channelService;
 
     /** The next port to use for a listen socket. */
-    private final AtomicInteger nextPort = new AtomicInteger(40000);
+    private static final AtomicInteger nextPort = new AtomicInteger(40000);
 
     /** The listen port for the client session service. */
     private int port;
