@@ -1197,10 +1197,9 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean leaveAck = false;
         private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
-	//private String channelName = null;
-	//private CompactId channelId = null;
 	private String reason;	
 	private String redirectEndpoint;
+        private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 
@@ -1506,7 +1505,11 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-                    sessionId = buf.getBytes(buf.limit() - buf.position());
+                    // FIXME: this is actually the reconnect key, but the
+                    // current implementation sends the sessionId to aid
+                    // this test.
+                    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+                    sessionId = reconnectKey;
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;

@@ -704,7 +704,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitLoginFailure = false;
 	private String reason;
 	private String redirectEndpoint;
-	private byte[] sessionId;
+	private byte[] reconnectKey;
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -946,10 +946,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    // FIXME: this is actually the reconnect key, but the
-		    // current implementation sends the sessionId to aid
-		    // this test.
-		    sessionId = buf.getBytes(buf.limit() - buf.position());
+		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
