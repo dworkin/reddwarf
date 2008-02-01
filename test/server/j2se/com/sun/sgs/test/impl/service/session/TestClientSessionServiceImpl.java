@@ -94,7 +94,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private SgsTestNode serverNode;
 
     /** The next port to use for a listen socket. */
-    private static final AtomicInteger nextPort = new AtomicInteger(40000);
+    private static final AtomicInteger nextPort = new AtomicInteger(20000);
 
     /** Any additional nodes, keyed by node hostname (for tests
      * needing more than one node). */
@@ -183,6 +183,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         }
         serverNode.shutdown(clean);
         serverNode = null;
+        Thread.sleep(100);
     }
 
     /* -- Test constructor -- */
