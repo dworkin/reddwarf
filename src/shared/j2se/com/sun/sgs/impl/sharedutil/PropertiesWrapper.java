@@ -88,7 +88,7 @@ public class PropertiesWrapper {
     }
 
     /**
-     * Returns the value of a required <code>int</code> property.
+     * Returns the value of an <code>int</code> property.
      *
      * @param	name the property name
      * @param   defaultValue the default value
@@ -111,7 +111,7 @@ public class PropertiesWrapper {
     }
 
     /**
-     * Returns the value of an <code>int</code> property.
+     * Returns the value of a required <code>int</code> property.
      *
      * @param   name the property name
      * @return  the value
