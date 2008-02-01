@@ -364,7 +364,7 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.app.port", "65535",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.run", 

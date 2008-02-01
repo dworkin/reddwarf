@@ -326,9 +326,10 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 					  (serverNode.getDataService()));
         String portStr = String.valueOf(port);
 
+        // TODO use SgsTestNode to obtain the default properties
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.app.port", "65535",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
             StandardProperties.APP_LISTENER,

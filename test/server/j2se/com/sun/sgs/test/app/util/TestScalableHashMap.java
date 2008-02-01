@@ -3291,9 +3291,11 @@ public class TestScalableHashMap extends Assert {
         // specific timeout values, so currently the default timeout is being
         // set very high, but when we can run specific transactions longer,
         // this should be used for the few tests that actually need this
+
+        // TODO use SgsTestNode to obtain the default properties?
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.app.port", "65535",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 System.getProperty("java.io.tmpdir") +
                                     File.separator + appName + ".db",

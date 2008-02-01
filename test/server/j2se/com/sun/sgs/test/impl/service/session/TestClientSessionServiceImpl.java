@@ -204,7 +204,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_PORT, "0");
+		    StandardProperties.APP_PORT, "65535");
 	    new ClientSessionServiceImpl(props, null,
 					 serverNode.getProxy());
 	    fail("Expected NullPointerException");
@@ -218,7 +218,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_PORT, "0");
+		    StandardProperties.APP_PORT, "65535");
 	    new ClientSessionServiceImpl(props,
 					 serverNode.getSystemRegistry(), null);
 	    fail("Expected NullPointerException");

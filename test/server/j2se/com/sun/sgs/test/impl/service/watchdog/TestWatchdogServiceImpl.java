@@ -197,7 +197,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
         WatchdogServiceImpl watchdog = null;
         Properties properties = createProperties(
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".port", "0");
         try {
             new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
@@ -224,7 +224,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    watchdog = 
@@ -241,7 +241,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
 	    watchdog =
@@ -260,7 +260,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
@@ -281,7 +281,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
@@ -306,7 +306,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -348,7 +348,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
@@ -413,7 +413,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -686,7 +686,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
@@ -1007,7 +1007,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "0",
+            StandardProperties.APP_PORT, "65535",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
