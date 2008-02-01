@@ -31,9 +31,6 @@ import com.sun.sgs.service.DataService;
 
 import java.io.Serializable;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 
 /**
  * Utility, package-private class for managing durable implementations of

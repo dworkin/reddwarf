@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -276,7 +275,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         ctxFactory = new TransactionContextFactoryImpl(transactionProxy);
 
         // keep a reference to the system components...
-        this.transactionProxy = transactionProxy;
+        TaskServiceImpl.transactionProxy = transactionProxy;
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
         // ...and to the other Services that are needed
@@ -393,7 +392,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
 
         // stop the handoff and status processing tasks
-        handoffTaskHandle.cancel();
+        if (handoffTaskHandle != null) {
+            handoffTaskHandle.cancel();
+        }
+
         statusUpdateTimer.cancel();
 
         return true;
