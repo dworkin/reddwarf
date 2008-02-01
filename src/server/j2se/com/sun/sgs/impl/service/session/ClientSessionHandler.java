@@ -572,6 +572,11 @@ class ClientSessionHandler {
 		    public void run() {
 			sendProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            // ignore
+                        }
 			handleDisconnect(false);
 		    }});
 

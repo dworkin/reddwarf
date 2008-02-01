@@ -752,20 +752,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void disconnect() {
-            System.err.println("DummyClient.disconnect: " + graceful);
+            System.err.println("DummyClient.disconnect");
 
             synchronized (lock) {
                 if (connected == false) {
                     return;
                 }
-                try {
-                    connection.close();
-                } catch (IOException e) {
-                    System.err.println(
-                        "DummyClient.disconnect exception:" + e);
-                    connected = false;
-                    lock.notifyAll();
-                }
+                connected = false;
+            }
+
+            try {
+                connection.close();
+            } catch (IOException e) {
+                System.err.println(
+                    "DummyClient.disconnect exception:" + e);
+            }
+
+            synchronized (lock) {
+                lock.notifyAll();
             }
 	}
 
