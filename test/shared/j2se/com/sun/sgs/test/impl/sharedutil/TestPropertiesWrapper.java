@@ -119,7 +119,7 @@ public class TestPropertiesWrapper extends TestCase {
         try {
             wrapper.getRequiredIntProperty("p");
             fail("Expected IllegalArgumentException");
-        } catch (NullPointerException e) {
+        } catch (IllegalArgumentException e) {
             System.err.println(e);
         }
         props.setProperty("p", "50");
