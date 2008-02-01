@@ -147,7 +147,7 @@ public class DummyWatchdogService implements WatchdogService {
             return nodeId;
         }
         public String getHostEndpoint() {
-            return "localhost:65535";
+            return "localhost:20000";
         }
         public boolean isAlive() {
             return isLocalNodeAlive();

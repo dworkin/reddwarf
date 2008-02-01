@@ -141,7 +141,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         
         serviceProps = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            StandardProperties.APP_PORT, "65535",
+            StandardProperties.APP_PORT, "20000",
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             WatchdogServerPropertyPrefix + ".start", "true",
             WatchdogServerPropertyPrefix + ".port", Integer.toString(WATCHDOG_PORT),
@@ -285,7 +285,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         Properties properties = createProperties(
             DataStoreImplClassName + ".directory", DB_DIRECTORY,
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            StandardProperties.APP_PORT, "65535",
+            StandardProperties.APP_PORT, "20000",
             serverPortPropertyName, Integer.toString(PORT));
         NodeMappingServerImpl nodemap = null;
         try {
@@ -303,7 +303,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testNegPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            StandardProperties.APP_PORT, "65535",
+            StandardProperties.APP_PORT, "20000",
             serverPortPropertyName, Integer.toString(-1));
         NodeMappingServerImpl nodemap = null;
         try {
@@ -322,7 +322,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     public void testBigPort() throws Exception {
         Properties properties = createProperties(
             StandardProperties.APP_NAME, "TestNodeMappingServerImpl",
-            StandardProperties.APP_PORT, "65535",
+            StandardProperties.APP_PORT, "20000",
             serverPortPropertyName, Integer.toString(65536));
         NodeMappingServerImpl nodemap = null;
         try {

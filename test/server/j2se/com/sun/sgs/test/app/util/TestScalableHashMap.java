@@ -3295,7 +3295,7 @@ public class TestScalableHashMap extends Assert {
         // TODO use SgsTestNode to obtain the default properties?
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "65535",
+            "com.sun.sgs.app.port", "20000",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 System.getProperty("java.io.tmpdir") +
                                     File.separator + appName + ".db",

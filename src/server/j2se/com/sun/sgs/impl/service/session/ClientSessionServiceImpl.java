@@ -221,9 +221,10 @@ public class ClientSessionServiceImpl
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
+            InetSocketAddress listenAddress = new InetSocketAddress(appPort);
 	    ServerSocketEndpoint endpoint =
-		new ServerSocketEndpoint(
-		    new InetSocketAddress(appPort), TransportType.RELIABLE);
+		new ServerSocketEndpoint(listenAddress,
+                                         TransportType.RELIABLE);
 	    acceptor = endpoint.createAcceptor();
 	    try {
 		acceptor.listen(acceptorListener);
@@ -233,6 +234,9 @@ public class ClientSessionServiceImpl
 			getListenPort());
 		}
 	    } catch (Exception e) {
+		logger.logThrow(Level.WARNING, e,
+                                "acceptor failed to listen on {0}",
+                                listenAddress);
 		try {
 		    acceptor.shutdown();
 		} catch (RuntimeException re) {

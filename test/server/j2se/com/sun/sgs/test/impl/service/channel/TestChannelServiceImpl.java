@@ -72,7 +72,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
@@ -110,9 +109,6 @@ public class TestChannelServiceImpl extends TestCase {
     /** The channel service on the server node. */
     private ChannelManager channelService;
 
-    /** The next port to use for a listen socket. */
-    private static final AtomicInteger nextPort = new AtomicInteger(20000);
-
     /** The listen port for the client session service. */
     private int port;
 
@@ -140,8 +136,6 @@ public class TestChannelServiceImpl extends TestCase {
                                              DummyAppListener.class);
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
-        props.setProperty(StandardProperties.APP_PORT,
-                          Integer.toString(nextPort.getAndIncrement()));
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
@@ -192,8 +186,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    Properties props = SgsTestNode.getDefaultProperties(
 	        APP_NAME, serverNode, DummyAppListener.class);
 	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
-	    props.put(StandardProperties.APP_PORT,
-	              Integer.toString(nextPort.getAndIncrement()));
             SgsTestNode node = 
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             String endpoint = host + ":" + node.getAppPort();

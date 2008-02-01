@@ -44,6 +44,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A node, used for testing.  The node is created using the kernel.
@@ -113,6 +114,8 @@ public class SgsTestNode {
 
     /** The listen port for the client session service. */
     private int appPort;
+
+    private static final AtomicInteger nextAppPort = new AtomicInteger(20000);
 
     /**
      * Creates the first SgsTestNode instance in this VM.  This thread's
@@ -360,11 +363,11 @@ public class SgsTestNode {
 				 serverNode.getNodeMappingService());
 
         String dir = System.getProperty("java.io.tmpdir") +
-                                File.separator +  appName + ".db";
+                                File.separator + appName + ".db";
 
         Properties retProps = createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "65535",
+            "com.sun.sgs.app.port", Integer.toString(nextAppPort.getAndIncrement()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.run", 

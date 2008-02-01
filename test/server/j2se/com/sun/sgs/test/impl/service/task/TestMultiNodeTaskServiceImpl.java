@@ -54,6 +54,7 @@ import java.io.Serializable;
 
 import java.util.Properties;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
@@ -87,6 +88,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     private Identity taskOwner;
 
     private static AtomicLong lastNodeUsed;
+    private static final AtomicInteger nextPort = new AtomicInteger(20000);
 
     /** Test Management. */
     
@@ -141,6 +143,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                 node.shutdown(false);
         }
         serverNode.shutdown(true);
+        Thread.sleep(100);
     }
 
     /** Tests. */
@@ -326,10 +329,10 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 					  (serverNode.getDataService()));
         String portStr = String.valueOf(port);
 
-        // TODO use SgsTestNode to obtain the default properties
+        // TODO use SgsTestNode to obtain the default properties?
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "65535",
+            "com.sun.sgs.app.port", Integer.toString(nextPort.getAndIncrement()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
             StandardProperties.APP_LISTENER,
