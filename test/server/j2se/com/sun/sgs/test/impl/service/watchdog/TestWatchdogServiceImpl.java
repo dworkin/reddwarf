@@ -686,12 +686,13 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "20000",
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
 	try {
 	    for (int i = 0; i < 5; i++) {
+                props.put(StandardProperties.APP_PORT,
+                          Integer.toString(19000 + i));
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		DummyNodeListener listener = new DummyNodeListener();
