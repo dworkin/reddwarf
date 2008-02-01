@@ -26,7 +26,7 @@
   <property name="ruby" location="/usr/bin/ruby"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9.4"/>
+  <property name="project.release" value="0.9.6"/>
   <!-- Set to true when building an external release -->
   <property name="external.release" value="false"/>
 
@@ -240,7 +240,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -268,7 +268,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -299,7 +299,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
