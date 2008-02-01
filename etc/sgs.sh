@@ -1,5 +1,5 @@
 #! /bin/sh
-# Copyright 2007 by Sun Microsystems, Inc. All rights reserved
+# Copyright 2007-2008 by Sun Microsystems, Inc. All rights reserved
 # Use is subject to license terms.
 #
 # Bourne shell script for starting the SGS server
