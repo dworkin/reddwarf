@@ -112,5 +112,11 @@ public interface TransactionParticipant {
      *                               the given transaction
      */
     public void abort(Transaction txn);
-
+    
+    /**
+     * Returns the name of the participant, which is usually its type.
+     * 
+     * @return the name of the participant
+     */
+     public String getName();
 }

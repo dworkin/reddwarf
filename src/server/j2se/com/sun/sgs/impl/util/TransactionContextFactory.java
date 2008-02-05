@@ -235,6 +235,16 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 		throw e;
 	    }
 	}
+        
+        /** {@inheritDoc} */
+        public String getName() {
+            Class c = TransactionContextFactory.this.getClass();
+            if (c.isMemberClass()) {
+                return c.getDeclaringClass().getName();
+            } else {
+                return c.getName();
+            }
+        }
     }
 
     /** Provides a non-durable transaction participant. */
