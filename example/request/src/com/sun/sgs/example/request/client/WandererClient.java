@@ -221,7 +221,7 @@ public class WandererClient implements Runnable {
 	    login();
 	    try {
 		send(move() + "\n" +
-		     (i % 5 == 0) ? storePosition() : getPosition());
+		     ((i % 5 == 0) ? storePosition() : getPosition()));
 		sleep();
 	    } catch (Exception e) {
 		noteFailing();
