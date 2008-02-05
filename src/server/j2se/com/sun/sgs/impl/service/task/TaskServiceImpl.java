@@ -912,7 +912,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     {
         /** Creates an instance with the given proxy. */
         TransactionContextFactoryImpl(TransactionProxy proxy) {
-            super(proxy);
+            super(proxy, NAME);
         }
         /** {@inheritDoc} */
         protected TxnState createContext(Transaction txn) {

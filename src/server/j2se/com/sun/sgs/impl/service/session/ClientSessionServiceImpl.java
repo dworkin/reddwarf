@@ -460,7 +460,7 @@ public class ClientSessionServiceImpl
 
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 
 	/** {@inheritDoc} */

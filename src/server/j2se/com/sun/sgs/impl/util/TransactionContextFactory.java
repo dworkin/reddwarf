@@ -45,6 +45,9 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     /** The transaction context map. */
     private final TransactionContextMap<T> contextMap;
 
+    /** The type name of the participants, used for profiling. */
+    private final String participantName;
+    
     /** Lock for access to the participant field. */
     private final Object lock = new Object();
 
@@ -56,12 +59,16 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * TransactionContextMap}.
      *
      * @param	contextMap the transaction context map
+     * @param   participantName  the type name of the transaction participants
      */
-    protected TransactionContextFactory(TransactionContextMap<T> contextMap) {
+    protected TransactionContextFactory(TransactionContextMap<T> contextMap,
+                                        String participantName) 
+    {
 	if (contextMap == null) {
 	    throw new NullPointerException("null contextMap");
 	}
 	this.contextMap = contextMap;
+        this.participantName = participantName;
     }
 
     /**
@@ -71,9 +78,13 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * needed.
      *
      * @param	txnProxy the transaction proxy
+     * @param   participantName  the type name of the transaction participants
      */
-    protected TransactionContextFactory(TransactionProxy txnProxy) {
+    protected TransactionContextFactory(TransactionProxy txnProxy,
+                                        String participantName) 
+    {
 	contextMap = new TransactionContextMap<T>(txnProxy);
+        this.participantName = participantName;
     }
 
    /**
@@ -235,6 +246,11 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 		throw e;
 	    }
 	}
+        
+        /** {@inheritDoc} */
+        public String getTypeName() {
+            return participantName;
+        }
     }
 
     /** Provides a non-durable transaction participant. */

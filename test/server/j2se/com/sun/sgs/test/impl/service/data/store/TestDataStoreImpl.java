@@ -1323,6 +1323,9 @@ public class TestDataStoreImpl extends TestCase {
 		    public void abort(Transaction txn) {
 			participant.abort(txn);
 		    }
+                    public String getTypeName() {
+                        return "DataStoreDummyParticipant";
+                    }
 		});
 	    }
 	};

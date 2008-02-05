@@ -136,7 +136,7 @@ public class NonDurableTaskQueue {
        
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 	
 	public Context createContext(Transaction txn) {
