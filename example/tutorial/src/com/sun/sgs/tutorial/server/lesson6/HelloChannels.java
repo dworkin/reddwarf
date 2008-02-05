@@ -30,8 +30,8 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ManagedReference;
 
 /**
  * Simple example of channel operations in the Project Darkstar Server.
@@ -49,27 +49,15 @@ public class HelloChannels
     private static final Logger logger =
         Logger.getLogger(HelloChannels.class.getName());
 
-    /** The name of the first channel: {@value #CHANNEL_1_NAME} */
-    public static final String CHANNEL_1_NAME = "Foo";
-
-    /** The name of the second channel: {@value #CHANNEL_2_NAME} */
-    public static final String CHANNEL_2_NAME = "Bar";
-
     /**
-     * The first {@link Channel}.
-     * (The second channel is looked up by name only.)
+     * Channel names for this example.
+     * 
+     * <b>Note:</b> these must correspond to the channel names used
+     * by the lesson 2 client tutorial.
      */
-    private ManagedReference channel1ref = null;
-
-    private Channel getChannel1() {
-        return (channel1ref == null) ? null : channel1ref.get(Channel.class);
-    }
-
-    private void setChannel1(Channel channel) {
-        channel1ref = (channel == null)
-            ? null
-            : AppContext.getDataManager().createReference(channel);
-    }
+    public static final String[] channelNames = new String[] {
+        "Foo", "Bar"
+    };
 
     /**
      * {@inheritDoc}
@@ -78,17 +66,14 @@ public class HelloChannels
      * so they only need to be created here in {@code initialize}.
      */
     public void initialize(Properties props) {
-        ChannelManager channelManager = AppContext.getChannelManager();
+        ChannelManager channelMgr = AppContext.getChannelManager();
+        DataManager dataMgr = AppContext.getDataManager();
 
-        // Create and keep a reference to the first channel.
-        Channel channel1 = channelManager.createChannel(Delivery.RELIABLE);
-        setChannel1(channel1);
-
-        // We don't keep the second channel object around, to demonstrate
-        // looking it up by name when needed.
-        Channel channel2 = channelManager.createChannel(Delivery.RELIABLE);
-        
-        AppContext.getDataManager().setBinding(CHANNEL_2_NAME, channel2);
+        for (String channelName : channelNames) {
+            // Create a channel and bind it to a name in the data store.
+            Channel channel = channelMgr.createChannel(Delivery.RELIABLE);
+            dataMgr.setBinding(channelName, channel);
+        }
     }
 
     /**
@@ -99,6 +84,6 @@ public class HelloChannels
      */
     public ClientSessionListener loggedIn(ClientSession session) {
         logger.log(Level.INFO, "User {0} has logged in", session.getName());
-        return new HelloChannelsSessionListener(session, getChannel1());
+        return new HelloChannelsSessionListener(session);
     }
 }
