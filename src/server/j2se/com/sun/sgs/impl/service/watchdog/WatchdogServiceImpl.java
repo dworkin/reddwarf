@@ -70,7 +70,8 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.start
  *	</b></code><br>
- *	<i>Default:</i> {@code true} <br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else {@code true} <br>
  *	Specifies whether the watchdog server should be started by this service.
  *	If {@code true}, the watchdog server is started.  If this property value
  *	is {@code true}, then the properties supported by the
@@ -79,7 +80,8 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
- *	<i>Default:</i> the local host name <br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, else the local host name <br>
  *
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
@@ -269,14 +271,18 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    " property must be specified");
 	    }
 	    boolean startServer = wrappedProps.getBooleanProperty(
- 		START_SERVER_PROPERTY, true);
+ 		START_SERVER_PROPERTY,
+		wrappedProps.getBooleanProperty(
+		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
             
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
 
 	    String clientHost = wrappedProps.getProperty(
-		CLIENT_HOST_PROPERTY, localHost);
+		CLIENT_HOST_PROPERTY,
+		wrappedProps.getProperty(
+		    StandardProperties.SERVER_HOST, localHost));
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);

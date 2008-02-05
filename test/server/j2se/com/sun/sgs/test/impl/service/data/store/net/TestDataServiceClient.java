@@ -76,7 +76,7 @@ public class TestDataServiceClient extends TestDataServiceImpl {
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",

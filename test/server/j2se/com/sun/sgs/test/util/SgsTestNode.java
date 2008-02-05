@@ -367,7 +367,7 @@ public class SgsTestNode {
             "com.sun.sgs.app.port", "0",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
-            "com.sun.sgs.impl.service.data.store.net.server.run", 
+            "com.sun.sgs.impl.service.data.store.net.server.start", 
                 startServer,
             "com.sun.sgs.impl.service.data.store.net.server.port", 
                 String.valueOf(requestedDataPort),
