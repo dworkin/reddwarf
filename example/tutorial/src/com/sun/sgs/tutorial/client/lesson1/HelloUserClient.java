@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007-2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -308,7 +308,7 @@ public class HelloUserClient extends JFrame
      * Decodes the message data and adds it to the display.
      */
     public void receivedMessage(ByteBuffer message) {
-        appendOutput("Server: " + decodeString(message));
+        appendOutput(decodeString(message));
     }
 
     /**
@@ -340,9 +340,19 @@ public class HelloUserClient extends JFrame
         if (! simpleClient.isConnected())
             return;
 
+        String text = getInputText();
+        send(text);
+    }
+
+    /**
+     * Encodes the given text and sends it to the server.
+     * 
+     * @param text the text to send.
+     */
+    protected void send(String text) {
         try {
-            String text = getInputText();
-            simpleClient.send(encodeString(text));
+            ByteBuffer message = encodeString(text);
+            simpleClient.send(message);
         } catch (Exception e) {
             e.printStackTrace();
         }
