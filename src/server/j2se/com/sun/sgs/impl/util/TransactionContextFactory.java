@@ -46,7 +46,7 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     private final TransactionContextMap<T> contextMap;
 
     /** The type name of the participants, used for profiling. */
-    private final String name;
+    private final String participantName;
     
     /** Lock for access to the participant field. */
     private final Object lock = new Object();
@@ -59,16 +59,16 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * TransactionContextMap}.
      *
      * @param	contextMap the transaction context map
-     * @param   name  the type name of the transaction participants
+     * @param   participantName  the type name of the transaction participants
      */
     protected TransactionContextFactory(TransactionContextMap<T> contextMap,
-                                        String name) 
+                                        String participantName) 
     {
 	if (contextMap == null) {
 	    throw new NullPointerException("null contextMap");
 	}
 	this.contextMap = contextMap;
-        this.name = name;
+        this.participantName = participantName;
     }
 
     /**
@@ -78,13 +78,13 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * needed.
      *
      * @param	txnProxy the transaction proxy
-     * @param   name  the type name of the transaction participants
+     * @param   participantName  the type name of the transaction participants
      */
     protected TransactionContextFactory(TransactionProxy txnProxy,
-                                        String name) 
+                                        String participantName) 
     {
 	contextMap = new TransactionContextMap<T>(txnProxy);
-        this.name = name;
+        this.participantName = participantName;
     }
 
    /**
@@ -249,7 +249,7 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
         
         /** {@inheritDoc} */
         public String getTypeName() {
-            return name;
+            return participantName;
         }
     }
 
