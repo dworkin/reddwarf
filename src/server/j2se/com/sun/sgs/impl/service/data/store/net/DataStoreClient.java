@@ -759,7 +759,7 @@ public final class DataStoreClient
     }
     
     /** {@inheritDoc} */
-    public String getName() {
+    public String getTypeName() {
         return this.getClass().getName();
     }
 

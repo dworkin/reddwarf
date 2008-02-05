@@ -45,6 +45,9 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     /** The transaction context map. */
     private final TransactionContextMap<T> contextMap;
 
+    /** The type name of the participants, used for profiling. */
+    private final String name;
+    
     /** Lock for access to the participant field. */
     private final Object lock = new Object();
 
@@ -56,12 +59,16 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * TransactionContextMap}.
      *
      * @param	contextMap the transaction context map
+     * @param   name  the type name of the transaction participants
      */
-    protected TransactionContextFactory(TransactionContextMap<T> contextMap) {
+    protected TransactionContextFactory(TransactionContextMap<T> contextMap,
+                                        String name) 
+    {
 	if (contextMap == null) {
 	    throw new NullPointerException("null contextMap");
 	}
 	this.contextMap = contextMap;
+        this.name = name;
     }
 
     /**
@@ -71,9 +78,13 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * needed.
      *
      * @param	txnProxy the transaction proxy
+     * @param   name  the type name of the transaction participants
      */
-    protected TransactionContextFactory(TransactionProxy txnProxy) {
+    protected TransactionContextFactory(TransactionProxy txnProxy,
+                                        String name) 
+    {
 	contextMap = new TransactionContextMap<T>(txnProxy);
+        this.name = name;
     }
 
    /**
@@ -237,13 +248,8 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	}
         
         /** {@inheritDoc} */
-        public String getName() {
-            Class c = TransactionContextFactory.this.getClass();
-            if (c.isMemberClass()) {
-                return c.getDeclaringClass().getName();
-            } else {
-                return c.getName();
-            }
+        public String getTypeName() {
+            return name;
         }
     }
 

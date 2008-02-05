@@ -1355,7 +1355,7 @@ public class DataStoreImpl
     }
     
     /** {@inheritDoc} */
-    public String getName() {
+    public String getTypeName() {
         return  this.getClass().getName();
     }
 

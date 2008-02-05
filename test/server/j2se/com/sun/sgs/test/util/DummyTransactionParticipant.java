@@ -88,7 +88,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	state = State.ABORTED;
     }
     
-    public String getName() { return "DummyTransactionParticipant"; }
+    public String getTypeName() { return "DummyTransactionParticipant"; }
 
     /* -- Other methods -- */
 

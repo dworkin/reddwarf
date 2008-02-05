@@ -468,7 +468,7 @@ public class ChannelServiceImpl
        
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	
 	public Context createContext(Transaction txn) {
