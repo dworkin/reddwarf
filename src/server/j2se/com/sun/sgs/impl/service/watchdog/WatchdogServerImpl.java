@@ -264,7 +264,9 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	isFullStack =
 	    finalServiceProperty == null ||
 	    finalServiceProperty.equals(
-		StandardProperties.StandardService.LAST_SERVICE);
+ 		StandardProperties.StandardService.LAST_SERVICE.toString());
+	logger.log(Level.CONFIG, "WatchdogServerImpl: detected " +
+		   (isFullStack ? "full stack" : "server stack"));
 	
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);

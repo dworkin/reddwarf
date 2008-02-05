@@ -253,19 +253,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			} catch (IOException e) {
 			    /*
 			     * It is likely that the coordinator's node failed
-			     * and hasn't recovered yet.  This operation needs
-			     * to be retried after a period of time to allow
-			     * recovery to complete, so throw a retryable
-			     * exception here.
-			     *
-			     * TBD: It would be nice to indicate in the
-			     * exception that this task should be retried
-			     * after a specific interval which relates to the
-			     * recovery time period.
+			     * and hasn't recovered yet.   When the
+			     * coordinator recovers, it will resume
+			     * servicing events, so ignore this exception.
 			     */
-			    throw new ResourceUnavailableException(
-				"channel coordinator node unavailable: " +
-				nodeId);
 			}
 		    }});
 	    
@@ -701,6 +692,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * specified {@code nodeId}, and returns {@code true} if the
      * session was a member of this channel when this method was
      * invoked and {@code false} otherwise.
+     *
+     * FIXME: need to send a 'leave' message to the session's channel
+     * server to remove the session from its cache.
      */
     private boolean removeSession(long nodeId, byte[] sessionIdBytes) {
 	// Remove session binding.
@@ -760,25 +754,43 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	long failedCoordNodeId, BigInteger channelRefId, Context context)
     {
 	dataService.markForUpdate(this);
-	servers.remove(failedCoordNodeId);
-	if (coordNodeId == failedCoordNodeId) {
-	    EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
-	    dataService.removeServiceBinding(getEventQueueKey());
-	    if (servers.isEmpty()) {
-		coordNodeId = getLocalNodeId();
-	    } else {
-		Long[] serverIds = servers.toArray(new Long[0]);
-		int index = random.nextInt(serverIds.length);
-		coordNodeId = serverIds[index];
-	    }
-	    dataService.setServiceBinding(getEventQueueKey(), eventQueue);
+	if (coordNodeId != failedCoordNodeId) {
+	    logger.log(
+		Level.SEVERE,
+		"attempt to reassign coordinator:{0} for channel:{1} " +
+		"that is not the failed node:{2}",
+		coordNodeId, failedCoordNodeId, this);
+	    return;
 	}
+	servers.remove(failedCoordNodeId);
+	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
+	if (eventQueue == null) {
+	    logger.log(
+		Level.SEVERE,
+		"event queue for channel:{0} and coordinator:{1} " +
+		"prematurely removed", this, coordNodeId);
+	    return;
+	}
+	/*
+	 * Remove previous coordinator's event queue binding, assign a new
+	 * coordinator, and set new coordinator's event queue binding.
+	 */
+	dataService.removeServiceBinding(getEventQueueKey());
+	if (servers.isEmpty()) {
+	    coordNodeId = getLocalNodeId();
+	} else {
+	    Long[] serverIds = servers.toArray(new Long[0]);
+	    int index = random.nextInt(serverIds.length);
+	    coordNodeId = serverIds[index];
+	}
+	dataService.setServiceBinding(getEventQueueKey(), eventQueue);
 	
 	/**
 	 * Send out refresh to all channel servers for this channel.
 	 *
-	 * TBD: should this be done even if failed coordinator node is not the
-	 * current coordinator?
+	 * FIXME: Sending out the refresh should the first task that the
+	 * new coordinator performs before servicing the event queue.  Need
+	 * to enqueue a "refresh" event at the head of the event queue.
 	 */
 	final Set<ChannelServer> channelServers = getChannelServers();
 	context.addChannelTask(
@@ -789,8 +801,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			try {
 			    server.refresh(channelId);
 			} catch (IOException e) {
-			    throw new RuntimeException(
-				"unable to contact server", e);
+			    /*
+			     * It is possible that the channel server's
+			     * node is no longer running (because of
+			     * shutdown/crash), so ignore this exception
+			     * and continue.
+			     */
+			    logger.log(
+				Level.FINE,
+				"unable to contact server:{0}",
+				server);
 			}
 		    }
 		}
@@ -1214,13 +1234,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		    try {
 			server.join(channel.channelId, sessionId);
 		    } catch (IOException e) {
-			// TBD: what is the right thing to do here?
+			/*
+			 * If the channel server can't be contacted, it has
+			 * failed or is shut down, so there is no need to
+			 * contact it to update its membership cache, so
+			 * ignore this exception.
+			 */
 			logger.logThrow(
-			    Level.WARNING, e,
+			    Level.FINE, e,
 			    "unable to contact channel server:{0} to " +
-			    "handle event:{1}", nodeId, this);
-			throw new RuntimeException(
-			    "unable to contact server", e);
+			    "handle event:{1}", server, this);
 		    }
 		}});
 	}
@@ -1279,8 +1302,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		    try {
 			server.leave(channel.channelId, sessionId);
 		    } catch (IOException e) {
-			throw new RuntimeException(
-			"unable to contact server", e);
+			/*
+			 * If the channel server can't be contacted, it has
+			 * failed or is shut down, so there is no need to
+			 * contact it to update its membership cache, so
+			 * ignore this exception.
+			 */
+			logger.logThrow(
+			    Level.FINE, e,
+			    "unable to contact channel server:{0} to " +
+			    "handle event:{1}", server, this);	
 		    }
 		}});
 	}
@@ -1317,8 +1348,17 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			try {
 			    server.leaveAll(channel.channelId);
 			} catch (IOException e) {
-			    throw new RuntimeException(
-				"unable to contact server", e);
+			    /*
+			     * If a channel server can't be contacted,
+			     * it has failed or is shut down, so there is
+			     * no need to contact it to update its
+			     * membership cache, so ignore this exception
+			     * and continue.
+			     */
+			    logger.logThrow(
+			        Level.FINE, e,
+				"unable to contact channel server:{0} to " +
+				"handle event:{1}", server, this);
 			}
 		    }
 		}});
@@ -1365,8 +1405,19 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			try {
 			    server.send(channel.channelId, channelMessage);
 			} catch (IOException e) {
-			    throw new RuntimeException(
-				"unable to contact server", e);
+			    /*
+			     * If a channel server can't be contacted, it
+			     * has failed or is shut down and the sessions
+			     * connected to that node have been
+			     * disconnected, so there is no need to contact
+			     * it to forward the message to its local
+			     * member sessions, so ignore this exception
+			     * and continue.
+			     */
+			    logger.logThrow(
+			        Level.FINE, e,
+				"unable to contact channel server:{0} to " +
+				"handle event:{1}", server, this);
 			}
 			// TBD: need to update queue that all
 			// channel servers have been notified of
@@ -1419,8 +1470,17 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			try {
 			    server.close(channel.channelId);
 			} catch (IOException e) {
-			    throw new RuntimeException(
-				"unable to contact server", e);
+			    /*
+			     * If a channel server can't be contacted,
+			     * it has failed or is shut down, so there is
+			     * no need to contact it to update its
+			     * membership cache, so ignore this exception and
+			     * continue.
+			     */
+			    logger.logThrow(
+			        Level.FINE, e,
+				"unable to contact channel server:{0} to " +
+				"handle event:{1}", server, this);
 			}
 		    }
 		}});
