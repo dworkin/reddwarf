@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -448,7 +448,7 @@ public class ClientSessionServiceImpl
 
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 
 	/** {@inheritDoc} */

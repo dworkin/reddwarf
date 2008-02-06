@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -912,7 +912,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     {
         /** Creates an instance with the given proxy. */
         TransactionContextFactoryImpl(TransactionProxy proxy) {
-            super(proxy);
+            super(proxy, NAME);
         }
         /** {@inheritDoc} */
         protected TxnState createContext(Transaction txn) {

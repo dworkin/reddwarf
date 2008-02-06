@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -515,7 +515,7 @@ public class ChannelServiceImpl
        
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	
 	public Context createContext(Transaction txn) {

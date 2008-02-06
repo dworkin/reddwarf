@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -756,6 +756,11 @@ public final class DataStoreClient
 	}
 	throw convertException(
 	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
+    }
+    
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return this.getClass().getName();
     }
 
     /* -- Other public methods -- */
