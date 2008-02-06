@@ -1233,6 +1233,8 @@
   <!-- Runs the example WandererClient -->
   <target name="example-wanderer-client" depends="example-classes"
 	  description="Runs the example WandererClient">
+    <!-- Set the host name of the application -->
+    <property name="app.host" value="localhost"/>
     <!-- Set the logging properties -->
     <property name="client.logging" location="example/logging.properties"/>
     <java classname="com.sun.sgs.example.request.client.WandererClient"
@@ -1241,6 +1243,8 @@
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${client.logging}"/>
+      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
+		   value="${app.host}"/>
       <syspropertyset refid="test.extra.properties"/>
     </java>
   </target>
