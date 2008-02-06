@@ -283,6 +283,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** Package name for this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
+    /** Class name. */
+    private static final String CLASSNAME = 
+            NodeMappingServiceImpl.class.getName();
     /**
      * The property that specifies whether the server should be instantiated
      * in this stack.  Also used by the unit tests.
@@ -923,7 +926,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 	
 	/** {@inheritDoc} */

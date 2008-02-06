@@ -757,6 +757,11 @@ public final class DataStoreClient
 	throw convertException(
 	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
+    
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return this.getClass().getName();
+    }
 
     /* -- Other public methods -- */
 

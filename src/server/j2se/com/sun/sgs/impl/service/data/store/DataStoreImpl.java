@@ -1353,6 +1353,11 @@ public class DataStoreImpl
 		txn, Level.FINER, e, "abort txn:" + txn);
 	}
     }
+    
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return  this.getClass().getName();
+    }
 
     /* -- Implements ProfileProducer -- */
 
