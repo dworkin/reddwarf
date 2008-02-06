@@ -61,11 +61,11 @@ import java.util.logging.Logger;
  * com.sun.sgs.example.request.server.RequestApp} to log at the following
  * levels:
  * <ul>
- * <li> {@link Level#CONFIG Level.CONFIG} Initialize the application
- * <li> {@link Level#FINE Level.FINE} Login, disconnect, or failure during
+ * <li> {@link Level#CONFIG Level.CONFIG} - Initialize the application
+ * <li> {@link Level#FINE Level.FINE} - Login, disconnect, or failure during
  *	processing received message
- * <li> {@link Level#FINER Level.FINER} Receive a message
- * <li> {@link Level#FINEST Level.FINEST} Join, leave, or send a message on a
+ * <li> {@link Level#FINER Level.FINER} - Receive a message
+ * <li> {@link Level#FINEST Level.FINEST} - Join, leave, or send a message on a
  *	channel, send a message to a session
  * </ul>
  */

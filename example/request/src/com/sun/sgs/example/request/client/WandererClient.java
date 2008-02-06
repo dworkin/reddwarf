@@ -67,10 +67,10 @@ import java.util.logging.Logger;
  * This class uses the {@link Logger} named {@code
  * com.sun.sgs.example.request.client.wanderer} to log at the following levels:
  * <ul>
- * <li> {@link Level#INFO Level.INFO} Initialization, performance data
- * <li> {@link Level#FINE Level.FINE} Login, disconnect, reconnection
- * <li> {@link Level#FINER Level.FINER} Send and receive messages
- * <li> {@link Level#FINEST Level.FINEST} Exceptions
+ * <li> {@link Level#INFO Level.INFO} - Initialization, performance data
+ * <li> {@link Level#FINE Level.FINE} - Login, disconnect, reconnection
+ * <li> {@link Level#FINER Level.FINER} - Send and receive messages
+ * <li> {@link Level#FINEST Level.FINEST} - Exceptions
  * </ul>
  */
 public class WandererClient implements Runnable {
@@ -173,8 +173,12 @@ public class WandererClient implements Runnable {
      */
     private String sector = null;
 
-    /** Starts up clients. */
-    public static void main(String[] args) throws Exception {
+    /**
+     * Starts up clients.
+     *
+     * @param args ignored
+     */
+    public static void main(String[] args) {
 	if (logger.isLoggable(Level.INFO)) {
 	    logger.log(Level.INFO,
 		       "Creating WandererClients:" +
@@ -194,7 +198,10 @@ public class WandererClient implements Runnable {
 	long interval = REPORT * 1000;
 	long start = System.currentTimeMillis();
 	while (true) {
-	    Thread.sleep(interval);
+	    try {
+		Thread.sleep(interval);
+	    } catch (InterruptedException e) {
+	    }
 	    Stats stats = new Stats();
 	    for (WandererClient client : clients) {
 		client.tally(stats);
@@ -207,6 +214,8 @@ public class WandererClient implements Runnable {
 
     /**
      * Creates an instance, and starts a thread to login and perform actions.
+     *
+     * @param host the application host
      */
     public WandererClient(String host) {
 	this.host = host;
