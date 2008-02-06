@@ -691,7 +691,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * Removes from this channel the member session with the specified
      * {@code sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId}, notifies the session's server that the
-     * session left the channek, and returns {@code true} if the
+     * session left the channel, and returns {@code true} if the
      * session was a member of this channel when this method was
      * invoked.  If the session is not a member of this channel, then no
      * action is taken and {@code false} is returned.
@@ -787,9 +787,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * 3} Finally, sends out a 'serviceEventQueue' request to the new
      * coordinator to restart this channel's event processing.
      */
-    private void reassignCoordinator(
-	long failedCoordNodeId, BigInteger channelRefId)
-    {
+    private void reassignCoordinator(long failedCoordNodeId) {
 	dataService.markForUpdate(this);
 	if (coordNodeId != failedCoordNodeId) {
 	    logger.log(
@@ -816,7 +814,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	if (servers.isEmpty()) {
 	    coordNodeId = getLocalNodeId();
 	} else {
-	    Long[] serverIds = servers.toArray(new Long[0]);
+	    Long[] serverIds = servers.toArray(new Long[servers.size()]);
 	    int index = random.nextInt(serverIds.length);
 	    coordNodeId = serverIds[index];
 	}
@@ -1683,7 +1681,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	ChannelImpl channel =
 	    getObjectForId(channelRefId, ChannelImpl.class);
 	if (channel != null) {
-	    channel.reassignCoordinator(nodeId, channelRefId);
+	    channel.reassignCoordinator(nodeId);
 	} else {
 	    // channel removed, so just remove the service binding.
 	    dataService.removeServiceBinding(key);
