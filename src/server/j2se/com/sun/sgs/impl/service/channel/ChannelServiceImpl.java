@@ -299,8 +299,7 @@ public class ChannelServiceImpl
 		}
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
-			Context context = contextFactory.joinTransaction();
-			ChannelImpl.serviceEventQueue(channelId, context);
+			ChannelImpl.serviceEventQueue(channelId);
 		    }});
 					  
 	    } finally {
@@ -568,6 +567,16 @@ public class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Adds the specified {@code task} to the task list of the given {@code
+     * channelId}.
+     */
+    static void addChannelTask(BigInteger channelId, Runnable task) {
+	Context context =
+	    getChannelService().contextFactory.joinTransaction();
+	context.addTask(channelId, task);
+    }
+
     /* -- Implement TransactionContext -- */
 
     /**
@@ -597,7 +606,7 @@ public class ChannelServiceImpl
 	 * added to the task handler's per-channel map of tasks to service.
 	 * The tasks are serviced by the TaskHandlerThread.
 	 */
-	public void addChannelTask(BigInteger channelId, Runnable task) {
+	public void addTask(BigInteger channelId, Runnable task) {
 	    List<Runnable> taskList = internalTaskLists.get(channelId);
 	    if (taskList == null) {
 		taskList = new LinkedList<Runnable>();
@@ -658,7 +667,7 @@ public class ChannelServiceImpl
 	private boolean flush() {
 	    if (isCommitted) {
 		for (BigInteger channelId : internalTaskLists.keySet()) {
-		    addChannelTasks(
+		    flushTasks(
 			channelId, internalTaskLists.get(channelId));
 		}
 		synchronized (taskHandlerLock) {
@@ -677,7 +686,7 @@ public class ChannelServiceImpl
      * be serviced by the TaskHandlerThread.  This method is invoked when a
      * context is flushed during transaction commit.
      */
-    private void addChannelTasks(
+    private void flushTasks(
 	BigInteger channelId, List<Runnable> taskList)
 	
     {
@@ -933,10 +942,8 @@ public class ChannelServiceImpl
 	 * members) or to this node if there are no member sessions.
 	 */
 	public void run() {
-	    ChannelServiceImpl channelService = getChannelService();
-	    Context context = channelService.contextFactory.joinTransaction();
-	    boolean moreCoordinators = ChannelImpl.reassignNextCoordinator(
-		getDataService(), nodeId, context);
+	    boolean moreCoordinators =
+		ChannelImpl.reassignNextCoordinator(getDataService(), nodeId);
 	    if (moreCoordinators) {
 		getTaskService().scheduleTask(this);
 	    }
@@ -974,10 +981,9 @@ public class ChannelServiceImpl
 	 * remove the next session from all channels.
 	 */
 	public void run() {
-	    DataService dataService = getDataService();
 	    boolean moreSessions =
 		ChannelImpl.removeNextSessionFromAllChannels(
-		    dataService, nodeId);
+		    getDataService(), nodeId);
 	    if (moreSessions) {
 		getTaskService().scheduleTask(this);
 	    }
