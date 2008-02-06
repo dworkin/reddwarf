@@ -1127,31 +1127,20 @@
   <target name="example-app-single-node"
 	  depends="example-classes, -maybe-delete-example-datastore"
           description="Runs an example app in single node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
     <!-- Set the application properties for the example to run -->
     <property name="app.properties"
 	      location="example/chat/ChatApp.properties"/>
-    <!-- Set the default logging level -->
-    <property name="app.level" value="INFO"/>
-    <!-- Set the logging properties -->
-    <property name="app.logging"
-	      location="example/logging-template.properties"/>
     <property name="app.dir" location="${build.dir}/example"/>
     <mkdir dir="${app.dir}"/>
     <mkdir dir="${app.dir}/dsdb"/>
-    <copy file="${app.logging}"
-	  tofile="${app.dir}/logging.properties"
-	  overwrite="true">
-      <filterset>
-	<filter token="LEVEL" value="${app.level}"/>
-      </filterset>
-    </copy>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  classpathref="example.server.classpath"
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${app.dir}/logging.properties"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
       <sysproperty key="com.sun.sgs.app.root" value="${app.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
@@ -1169,35 +1158,23 @@
   </target>
 
   <!-- Runs an example app in multi-node mode -->
-  <target name="example-app-multi-node"
-	  depends="example-classes, -maybe-delete-example-datastore"
+  <target name="example-app-multi-node" depends="example-classes"
           description="Runs an example app in multi-node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
     <!-- Set the application properties for the example to run -->
     <property name="app.properties"
 	      location="example/chat/ChatApp.properties"/>
     <!-- Set the host name of the server -->
     <property name="server.host" value="localhost"/>
-    <!-- Set the default logging level -->
-    <property name="app.level" value="INFO"/>
-    <!-- Set the logging properties -->
-    <property name="app.logging"
-	      location="example/logging-template.properties"/>
     <property name="app.dir" location="${build.dir}/example"/>
     <mkdir dir="${app.dir}"/>
-    <copy file="${app.logging}"
-	  tofile="${app.dir}/logging.properties"
-	  overwrite="true">
-      <filterset>
-	<filter token="LEVEL" value="${app.level}"/>
-      </filterset>
-    </copy>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  classpathref="example.server.classpath"
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${app.dir}/logging.properties"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
       <sysproperty key="com.sun.sgs.app.root" file="${app.dir}"/>
       <sysproperty key="com.sun.sgs.server.host" value="${server.host}"/>
       <sysproperty key="com.sun.sgs.server.start" value="false"/>
@@ -1213,39 +1190,24 @@
   <target name="example-server"
 	  depends="build-server, -maybe-delete-example-datastore"
 	  description="Runs the server for use with multi-node mode">
-    <!-- Set the application properties for the example to run, to get
-	 the application name -->
-    <property name="app.properties"
-	      location="example/chat/ChatApp.properties"/>
-    <!-- Set the default logging level -->
-    <property name="server.level" value="INFO"/>
     <!-- Set the logging properties -->
-    <property name="server.logging"
-	      location="example/logging-template.properties"/>
+    <property name="app.logging" location="example/logging.properties"/>
+    <!-- Set the application properties for the example to run -->
+    <property name="app.properties"
+	      location="example/chat/ChatAppServer.properties"/>
     <property name="server.dir" location="${build.dir}/example"/>
     <mkdir dir="${server.dir}"/>
     <mkdir dir="${server.dir}/dsdb"/>
-    <copy file="${server.logging}"
-	  tofile="${server.dir}/logging.properties"
-	  overwrite="true">
-      <filterset>
-	<filter token="LEVEL" value="${server.level}"/>
-      </filterset>
-    </copy>
-    <property file="${app.properties}" prefix="app.properties"/>
-    <copy file="example/server.properties"
-	  todir="${server.dir}"
-	  overwrite="true"/>
-    <echo file="${server.dir}/server.properties" append="true"
-	  message=
-	  "com.sun.sgs.app.name=${app.properties.com.sun.sgs.app.name}"/>
+    <concat destfile="${server.dir}/server.properties">
+      <fileset file="${app.properties}"/>
+      <fileset file="example/server.properties"/>
+    </concat>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  classpathref="server.classpath"
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${server.dir}/logging.properties"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
       <sysproperty key="com.sun.sgs.app.root" file="${server.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
@@ -1271,25 +1233,14 @@
   <!-- Runs the example WandererClient -->
   <target name="example-wanderer-client" depends="example-classes"
 	  description="Runs the example WandererClient">
-    <!-- Set the default logging level -->
-    <property name="client.level" value="INFO"/>
     <!-- Set the logging properties -->
-    <property name="client.logging"
-	      location="example/logging-template.properties"/>
-    <tempfile property="client.logging.filtered"
-	      destdir="${build.dir}"
-	      suffix=".logging"/>
-    <copy file="${client.logging}" tofile="${client.logging.filtered}">
-      <filterset>
-	<filter token="LEVEL" value="${client.level}"/>
-      </filterset>
-    </copy>
+    <property name="client.logging" location="example/logging.properties"/>
     <java classname="com.sun.sgs.example.request.client.WandererClient"
 	  classpathref="example.client.classpath"
 	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.util.logging.config.file"
-		   file="${client.logging.filtered}"/>
+		   file="${client.logging}"/>
       <syspropertyset refid="test.extra.properties"/>
     </java>
   </target>

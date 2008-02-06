@@ -227,7 +227,9 @@ public class WandererClient implements Runnable {
     /** Performs client actions. */
     public void run() {
 	for (int i = 0; true; i++) {
-	    login();
+	    if (getDisconnected()) {
+		login();
+	    }
 	    try {
 		send(move() + "\n" +
 		     ((i % 5 == 0) ? storePosition() : getPosition()));
@@ -235,7 +237,7 @@ public class WandererClient implements Runnable {
 	    } catch (Exception e) {
 		noteFailing();
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "Exception: " + e);
+		    logger.log(Level.FINEST, "Exception thrown", e);
 		}
 	    }
 	}
@@ -390,11 +392,12 @@ public class WandererClient implements Runnable {
 	received++;
     }
 
-    /** Records that the client is active. */
+    /** Records that the client is active, and notifies waiters. */
     synchronized void noteActive() {
 	active = true;
 	failing = false;
 	disconnected = false;
+	notifyAll();
     }
 
     /** Records that the client is failing. */
@@ -522,9 +525,6 @@ public class WandererClient implements Runnable {
 		    logger.log(Level.FINE, user + ": Logged in");
 		}
 		noteActive();
-		synchronized (this) {
-		    notifyAll();
-		}
 	    }
 	}
 
@@ -553,9 +553,6 @@ public class WandererClient implements Runnable {
 		}
 	    }
 	    setDisabled();
-	    synchronized (this) {
-		notifyAll();
-	    }
 	}
 
 	/* -- Implement ServerSessionListener -- */
