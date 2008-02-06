@@ -280,9 +280,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
 
 	    String clientHost = wrappedProps.getProperty(
-		CLIENT_HOST_PROPERTY,
-		wrappedProps.getProperty(
-		    StandardProperties.SERVER_HOST, localHost));
+		CLIENT_HOST_PROPERTY, localHost);
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
@@ -299,7 +297,10 @@ public class WatchdogServiceImpl implements WatchdogService {
 		serverPort = serverImpl.getPort();
 	    } else {
 		serverImpl = null;
-		host = wrappedProps.getProperty(HOST_PROPERTY, localHost);
+		host = wrappedProps.getProperty(
+		    HOST_PROPERTY,
+		    wrappedProps.getProperty(
+			StandardProperties.SERVER_HOST, localHost));
 		serverPort = wrappedProps.getIntProperty(
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
