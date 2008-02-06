@@ -1126,7 +1126,7 @@
   <!-- Runs an example app in single node mode -->
   <target name="example-app-single-node"
 	  depends="example-classes, -maybe-delete-example-datastore"
-          description="Runs an example app in single node mode">
+	  description="Runs an example app in single node mode">
     <!-- Set the logging properties -->
     <property name="app.logging" location="example/logging.properties"/>
     <!-- Set the application properties for the example to run -->
@@ -1141,12 +1141,12 @@
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
-      <sysproperty key="com.sun.sgs.app.root" value="${app.dir}"/>
+      <sysproperty key="com.sun.sgs.app.root" file="${app.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
 	 value="${test.bdb.env}"/>
       <syspropertyset refid="test.extra.properties"/>
-      <arg value="${app.properties}"/>
+      <arg file="${app.properties}"/>
     </java>
   </target>
 
@@ -1182,7 +1182,7 @@
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
 	 value="${test.bdb.env}"/>
       <syspropertyset refid="test.extra.properties"/>
-      <arg value="${app.properties}"/>
+      <arg file="${app.properties}"/>
     </java>
   </target>
 
