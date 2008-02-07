@@ -246,7 +246,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	@Override protected Context createContext(Transaction txn) {
 	    /*
