@@ -337,19 +337,7 @@ public class ClientSessionServiceImpl
         
         sessionDisconnectListeners.add(listener);
     }
-
-    /** {@inheritDoc} */
-    public ClientSession getClientSession(byte[] sessionId) {
-	if (sessionId == null) {
-	    throw new NullPointerException("null sessionId");
-	}
-	// TBD: is this method invocation necessary?
-	checkLocalNodeAlive();
-	return
-	    ClientSessionImpl.getSession(
-		dataService, new BigInteger(1, sessionId));
-    }
-
+    
     /** {@inheritDoc} */
     public void sendProtocolMessage(
 	ClientSession session, ByteBuffer message, Delivery delivery)
@@ -635,7 +623,7 @@ public class ClientSessionServiceImpl
 	    Context context = contextQueue.peek();
 	    if ((context != null) && (context.isCommitted)) {
 		synchronized (flushContextsLock) {
-		    flushContextsLock.notify();
+		    flushContextsLock.notifyAll();
 		}
 	    }
 	}
@@ -752,12 +740,11 @@ public class ClientSessionServiceImpl
 		    }
 
 		} else {
-		    byte[][] messageData = null;
-		    messageData = messages.toArray(messageData);
-		    Delivery[] deliveryData = null;
-		    deliveryData =
-			Collections.nCopies(messages.size(), Delivery.RELIABLE).
-			    toArray(deliveryData);
+		    int numMessages = messages.size();
+		    byte[][] messageData = messages.toArray(new byte[numMessages][]);
+		    Delivery[] deliveryData =
+			Collections.nCopies(numMessages, Delivery.RELIABLE).
+			    toArray(new Delivery[numMessages]);
 
 		    byte[] sessionId = sessionRefId.toByteArray();
 		    try {
