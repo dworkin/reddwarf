@@ -36,7 +36,7 @@ import java.util.logging.Level;
  * progress call tracking for services with embedded remote servers,
  * and shutdown support.
  *
- * <p>The {@link getName getName} method invokes the instance's {@code
+ * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
  * should provide an implementation of the {@code toString} method.
  */

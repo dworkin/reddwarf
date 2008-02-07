@@ -788,7 +788,10 @@ class Kernel {
                        "for application: " + appName);
         }
         
-        if (appProperties.getProperty(StandardProperties.APP_PORT) == null) {
+        if (!StandardProperties.APP_LISTENER_NONE.equals(
+		appProperties.getProperty(StandardProperties.APP_LISTENER)) &&
+	    appProperties.getProperty(StandardProperties.APP_PORT) == null)
+	{
             logger.log(Level.SEVERE, "Missing required property " +
                        StandardProperties.APP_PORT + " for application: " +
                        appName);

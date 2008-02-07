@@ -43,7 +43,9 @@ public class TestTransactionContextFactory extends TestCase {
     public void testIsPreparedFailsDuringCommit() throws Exception {
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	TransactionContextFactory<TransactionContext> contextFactory =
-	    new TransactionContextFactory<TransactionContext>(txnProxy) {
+	    new TransactionContextFactory<TransactionContext>(txnProxy, 
+                                          "TestTransactionContextFactory") 
+            {
 	        protected TransactionContext createContext(Transaction txn) {
 		    return new TransactionContext(txn) {
 			public boolean isPrepared() {

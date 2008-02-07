@@ -24,6 +24,7 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -38,6 +39,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
@@ -46,6 +48,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Collections;
@@ -296,8 +299,7 @@ public class ChannelServiceImpl
 		}
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
-			Context context = contextFactory.joinTransaction();
-			ChannelImpl.serviceEventQueue(channelId, context);
+			ChannelImpl.serviceEventQueue(channelId);
 		    }});
 					  
 	    } finally {
@@ -307,13 +309,29 @@ public class ChannelServiceImpl
 
 	/** {@inheritDoc}
 	 *
-	 * TBD: This method is not yet implemented, but will be when
-	 * channel coordinator recovery is implemented.
+	 * Reads the local membership list for the specified
+	 * {@code channelId}, and updates the local membership cache
+	 * for that channel.
 	 */
 	public void refresh(byte[] channelId) {
 	    callStarted();
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE, "refreshing channelId:{0}",
+			   HexDumper.toHexString(channelId));
+	    }
 	    try {
-		throw new AssertionError("not implemented");
+		BigInteger channelRefId = new BigInteger(1, channelId);
+		GetLocalMembersTask getMembersTask =
+		    new GetLocalMembersTask(channelRefId);
+		try {
+		    taskScheduler.runTransactionalTask(
+			getMembersTask, taskOwner);
+		} catch (Exception e) {
+		}
+		Set<BigInteger> newLocalMembers =
+		    Collections.synchronizedSet(getMembersTask.getLocalMembers());
+		localChannelMembersMap.put(channelRefId, newLocalMembers);
+		
 	    } finally {
 		callFinished();
 	    }
@@ -464,11 +482,40 @@ public class ChannelServiceImpl
 	}
     }
 
+    private class GetLocalMembersTask extends AbstractKernelRunnable {
+
+	private final BigInteger channelRefId;
+	private Set<BigInteger> localMembers = null;
+	
+	/**
+	 * Constructs an instance with the given {@code nodeId}.
+	 */
+	GetLocalMembersTask(BigInteger channelRefId) {
+	    this.channelRefId = channelRefId;
+	}
+
+	/** {@inheritDoc} */
+	public synchronized void run() {
+	    localMembers = ChannelImpl.getSessionRefIdsForNode(
+		dataService, channelRefId, localNodeId);
+	}
+
+	/**
+	 * Returns the session IDs for local members of the channel
+	 * specified during construction, or {@code null}, if the
+	 * {@code run} method has not successfully completed.
+	 */
+	synchronized Set<BigInteger> getLocalMembers() {
+	    return localMembers;
+	}
+	
+    }
+
     /* -- Implement TransactionContextFactory -- */
        
     private class ContextFactory extends TransactionContextFactory<Context> {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	
 	public Context createContext(Transaction txn) {
@@ -520,6 +567,16 @@ public class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Adds the specified {@code task} to the task list of the given {@code
+     * channelId}.
+     */
+    static void addChannelTask(BigInteger channelId, Runnable task) {
+	Context context =
+	    getChannelService().contextFactory.joinTransaction();
+	context.addTask(channelId, task);
+    }
+
     /* -- Implement TransactionContext -- */
 
     /**
@@ -549,7 +606,7 @@ public class ChannelServiceImpl
 	 * added to the task handler's per-channel map of tasks to service.
 	 * The tasks are serviced by the TaskHandlerThread.
 	 */
-	public void addChannelTask(BigInteger channelId, Runnable task) {
+	public void addTask(BigInteger channelId, Runnable task) {
 	    List<Runnable> taskList = internalTaskLists.get(channelId);
 	    if (taskList == null) {
 		taskList = new LinkedList<Runnable>();
@@ -610,7 +667,7 @@ public class ChannelServiceImpl
 	private boolean flush() {
 	    if (isCommitted) {
 		for (BigInteger channelId : internalTaskLists.keySet()) {
-		    addChannelTasks(
+		    flushTasks(
 			channelId, internalTaskLists.get(channelId));
 		}
 		synchronized (taskHandlerLock) {
@@ -629,7 +686,7 @@ public class ChannelServiceImpl
      * be serviced by the TaskHandlerThread.  This method is invoked when a
      * context is flushed during transaction commit.
      */
-    private void addChannelTasks(
+    private void flushTasks(
 	BigInteger channelId, List<Runnable> taskList)
 	
     {
@@ -739,6 +796,13 @@ public class ChannelServiceImpl
     }
 
     /* -- Other methods and classes -- */
+
+    /**
+     * Returns the channel service.
+     */
+    private static ChannelServiceImpl getChannelService() {
+	return txnProxy.getService(ChannelServiceImpl.class);
+    }
     
     /**
      * Returns the client session service.
@@ -771,7 +835,8 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Returns the {@code ChannelServer} for the given {@code nodeId}.
+     * Returns the {@code ChannelServer} for the given {@code nodeId}, or
+     * {@code null} if no channel server exists for the given {@code nodeId}.
      */
     static ChannelServer getChannelServer(long nodeId) {
 	// TBD: if the nodeId is the local nodeId, then this method
@@ -783,11 +848,7 @@ public class ChannelServiceImpl
 	    return getDataService().getServiceBinding(
 		channelServerKey, ChannelServerWrapper.class).get();
 	} catch (NameNotBoundException e) {
-	    logger.logThrow(
-		Level.SEVERE, e,
-		"ChannelServerWrapper binding:{0} doesn't exist",
-		channelServerKey);
-	    throw e;
+	    return null;
 	} catch (ObjectNotFoundException e) {
 	    logger.logThrow(
 		Level.SEVERE, e,
@@ -798,87 +859,45 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Removes channel server proxy and binding for the specified node.
-     */
-    private void removeChannelServerProxy(long nodeId) {
-	String channelServerKey = getChannelServerKey(nodeId);
-	try {
-	    ChannelServerWrapper proxyWrapper =
-		dataService.getServiceBinding(
-		    channelServerKey, ChannelServerWrapper.class);
-	    dataService.removeObject(proxyWrapper);
-	} catch (NameNotBoundException e) {
-	    // already removed
-	    return;
-	} catch (ObjectNotFoundException e) {
-	}
-	dataService.removeServiceBinding(channelServerKey);
-    }
-    
-    /**
      * The {@code RecoveryListener} for handling requests to recover
      * for a failed {@code ChannelService}.
-     *
-     * TBD: recovery also needs to re-assign channel coordinators assigned
-     * to the failed node.
      */
     private class ChannelServiceRecoveryListener
 	implements RecoveryListener
     {
-	/** {@inheritDoc}
-	 *
-	 * TBD: Recovery (due to being possibly-lengthy) should not be
-	 * performed in this remote method.  Recovery operations should
-	 * be performed in a separate thread.
-	 *
-	 * TODO: use persistent tasks instead?
-	 */
+	/** {@inheritDoc} */
 	public void recover(Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
+	    final TaskService taskService = getTaskService();
 	    try {
 		if (logger.isLoggable(Level.INFO)) {
 		    logger.log(Level.INFO, "Node:{0} recovering for node:{0}",
 			       localNodeId, nodeId);
 		}
-		/*
-		 * For each session on the failed node, remove the
-		 * given session from all channels it is a member of.
-		 *
-		 * TODO:  This transactional task may take too long.  It
-		 * probably should be broken up into more tasks.
-		 */
-		GetNodeSessionIdsTask task = new GetNodeSessionIdsTask(nodeId);
-		taskScheduler.runTransactionalTask(task, taskOwner);
-		
-		for (final byte[] sessionId : task.getSessionIds()) {
-		    if (logger.isLoggable(Level.FINEST)) {
-			logger.log(
-			    Level.FINEST,
-			    "Removing session:{0} from all channels",
-			    HexDumper.toHexString(sessionId));
-		    }
 
-		    /*
-		     * TODO:  This transactional task may take too long.  It
-		     * probably should be broken up into more tasks.
-		     */
-		    taskScheduler.runTransactionalTask(
-			new AbstractKernelRunnable() {
-			    public void run() {
-				ChannelImpl.removeSessionFromAllChannels(
-				    nodeId, sessionId);
-			    }
-			},
-			taskOwner);
-		}
 		/*
-		 * Remove binding to channel server proxy for failed
-		 * node, and remove proxy's wrapper.
+		 * Schedule persistent tasks to perform recovery.
 		 */
 		taskScheduler.runTransactionalTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
-			    removeChannelServerProxy(nodeId);
+			    /*
+			     * Reassign each failed coordinator to a new node.
+			     */
+			    taskService.scheduleTask(
+				new ReassignChannelCoordinatorsTask(nodeId));
+			    /*
+			     * For each session on the failed node, remove the
+			     * session from all channels it is a member of.
+			     */
+			    taskService.scheduleTask(
+ 				new RemoveSessionsFromAllChannelsTask(nodeId));
+			    /*
+			     * Remove binding to channel server proxy for
+			     * failed node, and remove proxy's wrapper.
+			     */
+			    taskService.scheduleTask(
+				new RemoveChannelServerProxyTask(nodeId));
 			}
 		    },
 		    taskOwner);
@@ -895,31 +914,121 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Task to obtain all sessions on a given node that are members
-     * of any channel.  This is used by the {@code
-     * ChannelServiceRecoveryListener} for obtaining all failed
-     * sessions that need to be removed from channels.
+     * A persistent task to reassign failed channel coordinators to another
+     * node. In a single task, only one failed coordinator is reassigned.
+     * A task for one coordinator schedules a task for the next
+     * reassignment, if there are coordinators left to be reassigned.
      */
-    private class GetNodeSessionIdsTask extends AbstractKernelRunnable {
+    private static class ReassignChannelCoordinatorsTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
 
+	/** The node ID. */
 	private final long nodeId;
-	private Set<byte[]> sessionIds = new HashSet<byte[]>();
-	
-	GetNodeSessionIdsTask(long nodeId) {
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	ReassignChannelCoordinatorsTask(long nodeId) {
 	    this.nodeId = nodeId;
 	}
 
-	/** {@inheritDoc} */
+	/**
+	 * Reassigns the next coordinator on the node (specified during
+	 * contruction) to another node (with locally connected session
+	 * members) or to this node if there are no member sessions.
+	 */
 	public void run() {
-	    Iterator<byte[]> iter =
-		ChannelImpl.getSessionIdsAnyChannel(dataService, nodeId);
-	    while (iter.hasNext()) {
-		sessionIds.add(iter.next());
+	    boolean moreCoordinators =
+		ChannelImpl.reassignNextCoordinator(getDataService(), nodeId);
+	    if (moreCoordinators) {
+		getTaskService().scheduleTask(this);
 	    }
 	}
+    }
 
-	Set<byte[]> getSessionIds() {
-	    return sessionIds;
+    /**
+     * A persistent task to remove all sessions on a given node from
+     * all channels those sessions are a member of.  In a single task,
+     * only one session is removed from all channels.  A task for one
+     * session schedules a task for the next session to be removed if
+     * there are sessions left to be removed.
+     */
+    private static class RemoveSessionsFromAllChannelsTask
+	 implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	RemoveSessionsFromAllChannelsTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/**
+	 * Removes the next session on the node (specified during
+	 * construction) from all channels that it is a member of, and
+	 * if there are more sessions left, schedules this task to
+	 * remove the next session from all channels.
+	 */
+	public void run() {
+	    boolean moreSessions =
+		ChannelImpl.removeNextSessionFromAllChannels(
+		    getDataService(), nodeId);
+	    if (moreSessions) {
+		getTaskService().scheduleTask(this);
+	    }
+	}
+    }
+    
+    /**
+     * A persistent task to remove the channel server proxy for a specified
+     * node.
+     */
+    private static class RemoveChannelServerProxyTask
+	 implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	RemoveChannelServerProxyTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/**
+	 * Removes the channel server proxy and binding for the node
+	 * specified during construction.
+	 */
+	public void run() {
+	    String channelServerKey = getChannelServerKey(nodeId);
+	    DataService dataService = getDataService();
+	    try {
+		ChannelServerWrapper proxyWrapper =
+		dataService.getServiceBinding(
+		    channelServerKey, ChannelServerWrapper.class);
+		dataService.removeObject(proxyWrapper);
+	    } catch (NameNotBoundException e) {
+		// already removed
+		return;
+	    } catch (ObjectNotFoundException e) {
+	    }
+	    dataService.removeServiceBinding(channelServerKey);
 	}
     }
 }

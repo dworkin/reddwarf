@@ -79,7 +79,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static final String APP_NAME = "TestChannelServiceImpl";
     
-    private static final int WAIT_TIME = 5000;
+    private static final int WAIT_TIME = 3000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -162,6 +162,8 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
+	// This sleep cuts down on the exceptions output due to shutdwon.
+	Thread.sleep(750);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -787,52 +789,88 @@ public class TestChannelServiceImpl extends TestCase {
 	}, taskOwner);
     }
 
+    
     public void testChannelSendAll() throws Exception {
-	final String channelName = "test";
+	String channelName = "test";
 	createChannel(channelName);
 	ClientGroup group = new ClientGroup(sevenDwarfs);
+	sendMessagesToChannel(channelName, group, 5);
+    }
 
+    public void testChannelSendAllMultipleNodes() throws Exception {
+	addNodes("one", "two", "three");
+	testChannelSendAll();
+    }
+
+    public void testChannelSendAllAfterRecovery() throws Exception {
+	testChannelSendAllMultipleNodes();
+	printServiceBindings();
+	System.err.println("simulate watchdog server crash...");
+	tearDown(false);
+	setUp(false);
+	//	Thread.sleep(WAIT_TIME);
+	printServiceBindings();
+	addNodes("ay", "bee", "sea");
+	ClientGroup group = new ClientGroup(sevenDwarfs);
+	sendMessagesToChannel("test", group, 3);
+    }
+
+    private void sendMessagesToChannel(
+	final String channelName, ClientGroup group, int numMessages)
+	throws Exception
+    {
 	try {
 	    boolean failed = false;
 	    joinUsers(channelName, sevenDwarfs);
 	    String messageString = "message";
-	    final MessageBuffer buf =
-		new MessageBuffer(MessageBuffer.getSize(messageString) +
-				  MessageBuffer.getSize(channelName) + 4);
-	    buf.putString(messageString).
-		putString(channelName).
-		putInt(0);
 
-	    // FIXME: send more than one message and verify ordering.
+	    for (int i = 0; i < numMessages; i++) {
+		final MessageBuffer buf =
+		    new MessageBuffer(MessageBuffer.getSize(messageString) +
+				      MessageBuffer.getSize(channelName) + 4);
+		buf.putString(messageString).
+		    putString(channelName).
+		    putInt(i);
 
-	    System.err.println("Sending message: " +
-			       HexDumper.format(buf.getBuffer()));
+		System.err.println("Sending message: " +
+				   HexDumper.format(buf.getBuffer()));
 
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    channel.send(ByteBuffer.wrap(buf.getBuffer()));
-		}
-	    }, taskOwner);
+		taskScheduler.runTransactionalTask(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    Channel channel = getChannel(channelName);
+			    channel.send(ByteBuffer.wrap(buf.getBuffer()));
+			}
+		    }, taskOwner);
+	    }
 
+	    Thread.sleep(5000);
 	    for (DummyClient client : group.getClients()) {
-		MessageInfo info = client.nextChannelMessage();
-		if (info == null) {
-		    failed = true;
-		    System.err.println(
- 			"member:" + client.name + " did not get message");
-		} else {
-		    if (! info.channelName.equals(channelName)) {
-			fail("Got channel name: " + info.channelName +
-			     ", Expected: " + channelName);
+		for (int i = 0; i < numMessages; i++) {
+		    MessageInfo info = client.nextChannelMessage();
+		    if (info == null) {
+			failed = true;
+			System.err.println(
+			    "member:" + client.name + " did not get message");
+			continue;
+		    } else {
+			if (! info.channelName.equals(channelName)) {
+			    fail("Got channel name: " + info.channelName +
+				 ", Expected: " + channelName);
+			}
+			System.err.println(
+			    client.name + " got channel message: " + info.seq);
+			if (info.seq != i) {
+			    failed = true;
+			    System.err.println(
+				"\tFAILURE: expected sequence number: " + i);
+			}
 		    }
-		    System.err.println(
-			client.name + " got channel message: " + info.seq);
 		}
 	    }
 
 	    if (failed) {
-		fail("test failed");
+		fail("test failed: see output");
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -845,11 +883,6 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelSendAllMultipleNodes() throws Exception {
-	addNodes("one", "two", "three");
-	testChannelSendAll();
-    }
-    
     /* -- Test Channel.close -- */
 
     public void testChannelCloseNoTxn() throws Exception {
@@ -971,9 +1004,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
 	    setUp(false);
-	    addNodes("recoveryNode");
 
-	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
+	    Thread.sleep(WAIT_TIME); // await recovery actions
 	    group.checkMembership(channelName, false);
 	    group.checkChannelSets(false);
 	    printServiceBindings();

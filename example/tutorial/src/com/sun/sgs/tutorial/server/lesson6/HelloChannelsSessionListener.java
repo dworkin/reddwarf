@@ -20,6 +20,7 @@
 package com.sun.sgs.tutorial.server.lesson6;
 
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,13 +31,15 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameNotBoundException;
 
 /**
  * Simple example {@link ClientSessionListener} for the Project Darkstar
  * Server.
  * <p>
  * Logs each time a session receives data or logs out, and echoes
- * any data received back to the sender.
+ * any data received back to the sender or broadcasts it to the
+ * requested channel.
  */
 class HelloChannelsSessionListener
     implements Serializable, ClientSessionListener
@@ -48,38 +51,30 @@ class HelloChannelsSessionListener
     private static final Logger logger =
         Logger.getLogger(HelloChannelsSessionListener.class.getName());
 
+    /** The message encoding. */
+    public static final String MESSAGE_CHARSET = "UTF-8";
+
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference sessionRef;
 
     /**
-     * Creates a new {@code HelloChannelsSessionListener} for the given
-     * session, and joins it to the given channels.
+     * Creates a new {@code HelloChannelsSessionListener} for the session.
      *
      * @param session the session this listener is associated with
-     * @param channel1 a channel to join
      */
-    public HelloChannelsSessionListener(ClientSession session,
-        Channel channel1)
+    public HelloChannelsSessionListener(ClientSession session)
     {
         if (session == null)
             throw new NullPointerException("null session");
 
-        if (channel1 == null)
-            throw new NullPointerException("null channel1");
-
         DataManager dataMgr = AppContext.getDataManager();
-
         sessionRef = dataMgr.createReference(session);
-
-        // Join to channel1
-        channel1.join(session);
-
-        // Lookup channel2 by name
-        Channel channel2 =
-            dataMgr.getBinding(HelloChannels.CHANNEL_2_NAME, Channel.class);
-
-        // Join to channel2
-        channel2.join(session);
+        
+        // Join the session to all channels
+        for (String channelName : HelloChannels.channelNames) {
+            Channel channel = findChannel(channelName);
+            channel.join(session);
+        }
     }
 
     /**
@@ -99,11 +94,75 @@ class HelloChannelsSessionListener
      */
     public void receivedMessage(ByteBuffer message) {
         ClientSession session = getSession();
+        String sessionName = session.getName();
 
-        logger.log(Level.INFO, "Message from {0}", session.getName());
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, "Message from {0}", sessionName);
+        }
 
-        // Echo message back to sender
-        session.send(message);
+        String text = decodeString(message);
+
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER,
+                       "{0} sends: {1}",
+                       new Object[] { sessionName, text });
+        }
+
+        String[] args = text.split(" ", 2);
+        
+        if (args.length < 2) {
+            logger.log(Level.WARNING,
+                       "Malformed message from {0}",
+                       sessionName);
+            return;
+        }
+
+        String channelName = args[0];
+        String contents = args[1];
+        if (channelName.charAt(0) == '*') {
+            // Direct message; print it and echo back
+            logger.log(Level.FINE, "Server echo to {0}", sessionName);
+
+            // Echo original message back to sender
+            message.rewind();
+            session.send(message);
+        } else {
+            // Channel message; broadcast to the correct channel
+
+            try {
+                logger.log(Level.FINE,
+                           "Server broadcast on {0}", channelName);
+
+                // Find the channel
+                Channel channel = findChannel(channelName);
+
+                // Construct the outbound message with
+                // the sender and channel names prepended.
+                String reply = "[" + sessionName +
+                               "@" + channelName +
+                               "] " + contents;
+
+                // Broadcast the message
+                channel.send(encodeString(reply));
+
+            } catch (NameNotBoundException e) {
+                logger.log(Level.WARNING,
+                           "Channel '{0}' not found",
+                           channelName);
+            }
+        }
+    }
+    
+    /**
+     * Return the channel with the given name.
+     * @param channelName the name of the channel
+     * 
+     * @return the channel with the given name
+     * @throws NameNotBoundException if the channel does not exist
+     */
+    private static Channel findChannel(String channelName) {
+        DataManager dataMgr = AppContext.getDataManager();
+        return dataMgr.getBinding(channelName, Channel.class);
     }
 
     /**
@@ -118,5 +177,37 @@ class HelloChannelsSessionListener
             "User {0} has logged out {1}",
             new Object[] { session.getName(), grace }
         );
+    }
+
+    /**
+     * Encodes a {@code String} into a {@link ByteBuffer}.
+     *
+     * @param s the string to encode
+     * @return the {@code ByteBuffer} which encodes the given string
+     */
+    protected static ByteBuffer encodeString(String s) {
+        try {
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required character set " + MESSAGE_CHARSET +
+                " not found", e);
+        }
+    }
+
+    /**
+     * Decodes a {@link ByteBuffer} into a {@code String}.
+     *
+     * @param buf the {@code ByteBuffer} to decode
+     * @return the decoded string
+     */
+    protected static String decodeString(ByteBuffer buf) {
+        try {
+            byte[] bytes = new byte[buf.remaining()];
+            buf.get(bytes);
+            return new String(bytes, MESSAGE_CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required character set " + MESSAGE_CHARSET +
+                " not found", e);
+        }
     }
 }

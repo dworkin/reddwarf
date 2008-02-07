@@ -78,7 +78,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
@@ -188,7 +188,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port", "0");
 	try {
@@ -278,7 +278,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(server.getPort()));
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	txn = new DummyTransaction();	
 	store = createDataStore(props);
 	server.shutdown();
