@@ -1039,6 +1039,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
+	Thread.sleep(250);
 	System.err.println("Get shutdown nodes (should be removed)...");
         taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
