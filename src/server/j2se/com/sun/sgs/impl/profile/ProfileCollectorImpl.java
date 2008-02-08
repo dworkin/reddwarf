@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,14 +19,15 @@
 
 package com.sun.sgs.impl.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCounter;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileSample;
 
@@ -34,10 +35,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -147,7 +145,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void startTask(KernelRunnable task, TaskOwner owner,
+    public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount) {
         if (profileReports.get() != null)
             throw new IllegalStateException("A task is already being " +

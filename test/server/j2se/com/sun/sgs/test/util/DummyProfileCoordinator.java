@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,8 @@
 
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
@@ -29,8 +31,6 @@ import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileProducer;
-
-import java.util.Properties;
 
 
 /** Simple profiling utility to support tests. */
@@ -49,7 +49,7 @@ public class DummyProfileCoordinator {
     private static final KernelRunnable task = new DummyKernelRunnable();
 
     // a dummy owner for all reports
-    private static final DummyTaskOwner owner = new DummyTaskOwner();
+    private static final Identity owner = new DummyIdentity();
 
     // a single instance that will be non-null if we're profiling
     private static DummyProfileCoordinator instance = null;

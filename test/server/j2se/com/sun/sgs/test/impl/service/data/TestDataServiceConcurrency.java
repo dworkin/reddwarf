@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -27,7 +27,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
@@ -63,8 +62,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	MinimalTestKernel.getTransactionProxy();
 
     /** The component registry. */
-    static final DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
+    static DummyComponentRegistry componentRegistry;
 
     /**
      * The types of operations to perform.  Each value includes the operations
@@ -155,11 +153,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	    (maxThreads != threads ?
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
-	componentRegistry.setComponent(
-	    TaskScheduler.class, 
-	    MinimalTestKernel.getSystemRegistry(
-		MinimalTestKernel.createContext())
-	    .getComponent(TaskScheduler.class));
+        MinimalTestKernel.create();
+        componentRegistry = MinimalTestKernel.getSystemRegistry();
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
@@ -203,7 +198,6 @@ public class TestDataServiceConcurrency extends TestCase {
 		((ProfileProducer) service));
 	}
 	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.registerAppContext();
 	int perThread = objects + objectsBuffer;
 	/* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
@@ -305,7 +299,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	}
 
 	public void run() {
-	    componentRegistry.registerAppContext();
+            MinimalTestKernel.registerCurrentThread();
 	    try {
 		createTxn();
 		for (int i = 0; i < operations; i++) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,6 @@
 
 package com.sun.sgs.auth;
 
-import com.sun.sgs.kernel.KernelAppContext;
 
 import javax.security.auth.login.LoginException;
 
@@ -52,17 +51,6 @@ public interface IdentityAuthenticator
      * @return the identifiers for the supported credential types
      */
     public String [] getSupportedCredentialTypes();
-
-    /**
-     * Tells this <code>IdentityAuthenticator</code> the context in which
-     * it is running. This should only be called once for the lifetime of
-     * this authenticator.
-     *
-     * @param context the context in which identities are authenticated
-     *
-     * @throws IllegalStateException if the context has already been assigned
-     */
-    public void assignContext(KernelAppContext context);
 
     /**
      * Authenticates the given credentials. The returned <code>Identity</code>

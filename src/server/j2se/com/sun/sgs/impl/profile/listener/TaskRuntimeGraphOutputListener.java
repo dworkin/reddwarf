@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,8 +19,8 @@
 
 package com.sun.sgs.impl.profile.listener;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
@@ -50,7 +50,7 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
      * Creates an instance of {@code TaskRuntimeGraphOutputListener}.
      *
      * @param properties the {@code Properties} for this listener
-     * @param owner the {@code TaskOwner} to use for all tasks run by
+     * @param owner the {@code Identity} to use for all tasks run by
      *        this listener
      * @param taskScheduler the {@code TaskScheduler} to use for
      *        running short-lived or recurring tasks
@@ -58,7 +58,7 @@ public class TaskRuntimeGraphOutputListener implements ProfileListener {
      *        run any long-lived tasks
      */
     public TaskRuntimeGraphOutputListener(Properties properties,
-					  TaskOwner owner,
+					  Identity owner,
 					  TaskScheduler taskScheduler,
 					  ResourceCoordinator resourceCoord)
     {

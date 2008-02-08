@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -23,8 +23,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCredentials;
 
-import com.sun.sgs.kernel.KernelAppContext;
-
 import java.util.Properties;
 
 import javax.security.auth.login.CredentialException;
@@ -37,9 +35,6 @@ import javax.security.auth.login.CredentialException;
  */
 public class NullAuthenticator implements IdentityAuthenticator {
 
-    // flag to make sure that the context only get assigned once
-    private boolean contextAssigned;
-
     /**
      * Creates an instance of <code>NullAuthenticator</code>.
      *
@@ -48,7 +43,6 @@ public class NullAuthenticator implements IdentityAuthenticator {
     public NullAuthenticator(
         @SuppressWarnings("unused") Properties properties)
     {
-        contextAssigned = false;
     }
 
     /**
@@ -56,15 +50,6 @@ public class NullAuthenticator implements IdentityAuthenticator {
      */
     public String [] getSupportedCredentialTypes() {
         return new String [] { NamePasswordCredentials.TYPE_IDENTIFIER };
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public synchronized void assignContext(KernelAppContext ctx) {
-        if (contextAssigned)
-            throw new IllegalStateException("Context was already assigned");
-        contextAssigned = true;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -27,7 +27,6 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
@@ -107,9 +106,8 @@ public class TestDataServicePerformance extends TestCase {
     /** Properties for creating services. */
     protected Properties props;
 
-    /** A component registry. */
-    private DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
+    /** The component registry. */
+    private DummyComponentRegistry componentRegistry;
 
     /** An initial, open transaction. */
     private DummyTransaction txn;
@@ -129,11 +127,8 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
-	componentRegistry.setComponent(
-	    TaskScheduler.class, 
-	    MinimalTestKernel.getSystemRegistry(
-		MinimalTestKernel.createContext())
-	    .getComponent(TaskScheduler.class));
+        MinimalTestKernel.create();
+        componentRegistry = MinimalTestKernel.getSystemRegistry();
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServicePerformance");
@@ -189,7 +184,6 @@ public class TestDataServicePerformance extends TestCase {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
 	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.registerAppContext();
 	createTransaction(10000);
 	service.setBinding("counters", new Counters(items));
 	txn.commit();
@@ -236,7 +230,6 @@ public class TestDataServicePerformance extends TestCase {
 	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
 	componentRegistry.setComponent(DataManager.class, service);
-	componentRegistry.registerAppContext();
 	createTransaction();
 	service.setBinding("counters", new Counters(items));
 	txn.commit();

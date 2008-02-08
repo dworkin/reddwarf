@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007-2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -112,7 +112,7 @@ class SimpleClientConnector extends ClientConnector {
      */
     @Override
     public void cancel() throws IOException {
-        // TODO implement
+        // TODO implement cancel()
         throw new UnsupportedOperationException("Cancel not yet implemented");
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -31,19 +31,17 @@ import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
-import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
+import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.DataService;
@@ -87,7 +85,7 @@ public class TestTaskServiceImpl extends TestCase {
     private TaskScheduler taskScheduler;
     
     /** The owner for tasks I initiate. */
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
     
     private DataService dataService;
     private NodeMappingService mappingService;
@@ -173,39 +171,6 @@ public class TestTaskServiceImpl extends TestCase {
             fail("Expected MissingResourceException");
         } catch (MissingResourceException e) {
             System.err.println(e);
-        }
-    }
-
-    public void testConstructorNoDataService() throws Exception {
-        // Need to convince the transaction proxy that there is no data service
-        // in this context
-        KernelAppContext ctx = txnProxy.getCurrentOwner().getContext();
-        Class appKernelClass = 
-                Class.forName("com.sun.sgs.impl.kernel.AppKernelAppContext");
-        Field servicesField = 
-                appKernelClass.getDeclaredField("serviceComponents");
-        servicesField.setAccessible(true);
-        ComponentRegistry services = (ComponentRegistry) servicesField.get(ctx);
-        Object dataService = services.getComponent(DataService.class);
-        
-        Class compRegClass = 
-                Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
-        Field componentField =
-                compRegClass.getDeclaredField("componentSet");
-        componentField.setAccessible(true);
-        LinkedHashSet componentSet = (LinkedHashSet)(componentField.
-                                                     get(services));
-        Object setClone = componentSet.clone();
-        componentSet.remove(dataService);
-        
-        try {
-            new TaskServiceImpl(new Properties(), systemRegistry, txnProxy);
-            fail("Expected MissingResourceException");
-        } catch (MissingResourceException e) {
-            System.err.println(e);
-        } finally {
-            // restore the data service
-            componentField.set(services, setClone);
         }
     }
 
@@ -391,13 +356,13 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
+        DummyTaskScheduler rejSched = new DummyTaskScheduler(true);
         DummyComponentRegistry registry = new DummyComponentRegistry();
         registry.setComponent(TaskScheduler.class, rejSched);
         final TaskServiceImpl service =
             new TaskServiceImpl(new Properties(), registry, txnProxy);
         mappingService.assignNode(TestTaskServiceImpl.class,
-                                  taskOwner.getIdentity());
+                                  taskOwner);
                                   Thread.sleep(5000);
         registry = new DummyComponentRegistry();
         taskScheduler.runTransactionalTask(
@@ -415,7 +380,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleDelayedRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
+        DummyTaskScheduler rejSched = new DummyTaskScheduler(true);
         DummyComponentRegistry registry = new DummyComponentRegistry();
         registry.setComponent(TaskScheduler.class, rejSched);
         final TaskServiceImpl service =
@@ -439,16 +404,15 @@ public class TestTaskServiceImpl extends TestCase {
         // test with application identity
         runImmediateTest(taskOwner);
         // test with un-mapped identity
-        TaskOwner newOwner =
-            new TaskOwnerImpl(new IdentityImpl("id"), taskOwner.getContext());
+        Identity newOwner = new IdentityImpl("id");
         runImmediateTest(newOwner);
         // test with mapped identity
         mappingService.assignNode(TestTaskServiceImpl.class,
-                                  newOwner.getIdentity());
+                                  newOwner);
         runImmediateTest(newOwner);
     }
 
-    private void runImmediateTest(TaskOwner owner) throws Exception {
+    private void runImmediateTest(Identity owner) throws Exception {
         taskScheduler.runTransactionalTask(
             new AbstractKernelRunnable() {
                 public void run() {
@@ -510,16 +474,14 @@ public class TestTaskServiceImpl extends TestCase {
         // test with application identity
         runPendingTest(taskOwner);
         // test with un-mapped identity
-        TaskOwner newOwner =
-            new TaskOwnerImpl(new IdentityImpl("id"), taskOwner.getContext());
+        Identity newOwner = new IdentityImpl("id");
         runPendingTest(newOwner);
         // test with mapped identity
-        mappingService.assignNode(TestTaskServiceImpl.class,
-                                  newOwner.getIdentity());
+        mappingService.assignNode(TestTaskServiceImpl.class, newOwner);
         runPendingTest(newOwner);
     }
 
-    private void runPendingTest(TaskOwner owner) throws Exception {
+    private void runPendingTest(Identity owner) throws Exception {
         taskScheduler.runTransactionalTask(
             new AbstractKernelRunnable() {
                 public void run() {
@@ -541,16 +503,14 @@ public class TestTaskServiceImpl extends TestCase {
         // test with application identity
         runPeriodicTest(taskOwner);
         // test with un-mapped identity
-        TaskOwner newOwner =
-            new TaskOwnerImpl(new IdentityImpl("id"), taskOwner.getContext());
+        Identity newOwner = new IdentityImpl("id");
         runPeriodicTest(newOwner);
         // test with mapped identity
-        mappingService.assignNode(TestTaskServiceImpl.class,
-                                  newOwner.getIdentity());
+        mappingService.assignNode(TestTaskServiceImpl.class, newOwner);
         runPeriodicTest(newOwner);
     }
 
-    public void runPeriodicTest(TaskOwner owner) throws Exception {
+    public void runPeriodicTest(Identity owner) throws Exception {
         taskScheduler.runTransactionalTask(
             new AbstractKernelRunnable() {
                 public void run() {

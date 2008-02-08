@@ -1,5 +1,20 @@
-/**
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+/*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.test.impl.service.nodemap;
@@ -8,18 +23,15 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
@@ -73,8 +85,7 @@ public class TestNodeMappingServerImpl extends TestCase {
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
-
-    private DummyAbstractKernelAppContext appContext;
+    
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
@@ -167,9 +178,9 @@ public class TestNodeMappingServerImpl extends TestCase {
         }
         
         MinimalTestKernel.useMasterScheduler(serviceProps);
-	appContext = MinimalTestKernel.createContext();
-	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext); 
-	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+	MinimalTestKernel.create();
+	systemRegistry = MinimalTestKernel.getSystemRegistry(); 
+	serviceRegistry = MinimalTestKernel.getServiceRegistry();
 	    
 	// create services
 	dataService = createDataService(systemRegistry);
@@ -239,7 +250,7 @@ public class TestNodeMappingServerImpl extends TestCase {
         if (clean) {
             deleteDirectory(DB_DIRECTORY);
         }
-        MinimalTestKernel.destroyContext(appContext);
+        MinimalTestKernel.destroy();
     }
 
     public void testConstructor() throws Exception {

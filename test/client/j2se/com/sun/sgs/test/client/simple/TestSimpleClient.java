@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007-2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -32,12 +32,11 @@
 
 package com.sun.sgs.test.client.simple;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -83,11 +82,7 @@ public class TestSimpleClient extends TestCase {
 	public void loginFailed(String reason) {
 	}
 
-	public ClientChannelListener joinedChannel(ClientChannel channel) {
-	    return null;
-	}
-
-	public void receivedMessage(byte[] message) {
+	public void receivedMessage(ByteBuffer message) {
 	}
 
 	public void reconnecting() {

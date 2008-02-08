@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -949,11 +949,16 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * Returns the transaction for the specified ID, throwing
+     * IllegalArgumentException if the ID is negative, throwing
      * TransactionNotActiveException if the transaction is not active, and
      * checking, if requested, whether the transaction has timed out.  Treats
      * transactions that are being reaped as being not active.
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
+	if (tid < 0) {
+	    throw new IllegalArgumentException(
+		"The transaction ID must not be negative: " + tid);
+	}
 	try {
 	    return txnTable.get(tid, checkTimeout);
 	} catch (RuntimeException e) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -192,7 +192,7 @@ final class TransactionImpl implements Transaction {
 		    "Attempt to add multiple durable participants");
 	    }
 	    if (collector != null) {
-		String name = participant.getClass().getName();
+		String name = participant.getTypeName();
 		detailMap.put(name, new ProfileParticipantDetailImpl(name));
 	    }
 	}
@@ -214,7 +214,7 @@ final class TransactionImpl implements Transaction {
 	case COMMITTING:
 	case COMMITTED:
 	    throw new IllegalStateException(
-		"Transaction is not active: " + state);
+		"Transaction is not active: " + state, cause);
 	default:
 	    throw new AssertionError();
 	}
@@ -241,7 +241,7 @@ final class TransactionImpl implements Transaction {
 	    if (collector != null) {
 		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
-		    detailMap.get(participant.getClass().getName());
+		    detailMap.get(participant.getTypeName());
 		detail.setAborted(finishTime - startTime);
 		collector.addParticipant(detail);
 	    }
@@ -330,7 +330,7 @@ final class TransactionImpl implements Transaction {
 	{
 	    TransactionParticipant participant = iter.next();
 	    if (collector != null) {
-		detail = detailMap.get(participant.getClass().getName());
+		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -390,7 +390,7 @@ final class TransactionImpl implements Transaction {
 			   this, participant);
 	    }
 	    if (collector != null) {
-		detail = detailMap.get(participant.getClass().getName());
+		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {

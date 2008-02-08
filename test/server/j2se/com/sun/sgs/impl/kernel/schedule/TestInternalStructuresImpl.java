@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -24,12 +24,11 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
 
 import java.util.Collection;
-import java.util.Properties;
 
 import junit.framework.JUnit4TestAdapter;
 
@@ -56,12 +55,12 @@ public class TestInternalStructuresImpl {
 
     // a basic task that shouldn't be run but can be used for tests
     private static final ScheduledTask testTask =
-        new ScheduledTask(testRunnable, new DummyTaskOwner(),
+        new ScheduledTask(testRunnable, new DummyIdentity(),
                           Priority.getDefaultPriority(), 0);
 
     // a basic, recurring task that shouldn't be run but can be used for tests
     private static final ScheduledTask recurringTestTask =
-        new ScheduledTask(testRunnable, new DummyTaskOwner(),
+        new ScheduledTask(testRunnable, new DummyIdentity(),
                           Priority.getDefaultPriority(), 0, 100);
 
     public TestInternalStructuresImpl() {
@@ -136,7 +135,7 @@ public class TestInternalStructuresImpl {
 
     @Test (expected=NullPointerException.class)
         public void constructScheduledTaskNullTask() throws Exception {
-        new ScheduledTask(null, new DummyTaskOwner(),
+        new ScheduledTask(null, new DummyIdentity(),
                           Priority.getDefaultPriority(), 0);
     }
 
@@ -148,7 +147,7 @@ public class TestInternalStructuresImpl {
 
     @Test (expected=NullPointerException.class)
         public void constructScheduledTaskNullPriority() throws Exception {
-        new ScheduledTask(testRunnable, new DummyTaskOwner(), null, 0);
+        new ScheduledTask(testRunnable, new DummyIdentity(), null, 0);
     }
 
     @Test public void assertIsRecurring() {
@@ -211,17 +210,17 @@ public class TestInternalStructuresImpl {
     }
 
     @Test public void timedTaskHandlerRejects() {
-        assertFalse((new TimedTaskHandler(new TimedTaskConsumerImpl())).
+        assertFalse((new TimedTaskHandler(new DummyApplicationScheduler())).
                     runDelayed(testTask));
     }
 
     @Test public void timedTaskHandlerAccepts() {
         ScheduledTask task =
-            new ScheduledTask(testRunnable, new DummyTaskOwner(),
+            new ScheduledTask(testRunnable, new DummyIdentity(),
                               Priority.getDefaultPriority(),
                               System.currentTimeMillis() +
                               TimedTaskHandler.FUTURE_THRESHOLD + 50);
-        assertTrue((new TimedTaskHandler(new TimedTaskConsumerImpl())).
+        assertTrue((new TimedTaskHandler(new DummyApplicationScheduler())).
                    runDelayed(task));
     }
 
@@ -249,14 +248,11 @@ public class TestInternalStructuresImpl {
         public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
             return new RecurringTaskHandleImpl(this, task);
         }
-        public void notifyCancelled(ScheduledTask task) {}
-        public void shutdown() {}
-    }
-
-    private static class TimedTaskConsumerImpl implements TimedTaskConsumer {
         public void timedTaskReady(ScheduledTask task) {
 
         }
+        public void notifyCancelled(ScheduledTask task) {}
+        public void shutdown() {}
     }
 
     /**

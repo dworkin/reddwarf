@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -134,6 +134,13 @@ interface ApplicationScheduler {
      */
     public RecurringTaskHandle addRecurringTask(ScheduledTask task);
 
+    /**
+     * Called when a delayed task has reached its time to run.
+     *
+     * @param task the <code>ScheduledTask</code> that is ready to run
+     */
+    public void timedTaskReady(ScheduledTask task);
+    
     /**
      * Notifies the scheduler that the given task has been cancelled. This
      * typically happens with recurring tasks when their associated handles

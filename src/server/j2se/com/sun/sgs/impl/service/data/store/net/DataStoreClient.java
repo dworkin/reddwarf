@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.Exceptions;
@@ -30,6 +31,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -59,18 +61,20 @@ import java.util.logging.Logger;
  *	than {@code 0}. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.server.run
+ *	com.sun.sgs.impl.service.data.store.net.server.start
  *	</b></code><br>
- *	<i>Default:</i> <code>false</code>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else {@code true}
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link DataStoreServerImpl}, using the properties provided
  *	to this instance's constructor. <p>
-
+ *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.server.host
  *	</b></code><br>
- *	<i>Required</i>
+ *	<i>Default</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, else the local host name.
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	DataStoreServer}. <p>
@@ -83,7 +87,7 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	DataStoreServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.data.store.net.server.run}
+ *	if the {@code com.sun.sgs.impl.service.data.store.net.server.start}
  *	property is {@code true}, and means that an anonymous port will be
  *	chosen for running the server. <p>
  *
@@ -149,9 +153,9 @@ public final class DataStoreClient
     /** The default maximum transaction timeout. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
 
-    /** The property that specifies to run the server. */
-    private static final String RUN_SERVER_PROPERTY =
-	PACKAGE + ".server.run";
+    /** The property that specifies to start the server. */
+    private static final String SERVER_START_PROPERTY =
+	PACKAGE + ".server.start";
 
     /** The server host name. */
     private final String serverHost;
@@ -172,11 +176,14 @@ public final class DataStoreClient
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
 
-    /** Object to synchronize on when accessing txnCount. */
+    /** Object to synchronize on when accessing txnCount and shuttingDown. */
     private final Object txnCountLock = new Object();
 
     /** The number of currently active transactions. */
     private int txnCount = 0;
+
+    /** Whether the client is in the process of shutting down. */
+    private boolean shuttingDown = false;
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -222,20 +229,22 @@ public final class DataStoreClient
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	serverHost = wrappedProps.getProperty(SERVER_HOST_PROPERTY);
-	if (serverHost == null) {
-	    throw new IllegalArgumentException(
-		"The " + SERVER_HOST_PROPERTY + " property must be specified");
-	}
-	boolean runServer = wrappedProps.getBooleanProperty(
-	    RUN_SERVER_PROPERTY, false);
+	String localHost = InetAddress.getLocalHost().getHostName();
+	serverHost = wrappedProps.getProperty(
+	    SERVER_HOST_PROPERTY,
+	    wrappedProps.getProperty(
+		StandardProperties.SERVER_HOST, localHost));
+	boolean serverStart = wrappedProps.getBooleanProperty(
+	    SERVER_START_PROPERTY,
+	    wrappedProps.getBooleanProperty(
+		StandardProperties.SERVER_START, true));
 	int specifiedServerPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, runServer ? 0 : 1,
+	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, serverStart ? 0 : 1,
 	    65535);
 	maxTxnTimeout = wrappedProps.getLongProperty(
 	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 1,
 	    Long.MAX_VALUE);
-	if (runServer) {
+	if (serverStart) {
 	    try {
 		localServer = new DataStoreServerImpl(properties);
 		serverPort = localServer.getPort();
@@ -525,6 +534,7 @@ public final class DataStoreClient
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
+		shuttingDown = true;
 		while (txnCount > 0) {
 		    try {
 			logger.log(Level.FINEST,
@@ -753,6 +763,11 @@ public final class DataStoreClient
 	throw convertException(
 	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
+    
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return this.getClass().getName();
+    }
 
     /* -- Other public methods -- */
 
@@ -827,15 +842,17 @@ public final class DataStoreClient
 	synchronized (txnCountLock) {
 	    if (txnCount < 0) {
 		throw new IllegalStateException("Service is shut down");
+	    } else if (shuttingDown) {
+		throw new IllegalStateException("Service is shutting down");
 	    }
 	    txnCount++;
 	}
 	boolean joined = false;
-	long tid;
+	long tid = -1;
 	try {
+	    tid = server.createTransaction(txn.getTimeout());
 	    txn.join(this);
 	    joined = true;
-	    tid = server.createTransaction(txn.getTimeout());
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
 			   "Created server transaction stid:{0,number,#} " +
@@ -845,6 +862,19 @@ public final class DataStoreClient
 	} finally {
 	    if (!joined) {
 		decrementTxnCount();
+		if (tid != -1) {
+		    try {
+			server.abort(tid);
+		    } catch (RuntimeException e) {
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.logThrow(
+				Level.FINEST, e,
+				"Problem aborting server transaction " +
+				"stid:{0,number,#} for transaction {1}",
+				tid, txn);
+			}
+		    }
+		}
 	    }
 	}
 	TxnInfo txnInfo = new TxnInfo(txn, tid);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,9 +19,10 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskOwner;
 
 
 /**
@@ -33,7 +34,7 @@ class ScheduledTask {
 
     // the common aspects of a task
     private final KernelRunnable task;
-    private final TaskOwner owner;
+    private final Identity owner;
     private final Priority priority;
     private final long startTime;
     private final long period;
@@ -61,12 +62,12 @@ class ScheduledTask {
      * represent a recurring task.
      *
      * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>TaskOwner</code> of the task
+     * @param owner the <code>Identity</code> of the task owner
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
      */
-    ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
+    ScheduledTask(KernelRunnable task, Identity owner, Priority priority,
                   long startTime) {
         this(task, owner, priority, startTime, NON_RECURRING);
     }
@@ -75,14 +76,14 @@ class ScheduledTask {
      * Creates an instance of <code>ScheduledTask</code>.
      *
      * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>TaskOwner</code> of the task
+     * @param owner the <code>Identity</code> of the task owner
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
      * @param period the delay between recurring executions, or
      *               <code>NON_RECURRING</code>
      */
-    ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
+    ScheduledTask(KernelRunnable task, Identity owner, Priority priority,
                   long startTime, long period) {
         if (task == null)
             throw new NullPointerException("Task cannot be null");
@@ -110,9 +111,9 @@ class ScheduledTask {
     /**
      * Returns the owner.
      *
-     * @return the <code>TaskOwner</code>
+     * @return the <code>Identity</code> that owns the task
      */
-    TaskOwner getOwner() {
+    Identity getOwner() {
         return owner;
     }
 

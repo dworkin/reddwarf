@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -32,7 +32,6 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
@@ -70,16 +69,18 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.start
  *	</b></code><br>
- *	<i>Default:</i> <code>true</code>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else <code>true</code>
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link NodeMappingServerImpl}, using the properties provided
  *	to this instance's constructor. <p>
-
+ *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
- *	<i>Default:</i> the local host name <br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, else the local host name <br>
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	NodeMappingServer}. <p>
@@ -92,9 +93,9 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	NodeMappingServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.nodemap.start.server}
- *	property is {@code true}, and means that an anonymous port will be
- *	chosen for running the server. <p>
+ *	if the {@code com.sun.sgs.impl.service.nodemap.server.start} property
+ *	is {@code true}, and means that an anonymous port will be chosen for
+ *	running the server. <p>
  *
  *  <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.client.port
@@ -284,6 +285,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** Package name for this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
+    /** Class name. */
+    private static final String CLASSNAME = 
+            NodeMappingServiceImpl.class.getName();
     /**
      * The property that specifies whether the server should be instantiated
      * in this stack.  Also used by the unit tests.
@@ -314,7 +318,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private final TaskScheduler taskScheduler;
     
     /** The owner for tasks I initiate. */
-    private final TaskOwner taskOwner;
+    private final Identity taskOwner;
     
     /** The data service. */
     private final DataService dataService;
@@ -432,8 +436,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
             contextFactory = new ContextFactory(txnProxy);
                 
             // Find or create our server.   
-            boolean instantiateServer =  wrappedProps.getBooleanProperty(
-                                                SERVER_START_PROPERTY, true);
+            boolean instantiateServer =
+		wrappedProps.getBooleanProperty(
+		    SERVER_START_PROPERTY,
+		    wrappedProps.getBooleanProperty(
+			StandardProperties.SERVER_START, true));
             String localHost = InetAddress.getLocalHost().getHostName();            
             String host;
             int port;
@@ -448,7 +455,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
             } else {
                 serverImpl = null;
                 host = 
-                    wrappedProps.getProperty(SERVER_HOST_PROPERTY, localHost);
+                    wrappedProps.getProperty(
+			SERVER_HOST_PROPERTY,
+			wrappedProps.getProperty(
+			    StandardProperties.SERVER_HOST, localHost));
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
@@ -517,11 +527,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
    
     /** {@inheritDoc} */
     public void ready() {
-        // We don't update our taskOwner because we know the initial
-        // context used during construction time is sufficient (this service
-        // does not need to run application code, and does not require
-        // Managers.
-        
         synchronized(stateLock) {
             state = State.RUNNING;
         }
@@ -929,7 +934,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 	
 	/** {@inheritDoc} */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -100,13 +100,13 @@ class CompleteMessageFilter {
 
         // Process complete messages, if any
         while (msgBuf.hasRemaining()) {
-            if (msgBuf.remaining() < 4)
+            if (msgBuf.remaining() < 2)
                 break;
 
-            if (! msgBuf.prefixedDataAvailable(4))
+            if (! msgBuf.prefixedDataAvailable(2))
                 break;
 
-            int msgLen = msgBuf.getInt();
+            int msgLen = msgBuf.getShort() & 0xFFFF;
 
             // Get a read-only buffer view on the complete message
             ByteBuffer completeMessage =
@@ -143,7 +143,7 @@ class CompleteMessageFilter {
     }
 
     /**
-     * Prepends the length of the given byte array as a 4-byte {@code int}]
+     * Prepends the length of the given byte array as a 2-byte {@code short}
      * in network byte-order, and passes the result to the {@linkplain
      * FilterListener#sendUnfiltered sendUnfiltered} method of the
      * given {@code listener}.
@@ -152,8 +152,8 @@ class CompleteMessageFilter {
      * @param message the data to filter and forward to the listener
      */
     void filterSend(FilterListener listener, byte[] message) {
-        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4, false);
-        buffer.putInt(message.length);
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 2, false);
+        buffer.putShort((short) message.length);
         buffer.put(message);
         buffer.flip();
         // Don't worry about the listener throwing an exception, since

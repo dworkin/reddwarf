@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -153,6 +153,7 @@ public class PowerOfTwoHistogram implements Histogram {
      * </pre>
      * 
      * @param binLabel the label to append to each of the bins
+     *
      * @return the histogram
      */
     public String toString(String binLabel) {

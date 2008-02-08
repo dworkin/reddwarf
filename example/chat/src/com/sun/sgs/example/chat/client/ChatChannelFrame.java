@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -25,6 +25,7 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -36,10 +37,6 @@ import javax.swing.WindowConstants;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.SessionId;
-
 /**
  * ChatChannelFrame presents a GUI so that a user can interact with
  * a channel. The users connected to the channel are displayed in a list
@@ -47,7 +44,7 @@ import com.sun.sgs.client.SessionId;
  * area on the bottom of the left side.
  */
 public class ChatChannelFrame extends JInternalFrame
-        implements ActionListener, ClientChannelListener
+        implements ActionListener
 {
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
@@ -55,11 +52,11 @@ public class ChatChannelFrame extends JInternalFrame
     /** The {@code ChatClient} that is the parent of this frame. */
     private final ChatClient myChatClient;
 
-    /** The {@code ClientChannel} associated with this frame. */
-    private final ClientChannel myChannel;
+    /** The name of the channel associated with this frame. */
+    private final String myChannelName;
 
     /** The {@code MultiList} containing this channel's members. */
-    private final MultiList<SessionId> multiList;
+    private final MultiList<ChatUser> multiList;
 
     /** The input field. */
     private final JTextField inputField;
@@ -74,17 +71,17 @@ public class ChatChannelFrame extends JInternalFrame
      * @param client the parent {@code ChatClient} of this frame.
      * @param channel the channel that this class will manage.
      */
-    public ChatChannelFrame(ChatClient client, ClientChannel channel) {
-        super("Channel: " + channel.getName());
+    public ChatChannelFrame(ChatClient client, String channelName) {
+        super("Channel: " + channelName);
         myChatClient = client;
-        myChannel = channel;
+        myChannelName = channelName;
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        multiList = new MultiList<SessionId>(SessionId.class, client);
+        multiList = new MultiList<ChatUser>(ChatUser.class, client);
         multiList.addMouseListener(myChatClient.getPMMouseListener());
         eastPanel.add(new JScrollPane(multiList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
@@ -104,33 +101,28 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Handles messages received from other clients on this channel,
      * as well as server notifications about other clients joining and
      * leaving this channel.
      */
-    public void receivedMessage(ClientChannel channel, SessionId sender,
-            byte[] message)
+    public void receivedMessage(String channelName, ChatUser sender,
+            ByteBuffer message)
     {
         try {
-            String messageString = ChatClient.fromMessageBytes(message);
+            String messageString = ChatClient.fromMessageBuffer(message);
             System.err.format("Recv on %s from %s: %s\n",
-                    channel.getName(), sender, messageString);
+                    channelName, sender, messageString);
             String[] args = messageString.split(" ", 2);
             String command = args[0];
 
             if (command.equals("/joined")) {
-                multiList.addItem(SessionId.fromBytes(
-                    ChatClient.fromHexString(args[1])));
+                multiList.addItem(ChatClient.findUserByIdString(args[1]));
             } else if (command.equals("/left")) {
-                memberLeft(SessionId.fromBytes(
-                        ChatClient.fromHexString(args[1])));
+                memberLeft(ChatClient.findUserByIdString(args[1]));
             } else if (command.equals("/members")) {
                 String[] members = args[1].split("\\s+");
                 for (String member : members) {
-                    multiList.addItem(SessionId.fromBytes(
-                        ChatClient.fromHexString(member)));
+                    multiList.addItem(ChatClient.findUserByIdString(member));
                 }
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
@@ -145,11 +137,9 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * {@inheritDoc}
-     * <p>
      * Closes this frame.
      */
-    public void leftChannel(ClientChannel channel) {
+    public void leftChannel() {
         dispose();
         if (getDesktopPane() != null) {
             getDesktopPane().remove(this);
@@ -161,7 +151,7 @@ public class ChatChannelFrame extends JInternalFrame
      *
      * @param member the member who left this channel
      */
-    void memberLeft(SessionId member) {
+    void memberLeft(ChatUser member) {
         multiList.removeItem(member);        
     }
 
@@ -173,10 +163,10 @@ public class ChatChannelFrame extends JInternalFrame
     public void actionPerformed(ActionEvent action) {
         try {
             String message = inputField.getText();
-            byte[] msgBytes = ChatClient.toMessageBytes(message);
-            myChannel.send(msgBytes);
+            ByteBuffer msgBuf = ChatClient.toMessageBuffer(message);
+            myChatClient.broadcastOnChannel(myChannelName, msgBuf);
             // Deliver to our own receivedMessage, since server won't echo.
-            receivedMessage(myChannel, myChatClient.getSessionId(), msgBytes);
+            receivedMessage(myChannelName, myChatClient.getChatUser(), msgBuf);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -208,7 +198,7 @@ public class ChatChannelFrame extends JInternalFrame
          */
         @Override
         public void internalFrameClosing(InternalFrameEvent event) {
-            frame.myChatClient.leaveChannel(frame.myChannel);
+            frame.myChatClient.leaveChannel(frame.myChannelName);
         }        
     }
 }

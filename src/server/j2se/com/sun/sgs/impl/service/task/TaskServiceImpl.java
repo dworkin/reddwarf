@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -32,8 +32,6 @@ import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
-
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -44,7 +42,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
@@ -211,7 +208,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     private static TransactionProxy transactionProxy = null;
 
     // the owning application context used for re-starting tasks
-    private TaskOwner appOwner;
+    private final Identity appOwner;
 
     // the identifier for the local node
     private final long nodeId;
@@ -287,10 +284,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         nodeMappingService =
             transactionProxy.getService(NodeMappingService.class);
 
+        appOwner = transactionProxy.getCurrentOwner();
+        
         // note that the application is always active locally, so there's
         // no chance of voting the application as inactive
-        activeIdentityMap.put(transactionProxy.getCurrentOwner().
-                              getIdentity(), 1);
+        activeIdentityMap.put(appOwner, 1);
 
         // register for identity mapping updates
         nodeMappingService.addNodeMappingListener(this);
@@ -342,8 +340,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         logger.log(Level.CONFIG, "readying TaskService");
 
-        appOwner = transactionProxy.getCurrentOwner();
-
         // bind the node-local hand-off set, noting that there's a (very
         // small) chance that another node may have already tried to hand-off
         // to us, in which case the set will already exist
@@ -371,7 +367,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         // tasks owned by the application (e.g., any tasks started
         // during the application's initialize() method), but hopefully
         // this will change when we add APIs for creating identities
-        nodeMappingService.assignNode(getClass(), appOwner.getIdentity());
+        nodeMappingService.assignNode(getClass(), appOwner);
 
         // kick-off a periodic hand-off task, but delay a little while so
         // that the system has a chance to finish setup
@@ -487,13 +483,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new IllegalStateException("Service is shutdown");
 
         // persist the task regardless of where it will ultimately run
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        Identity identity = owner.getIdentity();
-        TaskRunner runner = getRunner(task, identity, startTime, PERIOD_NONE);
+        Identity owner = transactionProxy.getCurrentOwner();
+        TaskRunner runner = getRunner(task, owner, startTime, PERIOD_NONE);
 
         // check where the owner is active to get the task running
-        if (! isMappedLocally(identity)) {
-            if (handoffTask(runner.getObjName(), identity))
+        if (! isMappedLocally(owner)) {
+            if (handoffTask(runner.getObjName(), owner))
                 return;
             runner.markIgnoreIsLocal();
         }
@@ -520,14 +515,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                        "at {0}", startTime);
 
         // persist the task regardless of where it will ultimately run
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        Identity identity = owner.getIdentity();
-        TaskRunner runner = getRunner(task, identity, startTime, period);
+        Identity owner = transactionProxy.getCurrentOwner();
+        TaskRunner runner = getRunner(task, owner, startTime, period);
         String objName = runner.getObjName();
 
         // check where the owner is active to get the task running
-        if (! isMappedLocally(identity)) {
-            if (handoffTask(objName, identity))
+        if (! isMappedLocally(owner)) {
+            if (handoffTask(objName, owner))
                 return new PeriodicTaskHandleImpl(objName);
             runner.markIgnoreIsLocal();
         }
@@ -535,11 +529,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             (PendingTask) dataService.getServiceBinding(objName);
         dataService.markForUpdate(ptask);
         ptask.setRunningNode(nodeId);
+
         RecurringTaskHandle handle =
             taskScheduler.scheduleRecurringTask(runner, owner, startTime,
                                                 period);
         ctxFactory.joinTransaction().addRecurringTask(objName, handle,
-                                                      identity);
+                                                      owner);
         return new PeriodicTaskHandleImpl(objName);
     }
 
@@ -554,8 +549,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         if (scheduleNDTaskOp != null)
             scheduleNDTaskOp.report();
 
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        scheduleTask(new NonDurableTask(task, owner.getIdentity()), owner,
+        Identity owner = transactionProxy.getCurrentOwner();
+        scheduleTask(new NonDurableTask(task, owner), owner,
                      START_NOW, defaultPriority);
     }
 
@@ -572,8 +567,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         if (scheduleNDTaskDelayedOp != null)
             scheduleNDTaskDelayedOp.report();
 
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        scheduleTask(new NonDurableTask(task, owner.getIdentity()), owner,
+        Identity owner = transactionProxy.getCurrentOwner();
+        scheduleTask(new NonDurableTask(task, owner), owner,
                      System.currentTimeMillis() + delay, defaultPriority);
     }
 
@@ -591,8 +586,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         if (scheduleNDTaskPrioritizedOp != null)
             scheduleNDTaskPrioritizedOp.report();
 
-        TaskOwner owner = transactionProxy.getCurrentOwner();
-        scheduleTask(new NonDurableTask(task, owner.getIdentity()), owner,
+        Identity owner = transactionProxy.getCurrentOwner();
+        scheduleTask(new NonDurableTask(task, owner), owner,
                      START_NOW, priority);
     }
 
@@ -627,7 +622,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      * from the scheduler. This is used for both the durable and non-durable
      * tasks, but not for periodic tasks.
      */
-    private void scheduleTask(KernelRunnable task, TaskOwner owner,
+    private void scheduleTask(KernelRunnable task, Identity owner,
                               long startTime, Priority priority) {
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "reserving a task starting " +
@@ -641,11 +636,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (startTime == START_NOW)
                 txnState.addReservation(taskScheduler.
                                         reserveTask(task, owner, priority),
-                                        owner.getIdentity());
+                                        owner);
             else
                 txnState.addReservation(taskScheduler.
                                         reserveTask(task, owner, startTime),
-                                        owner.getIdentity());
+                                        owner);
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.FINE))
                 logger.logThrow(Level.FINE, tre,
@@ -675,11 +670,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (recurringMap.containsKey(objName))
                 ctxFactory.joinTransaction().
                     cancelRecurringTask(objName, transactionProxy.
-                                        getCurrentOwner().getIdentity());
+                                                 getCurrentOwner());
             else
                 ctxFactory.joinTransaction().
-                    decrementStatusCount(transactionProxy.
-                                         getCurrentOwner().getIdentity());
+                    decrementStatusCount(transactionProxy.getCurrentOwner());
             return null;
         }
         boolean isAvailable = ptask.isTaskAvailable();
@@ -816,21 +810,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void commit() {
-            // use the reservations...
-            if (reservationSet != null)
-                for (TaskReservation reservation : reservationSet)
-                    reservation.use();
-            // ...start the periodic tasks...
-            if (addedRecurringMap != null) {
-                for (Entry<String,RecurringDetail> entry :
-                         addedRecurringMap.entrySet()) {
-                    RecurringDetail detail = entry.getValue();
-                    recurringMap.put(entry.getKey(), detail);
-                    addHandleForIdentity(detail.handle, detail.identity);
-                    detail.handle.start();
-                }
-            }
-            // ...cancel the cancelled periodic tasks...
+            // cancel the cancelled periodic tasks...
             if (cancelledRecurringSet != null) {
                 for (String objName : cancelledRecurringSet) {
                     RecurringDetail detail = recurringMap.remove(objName);
@@ -846,6 +826,20 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 int countChange = entry.getValue();
                 if (countChange != 0)
                     submitStatusChange(entry.getKey(), countChange);
+            }
+            // with the status counts updated, use the reservations...
+            if (reservationSet != null)
+                for (TaskReservation reservation : reservationSet)
+                    reservation.use();
+            // ... and start the periodic tasks
+            if (addedRecurringMap != null) {
+                for (Entry<String,RecurringDetail> entry :
+                         addedRecurringMap.entrySet()) {
+                    RecurringDetail detail = entry.getValue();
+                    recurringMap.put(entry.getKey(), detail);
+                    addHandleForIdentity(detail.handle, detail.identity);
+                    detail.handle.start();
+                }
             }
         }
         /** {@inheritDoc} */
@@ -916,7 +910,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     {
         /** Creates an instance with the given proxy. */
         TransactionContextFactoryImpl(TransactionProxy proxy) {
-            super(proxy);
+            super(proxy, NAME);
         }
         /** {@inheritDoc} */
         protected TxnState createContext(Transaction txn) {
@@ -1061,7 +1055,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
      */
     private void restartTasks(String identityName) {
         // start iterating from the root of the pending task namespace
-        TxnState txnState = ctxFactory.joinTransaction();
         String prefix = DS_PENDING_SPACE + identityName + ".";
         String objName = dataService.nextServiceBoundName(prefix);
         int taskCount = 0;
@@ -1107,11 +1100,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         TaskRunner runner = new TaskRunner(objName, ptask.getBaseTaskType(),
                                            identity);
         runner.markIgnoreIsLocal();
-        TaskOwner owner = new TaskOwnerImpl(identity, appOwner.getContext());
 
         if (ptask.getPeriod() == PERIOD_NONE) {
             // this is a non-periodic task
-            scheduleTask(runner, owner, ptask.getStartTime(), defaultPriority);
+            scheduleTask(runner, identity, ptask.getStartTime(), 
+                         defaultPriority);
         } else {
             // this is a periodic task...there is a rare but possible
             // scenario where a periodic task starts for an un-mapped
@@ -1137,7 +1130,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             ptask.setRunningNode(nodeId);
 
             RecurringTaskHandle handle =
-                taskScheduler.scheduleRecurringTask(runner, owner, start,
+                taskScheduler.scheduleRecurringTask(runner, identity, start,
                                                     period);
             ctxFactory.joinTransaction().
                 addRecurringTask(objName, handle, identity);

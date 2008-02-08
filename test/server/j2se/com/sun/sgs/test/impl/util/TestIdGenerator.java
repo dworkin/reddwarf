@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,16 +19,14 @@
 
 package com.sun.sgs.test.impl.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IdGenerator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import java.io.File;
-import java.util.Properties;
 import junit.framework.TestCase;
 
 
@@ -37,7 +35,7 @@ public class TestIdGenerator extends TestCase {
     private SgsTestNode serverNode;
     private TransactionProxy txnProxy;
     private TaskScheduler taskScheduler;
-    private TaskOwner taskOwner;
+    private Identity taskOwner;
 
     /** Constructs a test instance. */
     public TestIdGenerator(String name) {

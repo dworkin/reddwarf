@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007-2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -33,6 +33,7 @@
 package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * Represents an abstract network connection with the Project Darkstar Server.
@@ -42,16 +43,15 @@ public interface ClientConnection {
     /**
      * Asynchronously sends data to the server.
      * <p>
-     * The specified byte array must not be modified after invoking this
-     * method; if the byte array is modified, then this method may have
-     * unpredictable results.
+     * The specified byte buffer must not be modified after invoking this
+     * method; otherwise this method may have unpredictable results.
      *
      * @param message the message data to send
      *
      * @throws IOException if there was a synchronous problem sending
      *         the message
      */
-    void sendMessage(byte[] message) throws IOException;
+    void sendMessage(ByteBuffer message) throws IOException;
 
     /**
      * Asynchronously closes the connection, freeing any resources in use.

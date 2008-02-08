@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -33,6 +34,8 @@ import java.io.ObjectStreamClass;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -261,6 +264,7 @@ final class ClassesTable {
      *		descriptor
      */
     private static byte[] getClassInfo(ObjectStreamClass classDesc) {
+	checkObjectReplacement(classDesc);
 	ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
 	ObjectOutputStream objectOut = null;
 	try {
@@ -295,7 +299,9 @@ final class ClassesTable {
 	Exception exception;
 	try {
 	    in = new ObjectInputStream(new ByteArrayInputStream(classInfo));
-	    return (ObjectStreamClass) in.readObject();
+	    ObjectStreamClass classDesc = (ObjectStreamClass) in.readObject();
+	    checkObjectReplacement(classDesc);
+	    return classDesc;
 	} catch (ClassNotFoundException e) {
 	    exception = e;
 	} catch (IOException e) {
@@ -311,5 +317,76 @@ final class ClassesTable {
 	throw new ObjectIOException(
 	    "Problem obtaining class descriptor: " + exception.getMessage(),
 	    exception, false);
+    }
+
+    /**
+     * If the class associated with the specified class descriptor implements
+     * ManagedObject, checks that it does not have Serialization writeReplace
+     * or readResolve methods.  Using those methods to replace managed objects
+     * would confuse the data manager's enforcement of object identity.  Note
+     * that this check should be performed both at writing time, to insure such
+     * objects are not saved, and at reading time, to make sure that existing
+     * objects whose classes have had these methods newly added are not
+     * created.
+     */
+    private static void checkObjectReplacement(ObjectStreamClass classDesc) {
+	Class<?> cl = classDesc.forClass();
+	if (ManagedObject.class.isAssignableFrom(cl)) {
+	    if (hasSerializationMethod(cl, "writeReplace")) {
+		throw new ObjectIOException(
+		    "Managed objects must not define a Serialization " +
+		    "writeReplace method: " + cl.getName(),
+		    false);
+	    } else if (hasSerializationMethod(cl, "readResolve")) {
+		throw new ObjectIOException(
+		    "Managed objects must not define a Serialization " +
+		    "readResolve method: " + cl.getName(),
+		    false);
+	    }
+	}
+    }
+	    
+    /**
+     * Returns whether the class defines an inherited method used by
+     * Serialization.
+     */
+    private static boolean hasSerializationMethod(
+	Class<?> forClass, String methodName)
+    {
+	Method method = null;
+	Class<?> cl = forClass;
+	while (cl != null) {
+	    try {
+		method = cl.getDeclaredMethod(methodName);
+		break;
+	    } catch (NoSuchMethodException e) {
+		cl = cl.getSuperclass();
+	    }
+	}
+	if (method == null || method.getReturnType() != Object.class) {
+	    return false;
+	}
+	int mods = method.getModifiers();
+	if (Modifier.isStatic(mods) || Modifier.isAbstract(mods)) {
+	    return false;
+	} else if (Modifier.isPublic(mods) || Modifier.isProtected(mods)) {
+	    return true;
+	} else if (Modifier.isPrivate(mods)) {
+	    return forClass == cl;
+	} else {
+	    return forClass.getClassLoader() == cl.getClassLoader() &&
+		getPackageName(forClass).equals(getPackageName(cl));
+	}
+    }
+
+    /** Returns the package name of the class. */
+    private static String getPackageName(Class<?> cl) {
+	String name = cl.getName();
+	int pos = name.lastIndexOf('[');
+	if (pos >= 0) {
+	    name = name.substring(pos + 2);
+	}
+	pos = name.lastIndexOf('.');
+	return (pos < 0) ? "" : name.substring(0, pos);
     }
 }

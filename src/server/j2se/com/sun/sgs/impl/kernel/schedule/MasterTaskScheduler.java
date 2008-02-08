@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,16 +21,16 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
@@ -43,6 +43,7 @@ import com.sun.sgs.service.TransactionRunner;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -57,9 +58,9 @@ import java.util.logging.Logger;
 /**
  * This is the root scheduler class that is used by the rest of the system
  * to schedule tasks. It handles incoming tasks and profiling data, and
- * passes these on to a <code>SystemScheduler</code>. Essentially, this root
- * scheduler handles basic configuration and marshalling, but leaves all
- * the real work to its children.
+ * passes these on to an <code>ApplicationScheduler</code>. Essentially, this 
+ * root scheduler handles basic configuration and marshalling, but leaves all
+ * the real work to its child scheduler.
  */
 public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
 
@@ -69,21 +70,15 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
                                            class.getName()));
 
     // the scheduler used for this system
-    private final SystemScheduler systemScheduler;
+    private final ApplicationScheduler scheduler;
 
     // the runner used to execute tasks
     private final TaskExecutor taskExecutor;
 
-    /**
-     * The property used to define the system scheduler.
-     */
-    public static final String SYSTEM_SCHEDULER_PROPERTY =
-        "com.sun.sgs.impl.kernel.schedule.SystemScheduler";
-
-    // the default system scheduler
-    private static final String DEFAULT_SYSTEM_SCHEDULER =
-        "com.sun.sgs.impl.kernel.schedule.SingleAppSystemScheduler";
-
+    // the default scheduler
+    private static final String DEFAULT_APPLICATION_SCHEDULER =
+            "com.sun.sgs.impl.kernel.schedule.FIFOApplicationScheduler";
+    
     /**
      * The property used to define the default number of initial consumer
      * threads.
@@ -111,16 +106,13 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
      * @param taskHandler the system's <code>TaskHandler</code>
      * @param profileCollector the collector used for profiling data, or
      *                         <code>null</code> if profiling is disabled
-     * @param systemContext the context the system runs in, which is registered
-     *                      as the first application using this scheduler
      *
      * @throws Exception if there are any failures during configuration
      */
     public MasterTaskScheduler(Properties properties,
                                ResourceCoordinator resourceCoordinator,
                                TaskHandler taskHandler,
-                               ProfileCollector profileCollector,
-                               KernelAppContext systemContext)
+                               ProfileCollector profileCollector)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
@@ -132,22 +124,31 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
         if (taskHandler == null)
             throw new NullPointerException("Task Handler cannot be null");
 
-        // see what system scheduler is going to be used
-        String systemSchedulerName =
-            properties.getProperty(SYSTEM_SCHEDULER_PROPERTY,
-                                   DEFAULT_SYSTEM_SCHEDULER);
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Using {0} as the System Scheduler",
-                       systemSchedulerName);
-
-        // get the system scheduler instance
-        Class<?> systemSchedulerClass = Class.forName(systemSchedulerName);
-        Constructor<?> systemSchedulerConstructor =
-            systemSchedulerClass.getConstructor(Properties.class);
-        systemScheduler =
-            (SystemScheduler)(systemSchedulerConstructor.
-                    newInstance(properties));
-
+        // try to get the scheduler, falling back on the default
+        // if the specified one isn't available, or if none was specified
+        
+        String schedulerName =
+            properties.getProperty(ApplicationScheduler.
+                                   APPLICATION_SCHEDULER_PROPERTY,
+                                   DEFAULT_APPLICATION_SCHEDULER);
+        try {
+            Class<?> schedulerClass = Class.forName(schedulerName);
+            Constructor<?> schedulerCtor = 
+                    schedulerClass.getConstructor(Properties.class);
+            scheduler = 
+                    (ApplicationScheduler) (schedulerCtor.newInstance(properties));
+        } catch (InvocationTargetException e) {
+            if (logger.isLoggable(Level.CONFIG)) 
+ 	        logger.logThrow(Level.CONFIG, e.getCause(), "Scheduler {0} " +
+ 	                        "failed to initialize", schedulerName);
+            throw e;
+ 	} catch (Exception e) {
+            if (logger.isLoggable(Level.CONFIG))
+                logger.logThrow(Level.CONFIG, e, "Scheduler {0} unavailable",
+                                schedulerName);
+            throw e;
+        }
+        
         int startingThreads =
             Integer.parseInt(properties.
                     getProperty(INITIAL_CONSUMER_THREADS_PROPERTY,
@@ -158,40 +159,18 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
         threadCount = new AtomicInteger(startingThreads);
 
         this.taskExecutor =
-            new TaskExecutor(taskHandler, systemScheduler, profileCollector);
+            new TaskExecutor(taskHandler, scheduler, profileCollector);
         this.profileCollector = profileCollector;
 
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {
             resourceCoordinator.
-                startTask(new MasterTaskConsumer(this, systemScheduler,
+                startTask(new MasterTaskConsumer(this, scheduler,
                                                  taskExecutor),
                           null);
             if (profileCollector != null)
                 profileCollector.notifyThreadAdded();
         }
-
-        // register the system as the first application using the scheduler
-        registerApplication(systemContext, properties);
-    }
-
-    /**
-     * Registers an application that will be scheduling tasks.
-     *
-     * @param context the application's <code>KernelAppContext</code>
-     * @param properties the application's <code>Properties</code>
-     */
-    public void registerApplication(KernelAppContext context,
-                                    Properties properties) {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Registering application {0}", context);
-
-        if (context == null)
-            throw new NullPointerException("Context cannot be null");
-        if (properties == null)
-            throw new NullPointerException("Properties cannot be null");
-
-        systemScheduler.registerApplication(context, properties);
     }
 
     /**
@@ -229,43 +208,43 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
      * {@inheritDoc}
      */
     public void shutdown() {
-        systemScheduler.shutdown();
+        scheduler.shutdown();
     }
 
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner) {
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner) {
         ScheduledTask t = new ScheduledTask(task, owner, defaultPriority,
                                             System.currentTimeMillis());
-        return systemScheduler.reserveTask(t);
+        return scheduler.reserveTask(t);
     }
 
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        Priority priority) {
         ScheduledTask t = new ScheduledTask(task, owner, priority,
                                             System.currentTimeMillis());
-        return systemScheduler.reserveTask(t);
+        return scheduler.reserveTask(t);
     }
 
     /**
      * {@inheritDoc}
      */
-    public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
                                        long startTime) {
         ScheduledTask t = new ScheduledTask(task, owner, defaultPriority,
                                             startTime);
-        return systemScheduler.reserveTask(t);
+        return scheduler.reserveTask(t);
     }
 
     /**
      * {@inheritDoc}
      */
     public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
-                                        tasks, TaskOwner owner) {
+                                        tasks, Identity owner) {
         if (tasks == null)
             throw new NullPointerException("Collection cannot be null");
 
@@ -276,7 +255,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
                 ScheduledTask t =
                     new ScheduledTask(task, owner, defaultPriority,
                                       System.currentTimeMillis());
-                reservations.add(systemScheduler.reserveTask(t));
+                reservations.add(scheduler.reserveTask(t));
             } 
         } catch (TaskRejectedException tre) {
             // ...and if any fails, cancel all the reservations that were
@@ -292,8 +271,8 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner) {
-        systemScheduler.
+    public void scheduleTask(KernelRunnable task, Identity owner) {
+        scheduler.
             addTask(new ScheduledTask(task, owner, defaultPriority,
                                       System.currentTimeMillis()));
     }
@@ -301,9 +280,9 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              Priority priority) {
-        systemScheduler.
+        scheduler.
             addTask(new ScheduledTask(task, owner, priority,
                                       System.currentTimeMillis()));
     }
@@ -311,9 +290,9 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void scheduleTask(KernelRunnable task, TaskOwner owner,
+    public void scheduleTask(KernelRunnable task, Identity owner,
                              long startTime) {
-        systemScheduler.
+        scheduler.
             addTask(new ScheduledTask(task, owner, defaultPriority,
                                       startTime));
     }
@@ -322,10 +301,10 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
      * {@inheritDoc}
      */
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-                                                     TaskOwner owner,
+                                                     Identity owner,
                                                      long startTime,
                                                      long period) {
-        return systemScheduler.
+        return scheduler.
             addRecurringTask(new ScheduledTask(task, owner, defaultPriority,
                                                startTime, period));
     }
@@ -333,7 +312,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void runTask(KernelRunnable task, TaskOwner owner, boolean retry)
+    public void runTask(KernelRunnable task, Identity owner, boolean retry)
         throws Exception
     {
         // check that we're not already running a direct task
@@ -361,7 +340,7 @@ public class MasterTaskScheduler implements ProfileListener, TaskScheduler {
     /**
      * {@inheritDoc}
      */
-    public void runTransactionalTask(KernelRunnable task, TaskOwner owner)
+    public void runTransactionalTask(KernelRunnable task, Identity owner)
         throws Exception
     {
         // if we're not in the context of a scheduler thread, then we can

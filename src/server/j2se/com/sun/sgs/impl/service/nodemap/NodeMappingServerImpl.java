@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -29,7 +29,6 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -161,7 +160,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final TaskScheduler taskScheduler;
     
     /** The proxy owner for our transactional, synchronous tasks. */
-    private final TaskOwner taskOwner;
+    private final Identity taskOwner;
     
     /** The data service. */
     final DataService dataService;

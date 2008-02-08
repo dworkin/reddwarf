@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,15 +19,35 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
+import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import com.sun.sgs.impl.service.data.store.net.NetworkException;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.util.Properties;
+import junit.framework.TestSuite;
 
 /** Test the DataStoreClient class. */
 public class TestDataStoreClient extends TestDataStoreImpl {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestDataStoreClient.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestDataStoreClient(testMethod));
+	return suite;
+    }
 
     /**
      * The name of the host running the DataStoreServer, or null to create one
@@ -58,7 +78,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
@@ -78,6 +98,14 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 
     @Override
     public void testConstructorNoDirectory() throws Exception {
+	System.err.println("Skipping");
+    }
+    @Override
+    public void testConstructorBadAllocationBlockSize() throws Exception {
+	System.err.println("Skipping");
+    }
+    @Override
+    public void testConstructorNegativeAllocationBlockSize() throws Exception {
 	System.err.println("Skipping");
     }
     @Override
@@ -112,29 +140,11 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 
     /* -- Test constructor -- */
 
-    public void testConstructorBadAllocationBlockSize() throws Exception {
-	props.setProperty(
-	    DataStoreNetPackage + ".client.allocation.block.size", "gorp");
-	try {
-	    createDataStore(props);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructorNegativeAllocationBlockSize() throws Exception {
-	props.setProperty(
-	    DataStoreNetPackage + ".client.allocation.block.size", "-3");
-	try {
-	    createDataStore(props);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
     public void testConstructorBadPort() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(DataStoreNetPackage + ".server.port", "gorp");
 	try {
 	    createDataStore(props);
@@ -145,6 +155,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorNegativePort() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(DataStoreNetPackage + ".server.port", "-1");
 	try {
 	    createDataStore(props);
@@ -155,6 +169,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorBigPort() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(
 	    DataStoreNetPackage + ".server.port", "70000");
 	try {
@@ -166,7 +184,11 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorZeroPort() throws Exception {
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port", "0");
 	try {
@@ -178,6 +200,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorBadMaxTimeout() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(
 	    DataStoreNetPackage + ".max.txn.timeout", "gorp");
 	try {
@@ -189,6 +215,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 	
     public void testConstructorNegativeMaxTimeout() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(
 	    DataStoreNetPackage + ".max.txn.timeout", "-1");
 	try {
@@ -200,6 +230,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorZeroMaxTimeout() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
 	props.setProperty(
 	    DataStoreNetPackage + ".max.txn.timeout", "0");
 	try {
@@ -231,5 +265,37 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	    txn = null;
 	    System.err.println(e);
 	}
+    }
+
+    /**
+     * Test what happens when joining a transaction when the server has failed.
+     */
+    public void testJoinTxnServerFailed() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	store = null;
+	DataStoreServerImpl server = new DataStoreServerImpl(props);
+	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
+	props.setProperty(DataStoreNetPackage + ".server.port",
+			  String.valueOf(server.getPort()));
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
+	txn = new DummyTransaction();	
+	store = createDataStore(props);
+	server.shutdown();
+	try {
+	    store.createObject(txn);
+	    fail("Expected NetworkException");
+	} catch (NetworkException e) {
+	    System.err.println(e);
+	}
+	try {
+	    txn.abort(null);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	txn = null;
+	store.shutdown();
+	store = null;
     }
 }

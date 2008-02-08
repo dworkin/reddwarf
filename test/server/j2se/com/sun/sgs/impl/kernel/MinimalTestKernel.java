@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,16 +19,19 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
-import com.sun.sgs.kernel.KernelAppContext;
-import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.Manageable;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
@@ -37,8 +40,6 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.util.HashSet;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-
 
 /** Utility that sets up minimal support for running tasks */
 public final class MinimalTestKernel
@@ -52,10 +53,8 @@ public final class MinimalTestKernel
         new TaskHandler(new TestTransactionCoordinator(), null);
     // properties for a master scheduler (not used by default)
     private static Properties masterSchedulerProperties = null;
-    // a map of context state
-    private static final ConcurrentHashMap<DummyAbstractKernelAppContext,
-                                           ContextState> contextMap =
-        new ConcurrentHashMap<DummyAbstractKernelAppContext,ContextState>();
+    private static SimpleAppContext ctx;
+    private static DummyComponentRegistry registry;
 
     /** Gets the single proxy used for all tests */
     public static DummyTransactionProxy getTransactionProxy() {
@@ -80,90 +79,85 @@ public final class MinimalTestKernel
         masterSchedulerProperties = null;
     }
 
-    /** Creates a unique context setup to run tasks */
-    public static DummyAbstractKernelAppContext createContext() {
-        DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
-        DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
-        DummyAbstractKernelAppContext context =
-            new DummyAbstractKernelAppContext(serviceRegistry);
+    /** Creates a test kernel suitable for running tasks */
+    public static void create() {
+        registry = new DummyComponentRegistry();
+        ctx = new SimpleAppContext(registry);
 
-        serviceRegistry.registerAppContext();
+        // Register this thread, so we'll be able to run off it directly.
+        registerCurrentThread();
 
         TaskScheduler scheduler = null;
         if (masterSchedulerProperties == null) {
-            scheduler = new DummyTaskScheduler(context, false);
+            scheduler = new DummyTaskScheduler(false);
         } else {
             TestResourceCoordinator rc = new TestResourceCoordinator();
-            systemRegistry.setComponent(TestResourceCoordinator.class, rc);
+            registry.setComponent(TestResourceCoordinator.class, rc);
             try {
                 scheduler = new MasterTaskScheduler(masterSchedulerProperties,
-                                                    rc, taskHandler, null,
-                                                    context);
+                                                    rc, taskHandler, null);
             } catch (Exception e) {
                 throw new IllegalArgumentException("Failed to create " +
                                                    "master scheduler", e);
             }
         }
-        systemRegistry.setComponent(TaskScheduler.class, scheduler);
-
-        contextMap.put(context, new ContextState(systemRegistry,
-                                                 serviceRegistry));
-        
-        proxy.setContext(context);
-        return context;
+        registry.setComponent(TaskScheduler.class, scheduler);
     }
 
-    /** Gets the system registry used with the given context */
-    public static DummyComponentRegistry
-        getSystemRegistry(DummyAbstractKernelAppContext context) {
-        return contextMap.get(context).systemRegistry;
+    /** Gets the system registry */
+    public static DummyComponentRegistry getSystemRegistry() {
+        return registry;
     }
 
-    /** Gets the service registry used with the given context */
-    public static DummyComponentRegistry
-        getServiceRegistry(DummyAbstractKernelAppContext context) {
-        return contextMap.get(context).serviceRegistry;
+    /** Gets the service registry */
+    public static DummyComponentRegistry getServiceRegistry() {
+        return registry;
     }
 
-    /** Destorys the given context, doing the appropriate shutdown */
-    public static void destroyContext(DummyAbstractKernelAppContext context) {
-        ContextState contextState = contextMap.remove(context);
+    /** Destroys the test kernel, doing the appropriate shutdown */
+    public static void destroy() {
         TaskScheduler scheduler =
-            contextState.systemRegistry.getComponent(TaskScheduler.class);
+            registry.getComponent(TaskScheduler.class);
 
         if (scheduler instanceof DummyTaskScheduler) {
             ((DummyTaskScheduler)scheduler).shutdown();
         } else {
-            TestResourceCoordinator rc = contextState.systemRegistry.
+            TestResourceCoordinator rc = registry.
                 getComponent(TestResourceCoordinator.class);
             rc.shutdown();
         }
-
-	contextState.systemRegistry.clearComponents();
-	contextState.serviceRegistry.clearComponents();
 
         // NOTE: we could also do service shutdown here if we wanted
     }
 
     /**
-     * Creates a thread for running tasks. The thread's context will be
-     * initialized to the given {@code KernelAppContext}.
+     * Creates a thread for running tasks. 
      *
      * @param runnable the task to run in this thread
-     * @param context the context in which to run the tasks
      *
      * @return a <code>Thread</code>, ready to run but not started
      */
-    public static Thread createThread(final Runnable runnable,
-                                      KernelAppContext context) {
-        final TaskOwnerImpl owner =
-            new TaskOwnerImpl(new DummyIdentity(), context);
+    public static Thread createThread(final Runnable runnable) {
+        final Identity owner = new DummyIdentity();
         return new Thread(new Runnable() {
                 public void run() {
                     ThreadState.setCurrentOwner(owner);
+                    registerCurrentThread();
                     runnable.run();
                 }
             });
+    }
+    
+    /**
+     * Register this thread as running in the system.  This is used
+     * for threads not running through the task scheduler which need to
+     * acquire a valid {@code AppContext} (usually for Managers).
+     * Normally this is not needed, as running threads are invoked
+     * through the task scheduler;   tests creating their own threads
+     * might require this method.
+     */
+    public static void registerCurrentThread() {
+        ContextResolver.setContext(ctx);
     }
 
     /**
@@ -226,17 +220,6 @@ public final class MinimalTestKernel
         }
     }
 
-    /** Helper class used to manage context state, mostly for shutdown. */
-    private static class ContextState {
-        public DummyComponentRegistry systemRegistry;
-        public DummyComponentRegistry serviceRegistry;
-        public ContextState(DummyComponentRegistry systemRegistry,
-                            DummyComponentRegistry serviceRegistry) {
-            this.systemRegistry = systemRegistry;
-            this.serviceRegistry = serviceRegistry;
-        }
-    }
-
     /** A dummy, unbounded resource coordinator that can shutdown */
     public static class TestResourceCoordinator
         implements ResourceCoordinator
@@ -253,4 +236,49 @@ public final class MinimalTestKernel
         }
     }
 
+    /**
+     * Define an implementation of AppKernelAppContext that obtains components
+     * from a specified component registry.
+     */
+    private static class SimpleAppContext extends KernelContext {
+
+        /** The component registry. */
+        ComponentRegistry componentRegistry;
+
+        /**
+         * Creates an instance that obtains components from the argument and
+         * registers itself as the context for the current thread.
+         */
+        public SimpleAppContext(ComponentRegistry componentRegistry) {
+            super("DummyApplication", componentRegistry, new DummyComponentRegistry());
+            if (componentRegistry == null) {
+                throw new NullPointerException("The argument must not be null");
+            }
+            this.componentRegistry = componentRegistry;
+        }
+
+        public ChannelManager getChannelManager() {
+            return componentRegistry.getComponent(ChannelManager.class);
+        }
+
+        public DataManager getDataManager() {
+            return componentRegistry.getComponent(DataManager.class);
+        }
+
+        public TaskManager getTaskManager() {
+            return componentRegistry.getComponent(TaskManager.class);
+        }
+
+        public <T> T getManager(Class<T> type) {
+            return componentRegistry.getComponent(type);
+        }
+
+        public <T extends Service> T getService(Class<T> type) {
+            return componentRegistry.getComponent(type);
+        }
+
+        public String toString() {
+            return "DummyApplication" + componentRegistry;
+        }
+    }
 }

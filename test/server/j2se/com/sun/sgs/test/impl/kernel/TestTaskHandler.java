@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,14 +22,11 @@ package com.sun.sgs.test.impl.kernel;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.kernel.EmptyKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
-import com.sun.sgs.impl.kernel.TaskHandler;
 import com.sun.sgs.impl.kernel.TxnTimeoutTestRunnable;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -42,10 +39,6 @@ import junit.framework.TestCase;
 
 /** Test the TaskHandler class. */
 public class TestTaskHandler extends TestCase {
-
-    /** A dummy kernel app context. */
-    private static final KernelAppContext kernelAppContext =
-	new EmptyKernelAppContext("TestTaskHandler");
 
     /** The transaction coordinator. */
     static final MyTransactionCoordinator txnCoordinator =
@@ -431,8 +424,7 @@ public class TestTaskHandler extends TestCase {
 	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
 	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, false);
 	try {
-	    Thread thread = MinimalTestKernel.createThread(
-		 r, kernelAppContext);
+	    Thread thread = MinimalTestKernel.createThread(r);
 	    thread.start();
 	    thread.join(60000);
 	} finally {
@@ -455,8 +447,7 @@ public class TestTaskHandler extends TestCase {
 	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
 	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, true);
 	try {
-	    Thread thread = MinimalTestKernel.createThread(
-		 r, kernelAppContext);
+	    Thread thread = MinimalTestKernel.createThread(r);
 	    thread.start();
 	    thread.join(60000);
 	} finally {
@@ -507,8 +498,7 @@ public class TestTaskHandler extends TestCase {
 	/* Use our transaction coordinator ... */
 	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
 	try {
-	    Thread thread = MinimalTestKernel.createThread(
-		runnable, kernelAppContext);
+	    Thread thread = MinimalTestKernel.createThread(runnable);
 	    thread.start();
 	    thread.join(60000);
 	} finally {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -42,8 +42,7 @@ import java.util.logging.Logger;
  * between users. This scheduler uses an un-bounded queue. Unless the system
  * runs out of memory, this should always accept any tasks from any user.
  */
-class FIFOApplicationScheduler
-    implements ApplicationScheduler, TimedTaskConsumer {
+class FIFOApplicationScheduler implements ApplicationScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,16 +20,15 @@
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
-
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
+import java.lang.reflect.Constructor;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -69,7 +68,7 @@ public class TestApplicationSchedulerImpl {
 
     // a basic, recurring task that shouldn't be run but can be used for tests
     private static final ScheduledTask recurringTestTask =
-        new ScheduledTask(new DummyKernelRunnable(), new DummyTaskOwner(),
+        new ScheduledTask(new DummyKernelRunnable(), new DummyIdentity(),
                           Priority.getDefaultPriority(), 0, 100);
 
     // the fully-qualified name of the scheduler we're testing
@@ -608,10 +607,25 @@ public class TestApplicationSchedulerImpl {
     protected ApplicationScheduler getSchedulerInstance(Properties p)
         throws Exception
     {
-        applicationScheduler = LoaderUtil.getScheduler(p);
-        if (applicationScheduler == null)
-            throw new Exception("Couldn't load the app scheduler");
-        return applicationScheduler;
+        String appSchedulerName =
+            p.getProperty(ApplicationScheduler.
+                                   APPLICATION_SCHEDULER_PROPERTY);
+        if (appSchedulerName == null)
+            throw new Exception("Couldn't load the app scheduler, no property");
+
+        try {
+            Constructor<?> schedulerConstructor = null;
+       
+            Class<?> schedulerClass =
+                Class.forName(appSchedulerName);
+            schedulerConstructor =
+                schedulerClass.getConstructor(Properties.class);
+
+            return (ApplicationScheduler)(schedulerConstructor.
+                                          newInstance(p));
+        } catch (Exception e) {
+            throw new Exception("Couldn't load the app scheduler", e);
+        }
     }
 
     protected static ScheduledTask getNewTask() {
@@ -621,7 +635,7 @@ public class TestApplicationSchedulerImpl {
     protected static ScheduledTask getNewTask(long delay) {
         long time = System.currentTimeMillis() + delay;
         return new ScheduledTask(new DummyKernelRunnable(),
-                                 new DummyTaskOwner(),
+                                 new DummyIdentity(),
                                  Priority.getDefaultPriority(), time);
     }
 
