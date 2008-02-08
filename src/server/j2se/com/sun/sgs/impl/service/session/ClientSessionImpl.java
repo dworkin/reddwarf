@@ -281,8 +281,9 @@ public class ClientSessionImpl
     {
 	ClientSessionImpl sessionImpl = null;
 	try {
-	    ManagedReference sessionRef = dataService.createReferenceForId(id);
-	    sessionImpl = sessionRef.get(ClientSessionImpl.class);
+	    ManagedReference<?> sessionRef =
+		dataService.createReferenceForId(id);
+	    sessionImpl = (ClientSessionImpl) sessionRef.get();
 	} catch (ObjectNotFoundException e)  {
 	}
 	return sessionImpl;
@@ -321,7 +322,7 @@ public class ClientSessionImpl
 	ClientSessionListener listener = null;
 	try {
 	    ManagedObject obj =
-		dataService.getServiceBinding(listenerKey, ManagedObject.class);
+		dataService.getServiceBinding(listenerKey);
 	    dataService.removeServiceBinding(listenerKey);
  	    if (obj instanceof ListenerWrapper) {
 		dataService.removeObject(obj);

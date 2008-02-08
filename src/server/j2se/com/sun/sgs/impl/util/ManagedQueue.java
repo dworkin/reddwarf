@@ -91,7 +91,7 @@ public class ManagedQueue<E>
 	 * Returns the element associated with this entry.
 	 */
 	E getElement() {
-	    return (E) elementRef.get(ManagedObject.class);
+	    return (E) elementRef.get();
 	}
    }
 
@@ -107,7 +107,7 @@ public class ManagedQueue<E>
 	if (tailRef == null) {
 	    headRef = tailRef = entryRef;
 	} else {
-	    Entry<?> tail = tailRef.getForUpdate(Entry.class);
+	    Entry<?> tail = (Entry<?>) tailRef.getForUpdate();
 	    tail.nextEntryRef = entryRef;
 	    tailRef = entryRef;
 	}
@@ -194,11 +194,11 @@ public class ManagedQueue<E>
     
     @SuppressWarnings("unchecked")
     private Entry<E> getHead() {
-	return headRef.get(Entry.class);
+	return (Entry<E>) headRef.get();
     }
     
     @SuppressWarnings("unchecked")
     private Entry<E> getHeadForUpdate() {
-	return headRef.getForUpdate(Entry.class);
+	return (Entry<E>) headRef.getForUpdate();
     }
 }
