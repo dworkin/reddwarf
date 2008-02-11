@@ -66,7 +66,8 @@ public class StandardProperties {
     public static final String APP_LISTENER_NONE = "NONE";
 
     /**
-     * A required key specifying the listening port for the application.
+     * A key specifying the listening port for the application.  Required
+     * unless a null <code>AppListener</code> is specified.
      */
     public static final String APP_PORT = NS + "app.port";
 
@@ -184,4 +185,15 @@ public class StandardProperties {
      */
     public static final String AUTHENTICATORS = NS + "app.authenticators";
 
+    /**
+     * An optional property that specifies the default for whether to start the
+     * servers associated with services.
+     */
+    public static final String SERVER_START = NS + "server.start";
+
+    /**
+     * An optional property that specifies the default for the name of the host
+     * running the servers associated with services.
+     */
+    public static final String SERVER_HOST = NS + "server.host";
 }

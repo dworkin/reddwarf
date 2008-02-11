@@ -85,7 +85,7 @@ class ClientSessionHandler {
     private final ConnectionListener connectionListener;
 
     /** The Connection for sending messages to the client. */
-    private volatile Connection sessionConnection;
+    private volatile Connection sessionConnection = null;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -597,8 +597,6 @@ class ClientSessionHandler {
 			}
 			handleDisconnect(false);
 		    }});
-
-		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 
