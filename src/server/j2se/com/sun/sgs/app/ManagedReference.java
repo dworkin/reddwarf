@@ -50,9 +50,10 @@ import java.math.BigInteger;
 public interface ManagedReference<T> {
 
     /**
-     * Obtains the object associated with this reference.  For implementations
-     * that need to be notified of object modifications, applications should
-     * call {@link #getForUpdate getForUpdate} or {@link
+     * Obtains the object associated with this reference.  The object returned
+     * will implement {@link ManagedObject} and {@link Serializable}.  For
+     * implementations that need to be notified of object modifications,
+     * applications should call {@link #getForUpdate getForUpdate} or {@link
      * DataManager#markForUpdate DataManager.markForUpdate} before modifying
      * the returned object or any of the non-managed objects it refers to.
      *
@@ -68,7 +69,8 @@ public interface ManagedReference<T> {
 
     /**
      * Obtains the managed object associated with this reference, and notifies
-     * the system that the object is going to be modified.
+     * the system that the object is going to be modified.  The object returned
+     * will implement {@link ManagedObject} and {@link Serializable}.
      *
      * @return	the associated object
      * @throws	ObjectNotFoundException if the object associated with this
