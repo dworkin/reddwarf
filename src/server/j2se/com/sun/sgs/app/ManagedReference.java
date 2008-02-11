@@ -47,7 +47,7 @@ import java.math.BigInteger;
  * @param	<T> the type of the referenced object
  * @see		DataManager#createReference DataManager.createReference
  */
-public interface ManagedReference<T extends ManagedObject> {
+public interface ManagedReference<T> {
 
     /**
      * Obtains the object associated with this reference.  For implementations

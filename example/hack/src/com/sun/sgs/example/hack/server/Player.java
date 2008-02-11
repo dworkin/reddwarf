@@ -73,10 +73,10 @@ public class Player
     private String name;
 
     // the uid currently assigned to this player
-    private ManagedReference currentSessionRef;
+    private ManagedReference<ClientSession> currentSessionRef;
 
     // the channel that this player is currently using
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the game the user is currently playing, and its message handler
     private ManagedReference<Game> gameRef;
@@ -86,7 +86,7 @@ public class Player
     private ManagedReference<PlayerCharacterManager> characterManagerRef;
 
     private UtilChannel channel() {
-        return channelRef == null ? null : channelRef.get(UtilChannel.class);
+        return channelRef == null ? null : channelRef.get();
     }
 
     /**
@@ -187,8 +187,7 @@ public class Player
      *         currently playing
      */
     public ClientSession getCurrentSession() {
-        return currentSessionRef == null ? null
-                   : currentSessionRef.get(ClientSession.class);
+        return currentSessionRef == null ? null : currentSessionRef.get();
     }
 
     /**

@@ -654,6 +654,22 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testSetBindingNotManagedObject() throws Exception {
+	testSetBindingNotManagedObject(true);
+    }
+    public void testSetServiceBindingNotManagedObject() throws Exception {
+	testSetBindingNotManagedObject(false);
+    }
+    private void testSetBindingNotManagedObject(boolean app) throws Exception {
+	Object object = new Integer(2);
+	try {
+	    setBinding(app, service, "dummy", object);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Unusual states -- */
     private final Action setBinding = new Action() {
 	void run() { service.setBinding("dummy", dummy); }
@@ -1256,6 +1272,16 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testRemoveObjectNotManagedObject() {
+	Object object = "Hello";
+	try {
+	    service.removeObject(object);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Unusual states -- */
     private final Action removeObject = new Action() {
 	void run() { service.removeObject(dummy); }
@@ -1430,6 +1456,16 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testMarkForUpdateNotManagedObject() {
+	Object object = new Properties();
+	try {
+	    service.markForUpdate(object);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testMarkForUpdateRemoved() {
 	service.removeObject(dummy);
 	try {
@@ -1543,6 +1579,16 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedObject mo = new ManagedObject() { };
 	try {
 	    service.createReference(mo);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCreateReferenceNotManagedObject() {
+	Object object = Boolean.TRUE;
+	try {
+	    service.createReference(object);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -2895,7 +2941,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     void setBinding(
-	boolean app, DataService service, String name, ManagedObject object)
+	boolean app, DataService service, String name, Object object)
     {
 	if (app) {
 	    service.setBinding(name, object);

@@ -594,8 +594,8 @@ public class ScalableHashMap<K,V>
 	for (int i = 0; i < numLeaves; ++i) {
 	    ScalableHashMap<K,V> leaf = new ScalableHashMap<K,V>(
 		depth + leafBits, minDepth, splitThreshold, 1 << maxDirBits);
-	    leaf.parentRef = thisRef;
 	    leaves[i] = leaf;
+	    leaf.parentRef = thisRef;
 	}
 
 	// for the linked list for the leaves
@@ -773,9 +773,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the next entry or {@code null}
      */
-    PrefixEntry<K,V> nextEntry(
-	int hash, ManagedReference<? extends ManagedObject> keyRef)
-    {
+    PrefixEntry<K,V> nextEntry(int hash, ManagedReference<?> keyRef) {
 	BigInteger keyId = keyRef.getId();
 	for (int i = indexFor(hash); i < table.length; i++) {
 	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next) {
@@ -1433,7 +1431,7 @@ public class ScalableHashMap<K,V>
      *
      * @see ConcurrentIterator#remove ConcurrentIterator.remove
      */
-    void remove(int hash, ManagedReference<? extends ManagedObject> keyRef) {
+    void remove(int hash, ManagedReference<?> keyRef) {
 	int index = indexFor(hash);
 	PrefixEntry<K,V> prev = null;
 	for (PrefixEntry<K,V> e = getBucket(index); e != null; e = e.next) {
@@ -1806,7 +1804,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<? extends ManagedObject> keyOrPairRef;
+	private final ManagedReference<?> keyOrPairRef;
 
 	/**
 	 * A reference to the value, or null if the key and value are paired.
@@ -1815,7 +1813,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private ManagedReference<? extends ManagedObject> valueRef;
+	private ManagedReference<?> valueRef;
 
 	/**
 	 * The next chained entry in this entry's bucket.
@@ -1870,12 +1868,10 @@ public class ScalableHashMap<K,V>
 		// get a ManagedReference to that
 		setKeyWrapped(!(k instanceof ManagedObject));
 		keyOrPairRef = dm.createReference(
-		    isKeyWrapped() ? new ManagedSerializable<Object>(k)
-		    : (ManagedObject) k);
+		    isKeyWrapped() ? new ManagedSerializable<Object>(k) : k);
 		setValueWrapped(!(v instanceof ManagedObject));
 		valueRef = dm.createReference(
-		    isValueWrapped() ? new ManagedSerializable<V>(v)
-		    : (ManagedObject) v);
+		    isValueWrapped() ? new ManagedSerializable<V>(v) : v);
 	    }
 	}
 
@@ -1932,12 +1928,13 @@ public class ScalableHashMap<K,V>
 	 */
 	public final K getKey() {
 	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> ms =
+		ManagedSerializable<KeyValuePair<K,V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
-		return ms.get().getKey();
+		return msPair.get().getKey();
 	    } else if (isKeyWrapped()) {
-		ManagedSerializable<K> ms = uncheckedCast(keyOrPairRef.get());
-		return ms.get();
+		ManagedSerializable<K> msKey =
+		    uncheckedCast(keyOrPairRef.get());
+		return msKey.get();
 	    } else {
 		@SuppressWarnings("unchecked")
 		K result = (K) keyOrPairRef.get();
@@ -1955,7 +1952,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @see ConcurrentIterator
 	 */
-	ManagedReference<? extends ManagedObject> keyRef() {
+	ManagedReference<?> keyRef() {
 	    return keyOrPairRef;
 	}
 
@@ -1970,12 +1967,12 @@ public class ScalableHashMap<K,V>
 	 */
 	public final V getValue() {
 	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> ms =
+		ManagedSerializable<KeyValuePair<K,V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
-		return ms.get().getValue();
+		return msPair.get().getValue();
 	    } else if (isValueWrapped()) {
-		ManagedSerializable<V> ms = uncheckedCast(valueRef.get());
-		return ms.get();
+		ManagedSerializable<V> msValue = uncheckedCast(valueRef.get());
+		return msValue.get();
 	    } else {
 		@SuppressWarnings("unchecked")
 		V value = (V) valueRef.get();
@@ -2007,6 +2004,7 @@ public class ScalableHashMap<K,V>
 	    DataManager dm = AppContext.getDataManager();
 	    if (newValue instanceof ManagedObject) {
 		if (isKeyValuePair()) {
+		    /* Switch from wrapping key/value pair to wrapping key */
 		    ManagedSerializable<KeyValuePair<K,V>> msPair =
 			uncheckedCast(keyOrPairRef.get());
 		    ManagedSerializable<K> msKey =
@@ -2017,12 +2015,13 @@ public class ScalableHashMap<K,V>
 		    dm.removeObject(valueRef.get());
 		    setValueWrapped(false);
 		}
-		valueRef = dm.createReference((ManagedObject) newValue);
+		valueRef = dm.createReference(newValue);
 	    } else if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> ms =
+		ManagedSerializable<KeyValuePair<K,V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
-		ms.get().setValue(newValue);
+		msPair.get().setValue(newValue);
 	    } else if (isKeyWrapped()) {
+		/* Switch from wrapping key to wrapping key/value pair */
 		ManagedSerializable<K> msKey =
 		    uncheckedCast(keyOrPairRef.get());
 		ManagedSerializable<KeyValuePair<K,V>> msPair =
@@ -2185,7 +2184,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private ManagedReference<? extends ManagedObject> currentKeyRef = null;
+	private ManagedReference<?> currentKeyRef = null;
 
 	/**
 	 * Whether the current entry has been removed.

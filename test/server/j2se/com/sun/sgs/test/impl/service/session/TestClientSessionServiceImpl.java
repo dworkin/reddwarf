@@ -1079,21 +1079,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    return sessionSet;
 	}
-
-	DummyClientSessionListener getClientSessionListener(String name) {
-
-	    for (Map.Entry<ManagedReference<ClientSession>,
-		     ManagedReference<DummyClientSessionListener>> entry :
-		     sessions.entrySet()) {
-
-		ClientSession session = entry.getKey().get();
-		ManagedReference<DummyClientSessionListener> listenerRef =
-		    entry.getValue();
-		if (session.getName().equals(name)) {
-		    return listenerRef.get();
-		}
-	    }
-	}
     }
 
     private static class NonSerializableClientSessionListener

@@ -451,7 +451,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		for (String user : users) {
 		    ClientSession session =
-			dataService.getBinding(user, ClientSession.class);
+			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
 		}
 	    }
@@ -546,7 +546,7 @@ public class TestChannelServiceImpl extends TestCase {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    ClientSession session =
-			dataService.getBinding(user, ClientSession.class);
+			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
 		    channel.close();
 		    try {
@@ -590,12 +590,12 @@ public class TestChannelServiceImpl extends TestCase {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			dataService.getBinding("moe", ClientSession.class);
+			(ClientSession) dataService.getBinding("moe");
 		    channel.join(moe);
 
 		    try {
 			ClientSession larry =
-			    dataService.getBinding("larry", ClientSession.class);
+			    (ClientSession) dataService.getBinding("larry");
 			channel.leave(larry);
 			System.err.println("leave of non-member session returned");
 			
@@ -614,10 +614,10 @@ public class TestChannelServiceImpl extends TestCase {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			dataService.getBinding("moe", ClientSession.class);
+			(ClientSession) dataService.getBinding("moe");
 
 		    ClientSession larry =
-			dataService.getBinding("larry", ClientSession.class);
+			(ClientSession) dataService.getBinding("larry");
 		    
 		    Set<ClientSession> sessions = getSessions(channel);
 		    if (sessions.size() != 1) {
@@ -1145,7 +1145,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private ClientSession getClientSession(String name) {
 	try {
-	    return dataService.getBinding(name, ClientSession.class);
+	    return (ClientSession) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1192,7 +1192,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private ClientSession getSession(String name) {
 	try {
-	    return dataService.getBinding(name, ClientSession.class);
+	    return (ClientSession) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1200,7 +1200,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private Channel getChannel(String name) {
 	try {
-	    return dataService.getBinding(name, Channel.class);
+	    return (Channel) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1760,7 +1760,7 @@ public class TestChannelServiceImpl extends TestCase {
 	boolean receivedDisconnectedCallback = false;
 	boolean wasGracefulDisconnect = false;
 	
-	private final ManagedReference sessionRef;
+	private final ManagedReference<ClientSession> sessionRef;
 	
 	DummyClientSessionListener(ClientSession session) {
 	    DataManager dataManager = AppContext.getDataManager();
@@ -1787,14 +1787,14 @@ public class TestChannelServiceImpl extends TestCase {
 	    MessageBuffer buf = new MessageBuffer(bytes);
 	    String action = buf.getString();
 	    DataManager dataManager = AppContext.getDataManager();
-	    ClientSession session = sessionRef.get(ClientSession.class);
+	    ClientSession session = sessionRef.get();
 	    if (action.equals("join")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: join request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
 		channel.join(session);
 		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("leave")) {
@@ -1802,8 +1802,8 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("DummyClientSessionListener: leave request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
 		channel.leave(session);
 		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("message")) {
@@ -1811,8 +1811,8 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("DummyClientSessionListener: send request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
 		channel.send(message.asReadOnlyBuffer());
 	    }
 	}
@@ -1828,7 +1828,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	public void run() {
-	    session = dataService.getBinding(name, ClientSession.class);
+	    session = (ClientSession) dataService.getBinding(name);
 	}
 
 	ClientSession getSession() {

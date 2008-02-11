@@ -206,7 +206,7 @@ final class Context extends TransactionContext {
     /* -- Methods for obtaining references -- */
 
     /** Obtains the reference associated with the specified object. */
-    <T extends ManagedObject> ManagedReferenceImpl<T> getReference(T object) {
+    <T> ManagedReferenceImpl<T> getReference(T object) {
 	return ManagedReferenceImpl.getReference(this, object);
     }
 
@@ -214,12 +214,12 @@ final class Context extends TransactionContext {
      * Finds the existing reference associated with the specified object,
      * returning null if it is not found.
      */
-    <T extends ManagedObject> ManagedReferenceImpl<T> findReference(T object) {
+    <T> ManagedReferenceImpl<T> findReference(T object) {
 	return ManagedReferenceImpl.findReference(this, object);
     }
 
     /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl<? extends ManagedObject> getReference(long oid) {
+    ManagedReferenceImpl<?> getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 
@@ -229,11 +229,11 @@ final class Context extends TransactionContext {
     ManagedObject getBinding(String internalName) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return getReference(id).get(false);
+	return (ManagedObject) getReference(id).get(false);
     }
 
     /** Sets the object associated with the specified internal name. */
-    void setBinding(String internalName, ManagedObject object) {
+    void setBinding(String internalName, Object object) {
 	store.setBinding(txn, internalName, getReference(object).oid);
     }
 

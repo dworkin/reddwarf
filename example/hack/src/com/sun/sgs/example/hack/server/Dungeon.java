@@ -46,7 +46,7 @@ public class Dungeon implements Game, Serializable {
     private static final long serialVersionUID = 1;
 
     // the channel used for all players currently in this dungeon
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the name of this particular dungeon
     private String name;
@@ -64,7 +64,7 @@ public class Dungeon implements Game, Serializable {
     private HashMap<ClientSession,String> playerMap;
 
     private UtilChannel channel() {
-        return channelRef.get(UtilChannel.class);
+        return channelRef.get();
     }
 
     /**

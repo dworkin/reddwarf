@@ -39,7 +39,7 @@ import java.util.logging.Logger;
  * canonicalized: only a single instance appears for a given object ID or
  * object.
  */
-final class ManagedReferenceImpl<T extends ManagedObject>
+final class ManagedReferenceImpl<T>
     implements ManagedReference<T>, Serializable
 {
     /** The version of the serialized form. */
@@ -136,7 +136,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * refer to null, so this field will only be null if the object has not
      * been fetched yet.
      */
-    private transient T object;
+    private transient ManagedObject object;
 
     /**
      * The serialized form of the object before it was modified, or null.  Note
@@ -157,10 +157,12 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * the reference is not found.  Throws ObjectNotFoundException if the
      * object has been removed.
      */
-    static <T extends ManagedObject> ManagedReferenceImpl<T> findReference(
+    static <T> ManagedReferenceImpl<T> findReference(
 	Context context, T object)
     {
 	assert object != null : "Object is null";
+	assert object instanceof ManagedObject
+	    : "Object is not a managed object";
 	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
 	    context.refs.find(object));
 	if (ref != null && ref.isRemoved()) {
@@ -173,10 +175,12 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * Returns the reference associated with a context and object, creating a
      * NEW reference if none is found.
      */
-    static <T extends ManagedObject> ManagedReferenceImpl<T> getReference(
+    static <T> ManagedReferenceImpl<T> getReference(
 	Context context, T object)
     {
 	assert object != null : "Object is null";
+	assert object instanceof ManagedObject
+	    : "Object is not a managed object";
 	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
 	    context.refs.find(object));
 	if (ref == null) {
@@ -199,11 +203,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * Returns the reference associated with a context and object ID, creating
      * an EMPTY reference if none is found.
      */
-    static ManagedReferenceImpl<? extends ManagedObject> getReference(
+    static ManagedReferenceImpl<?> getReference(
 	Context context, long oid)
     {
-	ManagedReferenceImpl<? extends ManagedObject> ref =
-	    Objects.uncheckedCast(context.refs.find(oid));
+	ManagedReferenceImpl<?> ref = context.refs.find(oid);
 	if (ref == null) {
 	    ref = new ManagedReferenceImpl<ManagedObject>(context, oid);
 	    context.refs.add(ref);
@@ -223,7 +226,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     private ManagedReferenceImpl(Context context, T object) {
 	this.context = context;
 	oid = context.store.createObject(context.txn);
-	this.object = object;
+	this.object = (ManagedObject) object;
 	state = State.NEW;
 	validate();
     }
@@ -324,7 +327,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    }
 	    switch (state) {
 	    case EMPTY:
-		T tempObject = deserialize(
+		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
 		if (context.detectModifications) {
 		    unmodifiedBytes = SerialUtil.serialize(
@@ -357,7 +360,9 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		    "get tid:{0,number,#}, oid:{1,number,#} returns {2}",
 		    context.getTxnId(), oid, Objects.fastToString(object));
 	    }
-	    return object;
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    return result;
 	} catch (TransactionNotActiveException e) {
 	    throw new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
@@ -412,7 +417,9 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 			   context.getTxnId(), oid,
 			   Objects.fastToString(object));
 	    }
-	    return object;
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
@@ -645,7 +652,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     /** Returns the object currently associated with this reference or null. */
-    T getObject() {
+    ManagedObject getObject() {
 	return object;
     }
 
@@ -663,7 +670,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * Returns the managed object associated with serialized data.  Checks that
      * the return value is not null.
      */
-    private T deserialize(byte[] data) {
+    private ManagedObject deserialize(byte[] data) {
 	Object obj = SerialUtil.deserialize(data, context.classSerial);
 	if (obj == null) {
 	    throw new ObjectIOException(
@@ -672,8 +679,6 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    throw new ObjectIOException(
 		"Deserialized object must implement ManagedObject", false);
 	}
-	@SuppressWarnings("unchecked")
-	T result = (T) obj;
-	return result;
+	return (ManagedObject) obj;
     }
 }

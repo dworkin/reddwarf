@@ -67,7 +67,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private ManagedReference<GameChangeManager> gcmRef;
 
     // the channel used for all players currently in the lobby
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
@@ -76,7 +76,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private HashMap<String,GameMembershipDetail> countMap;
 
     private UtilChannel channel() {
-        return channelRef.get(UtilChannel.class);
+        return channelRef.get();
     }
 
     /**

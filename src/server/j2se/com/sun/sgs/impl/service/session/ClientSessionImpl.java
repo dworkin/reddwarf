@@ -321,8 +321,7 @@ public class ClientSessionImpl
 	 */
 	ClientSessionListener listener = null;
 	try {
-	    ManagedObject obj =
-		dataService.getServiceBinding(listenerKey);
+	    ManagedObject obj = dataService.getServiceBinding(listenerKey);
 	    dataService.removeServiceBinding(listenerKey);
  	    if (obj instanceof ListenerWrapper) {
 		dataService.removeObject(obj);

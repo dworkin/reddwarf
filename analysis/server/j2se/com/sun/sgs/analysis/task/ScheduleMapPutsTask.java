@@ -41,7 +41,7 @@ public class ScheduleMapPutsTask extends BasicScheduleTasks {
     private static final long serialVersionUID = 1;
 
     /** A reference to the map or null. */
-    private ManagedReference<? extends ManagedObject> mapRef;
+    private ManagedReference<? extends Map<Integer, Integer>> mapRef;
 
     /**
      * Creates an instance of this class using the specified configuration
@@ -60,8 +60,6 @@ public class ScheduleMapPutsTask extends BasicScheduleTasks {
 
     /** Creates a task to run. */
     protected Task createTask() {
-	@SuppressWarnings("unchecked")
-	Map<Object, Object> map = (Map<Object, Object>) mapRef.get();
-	return new MapPutTask(this, map, count);
+	return new MapPutTask(this, mapRef.get(), count);
     }
 }

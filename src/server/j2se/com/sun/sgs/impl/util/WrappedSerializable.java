@@ -57,7 +57,7 @@ public final class WrappedSerializable<T> implements Serializable {
 
     /** The managed reference for the object or wrapper.
      */
-    private ManagedReference<? extends ManagedObject> ref = null;
+    private ManagedReference<?> ref = null;
 
     /**
      * Constructs an instance of this class with the specified object.
@@ -114,7 +114,7 @@ public final class WrappedSerializable<T> implements Serializable {
      */
     public void remove() {
 	checkRemoved();
-	ManagedObject obj = ref.get();
+	Object obj = ref.get();
 	if (obj instanceof Wrapper) {
 	    AppContext.getDataManager().removeObject(obj);
 	}

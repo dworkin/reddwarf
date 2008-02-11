@@ -974,7 +974,7 @@ public class TestScalableHashSet extends Assert {
 		break;
 	    }
 	    try {
-		ManagedObject obj = dataService.createReferenceForId(id).get();
+		Object obj = dataService.createReferenceForId(id).get();
 		System.err.println(id + ": (" + obj.getClass().getName() +
 				   ") " + obj);
 	    } catch (Exception e) {

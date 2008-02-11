@@ -447,7 +447,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-     public void setBinding(String name, ManagedObject object) {
+     public void setBinding(String name, Object object) {
 	 setBindingInternal(name, object, false);
     }
 
@@ -462,16 +462,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public void removeObject(ManagedObject object) {
+    public void removeObject(Object object) {
 	Context context = null;
-	ManagedReferenceImpl ref = null;
+	ManagedReferenceImpl<?> ref = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
@@ -507,16 +502,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public void markForUpdate(ManagedObject object) {
+    public void markForUpdate(Object object) {
 	Context context = null;
-	ManagedReferenceImpl ref = null;
+	ManagedReferenceImpl<?> ref = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
@@ -544,17 +534,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> ManagedReference<T> createReference(
-	T object)
-    {
+    public <T> ManagedReference<T> createReference(T object) {
 	Context context = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    ManagedReference<T> result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -585,7 +568,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-     public void setServiceBinding(String name, ManagedObject object) {
+     public void setServiceBinding(String name, Object object) {
 	 setBindingInternal(name, object, true);
     }
 
@@ -600,14 +583,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public ManagedReference<? extends ManagedObject> createReferenceForId(
-	BigInteger id)
-    {
+    public ManagedReference<?> createReferenceForId(BigInteger id) {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReference<? extends ManagedObject> result =
-		context.getReference(getOid(id));
+	    ManagedReference<?> result = context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
@@ -689,17 +669,14 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Implement setBinding and setServiceBinding. */
     private void setBindingInternal(
-	String name, ManagedObject object, boolean serviceBinding)
+	String name, Object object, boolean serviceBinding)
     {
 	Context context = null;
 	try {
-	    if (name == null || object == null) {
-		throw new NullPointerException(
-		    "The arguments must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
+	    if (name == null) {
+		throw new NullPointerException("The name must not be null");
 	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -1016,7 +993,23 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * Returns the object ID for the reference, or null if the reference is
      * null.
      */
-    private static BigInteger refId(ManagedReference ref) {
+    private static BigInteger refId(ManagedReference<?> ref) {
 	return (ref != null) ? ref.getId() : null;
+    }
+
+    /**
+     * Checks that the argument is a legal managed object: non-null,
+     * serializable, and implements ManagedObject.
+     */
+    private static void checkManagedObject(Object object) {
+	if (object == null) {
+	    throw new NullPointerException("The object must not be null");
+	} else if (!(object instanceof Serializable)) {
+	    throw new IllegalArgumentException(
+		"The object must be serializable: " + object);
+	} else if (!(object instanceof ManagedObject)) {
+	    throw new IllegalArgumentException(
+		"The object must implement ManagedObject: " + object);
+	}
     }
 }

@@ -689,7 +689,7 @@ public class TestScalableHashMapStress extends Assert {
      */
     static void maybeRemoveObject(Object object) {
 	if (object instanceof ManagedObject) {
-	    AppContext.getDataManager().removeObject((ManagedObject) object);
+	    AppContext.getDataManager().removeObject(object);
 	}
     }
 
@@ -716,7 +716,7 @@ public class TestScalableHashMapStress extends Assert {
 		break;
 	    }
 	    try {
-		ManagedObject obj = dataService.createReferenceForId(id).get();
+		Object obj = dataService.createReferenceForId(id).get();
 		System.err.println(id + ": (" + obj.getClass().getName() +
 				   ") " + obj);
 	    } catch (Exception e) {

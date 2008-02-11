@@ -61,8 +61,9 @@ public interface DataService extends DataManager, Service {
 
     /**
      * Specifies an object for the service binding of a name, replacing any
-     * previous binding.  The object, as well as any objects it refers to, must
-     * implement {@link Serializable}.  Note that this method will throw {@link
+     * previous binding.  The object must implement {@link ManagedObject}, and
+     * both the object and any objects it refers to must implement {@link
+     * Serializable}.  Note that this method will throw {@link
      * IllegalArgumentException} if <code>object</code> does not implement
      * <code>Serializable</code>, but is not guaranteed to check that all
      * referred to objects implement <code>Serializable</code>.  Any instances
@@ -74,12 +75,12 @@ public interface DataService extends DataManager, Service {
      * @param	object the object associated with the service binding of the
      *		name
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setServiceBinding(String name, ManagedObject object);
+    void setServiceBinding(String name, Object object);
 
     /**
      * Removes the service binding for a name.  Note that the object previously
@@ -134,8 +135,7 @@ public interface DataService extends DataManager, Service {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    ManagedReference<? extends ManagedObject> createReferenceForId(
-	BigInteger id);
+    ManagedReference<?> createReferenceForId(BigInteger id);
 
     /**
      * Returns a unique identifier for the next object after the object with

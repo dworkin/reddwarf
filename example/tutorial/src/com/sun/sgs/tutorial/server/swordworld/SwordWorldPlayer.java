@@ -52,7 +52,7 @@ public class SwordWorldPlayer
     protected static final String PLAYER_BIND_PREFIX = "Player.";
 
     /** The {@code ClientSession} for this player, or null if logged out. */
-    private ManagedReference currentSessionRef = null;
+    private ManagedReference<ClientSession> currentSessionRef = null;
 
     /** The {@link SwordWorldRoom} this player is in, or null if none. */
     private ManagedReference<SwordWorldRoom> currentRoomRef = null;
@@ -101,7 +101,7 @@ public class SwordWorldPlayer
         if (currentSessionRef == null)
             return null;
 
-        return currentSessionRef.get(ClientSession.class);
+        return currentSessionRef.get();
     }
 
     /**

@@ -880,7 +880,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    private static ManagedObject getObjectForId(BigInteger refId) {
+    private static Object getObjectForId(BigInteger refId) {
 	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
 	    return dataService.createReferenceForId(refId).get();
@@ -1671,8 +1671,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	EventQueue eventQueue =
 	    (EventQueue) dataService.getServiceBinding(key);
 	BigInteger channelRefId = eventQueue.getChannelRefId();
-	ChannelImpl channel =
-	    (ChannelImpl) getObjectForId(channelRefId);
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
 	    channel.reassignCoordinator(nodeId);
 	} else {

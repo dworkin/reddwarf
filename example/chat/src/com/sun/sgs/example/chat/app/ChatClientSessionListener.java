@@ -67,7 +67,7 @@ public class ChatClientSessionListener
     private static final String COMMAND_PREFIX = "/";
 
     /** The {@link ClientSession} this listener receives events for. */
-    private final ManagedReference sessionRef;
+    private final ManagedReference<ClientSession> sessionRef;
 
     /**
      * Creates a new listener for the given {@code ClientSession}.
@@ -158,7 +158,7 @@ public class ChatClientSessionListener
     }
 
     private ClientSession session() {
-        return sessionRef.get(ClientSession.class);
+        return sessionRef.get();
     }
 
     private static Channel findOrCreateChannel(String channelName) {
@@ -175,7 +175,7 @@ public class ChatClientSessionListener
 
     private static Channel findChannel(String channelName) {
         String key = channelKey(channelName);
-        return AppContext.getDataManager().getBinding(key, Channel.class);
+        return (Channel) AppContext.getDataManager().getBinding(key);
     }
     
     private static String channelKey(String channelName) {
@@ -226,8 +226,10 @@ public class ChatClientSessionListener
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members ");
         listMessage.append(channelName);
-        for (ManagedReference memberRef : getChannelMemberRefs(channelName)) {
-            ClientSession member = memberRef.get(ClientSession.class);
+        for (ManagedReference<ClientSession> memberRef
+		 : getChannelMemberRefs(channelName))
+	{
+            ClientSession member = memberRef.get();
             listMessage.append(' ');
             listMessage.append(getIdString(memberRef));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
@@ -238,7 +240,9 @@ public class ChatClientSessionListener
         session().send(toMessageBuffer(listMessage.toString()));
     }
 
-    private Set<ManagedReference> getChannelMemberRefs(String channelName) {
+    private Set<ManagedReference<ClientSession>> getChannelMemberRefs(
+	String channelName)
+    {
         // FIXME implement
         return null;
     }
