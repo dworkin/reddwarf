@@ -93,7 +93,7 @@ public final class WrappedSerializable<T> implements Serializable {
      */
     public T get() {
 	checkRemoved();
-	ManagedObject obj = ref.get();
+	ManagedObject obj = (ManagedObject) ref.get();
 	if (obj instanceof Wrapper) {
 	    Wrapper<T> wrapper = Objects.uncheckedCast(obj);
 	    return wrapper.get();
