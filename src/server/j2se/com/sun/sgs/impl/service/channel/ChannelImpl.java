@@ -1229,6 +1229,15 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	void serviceEvent() {
 	    checkState();
+	    /*
+	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
+	     * true), then all pending events should to be serviced, since
+	     * a 'serviceEventQueue' request may have been missed when the
+	     * former channel coordinator failed and was in the process of
+	     * being reassigned.  So, assign the 'serviceAllEvents' flag
+	     * to indicate whether or not all pending events should be
+	     * processed below.
+	     */
 	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
 		ChannelImpl channel = getChannel();
@@ -1265,6 +1274,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		sendRefresh = false;
 	    }
 
+	    /*
+	     * Process channel events.  If the 'serviceAllEvents' flag is
+	     * true, then service all pending events.
+	     */
 	    do {
 		ChannelEvent event = getQueue().poll();
 		if (event == null) {
