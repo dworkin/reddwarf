@@ -60,6 +60,14 @@ import java.util.Set;
  * <p>If the application removes a {@code Channel} object from the
  * data manager, that channel will be closed.
  *
+ * <p>TODO: modify class documentation to note that an application should
+ * not remove a channel object, and that attempting to remove the channel
+ * object (by invoking {@code DataManager.removeObject}) will throw
+ * IllegalStateException.  If a channel is no longer needed, the
+ * application should close the channel by invoking the {@link #close
+ * close} method, and at some point later on, the channel object will be
+ * removed by the channel manager.
+ *
  * @see ChannelManager#createChannel ChannelManager.createChannel
  */
 public interface Channel extends ManagedObject {
