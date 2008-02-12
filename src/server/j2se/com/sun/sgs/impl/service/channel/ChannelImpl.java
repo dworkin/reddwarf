@@ -36,7 +36,9 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -58,6 +60,10 @@ import java.util.logging.Logger;
  *
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
+ *
+ * <p>TODO: This class needs to implement ManagedObjectRemoval and if the
+ * application attempts to remove an instance, then 'removingObject' should
+ * throw a non-retryable exception to prevent object removal.
  */
 public abstract class ChannelImpl implements Channel, Serializable {
 
@@ -251,6 +257,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	     */
 	    return;
 	}
+	final long coord = coordNodeId;
 	ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
 	    new AbstractKernelRunnable() {
 		public void run() {
@@ -263,6 +270,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			 * coordinator recovers, it will resume
 			 * servicing events, so ignore this exception.
 			 */
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.logThrow(
+				Level.FINEST, e,
+				"serviceEventQueue channel:{0} coord:{1} " +
+				"throws", HexDumper.toHexString(channelId),
+				coord);
+			}
 		    }
 		}});
     }
@@ -811,12 +825,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * coordinator, and set new coordinator's event queue binding.
 	 */
 	dataService.removeServiceBinding(getEventQueueKey());
-	if (servers.isEmpty()) {
-	    coordNodeId = getLocalNodeId();
-	} else {
-	    Long[] serverIds = servers.toArray(new Long[servers.size()]);
-	    int index = random.nextInt(serverIds.length);
-	    coordNodeId = serverIds[index];
+	coordNodeId = chooseCoordinatorNode();
+	if (logger.isLoggable(Level.FINE)) {
+	    logger.log(
+		Level.FINE,
+		"channel:{0} reassigning coordinator from:{1} to:{2}",
+		HexDumper.toHexString(channelId), failedCoordNodeId,
+		coordNodeId);
 	}
 	dataService.setServiceBinding(getEventQueueKey(), eventQueue);
 	/*
@@ -830,6 +845,36 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
+     * Chooses a node to be the new coordinator for this channel, and
+     * returns the ID for the chosen node.  If there is one or more
+     * channel server(s) for this channel that are currently alive, this
+     * method chooses one of those server nodes at random to be the new
+     * coordinator.  If there are no live channel servers for this channel,
+     * then the local node is chosen to be the coordinator.
+     *
+     * This method should be called within a transaction.
+     */
+    private long chooseCoordinatorNode() {
+	if (! servers.isEmpty()) {
+	    int numServers = servers.size();
+	    Long[] serverIds = servers.toArray(new Long[numServers]);
+	    int startIndex = random.nextInt(numServers);
+	    WatchdogService watchdogService =
+		ChannelServiceImpl.getWatchdogService();
+	    for (int i = 0; i < numServers; i++) {
+		int tryIndex = (startIndex + i) % numServers;
+		long candidateId = serverIds[tryIndex];
+		// TBD: check if selected node is alive?
+		Node coordCandidate = watchdogService.getNode(candidateId);
+		if (coordCandidate != null && coordCandidate.isAlive()) {
+		    return candidateId;
+		}
+	    }
+	}
+	return getLocalNodeId();
+    }
+
+    /**
      * Removes the client session with the specified {@code
      * sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId} from all channels that it is currently
@@ -838,7 +883,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * this node is recovering for a failed node whose sessions all
      * became disconnected.
      *
-     * This method should be call within a transaction.
+     * This method should be called within a transaction.
      */
     static void removeSessionFromAllChannels(
 	long nodeId, byte[] sessionIdBytes)
@@ -1184,12 +1229,17 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	void serviceEvent() {
 	    checkState();
+	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
 		ChannelImpl channel = getChannel();
 		final Set<ChannelServer> channelServers =
 		    channel.getChannelServers();
 		final BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
+			       HexDumper.toHexString(channelIdBytes));
+		}
 		ChannelServiceImpl.addChannelTask(
 		    channelRefId,
 		    new Runnable() {
@@ -1205,9 +1255,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 				     * and continue.
 				     */
 				    logger.log(
-					       Level.FINE,
-					       "unable to contact server:{0}",
-					       server);
+					Level.FINE,
+					"unable to contact server:{0}", server);
 				}
 			    }
 			}
@@ -1216,15 +1265,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		sendRefresh = false;
 	    }
 
-	    // TBD: more than one event could be processed here...
-	    final ChannelEvent event = getQueue().poll();
-	    if (event == null) {
-		return;
-	    }
+	    do {
+		ChannelEvent event = getQueue().poll();
+		if (event == null) {
+		    return;
+		}
 
-	    logger.log(Level.FINEST, "processing event:{0}", event);
-
-	    event.serviceEvent(this);
+		logger.log(Level.FINEST, "processing event:{0}", event);
+		event.serviceEvent(this);
+		
+	    } while (serviceAllEvents);
 	}
     }
 
@@ -1707,7 +1757,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			dataService, channel.getSessionNodePrefix(nodeId)))
 	    {
 		int index = sessionKey.lastIndexOf('.');
-		sessionKey = sessionKey.substring(index);
+		sessionKey = sessionKey.substring(index + 1);
 		// convert to BigInteger
 		BigInteger sessionRefId = new BigInteger(sessionKey, 16);
 		members.add(sessionRefId);
