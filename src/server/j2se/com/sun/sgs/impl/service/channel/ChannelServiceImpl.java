@@ -330,6 +330,15 @@ public class ChannelServiceImpl
 		}
 		Set<BigInteger> newLocalMembers =
 		    Collections.synchronizedSet(getMembersTask.getLocalMembers());
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
+			       HexDumper.toHexString(channelId));
+		    for (BigInteger sessionRefId : newLocalMembers) {
+			logger.log(
+			   Level.FINEST, "member:{0}",
+			   HexDumper.toHexString(sessionRefId.toByteArray()));
+		    }
+		}
 		localChannelMembersMap.put(channelRefId, newLocalMembers);
 		
 	    } finally {
@@ -436,7 +445,7 @@ public class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
 			       HexDumper.toHexString(channelId),
-			       HexDumper.format(message));
+			       HexDumper.format(message, 0x50));
 		}
 		/*
 		 * TBD: (optimization) this should enqueue the send
@@ -819,6 +828,13 @@ public class ChannelServiceImpl
     }
 
     /**
+     * Returns the watchdog service.
+     */
+    static WatchdogService getWatchdogService() {
+	return txnProxy.getService(WatchdogService.class);
+    }
+
+    /**
      * Returns the local node ID.
      */
     static long getLocalNodeId() {
@@ -871,7 +887,7 @@ public class ChannelServiceImpl
 	    final TaskService taskService = getTaskService();
 	    try {
 		if (logger.isLoggable(Level.INFO)) {
-		    logger.log(Level.INFO, "Node:{0} recovering for node:{0}",
+		    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
 			       localNodeId, nodeId);
 		}
 
