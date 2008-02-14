@@ -573,10 +573,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 */
 	public void abort(boolean retryable) {
 	    contextQueue.remove(this);
-            if (! retryable) {
-                for (Updates updates : sessionUpdates.values())
-                    updates.cancel();
-            }
+	    for (Updates updates : sessionUpdates.values())
+	        updates.cancel();
 	    checkFlush();
 	}
 
