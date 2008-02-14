@@ -1,3 +1,8 @@
+Version 0.9.5:
+- Fix the channel membership logic to allow clients to send during
+  channelJoined and not during channelLeft
+- Make client channel logic robust to channelJoined callback exceptions
+
 Version 0.9.4:
 - Add example C client source 
 

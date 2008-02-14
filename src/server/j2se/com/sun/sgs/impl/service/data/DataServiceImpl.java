@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -29,6 +29,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
+import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -69,6 +70,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
  *	</b></code> <br>
  *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
+ *	the {@code com.sun.sgs.server.start} property is {@code false}, else
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
@@ -243,7 +246,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	@Override protected Context createContext(Transaction txn) {
 	    /*
@@ -372,13 +375,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
-	    if (dataStoreClassName == null) {
-		store = new DataStoreImpl(properties, scheduler);
-	    } else {
+	    boolean serverStart = wrappedProps.getBooleanProperty(
+		StandardProperties.SERVER_START, true);
+	    if (dataStoreClassName != null) {
 		store = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
 		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
+	    } else if (serverStart) {
+		store = new DataStoreImpl(properties, scheduler);
+	    } else {
+		store = new DataStoreClient(properties);
 	    }
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {

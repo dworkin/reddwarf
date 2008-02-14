@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -32,7 +32,8 @@ import java.util.Set;
  * ChannelManager#createChannel ChannelManager.createChannel} method
  * with a {@link Delivery} requirement.  A {@link ClientSession} can
  * be added or removed from a channel using that {@code Channel}'s
- * {@link #join join} and {@link #leave leave} methods respectively.
+ * {@link #join(ClientSession) join} and
+ * {@link #leave(ClientSession) leave} methods respectively.
  * All client sessions can be removed from a channel by invoking
  * {@link #leaveAll leaveAll} on the channel.
  *
@@ -59,6 +60,14 @@ import java.util.Set;
  *
  * <p>If the application removes a {@code Channel} object from the
  * data manager, that channel will be closed.
+ *
+ * <p>TODO: modify class documentation to note that an application should
+ * not remove a channel object, and that attempting to remove the channel
+ * object (by invoking {@code DataManager.removeObject}) will throw
+ * IllegalStateException.  If a channel is no longer needed, the
+ * application should close the channel by invoking the {@link #close
+ * close} method, and at some point later on, the channel object will be
+ * removed by the channel manager.
  *
  * @see ChannelManager#createChannel ChannelManager.createChannel
  */

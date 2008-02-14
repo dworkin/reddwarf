@@ -1,5 +1,20 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.sun.sgs.impl.service.session;
@@ -70,7 +85,7 @@ class ClientSessionHandler {
     private final ConnectionListener connectionListener;
 
     /** The Connection for sending messages to the client. */
-    private volatile Connection sessionConnection;
+    private volatile Connection sessionConnection = null;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -137,7 +152,6 @@ class ClientSessionHandler {
 	    currentState == State.CONNECTING ||
 	    currentState == State.CONNECTED;
 
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -171,7 +185,7 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST,
 		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message));
+		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -582,8 +596,6 @@ class ClientSessionHandler {
 			}
 			handleDisconnect(false);
 		    }});
-
-		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 

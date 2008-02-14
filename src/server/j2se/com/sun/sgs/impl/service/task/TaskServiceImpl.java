@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -97,7 +97,7 @@ import java.util.logging.Logger;
  * identity are re-scheduled on the identity's new node. When an
  * already-scheduled, persisted task tries to run on the old node, that task
  * is dropped since it is already scheduled to run on the new node. After an
- * identity has been moved, any subsiquent attempts to schedule durable tasks
+ * identity has been moved, any subsequent attempts to schedule durable tasks
  * on behalf of that identity on the old node will result in the tasks being
  * scheduled to run on the new node. This is called task handoff.
  * <p>
@@ -145,7 +145,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // and how many tasks are pending for that identity
     private HashMap<Identity,Integer> activeIdentityMap;
 
-    // the transient set of identies thought to be mapped to this node
+    // the transient set of identities thought to be mapped to this node
     private HashSet<Identity> mappedIdentitySet;
 
     // a timer used to delay status votes
@@ -175,7 +175,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     public static final String HANDOFF_START_PROPERTY =
         NAME + ".handoff.start";
 
-    /** The default delay in millseconds before hand-off checking starts. */
+    /** The default delay in milliseconds before hand-off checking starts. */
     public static final long HANDOFF_START_DEFAULT = 2500L;
 
     // the actual amount of time to wait before hand-off checking starts
@@ -912,7 +912,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     {
         /** Creates an instance with the given proxy. */
         TransactionContextFactoryImpl(TransactionProxy proxy) {
-            super(proxy);
+            super(proxy, NAME);
         }
         /** {@inheritDoc} */
         protected TxnState createContext(Transaction txn) {

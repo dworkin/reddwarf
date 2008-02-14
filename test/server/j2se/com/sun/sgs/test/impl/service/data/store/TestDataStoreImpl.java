@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -1323,6 +1323,9 @@ public class TestDataStoreImpl extends TestCase {
 		    public void abort(Transaction txn) {
 			participant.abort(txn);
 		    }
+                    public String getTypeName() {
+                        return "DataStoreDummyParticipant";
+                    }
 		});
 	    }
 	};

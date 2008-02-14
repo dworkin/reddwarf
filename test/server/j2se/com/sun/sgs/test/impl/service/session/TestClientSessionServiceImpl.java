@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -509,11 +509,6 @@ public class TestClientSessionServiceImpl extends TestCase {
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
             setUp(false);
-	    dataService = serverNode.getDataService();
-	    if (! getServiceBindingKeys(NODE_PREFIX).contains(failedNodeKey)) {
-		fail("Failed node key prematurely removed: " + failedNodeKey);
-	    }
-            addNodes("one");
 	    client.checkDisconnected(false);
 
 	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    

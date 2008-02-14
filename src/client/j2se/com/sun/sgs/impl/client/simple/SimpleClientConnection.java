@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007-2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -59,10 +59,18 @@ class SimpleClientConnection implements ClientConnection, ConnectionListener {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(
                 SimpleClientConnection.class.getName()));
-    
+
+    /** the listener for this connection. */
     private final ClientConnectionListener ccl;
+
+    /** The underlying IO connection, or {@code null} if disconnected. */
     private Connection myHandle = null;
-    
+
+    /**
+     * Creates a new connection implementation.
+     * 
+     * @param listener the listener to receive notification of events
+     */
     SimpleClientConnection(ClientConnectionListener listener) {
         this.ccl = listener;
     }
@@ -150,13 +158,13 @@ class SimpleClientConnection implements ClientConnection, ConnectionListener {
     /**
      * {@inheritDoc}
      * <p>
-     * This implemenation forwards the message to the
+     * This implementation forwards the message to the
      * associated {@code ClientConnectionListener}.
      */
     public void bytesReceived(Connection conn, byte[] message) {
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "recv on {0}: {1}",
-                conn, HexDumper.format(message));
+                conn, HexDumper.format(message, 0x50));
         }
         assert conn.equals(this.myHandle);
         ccl.receivedMessage(message);

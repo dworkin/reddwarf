@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -3303,7 +3303,7 @@ public class TestScalableHashMap extends Assert {
                 "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
 	    "com.sun.sgs.txn.timeout", "1000000",
             "com.sun.sgs.impl.service.data.store.net.server.host", "localhost",
-            "com.sun.sgs.impl.service.data.store.net.server.run", "true",
+            "com.sun.sgs.impl.service.data.store.net.server.start", "true",
             "com.sun.sgs.impl.service.data.store.net.server.port", "0",
 	    "com.sun.sgs.impl.service.watchdog.server.start", "true",
 	    "com.sun.sgs.impl.service.nodemap.server.start", "true"

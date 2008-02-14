@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -55,9 +55,9 @@ public class ManagedQueue<E>
     private static final long serialVersionUID = 1L;
 
     /** The head of the queue, or null. */
-    private ManagedReference headRef;
+    private ManagedReference headRef = null;
     /** The tail of the queue, or null. */
-    private ManagedReference tailRef;
+    private ManagedReference tailRef = null;
 
     /**
      * A queue entry consisting of a reference to the element object

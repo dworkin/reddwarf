@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -36,7 +36,7 @@ import java.util.logging.Level;
  * progress call tracking for services with embedded remote servers,
  * and shutdown support.
  *
- * <p>The {@link getName getName} method invokes the instance's {@code
+ * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
  * should provide an implementation of the {@code toString} method.
  */
