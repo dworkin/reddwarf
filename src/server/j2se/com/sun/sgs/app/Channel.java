@@ -32,7 +32,8 @@ import java.util.Set;
  * ChannelManager#createChannel ChannelManager.createChannel} method
  * with a {@link Delivery} requirement.  A {@link ClientSession} can
  * be added or removed from a channel using that {@code Channel}'s
- * {@link #join join} and {@link #leave leave} methods respectively.
+ * {@link #join(ClientSession) join} and
+ * {@link #leave(ClientSession) leave} methods respectively.
  * All client sessions can be removed from a channel by invoking
  * {@link #leaveAll leaveAll} on the channel.
  *

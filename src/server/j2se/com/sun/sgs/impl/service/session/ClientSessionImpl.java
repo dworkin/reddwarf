@@ -26,6 +26,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -163,10 +164,10 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public ClientSession send(ByteBuffer message) {
 	try {
-            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
             } else if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
 	    }
@@ -176,13 +177,15 @@ public class ClientSessionImpl
                .flip();
 	    sessionService.sendProtocolMessage(
 	        this, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
-	
-	    logger.log(Level.FINEST, "send message:{0} returns", message);
+
 	    return this;
 
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, e, "send message:{0} throws", message);
+	    if (logger.isLoggable(Level.FINEST)) {
+	        logger.logThrow(Level.FINEST, e,
+	                        "send message:{0} throws",
+	                        HexDumper.format(message, 0x50));
+	    }
 	    throw e;
 	}
     }

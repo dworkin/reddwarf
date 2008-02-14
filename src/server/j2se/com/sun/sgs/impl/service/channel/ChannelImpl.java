@@ -27,6 +27,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -370,10 +371,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
-            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
             }
 	    /*
 	     * Enqueue send request.
@@ -384,7 +385,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
-			   this, HexDumper.format(bytes));
+			   this, HexDumper.format(bytes, 0x50));
 	    }
 	    return this;
 	    
@@ -392,7 +393,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e, "send channel:{0} message:{1} throws",
-		    this, HexDumper.format(message));
+		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
 	}
@@ -436,6 +437,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
+    @Override
     public boolean equals(Object obj) {
 	// TBD: Because this is a managed object, does an "==" check
 	// suffice here? 
@@ -446,11 +448,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
+    @Override
     public int hashCode() {
 	return Arrays.hashCode(channelId);
     }
 
     /** {@inheritDoc} */
+    @Override
     public String toString() {
 	return getClass().getName() +
 	    "[" + HexDumper.toHexString(channelId) + "]";
@@ -1374,6 +1378,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
 		HexDumper.toHexString(sessionId);
@@ -1414,6 +1419,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
 		HexDumper.toHexString(sessionId);
@@ -1464,6 +1470,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName();
 	}
@@ -1528,6 +1535,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName();
 	}
@@ -1590,6 +1598,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+	@Override
 	public String toString() {
 	    return getClass().getName();
 	}

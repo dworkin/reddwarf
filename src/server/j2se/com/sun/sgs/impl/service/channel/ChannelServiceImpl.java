@@ -445,7 +445,7 @@ public class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
 			       HexDumper.toHexString(channelId),
-			       HexDumper.format(message));
+			       HexDumper.format(message, 0x50));
 		}
 		/*
 		 * TBD: (optimization) this should enqueue the send
