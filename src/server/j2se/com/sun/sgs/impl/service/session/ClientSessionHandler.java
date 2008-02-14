@@ -152,7 +152,6 @@ class ClientSessionHandler {
 	    currentState == State.CONNECTING ||
 	    currentState == State.CONNECTED;
 
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -186,7 +185,7 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST,
 		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message));
+		this, HexDumper.format(message, 0x50));
 	}
     }
 
