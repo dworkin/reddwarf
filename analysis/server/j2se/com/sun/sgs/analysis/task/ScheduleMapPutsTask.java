@@ -20,7 +20,6 @@
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.util.ScalableHashMap;
