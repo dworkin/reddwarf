@@ -1970,7 +1970,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Unusual states -- */
     private final Action getReference = new Action() {
-	private ManagedReference ref;
+	private ManagedReference<?> ref;
 	void setUp() { ref = service.createReference(dummy); }
 	void run() { ref.get(); }
     };
@@ -2346,7 +2346,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Unusual states -- */
     private final Action getReferenceUpdate = new Action() {
-	private ManagedReference ref;
+	private ManagedReference<?> ref;
 	void setUp() { ref = service.createReference(dummy); }
 	void run() { ref.getForUpdate(); }
     };
@@ -2454,7 +2454,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	createTransaction();
 	dummy = (DummyManagedObject) service.getBinding("dummy");
-	ManagedReference ref = service.createReference(dummy);
+	ManagedReference<DummyManagedObject> ref =
+	    service.createReference(dummy);
 	assertEquals(id, ref.getId());
 	dummy2 = (DummyManagedObject) service.getBinding("dummy2");
 	assertEquals(id2, service.createReference(dummy2).getId());
@@ -2463,13 +2464,15 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test ManagedReference.equals -- */
 
     public void testReferenceEquals() throws Exception {
-	final ManagedReference ref = service.createReference(dummy);
+	final ManagedReference<DummyManagedObject> ref =
+	    service.createReference(dummy);
 	assertFalse(ref.equals(null));
 	assertFalse(ref.equals(Boolean.TRUE));
 	assertTrue(ref.equals(ref));
 	assertTrue(ref.equals(service.createReference(dummy)));
 	DummyManagedObject dummy2 = new DummyManagedObject();
-	ManagedReference ref2 = service.createReference(dummy2);
+	ManagedReference<DummyManagedObject> ref2 =
+	    service.createReference(dummy2);
 	assertFalse(ref.equals(ref2));
 	ManagedReference<ManagedObject> ref3 =
 	    new ManagedReference<ManagedObject>() {
@@ -2481,7 +2484,8 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	createTransaction();
 	dummy = (DummyManagedObject) service.getBinding("dummy");
-	ManagedReference ref4 = service.createReference(dummy);
+	ManagedReference<DummyManagedObject> ref4 =
+	    service.createReference(dummy);
 	assertTrue(ref.equals(ref4));
 	assertTrue(ref4.equals(ref));
 	assertEquals(ref.hashCode(), ref4.hashCode());
@@ -3103,7 +3107,7 @@ public class TestDataServiceImpl extends TestCase {
     static class DeserializationDelayed extends DummyManagedObject {
 	private static final long serialVersionUID = 1;
 	private static long delay = 0;
-	private ManagedReference next = null;
+	private ManagedReference<DummyManagedObject> next = null;
 	@Override
 	public void setNext(DummyManagedObject next) {
 	    service.markForUpdate(this);

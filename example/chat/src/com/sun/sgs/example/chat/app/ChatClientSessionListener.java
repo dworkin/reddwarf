@@ -186,7 +186,7 @@ public class ChatClientSessionListener
         return getIdString(sessionRef);
     }
 
-    private String getIdString(ManagedReference ref) {
+    private String getIdString(ManagedReference<?> ref) {
         return ref.getId().toString(16);
     }
 

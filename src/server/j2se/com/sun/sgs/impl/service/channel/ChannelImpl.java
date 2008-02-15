@@ -130,7 +130,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	this.delivery = delivery;
 	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
-	ManagedReference ref = dataService.createReference(this);
+	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.channelId = ref.getId().toByteArray();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {

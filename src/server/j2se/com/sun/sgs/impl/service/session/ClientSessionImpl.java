@@ -136,7 +136,8 @@ public class ClientSessionImpl
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
 	DataService dataService = sessionService.getDataService();
-	ManagedReference sessionRef = dataService.createReference(this);
+	ManagedReference<ClientSessionImpl> sessionRef =
+	    dataService.createReference(this);
 	id = sessionRef.getId();
 	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(), this);

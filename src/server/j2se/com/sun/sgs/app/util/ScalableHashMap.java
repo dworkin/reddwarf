@@ -1727,7 +1727,7 @@ public class ScalableHashMap<K,V>
 		}
 		int offset = offsets.pop();
 		node = currentNodeRef.get();
-		ManagedReference childRef = node.nodeDirectory[offset];
+		ManagedReference<?> childRef = node.nodeDirectory[offset];
 		while (++offset < node.nodeDirectory.length) {
 		    /* Skip clearing duplicate nodes in the directory */
 		    if (childRef != node.nodeDirectory[offset]) {

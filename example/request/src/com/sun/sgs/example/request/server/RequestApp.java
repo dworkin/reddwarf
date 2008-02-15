@@ -324,7 +324,7 @@ public class RequestApp implements AppListener, Serializable {
 	}
 
 	/** Returns an identifier for the session. */ 
-	static String sessionId(ManagedReference session) {
+	static String sessionId(ManagedReference<ClientSession> session) {
 	    return "Session-" + session.getId();
 	}
     }

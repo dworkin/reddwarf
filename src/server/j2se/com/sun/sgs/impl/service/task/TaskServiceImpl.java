@@ -606,7 +606,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // get the name of the new object and bind that into the pending
         // namespace for recovery on startup
-        ManagedReference taskRef = dataService.createReference(ptask);
+        ManagedReference<PendingTask> taskRef =
+	    dataService.createReference(ptask);
         String objName = DS_PENDING_SPACE + identity.getName() + "." +
             taskRef.getId();
         dataService.setServiceBinding(objName, ptask);
