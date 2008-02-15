@@ -77,8 +77,26 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 public class TestClientSessionServiceImpl extends TestCase {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() {
+	if (testMethod == null) {
+	    return new TestSuite(TestClientSessionServiceImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestClientSessionServiceImpl(testMethod));
+	return suite;
+    }
+
     /** The name of the DataServiceImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
@@ -656,6 +674,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
 	
+    }
+
+    /**
+     * Test sending from the server to the client session in a transaction that
+     * aborts with a retryable exception to make sure that message buffers are
+     * reclaimed.
+     */
+    public void testClientSessionSendAbortRetryable() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	try {
+	    client.connect(port);
+	    client.login("client", "dummypassword");
+	    for (int i = 0; i < 20; i++) {
+		createTransaction();
+		Set<ClientSession> sessions = getAppListener().getSessions();
+		ClientSession session = sessions.iterator().next();
+		session.send(new byte[8096]);
+		txn.abort(new MaybeRetryException("Retryable",  true));
+		txn = null;
+	    }
+	} finally {
+	    client.disconnect(false);
+	}
     }
 
     public void testClientSend() throws Exception {
