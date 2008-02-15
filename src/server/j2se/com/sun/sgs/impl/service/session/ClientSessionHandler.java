@@ -85,7 +85,7 @@ class ClientSessionHandler {
     private final ConnectionListener connectionListener;
 
     /** The Connection for sending messages to the client. */
-    private volatile Connection sessionConnection;
+    private volatile Connection sessionConnection = null;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -152,7 +152,6 @@ class ClientSessionHandler {
 	    currentState == State.CONNECTING ||
 	    currentState == State.CONNECTED;
 
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -186,7 +185,7 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST,
 		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message));
+		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -597,8 +596,6 @@ class ClientSessionHandler {
 			}
 			handleDisconnect(false);
 		    }});
-
-		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 

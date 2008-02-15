@@ -25,7 +25,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 
 /**

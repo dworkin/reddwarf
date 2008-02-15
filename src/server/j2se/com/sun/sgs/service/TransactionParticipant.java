@@ -112,5 +112,13 @@ public interface TransactionParticipant {
      *                               the given transaction
      */
     public void abort(Transaction txn);
-
+    
+    /**
+     * Returns the fully qualified type name of the participant.
+     * If this participant is acting as a proxy for a {@code Service}, this
+     * will typically be the {@code Service}'s type name. 
+     * 
+     * @return the name of the participant
+     */
+     public String getTypeName();
 }
