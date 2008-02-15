@@ -687,11 +687,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(port);
 	    client.login("client", "dummypassword");
-	    for (int i = 0; i < 20; i++) {
+	    for (int i = 0; i < 40; i++) {
 		createTransaction();
 		Set<ClientSession> sessions = getAppListener().getSessions();
 		ClientSession session = sessions.iterator().next();
-		session.send(new byte[8096]);
+		session.send(new byte[4048]);
 		txn.abort(new MaybeRetryException("Retryable",  true));
 		txn = null;
 	    }
