@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
@@ -242,7 +243,7 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public String toString() {
 	return getClass().getName() + "[" + getName() + "]@[id:" +
-	    id + ",node:" + nodeId + "]";
+	    HexDumper.toHexString(idBytes) + ",node:" + nodeId + "]";
     }
     
     /* -- Serialization methods -- */
@@ -342,10 +343,24 @@ public class ClientSessionImpl
 	}
 
 	/*
-	 * Invoke listener's disconnected callback.
+	 * Invoke listener's disconnected callback, and ignore any
+	 * non-retryable exception thrown.
 	 */
 	if (listener != null) {
-	    listener.disconnected(graceful);
+	    try {
+		listener.disconnected(graceful);
+	    } catch (RuntimeException e) {
+		if (e instanceof ExceptionRetryStatus &&
+		    ((ExceptionRetryStatus) e).shouldRetry() == true) {
+		    throw e;
+		} else {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"invoking disconnected callback on listener:{0} " +
+			" for session:{1} throws",
+			listener, this);
+		}
+	    }
 	}
 
 	/*

@@ -224,17 +224,21 @@ public abstract class ChannelImpl implements Channel, Serializable {
     private void addEvent(ChannelEvent event) {
 
 	/*
-	 * Enqueue channel event and notify the coordinator that there is
-	 * an event to service.
-	 *
-	 * TBD: (optimization) if the coordinator for this channel is
-	 * the local node, we could process the event here if the
-	 * queue is empty (instead of enqueuing the event and
-	 * notifying the coordinator to service it).
+	 * Enqueue channel event.  If the coordinator is the local node,
+	 * and the event being added is the only event in the queue,
+	 * process the event immediately; otherwise, notify the coordinator
+	 * that there is an event to service.
 	 */
-	if (getEventQueue(coordNodeId, channelId).offer(event)) {
-	    notifyServiceEventQueue();
+	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
+	boolean serviceEventLocally =
+	    isCoordinator() && eventQueue.getQueue().isEmpty();
 	    
+	if (eventQueue.offer(event)) {
+	    if (serviceEventLocally) {
+		eventQueue.serviceEvent();
+	    } else {
+		notifyServiceEventQueue();
+	    }
 	} else {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add channel event");
@@ -633,6 +637,14 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
+     * Returns {@code true} if this node is the coordinator for this
+     * channel, otherwise returns {@code false}.
+     */
+    private boolean isCoordinator() {
+	return coordNodeId == getLocalNodeId();
+    }
+
+    /**
      * If the specified {@code session} is not already a member of
      * this channel, adds the session to this channel and
      * returns {@code true}; otherwise if the specified {@code
@@ -864,7 +876,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    for (int i = 0; i < numServers; i++) {
 		int tryIndex = (startIndex + i) % numServers;
 		long candidateId = serverIds[tryIndex];
-		// TBD: check if selected node is alive?
 		Node coordCandidate = watchdogService.getNode(candidateId);
 		if (coordCandidate != null && coordCandidate.isAlive()) {
 		    return candidateId;
@@ -912,7 +923,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * Returns the channel server for the specified {@code nodeId}.
      */
     private static ChannelServer getChannelServer(long nodeId) {
-	return ChannelServiceImpl.getChannelServer(nodeId);
+	return ChannelServiceImpl.getChannelService().getChannelServer(nodeId);
     }
 
     /**
@@ -1229,6 +1240,21 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	void serviceEvent() {
 	    checkState();
+	    ChannelImpl channel = getChannel();
+	    if (! channel.isCoordinator()) {
+		// TBD: should a serviceEventQueue request be forwarded to
+		// the true channel coordinator?
+		logger.log(
+		    Level.WARNING,
+		    "Attempt at node:{0} channel:{1} to service events; " +
+		    "instead of current coordinator:{2}",
+		    getLocalNodeId(),
+		    HexDumper.toHexString(channel.channelId),
+		    channel.coordNodeId);
+		return;
+	    }
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
 	    /*
 	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
 	     * true), then all pending events should to be serviced, since
@@ -1240,7 +1266,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	     */
 	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
-		ChannelImpl channel = getChannel();
 		final Set<ChannelServer> channelServers =
 		    channel.getChannelServers();
 		final BigInteger channelRefId = getChannelRefId();
@@ -1278,6 +1303,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	     * Process channel events.  If the 'serviceAllEvents' flag is
 	     * true, then service all pending events.
 	     */
+
+	    int eventsToService = channelService.eventsPerTxn;
 	    do {
 		ChannelEvent event = getQueue().poll();
 		if (event == null) {
@@ -1287,7 +1314,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		logger.log(Level.FINEST, "processing event:{0}", event);
 		event.serviceEvent(this);
 		
-	    } while (serviceAllEvents);
+	    } while (serviceAllEvents || --eventsToService > 0);
 	}
     }
 
@@ -1453,7 +1480,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 				 * is no need to contact it to update its
 				 * membership cache, so ignore this
 				 * exception and continue.
-			     */
+				 */
 				logger.logThrow(
 				    Level.FINE, e,
 				    "unable to contact channel server:{0} " +
