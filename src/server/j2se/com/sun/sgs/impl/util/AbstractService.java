@@ -23,7 +23,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
@@ -65,9 +67,12 @@ public abstract class AbstractService implements Service {
 
     /** The data service. */
     protected final DataService dataService;
-    
+
     /** The task scheduler. */
     protected final TaskScheduler taskScheduler;
+    
+    /** The transaction scheduler. */
+    protected final TransactionScheduler transactionScheduler;
 
     /** The task owner. */
     protected final Identity taskOwner;
@@ -129,6 +134,8 @@ public abstract class AbstractService implements Service {
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	this.transactionScheduler =
+	    systemRegistry.getComponent(TransactionScheduler.class);
 	this.dataService = txnProxy.getService(DataService.class);
 	this.taskOwner = txnProxy.getCurrentOwner();
 	setState(State.INITIALIZED);
@@ -351,4 +358,9 @@ public abstract class AbstractService implements Service {
 	    setState(AbstractService.State.SHUTDOWN);
 	}
     }
+
+	/** Creates a {@code TaskQueue} for dependent, transactional tasks. */
+	public TaskQueue createTaskQueue() {
+	    return transactionScheduler.createTaskQueue();
+	}
 }

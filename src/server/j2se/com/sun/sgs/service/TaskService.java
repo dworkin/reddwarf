@@ -24,7 +24,6 @@ import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionException;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.Priority;
 
 
 /**
@@ -33,10 +32,8 @@ import com.sun.sgs.kernel.Priority;
  * <code>TaskManager</code> schedule durable, transactional tasks. The
  * <code>scheduleNonDurableTask</code> methods defined here are used to
  * schedule tasks that are not persisted by the <code>TaskService</code> and
- * not invoked in a transactional context (the caller may still create a
- * transactional context for their task by using a
- * <code>TransactionRunner</code>). All tasks scheduled will be owned by the
- * current task's owner.
+ * not invoked in a transactional context. All tasks scheduled will be owned
+ * by the current task's owner.
  */
 public interface TaskService extends TaskManager, Service {
 
@@ -70,20 +67,5 @@ public interface TaskService extends TaskManager, Service {
      *		                        problem with the current transaction
      */
     public void scheduleNonDurableTask(KernelRunnable task, long delay);
-
-    /**
-     * Schedules a single task to run, at some requested priority, once the
-     * current task has finished. The task will not be persisted  by the
-     * <code>TaskService</code>, and therefore is not guaranteed to run.
-     *
-     * @param task the <code>KernelTask</code> to run
-     * @param priority the requested <code>Priority</code> for the task
-     *
-     * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses
-     *                               to accept the task
-     * @throws TransactionException if the operation failed because of a
-     *		                        problem with the current transaction
-     */
-    public void scheduleNonDurableTask(KernelRunnable task, Priority priority);
 
 }

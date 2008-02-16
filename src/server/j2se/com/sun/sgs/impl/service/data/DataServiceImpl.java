@@ -40,13 +40,13 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.Properties;
@@ -397,8 +397,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    synchronized (stateLock) {
 		state = State.RUNNING;
 	    }
-	    taskScheduler.runTask(
-		new TransactionRunner(
+	    systemRegistry.getComponent(TransactionScheduler.class).runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    DataServiceHeader header;
@@ -417,8 +416,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 					   "Created new header {0}", header);
 			    }
 			}
-		    }),
-		taskOwner, true);
+		    },
+		taskOwner);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");

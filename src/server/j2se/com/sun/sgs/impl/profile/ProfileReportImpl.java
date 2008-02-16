@@ -69,7 +69,7 @@ class ProfileReportImpl implements ProfileReport {
     boolean succeeded = false;
     long runningTime = 0;
     int tryCount = 0;
-    Exception exception = null;
+    Throwable throwable = null;
 
     List<ProfileOperation> ops = new ArrayList<ProfileOperation>();
     Set<ProfileParticipantDetail> participants =
@@ -293,8 +293,18 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public Exception getException() {
-	return exception;
+    public Throwable getFailureCause() {
+	return throwable;
+    }
+
+    /**
+     * Package-private method used to merge the state of one report into
+     * another. This is typically used when a nested, profiled task
+     * completes and needs to share its data with its parent.
+     */
+    void merge(ProfileReportImpl report) {
+        // FIXME: implement merging for all counts, samples, and ops
+        // before the final commit of this code
     }
 
 }

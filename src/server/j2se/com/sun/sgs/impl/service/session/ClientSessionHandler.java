@@ -31,10 +31,10 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -108,7 +108,7 @@ class ClientSessionHandler {
     private boolean shutdown = false;
 
     /** The queue of tasks for notifying listeners of received messages. */
-    private volatile NonDurableTaskQueue taskQueue = null;
+    private volatile TaskQueue taskQueue = null;
 
     /**
      * Constructs an instance of this class.
@@ -468,7 +468,7 @@ class ClientSessionHandler {
 			} else {
 			    scheduleHandleDisconnect(false);
 			}
-		    }});
+		    }}, identity);
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
@@ -549,11 +549,7 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue =
-		    new NonDurableTaskQueue(
-			sessionService.getTransactionProxy(),
-			sessionService.nonDurableTaskScheduler,
-			authenticatedIdentity);
+		taskQueue = sessionService.createTaskQueue();
 		identity = authenticatedIdentity;
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();

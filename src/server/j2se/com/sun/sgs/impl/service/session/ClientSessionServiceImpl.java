@@ -34,7 +34,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.io.Acceptor;
@@ -135,9 +134,6 @@ public class ClientSessionServiceImpl
     /** The Acceptor for listening for new connections. */
     private final Acceptor<SocketAddress> acceptor;
 
-    /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
-
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
@@ -146,6 +142,9 @@ public class ClientSessionServiceImpl
 
     /** The node mapping service. */
     final NodeMappingService nodeMapService;
+
+    /** The task service. */
+    final TaskService taskService;
 
     /** The identity manager. */
     final IdentityCoordinator identityManager;
@@ -227,12 +226,8 @@ public class ClientSessionServiceImpl
 
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
-            
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
-            nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner,
-		    txnProxy.getService(TaskService.class));
+	    taskService = txnProxy.getService(TaskService.class);
             
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
@@ -993,11 +988,9 @@ public class ClientSessionServiceImpl
     /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
-     * 
-     * @see NonDurableTaskScheduler#scheduleTask(KernelRunnable, Identity)
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
+        transactionScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
@@ -1007,15 +1000,22 @@ public class ClientSessionServiceImpl
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)
     {
-        nonDurableTaskScheduler.
-            scheduleNonTransactionalTask(task, ownerIdentity);
+        taskScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
      * Schedules a non-durable, transactional task using the task service.
      */
-    void scheduleTaskOnCommit(KernelRunnable task) {
-        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
+    void scheduleTaskOnCommit(final KernelRunnable task) {
+        final Identity owner = txnProxy.getCurrentOwner();
+        taskService.scheduleNonDurableTask(new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return task.getBaseTaskType();
+                }
+                public void run() throws Exception {
+                    transactionScheduler.runTask(task, owner);
+                }
+            });
     }
 
     /**
@@ -1029,7 +1029,7 @@ public class ClientSessionServiceImpl
 	    taskOwner :
 	    ownerIdentity;
 	    
-	taskScheduler.runTransactionalTask(task, owner);
+	transactionScheduler.runTask(task, owner);
     }
 
     /**
@@ -1047,7 +1047,7 @@ public class ClientSessionServiceImpl
 	 */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    try {
-		taskScheduler.runTransactionalTask(
+		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    notifyDisconnectedSessions(node.getId());
