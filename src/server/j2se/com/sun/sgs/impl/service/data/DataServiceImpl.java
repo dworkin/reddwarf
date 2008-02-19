@@ -650,7 +650,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, returns {3}",
+		    "{0} tid:{1,number,#}, name:{2} returns {3}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    contextTxnId(context), name, Objects.fastToString(result));
 	    }

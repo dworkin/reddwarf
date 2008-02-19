@@ -546,8 +546,7 @@ public class TestScalableHashMap extends Assert {
 	taskScheduler.runTransactionalTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    assertEquals(control,
-				 dataService.getBinding("test"));
+		    assertEquals(control, dataService.getBinding("test"));
 		}
 	    }, taskOwner);
     }
