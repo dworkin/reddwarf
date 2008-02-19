@@ -217,72 +217,68 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Adds the specified channel {@code event} to this channel's event queue
-     * and schedules a non-durable task (that is performed on transaction
-     * commit) to notify the coordinator that it should service the event
-     * queue.
+     * and notifies the coordinator that there is an event to service.
      */
     private void addEvent(ChannelEvent event) {
 
-	/*
-	 * Enqueue channel event.  If the coordinator is the local node,
-	 * and the event being added is the only event in the queue,
-	 * process the event immediately; otherwise, notify the coordinator
-	 * that there is an event to service.
-	 */
 	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
-	boolean serviceEventLocally =
-	    isCoordinator() && eventQueue.getQueue().isEmpty();
 	    
 	if (eventQueue.offer(event)) {
-	    if (serviceEventLocally) {
-		eventQueue.serviceEvent();
-	    } else {
-		notifyServiceEventQueue();
-	    }
+	    notifyServiceEventQueue(eventQueue);
 	} else {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add channel event");
 	}
     }
 
-    /*
-     * Schedule task to send a request to this channel's coordinator to
-     * service the event queue.
+    /**
+     * If the coordinator is the local node, services events locally;
+     * otherwise, schedules a task to send a request to this channel's
+     * coordinator to service the event queue.
+     *
+     * @param	eventQueue this channel's event queue
      */
-    private void notifyServiceEventQueue() {
-	final ChannelServer coordinator = getChannelServer(coordNodeId);
-	if (coordinator == null) {
-	    /*
-	     * If the ChannelServer for the coordinator's node has been
-	     * removed, then the coordinator's node has failed and will
-	     * be reassigned during recovery.  When recovery for the
-	     * failed node completes, the newly chosen coordinator will
-	     * restart the processing of channel events.
-	     */
-	    return;
-	}
-	final long coord = coordNodeId;
-	ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
-	    new AbstractKernelRunnable() {
-		public void run() {
-		    try {
-			coordinator.serviceEventQueue(channelId);
-		    } catch (IOException e) {
-			/*
-			 * It is likely that the coordinator's node failed
-			 * and hasn't recovered yet.   When the
-			 * coordinator recovers, it will resume
-			 * servicing events, so ignore this exception.
-			 */
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.logThrow(
-				Level.FINEST, e,
-				"serviceEventQueue channel:{0} coord:{1} " +
-				"throws", HexDumper.toHexString(channelId),
-				coord);
+    private void notifyServiceEventQueue(EventQueue eventQueue) {
+	
+	if (isCoordinator()) {
+	    eventQueue.serviceEvent();
+	    
+	} else {
+	    
+	    final ChannelServer coordinator = getChannelServer(coordNodeId);
+	    if (coordinator == null) {
+		/*
+		 * If the ChannelServer for the coordinator's node has been
+		 * removed, then the coordinator's node has failed and will
+		 * be reassigned during recovery.  When recovery for the
+		 * failed node completes, the newly chosen coordinator will
+		 * restart the processing of channel events.
+		 */
+		return;
+	    }
+	    final long coord = coordNodeId;
+	    ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
+	        new AbstractKernelRunnable() {
+		    public void run() {
+			try {
+			    coordinator.serviceEventQueue(channelId);
+			} catch (IOException e) {
+			    /*
+			     * It is likely that the coordinator's node failed
+			     * and hasn't recovered yet.   When the
+			     * coordinator recovers, it will resume
+			     * servicing events, so ignore this exception.
+			     */
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.logThrow(
+				    Level.FINEST, e,
+				    "serviceEventQueue channel:{0} coord:{1} " +
+				    "throws", HexDumper.toHexString(channelId),
+				    coord);
+			    }
 			}
-		    }
-		}});
+		    }});
+	}
     }
     
     /** {@inheritDoc}
@@ -853,7 +849,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * to the new coordinator.
 	 */
 	eventQueue.setSendRefresh();
-	notifyServiceEventQueue();
+	notifyServiceEventQueue(eventQueue);
     }
 
     /**

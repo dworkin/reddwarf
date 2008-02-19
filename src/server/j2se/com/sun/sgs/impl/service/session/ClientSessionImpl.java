@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
@@ -30,6 +29,8 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
@@ -294,22 +295,24 @@ public class ClientSessionImpl
     }
 
     /**
-     * Invokes the {@code disconnected} callback on this session's
-     * {@code ClientSessionListener} (if present), removes the
-     * listener and its binding (if present), and then removes this
-     * session and its bindings from the specified {@code
-     * dataService}.  If the bindings have already been removed from
-     * the {@code dataService} this method takes no action.  This
-     * method should only be called within a transaction.
+     * Invokes the {@code disconnected} callback on this session's {@code
+     * ClientSessionListener} (if present and {@code notify} is
+     * {@code true}), removes the listener and its binding (if present),
+     * and then removes this session and its bindings from the specified
+     * {@code dataService}.  If the bindings have already been removed from
+     * the {@code dataService} this method takes no action.  This method
+     * should only be called within a transaction.
      *
      * @param	dataService a data service
      * @param	graceful {@code true} if disconnection is graceful,
      *		and {@code false} otherwise
+     * @param	notify {@code true} if the {@code disconnected}
+     *		callback should be invoked
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
     void notifyListenerAndRemoveSession(
-	DataService dataService, boolean graceful)
+	final DataService dataService, final boolean graceful, boolean notify)
     {
 	String sessionKey = getSessionKey();
 	String sessionNodeKey = getSessionNodeKey();
@@ -321,7 +324,6 @@ public class ClientSessionImpl
 	 * in the data service if the AppListener.loggedIn callback
 	 * either threw a non-retryable exception or returned a
 	 * null listener.
-	 *
 	 */
 	ClientSessionListener listener = null;
 	try {
@@ -343,23 +345,34 @@ public class ClientSessionImpl
 	}
 
 	/*
-	 * Invoke listener's disconnected callback, and ignore any
-	 * non-retryable exception thrown.
+	 * Invoke listener's 'disconnected' callback if 'notify'
+	 * is true and a listener exists for this client session.  If the
+	 * 'disconnected' callback throws a non-retryable exception,
+	 * schedule a task to remove this session and its associated
+	 * bindings without invoking the listener, and rethrow the
+	 * exception so that the currently executing transaction aborts.
 	 */
-	if (listener != null) {
+	if (notify && listener != null) {
 	    try {
 		listener.disconnected(graceful);
 	    } catch (RuntimeException e) {
-		if (e instanceof ExceptionRetryStatus &&
-		    ((ExceptionRetryStatus) e).shouldRetry() == true) {
-		    throw e;
-		} else {
+		if (! isRetryableException(e)) {
 		    logger.logThrow(
 			Level.WARNING, e,
 			"invoking disconnected callback on listener:{0} " +
 			" for session:{1} throws",
 			listener, this);
+		    sessionService.scheduleTask(
+			new AbstractKernelRunnable() {
+			    public void run() {
+				ClientSessionImpl sessionImpl = 
+				    ClientSessionImpl.getSession(dataService, id);
+				sessionImpl.notifyListenerAndRemoveSession(
+				    dataService, graceful, false);
+			    }},
+			identity);
 		}
+		throw e;
 	    }
 	}
 

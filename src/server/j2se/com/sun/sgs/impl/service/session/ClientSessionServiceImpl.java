@@ -1091,7 +1091,8 @@ public class ClientSessionServiceImpl
 		ClientSessionImpl sessionImpl = 
 		    dataService.getServiceBinding(
 			sessionKey, ClientSessionImpl.class);
-		sessionImpl.notifyListenerAndRemoveSession(dataService, false);
+		sessionImpl.notifyListenerAndRemoveSession(
+		    dataService, false, true);
 	    }
 	}
     }

@@ -78,6 +78,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String THROW_RUNTIME_EXCEPTION =
 	"throw RuntimeException";
 
+    private static final String DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION =
+	"disconnect throws non-retryable exception";
+
     private static final String SESSION_PREFIX =
 	"com.sun.sgs.impl.service.session.impl";
 
@@ -428,11 +431,32 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("test");
+	    checkBindings(1);
 	    client.logout();
 	    client.checkDisconnected(true);
+	    checkBindings(0);	    
 	} catch (InterruptedException e) {
 	    e.printStackTrace();
 	    fail("testLogout interrupted");
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+
+    public void testDisconnectedCallbackThrowingNonRetryableException()
+	throws Exception
+    {
+	DummyClient client =
+	    new DummyClient(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login("test");
+	    checkBindings(1);
+	    client.logout();
+	    client.checkDisconnected(true);
+	    // give scheduled task a chance to clean up...
+	    Thread.sleep(250);
+	    checkBindings(0);	    
 	} finally {
 	    client.disconnect(false);
 	}
@@ -479,54 +503,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
 	    client.connect(serverNode.getAppPort());
 	    client.login("password");
-
-	    List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
-	    System.err.println("Listener keys: " + listenerKeys);
-	    if (listenerKeys.isEmpty()) {
-		fail("no listener keys");
-	    } else if (listenerKeys.size() > 1) {
-		fail("more than one listener key");
-	    }
-	    
-	    List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
-	    System.err.println("Session keys: " + sessionKeys);
-	    if (sessionKeys.isEmpty()) {
-		fail("no session keys");
-	    } else if (sessionKeys.size() > 1) {
-		fail("more than one session key");
-	    }
-	    
-	    List<String> sessionNodeKeys =
-		getServiceBindingKeys(SESSION_NODE_PREFIX);
-	    System.err.println("Session node keys: " + sessionNodeKeys);
-	    if (sessionNodeKeys.isEmpty()) {
-		fail("no session node keys");
-	    } else if (sessionNodeKeys.size() > 1) {
-		fail("more than one session node key");
-	    }
+	    checkBindings(1);
 
             // Simulate "crash"
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
             setUp(false);
 	    client.checkDisconnected(false);
-
-	    listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);	    
-	    if (! listenerKeys.isEmpty()) {
-		System.err.println("Listener key not removed: " + listenerKeys);
-		fail("listener key not removed!");
-	    }
-	    sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
-	    if (! sessionKeys.isEmpty()) {
-		System.err.println("Session keys not removed: " + sessionKeys);
-		fail("session keys not removed!");
-	    }
-	    
-	    sessionNodeKeys = getServiceBindingKeys(SESSION_NODE_PREFIX);
-	    if (! sessionNodeKeys.isEmpty()) {
-		System.err.println("Session keys not removed: " + sessionNodeKeys);
-		fail("session node keys not removed!");
-	    }
+	    System.err.println("check for session bindings being removed.");
+	    checkBindings(0);
 	    // Wait to make sure that node key is cleaned up.
 	    Thread.sleep(WAIT_TIME);
 	    nodeKeys = getServiceBindingKeys(NODE_PREFIX);
@@ -540,6 +525,35 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Check that the session bindings are the expected number and throw an
+     * exception if they aren't.
+     */
+    private void checkBindings(int numExpected) throws Exception {
+	
+	List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
+	System.err.println("Listener keys: " + listenerKeys);
+	if (listenerKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " listener keys, got " +
+		 listenerKeys.size());
+	}
+	    
+	List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
+	System.err.println("Session keys: " + sessionKeys);
+	if (sessionKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session keys, got " +
+		 sessionKeys.size());
+	}
+	    
+	List<String> sessionNodeKeys =
+	    getServiceBindingKeys(SESSION_NODE_PREFIX);
+	System.err.println("Session node keys: " + sessionNodeKeys);
+	if (sessionNodeKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session node keys, got " +
+		 sessionNodeKeys.size());
+	}
+    }
+    
     private List<String> getServiceBindingKeys(String prefix) throws Exception {
         GetKeysTask task = new GetKeysTask(prefix);
         taskScheduler.runTransactionalTask(task, taskOwner);
@@ -1040,27 +1054,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
+
+	    String name = session.getName();
+	    DummyClientSessionListener listener;
 	    
-	    if (session.getName().equals(RETURN_NULL)) {
+	    if (name.equals(RETURN_NULL)) {
 		return null;
-	    } else if (session.getName().equals(NON_SERIALIZABLE)) {
+	    } else if (name.equals(NON_SERIALIZABLE)) {
 		return new NonSerializableClientSessionListener();
-	    } else if (session.getName().equals(THROW_RUNTIME_EXCEPTION)) {
+	    } else if (name.equals(THROW_RUNTIME_EXCEPTION)) {
 		throw new RuntimeException("loggedIn throwing an exception");
+	    } else if (name.equals(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION)) {
+		listener = new DummyClientSessionListener(name, true);
 	    } else {
-		DummyClientSessionListener listener =
-		    new DummyClientSessionListener(session);
-		DataManager dataManager = AppContext.getDataManager();
-		ManagedReference sessionRef =
-		    dataManager.createReference(session);
-		ManagedReference listenerRef =
-		    dataManager.createReference(listener);
-		dataManager.markForUpdate(this);
-		sessions.put(sessionRef, listenerRef);
-		System.err.println(
-		    "DummyAppListener.loggedIn: session:" + session);
-		return listener;
+		listener = new DummyClientSessionListener(name, false);
 	    }
+	    DataManager dataManager = AppContext.getDataManager();
+	    ManagedReference sessionRef =
+		dataManager.createReference(session);
+	    ManagedReference listenerRef =
+		dataManager.createReference(listener);
+	    dataManager.markForUpdate(this);
+	    sessions.put(sessionRef, listenerRef);
+	    System.err.println("DummyAppListener.loggedIn: session:" + session);
+	    return listener;
 	}
 
         /** {@inheritDoc} */
@@ -1094,13 +1111,15 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
+	private final boolean disconnectedThrowsException;
 	private int seq = -1;
 	
-	private transient final ClientSession session;
 	
-	DummyClientSessionListener(ClientSession session) {
-	    this.session = session;
-	    this.name = session.getName();
+	DummyClientSessionListener(
+	    String name, boolean disconnectedThrowsException)
+	{
+	    this.name = name;
+	    this.disconnectedThrowsException = disconnectedThrowsException;
 	}
 
         /** {@inheritDoc} */
@@ -1113,6 +1132,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.graceful = graceful;
 	    synchronized (client.disconnectedCallbackLock) {
 		client.disconnectedCallbackLock.notifyAll();
+	    }
+	    if (disconnectedThrowsException) {
+		throw new RuntimeException(
+		    "disconnected throws non-retryable exception");
 	    }
 	}
 
