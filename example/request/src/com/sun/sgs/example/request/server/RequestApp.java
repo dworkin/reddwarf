@@ -158,7 +158,7 @@ public class RequestApp implements AppListener, Serializable {
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the client session. */
-	private final ManagedReference session;
+	private final ManagedReference<ClientSession> session;
 
 	/** Creates an instance for the specified client session. */
 	SessionListener(ClientSession session) {
@@ -224,7 +224,7 @@ public class RequestApp implements AppListener, Serializable {
 	/** Joins the specified channel. */
 	private void joinChannel(String channelName) {
 	    Channel channel = getChannel(channelName);
-	    channel.join(session.get(ClientSession.class));
+	    channel.join(session.get());
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   sessionId(session) +
@@ -235,7 +235,7 @@ public class RequestApp implements AppListener, Serializable {
 	/** Leaves the specified channel. */
 	private void leaveChannel(String channelName) {
 	    Channel channel = getChannel(channelName);
-	    channel.leave(session.get(ClientSession.class));
+	    channel.leave(session.get());
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   sessionId(session) +
@@ -268,8 +268,8 @@ public class RequestApp implements AppListener, Serializable {
 	    String binding = "Item-" + itemName;
 	    String value;
 	    try {
-		ManagedString item = AppContext.getDataManager().getBinding(
-		    binding, ManagedString.class);
+		ManagedString item = (ManagedString)
+		    AppContext.getDataManager().getBinding(binding);
 		value = item.getString();
 	    } catch (NameNotBoundException e) {
 		value = "[Not found]";
@@ -289,7 +289,7 @@ public class RequestApp implements AppListener, Serializable {
 	    String binding = "Item-" + itemName;
 	    try {
 		ManagedString item =
-		    dataManager.getBinding(binding, ManagedString.class);
+		    (ManagedString) dataManager.getBinding(binding);
 		item.setString(value);
 	    } catch (NameNotBoundException e) {
 		dataManager.setBinding(binding, new ManagedString(value));
@@ -304,7 +304,7 @@ public class RequestApp implements AppListener, Serializable {
 	    DataManager dataManager = AppContext.getDataManager();
 	    String binding = "Channel-" + channelName;
 	    try {
-		return dataManager.getBinding(binding, Channel.class);
+		return (Channel) dataManager.getBinding(binding);
 	    } catch (NameNotBoundException e) {
 	    }
 	    Channel channel = AppContext.getChannelManager().createChannel(
@@ -320,11 +320,11 @@ public class RequestApp implements AppListener, Serializable {
 			   sessionId(session) +
 			   ": Sent to session: " + message);
 	    }
-	    session.get(ClientSession.class).send(stringToBuffer(message));
+	    session.get().send(stringToBuffer(message));
 	}
 
 	/** Returns an identifier for the session. */ 
-	static String sessionId(ManagedReference session) {
+	static String sessionId(ManagedReference<ClientSession> session) {
 	    return "Session-" + session.getId();
 	}
     }

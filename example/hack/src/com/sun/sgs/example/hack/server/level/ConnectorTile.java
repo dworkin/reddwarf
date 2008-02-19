@@ -49,10 +49,10 @@ public class ConnectorTile implements Tile, Serializable {
     private int id;
 
     // a reference to the connector
-    private ManagedReference connectorRef;
+    private ManagedReference<Connector> connectorRef;
 
     // the characters currently on this tile
-    private ArrayList<ManagedReference> characterRefs;
+    private ArrayList<ManagedReference<CharacterManager>> characterRefs;
 
     /**
      * Creates an instance of <code>ConnectorTile</code>.
@@ -65,7 +65,7 @@ public class ConnectorTile implements Tile, Serializable {
 
         connectorRef = AppContext.getDataManager().createReference(connector);
 
-        characterRefs = new ArrayList<ManagedReference>();
+        characterRefs = new ArrayList<ManagedReference<CharacterManager>>();
     }
 
     /**
@@ -114,9 +114,8 @@ public class ConnectorTile implements Tile, Serializable {
         // this tile can't have items, so we just make a stack of all
         // the characters, where the top-most will probably obscure all
         // other characters
-        for (ManagedReference mgrRef : characterRefs)
-            ids[i++] = mgrRef.get(CharacterManager.class).
-                getCurrentCharacter().getID();
+        for (ManagedReference<CharacterManager> mgrRef : characterRefs)
+            ids[i++] = mgrRef.get().getCurrentCharacter().getID();
 
         // the first element must always be the tile itself
         ids[0] = getID();
@@ -186,8 +185,7 @@ public class ConnectorTile implements Tile, Serializable {
     public ActionResult moveTo(CharacterManager characterManager) {
         // this ignores any characters on this space, and simply sends
         // the moving character into the connector
-        if (connectorRef.get(Connector.class).
-            enteredConnection(characterManager))
+        if (connectorRef.get().enteredConnection(characterManager))
             return ActionResult.CHARACTER_LEFT;
         else
             return ActionResult.FAIL;

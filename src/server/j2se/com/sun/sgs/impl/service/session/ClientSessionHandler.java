@@ -734,8 +734,8 @@ class ClientSessionHandler {
 	 */
 	public void run() {
 	    AppListener appListener =
-		dataService.getServiceBinding(
-		    StandardProperties.APP_LISTENER, AppListener.class);
+		(AppListener) dataService.getServiceBinding(
+		    StandardProperties.APP_LISTENER);
 	    logger.log(
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
