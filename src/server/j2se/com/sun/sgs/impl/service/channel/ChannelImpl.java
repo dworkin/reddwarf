@@ -1173,8 +1173,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
 	 * {@code true} if successful, and {@code false} otherwise.
+	 * 
+	 * @param event the event
+	 * @return {@code true} if successful, and {@code false} otherwise
 	 */
 	boolean offer(ChannelEvent event) {
+	    // TODO return false if the cost is too high
+	    int cost = event.getCost();
 	    return getQueue().offer(event);
 	}
 
@@ -1287,6 +1292,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		if (event == null) {
 		    return;
 		}
+		
+		// TODO update event cost accounting
 
 		logger.log(Level.FINEST, "processing event:{0}", event);
 		event.serviceEvent(this);
@@ -1311,6 +1318,16 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	public abstract void serviceEvent(EventQueue eventQueue);
 
+	/**
+	 * Returns the cost of this event, which the {@code EventQueue}
+	 * may use to reject events when the total cost is too large.
+	 * The default implementation returns a cost of zero.
+	 * 
+	 * @return the cost of this event
+	 */
+	public int getCost() {
+	    return 0;
+	}
     }
 
     /**
@@ -1532,6 +1549,12 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			    // the 'send'.
 			}
 		    }});
+	}
+
+        /** {@inheritDoc} */
+	@Override
+	public int getCost() {
+	    return message.length;
 	}
 
 	/** {@inheritDoc} */

@@ -536,6 +536,8 @@ public class ClientSessionServiceImpl
 	 */
         public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
         {
+            Throwable exception = null;
+
             try {
                 AsynchronousSocketChannel newChannel = result.getNow();
                 logger.log(Level.FINER, "Accepted {0}", newChannel);
@@ -551,15 +553,33 @@ public class ClientSessionServiceImpl
                 acceptFuture = acceptor.accept(this);
 
             } catch (ExecutionException e) {
-                SocketAddress addr = null;
-                try {
-                    addr = acceptor.getLocalAddress();
-                } catch (IOException ioe) {
-                    // ignore
-                }
-                logger.logThrow(Level.SEVERE, e.getCause(),
-                                "acceptor error on {0}", addr);
-                // TBD: take other actions, such as restarting acceptor?
+                exception = (e.getCause() == null) ? e : e.getCause();
+            } catch (RuntimeException e) {
+                exception = e;
+            }
+
+            if (exception == null) {
+                return;
+            }
+
+            SocketAddress addr = null;
+            try {
+                addr = acceptor.getLocalAddress();
+            } catch (IOException ioe) {
+                // ignore
+            }
+
+            logger.logThrow(Level.SEVERE, exception,
+                            "acceptor error on {0}", addr);
+
+            // TBD: take other actions, such as restarting acceptor?
+
+            if (exception instanceof RuntimeException) {
+                throw (RuntimeException) exception;
+            } else if (exception instanceof Error) {
+                throw (Error) exception;
+            } else {
+                throw new RuntimeException(exception.getMessage(), exception);
             }
 	}
     }
