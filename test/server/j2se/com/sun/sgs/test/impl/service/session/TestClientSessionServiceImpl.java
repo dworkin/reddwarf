@@ -27,6 +27,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -648,7 +649,10 @@ public class TestClientSessionServiceImpl extends TestCase {
     /**
      * Test sending from the server to the client session in a transaction that
      * aborts with a retryable exception to make sure that message buffers are
-     * reclaimed.
+     * reclaimed.  Try sending 4K bytes, and have the task abort 40 times with
+     * a retryable exception so the task is retried.  If the buffers are not
+     * being reclaimed then the sends will eventually fail because the buffer
+     * space is used up.
      */
     public void testClientSessionSendAbortRetryable() throws Exception {
 	DummyClient client = new DummyClient("clientname");
@@ -657,13 +661,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login("dummypassword");
 	    taskScheduler.runTransactionalTask(
 		new AbstractKernelRunnable() {
-		    int count;
+		    int tryCount = 0;
 		    public void run() {
 			Set<ClientSession> sessions =
 			    getAppListener().getSessions();
 			ClientSession session = sessions.iterator().next();
-			session.send(ByteBuffer.wrap(new byte[4048]));
-			if (++count < 40) {
+			try {
+			    session.send(ByteBuffer.wrap(new byte[4096]));
+			} catch (MessageRejectedException e) {
+			    throw new RuntimeException(
+				"Should not run out of buffer space: " + e, e);
+			}
+			if (++tryCount < 40) {
 			    throw new MaybeRetryException("Retryable",  true);
 			}
 		    }
