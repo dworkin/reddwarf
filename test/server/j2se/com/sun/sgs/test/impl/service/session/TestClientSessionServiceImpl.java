@@ -679,7 +679,10 @@ public class TestClientSessionServiceImpl extends TestCase {
     /**
      * Test sending from the server to the client session in a transaction that
      * aborts with a retryable exception to make sure that message buffers are
-     * reclaimed.
+     * reclaimed.  Try sending 4K bytes, and have the task abort 40 times with
+     * a retryable exception so the task is retried.  If the buffers are not
+     * being reclaimed then the sends will eventually fail because the buffer
+     * space is used up.
      */
     public void testClientSessionSendAbortRetryable() throws Exception {
 	registerAppListener();
@@ -691,7 +694,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		createTransaction();
 		Set<ClientSession> sessions = getAppListener().getSessions();
 		ClientSession session = sessions.iterator().next();
-		session.send(new byte[4048]);
+		try {
+		    session.send(new byte[4096]);
+		} catch (RuntimeException e) {
+		    throw new RuntimeException("Send should succeed: " + e, e);
+		}
 		txn.abort(new MaybeRetryException("Retryable",  true));
 		txn = null;
 	    }
