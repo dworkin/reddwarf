@@ -432,15 +432,24 @@ public class ClientSessionServiceImpl
         
         sessionDisconnectListeners.add(listener);
     }
-    
-    /** {@inheritDoc} */
-    public void sendProtocolMessage(
-	ClientSession session, ByteBuffer message, Delivery delivery)
+
+    /**
+     * Sends the specified protocol {@code message} to the specified
+     * client {@code session} with the specified {@code delivery}
+     * guarantee.  This method must be called within a transaction.
+     * The message is delivered when the transaction commits.
+     *
+     * @param   session a client session
+     * @param   message a complete protocol message
+     * @param   delivery a delivery requirement
+     *
+     * @throws  TransactionException if there is a problem with the
+     *          current transaction
+     */
+    void sendMessageOnCommit(
+	ClientSessionImpl session, byte[] message, Delivery delivery)
     {
-        byte[] bytes = new byte[message.remaining()];
-        message.get(bytes);
-	checkContext().addMessage(
-	    getClientSessionImpl(session), bytes, delivery);
+	checkContext().addMessage(session, message, delivery);
     }
 
     /**
@@ -482,9 +491,7 @@ public class ClientSessionServiceImpl
 	 * to send to client session.
 	 */
 	if (handler != null) {
-	    byte[] bytes = new byte[message.remaining()];
-	    message.get(bytes);
-	    handler.sendProtocolMessage(bytes, delivery);
+	    handler.sendRaw(message, delivery);
 	} else {
 	    logger.log(
 		Level.FINE,
@@ -876,7 +883,8 @@ public class ClientSessionServiceImpl
 			return;
 		    }
 		    for (byte[] message : messages) {
-			handler.sendProtocolMessage(message, Delivery.RELIABLE);
+			handler.sendWithAccounting(ByteBuffer.wrap(message),
+			                           Delivery.RELIABLE);
 		    }
 
 		} else {
@@ -1004,7 +1012,8 @@ public class ClientSessionServiceImpl
 		}
 
 		for (int i = 0; i < messages.length; i++) {
-		    handler.sendProtocolMessage(messages[i], delivery[i]);
+		    handler.sendWithAccounting(
+		        ByteBuffer.wrap(messages[i]), delivery[i]);
 		}
 	    } finally {
 		callFinished();

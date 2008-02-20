@@ -23,7 +23,8 @@ import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.WritePendingException;
 
 /**
- * An attempt at making a wrapper channel.
+ * A wrapper channel that reads and writes complete messages,
+ * masking (and re-issuing) partial IO operations.
  */
 public class AsynchronousMessageChannel implements Channel {
 
@@ -44,14 +45,14 @@ public class AsynchronousMessageChannel implements Channel {
 
     /**
      * Creates a new instance of this class with the given channel.
-     * Uses a PrefixMessageDetector on a 4-byte length field to
+     * Uses a PrefixMessageDetector on a 2-byte length field to
      * determine when a message is complete.
      * 
      * @param channel a channel
      */
     public AsynchronousMessageChannel(AsynchronousByteChannel channel)
     {
-        this(channel, new PrefixMessageLengthDetector(4));
+        this(channel, new PrefixMessageLengthDetector(2));
     }
 
     /**
@@ -72,10 +73,14 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO doc
+     * Strategy to determine the length of a complete message.
      */
     public interface CompleteMessageDetector {
+
         /**
+         * Returns the length of the complete message based given the
+         * data read so far, or {@code -1} if the length cannot be
+         * determined.
          * 
          * @param buf the buffer
          * @return the length, or -1
@@ -84,12 +89,18 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO doc
+     * A {@code CompleteMessageDetector} that always indicates the
+     * message is complete, unless zero bytes have been read.
      */
     public static class PartialMessageDetector
         implements CompleteMessageDetector
     {
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         * <p>
+         * This implementation always returns the current buffer length
+         * if it is non-zero, or {@code -1} if the buffer is empty.
+         */
         public int completeMessageLength(ByteBuffer buf) {
             int pos = buf.position();
             return pos > 0 ? pos : -1;
@@ -97,15 +108,23 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * TODO doc
+     * A {@code CompleteMessageDetector} that reads a length
+     * prefix to determine the message size.
      */
     public static class PrefixMessageLengthDetector
         implements CompleteMessageDetector
     {
+        /** The number of bytes used for a length prefix. */
         private final int prefixLength;
 
         /**
-         * @param n the prefix length, in bytes
+         * Constructs a new detector for the given prefix size.
+         * The prefix length must be {@code 1}, {@code 2}, or
+         * {@code 4} bytes.
+         * 
+         * @param  n the prefix length, in bytes
+         * @throws IllegalArgumentException if {@code n} is not
+         *         a valid prefix length
          */
         public PrefixMessageLengthDetector(int n) {
             if (! (n == 1 || n == 2 || n == 4))
@@ -114,7 +133,12 @@ public class AsynchronousMessageChannel implements Channel {
             this.prefixLength = n;
         }
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         * <p>
+         * If more than <i>[prefix length]</i> bytes have been read, then
+         * that number is returned, or {@code -1} otherwise.
+         */
         public int completeMessageLength(ByteBuffer buf) {
             if (buf.position() >= prefixLength) {
                 return peekPrefixLength(buf) + prefixLength;
@@ -143,12 +167,9 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * Result is a read-only view into the "dst" buffer containing
-     * a complete message as determiend by the MessageDispatcher.
-     * @param dst 
-     * @param attachment 
-     * @param handler 
-     * @param <A> 
+     * Result is a read-only view into the {@code dst} buffer containing
+     * a complete message as determined by the CompleteMessageDetector.
+     * 
      * @return an IoFuture
      * @throws ReadPendingException if a read is in progress
      */
@@ -165,9 +186,9 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * @param <A>
-     * @param dst
-     * @param handler
+     * Result is a read-only view into the {@code dst} buffer containing
+     * a complete message as determined by the CompleteMessageDetector.
+     * 
      * @return an IoFuture
      * @throws ReadPendingException if a read is in progress
      */
@@ -177,10 +198,9 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * @param <A>
-     * @param src
-     * @param attachment
-     * @param handler
+     * Writes a complete message contained in {@code src} to the underlying
+     * channel.
+     * 
      * @return an IoFuture
      * @throws WritePendingException if a write is in progress
      */
@@ -196,9 +216,9 @@ public class AsynchronousMessageChannel implements Channel {
     }
 
     /**
-     * @param <A>
-     * @param src
-     * @param handler
+     * Writes a complete message contained in {@code src} to the underlying
+     * channel.
+     * 
      * @return an IoFuture
      * @throws WritePendingException if a write is in progress
      */
@@ -207,12 +227,16 @@ public class AsynchronousMessageChannel implements Channel {
         return write(src, null, handler);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public void close() throws IOException {
         channel.close();
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public boolean isOpen() {
         return channel.isOpen();
     }

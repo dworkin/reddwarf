@@ -44,22 +44,6 @@ public interface ClientSessionService extends Service {
         ClientSessionDisconnectListener listener);
 
     /**
-     * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method must be called within a transaction.
-     * The message is delivered when the transaction commits.
-     *
-     * @param	session	a client session
-     * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void sendProtocolMessage(
-	ClientSession session, ByteBuffer message, Delivery delivery);
-
-    /**
      * Sends the specified protocol {@code message} to the <i>local</i>
      * client session with the specified {@code sessionRefId}. If the
      * specified client session is not connected to the local node, the

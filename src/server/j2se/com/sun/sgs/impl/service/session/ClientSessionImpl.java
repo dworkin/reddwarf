@@ -24,6 +24,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionException;
@@ -101,6 +102,14 @@ public class ClientSessionImpl
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
+    /** The capacity of the write buffer, in bytes. */
+    // TODO this doesn't have to be final, but additional logic is
+    // required to support dynamic capacity. -JM
+    private final int writeBufferCapacity;
+
+    /** The number of bytes of the write buffer that are available. */
+    private int writeBufferAvailable;
+
     /*
      * Should a managed reference to the ClientSessionListener be cached in
      * the ClientSessionImpl for efficiency?
@@ -135,6 +144,10 @@ public class ClientSessionImpl
 	this.sessionServer = sessionService.getServerProxy();
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
+
+	writeBufferCapacity = sessionService.getWriteBufferSize();
+	writeBufferAvailable = writeBufferCapacity;
+
 	DataService dataService = sessionService.getDataService();
 	ManagedReference<ClientSessionImpl> sessionRef =
 	    dataService.createReference(this);
@@ -172,12 +185,25 @@ public class ClientSessionImpl
             } else if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
 	    }
-            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
+
+            // Reservation support
+            int size = message.remaining();
+            // N.B.: need to reserve 2 extra bytes for the length prefix
+            reserve(2 + 1 + size);
+
+            /*
+             * TODO possible optimization: if we have passed our own
+             * special buffer to the app, we can detect that here and
+             * possibly avoid a copy.  Our special buffer could be one
+             * we passed to the receivedMessage callback, or we could
+             * add a special API to pre-allocate buffers. -JM
+             */
+            byte[] bytes = new byte[1 + size];
+            ByteBuffer buf = ByteBuffer.wrap(bytes);
             buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
                .put(message)
                .flip();
-	    sessionService.sendProtocolMessage(
-	        this, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
+	    sessionService.sendMessageOnCommit(this, bytes, Delivery.RELIABLE);
 
 	    return this;
 
@@ -189,6 +215,48 @@ public class ClientSessionImpl
 	    }
 	    throw e;
 	}
+    }
+
+    /**
+     * Attempts to reserve enough space to send a message of the given size.
+     * Must be called within a transaction.
+     * 
+     * @param size the size of the reservation, in bytes
+     */
+    void reserve(int size) {
+        if (writeBufferAvailable < size) {
+            throw new MessageRejectedException(
+                "not enough queue space: available = " +
+                writeBufferAvailable + " requested = " +
+                size);
+        }
+
+        sessionService.getDataService().markForUpdate(this);
+        writeBufferAvailable -= size;
+
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST,
+                "{0} reserved {1,number,#} leaving {2,number,#}",
+                this, size, writeBufferAvailable);
+        }
+    }
+
+    /**
+     * Updates the reserved-space count after a message has been sent.
+     * Must be called within a transaction, and only if the transaction
+     * that reserved space for the message has completed successfully.
+     * 
+     * @param size the size of the message that was sent
+     */
+    void reservationComplete(DataService dataService, int size) {
+        dataService.markForUpdate(this);
+        writeBufferAvailable += size;
+
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST,
+                "{0} cleared reservation of {1,number,#} leaving {2,number,#}",
+                this, size, writeBufferAvailable);
+        }
     }
 
     /** {@inheritDoc} */
@@ -211,6 +279,7 @@ public class ClientSessionImpl
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
+    @Override
     public boolean equals(Object obj) {
 	if (this == obj) {
 	    return true;
@@ -239,14 +308,16 @@ public class ClientSessionImpl
     }
     
     /** {@inheritDoc} */
+    @Override
     public int hashCode() {
 	return id.hashCode();
     }
 
     /** {@inheritDoc} */
+    @Override
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@[id:" +
-	    id + ",node:" + nodeId + "]";
+	return getClass().getName() + "[" + getName() + "]@[id:0x" +
+	    id.toString(16) + ",node:" + nodeId + "]";
     }
     
     /* -- Serialization methods -- */

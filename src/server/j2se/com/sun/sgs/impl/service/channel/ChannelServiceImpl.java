@@ -96,6 +96,16 @@ public class ChannelServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
     
+    /** The name of the write buffer size property. */
+    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+        PKG_NAME + ".buffer.write.max";
+
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
+    /** The write buffer size for new channels. */
+    private final int writeBufferSize;
+    
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
 
@@ -173,6 +183,10 @@ public class ChannelServiceImpl
 		txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
+
+            writeBufferSize = wrappedProps.getIntProperty(
+                WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -253,7 +267,8 @@ public class ChannelServiceImpl
     /** {@inheritDoc} */
     public Channel createChannel(Delivery delivery) {
 	try {
-	    Channel channel = ChannelImpl.newInstance(delivery);
+	    Channel channel =
+	        ChannelImpl.newInstance(delivery, writeBufferSize);
 	    return channel;
 	    
 	} catch (RuntimeException e) {

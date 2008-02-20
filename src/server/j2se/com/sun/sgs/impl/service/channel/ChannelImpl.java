@@ -120,14 +120,20 @@ public abstract class ChannelImpl implements Channel, Serializable {
     /** Flag that is 'true' if this channel is closed. */
     private boolean isClosed = false;
 
+    /** The capacity of the write buffer, in bytes. */
+    // TODO this doesn't have to be final, but additional logic is
+    // required to support dynamic capacity. -JM
+    private final int writeBufferCapacity;
+
     /**
      * Constructs an instance of this class with the specified
      * {@code delivery} requirement.
      *
      * @param delivery a delivery requirement
      */
-    protected ChannelImpl(Delivery delivery) {
+    protected ChannelImpl(Delivery delivery, int writeBufferCapacity) {
 	this.delivery = delivery;
+	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
@@ -145,11 +151,12 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Constructs a new {@code ChannelImpl} with the given {@code
-     * delivery} requirement.
+     * delivery} requirement and write-buffer capacity.
      */
-    static ChannelImpl newInstance(Delivery delivery) {
+    static ChannelImpl newInstance(Delivery delivery, int writeBufferCapacity)
+    {
 	// TBD: create other channel types depending on delivery.
-	return new OrderedUnreliableChannelImpl(delivery);
+	return new OrderedUnreliableChannelImpl(delivery, writeBufferCapacity);
     }
 
     /* -- Implement Channel -- */
@@ -1155,6 +1162,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	private boolean sendRefresh = false;
 
+	/** The number of bytes of the write buffer that are available. */
+	private int writeBufferAvailable;
+
 	/**
 	 * Constructs an event queue for the specified {@code channel}.
 	 */
@@ -1162,6 +1172,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    channelRef = channel.dataService.createReference(channel);
 	    queueRef = channel.dataService.createReference(
 		new ManagedQueue<ChannelEvent>());
+	    writeBufferAvailable = channel.getWriteBufferCapacity();
 	}
 
 	/**
@@ -1172,9 +1183,24 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 */
 	boolean offer(ChannelEvent event) {
-	    // TODO return false if the cost is too high
+
 	    int cost = event.getCost();
-	    return getQueue().offer(event);
+	    if (cost > writeBufferAvailable)
+	            return false;
+
+	    boolean result = getQueue().offer(event);
+	    
+	    if (result && (cost > 0)) {
+                writeBufferAvailable -= cost;
+
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(Level.FINEST,
+                        "{0} reserved {1,number,#} leaving {2,number,#}",
+                        this, cost, writeBufferAvailable);
+                }
+	    }
+	    
+	    return result;
 	}
 
 	/**
@@ -1285,10 +1311,20 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		if (event == null) {
 		    return;
 		}
-		
-		// TODO update event cost accounting
 
-		logger.log(Level.FINEST, "processing event:{0}", event);
+                logger.log(Level.FINEST, "processing event:{0}", event);
+
+                int cost = event.getCost();
+		if (cost > 0) {
+		    writeBufferAvailable += cost;
+
+		    if (logger.isLoggable(Level.FINEST)) {
+		        logger.log(Level.FINEST,
+		            "{0} cleared reservation of {1,number,#} leaving {2,number,#}",
+		            this, cost, writeBufferAvailable);
+		    }
+		}
+
 		event.serviceEvent(this);
 		
 	    } while (serviceAllEvents);
@@ -1555,6 +1591,15 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	public String toString() {
 	    return getClass().getName();
 	}
+    }
+
+    /**
+     * Returns the write buffer capacity for this channel.
+     * 
+     * @return the write buffer capacity
+     */
+    int getWriteBufferCapacity() {
+        return writeBufferCapacity;
     }
 
     /**

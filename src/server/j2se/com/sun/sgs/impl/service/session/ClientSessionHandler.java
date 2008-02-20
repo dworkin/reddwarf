@@ -43,12 +43,9 @@ import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -155,15 +152,60 @@ class ClientSessionHandler {
 	return connected;
     }
 
+    private class AccountingWriteRequest extends WriteRequest {
+
+        public AccountingWriteRequest(ByteBuffer message, Delivery delivery) {
+            super(message, delivery);
+        }
+
+        @Override
+        public void done() {
+            final int size = getSize();
+            final BigInteger id = sessionRefId;
+
+            if (id == null) {
+                return;
+            }
+
+            super.done();
+
+            scheduleTask(new AbstractKernelRunnable() {
+                public void run() {
+                    ClientSessionImpl sessionImpl = 
+                        ClientSessionImpl.getSession(dataService, sessionRefId);
+                    sessionImpl.reservationComplete(dataService, size);
+                }
+            });
+        }
+    }
+
+    /**
+     * Immediately sends the specified protocol {@code message}
+     * according to the specified {@code delivery} requirement,
+     * and update the available bytes for sends on this session
+     * when the write operation completes.
+     */
+    void sendWithAccounting(ByteBuffer message, Delivery delivery) {
+        write(new AccountingWriteRequest(message, delivery));
+    }
+
     /**
      * Immediately sends the specified protocol {@code message}
      * according to the specified {@code delivery} requirement.
      */
-    void sendProtocolMessage(byte[] message, Delivery delivery) {
-	// TBI: ignore delivery for now...
+    void sendRaw(ByteBuffer message, Delivery delivery) {
+        write(new WriteRequest(message, delivery));
+    }
+
+    /**
+     * Enqueue a write request.
+     * 
+     * @param writeRequest a write request
+     */
+    private void write(WriteRequest writeRequest) {
 	try {
 	    if (isConnected()) {
-	        writeHandler.reserve(ByteBuffer.wrap(message)).run();
+	        writeHandler.write(writeRequest);
 	    } else {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
@@ -178,13 +220,6 @@ class ClientSessionHandler {
 		    Level.WARNING, e,
 		    "sendProtocolMessage session:{0} throws", this);
 	    }
-	}
-	
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST,
-		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -246,7 +281,7 @@ class ClientSessionHandler {
 	    if (graceful) {
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
 
-	        sendProtocolMessage(msg, Delivery.RELIABLE);
+	        sendRaw(ByteBuffer.wrap(msg), Delivery.RELIABLE);
 	    }
 
 	    try {
@@ -285,7 +320,7 @@ class ClientSessionHandler {
      */
     private void scheduleHandleDisconnect(final boolean graceful) {
 
-        // TODO should this be added? -JM
+        // TODO should we set the state to DISCONNECTING? -JM
         /*
         synchronized (lock) {
             if (state != State.DISCONNECTED)
@@ -323,10 +358,17 @@ class ClientSessionHandler {
             }
 
             sessionConnection = conn;
+
+            /*
+             * TODO it might be a good idea to implement high- and
+             * low-water marks for the buffers, so they don't go
+             * into hysteresis when they get full. -JM
+             */
+
             readHandler =
                 new ConnectedReadHandler(sessionService.getReadBufferSize());
             writeHandler =
-                new ConnectedWriteHandler(sessionService.getWriteBufferSize());
+                new ConnectedWriteHandler();
 
             switch (state) {
             case CONNECTING:
@@ -345,7 +387,10 @@ class ClientSessionHandler {
      * Flags this session as shut down, and closes the connection.
      */
     void shutdown() {
-	synchronized (lock) {
+
+        // TODO close the readHandler and writeHandler? -JM
+
+        synchronized (lock) {
 	    if (shutdown == true) {
 		return;
 	    }
@@ -375,168 +420,134 @@ class ClientSessionHandler {
      * Write completion handler for the session's connection.
      */
     private abstract class WriteHandler
-        implements CompletionHandler<Void, Integer>
+        implements CompletionHandler<Void, WriteRequest>
     {
-        public abstract FutureTask<Void> reserve(ByteBuffer message);
+        public abstract void write(WriteRequest request);
+        public abstract void close();
     }
 
     private class ClosedWriteHandler extends WriteHandler {
 
         @Override
-        public FutureTask<Void> reserve(ByteBuffer message) {
+        public void write(WriteRequest request) {
             throw new ClosedAsynchronousChannelException();
         }
-
-        public void completed(IoFuture<Void, Integer> result) {
-            // Ignore
-        }
         
+        @Override
+        public void close() {
+            // no-op
+        }
+
+        public void completed(IoFuture<Void, WriteRequest> result) {
+            throw new AssertionError("should be unreachable");
+        }    
     }
+
     private class ConnectedWriteHandler extends WriteHandler {
 
-        private int availableToReserve;
-        private LinkedList<ByteBuffer> pendingWrites = new LinkedList<ByteBuffer>();
-        
-        // TODO provide our own, allocated-on-connect backing DirectBuffer
-        // for the pendingWrites, which can be view buffers into the
-        // backing buffer.
+        private final LinkedList<WriteRequest> pendingWrites =
+            new LinkedList<WriteRequest>();
 
-        private IoFuture<Void, ?> writeFuture = null;
+        private volatile IoFuture<Void, ?> writeFuture = null;
         private boolean isWriting = false;
 
-        ConnectedWriteHandler(int bufferSize) {
-            availableToReserve = bufferSize;
+        ConnectedWriteHandler() {
+            // no-op
         }
 
-        public FutureTask<Void> reserve(ByteBuffer message) {
-            int size = message.remaining();
+        @Override
+        public void close() {
+            IoFuture<?, ?> future = writeFuture;
+            writeFuture = null;
 
-            if (size <= 0)
-                throw new IllegalArgumentException(
-                    "reservation size must be positive");
-
-            int prevAvailable;
-            synchronized (lock) {
-                prevAvailable = availableToReserve;
-                if (prevAvailable < size)
-                    throw new BufferOverflowException();
-
-                availableToReserve = prevAvailable - size;
-            }
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST,
-                    "{0} reserved {1,number,#} of {2,number,#} ({3,number,#} remain)",
-                    ClientSessionHandler.this,
-                    size, prevAvailable, (prevAvailable - size));
-            }
-            
-            // TODO message.slice().asReadOnlyBuffer();
-            return new WriteReservation(new Writer());
-        }
-
-        final class Writer implements Callable<Void> {
-
-            public Void call() throws Exception {
-                // TODO Auto-generated method stub
-                return null;
-            }
-            
-        }
-
-        final class WriteReservation extends FutureTask<Void> {
-
-            public WriteReservation(Callable<Void> callable) {
-                super(callable);
-            }
-            
-            @Override
-            protected void done() {
-                if (isCancelled()) {
-                    // TODO
-                } else {
-                    // TODO
-                }
-                super.done();
+            if (future != null) {
+                future.cancel(true);
             }
         }
 
-        public void cancelReservation(Object reservation) {
-            ByteBuffer rsvp = (ByteBuffer) reservation;
-            if (! rsvp.hasRemaining())
-                throw new IllegalArgumentException("bad reservation");
-
-            int reserved = rsvp.capacity();
-            // Invalidate the reservation
-            rsvp.position(rsvp.limit());
-            synchronized (lock) {
-                availableToReserve += reserved;
-            }
-        }
-
-        public void write(Object reservation) {
-            ByteBuffer rsvp = (ByteBuffer) reservation;
-            if (! rsvp.hasRemaining())
-                throw new IllegalArgumentException("bad reservation");
-
-            // Invalidate the reservation, but get a private buffer view first
-            ByteBuffer buf = rsvp.slice();
-            rsvp.position(rsvp.limit());
-
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(
-                    Level.FINEST,
-                    "WriteHandler.write session:{0} adding message:{1}",
-                    ClientSessionHandler.this, HexDumper.format(buf, 0x50));
-            }
+        @Override
+        public void write(WriteRequest request) {
 
             boolean first;
+
             synchronized (lock) {
                 first = pendingWrites.isEmpty();
-                pendingWrites.add(buf);
-            }       
+                pendingWrites.add(request);
+            }
+            
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST,
+                           "{0} write {1}, first={2}",
+                           ClientSessionHandler.this, request, first);
+            }
 
-            if (first)
+            if (first) {
                 processQueue();
+            }
         }
 
         private void processQueue() {
-            ByteBuffer buf;
+            WriteRequest request;
 
             synchronized (lock) {
                 if (isWriting)
                     return;
 
-                buf = pendingWrites.peek();
-                if (buf == null)
-                    return;
+                request = pendingWrites.peek();
 
-                isWriting = true;
+                if (request != null) {
+                    isWriting = true;
+                }
             }
 
-            writeFuture = sessionConnection.write(buf, buf.remaining(), this);
+            if (logger.isLoggable(Level.FINEST)) {
+                pendingWrites.size();
+                logger.log(Level.FINEST,
+                           "{0} processQueue size={1,number,#}, head={2}",
+                           ClientSessionHandler.this, pendingWrites.size(),
+                           request);
+            }
+
+            if (request == null) {
+                return;
+            }
+
+            try {
+                writeFuture = sessionConnection.write(
+                    request.getMessage(), request, this);
+            } catch (RuntimeException e) {
+                logger.logThrow(Level.SEVERE, e,
+                    "{0} processing request {1}",
+                    ClientSessionHandler.this, request);
+
+                // Let the request do its cleanup, if any
+                request.done();
+
+                throw e;
+            }
         }
 
-        public void completed(IoFuture<Void, Integer> result) {
-            int len = result.attach(null);
+        public void completed(IoFuture<Void, WriteRequest> result) {
+            WriteRequest request = result.attach(null);
 
-            int nowAvailable;
             synchronized (lock) {
-                nowAvailable = availableToReserve + len;
-                availableToReserve = nowAvailable;
                 pendingWrites.remove();
                 isWriting = false;
             }
             writeFuture = null;
 
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(
+                    Level.FINEST,
+                    "{0} completed write request {1}",
+                    ClientSessionHandler.this, request);
+            }
+
+            // Let the request do its cleanup, if any
+            request.done();
+
             try {
                 result.getNow();
-
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "Write completed on {0}, len:{1,number,#}, avail:{2,number,#}",
-                        sessionConnection, len, nowAvailable);
-                }
 
                 // Keep writing
                 processQueue();
@@ -549,9 +560,10 @@ class ClientSessionHandler {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
                         Level.FINE, e,
-                        "Write completion exception {0}, len:{1,number,#}",
-                        sessionConnection, len);
+                        "{0} during completion of {1}",
+                        ClientSessionHandler.this, request);
                 }
+
                 scheduleHandleDisconnect(false);
             }
         }
@@ -564,29 +576,37 @@ class ClientSessionHandler {
         implements CompletionHandler<ByteBuffer, Void>
     {
         public abstract void read();
+        public abstract void close();
     }
 
     private class ClosedReadHandler extends ReadHandler {
 
+        @Override
         public void read() {
             throw new ClosedAsynchronousChannelException();
         }
 
+        @Override
+        public void close() {
+            // no-op
+        }
+
         public void completed(IoFuture<ByteBuffer, Void> result) {
-            // Ignore
+            throw new AssertionError("should be unreachable");
         }
     }
 
     private class ConnectedReadHandler extends ReadHandler {
 
         private final ByteBuffer readBuffer;
-        private IoFuture<ByteBuffer, ?> readFuture = null;
+        private volatile IoFuture<ByteBuffer, ?> readFuture = null;
         private boolean isReading = false;
 
         ConnectedReadHandler(int bufferSize) {
             readBuffer = ByteBuffer.allocateDirect(bufferSize);
         }
 
+        @Override
         public void read() {
             synchronized (lock) {
                 if (isReading)
@@ -595,6 +615,16 @@ class ClientSessionHandler {
             }
 
             readFuture = sessionConnection.read(readBuffer, this);
+        }
+
+        @Override
+        public void close() {
+            IoFuture<?, ?> future = readFuture;
+            readFuture = null;
+            
+            if (future != null) {
+                future.cancel(true);
+            }
         }
 
         public void completed(IoFuture<ByteBuffer, Void> result) {
@@ -850,8 +880,9 @@ class ClientSessionHandler {
 		    getLoginRedirectMessage(node.getHostName());
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
-			sendProtocolMessage(
-			    loginRedirectMessage, Delivery.RELIABLE);
+			sendRaw(
+			    ByteBuffer.wrap(loginRedirectMessage),
+			    Delivery.RELIABLE);
 			try {
 			    // FIXME: this is a hack to make sure that
 			    // the client receives the login redirect
@@ -871,7 +902,8 @@ class ClientSessionHandler {
 	private void sendLoginFailureAndDisconnect() {
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
-		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
+		    sendRaw(ByteBuffer.wrap(loginFailureMessage),
+		            Delivery.RELIABLE);
 		    handleDisconnect(false);
 		}});
 	}
