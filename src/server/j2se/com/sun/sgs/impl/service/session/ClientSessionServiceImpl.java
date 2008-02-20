@@ -69,6 +69,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -543,50 +544,47 @@ public class ClientSessionServiceImpl
 	 */
         public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
         {
-            Throwable exception = null;
-
             try {
-                AsynchronousSocketChannel newChannel = result.getNow();
-                logger.log(Level.FINER, "Accepted {0}", newChannel);
+                try {
+                    AsynchronousSocketChannel newChannel = result.getNow();
+                    logger.log(Level.FINER, "Accepted {0}", newChannel);
 
-                ClientSessionHandler handler =
-                    new ClientSessionHandler(
+                    ClientSessionHandler handler =
+                        new ClientSessionHandler(
                             ClientSessionServiceImpl.this, dataService);
 
-                // Startup the new session handler
-                handler.connected(new AsynchronousMessageChannel(newChannel));
+                    // Startup the new session handler
+                    handler.connected(new AsynchronousMessageChannel(newChannel));
 
-                // Resume accepting connections
-                acceptFuture = acceptor.accept(this);
+                    // Resume accepting connections
+                    acceptFuture = acceptor.accept(this);
 
-            } catch (ExecutionException e) {
-                exception = (e.getCause() == null) ? e : e.getCause();
-            } catch (RuntimeException e) {
-                exception = e;
-            }
+                } catch (ExecutionException e) {
+                    throw (e.getCause() == null) ? e : e.getCause();
+                }
+            } catch (CancellationException e) {               
+                logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
+                //ignore
+            } catch (Throwable e) {
+                SocketAddress addr = null;
+                try {
+                    addr = acceptor.getLocalAddress();
+                } catch (IOException ioe) {
+                    // ignore
+                }
 
-            if (exception == null) {
-                return;
-            }
+                logger.logThrow(Level.SEVERE, e,
+                    "acceptor error on {0}", addr);
 
-            SocketAddress addr = null;
-            try {
-                addr = acceptor.getLocalAddress();
-            } catch (IOException ioe) {
-                // ignore
-            }
+                // TBD: take other actions, such as restarting acceptor?
 
-            logger.logThrow(Level.SEVERE, exception,
-                            "acceptor error on {0}", addr);
-
-            // TBD: take other actions, such as restarting acceptor?
-
-            if (exception instanceof RuntimeException) {
-                throw (RuntimeException) exception;
-            } else if (exception instanceof Error) {
-                throw (Error) exception;
-            } else {
-                throw new RuntimeException(exception.getMessage(), exception);
+                if (e instanceof RuntimeException) {
+                    throw (RuntimeException) e;
+                } else if (e instanceof Error) {
+                    throw (Error) e;
+                } else {
+                    throw new RuntimeException(e.getMessage(), e);
+                }
             }
 	}
     }
