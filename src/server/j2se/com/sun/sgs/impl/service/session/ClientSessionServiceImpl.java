@@ -356,7 +356,9 @@ public class ClientSessionServiceImpl
             }
             
             try {
-                acceptor.close();
+                if (acceptor != null) {
+                    acceptor.close();
+                }
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "closing acceptor");
                 // swallow exception
@@ -382,6 +384,9 @@ public class ClientSessionServiceImpl
         } catch (InterruptedException e) {
             logger.logThrow(Level.FINE, e, "shutdown interrupted");
             Thread.currentThread().interrupt();
+        } catch (RuntimeException e) {
+            logger.logThrow(Level.FINE, e, "shutdown exception occurred");
+            // swallow exception
         }
 
 	try {
