@@ -640,15 +640,6 @@ class ClientSessionHandler {
                     return;
                 }
 
-                int len = message.getInt();
-                
-                if (len != message.remaining()) {
-                    logger.log(Level.SEVERE,
-                        "Message length mismatch; expect {0,number,#} but have {1,number,#}",
-                        new Object[] { len, message.remaining() });
-                    scheduleHandleDisconnect(false);
-                }
-
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(
                         Level.FINEST,
@@ -656,7 +647,7 @@ class ClientSessionHandler {
                         sessionConnection, HexDumper.format(message, 0x50));
                 }
 
-                if (len < 1) {
+                if (message.remaining() < 1) {
                     if (logger.isLoggable(Level.SEVERE)) {
                         logger.log(
                             Level.SEVERE,
