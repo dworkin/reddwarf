@@ -83,7 +83,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the object to notify when done. */
-	final ManagedReference schedulerRef;
+	final ManagedReference<ScheduleSimpleTasks> schedulerRef;
 
 	/** The remaining number of operations to run. */
 	int count;
@@ -103,7 +103,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	/** Notifies the status object if done, else reschedules itself. */
 	public void run() {
 	    if (--count <= 0) {
-		schedulerRef.get(ScheduleSimpleTasks.class).taskDone();
+		schedulerRef.get().taskDone();
 	    } else {
 		AppContext.getTaskManager().scheduleTask(getNextTask());
 	    }
@@ -136,8 +136,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	}
 
 	Task getNextTask() {
-	    return new ManagedSimpleTask(
-		schedulerRef.get(ScheduleSimpleTasks.class), count);
+	    return new ManagedSimpleTask(schedulerRef.get(), count);
 	}
     }
 }

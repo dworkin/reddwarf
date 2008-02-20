@@ -136,7 +136,8 @@ public class ClientSessionImpl
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
 	DataService dataService = sessionService.getDataService();
-	ManagedReference sessionRef = dataService.createReference(this);
+	ManagedReference<ClientSessionImpl> sessionRef =
+	    dataService.createReference(this);
 	id = sessionRef.getId();
 	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(), this);
@@ -288,8 +289,9 @@ public class ClientSessionImpl
     {
 	ClientSessionImpl sessionImpl = null;
 	try {
-	    ManagedReference sessionRef = dataService.createReferenceForId(id);
-	    sessionImpl = sessionRef.get(ClientSessionImpl.class);
+	    ManagedReference<?> sessionRef =
+		dataService.createReferenceForId(id);
+	    sessionImpl = (ClientSessionImpl) sessionRef.get();
 	} catch (ObjectNotFoundException e)  {
 	}
 	return sessionImpl;
@@ -327,8 +329,7 @@ public class ClientSessionImpl
 	 */
 	ClientSessionListener listener = null;
 	try {
-	    ManagedObject obj =
-		dataService.getServiceBinding(listenerKey, ManagedObject.class);
+	    ManagedObject obj = dataService.getServiceBinding(listenerKey);
 	    dataService.removeServiceBinding(listenerKey);
  	    if (obj instanceof ListenerWrapper) {
 		dataService.removeObject(obj);
@@ -449,9 +450,7 @@ public class ClientSessionImpl
      */
     ClientSessionListener getClientSessionListener(DataService dataService) {
 	String listenerKey = getListenerKey();
-	ManagedObject obj =
-	    dataService.getServiceBinding(
-		listenerKey, ManagedObject.class);
+	ManagedObject obj = dataService.getServiceBinding(listenerKey);
 	return
 	    (obj instanceof ListenerWrapper) ?
 	    ((ListenerWrapper) obj).get() :

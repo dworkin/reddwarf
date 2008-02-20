@@ -59,7 +59,7 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
     public static final int CHANGE_MANAGER_FREQUENCY = 4000;
 
     // the set of listeners
-    private HashSet<ManagedReference> listeners;
+    private HashSet<ManagedReference<GameChangeListener>> listeners;
 
     // the set of added games
     private HashSet<String> addedGames;
@@ -77,7 +77,7 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * <code>getInstance</code> and that enforces the singleton.
      */
     private GameChangeManager() {
-        listeners = new HashSet<ManagedReference>();
+        listeners = new HashSet<ManagedReference<GameChangeListener>>();
         addedGames = new HashSet<String>();
         removedGames = new HashSet<String>();
         updateMap = new HashMap<String,GameMembershipDetail>();
@@ -101,7 +101,7 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
         // try to get an existing reference
         GameChangeManager gcm = null;
         try {
-            gcm = dataManager.getBinding(IDENTIFIER, GameChangeManager.class);
+            gcm = (GameChangeManager) dataManager.getBinding(IDENTIFIER);
         } catch (NameNotBoundException e) {
             gcm = new GameChangeManager();
             dataManager.setBinding(IDENTIFIER, gcm);
@@ -170,26 +170,23 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
 
         // send the game removed notice
         if (removedGames.size() > 0) {
-            for (ManagedReference listenerRef : listeners)
-                listenerRef.getForUpdate(GameChangeListener.class).
-                    gameRemoved(removedGames);
+            for (ManagedReference<GameChangeListener> listenerRef : listeners)
+                listenerRef.getForUpdate().gameRemoved(removedGames);
             removedGames.clear();
         }
 
         // send the game added notice
         if (addedGames.size() > 0) {
-            for (ManagedReference listenerRef : listeners)
-                listenerRef.getForUpdate(GameChangeListener.class).
-                    gameAdded(addedGames);
+            for (ManagedReference<GameChangeListener> listenerRef : listeners)
+                listenerRef.getForUpdate().gameAdded(addedGames);
             addedGames.clear();
         }
 
         // send the updated membership detail
         if (updateMap.size() > 0) {
             Collection<GameMembershipDetail> details = updateMap.values();
-            for (ManagedReference listenerRef : listeners)
-                listenerRef.getForUpdate(GameChangeListener.class).
-                    membershipChanged(details);
+            for (ManagedReference<GameChangeListener> listenerRef : listeners)
+                listenerRef.getForUpdate().membershipChanged(details);
             updateMap.clear();
         }
     }

@@ -45,12 +45,12 @@ public class SwordWorldRoom extends SwordWorldObject
         Logger.getLogger(SwordWorldRoom.class.getName());
 
     /** The set of items in this room. */
-    private final Set<ManagedReference> items =
-        new HashSet<ManagedReference>();
+    private final Set<ManagedReference<SwordWorldObject>> items =
+        new HashSet<ManagedReference<SwordWorldObject>>();
 
     /** The set of players in this room. */
-    private final Set<ManagedReference> players =
-        new HashSet<ManagedReference>();
+    private final Set<ManagedReference<SwordWorldPlayer>> players =
+        new HashSet<ManagedReference<SwordWorldPlayer>>();
 
     /**
      * Creates a new room with the given name and description, initially
@@ -139,8 +139,8 @@ public class SwordWorldRoom extends SwordWorldObject
 
         if (! items.isEmpty()) {
             output.append("On the floor you see:\n");
-            for (ManagedReference itemRef : items) {
-                SwordWorldObject item = itemRef.get(SwordWorldObject.class);
+            for (ManagedReference<SwordWorldObject> itemRef : items) {
+                SwordWorldObject item = itemRef.get();
                 output.append(item.getDescription()).append('\n');
             }
         }
@@ -196,8 +196,8 @@ public class SwordWorldRoom extends SwordWorldObject
         ArrayList<SwordWorldPlayer> otherPlayers =
             new ArrayList<SwordWorldPlayer>(players.size());
 
-        for (ManagedReference playerRef : players) {
-            SwordWorldPlayer other = playerRef.get(SwordWorldPlayer.class);
+        for (ManagedReference<SwordWorldPlayer> playerRef : players) {
+            SwordWorldPlayer other = playerRef.get();
             if (! player.equals(other))
                 otherPlayers.add(other);
         }

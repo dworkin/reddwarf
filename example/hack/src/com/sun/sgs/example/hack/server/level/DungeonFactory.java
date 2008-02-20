@@ -92,8 +92,8 @@ public class DungeonFactory {
 
         // the collection of boards and levels
         HashMap<String,SimpleBoard> boards = new HashMap<String,SimpleBoard>();
-        HashMap<String,ManagedReference> levelRefs =  //simplelevel
-            new HashMap<String,ManagedReference>();
+        HashMap<String,ManagedReference<SimpleLevel>> levelRefs =  //simplelevel
+            new HashMap<String,ManagedReference<SimpleLevel>>();
 
         // the various kinds of connectors
         HashSet<ConnectionData> connections = new HashSet<ConnectionData>();
@@ -103,10 +103,11 @@ public class DungeonFactory {
 
         // the collection of Monster (AI) and NPC characters
         // to AICharacterManager
-        HashMap<String,HashSet<ManagedReference>> npcMap =
-            new HashMap<String,HashSet<ManagedReference>>();
-        HashMap<String,HashSet<ManagedReference>> aiMap =
-            new HashMap<String,HashSet<ManagedReference>>();
+        HashMap<String,HashSet<ManagedReference<AICharacterManager>>> npcMap =
+            new HashMap<String,HashSet<ManagedReference<AICharacterManager>>>();
+        HashMap<String,HashSet<ManagedReference<AICharacterManager>>> aiMap =
+            new HashMap<
+		String, HashSet<ManagedReference<AICharacterManager>>>();
 
         // first, parse the data file itself
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
@@ -156,9 +157,10 @@ public class DungeonFactory {
                 // put it into a bucket for the given level, creating the
                 // bucket if it doesn't already exist
                 // to AICharacterManager
-                HashSet<ManagedReference> set = npcMap.get(levelName);
+                HashSet<ManagedReference<AICharacterManager>> set =
+		    npcMap.get(levelName);
                 if (set == null) {
-                    set = new HashSet<ManagedReference>();
+                    set = new HashSet<ManagedReference<AICharacterManager>>();
                     npcMap.put(levelName, set);
                 }
                 set.add(dataManager.createReference(aiCMR));
@@ -177,9 +179,10 @@ public class DungeonFactory {
 
                 // put the monster into a bucket for the given level, creating
                 // the bucket if it doesn't already exist
-                HashSet<ManagedReference> set = aiMap.get(levelName);
+                HashSet<ManagedReference<AICharacterManager>> set =
+		    aiMap.get(levelName);
                 if (set == null) {
-                    set = new HashSet<ManagedReference>();
+                    set = new HashSet<ManagedReference<AICharacterManager>>();
                     aiMap.put(levelName, set);
                 }
                 set.add(dataManager.createReference(aiCMR));
@@ -202,11 +205,9 @@ public class DungeonFactory {
         for (ConnectionData data : connections) {
             // create a connector and register it
             SimpleConnector connector =
-                new SimpleConnector(levelRefs.get(data.level1).
-                                    get(Level.class),
+                new SimpleConnector(levelRefs.get(data.level1).get(),
                                     data.level1X, data.level1Y,
-                                    levelRefs.get(data.level2).
-                                    get(Level.class),
+                                    levelRefs.get(data.level2).get(),
                                     data.level2X, data.level2Y);
 
             // notify both boards of the connector
@@ -220,11 +221,9 @@ public class DungeonFactory {
         for (ConnectionData data : playerConnectors) {
             // create a connector and register it
             PlayerConnector connector =
-                new PlayerConnector(levelRefs.get(data.level1).
-                                    get(Level.class),
+                new PlayerConnector(levelRefs.get(data.level1).get(),
                                     data.level1X, data.level1Y,
-                                    levelRefs.get(data.level2).
-                                    get(Level.class),
+                                    levelRefs.get(data.level2).get(),
                                     data.level2X, data.level2Y);
 
             // notify both boards of the connector
@@ -238,8 +237,7 @@ public class DungeonFactory {
         for (ConnectionData data : oneWays) {
             // create the connector and register it
             OneWayConnector connector =
-                new OneWayConnector(levelRefs.get(data.level2).
-                                    get(Level.class),
+                new OneWayConnector(levelRefs.get(data.level2).get(),
                                     data.level2X, data.level2Y);
 
             // notify the source board of the connector
@@ -250,13 +248,13 @@ public class DungeonFactory {
         // also generate the entry connector, register it, and set it for
         // the entry board
         GameConnector gameConnector =
-            new GameConnector(lobby, levelRefs.get(entryLevel).
-                              get(SimpleLevel.class), entryX, entryY);
+            new GameConnector(lobby, levelRefs.get(entryLevel).get(),
+			      entryX, entryY);
         boards.get(entryLevel).setAsConnector(entryX, entryY, gameConnector);
 
         // with all the connectors in place, notify the levels
-        for (ManagedReference levelRef : levelRefs.values()) {
-            SimpleLevel level = levelRef.get(SimpleLevel.class);
+        for (ManagedReference<SimpleLevel> levelRef : levelRefs.values()) {
+            SimpleLevel level = levelRef.get();
             level.setBoard(boards.get(level.getName()));
         }
 
@@ -265,9 +263,11 @@ public class DungeonFactory {
         // now that the levels are all set, add the NPC characters to the
         // levels and the timer
         for (String levelName : npcMap.keySet()) {
-            Level level = levelRefs.get(levelName).get(Level.class);
-            for (ManagedReference mgrRef : npcMap.get(levelName)) {
-                AICharacterManager mgr = mgrRef.get(AICharacterManager.class);
+            Level level = levelRefs.get(levelName).get();
+            for (ManagedReference<AICharacterManager> mgrRef :
+		     npcMap.get(levelName))
+	    {
+                AICharacterManager mgr = mgrRef.get();
                 taskManager.schedulePeriodicTask(mgr, 0, 1700);
                 //eventAg.addCharacterMgr(mgr);
                 level.addCharacter(mgr);
@@ -276,9 +276,10 @@ public class DungeonFactory {
 
         // add the Monsters too
         for (String levelName : aiMap.keySet()) {
-            Level level = levelRefs.get(levelName).get(Level.class);
-            for (ManagedReference mgrRef : aiMap.get(levelName)) {
-                AICharacterManager mgr = mgrRef.get(AICharacterManager.class);
+            Level level = levelRefs.get(levelName).get();
+            for (ManagedReference<AICharacterManager> mgrRef :
+		     aiMap.get(levelName)) {
+                AICharacterManager mgr = mgrRef.get();
                 taskManager.schedulePeriodicTask(mgr, 0, 1100);
                 //eventAg.addCharacterMgr(mgr);
                 level.addCharacter(mgr);
@@ -332,13 +333,14 @@ public class DungeonFactory {
      */
     public static class EventAggregator implements Task, Serializable {
         private static final long serialVersionUID = 1;
-        HashSet<ManagedReference> mgrs = new HashSet<ManagedReference>();
+        HashSet<ManagedReference<AICharacterManager>> mgrs =
+	    new HashSet<ManagedReference<AICharacterManager>>();
         public void addCharacterMgr(AICharacterManager mgr) {
             mgrs.add(AppContext.getDataManager().createReference(mgr));
         }
         public void run() throws Exception {
-            for (ManagedReference mgrRef : mgrs)
-                mgrRef.get(AICharacterManager.class).run();
+            for (ManagedReference<AICharacterManager> mgrRef : mgrs)
+                mgrRef.get().run();
         }
     }
 

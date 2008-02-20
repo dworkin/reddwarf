@@ -78,7 +78,7 @@ public abstract class BasicScheduleTasks
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the object to notify when done. */
-	private final ManagedReference schedulerRef;
+	private final ManagedReference<BasicScheduleTasks> schedulerRef;
 	
 	/** How many tasks to schedule. */
 	private int tasks;
@@ -95,8 +95,7 @@ public abstract class BasicScheduleTasks
 
 	public void run() {
 	    TaskManager taskManager = AppContext.getTaskManager();
-	    BasicScheduleTasks scheduler =
-		schedulerRef.get(BasicScheduleTasks.class);
+	    BasicScheduleTasks scheduler = schedulerRef.get();
 	    taskManager.scheduleTask(scheduler.createTask());
 	    tasks--;
 	    if (tasks > 0) {

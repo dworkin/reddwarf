@@ -73,20 +73,20 @@ public class Player
     private String name;
 
     // the uid currently assigned to this player
-    private ManagedReference currentSessionRef;
+    private ManagedReference<ClientSession> currentSessionRef;
 
     // the channel that this player is currently using
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the game the user is currently playing, and its message handler
-    private ManagedReference gameRef;
+    private ManagedReference<Game> gameRef;
     private MessageHandler messageHandler = null;
 
     // this player's character manager
-    private ManagedReference characterManagerRef;
+    private ManagedReference<PlayerCharacterManager> characterManagerRef;
 
     private UtilChannel channel() {
-        return channelRef == null ? null : channelRef.get(UtilChannel.class);
+        return channelRef == null ? null : channelRef.get();
     }
 
     /**
@@ -118,7 +118,7 @@ public class Player
         // try to lookup the existing Player
         Player player = null;
         try {
-            player = dataManager.getBinding(NAME_PREFIX + name, Player.class);
+            player = (Player) dataManager.getBinding(NAME_PREFIX + name);
         } catch (NameNotBoundException e) {
             player = new Player(name);
             dataManager.setBinding(NAME_PREFIX + name, player);
@@ -154,7 +154,7 @@ public class Player
      * @return the character manager
      */
     public PlayerCharacterManager getCharacterManager() {
-        return characterManagerRef.get(PlayerCharacterManager.class);
+        return characterManagerRef.get();
     }
 
     /**
@@ -187,8 +187,7 @@ public class Player
      *         currently playing
      */
     public ClientSession getCurrentSession() {
-        return currentSessionRef == null ? null
-                   : currentSessionRef.get(ClientSession.class);
+        return currentSessionRef == null ? null : currentSessionRef.get();
     }
 
     /**
@@ -211,9 +210,8 @@ public class Player
 
         // if we were previously playing a game, leave it
         if (isPlaying()) {
-            gameRef.getForUpdate(Game.class).leave(this);
-            characterManagerRef.getForUpdate(PlayerCharacterManager.class).
-                setCurrentLevel(null);
+            gameRef.getForUpdate().leave(this);
+            characterManagerRef.getForUpdate().setCurrentLevel(null);
             playing = false;
         }
 
@@ -241,8 +239,7 @@ public class Player
      * checking when leaving dungeons).
      */
     public void leaveCurrentLevel() {
-        PlayerCharacterManager pcm =
-            characterManagerRef.get(PlayerCharacterManager.class);
+        PlayerCharacterManager pcm = characterManagerRef.get();
         Level level = pcm.getCurrentLevel();
 
         if (level != null) {

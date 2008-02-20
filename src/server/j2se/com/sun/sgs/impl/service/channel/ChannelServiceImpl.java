@@ -862,8 +862,8 @@ public class ChannelServiceImpl
 	String channelServerKey =
 	    ChannelServiceImpl.getChannelServerKey(nodeId);
 	try {
-	    return getDataService().getServiceBinding(
-		channelServerKey, ChannelServerWrapper.class).get();
+	    return ((ChannelServerWrapper) getDataService().getServiceBinding(
+			channelServerKey)).get();
 	} catch (NameNotBoundException e) {
 	    return null;
 	} catch (ObjectNotFoundException e) {
@@ -1037,8 +1037,8 @@ public class ChannelServiceImpl
 	    DataService dataService = getDataService();
 	    try {
 		ChannelServerWrapper proxyWrapper =
-		dataService.getServiceBinding(
-		    channelServerKey, ChannelServerWrapper.class);
+		    (ChannelServerWrapper) dataService.getServiceBinding(
+			channelServerKey);
 		dataService.removeObject(proxyWrapper);
 	    } catch (NameNotBoundException e) {
 		// already removed
