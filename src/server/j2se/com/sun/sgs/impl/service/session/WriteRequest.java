@@ -43,12 +43,12 @@ class WriteRequest {
         // Prepend the message length as an unsigned short.
         // TODO not elegant
         int size = message.remaining();
-        buf = ByteBuffer.allocate(2 + size);
-        buf.putShort((short) size)
-           .put(message)
-           .asReadOnlyBuffer()
-           .flip();
+        ByteBuffer copyBuf = ByteBuffer.allocate(2 + size);
+        copyBuf.putShort((short) size)
+               .put(message)
+               .flip();
 
+        this.buf = copyBuf.asReadOnlyBuffer();
         this.delivery = delivery;
     }
 
