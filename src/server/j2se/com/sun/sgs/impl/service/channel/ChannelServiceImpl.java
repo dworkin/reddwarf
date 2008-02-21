@@ -95,6 +95,15 @@ public class ChannelServiceImpl
 	
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
+
+    /** The property name for the maximum number of events to process in a single
+     * transaction.
+     */
+    private static final String EVENTS_PER_TXN_PROPERTY =
+	PKG_NAME + ".events.per.txn";
+
+    /** The default events per transaction. */
+    private static final int DEFAULT_EVENTS_PER_TXN = 1;
     
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
@@ -140,6 +149,9 @@ public class ChannelServiceImpl
 	coordinatorTaskQueues =
 	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
 
+    /** The maximum number of channel events to sevice per transaction. */
+    final int eventsPerTxn;
+
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -173,6 +185,13 @@ public class ChannelServiceImpl
 		txnProxy.getService(WatchdogService.class);
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
+
+	    /*
+	     * Get the property for controlling channel event processing.
+	     */
+	    eventsPerTxn = wrappedProps.getIntProperty(
+		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
+		0, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -809,7 +828,7 @@ public class ChannelServiceImpl
     /**
      * Returns the channel service.
      */
-    private static ChannelServiceImpl getChannelService() {
+    static ChannelServiceImpl getChannelService() {
 	return txnProxy.getService(ChannelServiceImpl.class);
     }
     
@@ -851,26 +870,31 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Returns the {@code ChannelServer} for the given {@code nodeId}, or
-     * {@code null} if no channel server exists for the given {@code nodeId}.
+     * Returns the {@code ChannelServer} for the given {@code nodeId},
+     * or {@code null} if no channel server exists for the given
+     * {@code nodeId}.  If the specified {@code nodeId} is the local
+     * node's ID, then this method returns a reference to the server
+     * implementation object, rather than the proxy.
+     *
      */
-    static ChannelServer getChannelServer(long nodeId) {
-	// TBD: if the nodeId is the local nodeId, then this method
-	// should return a reference to the local channel server impl,
-	// rather than the channel server proxy. -- ann (12/11/07)
-	String channelServerKey =
-	    ChannelServiceImpl.getChannelServerKey(nodeId);
-	try {
-	    return ((ChannelServerWrapper) getDataService().getServiceBinding(
+    ChannelServer getChannelServer(long nodeId) {
+	if (nodeId == localNodeId) {
+	    return serverImpl;
+	} else {
+	    String channelServerKey = getChannelServerKey(nodeId);
+	    try {
+		return
+		    ((ChannelServerWrapper) getDataService().getServiceBinding(
 			channelServerKey)).get();
-	} catch (NameNotBoundException e) {
-	    return null;
-	} catch (ObjectNotFoundException e) {
-	    logger.logThrow(
-		Level.SEVERE, e,
-		"ChannelServerWrapper binding:{0} exists, " +
-		"but object removed", channelServerKey);
-	    throw e;
+	    } catch (NameNotBoundException e) {
+		return null;
+	    } catch (ObjectNotFoundException e) {
+		logger.logThrow(
+		    Level.SEVERE, e,
+		    "ChannelServerWrapper binding:{0} exists, " +
+		    "but object removed", channelServerKey);
+		throw e;
+	    }
 	}
     }
 
