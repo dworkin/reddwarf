@@ -27,6 +27,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -129,7 +130,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	this.delivery = delivery;
 	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
-	ManagedReference ref = dataService.createReference(this);
+	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.channelId = ref.getId().toByteArray();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {
@@ -370,10 +371,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
-            if (message.remaining() > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
             }
 	    /*
 	     * Enqueue send request.
@@ -384,7 +385,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
-			   this, HexDumper.format(bytes));
+			   this, HexDumper.format(bytes, 0x50));
 	    }
 	    return this;
 	    
@@ -392,7 +393,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e, "send channel:{0} message:{1} throws",
-		    this, HexDumper.format(message));
+		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
 	}
@@ -436,6 +437,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
+    @Override
     public boolean equals(Object obj) {
 	// TBD: Because this is a managed object, does an "==" check
 	// suffice here? 
@@ -446,11 +448,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
+    @Override
     public int hashCode() {
 	return Arrays.hashCode(channelId);
     }
 
     /** {@inheritDoc} */
+    @Override
     public String toString() {
 	return getClass().getName() +
 	    "[" + HexDumper.toHexString(channelId) + "]";
@@ -683,7 +687,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	ChannelSet channelSet;
 	try {
 	    channelSet =
-		dataService.getServiceBinding(channelSetKey, ChannelSet.class);
+		(ChannelSet) dataService.getServiceBinding(channelSetKey);
 	} catch (NameNotBoundException e) {
 	    channelSet = new ChannelSet(dataService, session);
 	    dataService.setServiceBinding(channelSetKey, channelSet);
@@ -745,7 +749,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	try {
 	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
 	    ChannelSet channelSet =
-		dataService.getServiceBinding(channelSetKey, ChannelSet.class);
+		(ChannelSet) dataService.getServiceBinding(channelSetKey);
 	    boolean removed = channelSet.remove(this);
 	    if (channelSet.isEmpty()) {
 		dataService.removeServiceBinding(channelSetKey);
@@ -897,8 +901,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
     {
 	Set<byte[]> channelIds = getChannelsForSession(nodeId, sessionIdBytes);
 	for (byte[] channelId : channelIds) {
-	    ChannelImpl channel = getObjectForId(
-		new BigInteger(1, channelId), ChannelImpl.class);
+	    ChannelImpl channel = (ChannelImpl) getObjectForId(
+		new BigInteger(1, channelId));
 	    if (channel != null) {
 		channel.removeSession(nodeId, sessionIdBytes);
 	    } else {
@@ -923,24 +927,19 @@ public abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Returns the managed object with the specified {@code refId} and
-     * {@code type}, or {@code null} if there is no object with the
-     * specified {@code refId}.
+     * Returns the managed object with the specified {@code refId}, or {@code
+     * null} if there is no object with the specified {@code refId}.
      *
-     * @param	<T> the type of the referenced object
      * @param	refId the object's identifier as obtained by
      *		{@link ManagedReference#getId ManagedReference.getId}
-     * @param	type a class representing the type of the referenced object
      *
-     * @throws	ClassCastException if the object associated with the
-     *		specified {@code refId} is not of the specified type
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    private static <T> T getObjectForId(BigInteger refId, Class<T> type) {
+    private static Object getObjectForId(BigInteger refId) {
 	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
-	    return dataService.createReferenceForId(refId).get(type);
+	    return dataService.createReferenceForId(refId).get();
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -960,7 +959,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	try {
 	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
 	    channelSet =
-		dataService.getServiceBinding(channelSetKey, ChannelSet.class);
+		(ChannelSet) dataService.getServiceBinding(channelSetKey);
 	} catch (NameNotBoundException e) {
 	    // ignore; session may not be a member of any channel
 	}
@@ -998,8 +997,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		    dataService, getSessionPrefix()))
 	{
 	    ClientSessionInfo sessionInfo =
-		dataService.getServiceBinding(
-		    sessionKey, ClientSessionInfo.class);
+		(ClientSessionInfo) dataService.getServiceBinding(sessionKey);
 	    removeSession(sessionInfo.nodeId, sessionInfo.sessionIdBytes);
 	}
 	dataService.markForUpdate(this);
@@ -1055,8 +1053,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	String sessionKey = getSessionKey(session);
 	ClientSessionInfo info = null;
 	try {
-	    info = dataService.getServiceBinding(
-		sessionKey, ClientSessionInfo.class);
+	    info = (ClientSessionInfo) dataService.getServiceBinding(
+		sessionKey);
 	} catch (NameNotBoundException e) {
 	} catch (ObjectNotFoundException e) {
 	    logger.logThrow(
@@ -1081,7 +1079,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	private final static long serialVersionUID = 1L;
 	final long nodeId;
 	final byte[] sessionIdBytes;
-	private final ManagedReference sessionRef;
+	private final ManagedReference<ClientSession> sessionRef;
 	    
 
 	/**
@@ -1103,7 +1101,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	ClientSession getClientSession() {
 	    try {
-		return sessionRef.get(ClientSession.class);
+		return sessionRef.get();
 	    } catch (ObjectNotFoundException e) {
 		return null;
 	    }
@@ -1154,9 +1152,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	private final static long serialVersionUID = 1L;
 
 	/** The managed reference to the queue's channel. */
-	private final ManagedReference channelRef;
+	private final ManagedReference<ChannelImpl> channelRef;
 	/** The managed reference to the managed queue. */
-	private final ManagedReference queueRef;
+	private final ManagedReference<ManagedQueue<ChannelEvent>> queueRef;
 	/** The sequence number for events on this channel. */
 	private long seq = 0;
 	/** If {@code true}, a refresh should be sent to all channel's
@@ -1185,7 +1183,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * Returns the channel for this queue.
 	 */
 	ChannelImpl getChannel() {
-	    return channelRef.get(ChannelImpl.class);
+	    return channelRef.get();
 	}
 
 	/**
@@ -1198,9 +1196,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	/**
 	 * Returns the managed queue object.
 	 */
-	@SuppressWarnings("unchecked")
 	ManagedQueue<ChannelEvent> getQueue() {
-	    return queueRef.get(ManagedQueue.class);
+	    return queueRef.get();
 	}
 
 	/**
@@ -1351,8 +1348,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    ClientSession session = getObjectForId(
-		new BigInteger(1, sessionId), ClientSession.class);
+	    ClientSession session = (ClientSession) getObjectForId(
+		new BigInteger(1, sessionId));
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
@@ -1397,6 +1394,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
 		HexDumper.toHexString(sessionId);
@@ -1422,8 +1420,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    ClientSession session = getObjectForId(
-		new BigInteger(1, sessionId), ClientSession.class);
+	    ClientSession session = (ClientSession) getObjectForId(
+		new BigInteger(1, sessionId));
 	    if (session == null) {
 		logger.log(
 		    Level.FINE,
@@ -1437,6 +1435,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName() + ": " +
 		HexDumper.toHexString(sessionId);
@@ -1487,6 +1486,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName();
 	}
@@ -1551,6 +1551,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return getClass().getName();
 	}
@@ -1613,6 +1614,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
+	@Override
 	public String toString() {
 	    return getClass().getName();
 	}
@@ -1627,7 +1629,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
 	    return
-		dataService.getServiceBinding(eventQueueKey, EventQueue.class);
+		(EventQueue) dataService.getServiceBinding(eventQueueKey);
 	} catch (NameNotBoundException e) {
 	    logger.logThrow(
 		Level.WARNING, e,
@@ -1686,7 +1688,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    String key = iterator.next();
 	    ClientSessionInfo info =
-		dataService.getServiceBinding(key, ClientSessionInfo.class);
+		(ClientSessionInfo) dataService.getServiceBinding(key);
 	    ClientSession session = info.getClientSession();
 	    if (session == null) {
 		return hasNext();
@@ -1741,7 +1743,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    return false;
 	}
 	ChannelSet channelSet =
-	    dataService.getServiceBinding(key, ChannelSet.class);
+	    (ChannelSet) dataService.getServiceBinding(key);
 	removeSessionFromAllChannels(nodeId, channelSet.sessionIdBytes);
 	return true;
     }
@@ -1762,10 +1764,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    return false;
 	}
 	EventQueue eventQueue =
-	    dataService.getServiceBinding(key, EventQueue.class);
+	    (EventQueue) dataService.getServiceBinding(key);
 	BigInteger channelRefId = eventQueue.getChannelRefId();
-	ChannelImpl channel =
-	    getObjectForId(channelRefId, ChannelImpl.class);
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
 	    channel.reassignCoordinator(nodeId);
 	} else {
@@ -1786,7 +1787,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 DataService dataService, BigInteger channelRefId, long nodeId)
     {
 	Set<BigInteger> members = new HashSet<BigInteger>();
-	ChannelImpl channel = getObjectForId(channelRefId, ChannelImpl.class);
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
 	    for (String sessionKey :
 		     BoundNamesUtil.getServiceBoundNamesIterable(

@@ -47,38 +47,58 @@ import com.sun.sgs.io.Connector;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
- * {@code Connector} to establish connections. <p>
- *
- * The {@link #SimpleClientConnector constructor} supports the
- * following properties: <p>
- *
+ * {@code Connector} to establish connections.
+ * <p>
+ * The
+ * {@link SimpleClientConnector#SimpleClientConnector(Properties) constructor}
+ * supports the following properties:
+ * <p>
  * <ul>
  *
  * <li> <i>Key:</i> {@code host} <br>
  *	<i>No default &mdash; required</i> <br>
- *	Specifies the server host. <p>
- *
+ *	Specifies the server host.
+ * <p>
  * <li> <i>Key:</i> {@code port} <br>
  *	<i>No default &mdash; required</i> <br>
- *	Specifies the server port. <p>
- *
+ *	Specifies the server port.
+ * <p>
  * <li> <i>Key:</i> {@code connectTimeout} <br>
- *	<i>Default:</i> {@code 5000} <br>
+ *	<i>Default:</i> {@value SimpleClientConnector#DEFAULT_CONNECT_TIMEOUT}
+ *      <br>
  *	Specifies the timeout (in milliseconds) for a connect attempt
- *	to the server. <p>
- *
- * </ul> <p>
+ *	to the server.
+ * </ul>
  */
 class SimpleClientConnector extends ClientConnector {
-    
-    private final long DEFAULT_CONNECT_TIMEOUT = 5000;
-    private final String DEFAULT_CONNECT_FAILURE_MESSAGE =
+
+    /**
+     * The default timeout for connect operations:
+     * {@value #DEFAULT_CONNECT_TIMEOUT} ms
+     */
+    public static final long DEFAULT_CONNECT_TIMEOUT = 5000;
+
+    /**
+     * The default connect failure message:
+     * {@value #DEFAULT_CONNECT_FAILURE_MESSAGE}
+     */
+    public static final String DEFAULT_CONNECT_FAILURE_MESSAGE =
 	"Unable to connect to server";
     
+    /** The underlying IO connector. */
     private final Connector<SocketAddress> connector;
+
+    /** The connect timeout. */
     private final long connectTimeout;
+
+    /** The connect timeout watchdog thread. */
     private Thread connectWatchdog;
-    
+
+    /**
+     * Creates a new connector with the given properties.
+     * 
+     * @param properties the properties for this connector
+     */
     SimpleClientConnector(Properties properties) {
         
         String host = properties.getProperty("host");
@@ -131,10 +151,19 @@ class SimpleClientConnector extends ClientConnector {
 	connectWatchdog.start();
     }
 
+    /**
+     * A thread that awaits a connection attempt timeout.
+     */
     private class ConnectWatchdogThread extends Thread {
 
+        /** The listener for timed-out connection attempts. */
 	private final ClientConnectionListener listener;
 
+	/**
+	 * Creates a new timeout watchdog thread with the specified listener.
+	 * 
+	 * @param listener the timeout listener
+	 */
 	ConnectWatchdogThread(ClientConnectionListener listener) {
 	    super("ConnectWatchdogThread-" +
 		  connector.getEndpoint().toString());
@@ -142,8 +171,10 @@ class SimpleClientConnector extends ClientConnector {
 	    setDaemon(true);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	public void run() {
-
 	    boolean connectComplete = false;
 	    String connectFailureMessage = null;
 	    try {

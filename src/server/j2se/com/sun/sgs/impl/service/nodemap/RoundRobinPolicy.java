@@ -223,7 +223,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 String key = dataService.nextServiceBoundName(nodekey);
                 boolean done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = dataService.getServiceBinding(key, IdentityMO.class); 
+                    idmo = (IdentityMO) dataService.getServiceBinding(key); 
                 }
                 node = watchdogService.getNode(nodeId);
             } catch (Exception e) {

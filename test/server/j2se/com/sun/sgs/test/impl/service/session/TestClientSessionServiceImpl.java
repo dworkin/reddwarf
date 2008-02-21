@@ -680,7 +680,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Find the app listener */
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-	    StandardProperties.APP_LISTENER, AppListener.class);
+	    StandardProperties.APP_LISTENER);
     }
 
     /**
@@ -1048,9 +1048,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ManagedReference, ManagedReference> sessions =
-	    Collections.synchronizedMap(
-		new HashMap<ManagedReference, ManagedReference>());
+	private final Map<ManagedReference<ClientSession>,
+			  ManagedReference<DummyClientSessionListener>>
+	    sessions = Collections.synchronizedMap(
+		new HashMap<ManagedReference<ClientSession>,
+			    ManagedReference<DummyClientSessionListener>>());
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
@@ -1070,9 +1072,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		listener = new DummyClientSessionListener(name, false);
 	    }
 	    DataManager dataManager = AppContext.getDataManager();
-	    ManagedReference sessionRef =
+	    ManagedReference<ClientSession> sessionRef =
 		dataManager.createReference(session);
-	    ManagedReference listenerRef =
+	    ManagedReference<DummyClientSessionListener> listenerRef =
 		dataManager.createReference(listener);
 	    dataManager.markForUpdate(this);
 	    sessions.put(sessionRef, listenerRef);
@@ -1087,8 +1089,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private Set<ClientSession> getSessions() {
 	    Set<ClientSession> sessionSet =
 		new HashSet<ClientSession>();
-	    for (ManagedReference sessionRef : sessions.keySet()) {
-		sessionSet.add(sessionRef.get(ClientSession.class));
+	    for (ManagedReference<ClientSession> sessionRef
+		     : sessions.keySet())
+	    {
+		sessionSet.add(sessionRef.get());
 	    }
 	    return sessionSet;
 	}

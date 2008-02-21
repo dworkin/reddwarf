@@ -464,7 +464,7 @@ public class ChannelServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
 			       HexDumper.toHexString(channelId),
-			       HexDumper.format(message));
+			       HexDumper.format(message, 0x50));
 		}
 		/*
 		 * TBD: (optimization) this should enqueue the send
@@ -883,8 +883,9 @@ public class ChannelServiceImpl
 	} else {
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    try {
-		return dataService.getServiceBinding(
-		    channelServerKey, ChannelServerWrapper.class).get();
+		return
+		    ((ChannelServerWrapper) getDataService().getServiceBinding(
+			channelServerKey)).get();
 	    } catch (NameNotBoundException e) {
 		return null;
 	    } catch (ObjectNotFoundException e) {
@@ -1059,8 +1060,8 @@ public class ChannelServiceImpl
 	    DataService dataService = getDataService();
 	    try {
 		ChannelServerWrapper proxyWrapper =
-		dataService.getServiceBinding(
-		    channelServerKey, ChannelServerWrapper.class);
+		    (ChannelServerWrapper) dataService.getServiceBinding(
+			channelServerKey);
 		dataService.removeObject(proxyWrapper);
 	    } catch (NameNotBoundException e) {
 		// already removed

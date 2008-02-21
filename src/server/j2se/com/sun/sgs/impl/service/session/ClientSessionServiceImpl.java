@@ -1089,8 +1089,8 @@ public class ClientSessionServiceImpl
 		// TBD: should each notification/removal happen as a
 		// separate task?
 		ClientSessionImpl sessionImpl = 
-		    dataService.getServiceBinding(
-			sessionKey, ClientSessionImpl.class);
+		    (ClientSessionImpl) dataService.getServiceBinding(
+			sessionKey);
 		sessionImpl.notifyListenerAndRemoveSession(
 		    dataService, false, true);
 	    }

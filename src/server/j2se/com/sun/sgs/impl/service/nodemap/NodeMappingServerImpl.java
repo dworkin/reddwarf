@@ -460,7 +460,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         public void run() {
             try {
                 IdentityMO idmo = 
-                    dataService.getServiceBinding(idkey, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(idkey);
 
                 found = true;
                 long nodeId = idmo.getNodeId();
@@ -610,7 +610,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
             if (dead) {
                 IdentityMO idmo = 
-                        dataService.getServiceBinding(idkey, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(idkey);
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -803,9 +803,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     if (oldNode != null) {
                         try {
                             // Find the old IdentityMO, with the old node info.
-                            IdentityMO oldidmo = 
-                                dataService.getServiceBinding(idkey, 
-                                                              IdentityMO.class);
+                            IdentityMO oldidmo = (IdentityMO)
+				dataService.getServiceBinding(idkey);
 
                             // Check once more for the assigned node - someone
                             // else could have mapped it before we got here.
@@ -999,7 +998,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 String key = dataService.nextServiceBoundName(nodekey);
                 done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = dataService.getServiceBinding(key, IdentityMO.class);
+                    idmo = (IdentityMO) dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
                 // TODO: this kind of check may need to be applied to more
@@ -1096,7 +1095,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
          * @throws ObjectNotFoundException if the object has been removed
          */
         public void run() {
-            idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+            idmo = (IdentityMO) dataService.getServiceBinding(idkey);
         }
         
         /**
@@ -1161,7 +1160,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             IdentityMO idmo = null;
             try {
                 // Look for the identity in the map.
-                idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                idmo = (IdentityMO) dataService.getServiceBinding(idkey);
                 foundKeys.add(idkey);
             } catch (Exception e) {
                 // Do nothing: leave idmo as null to indicate not found
@@ -1171,7 +1170,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
 
                 try {
-                    dataService.getServiceBinding(nodekey, IdentityMO.class);
+		    dataService.getServiceBinding(nodekey);
                     foundKeys.add(nodekey);
                 } catch (Exception e) {
                     logger.log(Level.SEVERE, 
