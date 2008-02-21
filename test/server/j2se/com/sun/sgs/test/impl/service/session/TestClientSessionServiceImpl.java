@@ -649,10 +649,11 @@ public class TestClientSessionServiceImpl extends TestCase {
     /**
      * Test sending from the server to the client session in a transaction that
      * aborts with a retryable exception to make sure that message buffers are
-     * reclaimed.  Try sending 4K bytes, and have the task abort 40 times with
+     * reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
      * a retryable exception so the task is retried.  If the buffers are not
      * being reclaimed then the sends will eventually fail because the buffer
-     * space is used up.
+     * space is used up.  Note that this test assumes that sending 400 KB of
+     * data will surpass the I/O throttling limit.
      */
     public void testClientSessionSendAbortRetryable() throws Exception {
 	DummyClient client = new DummyClient("clientname");
@@ -669,10 +670,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 			try {
 			    session.send(ByteBuffer.wrap(new byte[4096]));
 			} catch (MessageRejectedException e) {
-			    throw new RuntimeException(
-				"Should not run out of buffer space: " + e, e);
+			    fail("Should not run out of buffer space: " + e);
 			}
-			if (++tryCount < 40) {
+			if (++tryCount < 100) {
 			    throw new MaybeRetryException("Retryable",  true);
 			}
 		    }
