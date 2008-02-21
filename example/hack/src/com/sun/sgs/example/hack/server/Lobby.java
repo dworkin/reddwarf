@@ -64,10 +64,10 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     public static final String IDENTIFIER = NAME_PREFIX + "lobby";
 
     // a reference to the game change manager
-    private ManagedReference gcmRef;
+    private ManagedReference<GameChangeManager> gcmRef;
 
     // the channel used for all players currently in the lobby
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
@@ -76,7 +76,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private HashMap<String,GameMembershipDetail> countMap;
 
     private UtilChannel channel() {
-        return channelRef.get(UtilChannel.class);
+        return channelRef.get();
     }
 
     /**
@@ -134,7 +134,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // try to get an existing reference
         Lobby lobby = null;
         try {
-            lobby = dataManager.getBinding(IDENTIFIER, Lobby.class);
+            lobby = (Lobby) dataManager.getBinding(IDENTIFIER);
         } catch (NameNotBoundException e) {
             lobby = new Lobby(gcm);
             dataManager.setBinding(IDENTIFIER, lobby);
@@ -158,7 +158,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // the queue model?
         GameMembershipDetail detail =
             new GameMembershipDetail(IDENTIFIER, numPlayers() + 1);
-        gcmRef.get(GameChangeManager.class).notifyMembershipChanged(detail);
+        gcmRef.get().notifyMembershipChanged(detail);
 
         // update all existing members about the new uid's name
         ClientSession session = player.getCurrentSession();
@@ -209,7 +209,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // the queue model?
         GameMembershipDetail detail =
             new GameMembershipDetail(IDENTIFIER, numPlayers());
-        gcmRef.get(GameChangeManager.class).notifyMembershipChanged(detail);
+        gcmRef.get().notifyMembershipChanged(detail);
     }
 
     /**

@@ -34,7 +34,7 @@ public class OneWayConnector implements Connector, Serializable {
     private static final long serialVersionUID = 1;
 
     // the target level
-    private ManagedReference levelRef;
+    private ManagedReference<Level> levelRef;
 
     // the target position
     private int xPos;
@@ -61,7 +61,7 @@ public class OneWayConnector implements Connector, Serializable {
      */
     public boolean enteredConnection(CharacterManager mgr) {
         // this connector is easy...we just dump the player to the position
-        levelRef.get(Level.class).addCharacter(mgr, xPos, yPos);
+        levelRef.get().addCharacter(mgr, xPos, yPos);
 
         return true;
     }
