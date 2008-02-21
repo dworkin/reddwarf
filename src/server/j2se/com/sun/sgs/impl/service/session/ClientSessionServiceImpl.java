@@ -821,7 +821,10 @@ public class ClientSessionServiceImpl
 		throw new NullPointerException("null sessionImpl");
 	    } 
 	    this.sessionRefId = sessionImpl.getId();
-	    this.sessionServer = sessionImpl.getClientSessionServer();
+	    this.sessionServer =
+		sessionImpl.getNodeId() == localNodeId ?
+		serverImpl :
+		sessionImpl.getClientSessionServer();
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {
@@ -1240,7 +1243,8 @@ public class ClientSessionServiceImpl
 		ClientSessionImpl sessionImpl = 
 		    (ClientSessionImpl) dataService.getServiceBinding(
 			sessionKey);
-		sessionImpl.notifyListenerAndRemoveSession(dataService, false);
+		sessionImpl.notifyListenerAndRemoveSession(
+		    dataService, false, true);
 	    }
 	}
     }
