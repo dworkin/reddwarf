@@ -24,6 +24,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
@@ -1181,12 +1182,18 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * 
 	 * @param event the event
 	 * @return {@code true} if successful, and {@code false} otherwise
+	 * @throws MessageRejectedException if the cost of the event
+	 *         exceeds the availability of the queue
 	 */
 	boolean offer(ChannelEvent event) {
 
 	    int cost = event.getCost();
-	    if (cost > writeBufferAvailable)
-	            return false;
+	    if (cost > writeBufferAvailable) {
+	        throw new MessageRejectedException(
+	            "not enough queue space: available = " +
+	            writeBufferAvailable + " requested = " +
+	            cost);
+	    }
 
 	    boolean result = getQueue().offer(event);
 	    
@@ -1199,7 +1206,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
                         this, cost, writeBufferAvailable);
                 }
 	    }
-	    
+
 	    return result;
 	}
 
