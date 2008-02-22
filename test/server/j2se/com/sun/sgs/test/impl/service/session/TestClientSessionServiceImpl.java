@@ -27,6 +27,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -62,8 +63,25 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import junit.framework.TestCase;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import junit.framework.TestSuite;
 
 public class TestClientSessionServiceImpl extends TestCase {
+
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() throws Exception {
+	if (testMethod == null) {
+	    return new TestSuite(TestClientSessionServiceImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestClientSessionServiceImpl(testMethod));
+	return suite;
+    }
 
     private static final String APP_NAME = "TestClientSessionServiceImpl";
 
@@ -637,6 +655,42 @@ public class TestClientSessionServiceImpl extends TestCase {
                     fail("expected disconnected session");
                 }
              }, taskOwner);
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+
+    /**
+     * Test sending from the server to the client session in a transaction that
+     * aborts with a retryable exception to make sure that message buffers are
+     * reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
+     * a retryable exception so the task is retried.  If the buffers are not
+     * being reclaimed then the sends will eventually fail because the buffer
+     * space is used up.  Note that this test assumes that sending 400 KB of
+     * data will surpass the I/O throttling limit.
+     */
+    public void testClientSessionSendAbortRetryable() throws Exception {
+	DummyClient client = new DummyClient("clientname");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login("dummypassword");
+	    taskScheduler.runTransactionalTask(
+		new AbstractKernelRunnable() {
+		    int tryCount = 0;
+		    public void run() {
+			Set<ClientSession> sessions =
+			    getAppListener().getSessions();
+			ClientSession session = sessions.iterator().next();
+			try {
+			    session.send(ByteBuffer.wrap(new byte[4096]));
+			} catch (MessageRejectedException e) {
+			    fail("Should not run out of buffer space: " + e);
+			}
+			if (++tryCount < 100) {
+			    throw new MaybeRetryException("Retryable",  true);
+			}
+		    }
+		}, taskOwner);
 	} finally {
 	    client.disconnect(false);
 	}
