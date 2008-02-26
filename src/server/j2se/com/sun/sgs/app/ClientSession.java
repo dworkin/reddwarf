@@ -64,6 +64,14 @@ import java.nio.ByteBuffer;
  * becomes invalid and can no longer be used to communicate with that
  * client.  When that client logs back in again, a new session is
  * established with the server.
+ *
+ * <p>TODO: modify class documentation to note that an application should
+ * not remove a client session object, and that attempting to remove a
+ * client session object (by invoking {@code DataManager.removeObject})
+ * will be ignored.  If a client session is no longer needed, the
+ * application should disconnect the session by invoking the {@link
+ * #disconnect disconnect} method, and at some point later on, the client
+ * session object will be removed by the server.
  */
 public interface ClientSession extends ManagedObject {
 

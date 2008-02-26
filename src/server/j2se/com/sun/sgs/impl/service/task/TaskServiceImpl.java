@@ -96,7 +96,7 @@ import java.util.logging.Logger;
  * identity are re-scheduled on the identity's new node. When an
  * already-scheduled, persisted task tries to run on the old node, that task
  * is dropped since it is already scheduled to run on the new node. After an
- * identity has been moved, any subsiquent attempts to schedule durable tasks
+ * identity has been moved, any subsequent attempts to schedule durable tasks
  * on behalf of that identity on the old node will result in the tasks being
  * scheduled to run on the new node. This is called task handoff.
  * <p>
@@ -144,7 +144,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // and how many tasks are pending for that identity
     private HashMap<Identity,Integer> activeIdentityMap;
 
-    // the transient set of identies thought to be mapped to this node
+    // the transient set of identities thought to be mapped to this node
     private HashSet<Identity> mappedIdentitySet;
 
     // a timer used to delay status votes
@@ -174,7 +174,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     public static final String HANDOFF_START_PROPERTY =
         NAME + ".handoff.start";
 
-    /** The default delay in millseconds before hand-off checking starts. */
+    /** The default delay in milliseconds before hand-off checking starts. */
     public static final long HANDOFF_START_DEFAULT = 2500L;
 
     // the actual amount of time to wait before hand-off checking starts
@@ -349,8 +349,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                     }
                     public void run() throws Exception {
                         try {
-                            dataService.getServiceBinding(localHandoffSpace,
-                                                          StringHashSet.class);
+                            dataService.getServiceBinding(localHandoffSpace);
                         } catch (NameNotBoundException nnbe) {
                             dataService.setServiceBinding(localHandoffSpace,
                                                           new StringHashSet());
@@ -417,9 +416,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                     public void run() throws Exception {
                         StringHashSet set = null;
                         try {    
-                            set = dataService.
-                                getServiceBinding(handoffSpace,
-                                                  StringHashSet.class);
+                            set = (StringHashSet)
+				dataService.getServiceBinding(handoffSpace);
                         } catch (NameNotBoundException nnbe) {
                             // this only happens when this recover method
                             // is called more than once, and just means that
@@ -530,7 +528,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             runner.markIgnoreIsLocal();
         }
         PendingTask ptask =
-            dataService.getServiceBinding(objName, PendingTask.class);
+            (PendingTask) dataService.getServiceBinding(objName);
         dataService.markForUpdate(ptask);
         ptask.setRunningNode(nodeId);
 
@@ -610,7 +608,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // get the name of the new object and bind that into the pending
         // namespace for recovery on startup
-        ManagedReference taskRef = dataService.createReference(ptask);
+        ManagedReference<PendingTask> taskRef =
+	    dataService.createReference(ptask);
         String objName = DS_PENDING_SPACE + identity.getName() + "." +
             taskRef.getId();
         dataService.setServiceBinding(objName, ptask);
@@ -665,7 +664,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     PendingTask fetchPendingTask(String objName) {
         PendingTask ptask = null;
         try {
-            ptask = dataService.getServiceBinding(objName, PendingTask.class);
+            ptask = (PendingTask) dataService.getServiceBinding(objName);
         } catch (NameNotBoundException nnbe) {
             // the task was already removed, so check if this is a recurring
             // task, because then we need to cancel it (this may happen if
@@ -714,7 +713,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
         // resolve the task, which checks if the task was already cancelled
         try {
-            ptask = dataService.getServiceBinding(objName, PendingTask.class);
+            ptask = (PendingTask) dataService.getServiceBinding(objName);
         } catch (NameNotBoundException nnbe) {
             throw new ObjectNotFoundException("task was already cancelled");
         }
@@ -1084,7 +1083,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     private void restartTask(String objName) {
         PendingTask ptask = null;
         try {
-            ptask = dataService.getServiceBinding(objName, PendingTask.class);
+            ptask = (PendingTask) dataService.getServiceBinding(objName);
         } catch (NameNotBoundException nnbe) {
             // this happens when a task is scheduled for an identity that
             // hasn't yet been mapped or is in the process of being mapped,
@@ -1263,7 +1262,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                        objName, newNodeId);
         try {
             StringHashSet set =
-                dataService.getServiceBinding(handoffName, StringHashSet.class);
+		(StringHashSet) dataService.getServiceBinding(handoffName);
             set.add(objName);
         } catch (NameNotBoundException nnbe) {
             // this will only happen in the unlikely event that the identity
@@ -1296,9 +1295,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
-            StringHashSet set =
-                dataService.getServiceBinding(localHandoffSpace,
-                                              StringHashSet.class);
+            StringHashSet set = (StringHashSet) dataService.getServiceBinding(
+		localHandoffSpace);
             if (! set.isEmpty()) {
                 Iterator<String> it = set.iterator();
                 while (it.hasNext()) {

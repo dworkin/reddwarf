@@ -235,10 +235,21 @@ public class SimpleClient implements ServerSession {
         sendRaw(msg);
     }
 
+    /**
+     * Sends raw data to the underlying connection.
+     * 
+     * @param buf the data to send
+     * @throws IOException if an IO problem occurs
+     */
     private void sendRaw(ByteBuffer buf) throws IOException {
         clientConnection.sendMessage(buf);
     }
-    
+
+    /**
+     * Throws an exception if this client is not connected.
+     * 
+     * @throws IllegalStateException if this client is not connected
+     */
     private void checkConnected() {
         if (!isConnected()) {
             RuntimeException re =
@@ -248,6 +259,11 @@ public class SimpleClient implements ServerSession {
         }
     }
 
+    /**
+     * Throws an exception if this client is not logged in.
+     * 
+     * @throws IllegalStateException if this client is not logged in
+     */
     private void checkLoggedIn() {
         if (! loggedIn) {
             RuntimeException re =
@@ -356,6 +372,12 @@ public class SimpleClient implements ServerSession {
             }
         }
 
+        /**
+         * Processes an application message.
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
         private void handleApplicationMessage(MessageBuffer msg)
             throws IOException
         {
@@ -418,6 +440,9 @@ public class SimpleClient implements ServerSession {
                 logger.log(Level.FINER, "Logged out gracefully");
                 expectingDisconnect = true;
                 loggedIn = false;
+
+                // TODO verify that graceful works correctly
+
                 // Server should disconnect us
                 /*
                 try {

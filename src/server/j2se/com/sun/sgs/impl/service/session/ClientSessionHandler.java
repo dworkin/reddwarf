@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -30,6 +29,7 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -151,7 +151,6 @@ class ClientSessionHandler {
 	    currentState == State.CONNECTING ||
 	    currentState == State.CONNECTED;
 
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -185,7 +184,7 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST,
 		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message));
+		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -267,8 +266,8 @@ class ClientSessionHandler {
 		public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
-		    sessionImpl.
-			notifyListenerAndRemoveSession(dataService, graceful);
+		    sessionImpl. notifyListenerAndRemoveSession(
+			dataService, graceful, true);
 		}
 	    });
 	}
@@ -735,8 +734,8 @@ class ClientSessionHandler {
 	 */
 	public void run() {
 	    AppListener appListener =
-		dataService.getServiceBinding(
-		    StandardProperties.APP_LISTENER, AppListener.class);
+		(AppListener) dataService.getServiceBinding(
+		    StandardProperties.APP_LISTENER);
 	    logger.log(
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
@@ -792,8 +791,7 @@ class ClientSessionHandler {
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
-		} else if (!(ex instanceof ExceptionRetryStatus) ||
-			   ((ExceptionRetryStatus) ex).shouldRetry() == false) {
+		} else if (! isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +

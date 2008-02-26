@@ -73,7 +73,7 @@ public final class AdaptiveField<T> implements Serializable {
      *
      * @serial
      */
-    private ManagedReference ref;
+    private ManagedReference<ManagedSerializable<T>> ref;
 
     /**
      * A local cache of the object if it is being managed by the data store but
@@ -139,14 +139,12 @@ public final class AdaptiveField<T> implements Serializable {
      *
      * @return the value of the field
      */
-    @SuppressWarnings("unchecked")
     public T get() {
 	if (isLocal) {
 	    return local;
 	}
 	if (remoteCache == null && ref != null) {
-	    remoteCache = ((ManagedSerializable<T>)
-			   ref.get(ManagedSerializable.class)).get();
+	    remoteCache = ref.get().get();
 	}
 	return remoteCache;
     }
@@ -160,13 +158,12 @@ public final class AdaptiveField<T> implements Serializable {
      *
      * @return the value of the field
      */
-    @SuppressWarnings("unchecked")
     public T getForUpdate() {
 	if (isLocal) {
 	    return local;
 	}
 	if (ref != null) {
-	    remoteCache = (T) ref.getForUpdate(ManagedSerializable.class).get();
+	    remoteCache = ref.getForUpdate().get();
 	}
 	return remoteCache;
     }
@@ -189,11 +186,10 @@ public final class AdaptiveField<T> implements Serializable {
      * included in the serialization graph of the object that contains this
      * field.
      */
-    @SuppressWarnings("unchecked")
     public void makeLocal() {
 	if (!isLocal) {
 	    if (ref != null) {
-		ManagedSerializable<T> m = ref.get(ManagedSerializable.class);
+		ManagedSerializable<T> m = ref.get();
 		// REMINDER: if we can ever remote the object without having to
 		// call get(), then we could use to localCache to speed this
 		// next call up a bit.
@@ -233,8 +229,7 @@ public final class AdaptiveField<T> implements Serializable {
      */
     public void markForUpdate() {
 	if (!isLocal && ref != null) {
-	    AppContext.getDataManager().markForUpdate(
-		ref.get(ManagedSerializable.class));
+	    AppContext.getDataManager().markForUpdate(ref.get());
 	}
     }
 
@@ -243,7 +238,6 @@ public final class AdaptiveField<T> implements Serializable {
      *
      * @param value the new value of the field
      */
-    @SuppressWarnings("unchecked")
     public void set(T value) {
 	set(value, isLocal);
     }
@@ -256,7 +250,6 @@ public final class AdaptiveField<T> implements Serializable {
      * @param isLocal whether this field should be kept with a local reference
      *        or stored in the data store.
      */
-    @SuppressWarnings("unchecked")
     public void set(T value, boolean isLocal) {
 	if (isLocal) {
 	    local = value;
@@ -265,8 +258,7 @@ public final class AdaptiveField<T> implements Serializable {
 	    if (!this.isLocal) {
 		this.isLocal = true;
 		if (ref != null) {
-		    AppContext.getDataManager().removeObject(
-			ref.get(ManagedSerializable.class));
+		    AppContext.getDataManager().removeObject(ref.get());
 		    ref = null;
 		    remoteCache = null;
 		}
@@ -296,12 +288,11 @@ public final class AdaptiveField<T> implements Serializable {
 		} else if (value != null) {
 		    // we can reuse the previous ManagedSerializable to hold
 		    // the value
-		    ref.get(ManagedSerializable.class).set(value);
+		    ref.get().set(value);
 		} else {
 		    // else, the value is null but we had an old value stored
 		    // by reference, so remove it from the data store
-		    AppContext.getDataManager().removeObject(
-			ref.get(ManagedSerializable.class));
+		    AppContext.getDataManager().removeObject(ref.get());
 		    ref = null;
 		}
 	    }

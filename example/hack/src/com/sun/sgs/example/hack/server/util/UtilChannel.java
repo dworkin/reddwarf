@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Set;
 
+import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
@@ -109,7 +110,7 @@ public class UtilChannel
     private static final long serialVersionUID = 1L;
 
     /** A reference to the underlying {@code Channel}. */
-    private final ManagedReference channelRef;
+    private final ManagedReference<Channel> channelRef;
 
     /**
      * TODO doc

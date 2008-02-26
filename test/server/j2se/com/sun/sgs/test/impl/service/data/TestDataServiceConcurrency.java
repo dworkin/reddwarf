@@ -343,22 +343,22 @@ public class TestDataServiceConcurrency extends TestCase {
 	    switch (random.nextInt(whichOperations.value)) {
 	    case 0:
 		/* Get binding */
-		service.getBinding(name, Object.class);
+		service.getBinding(name);
 		break;
 	    case 1:
 		/* Set bindings */
 		ModifiableObject obj =
-		    service.getBinding(name, ModifiableObject.class);
+		    (ModifiableObject) service.getBinding(name);
 		String name2 = getObjectName(start + random.nextInt(objects));
 		ModifiableObject obj2 =
-		    service.getBinding(name2, ModifiableObject.class);
+		    (ModifiableObject) service.getBinding(name2);
 		service.setBinding(name, obj2);
 		service.setBinding(name2, obj);
 		break;
 	    case 2:
 		/* Modify object */
-		service.getBinding(name, ModifiableObject.class)
-		    .incrementNumber();
+		((ModifiableObject)
+		 service.getBinding(name)).incrementNumber();
 		break;
 	    case 3:
 		/* Create object */

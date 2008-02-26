@@ -31,8 +31,8 @@ public class MoveGameTask implements Task, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    private ManagedReference playerRef;
-    private ManagedReference gameRef = null;
+    private ManagedReference<Player> playerRef;
+    private ManagedReference<Game> gameRef = null;
 
     public MoveGameTask(Player player, Game game) {
         DataManager dataManager = AppContext.getDataManager();
@@ -42,8 +42,8 @@ public class MoveGameTask implements Task, Serializable {
     }
 
     public void run() throws Exception {
-        Game game = (gameRef != null) ? gameRef.get(Game.class) : null;
-        playerRef.get(Player.class).moveToGame(game);
+        Game game = (gameRef != null) ? gameRef.get() : null;
+        playerRef.get().moveToGame(game);
     }
 
 }
