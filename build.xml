@@ -27,7 +27,7 @@
   <property name="ruby" location="/usr/bin/ruby"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9.5.1"/>
+  <property name="project.release" value="0.9.5.2"/>
   <!-- Set to true when building an external release -->
   <property name="external.release" value="false"/>
 
