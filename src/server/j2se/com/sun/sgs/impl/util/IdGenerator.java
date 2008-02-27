@@ -137,7 +137,7 @@ public class IdGenerator {
 	    DataService dataService = txnProxy.getService(DataService.class);
 	    State state;
 	    try {
-		state = dataService.getServiceBinding(name, State.class);
+		state = (State) dataService.getServiceBinding(name);
 	    } catch (NameNotBoundException e) {
 		state = new State(0);
 		dataService.setServiceBinding(name, state);

@@ -46,7 +46,7 @@ class HelloUserSessionListener
         Logger.getLogger(HelloUserSessionListener.class.getName());
 
     /** The session this {@code ClientSessionListener} is listening to. */
-    private final ManagedReference sessionRef;
+    private final ManagedReference<ClientSession> sessionRef;
 
     /**
      * Creates a new {@code HelloUserSessionListener} for the given session.
@@ -67,7 +67,7 @@ class HelloUserSessionListener
      */
     protected ClientSession getSession() {
         // We created the ref with a non-null session, so no need to check it.
-        return sessionRef.get(ClientSession.class);
+        return sessionRef.get();
     }
 
     /**

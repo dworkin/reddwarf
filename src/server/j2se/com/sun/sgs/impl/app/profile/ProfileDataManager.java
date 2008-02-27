@@ -81,14 +81,14 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public <T> T getBinding(String name, Class<T> type) {
-        return backingManager.getBinding(name, type);
+    public ManagedObject getBinding(String name) {
+        return backingManager.getBinding(name);
     }
 
     /**
      * {@inheritDoc}
      */
-    public void setBinding(String name, ManagedObject object) {
+    public void setBinding(String name, Object object) {
         backingManager.setBinding(name, object);
     }
 
@@ -109,14 +109,14 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public void removeObject(ManagedObject object) {
+    public void removeObject(Object object) {
         backingManager.removeObject(object);
     }
 
     /**
      * {@inheritDoc}
      */
-    public void markForUpdate(ManagedObject object) {
+    public void markForUpdate(Object object) {
         backingManager.markForUpdate(object);
     }
 
@@ -126,7 +126,7 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
      * Note that this method is the only one that is directly reported by
      * this manager, if profiling is enabled.
      */
-    public ManagedReference createReference(ManagedObject object) {
+    public <T> ManagedReference<T> createReference(T object) {
         if (createReferenceOp != null)
             createReferenceOp.report();
         return backingManager.createReference(object);

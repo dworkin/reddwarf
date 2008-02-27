@@ -666,7 +666,10 @@ public class ClientSessionServiceImpl
 		throw new NullPointerException("null sessionImpl");
 	    } 
 	    this.sessionRefId = sessionImpl.getId();
-	    this.sessionServer = sessionImpl.getClientSessionServer();
+	    this.sessionServer =
+		sessionImpl.getNodeId() == localNodeId ?
+		serverImpl :
+		sessionImpl.getClientSessionServer();
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {
@@ -1086,9 +1089,10 @@ public class ClientSessionServiceImpl
 		// TBD: should each notification/removal happen as a
 		// separate task?
 		ClientSessionImpl sessionImpl = 
-		    dataService.getServiceBinding(
-			sessionKey, ClientSessionImpl.class);
-		sessionImpl.notifyListenerAndRemoveSession(dataService, false);
+		    (ClientSessionImpl) dataService.getServiceBinding(
+			sessionKey);
+		sessionImpl.notifyListenerAndRemoveSession(
+		    dataService, false, true);
 	    }
 	}
     }

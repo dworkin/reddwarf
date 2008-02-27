@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -324,6 +325,22 @@ public abstract class AbstractService implements Service {
 	}
     }
 
+    /**
+     * Returns {@code true} if the specified exception is retryable, and
+     * {@code false} otherwise.  A retryable exception is one that
+     * implements {@link ExceptionRetryStatus} and invoking its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns {@code
+     * true}.
+     *
+     * @param	e an exception
+     * @return	{@code true} if the specified exception is retryable, annd
+     *		{@code false} otherwise
+     */
+    public static boolean isRetryableException(Exception e) {
+	return (e instanceof ExceptionRetryStatus) &&
+	    ((ExceptionRetryStatus) e).shouldRetry();
+    }
+    
     /**
      * Sets this service's state to {@code newState}.
      *

@@ -40,7 +40,7 @@ public class DungeonMessageHandler implements MessageHandler, Serializable {
     private static final long serialVersionUID = 1;
 
     // reference to the associated dungeon
-    private ManagedReference dungeonRef;
+    private ManagedReference<Dungeon> dungeonRef;
 
     /**
      * Creates a new <code>DungeonMessageHandler</code>.

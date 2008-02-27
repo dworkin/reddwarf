@@ -49,13 +49,13 @@ public class Creator implements Game, Serializable {
     public static final String IDENTIFIER = NAME_PREFIX + "creator";
 
     // the channel used for all players currently in the lobby
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the number of players interacting with the creator
     private int playerCount = 0;
 
     private UtilChannel channel() {
-        return channelRef.get(UtilChannel.class);
+        return channelRef.get();
     }
 
     /**
@@ -92,7 +92,7 @@ public class Creator implements Game, Serializable {
         // try to get an existing reference
         Creator creator = null;
         try {
-            creator = dataManager.getBinding(IDENTIFIER, Creator.class);
+            creator = (Creator) dataManager.getBinding(IDENTIFIER);
         } catch (NameNotBoundException e) {
             creator = new Creator();
             dataManager.setBinding(IDENTIFIER, creator);

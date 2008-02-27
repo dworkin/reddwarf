@@ -55,7 +55,7 @@ class HelloChannelsSessionListener
     public static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The session this {@code ClientSessionListener} is listening to. */
-    private final ManagedReference sessionRef;
+    private final ManagedReference<ClientSession> sessionRef;
 
     /**
      * Creates a new {@code HelloChannelsSessionListener} for the session.
@@ -84,7 +84,7 @@ class HelloChannelsSessionListener
      */
     protected ClientSession getSession() {
         // We created the ref with a non-null session, so no need to check it.
-        return sessionRef.get(ClientSession.class);
+        return sessionRef.get();
     }
 
     /**
@@ -162,7 +162,7 @@ class HelloChannelsSessionListener
      */
     private static Channel findChannel(String channelName) {
         DataManager dataMgr = AppContext.getDataManager();
-        return dataMgr.getBinding(channelName, Channel.class);
+        return (Channel) dataMgr.getBinding(channelName);
     }
 
     /**
