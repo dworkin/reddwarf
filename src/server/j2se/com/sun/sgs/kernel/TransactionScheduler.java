@@ -25,12 +25,20 @@ import com.sun.sgs.auth.Identity;
 
 
 /**
- * This extension of {@code Scheduler} is used to schedule transactional
- * tasks. These are tasks that run in the context of a {code Transaction}.
- * Transactional tasks are expected to be short-lived (typically on the
- * order of 10s of milliseconds). All tasks run through an implementaion
- * of {@code TransactionScheduler} will run transactionally, and may be
- * re-tried in the event of failure.
+ * This interface is used to schedule transactional tasks for immediate,
+ * delayed, or periodic execution. Transactional tasks are short-lived:
+ * typically on the order of a few 10s of milliseconds) and not longer than
+ * the value of the property {@code com.sun.sgs.txn.timeout}. All tasks run
+ * through an implementaion of {@code TransactionScheduler} will run
+ * transactionally, and may be re-tried in the event of failure.
+ * <p>
+ * Many methods will make a best effort to schedule a given task to run, but
+ * based on the policy of the implementation, the task and its owner, may be
+ * unable to accept the given task. In this case {@code TaskRejectedException}
+ * is thrown. To ensure that a task will be accepted, methods are provided to
+ * get a {@code TaskReservation}. This is especially useful for {@code Service}
+ * methods working within a transaction that need to ensure that a task will
+ * be accepted before they can commit.
  * <p>
  * If the result of running a task via the {@code reserveTask} or
  * {@code scheduleTask} methods is an {@code Exception} which implements
@@ -43,7 +51,92 @@ import com.sun.sgs.auth.Identity;
  * Note that re-try is handled slightly differently for {@code runTask}. See
  * the documentation on that method for more details.
  */
-public interface TransactionScheduler extends Scheduler {
+public interface TransactionScheduler {
+
+    /**
+     * Reserves the ability to run the given task.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     *
+     * @return a {@code TaskReservation} for the task
+     *
+     * @throws TaskRejectedException if a reservation cannot be made
+     */
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner);
+
+    /**
+     * Reserves the ability to run the given task at a specified point in
+     * the future. The {@code startTime} is a value in milliseconds
+     * measured from 1/1/1970.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     * @param startTime the time at which to start the task
+     *
+     * @return a {@code TaskReservation} for the task
+     *
+     * @throws TaskRejectedException if a reservation cannot be made
+     */
+    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
+                                       long startTime);
+
+    /**
+     * Schedules a task to run as soon as possible based on the specific
+     * scheduler implementation.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     *
+     * @throws TaskRejectedException if the given task is not accepted
+     */
+    public void scheduleTask(KernelRunnable task, Identity owner);
+
+    /**
+     * Schedules a task to run at a specified point in the future. The
+     * {@code startTime} is a value in milliseconds measured from
+     * 1/1/1970. If the starting time has already passed, then the task is
+     * run immediately.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     * @param startTime the time at which to start the task
+     *
+     * @throws TaskRejectedException if the given task is not accepted
+     */
+    public void scheduleTask(KernelRunnable task, Identity owner,
+                             long startTime);
+
+    /**
+     * Schedules a task to start running at a specified point in the future,
+     * and continuing running on a regular period starting from that
+     * initial point. Unlike the other {@code scheduleTask} methods, this
+     * method will never fail to accept to the task so there is no need for
+     * a reservation. Note, however, that the task will not actually start
+     * executing until {@code start} is called on the returned
+     * {@code RecurringTaskHandle}.
+     * <p>
+     * At each execution point the scheduler will make a best effort to run
+     * the task, but based on available resources scheduling the task may
+     * fail. Regardless, the scheduler will always try again at the next
+     * execution time.
+     *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     * @param startTime the time at which to start the task
+     * @param period the length of time in milliseconds between each
+     *               recurring task execution
+     *
+     * @return a {@code RecurringTaskHandle} used to manage the
+     *         recurring task
+     *
+     * @throws IllegalArgumentException if {@code period} is less than or
+     *                                  equal to zero
+     */
+    public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
+                                                     Identity owner,
+                                                     long startTime,
+                                                     long period);
 
     /**
      * Runs the given task synchronously, returning when the task has

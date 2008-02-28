@@ -129,7 +129,7 @@ public final class ContextResolver {
      *
      * @return the current {@code AppKernelAppContext}
      */
-    public static KernelContext getContext() {
+    static KernelContext getContext() {
         return context.get();
     }
 

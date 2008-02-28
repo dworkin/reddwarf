@@ -25,11 +25,11 @@ import com.sun.sgs.auth.Identity;
 
 
 /**
- * This extension of {@code Scheduler} is used to request tasks with a
- * specific priority. This is an experimental interface to provide a way
- * to test different thoughts on priority.
+ * This is an experimental interface to provide a way to test different
+ * thoughts on priority through a few basic scheduling methods that accept
+ * priority levels.
  */
-public interface PriorityScheduler extends Scheduler {
+public interface PriorityScheduler {
 
     /**
      * Reserves the ability to run the given task. The scheduler will make

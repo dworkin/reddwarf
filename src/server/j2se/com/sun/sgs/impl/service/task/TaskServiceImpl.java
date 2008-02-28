@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -234,7 +233,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // the profiled operations
     private ProfileOperation scheduleNDTaskOp = null;
     private ProfileOperation scheduleNDTaskDelayedOp = null;
-    private ProfileOperation scheduleNDTaskPrioritizedOp = null;
 
     /**
      * Creates an instance of {@code TaskServiceImpl}. See the class javadoc
@@ -272,7 +270,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         ctxFactory = new TransactionContextFactoryImpl(transactionProxy);
 
         // keep a reference to the system components...
-        this.transactionProxy = transactionProxy;
+        TaskServiceImpl.transactionProxy = transactionProxy;
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
         transactionScheduler =
             systemRegistry.getComponent(TransactionScheduler.class);
@@ -448,8 +446,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                 consumer.registerOperation("scheduleNonDurableTask");
             scheduleNDTaskDelayedOp =
                 consumer.registerOperation("scheduleNonDurableTaskDelayed");
-            scheduleNDTaskPrioritizedOp =
-                consumer.registerOperation("scheduleNonDurableTaskPrioritized");
         }
     }
 
@@ -538,7 +534,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     /**
      * {@inheritDoc}
      */
-    public void scheduleNonDurableTask(KernelRunnable task) {
+    public void scheduleNonDurableTask(KernelRunnable task,
+                                       boolean transactional) {
         if (task == null)
             throw new NullPointerException("Task must not be null");
         if (isShutdown)
@@ -547,13 +544,15 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             scheduleNDTaskOp.report();
 
         Identity owner = transactionProxy.getCurrentOwner();
-        scheduleTask(new NonDurableTask(task, owner), owner, START_NOW, false);
+        scheduleTask(new NonDurableTask(task, owner, transactional), owner,
+                     START_NOW, false);
     }
 
     /**
      * {@inheritDoc}
      */
-    public void scheduleNonDurableTask(KernelRunnable task, long delay) {
+    public void scheduleNonDurableTask(KernelRunnable task, long delay,
+                                       boolean transactional) {
         if (task == null)
             throw new NullPointerException("Task must not be null");
         if (delay < 0)
@@ -564,7 +563,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             scheduleNDTaskDelayedOp.report();
 
         Identity owner = transactionProxy.getCurrentOwner();
-        scheduleTask(new NonDurableTask(task, owner), owner,
+        scheduleTask(new NonDurableTask(task, owner, transactional), owner,
                      System.currentTimeMillis() + delay, false);
     }
 
@@ -985,16 +984,20 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     }
 
     /**
-     * Private wrapper class for all non-durable tasks. This simply makes
-     * sure that when a non-durable task runs, the status count for the
-     * associated identity is decremented.
+     * Private wrapper class for all non-durable tasks. This makes sure that
+     * when a non-durable task runs the status count for the associated
+     * identity is decremented, and runs the task within a transaction if
+     * this was requested.
      */
     private class NonDurableTask implements KernelRunnable {
         private final KernelRunnable runnable;
         private final Identity identity;
-        NonDurableTask(KernelRunnable runnable, Identity identity) {
+        private final boolean transactional;
+        NonDurableTask(KernelRunnable runnable, Identity identity,
+                       boolean transactional) {
             this.runnable = runnable;
             this.identity = identity;
+            this.transactional = transactional;
         }
         public String getBaseTaskType() {
             return runnable.getBaseTaskType();
@@ -1003,20 +1006,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (isShutdown)
                 return;
             try {
-                runnable.run();
-            } catch (Throwable t) {
-                // only if the task isn't going to be retried, submit the
-                // status change now
-                if ((! (t instanceof ExceptionRetryStatus)) ||
-                    (! ((ExceptionRetryStatus)t).shouldRetry()))
-                    submitStatusChange(identity, -1);
-
-                if (t instanceof Error)
-                    throw (Error)t;
+                if (transactional)
+                    transactionScheduler.runTask(runnable, identity);
                 else
-                    throw (Exception)t;
+                    runnable.run();
+            } finally {
+                submitStatusChange(identity, -1);
             }
-            submitStatusChange(identity, -1);
         }
     }
 
@@ -1033,7 +1029,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         // loop through all bound names for the given identity, starting
         // each pending task in a separate transaction
         while ((objName != null) && (objName.startsWith(prefix))) {
-            scheduleNonDurableTask(new TaskRestartRunner(objName));
+            scheduleNonDurableTask(new TaskRestartRunner(objName), true);
             objName = dataService.nextServiceBoundName(objName);
             taskCount++;
         }
@@ -1116,14 +1112,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             return getClass().getName();
         }
         public void run() throws Exception {
-            transactionScheduler.runTask(new KernelRunnable() {
-                    public String getBaseTaskType() {
-                        return NAME + ".RestartTransactionRunner";
-                    }
-                    public void run() throws Exception {
-                        restartTask(objName);
-                    }
-                }, appOwner);
+            restartTask(objName);
         }
     }
 
@@ -1272,7 +1261,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             if (! set.isEmpty()) {
                 Iterator<String> it = set.iterator();
                 while (it.hasNext()) {
-                    scheduleNonDurableTask(new TaskRestartRunner(it.next()));
+                    scheduleNonDurableTask(new TaskRestartRunner(it.next()),
+                                           true);
                     it.remove();
                 }
             }

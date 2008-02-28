@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.auth.Identity;
 
@@ -91,7 +90,8 @@ final class TransactionSchedulerImpl
     private static final String DEFAULT_CONSUMER_THREADS = "4";
 
     // the default priority for tasks
-    private static Priority defaultPriority = Priority.getDefaultPriority();
+    private static final Priority defaultPriority =
+        Priority.getDefaultPriority();
 
     // the coordinator used to create and coordinate transactions
     private final TransactionCoordinator transactionCoordinator;
@@ -337,7 +337,8 @@ final class TransactionSchedulerImpl
 
     /**
      * Package-private method that runs the given task in a transaction that
-     * is not bound by any timeout value.
+     * is not bound by any timeout value (i.e., is bound only by the
+     * {@code com.sun.sgs.txn.timeout.unbounded} property value).
      *
      * @param task the {@code KernelRunnable} to run transactionally
      * @param owner the {@code Identity} that owns the task
@@ -498,7 +499,12 @@ final class TransactionSchedulerImpl
                         ContextResolver.clearCurrentTransaction(transaction);
                     }
 
-                    // try to commit the transaction
+                    // try to commit the transaction...note that there's the
+                    // chance that the application code masked the orginal
+                    // cause of a failure, so we'll check for that first,
+                    // re-throwing the root cause in that case
+                    if (transaction.isAborted())
+                        throw transaction.getAbortCause();
                     handle.commit();
 
                     // the task completed successfully, so we're done
@@ -515,7 +521,13 @@ final class TransactionSchedulerImpl
                     if (logger.isLoggable(Level.WARNING))
                         logger.logThrow(Level.WARNING, ie, "skipping a task " +
                                         "that was interrupted: {0}", task);
-                    // FIXME: does the task need to get re-scheduled here?
+                    // NOTE: At this point the task is being dropped, but it
+                    // should probably be re-tried in a different thread,
+                    // unless this stack is shutting down. This can't be done
+                    // without handling re-try handoff correctly (as described
+                    // in runTask and shouldRetry), so while the current
+                    // behavior is technically valid, this task should be
+                    // re-queued when that behavior is available
                     throw ie;
                 } catch (Throwable t) {
                     // make sure the transaction was aborted

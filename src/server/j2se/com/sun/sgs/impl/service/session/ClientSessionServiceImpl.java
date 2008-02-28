@@ -1009,16 +1009,8 @@ public class ClientSessionServiceImpl
     /**
      * Schedules a non-durable, transactional task using the task service.
      */
-    void scheduleTaskOnCommit(final KernelRunnable task) {
-        final Identity owner = txnProxy.getCurrentOwner();
-        taskService.scheduleNonDurableTask(new KernelRunnable() {
-                public String getBaseTaskType() {
-                    return task.getBaseTaskType();
-                }
-                public void run() throws Exception {
-                    transactionScheduler.runTask(task, owner);
-                }
-            });
+    void scheduleTaskOnCommit(KernelRunnable task) {
+        taskService.scheduleNonDurableTask(task, true);
     }
 
     /**

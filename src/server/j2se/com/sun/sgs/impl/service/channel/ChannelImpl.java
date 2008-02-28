@@ -278,7 +278,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 				    coord);
 			    }
 			}
-		    }});
+		    }}, false);
 	}
     }
     

@@ -204,13 +204,18 @@ class Kernel {
             // initialize the transaction coordinator
             setupTransactionCoordinator(profileCollector);
 
-            // create the schedulers
+            // create the schedulers, and provide an empty context in case
+            // any profiling comonents try to do transactional work
             transactionScheduler =
                 new TransactionSchedulerImpl(appProperties,
                                              transactionCoordinator,
                                              profileCollector);
             taskScheduler =
                 new TaskSchedulerImpl(appProperties, profileCollector);
+                        
+            KernelContext ctx = new StartupKernelContext("Kernel");
+            transactionScheduler.setContext(ctx);
+            taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
             systemRegistry = new ComponentRegistryImpl();
@@ -298,9 +303,10 @@ class Kernel {
         }
 
         // finally, register the scheduler as a listener too
-        if (transactionScheduler instanceof ProfileListener)
-            profileCollector.
-                addListener((ProfileListener)transactionScheduler);
+        // NOTE: if we make the schedulers pluggable, or add other components
+        // that are listeners, then we should scan through all of the system
+        // components and check if they are listeners
+        profileCollector.addListener(transactionScheduler);
     }
 
     /**
@@ -323,7 +329,7 @@ class Kernel {
     }
 
     /**
-     * Creates each of the <code>Service</code>s and their coorespondint
+     * Creates each of the <code>Service</code>s and their cooresponding
      * <code>Manager</code>s (if any) in order, in preparation for starting
      * up an application.
      */

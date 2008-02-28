@@ -31,9 +31,9 @@ import com.sun.sgs.kernel.KernelRunnable;
  * run after the current task completes. The methods inherited from
  * <code>TaskManager</code> schedule durable, transactional tasks. The
  * <code>scheduleNonDurableTask</code> methods defined here are used to
- * schedule tasks that are not persisted by the <code>TaskService</code> and
- * not invoked in a transactional context. All tasks scheduled will be owned
- * by the current task's owner.
+ * schedule tasks that are not persisted by the <code>TaskService</code> but
+ * optionally invoked in a transactional context. All tasks scheduled will
+ * be owned by the current task's owner.
  */
 public interface TaskService extends TaskManager, Service {
 
@@ -43,13 +43,16 @@ public interface TaskService extends TaskManager, Service {
      * therefore is not guaranteed to run.
      *
      * @param task the <code>KernelTask</code> to run
+     * @param transactional <code>true</code> if the given task should be run
+     *                      in a transaction, <code>false</code> otherwise
      *
-     * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses
-     *                               to accept the task
+     * @throws TaskRejectedException if the backing scheduler refuses to
+     *                               accept the task
      * @throws TransactionException if the operation failed because of a
      *		                        problem with the current transaction
      */
-    public void scheduleNonDurableTask(KernelRunnable task);
+    public void scheduleNonDurableTask(KernelRunnable task,
+                                       boolean transactional);
 
     /**
      * Schedules a single task to run, after the given delay, once the
@@ -60,12 +63,15 @@ public interface TaskService extends TaskManager, Service {
      *
      * @param task the <code>KernelTask</code> to run
      * @param delay the number of milliseconds to delay before running the task
+     * @param transactional <code>true</code> if the given task should be run
+     *                      in a transaction, <code>false</code> otherwise
      *
-     * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses
-     *                               to accept the task
+     * @throws TaskRejectedException if the backing scheduler refuses to
+     *                               accept the task
      * @throws TransactionException if the operation failed because of a
      *		                        problem with the current transaction
      */
-    public void scheduleNonDurableTask(KernelRunnable task, long delay);
+    public void scheduleNonDurableTask(KernelRunnable task, long delay,
+                                       boolean transactional);
 
 }

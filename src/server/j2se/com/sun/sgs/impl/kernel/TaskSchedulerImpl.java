@@ -191,8 +191,6 @@ final class TaskSchedulerImpl implements TaskScheduler {
                                                      long period) {
         if (period <= 0)
             throw new IllegalArgumentException("Illegal period: " + period);
-        if (isShutdown)
-            throw new IllegalStateException("Scheduler is shutdown");
 
         return new RecurringTaskHandleImpl(new TaskDetail(task, owner,
                                                           startTime, true),
