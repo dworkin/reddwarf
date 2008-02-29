@@ -29,7 +29,7 @@ import com.sun.sgs.auth.Identity;
  * delayed, or periodic execution. Transactional tasks are short-lived:
  * typically on the order of a few 10s of milliseconds) and not longer than
  * the value of the property {@code com.sun.sgs.txn.timeout}. All tasks run
- * through an implementaion of {@code TransactionScheduler} will run
+ * through an implementation of {@code TransactionScheduler} will run
  * transactionally, and may be re-tried in the event of failure.
  * <p>
  * Many methods will make a best effort to schedule a given task to run, but

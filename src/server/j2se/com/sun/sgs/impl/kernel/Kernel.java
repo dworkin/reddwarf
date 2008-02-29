@@ -205,7 +205,7 @@ class Kernel {
             setupTransactionCoordinator(profileCollector);
 
             // create the schedulers, and provide an empty context in case
-            // any profiling comonents try to do transactional work
+            // any profiling components try to do transactional work
             transactionScheduler =
                 new TransactionSchedulerImpl(appProperties,
                                              transactionCoordinator,
@@ -329,7 +329,7 @@ class Kernel {
     }
 
     /**
-     * Creates each of the <code>Service</code>s and their cooresponding
+     * Creates each of the <code>Service</code>s and their corresponding
      * <code>Manager</code>s (if any) in order, in preparation for starting
      * up an application.
      */
