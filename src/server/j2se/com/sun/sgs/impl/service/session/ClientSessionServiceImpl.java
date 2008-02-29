@@ -106,11 +106,31 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The default block size for the IdGenerator. */
     private static final int ID_GENERATOR_BLOCK_SIZE = 256;
     
+    /** The name of the read buffer size property. */
+    private static final String READ_BUFFER_SIZE_PROPERTY =
+        CLASSNAME + ".buffer.read.max";
+
+    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
+    private static final int DEFAULT_READ_BUFFER_SIZE = 64 * 1024;
+    
+    /** The name of the write buffer size property. */
+    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+        CLASSNAME + ".buffer.write.max";
+
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
     /** The transaction proxy for this class. */
     static TransactionProxy txnProxy;
 
     /** The application name. */
     private final String appName;
+
+    /** The read buffer size for new connections. */
+    private final int readBufferSize;
+
+    /** The write buffer size for new connections. */
+    private final int writeBufferSize;
 
     /** The port number for accepting connections. */
     private final int port;
@@ -215,6 +235,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	    PropertiesWrapper wrappedProperties =
 		new PropertiesWrapper(properties);
+
+            readBufferSize = wrappedProperties.getIntProperty(
+                READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
+
+            writeBufferSize = wrappedProperties.getIntProperty(
+                WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
+
 	    idBlockSize =
 		wrappedProperties.getIntProperty(
  		    CLASSNAME + ".id.block.size", ID_GENERATOR_BLOCK_SIZE);
@@ -378,6 +407,24 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** {@inheritDoc} */
     public SgsClientSession getClientSession(byte[] sessionId) {
 	return sessions.get(new ClientSessionId(sessionId));
+    }
+
+    /**
+     * Returns the size of the read buffer to use for new connections.
+     * 
+     * @return the size of the read buffer to use for new connections
+     */
+    int getReadBufferSize() {
+        return readBufferSize;
+    }
+
+    /**
+     * Returns the size of the write buffer to use for new connections.
+     * 
+     * @return the size of the write buffer to use for new connections
+     */
+    int getWriteBufferSize() {
+        return writeBufferSize;
     }
 
     /* -- Implement accept() handler -- */

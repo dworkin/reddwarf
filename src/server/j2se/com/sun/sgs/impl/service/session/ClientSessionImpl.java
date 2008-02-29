@@ -104,9 +104,6 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The IO channel for sending messages to the client. */
     private AsynchronousMessageChannel sessionConnection = null;
 
-    public static final int DEFAULT_READ_BUFFER_SIZE  =  64 * 1024;
-    public static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
-    
     /** The read completion handler for IO. */
     private ReadHandler readHandler = new ClosedReadHandler();
     
@@ -586,8 +583,10 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
             }
 
             sessionConnection = conn;
-            readHandler = new ConnectedReadHandler(DEFAULT_READ_BUFFER_SIZE);
-            writeHandler = new ConnectedWriteHandler(DEFAULT_WRITE_BUFFER_SIZE);
+            readHandler =
+		new ConnectedReadHandler(sessionService.getReadBufferSize());
+            writeHandler =
+		new ConnectedWriteHandler(sessionService.getWriteBufferSize());
 
             switch (state) {
 
