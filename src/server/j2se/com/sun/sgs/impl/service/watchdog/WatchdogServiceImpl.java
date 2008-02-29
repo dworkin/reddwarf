@@ -183,8 +183,8 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The application name */
     private final String appName;
 
-    /** The exporter for this server. */
-    private final Exporter<WatchdogClient> exporter;
+    /** The exporter for this server or {@code null}. */
+    private Exporter<WatchdogClient> exporter = null;
 
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
@@ -350,6 +350,9 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
+	    if (exporter != null) {
+		exporter.unexport();
+	    }
 	    throw e;
 	}
     }
@@ -386,6 +389,9 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    renewThread.join();
 	} catch (InterruptedException e) {
 	    return false;
+	}
+	if (exporter != null) {
+	    exporter.unexport();
 	}
 	if (serverImpl != null) {
 	    serverImpl.shutdown();

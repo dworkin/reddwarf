@@ -955,7 +955,6 @@
       <compilerarg line="${javac.compilerargs}"/>
       <classpath>
         <path refid="server.classpath"/>
-        <path refid="mina.classpath"/>
       </classpath>
     </javac>
   </target>
@@ -1143,7 +1142,7 @@
 	   source="${javac.source}"
 	   classpathref="server.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 

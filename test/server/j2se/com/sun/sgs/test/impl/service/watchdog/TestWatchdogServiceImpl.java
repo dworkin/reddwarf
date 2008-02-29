@@ -141,6 +141,8 @@ public class TestWatchdogServiceImpl extends TestCase {
             additionalNodes = null;
         }
         serverNode.shutdown(clean);
+	/* Wait for sockets to close down. */
+	Thread.sleep(100);
     }
 
     /* -- Test constructor -- */
