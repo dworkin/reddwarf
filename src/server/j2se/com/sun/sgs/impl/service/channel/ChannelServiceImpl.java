@@ -76,7 +76,7 @@ import java.util.logging.Logger;
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
  */
-public class ChannelServiceImpl
+public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
 {
     /** The name of this class. */
@@ -191,7 +191,7 @@ public class ChannelServiceImpl
 	     */
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
-		0, Integer.MAX_VALUE);
+		1, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -346,6 +346,11 @@ public class ChannelServiceImpl
 		    taskScheduler.runTransactionalTask(
 			getMembersTask, taskOwner);
 		} catch (Exception e) {
+		    // FIXME: what is the right thing to do here?
+		    logger.logThrow(
+ 			Level.WARNING, e,
+			"obtaining members of channel:{0} throws",
+			HexDumper.toHexString(channelId));
 		}
 		Set<BigInteger> newLocalMembers =
 		    Collections.synchronizedSet(getMembersTask.getLocalMembers());

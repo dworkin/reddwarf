@@ -90,7 +90,7 @@ import java.util.logging.Logger;
  * Note that this server caches NodeImpls outside the data service to
  * maintain state.
  */
-public class WatchdogServerImpl implements WatchdogServer, Service {
+public final class WatchdogServerImpl implements WatchdogServer, Service {
 
     /** Server state. */
     private static enum State {
@@ -740,10 +740,12 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    NodeImpl choice = null;
             // Copy of the alive nodes
             NodeImpl[] values;
+            int numAliveNodes;
 	    synchronized (aliveNodes) {
-                values = aliveNodes.values().toArray(new NodeImpl[0]);
+		numAliveNodes = aliveNodes.size();
+                values =
+		    aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
             }
-            int numAliveNodes = values.length;       
 	    int random = backupChooser.nextInt(numAliveNodes);
 	    for (int i = 0; i < numAliveNodes; i++) {
 		// Choose one of the values[] elements randomly. If we
@@ -816,8 +818,8 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	public void run() {
 
 	    while (! shuttingDown()) {
-		while (statusChangedNodes.isEmpty()) {
-		    synchronized (notifyClientsLock) {
+		synchronized (notifyClientsLock) {
+		    while (statusChangedNodes.isEmpty()) {
 			try {
 			    notifyClientsLock.wait();
 			} catch (InterruptedException e) {

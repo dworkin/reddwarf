@@ -183,7 +183,7 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String toString() {
+    public synchronized String toString() {
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;

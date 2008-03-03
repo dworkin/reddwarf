@@ -33,6 +33,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.io.Connector;
@@ -41,6 +42,7 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
@@ -642,6 +644,72 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSessionSend() throws Exception {
+	final String name = "dummy";
+	DummyClient client = new DummyClient(name);
+	try {
+	    final String counterName = "counter";
+	    client.connect(serverNode.getAppPort());
+	    client.login("dummypassword");
+	    addNodes("a", "b", "c", "d");
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    AppContext.getDataManager().
+			setBinding(counterName, new Counter());
+		}}, taskOwner);
+	    
+	    int iterations = 3;
+	    List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
+	    nodes.add(serverNode);
+	    nodes.addAll(additionalNodes.values());
+	    
+	    for (int i = 0; i < iterations; i++) {
+		for (SgsTestNode node : nodes) {
+		    TaskScheduler scheduler = 
+			node.getSystemRegistry().
+			    getComponent(TaskScheduler.class);
+		    Identity identity = node.getProxy().getCurrentOwner();
+		    scheduler.scheduleTask(
+		        new TransactionRunner(
+		    	  new AbstractKernelRunnable() {
+			    public void run() {
+				DataManager dataManager =
+				    AppContext.getDataManager();
+				Counter counter = (Counter)
+				    dataManager.getBinding(counterName);
+				ClientSession session = (ClientSession)
+				    dataManager.getBinding(name);
+				MessageBuffer buf = new MessageBuffer(4);
+				buf.putInt(counter.getAndIncrement());
+				session.send(ByteBuffer.wrap(buf.getBuffer()));
+			    }}),
+			
+			identity);
+		}
+	    }
+
+	    client.checkMessagesReceived(nodes.size() * iterations);
+
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+
+    private static class Counter implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1L;
+
+	private int value = 0;
+
+	int getAndIncrement() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    return value++;
+	}
+    }
+
+	
+
+		
+
     public void testClientSend() throws Exception {
 	sendMessagesAndCheck(5, 5, null);
     }
@@ -691,7 +759,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String name;
 	private String password;
 	private Connector<SocketAddress> connector;
-	private ConnectionListener listener;
+	private Listener listener;
 	private Connection connection;
 	private boolean connected = false;
 	private final Object lock = new Object();
@@ -856,7 +924,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
-	void sendMessages(int numMessages, int expectedMessages, RuntimeException re) {
+	void sendMessages(
+	    int numMessages, int expectedMessages, RuntimeException re)
+	{
 	    this.expectedMessages = expectedMessages;
 	    this.throwException = re;
 	    
@@ -878,6 +948,36 @@ public class TestClientSessionServiceImpl extends TestCase {
 			     receivedMessages);
 		    }
 		}
+	    }
+	}
+
+	void checkMessagesReceived(int expectedMessages) {
+	    this.expectedMessages = expectedMessages;
+
+	    synchronized (receivedAllMessagesLock) {
+		if (listener.messageList.size() != expectedMessages) {
+		    try {
+			receivedAllMessagesLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+
+		    int receivedMessages = listener.messageList.size();
+		    if (receivedMessages != expectedMessages) {
+			fail("expected " + expectedMessages + ", received " +
+			     receivedMessages);
+		    }
+		}
+	    }
+
+	    int i = 0;
+	    for (byte[] message : listener.messageList) {
+		MessageBuffer buf = new MessageBuffer(message);
+		int value = buf.getInt();
+		System.err.println("[" + name + "] received message " + value);
+		if (value != i) {
+		    fail("expected message " + i + ", got " + value);
+		}
+		i++;
 	    }
 	}
 
@@ -989,7 +1089,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
-			System.err.println("message received: " + message);
+			System.err.println("[" + name +
+					   "] received SESSION_MESSAGE: " +
+					   HexDumper.toHexString(message));
 			lock.notifyAll();
 		    }
 		    break;
@@ -1078,6 +1180,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		dataManager.createReference(listener);
 	    dataManager.markForUpdate(this);
 	    sessions.put(sessionRef, listenerRef);
+	    dataManager.setBinding(session.getName(), session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
