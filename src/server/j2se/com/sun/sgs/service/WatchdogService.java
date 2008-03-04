@@ -93,6 +93,20 @@ public interface WatchdogService extends Service {
     Node getNode(long nodeId);
 
     /**
+     * Returns node status information for the node on the specified
+     * {@code host} and {@code port}, or {@code null} if the node is unknown.  
+     * This method should only be called within a transaction.
+     *
+     * @param	host	a host name
+     * @param   port    a port
+     * @return	node status information for the node on {@code host} and 
+     *          {@code port}, or {@code null}
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    Node getNode(String host, int port);
+    
+    /**
      * Returns the node that is designated as the backup for the node
      * with the specified {@code nodeId}, or {@code null} if no backup
      * is currently designated.  This method must be called within a

@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -207,6 +208,9 @@ public class WatchdogServiceImpl implements WatchdogService {
     /** The name of the local host. */
     final String localHost;
     
+    /** The application port. */
+    final int appPort;
+    
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
@@ -275,17 +279,43 @@ public class WatchdogServiceImpl implements WatchdogService {
 		wrappedProps.getBooleanProperty(
 		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
-            
+           
+             String finalService =
+                properties.getProperty(StandardProperties.FINAL_SERVICE);
+             StandardService finalStandardService = null;
+             boolean isFullStack = true;
+             if (finalService == null) {
+                 finalStandardService = StandardService.LAST_SERVICE;
+                 isFullStack = true;
+             } else {
+                 finalStandardService =
+                    Enum.valueOf(StandardService.class, finalService);
+                 isFullStack = 
+                    !(properties.getProperty(StandardProperties.APP_LISTENER)
+                     .equals(StandardProperties.APP_LISTENER_NONE));
+             }
+        
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
             
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
 
-	    int appPort = wrappedProps.getRequiredIntProperty(
-	        StandardProperties.APP_PORT, 1, 65535);
-
-	    String nodeEndpoint = clientHost + ":" + appPort;
+            // If we're running on a full stack (the usual case), or a
+            // partial stack that includes the client session service,
+            // insist that a valid port number be specfied.
+            // The client session service will attempt to open that port.
+            //
+            // Otherwise, no port is needed or required, and we simply use
+            // -1 as a placeholder for the port number.
+            if (isFullStack || 
+                (StandardService.ClientSessionService.ordinal() <=
+                    finalStandardService.ordinal()) ) {
+                appPort = wrappedProps.getRequiredIntProperty(
+                    StandardProperties.APP_PORT, 1, 65535);
+            } else {
+                appPort = -1;
+            }
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
@@ -297,7 +327,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-		    nodeEndpoint, clientProxy);
+		    clientHost, appPort, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -332,7 +362,7 @@ public class WatchdogServiceImpl implements WatchdogService {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(nodeEndpoint, 
+                long[] values = serverProxy.registerNode(clientHost, appPort, 
                                                          clientProxy);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
@@ -347,8 +377,8 @@ public class WatchdogServiceImpl implements WatchdogService {
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, endpoint:{0}, localNodeId:{1}",
-			   nodeEndpoint, localNodeId);
+			   "node registered, host:{0}, port:{1} localNodeId:{2}",
+			   clientHost, appPort, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -442,6 +472,12 @@ public class WatchdogServiceImpl implements WatchdogService {
 	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
 	}
 	return NodeImpl.getNode(dataService, nodeId);
+    }
+    
+    /** {@inheritDoc} */
+    public Node getNode(String host, int port) {
+        checkState();
+        return NodeImpl.getNode(dataService, host, port);
     }
 
     /** {@inheritDoc} */
@@ -594,7 +630,7 @@ public class WatchdogServiceImpl implements WatchdogService {
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, false);
+	    Node node = new NodeImpl(localNodeId, localHost, appPort, false);
 	    notifyNodeListeners(node);
 	}
     }
@@ -684,7 +720,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 
 	/** {@inheritDoc} */
 	public void nodeStatusChanges(
- 	    long[] ids, String hosts[], boolean[] status, long[] backups)
+ 	    long[] ids, String hosts[], int[] ports, 
+            boolean[] status, long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
 		status.length != backups.length)
@@ -697,7 +734,8 @@ public class WatchdogServiceImpl implements WatchdogService {
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
+		    new NodeImpl(ids[i], hosts[i], ports[i], 
+                                 status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (status[i] == false && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);

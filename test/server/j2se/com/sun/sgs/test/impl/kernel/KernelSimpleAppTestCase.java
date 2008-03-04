@@ -95,6 +95,8 @@ abstract class KernelSimpleAppTestCase extends TestCase {
      * logging, and system properties.
      */
     ProcessBuilder createProcessBuilder() throws Exception {
+        /* Update the port number in config */
+        config.setProperty("com.sun.sgs.app.port", String.valueOf(getPort()));
 	/* Create the application configuration file */
 	File configFile = File.createTempFile("SimpleApp", "config");
 	OutputStream configOut = new FileOutputStream(configFile);

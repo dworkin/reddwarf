@@ -90,6 +90,23 @@ public class SgsTestNode {
         }
     }
 
+    /** The default initial application port for the this test suite. */
+    private final static int DEFAULT_PORT = 20000;
+    
+    /** The property that can be used to select an initial port. */
+    private final static String PORT_PROPERTY = "test.sgs.port";
+    
+    /** The next application port to use for this test suite. */
+    private static AtomicInteger nextAppPort;
+    
+    static {
+        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
+        int port = systemPort == null ? DEFAULT_PORT 
+                                      : systemPort.intValue();
+        nextAppPort = new AtomicInteger(port);
+    }
+    
+    
     /** The app name. */
     private final String appName;
 
@@ -116,8 +133,6 @@ public class SgsTestNode {
 
     /** The listen port for the client session service. */
     private int appPort;
-
-    private static final AtomicInteger nextAppPort = new AtomicInteger(20000);
 
     /**
      * Creates the first SgsTestNode instance in this VM.  This thread's
@@ -211,8 +226,7 @@ public class SgsTestNode {
         if (listenerClass == null) {
             listenerClass = DummyAppListener.class;
         }
-	
-        boolean isServerNode = serverNode == null;
+
         if (properties == null) {
 	    props = getDefaultProperties(appName, serverNode, listenerClass);
         } else {
@@ -384,7 +398,7 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", Integer.toString(nextAppPort.getAndIncrement()),
+            "com.sun.sgs.app.port", Integer.toString(getNextAppPort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.start", 
@@ -424,6 +438,13 @@ public class SgsTestNode {
      */
     public int getAppPort() {
 	return appPort;
+    }
+    
+    /**
+     * Returns a unique port number.
+     */
+    public static int getNextAppPort() {
+        return nextAppPort.getAndIncrement();
     }
     
     /** Creates the specified directory, if it does not already exist. */

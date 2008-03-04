@@ -115,6 +115,14 @@ public class DummyWatchdogService implements WatchdogService {
             throw new IllegalArgumentException("Unknown node id: " + nodeId);
         return node;
     }
+    
+    /** {@inheritDoc} */
+    public Node getNode(String host, int port) {
+        for (Node n : nodeMap.values()) {
+            if (host.equals(n.getHostName()) && port == n.getPort()) return n;
+        }
+        return null;
+    }
 
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
@@ -146,8 +154,11 @@ public class DummyWatchdogService implements WatchdogService {
         public long getId() {
             return nodeId;
         }
-        public String getHostEndpoint() {
-            return "localhost:20000";
+        public String getHostName() {
+            return "localhost";
+        }
+        public int getPort() {
+            return 20000;
         }
         public boolean isAlive() {
             return isLocalNodeAlive();

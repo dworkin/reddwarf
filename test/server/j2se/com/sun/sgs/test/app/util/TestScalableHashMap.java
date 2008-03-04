@@ -23,7 +23,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
@@ -31,12 +30,10 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.UtilProperties;
 import static com.sun.sgs.test.util.UtilReflection.getConstructor;
 import static com.sun.sgs.test.util.UtilReflection.getMethod;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -3266,29 +3263,10 @@ public class TestScalableHashMap extends Assert {
     }
 
     private static Properties createProps(String appName) throws Exception {
-        // TODO: we don't currently support creating transactions with
-        // specific timeout values, so currently the default timeout is being
-        // set very high, but when we can run specific transactions longer,
-        // this should be used for the few tests that actually need this
-
-        // TODO use SgsTestNode to obtain the default properties?
-        return UtilProperties.createProperties(
-            "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "20000",
-            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-                System.getProperty("java.io.tmpdir") +
-                                    File.separator + appName + ".db",
-            StandardProperties.APP_LISTENER,
-                SgsTestNode.DummyAppListener.class.getName(),
-            "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
-                "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
-	    "com.sun.sgs.txn.timeout", "1000000",
-            "com.sun.sgs.impl.service.data.store.net.server.host", "localhost",
-            "com.sun.sgs.impl.service.data.store.net.server.start", "true",
-            "com.sun.sgs.impl.service.data.store.net.server.port", "0",
-	    "com.sun.sgs.impl.service.watchdog.server.start", "true",
-	    "com.sun.sgs.impl.service.nodemap.server.start", "true"
-        );
+        Properties props = SgsTestNode.getDefaultProperties(appName, null, 
+                                           SgsTestNode.DummyAppListener.class);
+        props.setProperty("com.sun.sgs.txn.timeout", "1000000");
+        return props;
     }
 
     /*

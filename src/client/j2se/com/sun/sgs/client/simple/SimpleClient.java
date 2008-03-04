@@ -75,7 +75,7 @@ public class SimpleClient implements ServerSession {
      */
     private final ClientConnectionListener connListener =
         new SimpleClientConnectionListener();
-
+    
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
 
@@ -279,6 +279,13 @@ public class SimpleClient implements ServerSession {
     final class SimpleClientConnectionListener
         implements ClientConnectionListener
     {
+        /** Indicates whether we're in the midst of an automatic redirect.
+         *  In this case, we'll want to disconnect our previous connection,
+         *  but we don't want to tell the client listener.
+         */
+        private volatile boolean redirect = false;
+    
+        PasswordAuthentication authentication = null;
         // Implement ClientConnectionListener
 
         /**
@@ -292,8 +299,12 @@ public class SimpleClient implements ServerSession {
                 clientConnection = connection;
             }
 
-            PasswordAuthentication authentication =
-                clientListener.getPasswordAuthentication();
+            // First time through, we haven't authenticated yet.
+            // We don't want to have to reauthenticate for each login
+            // redirect.
+            if (authentication == null) {
+                authentication = clientListener.getPasswordAuthentication();
+            }
 
             if (authentication == null) {
                 logout(true);
@@ -339,8 +350,14 @@ public class SimpleClient implements ServerSession {
 
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting disconnect
-            clientListener.disconnected(expectingDisconnect, reason);
+            
+            // Don't tell the client listener about the disconnect if we're
+            // doing it as part of an automatic redirect.
+            if (!redirect) {
+                clientListener.disconnected(expectingDisconnect, reason);
+            }
             expectingDisconnect = false;
+            redirect = false;
         }
 
         /**
@@ -371,7 +388,7 @@ public class SimpleClient implements ServerSession {
                 }
             }
         }
-
+        
         /**
          * Processes an application message.
          * 
@@ -398,11 +415,20 @@ public class SimpleClient implements ServerSession {
             }
 
             case SimpleSgsProtocol.LOGIN_REDIRECT: {
-                String endpoint = msg.getString();
-                logger.log(Level.FINER, "Login redirect: {0}", endpoint);
-                // TBI login redirect
-                clientListener.loginFailed(
-                    "unimplemented, want redirect to " + endpoint);
+                String host = msg.getString();
+                int port = msg.getInt();
+                logger.log(Level.FINER, "Login redirect: {0}:{1}", host, port);
+                
+                // Disconnect our current connection, and connect to the
+                // new host and port
+                redirect = true;
+                clientConnection.disconnect();
+                Properties props = new Properties();
+                props.setProperty("host", host);
+                props.setProperty("port", String.valueOf(port));
+                ClientConnector connector = ClientConnector.create(props);
+                // This eventually causes connected to be called
+                connector.connect(connListener);
                 break;
             }
 

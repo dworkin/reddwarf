@@ -116,7 +116,7 @@ import java.util.logging.Logger;
  *
  * This class is public for testing.
  */
-public class NodeMappingServerImpl implements NodeMappingServer {
+public final class NodeMappingServerImpl implements NodeMappingServer {
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -763,7 +763,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         try {
             newNodeId = assignPolicy.chooseNode(id);
         } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.WARNING, ex, "mapToNewNode: id {0} from {1}"
+            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
                     + " failed because no live nodes are available", 
                     id, oldNode);
             throw ex;
@@ -1162,7 +1162,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 // Look for the identity in the map.
                 idmo = (IdentityMO) dataService.getServiceBinding(idkey);
                 foundKeys.add(idkey);
-            } catch (Exception e) {
+            } catch (NameNotBoundException e) {
                 // Do nothing: leave idmo as null to indicate not found
             }
             if (idmo != null) {

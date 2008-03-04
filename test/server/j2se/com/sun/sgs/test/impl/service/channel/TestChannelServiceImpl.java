@@ -172,7 +172,6 @@ public class TestChannelServiceImpl extends TestCase {
         }
         serverNode.shutdown(clean);
         serverNode = null;
-        Thread.sleep(100);
     }
 
     /** 
@@ -1117,16 +1116,13 @@ public class TestChannelServiceImpl extends TestCase {
 		String user = iter.next();
 		DummyClient client = clients.get(user);
 		System.err.println("user: " + user +
-				   ", redirectEndpoint: " + client.redirectEndpoint);
-                // Note that the redirectEndpoint can sometimes be null,
+				   ", redirectHost: " + client.redirectHost);
+                // Note that the redirectHost can sometimes be null,
                 // as it won't be assigned if the initial login request
                 // was successful.  That would occur if the initial node 
                 // assignment for the client is the localhost, where the
                 // serverNode is running.
-                String clientHost = 
-                        client.redirectEndpoint == null ? null :
-                            client.redirectEndpoint.split(":", 2)[0];
-		if (host.equals(clientHost)) {
+		if (host.equals(client.redirectHost)) {
 		    iter.remove();
 		    removedClients.put(user, client);
 		}
@@ -1336,7 +1332,8 @@ public class TestChannelServiceImpl extends TestCase {
         private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
 	private String reason;	
-	private String redirectEndpoint;
+	private String redirectHost;
+        private int redirectPort;
         private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
@@ -1427,7 +1424,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-//	    redirectEndpoint = null;
+//            redirectHost = null;
+//            redirectPort = 0;
+            
 	}
 
 	DummyClient login(String user, String pass) {
@@ -1465,7 +1464,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (loginSuccess) {
 			return this;
 		    } else if (loginRedirect) {
-			host = redirectEndpoint.split(":", 2)[0];
+			host = redirectHost;
 		    } else {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
@@ -1476,13 +1475,13 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 
 	    // handle redirected login
-//	    int redirectPort =
-//	        Integer.valueOf(redirectEndpoint.split(":", 2)[1]);
 	    SgsTestNode node = additionalNodes.get(host);
-	    int redirectPort = node.getAppPort();
 	    nodeId = node.getWatchdogService().getLocalNodeId();
+            // cache a local copy of redirect port, in case it's ever
+            // cleared by disconnect
+            int port = redirectPort;
 	    disconnect();
-	    connect(redirectPort);
+	    connect(port);
 	    return login(user, pass);
 	}
 
@@ -1690,12 +1689,14 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectEndpoint = buf.getString();
+		    redirectHost = buf.getString();
+                    redirectPort = buf.getInt();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", endpoint:" + redirectEndpoint);
+					   ", host:" + redirectHost +
+                                           ", port:" + redirectPort);
 			lock.notifyAll();
 		    } break;
 

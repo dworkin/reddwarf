@@ -54,12 +54,19 @@ class NodeImpl
 
     /** The prefix for NodeImpl state. */
     private static final String NODE_PREFIX = PKG_NAME + ".node";
+    
+    /** The prefix for a node saved by host and port location. */
+    private static final String NODE_LOCATION_PREFIX = 
+            PKG_NAME + ".location";
 
     /** The node id. */
     private final long id;
     
-    /** The host endpoint (hostname:port), or {@code null}. */
+    /** The host name, or {@code null}. */
     private final String host;
+    
+    /** The port, or {@code null}. */
+    private final int port;
 
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
@@ -82,53 +89,75 @@ class NodeImpl
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code client}.  This instance's
-     * alive status is set to {@code true}.  The expiration time for
-     * this instance should be set as soon as it is known.
+     * nodeId}, {@code hostName}, {@code port}, and {@code client}.  
+     * This instance's alive status is set to {@code true}.  The expiration 
+     * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
+     * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
-	this.id = nodeId;
-	this.host = hostName;
-	this.client = client;
-	this.isAlive = true;
+    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
+        this (nodeId, hostName, port, client, true, INVALID_ID);
     }
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostEndpoint}, and {@code isAlive} status.  This
+     * nodeId}, {@code hostName}, and {@code isAlive} status.  This
      * instance's watchdog client is set to {@code null} and its
      * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
-     * @param 	hostEndpoint a host endpoint, or {@code null}
+     * @param 	hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostEndpoint, boolean isAlive) {
-	this(nodeId, hostEndpoint, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
+	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
     }
 	
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostEndpoint}, {@code backupId}, and {@code
-     * isAlive} status.  This instance's watchdog client is set to
+     * nodeId}, {@code hostName}, {@code port}, {@code isAlive} status, and 
+     * {@code backupId}.  This instance's watchdog client is set to
      * {@code null}.
      *
      * @param 	nodeId a node ID
-     * @param   hostEndpoint a host endpoint, or {@code null}
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostEndpoint, boolean isAlive, long backupId) {
-	this.id = nodeId;
-	this.host = hostEndpoint;
-	this.client = null;
-	this.isAlive = isAlive;
-	this.backupId = backupId;
+    NodeImpl(long nodeId, String hostName, int port, 
+             boolean isAlive, long backupId) 
+    {
+        this(nodeId, hostName, port, null, isAlive, backupId);
+    }
+    
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostName}, {@code port}, {@code client}, 
+     * {@code isAlive} status, and {@code backupId}.
+     *
+     * @param 	nodeId a node ID
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
+     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	backupId the ID of the node's backup (-1 if no backup
+     *		is assigned)
+     */
+    private NodeImpl(long nodeId, String hostName, int port, 
+                     WatchdogClient client, boolean isAlive, long backupId) 
+    {
+        this.id = nodeId;
+
+	this.host = hostName;
+        this.port = port;
+        this.client = client;
+        this.isAlive = isAlive;
+        this.backupId = backupId;
     }
 
     /* -- Implement Node -- */
@@ -139,8 +168,13 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String getHostEndpoint() {
+    public String getHostName() {
 	return host;
+    }
+    
+    /** {@inheritDoc} */
+    public int getPort() {
+        return port;
     }
 
     /** {@inheritDoc} */
@@ -172,7 +206,8 @@ class NodeImpl
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && compareStrings(host, node.host) == 0;
+	    return id == node.id && compareStrings(host, node.host) == 0 &&
+                     port == node.port;
 	}
 	return false;
     }
@@ -186,7 +221,8 @@ class NodeImpl
     public String toString() {
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
-	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;
+	    (backupId == INVALID_ID ? "(none)" : backupId) + 
+            "]@" + host + ":" + port;
     }
 
     /* -- package access methods -- */
@@ -300,6 +336,7 @@ class NodeImpl
      */
     synchronized void putNode(DataService dataService) {
 	dataService.setServiceBinding(getNodeKey(id), this);
+        dataService.setServiceBinding(getNodeLocationKey(host, port), this);
     }
     
     /**
@@ -338,6 +375,8 @@ class NodeImpl
 	NodeImpl node;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
+            String locKey = getNodeLocationKey(node.host, node.port);
+            dataService.removeServiceBinding(locKey);
 	    dataService.removeServiceBinding(key);
 	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
@@ -366,6 +405,31 @@ class NodeImpl
 	return node;
     }
 
+    /**
+     * Returns the {@code Node} instance located at the given 
+     * {@code host} and {@code port}, retrieved from the specified
+     * {@code dataService}, or {@code null} if such a node isn't bound
+     * in the data service.  This method should only be called within
+     * a transaction.
+     * 
+     * @param dataService a data service
+     * @param host        the host where the node is expected to be bound
+     * @param port        the port where the node is expected to be bound
+     * @return the node bound to the given {@code host} and {@code port}, or
+     *         {@code null}
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    static Node getNode(DataService dataService, String host, int port) {
+        String key = getNodeLocationKey(host, port);
+        NodeImpl node = null;
+	try {
+	    node = (NodeImpl) dataService.getServiceBinding(key);
+	} catch (NameNotBoundException e) {
+	}
+	return node;
+    }
+    
     /**
      * Marks all nodes currently bound in the specified {@code
      * dataService} as failed, and returns a collection of those
@@ -438,6 +502,10 @@ class NodeImpl
      */
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;
+    }
+    
+    private static String getNodeLocationKey(String host, int port) {
+        return NODE_LOCATION_PREFIX + "." + host + "." + port;
     }
     
     /**

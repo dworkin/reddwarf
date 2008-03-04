@@ -172,8 +172,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
             SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
-            String endpoint = host + ":" + node.getAppPort();
-            additionalNodes.put(endpoint, node);
+            additionalNodes.put(host, node);
         }
     }
 
@@ -188,6 +187,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
+        Thread.sleep(100);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -196,7 +196,6 @@ public class TestClientSessionServiceImpl extends TestCase {
         }
         serverNode.shutdown(clean);
         serverNode = null;
-        Thread.sleep(100);
     }
 
     /* -- Test constructor -- */
@@ -296,10 +295,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testLoginRedirect() throws Exception {
 	int serverAppPort = serverNode.getAppPort();
-	String[] endpoints = new String[] { "one", "two", "three", "four"};
+	String[] hosts = new String[] { "one", "two", "three", "four"};
 	String[] users = new String[] { "sleepy", "bashful", "dopey", "doc" };
 	Set<DummyClient> clients = new HashSet<DummyClient>();
-	addNodes(endpoints);
+	addNodes(hosts);
 	boolean failed = false;
 	int redirectCount = 0;
 	try {
@@ -309,10 +308,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		if (! client.login("password")) {
 		    // login redirected
 		    redirectCount++;
-		    int redirectPort =
-	                Integer.valueOf(client.redirectEndpoint.split(":", 2)[1]);
+                    int port = client.redirectPort;
 		    client = new DummyClient(user);
-		    client.connect(redirectPort);
+		    client.connect(port);
 		    if (!client.login("password")) {
 			failed = true;
 			System.err.println("login for user: " + user +
@@ -759,7 +757,8 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;
-	private String redirectEndpoint;
+	private String redirectHost;
+        private int redirectPort;
 	private byte[] reconnectKey;
 	
 	volatile boolean receivedDisconnectedCallback = false;
@@ -1023,12 +1022,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
-		    redirectEndpoint = buf.getString();
+		    redirectHost = buf.getString();
+                    redirectPort = buf.getInt();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", endpoint:" + redirectEndpoint);
+					   ", host:" + redirectHost +
+                                           ", port:" + redirectPort);
 			lock.notifyAll();
 		    } break;
 

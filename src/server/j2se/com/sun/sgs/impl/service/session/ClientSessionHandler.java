@@ -581,7 +581,7 @@ class ClientSessionHandler {
 			name, sessionService.getLocalNodeId(), node);
 		}
 		final byte[] loginRedirectMessage =
-		    getLoginRedirectMessage(node.getHostEndpoint());
+		    getLoginRedirectMessage(node.getHostName(), node.getPort());
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			sendProtocolMessage(
@@ -820,13 +820,14 @@ class ClientSessionHandler {
 
     /**
      * Returns a byte array containing a LOGIN_REDIRECT protocol
-     * message containing the given {@code hostname}.
+     * message containing the given {@code hostname} and {@code port.
      */
-    private static byte[] getLoginRedirectMessage(String hostname) {
+    private static byte[] getLoginRedirectMessage(String hostname, int port) {
 	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(1 + hostStringSize);
+	MessageBuffer ack = new MessageBuffer(1 + hostStringSize + 4);
         ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putString(hostname);
+            putString(hostname).
+            putInt(port);
         return ack.getBuffer();
     }	
 }
