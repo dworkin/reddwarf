@@ -125,7 +125,7 @@ import java.util.logging.Logger;
  *	{@code 65535}.<p>
  * </dl> <p>
  */
-public class WatchdogServiceImpl implements WatchdogService {
+public final class WatchdogServiceImpl implements WatchdogService {
 
     /**  The name of this class. */
     private static final String CLASSNAME =
@@ -712,8 +712,11 @@ public class WatchdogServiceImpl implements WatchdogService {
     private final class RecoveryCompleteFutureImpl
 	implements RecoveryCompleteFuture
     {
+	/** The failed node. */
 	private final Node node;
+	/** The recovery listener for this future (currently unused). */
 	private final RecoveryListener listener;
+	/** Indicates whether recovery is done. */
 	private boolean isDone = false;
 
 	/**

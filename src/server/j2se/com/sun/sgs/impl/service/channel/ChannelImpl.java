@@ -137,8 +137,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
 		       HexDumper.toHexString(channelId));
 	}
-	dataService.setServiceBinding(
-	    getEventQueueKey(), new EventQueue(this));
+	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
     }
 
     /* -- Factory methods -- */
@@ -1225,11 +1224,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    
 	/**
 	 * Processes (at least) the first event in the queue.
-	 *
-	 * TBD: (optimization for all events) if the coordinator for
-	 * this channel is the local node, we could short-circuit the
-	 * remote invocation on the channel server proxy and instead
-	 * invoke the local channel server implementation directly.
 	 */
 	void serviceEvent() {
 	    checkState();
@@ -1296,10 +1290,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	     * Process channel events.  If the 'serviceAllEvents' flag is
 	     * true, then service all pending events.
 	     */
-
 	    int eventsToService = channelService.eventsPerTxn;
+	    ManagedQueue<ChannelEvent> eventQueue = getQueue();
 	    do {
-		ChannelEvent event = getQueue().poll();
+		ChannelEvent event = eventQueue.poll();
 		if (event == null) {
 		    return;
 		}
