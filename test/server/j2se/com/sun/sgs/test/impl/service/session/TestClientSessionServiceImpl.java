@@ -27,15 +27,18 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -47,6 +50,9 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -652,16 +658,39 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
 	    addNodes("a", "b", "c", "d");
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-		public void run() {
-		    AppContext.getDataManager().
-			setBinding(counterName, new Counter());
-		}}, taskOwner);
 	    
-	    int iterations = 3;
-	    List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
+	    int iterations = 4;
+	    final List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
+	    
+	    /*
+	     * Replace each node's ClientSessionServer, bound in the data
+	     * service, with a wrapped server that delays before sending
+	     * the message.
+	     */
+	    final DataService ds = dataService;
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		@SuppressWarnings("unchecked")
+		public void run() {
+		    for (SgsTestNode node : nodes) {
+			String key = "com.sun.sgs.impl.service.session.server." +
+			    node.getNodeId();
+			ManagedSerializable<ClientSessionServer> managedServer =
+			    (ManagedSerializable<ClientSessionServer>)
+			    dataService.getServiceBinding(key);
+			DelayingInvocationHandler handler =
+			    new DelayingInvocationHandler(managedServer.get());
+			ClientSessionServer delayingServer =
+			    (ClientSessionServer)
+			    Proxy.newProxyInstance(
+				ClientSessionServer.class.getClassLoader(),
+				new Class[] { ClientSessionServer.class },
+				handler);
+			dataService.setServiceBinding(
+			    key, new ManagedSerializable(delayingServer));
+		    }
+		}}, taskOwner);
 	    
 	    for (int i = 0; i < iterations; i++) {
 		for (SgsTestNode node : nodes) {
@@ -675,8 +704,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 			    public void run() {
 				DataManager dataManager =
 				    AppContext.getDataManager();
-				Counter counter = (Counter)
-				    dataManager.getBinding(counterName);
+				Counter counter;
+				try {
+				    counter = (Counter)
+					dataManager.getBinding(counterName);
+				} catch (NameNotBoundException e) {
+				    throw new MaybeRetryException("retry", true);
+				}
 				ClientSession session = (ClientSession)
 				    dataManager.getBinding(name);
 				MessageBuffer buf = new MessageBuffer(4);
@@ -687,6 +721,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 			identity);
 		}
 	    }
+	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		public void run() {
+		    AppContext.getDataManager().
+			setBinding(counterName, new Counter());
+		}}, taskOwner);
 
 	    client.checkMessagesReceived(nodes.size() * iterations);
 
@@ -705,10 +744,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return value++;
 	}
     }
-
-	
-
-		
 
     public void testClientSend() throws Exception {
 	sendMessagesAndCheck(5, 5, null);
@@ -1289,5 +1324,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return retry;
 	}
     }
+
+    private static class DelayingInvocationHandler
+	implements InvocationHandler, Serializable
+    {
+	private final static long serialVersionUID = 1L;
+	private Object obj;
 	
+	DelayingInvocationHandler(Object obj) {
+	    this.obj = obj;
+	}
+	
+	public Object invoke(Object proxy, Method method, Object[] args)
+	    throws Exception
+	{
+	    Thread.sleep(100);
+	    return method.invoke(obj, args);
+	}
+    }
 }

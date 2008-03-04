@@ -740,7 +740,7 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 	    NodeImpl choice = null;
             // Copy of the alive nodes
             NodeImpl[] values;
-            int numAliveNodes;
+            final int numAliveNodes;
 	    synchronized (aliveNodes) {
 		numAliveNodes = aliveNodes.size();
                 values =

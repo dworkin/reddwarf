@@ -96,15 +96,6 @@ public class ClientSessionImpl
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
 
-    /** The client session server (possibly remote) for this client
-     * session.
-     *
-     * TBD: the session server for each node should be bound in the data
-     * service instead of holding a copy in each ClientSessionImpl
-     * instance.
-     */
-    private final ClientSessionServer sessionServer;
-
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
@@ -139,7 +130,6 @@ public class ClientSessionImpl
 	    throw new IllegalStateException("session's identity is not set");
 	}
 	this.sessionService = sessionService;
-	this.sessionServer = sessionService.getServerProxy();
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
 	DataService dataService = sessionService.getDataService();
@@ -418,8 +408,8 @@ public class ClientSessionImpl
     /**
      * Returns the {@code ClientSessionServer} for this instance.
      */
-    ClientSessionServer getClientSessionServer() {
-	return sessionServer;
+    private ClientSessionServer getClientSessionServer() {
+	return sessionService.getClientSessionServer(nodeId);
     }
     
     /**
@@ -593,7 +583,18 @@ public class ClientSessionImpl
 	    eventQueue.serviceEvent();
 	    
 	} else {
-	    
+
+	    final ClientSessionServer sessionServer = getClientSessionServer();
+	    if (sessionServer == null) {
+		/*
+		 * If the ClientSessionServer for this session has been
+		 * removed, then this session's node has failed and the
+		 * session has been disconnected.  The event queue will be
+		 * cleaned up eventually, so there is no need to flag an
+		 * error here.
+		 */
+		return;
+	    }
 	    sessionService.scheduleNonTransactionalTask(
 	        new AbstractKernelRunnable() {
 		    public void run() {
@@ -683,7 +684,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.disconnect(eventQueue.getClientSession());
+	    sessionImpl.sessionService.disconnect(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

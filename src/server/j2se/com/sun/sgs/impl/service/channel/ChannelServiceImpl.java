@@ -32,6 +32,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -222,7 +223,7 @@ public final class ChannelServiceImpl
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
-			    new ChannelServerWrapper(serverProxy));
+			    new ManagedSerializable<ChannelServer>(serverProxy));
 		    }},
 		taskOwner);
 
@@ -867,7 +868,7 @@ public final class ChannelServiceImpl
 
     /**
      * Returns the key for accessing the {@code ChannelServer}
-     * instance (which is wrapped in a {@code ChannelServerWrapper})
+     * instance (which is wrapped in a {@code ManagedSerializable})
      * for the specified {@code nodeId}.
      */
     private static String getChannelServerKey(long nodeId) {
@@ -888,16 +889,16 @@ public final class ChannelServiceImpl
 	} else {
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    try {
-		return
-		    ((ChannelServerWrapper) getDataService().getServiceBinding(
-			channelServerKey)).get();
+		ManagedSerializable wrappedProxy = (ManagedSerializable)
+		    dataService.getServiceBinding(channelServerKey);
+		return (ChannelServer) wrappedProxy.get();
 	    } catch (NameNotBoundException e) {
 		return null;
 	    } catch (ObjectNotFoundException e) {
 		logger.logThrow(
 		    Level.SEVERE, e,
-		    "ChannelServerWrapper binding:{0} exists, " +
-		    "but object removed", channelServerKey);
+		    "ChannelServer binding:{0} exists, but object removed",
+		    channelServerKey);
 		throw e;
 	    }
 	}
@@ -1064,10 +1065,8 @@ public final class ChannelServiceImpl
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    DataService dataService = getDataService();
 	    try {
-		ChannelServerWrapper proxyWrapper =
-		    (ChannelServerWrapper) dataService.getServiceBinding(
-			channelServerKey);
-		dataService.removeObject(proxyWrapper);
+		dataService.removeObject(
+		    dataService.getServiceBinding(channelServerKey));
 	    } catch (NameNotBoundException e) {
 		// already removed
 		return;

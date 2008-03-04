@@ -20,6 +20,9 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
@@ -33,6 +36,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -44,6 +48,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -52,6 +57,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -154,6 +160,9 @@ public final class ClientSessionServiceImpl
     /** The node mapping service. */
     final NodeMappingService nodeMapService;
 
+    /** The task service. */
+    final TaskService taskService;
+
     /** The identity manager. */
     final IdentityCoordinator identityManager;
 
@@ -246,23 +255,37 @@ public final class ClientSessionServiceImpl
 		throw e;
 	    }
 
+	    /*
+	     * Get services and initialize service-related and other
+	     * instance fields.
+	     */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
-
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
-            
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
+	    taskService = txnProxy.getService(TaskService.class);
             nonDurableTaskScheduler =
 		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner,
-		    txnProxy.getService(TaskService.class));
-            
-	    localNodeId = watchdogService. getLocalNodeId();
+		    taskScheduler, taskOwner, taskService);
+	    localNodeId = watchdogService.getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
 
+	    /*
+	     * Store the ClientSessionServer proxy in the data store.
+	     */
+	    taskScheduler.runTransactionalTask(
+		new AbstractKernelRunnable() {
+		    public void run() {
+			dataService.setServiceBinding(
+			    getClientSessionServerKey(localNodeId),
+			    new ManagedSerializable<ClientSessionServer>(
+				serverProxy));
+		    }},
+		taskOwner);
+	    
 	    /*
 	     * Listen for incoming client connections.
 	     */
@@ -347,12 +370,32 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Returns the proxy for the client session server
+     * Returns the proxy for the client session server on the specified
+     * {@code nodeId}, or {@code null} if no server exists.
      *
-     * @return	the proxy for the client session server
+     * @param	nodeId a node ID
+     * @return	the proxy for the client session server on the specified
+     * 		{@code nodeId}, or {@code null}
      */
-    ClientSessionServer getServerProxy() {
-	return serverProxy;
+    ClientSessionServer getClientSessionServer(long nodeId) {
+	if (nodeId == localNodeId) {
+	    return serverImpl;
+	} else {
+	    String sessionServerKey = getClientSessionServerKey(nodeId);
+	    try {
+		ManagedSerializable wrappedProxy = (ManagedSerializable)
+		    dataService.getServiceBinding(sessionServerKey);
+		return (ClientSessionServer) wrappedProxy.get();
+	    } catch (NameNotBoundException e) {
+		return null;
+	    }  catch (ObjectNotFoundException e) {
+		logger.logThrow(
+		    Level.SEVERE, e,
+		    "ClientSessionServer binding:{0} exists, " +
+		    "but object removed", sessionServerKey);
+		throw e;
+	    }
+	}
     }
 
     /* -- Implement ClientSessionService -- */
@@ -389,6 +432,8 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    /* -- Package access methods for adding commit actions -- */
+    
     /**
      * Sends the specified protocol {@code message} to the specified
      * client {@code session} with the specified {@code delivery}
@@ -891,6 +936,15 @@ public final class ClientSessionServiceImpl
     }
     
     /**
+     * Returns the key for accessing the {@code ClientSessionServer}
+     * instance (which is wrapped in a {@code ManagedSerializable})
+     * for the specified {@code nodeId}.
+     */
+    private static String getClientSessionServerKey(long nodeId) {
+	return PKG_NAME + ".server." + nodeId;
+    }
+    
+    /**
      * Checks if the local node is considered alive, and throws an
      * {@code IllegalStateException} if the node is no longer alive.
      * This method should be called within a transaction.
@@ -1014,11 +1068,14 @@ public final class ClientSessionServiceImpl
 	 * be performed in a separate thread.
 	 */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
+	    final long nodeId = node.getId();
 	    try {
 		taskScheduler.runTransactionalTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
-			    notifyDisconnectedSessions(node.getId());
+			    taskService.scheduleTask(
+				new RemoveClientSessionServerProxyTask(nodeId));
+			    notifyDisconnectedSessions(nodeId);
 			}},
 		    taskOwner);
 		future.done();
@@ -1026,7 +1083,7 @@ public final class ClientSessionServiceImpl
 		logger.logThrow(
  		    Level.WARNING, e,
 		    "notifying disconnected sessions for node:{0} throws",
-		    node.getId());
+		    nodeId);
 		// TBD: what should it do if it can't recover?
 	    }
 	}
@@ -1059,6 +1116,46 @@ public final class ClientSessionServiceImpl
 		sessionImpl.notifyListenerAndRemoveSession(
 		    dataService, false, true);
 	    }
+	}
+    }
+
+    /**
+     * A persistent task to remove the client session server proxy for a
+     * specified node.
+     */
+    private static class RemoveClientSessionServerProxyTask
+	 implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	RemoveClientSessionServerProxyTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/**
+	 * Removes the client session server proxy and binding for the node
+	 * specified during construction.
+	 */
+	public void run() {
+	    String sessionServerKey = getClientSessionServerKey(nodeId);
+	    DataService dataService = getDataService();
+	    try {
+		dataService.removeObject(
+		    dataService.getServiceBinding(sessionServerKey));
+	    } catch (NameNotBoundException e) {
+		// already removed
+		return;
+	    } catch (ObjectNotFoundException e) {
+	    }
+	    dataService.removeServiceBinding(sessionServerKey);
 	}
     }
 }
