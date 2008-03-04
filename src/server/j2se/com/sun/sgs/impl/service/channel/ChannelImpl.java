@@ -121,9 +121,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
     /** Flag that is 'true' if this channel is closed. */
     private boolean isClosed = false;
 
-    /** The capacity of the write buffer, in bytes. */
-    // TODO this doesn't have to be final, but additional logic is
-    // required to support dynamic capacity. -JM
+    /**
+     * The maximum number of message bytes that can be queued for delivery on
+     * this channel.
+     */
     private final int writeBufferCapacity;
 
     /**
@@ -131,6 +132,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * {@code delivery} requirement.
      *
      * @param delivery a delivery requirement
+     * @param writeBufferCapacity the capacity of the write buffer, in bytes
      */
     protected ChannelImpl(Delivery delivery, int writeBufferCapacity) {
 	this.delivery = delivery;
@@ -154,7 +156,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * Constructs a new {@code ChannelImpl} with the given {@code
      * delivery} requirement and write-buffer capacity.
      */
-    static ChannelImpl newInstance(Delivery delivery, int writeBufferCapacity)
+    static ChannelImpl newInstance(
+	Delivery delivery, int writeBufferCapacity)
     {
 	// TBD: create other channel types depending on delivery.
 	return new OrderedUnreliableChannelImpl(delivery, writeBufferCapacity);
@@ -1170,7 +1173,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	private boolean sendRefresh = false;
 
-	/** The number of bytes of the write buffer that are available. */
+	/**
+	 * The number of bytes of the write buffer that are currently
+	 * available.
+	 */
 	private int writeBufferAvailable;
 
 	/**
@@ -1190,16 +1196,15 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * @param event the event
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 * @throws MessageRejectedException if the cost of the event
-	 *         exceeds the availability of the queue
+	 *         exceeds the available buffer space in the queue
 	 */
 	boolean offer(ChannelEvent event) {
 
 	    int cost = event.getCost();
 	    if (cost > writeBufferAvailable) {
 	        throw new MessageRejectedException(
-	            "not enough queue space: available = " +
-	            writeBufferAvailable + " requested = " +
-	            cost);
+	            "Not enough queue space: " + writeBufferAvailable +
+		    " bytes available, " + cost + " requested");
 	    }
 
 	    boolean result = getQueue().offer(event);
@@ -1350,8 +1355,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
 
 		    if (logger.isLoggable(Level.FINEST)) {
 		        logger.log(Level.FINEST,
-		            "{0} cleared reservation of {1,number,#} leaving {2,number,#}",
-		            this, cost, writeBufferAvailable);
+				   "{0} cleared reservation of " +
+				   "{1,number,#} bytes, leaving {2,number,#}",
+				   this, cost, writeBufferAvailable);
 		    }
 		}
 
@@ -1375,7 +1381,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * Services this event, taken from the head of the given {@code
 	 * eventQueue}.
 	 */
-	public abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(EventQueue eventQueue);
 
 	/**
 	 * Returns the cost of this event, which the {@code EventQueue}
@@ -1384,7 +1390,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 * 
 	 * @return the cost of this event
 	 */
-	public int getCost() {
+	int getCost() {
 	    return 0;
 	}
     }
@@ -1610,9 +1616,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		    }});
 	}
 
-        /** {@inheritDoc} */
+	/** Use the message length as the cost for sending messages. */
 	@Override
-	public int getCost() {
+	int getCost() {
 	    return message.length;
 	}
 

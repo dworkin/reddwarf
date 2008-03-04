@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.session;
+package com.sun.sgs.impl.nio;
 
 import com.sun.sgs.nio.channels.IoFuture;
 import java.util.concurrent.Callable;
@@ -28,10 +28,10 @@ import java.util.concurrent.FutureTask;
  * An implementation of {@code IoFuture} that adds an object attachment to a
  * {@code FutureTask}.
  *
- * @param	<R> the result type
- * @param	<A> the attachment type
+ * @param <R> the result type
+ * @param <A> the attachment type
  */
-public class AttachedFutureTask<R, A> extends FutureTask<R>
+public class IoFutureTask<R, A> extends FutureTask<R>
     implements IoFuture<R, A>
 {
     /**
@@ -46,11 +46,21 @@ public class AttachedFutureTask<R, A> extends FutureTask<R>
      * Callable} and including the specified attachment.
      *
      * @param	callable the callable task
-     * @param	the attachment; may be {@code null}
+     * @param	attachment the attachment; may be {@code null}
      */
-    public AttachedFutureTask(Callable<R> callable, A attachment) {
+    public IoFutureTask(Callable<R> callable, A attachment) {
 	super(callable);
 	this.attachment = attachment;
+    }
+
+    /**
+     * Creates an instance of this class for running the specified {@code
+     * Callable} and including the specified attachment.
+     */
+    public static <R, A> IoFuture newInstance(
+	Callable<R> callable, A attachment)
+    {
+	return new IoFutureTask<R, A>(callable, attachment);
     }
 
     /* -- Implement IoFuture -- */

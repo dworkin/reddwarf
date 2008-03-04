@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.session;
+package com.sun.sgs.impl.nio;
 
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
@@ -25,17 +25,18 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Defines a {@code CompletionHandler} to use when implementing methods that
- * return an {@code IoFuture}, have a {@code CompletionHandler} parameter, and
- * are implemented by making calls to similar methods. <p>
+ * An abstract base class for defining a {@code CompletionHandler} to use when
+ * implementing methods that return an {@code IoFuture}, have a {@code
+ * CompletionHandler} parameter, and are implemented by making calls to similar
+ * methods. <p>
  *
- * @param	<OR> the result type for the outer handler
- * @param	<OA> the attachment type for the outer handler
- * @param	<IR> the result type for this handler
- * @param	<IA> the attachment type for this handler
+ * @param <OR> the result type for the outer handler
+ * @param <OA> the attachment type for the outer handler
+ * @param <IR> the result type for this handler
+ * @param <IA> the attachment type for this handler
  */
 public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
-    extends AttachedFutureTask<OR, OA>
+    extends IoFutureTask<OR, OA>
     implements CompletionHandler<IR, IA>
 {
     /** The associated outer handler. */
@@ -72,8 +73,8 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
 
     /**
      * Invoked when an inner computation has completed.  This method calls
-     * {@link #implCompleted}, and calls {@link Future#setException} on the
-     * future if that method throws an exception.
+     * {@link #implCompleted}, and calls {@link #setException} on the future if
+     * that method throws an exception.
      *
      * @param	innerResult the result of the inner computation
      */
@@ -167,7 +168,7 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      * Any exception thrown will terminate the computation.  If an {@link
      * ExecutionException} is thrown, then its cause will be used.
      *
-     * @param	result the result of the delegated computation
+     * @param	innerResult the result of the delegated computation
      * @return	a future for managing continued compuation, or {@code null} to
      *		specify that the computation is done
      * @throws	Exception if the computation failed

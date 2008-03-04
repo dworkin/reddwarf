@@ -499,7 +499,8 @@ public class ChannelServiceImpl
 		ByteBuffer buf = ByteBuffer.wrap(message);
 		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
+ 			sessionRefId, buf.asReadOnlyBuffer(),
+			Delivery.RELIABLE);
 		}
 
 	    } finally {

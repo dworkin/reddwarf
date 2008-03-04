@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.impl.nio.DelegatingCompletionHandler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
@@ -42,12 +43,12 @@ import java.util.logging.Logger;
  */
 public class AsynchronousMessageChannel implements Channel {
 
+    /** The number of bytes used to represent the message length. */
+    public static final int PREFIX_LENGTH = 2;
+
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(AsynchronousMessageChannel.class.getName()));
-
-    /** The number of bytes used to represent the message length. */
-    private static final int PREFIX_LENGTH = 2;
 
     /**
      * The underlying channel (possibly another layer of abstraction,
@@ -71,7 +72,7 @@ public class AsynchronousMessageChannel implements Channel {
      * @param	channel a channel
      * @param	readBufferSize the number of bytes in the read buffer
      * @throws	IllegalArgumentException if {@code readBufferSize} is smaller
-     *		{@value PREFIX_LENGTH}
+     *		than {@value #PREFIX_LENGTH}
      */
     public AsynchronousMessageChannel(
 	AsynchronousByteChannel channel, int readBufferSize)
