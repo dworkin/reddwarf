@@ -25,6 +25,7 @@ import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.WritePendingException;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -37,7 +38,7 @@ import java.util.logging.Logger;
 /**
  * A wrapper channel that reads and writes complete messages by framing
  * messages with a 2-byte message length, and masking (and re-issuing) partial
- * I/O operations.
+ * I/O operations.  Also enforces a fixed buffer size when reading.
  */
 public class AsynchronousMessageChannel implements Channel {
 
@@ -60,64 +61,86 @@ public class AsynchronousMessageChannel implements Channel {
     /** Whether there is a write underway. */
     final AtomicBoolean writePending = new AtomicBoolean();
 
+    /** The read buffer. */
+    final ByteBuffer readBuffer;
+
     /**
-     * Creates a new instance of this class with the given channel.
+     * Creates a new instance of this class with the given channel and read
+     * buffer size.
      * 
-     * @param channel a channel
+     * @param	channel a channel
+     * @param	readBufferSize the number of bytes in the read buffer
+     * @throws	IllegalArgumentException if {@code readBufferSize} is smaller
+     *		{@value PREFIX_LENGTH}
      */
-    public AsynchronousMessageChannel(AsynchronousByteChannel channel) {
+    public AsynchronousMessageChannel(
+	AsynchronousByteChannel channel, int readBufferSize)
+    {
+	if (readBufferSize < PREFIX_LENGTH) {
+	    throw new IllegalArgumentException(
+		"The readBufferSize must not be smaller than " +
+		PREFIX_LENGTH);
+	}
 	this.channel = channel;
+	readBuffer = ByteBuffer.allocateDirect(readBufferSize);
     }
 
     /* -- Methods for reading and writing -- */
 
     /**
-     * Initiates reading a complete message from this channel into the given
-     * buffer.  Returns a future which will contain the specified attachment
-     * and a read-only view of {@code dst} buffer containing the complete
-     * message.  Calls {@code handler} when the read operation has completed,
-     * if {@code handler} is not {@code null}.
+     * Initiates reading a complete message from this channel.  Returns a
+     * future which will contain the specified attachment and a read-only view
+     * of a buffer containing the complete message.  Calls {@code handler} when
+     * the read operation has completed, if {@code handler} is not {@code
+     * null}.  The buffer's position will be set to {@code 0} and it's limit
+     * will be set to the length of the complete message.  The contents of the
+     * buffer will remain valid until the next call to {@code read}.
      * 
      * @param	<A> the attachment type
-     * @param	dst the buffer into which bytes are to be transferred
      * @param	attachment the object to {@link IoFuture#attach attach} to the
      *		returned {@link IoFuture} object; can be {@code null}
      * @param	handler the completion handler object; can be {@code null}
      * @return	a future representing the result of the operation
+     * @throws	BufferOverflowException if the buffer does not contain enough
+     *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
     public <A> IoFuture<ByteBuffer, A> read(
-	ByteBuffer dst, A attachment, CompletionHandler<ByteBuffer, A> handler)
+	A attachment, CompletionHandler<ByteBuffer, A> handler)
     {
         if (!readPending.compareAndSet(false, true)) {
             throw new ReadPendingException();
 	}
-        return new Reader<A>(attachment, handler).start(dst);
+        return new Reader<A>(attachment, handler).start(null);
     }
 
     /**
-     * Initiates reading a complete message from this channel into the given
-     * buffer, and returns a future which will contain a {@code null}
-     * attachment and a read-only view into the {@code dst} buffer containing
-     * the complete message.
+     * Initiates reading a complete message from this channel.  Returns a
+     * future which will contain a {@code null} attachment and a read-only view
+     * of a buffer containing the complete message.  Calls {@code handler} when
+     * the read operation has completed, if {@code handler} is not {@code
+     * null}.  The buffer's position will be set to {@code 0} and it's limit
+     * will be set to the length of the complete message.  The contents of the
+     * buffer will remain valid until the next call to {@code read}.
      * 
      * @param	<A> the attachment type
-     * @param	dst the buffer into which bytes are to be transferred
      * @param	handler the completion handler object; can be {@code null}
-     * @return	a future representing the result of the operation.
+     * @return	a future representing the result of the operation
+     * @throws	BufferOverflowException if the buffer does not contain enough
+     *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
     public final <A> IoFuture<ByteBuffer, A> read(
-	ByteBuffer dst, CompletionHandler<ByteBuffer, A> handler)
+	CompletionHandler<ByteBuffer, A> handler)
     {
-        return read(dst, null, handler);
+        return read(null, handler);
     }
 
     /**
      * Initiates writing a complete message from the given buffer to the
      * underlying channel, and returns a future which will contain the
-     * specified attachment and a read-only view into the {@code src} buffer
-     * containing the complete message.
+     * specified attachment.  Writes bytes starting at the buffer's current
+     * position and up to its limit.
      * 
      * @param	<A> the attachment type
      * @param	src the buffer from which bytes are to be retrieved
@@ -139,8 +162,8 @@ public class AsynchronousMessageChannel implements Channel {
     /**
      * Initiates writing a complete message from the given buffer to the
      * underlying channel, and returns a future which will contains a {@code
-     * null} attachment and a read-only view into the {@code src} buffer
-     * containing the complete message.
+     * null} attachment.  Writes bytes starting at the buffer's current
+     * position and up to its limit.
      * 
      * @param	<A> the attachment type
      * @param	src the buffer from which bytes are to be retrieved
@@ -169,124 +192,146 @@ public class AsynchronousMessageChannel implements Channel {
     /* -- Other methods and classes -- */
 
     /**
-     * Returns the length of the complete message based on the data read into
-     * the buffer between position 0 and the current position, or {@code -1} if
-     * the length cannot be determined.
+     * Returns the length of the complete message, including the length prefix,
+     * based on the data read into the buffer between position 0 and the
+     * current position, or {@code -1} if the length cannot be determined.
      * 
-     * @param	buf the buffer
      * @return	the length, or {@code -1}
      */
-    int completeMessageLength(ByteBuffer buf) {
-	if (buf.position() >= PREFIX_LENGTH) {
-	    return (buf.getShort(0) & 0xffff) + PREFIX_LENGTH;
-	}
-	/* Check that there is room for the prefix in the buffer */
-	if (buf.limit() < PREFIX_LENGTH) {
-	    throw new BufferOverflowException();
-	}
-	return -1;
+    int getMessageLength() {
+	return (readBuffer.position() >= PREFIX_LENGTH)
+	    ? (readBuffer.getShort(0) & 0xffff) + PREFIX_LENGTH : -1;
     }
 
+    /**
+     * Implement a completion handler for reading a complete message from the
+     * underlying byte stream.
+     */
     private final class Reader<A>
 	extends DelegatingCompletionHandler<ByteBuffer, A, Integer, ByteBuffer>
     {
+	/** The length of the message, or -1 if not yet known. */
         private int messageLen = -1;
 
+	/** Creates an instance with the specified attachment and handler. */
         Reader(A attachment, CompletionHandler<ByteBuffer, A> handler) {
             super(attachment, handler);
         }
 
-        /** {@inheritDoc} */
+	/** Clear the readPending flag. */
         @Override
         protected void done() {
             readPending.set(false);
             super.done();
         }
 
-        /** {@inheritDoc} */
+        /** Start reading into the buffer. */
         @Override
-        protected IoFuture<Integer, ByteBuffer> implStart(ByteBuffer dst) {
-            return processBuffer(dst);
+        protected IoFuture<Integer, ByteBuffer> implStart(ByteBuffer ignore) {
+	    int position = readBuffer.position();
+	    if (position > 0) {
+		/* Skip previous message, moving remaining bytes to front */
+		int len = getMessageLength();
+		assert len > 0;
+		if (position > len) {
+		    readBuffer.position(len);
+		    readBuffer.limit(position);
+		    readBuffer.compact();
+		} else {
+		    readBuffer.clear();
+		}
+	    }
+            return processBuffer();
         }
 
-        /** {@inheritDoc} */
+	/** Process the results of reading so far and read more if needed. */
         @Override
         protected IoFuture<Integer, ByteBuffer> implCompleted(
 	    IoFuture<Integer, ByteBuffer> result)
-            throws ExecutionException 
+            throws ExecutionException, EOFException
         {
-            ByteBuffer dst = result.attach(null);
             int bytesRead = result.getNow();
-
             if (bytesRead < 0) {
-                set(null);
-                return null;
-            }
-
-            return processBuffer(dst);
+		throw new EOFException("The message was incomplete");
+	    }
+	    return processBuffer();
         }
 
-        private IoFuture<Integer, ByteBuffer> processBuffer(ByteBuffer dst) {
-            ByteBuffer readBuf = dst.asReadOnlyBuffer();
-
+	/**
+	 * Process the results of reading into the buffer, and return a future
+	 * to read more if needed.
+	 */
+        private IoFuture<Integer, ByteBuffer> processBuffer() {
             if (messageLen < 0) {
-                messageLen = completeMessageLength(dst);
-
+                messageLen = getMessageLength();
                 if (messageLen >= 0) {
-                    // Ensure that the buffer will hold the complete message
-                    if (dst.limit() < messageLen) {
+                    if (readBuffer.limit() < messageLen) {
+			/* Buffer is too small to hold complete message */
                         throw new BufferOverflowException();
                     }
-                } else {
-                    // Or at least ensure that the buffer isn't full
-                    if (! dst.hasRemaining()) {
-                        throw new BufferOverflowException();
-		    }
                 }
             }
-
-            if (messageLen >= 0 && dst.position() >= messageLen) {
+            if (messageLen >= 0 && readBuffer.position() >= messageLen) {
                 if (logger.isLoggable(Level.FINER)) {
-                    logger.log(Level.FINER,
-			       "{0} read complete {1}:{2}",
-			       this, messageLen, dst.position());
+                    logger.log(Level.FINER, "{0} read complete {1}:{2}",
+			       this, messageLen, readBuffer.position());
                 }
-                readBuf.limit(messageLen).flip();
-                set(readBuf); // Invokes the completion handler
+		/*
+		 * Return a read-only buffer containing just the message bytes
+		 * without the length prefix.
+		 */
+		ByteBuffer result = readBuffer.duplicate();
+		result.limit(messageLen);
+		result.position(PREFIX_LENGTH);
+                set(result.slice().asReadOnlyBuffer());
                 return null;
-            }
-
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER,
-			   "{0} read incomplete {1}:{2}",
-			   this, messageLen, dst.position());
-            }
-            return channel.read(dst, dst, this);
+            } else {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(Level.FINER, "{0} read incomplete {1}:{2}",
+			       this, messageLen, readBuffer.position());
+		}
+		return channel.read(readBuffer, null, this);
+	    }
         }
     }
 
+    /**
+     * Implement a completion handler for writing a complete message to the
+     * underlying byte stream.
+     */
     private final class Writer<A>
-	extends DelegatingCompletionHandler<Void, A, Integer, ByteBuffer> {
-
+	extends DelegatingCompletionHandler<Void, A, Integer, ByteBuffer>
+    {
+	/** Creates an instance with the specified attachment and handler. */
         Writer(A attachment, CompletionHandler<Void, A> handler) {
             super(attachment, handler);
         }
 
-        /** {@inheritDoc} */
+	/** Clear the writePending flag. */
         @Override
         protected void done() {
             writePending.set(false);
             super.done();
         }
 
-        /** {@inheritDoc} */
+	/** Start writing from the buffer. */
         @Override
         protected IoFuture<Integer, ByteBuffer> implStart(ByteBuffer src) {
-	    /* XXX: Move prepending size to here.  -tjb@sun.com (02/27/2008) */
-            return channel.write(src, src, this);
+	    int size = src.remaining();
+	    assert size < Short.MAX_VALUE;
+	    /* Prepend the size as a short. */
+	    /*
+	     * XXX: Maybe avoid copying by doing two writes?  -tjb@sun.com
+	     * (02/29/2008)
+	     */
+	    ByteBuffer withSize = ByteBuffer.allocate(2 + size);
+	    withSize.putShort((short) size)
+		.put(src)
+		.flip();
+            return channel.write(withSize, withSize, this);
         }
 
-        /** {@inheritDoc} */
+	/** Process the results of writing so far and write more if needed. */
         @Override
         protected IoFuture<Integer, ByteBuffer> implCompleted(
 	    IoFuture<Integer, ByteBuffer> result)
@@ -295,10 +340,10 @@ public class AsynchronousMessageChannel implements Channel {
             ByteBuffer src = result.attach(null);
             result.getNow();
             if (src.hasRemaining()) {
-                // Write some more
+                /* Write some more */
                 return channel.write(src, src, this);
             } else {
-                // Finished
+                /* Finished */
                 set(null);
                 return null;
             }

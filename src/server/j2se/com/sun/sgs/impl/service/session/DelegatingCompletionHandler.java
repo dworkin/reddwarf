@@ -23,7 +23,6 @@ import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
 
 /**
  * Defines a {@code CompletionHandler} to use when implementing methods that
@@ -36,11 +35,9 @@ import java.util.concurrent.FutureTask;
  * @param	<IA> the attachment type for this handler
  */
 public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
+    extends AttachedFutureTask<OR, OA>
     implements CompletionHandler<IR, IA>
 {
-    /** The associated outer IoFuture. */
-    private final MyAttachedFutureTask<OR, OA> outerFuture;
-
     /** The associated outer handler. */
     private final CompletionHandler<OR, OA> outerHandler;
 
@@ -63,7 +60,11 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
     public DelegatingCompletionHandler(
 	OA outerAttachment, CompletionHandler<OR, OA> outerHandler)
     {
-	outerFuture = new MyAttachedFutureTask<OR, OA>(outerAttachment);
+	/*
+	 * We won't be calling {@code run} on this object anyway, so the
+	 * callable should not be called.
+	 */
+	super(new FailingCallable<OR>(), outerAttachment);
 	this.outerHandler = outerHandler;
     }
 
@@ -78,22 +79,50 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      */
     public final void completed(IoFuture<IR, IA> innerResult) {
 	synchronized (lock) {
-	    if (!outerFuture.isDone()) {
+	    if (!isDone()) {
 		try {
 		    innerFuture = implCompleted(innerResult);
 		    if (innerFuture == null) {
-			outerFuture.set(null);
+			set(null);
 		    }
 		} catch (ExecutionException e) {
-		    outerFuture.setException(e.getCause());
+		    setException(e.getCause());
 		} catch (Throwable t) {
-		    outerFuture.setException(t);
+		    setException(t);
 		}
 	    }
 	}
     }
 
     /* -- Other public methods -- */
+
+    /**
+     * This method should not be called.
+     *
+     * @see	#start
+     */
+    @Override
+    public final void run() {
+	throw new UnsupportedOperationException(
+	    "The run method is not supported");
+    }
+
+    /** Cancel the current future, if any. */
+    @Override
+    public final boolean cancel(boolean mayInterruptIfRunning) {
+	synchronized (lock) {
+	    if (isDone()) {
+		return false;
+	    }
+	    boolean success = (innerFuture == null)
+		? true : innerFuture.cancel(mayInterruptIfRunning);
+	    if (success) {
+		success = super.cancel(false);
+		assert success;
+	    }
+	    return success;
+	}
+    }
 
     /**
      * Starts the computation and returns a future representing the result of
@@ -105,17 +134,17 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      */
     public final IoFuture<OR, OA> start(IA innerAttachment) {
 	synchronized (lock) {
-	    if (!outerFuture.isDone()) {
+	    if (!isDone()) {
 		try {
 		    innerFuture = implStart(innerAttachment);
 		    if (innerFuture == null) {
-			outerFuture.set(null);
+			set(null);
 		    }
 		} catch (Throwable t) {
-		    outerFuture.setException(t);
+		    setException(t);
 		}
 	    }
-	    return outerFuture;
+	    return this;
 	}
     }
 
@@ -141,12 +170,11 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      * @param	result the result of the delegated computation
      * @return	a future for managing continued compuation, or {@code null} to
      *		specify that the computation is done
-     * @throws	ExecutionException if the computation failed
-     * @throws	
+     * @throws	Exception if the computation failed
      */
     protected abstract IoFuture<IR, IA> implCompleted(
 	IoFuture<IR, IA> innerResult)
-	throws ExecutionException;
+	throws Exception;
 
     /**
      * Called when the computation is completed, which occurs when {@link
@@ -154,88 +182,20 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      * outer future is cancelled. <p>
      *
      * This implementation runs the outer completion handler.  Subclasses that
-     * override this method should make sure to call the superclass method.
+     * override this method should make sure to call this method by calling
+     * {@code super.done()}.
      */
+    @Override
     protected void done() {
-	innerFuture = null;
-	if (outerHandler != null) {
-	    outerHandler.completed(outerFuture);
-	}
-    }
-
-    /**
-     * Sets the outer result of the computation.  Subclasses should call this
-     * method from the {@code #implStart} or {@code #implCompleted} methods to
-     * supply the result.
-     *
-     * @param	outerResult the result of the computation
-     */
-    protected final void set(OR outerResult) {
 	synchronized (lock) {
-	    outerFuture.set(outerResult);
+	    innerFuture = null;
+	    if (outerHandler != null) {
+		outerHandler.completed(this);
+	    }
 	}
     }
 
     /* -- Private methods and classes -- */
-
-    /**
-     * Defines a subclass of {@code FutureTask} that does not perform any
-     * operation on its own, but instead is used to record the results of
-     * operations performed by the {@link #implStart} and {@link
-     * #implCompleted} methods, and to handle calls to {@link Future#cancel} on
-     * the outer future.
-     */
-    private final class MyAttachedFutureTask<OR, OA>
-	extends AttachedFutureTask<OR, OA> {
-
-	/** Creates an instance of this class. */
-	MyAttachedFutureTask(OA attachment) {
-	    /*
-	     * We won't be calling {@code run} on this object anyway, so the
-	     * callable should not be called.
-	     */
-	    super(new FailingCallable<OR>(), attachment);
-	}
-
-	/** Pass the call to the containing class. */
-        @Override
-        protected void done() {
-	    DelegatingCompletionHandler.this.done();
-	}
-
-	/** Cancel the current future, if any. */
-	@Override
-	public boolean cancel(boolean mayInterruptIfRunning) {
-	    synchronized (lock) {
-		if (isDone()) {
-		    return false;
-		}
-		boolean success = (innerFuture == null)
-		    ? true : innerFuture.cancel(mayInterruptIfRunning);
-                if (success) {
-                    success = super.cancel(false);
-                    assert success;
-                }
-                return success;
-            }
-	}
-
-	/**
-	 * Override to permit calling this method from the containing class.
-	 */
-	@Override
-	protected void setException(Throwable t) {
-	    super.setException(t);
-	}
-	
-	/**
-	 * Override to permit calling this method from the containing class.
-	 */
-	@Override
-	protected void set(OR value) {
-	    super.set(value);
-	}
-    }
 
     /** Implements a {@code Callable} that fails if called. */
     private static final class FailingCallable<V> implements Callable<V> {

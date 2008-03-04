@@ -39,16 +39,7 @@ class WriteRequest {
      * @param delivery a delivery requirement
      */
     public WriteRequest(ByteBuffer message, Delivery delivery) {
-
-        // Prepend the message length as an unsigned short.
-        // TODO not elegant
-        int size = message.remaining();
-        ByteBuffer copyBuf = ByteBuffer.allocate(2 + size);
-        copyBuf.putShort((short) size)
-               .put(message)
-               .flip();
-
-        this.buf = copyBuf.asReadOnlyBuffer();
+        this.buf = message;
         this.delivery = delivery;
     }
 

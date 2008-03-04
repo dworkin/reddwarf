@@ -559,7 +559,9 @@ public class ClientSessionServiceImpl
                             ClientSessionServiceImpl.this, dataService);
 
                     // Startup the new session handler
-                    handler.connected(new AsynchronousMessageChannel(newChannel));
+                    handler.connected(
+			new AsynchronousMessageChannel(
+			    newChannel, readBufferSize));
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);
