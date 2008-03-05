@@ -108,7 +108,11 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
 	    "The run method is not supported");
     }
 
-    /** Cancel the current future, if any. */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation cancels the current future, if any.
+     */
     @Override
     public final boolean cancel(boolean mayInterruptIfRunning) {
 	synchronized (lock) {

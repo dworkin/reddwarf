@@ -76,6 +76,19 @@
     <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
 
+  <!-- Package com.sun.sgs.impl.nio -->
+
+  <!-- It is OK to pass null to FutureTask.set to mark the future as
+       done; the parameter is not dereferenced -->
+  <Match>
+    <Class name="com.sun.sgs.impl.nio.DelegatingCompletionHandler"/>
+    <Or>
+      <Method name="completed"/>
+      <Method name="start"/>
+    </Or>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.data -->
 
   <!-- OK if version field is not currently being read, it should still

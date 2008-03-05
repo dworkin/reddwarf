@@ -345,7 +345,6 @@ public class AsynchronousMessageChannel implements Channel {
                 return channel.write(src, src, this);
             } else {
                 /* Finished */
-                set(null);
                 return null;
             }
         }

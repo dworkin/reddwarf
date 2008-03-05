@@ -56,12 +56,20 @@ public class IoFutureTask<R, A> extends FutureTask<R>
     /**
      * Creates an instance of this class for running the specified {@code
      * Callable} and including the specified attachment.
+     *
+     * @param	<R> the result type
+     * @param	<A> the attachment type
+     * @param	callable the callable task
+     * @param	attachment the attachment; may be {@code null}
+     * @return	a new {@code IoFuture}
      */
     public static <R, A> IoFuture newInstance(
 	Callable<R> callable, A attachment)
     {
 	return new IoFutureTask<R, A>(callable, attachment);
     }
+
+
 
     /* -- Implement IoFuture -- */
 
