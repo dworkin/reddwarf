@@ -1198,26 +1198,22 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	 *         exceeds the available buffer space in the queue
 	 */
 	boolean offer(ChannelEvent event) {
-
 	    int cost = event.getCost();
 	    if (cost > writeBufferAvailable) {
 	        throw new MessageRejectedException(
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
-
 	    boolean result = getQueue().offer(event);
-	    
 	    if (result && (cost > 0)) {
+		ChannelServiceImpl.getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
-
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(Level.FINEST,
                         "{0} reserved {1,number,#} leaving {2,number,#}",
                         this, cost, writeBufferAvailable);
                 }
 	    }
-
 	    return result;
 	}
 
@@ -1285,6 +1281,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
+	    DataService dataService =
+		ChannelServiceImpl.getDataService();
 	    /*
 	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
 	     * true), then all pending events should to be serviced, since
@@ -1325,7 +1323,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
 			    }
 			}
 		    });
-		ChannelServiceImpl.getDataService().markForUpdate(this);
+		dataService.markForUpdate(this);
 		sendRefresh = false;
 	    }
 
@@ -1342,7 +1340,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		}
 
                 logger.log(Level.FINEST, "processing event:{0}", event);
-
                 int cost = event.getCost();
 		if (cost > 0) {
 		    writeBufferAvailable += cost;
@@ -1354,7 +1351,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 				   this, cost, writeBufferAvailable);
 		    }
 		}
-
 		event.serviceEvent(this);
 		
 	    } while (serviceAllEvents || --eventsToService > 0);

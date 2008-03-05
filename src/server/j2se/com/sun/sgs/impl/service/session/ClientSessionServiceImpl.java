@@ -612,16 +612,14 @@ public final class ClientSessionServiceImpl
         return writeBufferSize;
     }
 
-    /* -- Implement AcceptorListener -- */
-
+    /** A completion handler for accepting connections. */
     private class AcceptorListener
         implements CompletionHandler<AsynchronousSocketChannel, Void>
     {
 
-	/**
-	 * {@inheritDoc}
-	 */
-        public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
+	/** Handle new connection or report failure. */
+        public void completed(
+	    IoFuture<AsynchronousSocketChannel, Void> result)
         {
             try {
                 try {
@@ -654,8 +652,8 @@ public final class ClientSessionServiceImpl
                     // ignore
                 }
 
-                logger.logThrow(Level.SEVERE, e,
-                    "acceptor error on {0}", addr);
+                logger.logThrow(
+		    Level.SEVERE, e, "acceptor error on {0}", addr);
 
                 // TBD: take other actions, such as restarting acceptor?
 

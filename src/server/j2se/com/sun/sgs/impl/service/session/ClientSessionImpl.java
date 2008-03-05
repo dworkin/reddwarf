@@ -101,12 +101,7 @@ public class ClientSessionImpl
     private volatile boolean connected = true;
 
     /** The capacity of the write buffer, in bytes. */
-    // TODO this doesn't have to be final, but additional logic is
-    // required to support dynamic capacity. -JM
     private final int writeBufferCapacity;
-
-    /** The number of bytes of the write buffer that are available. */
-    private int writeBufferAvailable;
 
     /*
      * TBD: Should a managed reference to the ClientSessionListener be
@@ -141,10 +136,7 @@ public class ClientSessionImpl
 	this.sessionService = sessionService;
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
-
 	writeBufferCapacity = sessionService.getWriteBufferSize();
-	writeBufferAvailable = writeBufferCapacity;
-
 	DataService dataService = sessionService.getDataService();
 	ManagedReference<ClientSessionImpl> sessionRef =
 	    dataService.createReference(this);
@@ -183,21 +175,14 @@ public class ClientSessionImpl
             } else if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
 	    }
-
-            // Reservation support
-            int size = message.remaining();
-            // N.B.: need to reserve 2 extra bytes for the length prefix
-            reserve(2 + 1 + size);
-
             /*
-             * TODO possible optimization: if we have passed our own
-             * special buffer to the app, we can detect that here and
-             * possibly avoid a copy.  Our special buffer could be one
-             * we passed to the receivedMessage callback, or we could
-             * add a special API to pre-allocate buffers. -JM
+             * TODO: Possible optimization: if we have passed our own special
+             * buffer to the app, we can detect that here and possibly avoid a
+             * copy.  Our special buffer could be one we passed to the
+             * receivedMessage callback, or we could add a special API to
+             * pre-allocate buffers. -JM
              */
-            byte[] bytes = new byte[1 + size];
-            ByteBuffer buf = ByteBuffer.wrap(bytes);
+            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
             buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
                .put(message)
                .flip();
@@ -213,48 +198,6 @@ public class ClientSessionImpl
 	    }
 	    throw e;
 	}
-    }
-
-    /**
-     * Attempts to reserve enough space to send a message of the given size.
-     * Must be called within a transaction.
-     * 
-     * @param size the size of the reservation, in bytes
-     */
-    void reserve(int size) {
-        if (writeBufferAvailable < size) {
-            throw new MessageRejectedException(
-                "not enough queue space: available = " +
-                writeBufferAvailable + " requested = " +
-                size);
-        }
-
-        sessionService.getDataService().markForUpdate(this);
-        writeBufferAvailable -= size;
-
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST,
-                "{0} reserved {1,number,#} leaving {2,number,#}",
-                this, size, writeBufferAvailable);
-        }
-    }
-
-    /**
-     * Updates the reserved-space count after a message has been sent.
-     * Must be called within a transaction, and only if the transaction
-     * that reserved space for the message has completed successfully.
-     * 
-     * @param size the size of the message that was sent
-     */
-    void reservationComplete(DataService dataService, int size) {
-        dataService.markForUpdate(this);
-        writeBufferAvailable += size;
-
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST,
-                "{0} cleared reservation of {1,number,#} leaving {2,number,#}",
-                this, size, writeBufferAvailable);
-        }
     }
 
     /** {@inheritDoc} */
@@ -700,6 +643,15 @@ public class ClientSessionImpl
     }
     
     /**
+     * Returns the write buffer capacity for this session.
+     * 
+     * @return the write buffer capacity
+     */
+    int getWriteBufferCapacity() {
+        return writeBufferCapacity;
+    }
+
+    /**
      * Represents an event for a client session.
      */
     private static abstract class SessionEvent
@@ -713,8 +665,18 @@ public class ClientSessionImpl
 	 * Services this event, taken from the head of the given {@code
 	 * eventQueue}.
 	 */
-	public abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(EventQueue eventQueue);
 
+	/**
+	 * Returns the cost of this event, which the {@code EventQueue}
+	 * may use to reject events when the total cost is too large.
+	 * The default implementation returns a cost of zero.
+	 * 
+	 * @return the cost of this event
+	 */
+	int getCost() {
+	    return 0;
+	}
     }
 
     private static class SendEvent extends SessionEvent {
@@ -731,10 +693,16 @@ public class ClientSessionImpl
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
 	    sessionImpl.sessionService.sendProtocolMessage(
 		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+	}
+
+	/** Use the message length as the cost for sending messages. */
+	@Override
+	int getCost() {
+	    return message.length;
 	}
 
 	/** {@inheritDoc} */
@@ -754,7 +722,7 @@ public class ClientSessionImpl
 	DisconnectEvent() {}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
 	    sessionImpl.sessionService.disconnect(sessionImpl);
 	}
@@ -779,6 +747,9 @@ public class ClientSessionImpl
 	/** The managed reference to the managed queue. */
 	private final ManagedReference<ManagedQueue<SessionEvent>> queueRef;
 
+	/** The number of bytes of the write buffer currently available. */
+	private int writeBufferAvailable;
+
 	/**
 	 * Constructs an event queue for the specified {@code sessionImpl}.
 	 */
@@ -787,14 +758,36 @@ public class ClientSessionImpl
 	    sessionRef = dataService.createReference(sessionImpl);
 	    queueRef = dataService.createReference(
 		new ManagedQueue<SessionEvent>());
+	    writeBufferAvailable = sessionImpl.writeBufferCapacity;
 	}
 
 	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
 	 * {@code true} if successful, and {@code false} otherwise.
+	 *
+	 * @param event the event
+	 * @return {@code true} if successful, and {@code false} otherwise
+	 * @throws MessageRejectedException if the cost of the event
+	 *         exceeds the available buffer space in the queue
 	 */
 	boolean offer(SessionEvent event) {
-	    return getQueue().offer(event);
+	    int cost = event.getCost();
+	    if (cost > writeBufferAvailable) {
+	        throw new MessageRejectedException(
+	            "Not enough queue space: " + writeBufferAvailable +
+		    " bytes available, " + cost + " requested");
+	    }
+	    boolean result = getQueue().offer(event);
+	    if (result && cost > 0) {
+		ClientSessionServiceImpl.getDataService().markForUpdate(this);
+                writeBufferAvailable -= cost;
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(Level.FINEST,
+                        "{0} reserved {1,number,#} leaving {2,number,#}",
+                        this, cost, writeBufferAvailable);
+                }
+	    }
+	    return result;
 	}
 
 	/**
@@ -835,7 +828,9 @@ public class ClientSessionImpl
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
 	    ManagedQueue<SessionEvent> eventQueue = getQueue();
-	    
+	    DataService dataService =
+		ClientSessionServiceImpl.getDataService();
+
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();
 		if (event == null) {
@@ -844,6 +839,19 @@ public class ClientSessionImpl
 		}
 
 		logger.log(Level.FINEST, "processing event:{0}", event);
+
+                int cost = event.getCost();
+		if (cost > 0) {
+		    dataService.markForUpdate(this);
+		    writeBufferAvailable += cost;
+		    if (logger.isLoggable(Level.FINEST)) {
+		        logger.log(Level.FINEST,
+				   "{0} cleared reservation of " +
+				   "{1,number,#} bytes, leaving {2,number,#}",
+				   this, cost, writeBufferAvailable);
+		    }
+		}
+
 		event.serviceEvent(this);
 	    }
 	}

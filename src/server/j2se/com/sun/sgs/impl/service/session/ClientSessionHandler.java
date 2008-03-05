@@ -84,16 +84,16 @@ class ClientSessionHandler {
 
     /** The data service. */
     private final DataService dataService;
-    
+
     /**
      * The I/O channel for sending messages to the client, or null if
      * not connected.
      */
     private AsynchronousMessageChannel sessionConnection = null;
-    
+
     /** The completion handler for reading from the I/O channel. */
     private ReadHandler readHandler = new ClosedReadHandler();
-    
+
     /** The completion handler for writing to the I/O channel. */
     private WriteHandler writeHandler = new ClosedWriteHandler();
 
@@ -155,60 +155,15 @@ class ClientSessionHandler {
 	return connected;
     }
 
-    private class AccountingWriteRequest extends WriteRequest {
-
-        public AccountingWriteRequest(ByteBuffer message, Delivery delivery) {
-            super(message, delivery);
-        }
-
-        @Override
-        public void done() {
-            final int size = getSize();
-            final BigInteger id = sessionRefId;
-
-            if (id == null) {
-                return;
-            }
-
-            super.done();
-
-            scheduleTask(new AbstractKernelRunnable() {
-                public void run() {
-                    ClientSessionImpl sessionImpl = 
-                        ClientSessionImpl.getSession(dataService, sessionRefId);
-                    sessionImpl.reservationComplete(dataService, size);
-                }
-            });
-        }
-    }
-
-    /**
-     * Immediately sends the specified protocol {@code message}
-     * according to the specified {@code delivery} requirement,
-     * and update the available bytes for sends on this session
-     * when the write operation completes.
-     */
-    void sendWithAccounting(ByteBuffer message, Delivery delivery) {
-        write(new AccountingWriteRequest(message, delivery));
-    }
-
     /**
      * Immediately sends the specified protocol {@code message}
      * according to the specified {@code delivery} requirement.
      */
-    void sendRaw(ByteBuffer message, Delivery delivery) {
-        write(new WriteRequest(message, delivery));
-    }
-
-    /**
-     * Enqueue a write request.
-     * 
-     * @param writeRequest a write request
-     */
-    private void write(WriteRequest writeRequest) {
+    void sendProtocolMessage(byte[] message, Delivery delivery) {
+	// TBI: ignore delivery for now...
 	try {
 	    if (isConnected()) {
-	        writeHandler.write(writeRequest);
+	        writeHandler.write(ByteBuffer.wrap(message));
 	    } else {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
@@ -217,6 +172,7 @@ class ClientSessionHandler {
 			"session is disconnected", this);
 		}
 	    }
+		    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
@@ -284,7 +240,7 @@ class ClientSessionHandler {
 	    if (graceful) {
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
 
-	        sendRaw(ByteBuffer.wrap(msg), Delivery.RELIABLE);
+	        sendProtocolMessage(msg, Delivery.RELIABLE);
 	    }
 
 	    try {
@@ -323,7 +279,7 @@ class ClientSessionHandler {
      */
     private void scheduleHandleDisconnect(final boolean graceful) {
 
-        // TODO should we set the state to DISCONNECTING? -JM
+        // TODO: Should we set the state to DISCONNECTING? -JM
         /*
         synchronized (lock) {
             if (state != State.DISCONNECTED)
@@ -338,19 +294,20 @@ class ClientSessionHandler {
     }
 
     /**
-     * Notifies this handler that a new IO connection has become active.
+     * Notifies this handler that a new I/O connection has become active.
      * 
      * @param conn the new connection
      */
     void connected(AsynchronousMessageChannel conn) {
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "connected to {0}", conn);
+            logger.log(Level.FINER, "connected handle:{0}", conn);
         }
 
         synchronized (lock) {
             // check if there is already a handle set
             if (sessionConnection != null) {
-                logger.log(Level.WARNING,
+                logger.log(
+		    Level.WARNING,
                     "session already connected to {0}", sessionConnection);
                 try {
                     conn.close();
@@ -363,15 +320,16 @@ class ClientSessionHandler {
             sessionConnection = conn;
 
             /*
-             * TODO it might be a good idea to implement high- and
-             * low-water marks for the buffers, so they don't go
-             * into hysteresis when they get full. -JM
+             * TODO: It might be a good idea to implement high- and low-water
+             * marks for the buffers, so they don't go into hysteresis when
+             * they get full. -JM
              */
 
             readHandler = new ConnectedReadHandler();
             writeHandler = new ConnectedWriteHandler();
 
             switch (state) {
+
             case CONNECTING:
                 state = State.CONNECTED;
                 break;
@@ -381,7 +339,6 @@ class ClientSessionHandler {
         }
 
         readHandler.read();
-
     }
     
     /**
@@ -393,6 +350,10 @@ class ClientSessionHandler {
 		return;
 	    }
 	    shutdown = true;
+	    /*
+	     * XXX: Why does this method set the field without calling
+	     * scheduleHandleDisconnect?  -tjb@sun.com (03/05/2008)
+	     */
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
 	    if (sessionConnection != null) {
@@ -412,14 +373,14 @@ class ClientSessionHandler {
 	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
     }
 
-    /* -- IO completion handlers -- */
+    /* -- I/O completion handlers -- */
 
     /** A completion handler for writing to a connection. */
     private abstract class WriteHandler
-        implements CompletionHandler<Void, WriteRequest>
+        implements CompletionHandler<Void, Void>
     {
-	/** Writes the specified request. */
-        abstract void write(WriteRequest request);
+	/** Writes the specified message. */
+        abstract void write(ByteBuffer message);
     }
 
     /** A completion handler for writing that always fails. */
@@ -428,11 +389,11 @@ class ClientSessionHandler {
 	ClosedWriteHandler() { }
 
         @Override
-        void write(WriteRequest request) {
+        void write(ByteBuffer message) {
             throw new ClosedAsynchronousChannelException();
         }
         
-        public void completed(IoFuture<Void, WriteRequest> result) {
+        public void completed(IoFuture<Void, Void> result) {
             throw new AssertionError("should be unreachable");
         }    
     }
@@ -441,8 +402,8 @@ class ClientSessionHandler {
     private class ConnectedWriteHandler extends WriteHandler {
 
 	/** An unbounded queue of messages waiting to be written. */
-        private final LinkedList<WriteRequest> pendingWrites =
-            new LinkedList<WriteRequest>();
+        private final LinkedList<ByteBuffer> pendingWrites =
+            new LinkedList<ByteBuffer>();
 
 	/** Whether a write is underway. */
         private boolean isWriting = false;
@@ -451,19 +412,21 @@ class ClientSessionHandler {
         ConnectedWriteHandler() { }
 
 	/**
-	 * Adds the request to the queue, and starts processing the queue if
+	 * Adds the message to the queue, and starts processing the queue if
 	 * needed.
 	 */
         @Override
-        void write(WriteRequest request) {
+        void write(ByteBuffer message) {
             boolean first;
             synchronized (lock) {
                 first = pendingWrites.isEmpty();
-                pendingWrites.add(request);
+                pendingWrites.add(message);
             }
             if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST, "{0} write request {1}, first={2}",
-                           ClientSessionHandler.this, request, first);
+                logger.log(Level.FINEST,
+			   "write session:{0} message:{1} first:{2}",
+                           ClientSessionHandler.this,
+			   HexDumper.format(message, 0x50), first);
             }
             if (first) {
                 processQueue();
@@ -472,58 +435,53 @@ class ClientSessionHandler {
 
 	/** Start processing the first element of the queue, if present. */
         private void processQueue() {
-            WriteRequest request;
+            ByteBuffer message;
             synchronized (lock) {
                 if (isWriting) {
                     return;
 		}
-                request = pendingWrites.peek();
-                if (request != null) {
+                message = pendingWrites.peek();
+                if (message != null) {
                     isWriting = true;
                 }
             }
             if (logger.isLoggable(Level.FINEST)) {
                 pendingWrites.size();
-                logger.log(Level.FINEST,
-                           "{0} processQueue size={1,number,#}, head={2}",
-                           ClientSessionHandler.this, pendingWrites.size(),
-                           request);
+                logger.log(
+		    Level.FINEST,
+		    "processQueue session:{0} size:{1,number,#} head={2}",
+		    ClientSessionHandler.this, pendingWrites.size(),
+		    HexDumper.format(message, 0x50));
             }
-            if (request == null) {
+            if (message == null) {
                 return;
             }
             try {
-                sessionConnection.write(
-                    request.getMessage(), request, this);
+                sessionConnection.write(message, null, this);
             } catch (RuntimeException e) {
                 logger.logThrow(Level.SEVERE, e,
-				"{0} processing request {1}",
-				ClientSessionHandler.this, request);
-                /* Let the request do its cleanup, if any */
-                request.done();
+				"{0} processing message {1}",
+				ClientSessionHandler.this,
+				HexDumper.format(message, 0x50));
                 throw e;
             }
         }
 
 	/** Done writing the first request in the queue. */
-        public void completed(IoFuture<Void, WriteRequest> result) {
-            WriteRequest request = result.attach(null);
+        public void completed(IoFuture<Void, Void> result) {
+	    ByteBuffer message;
             synchronized (lock) {
-                pendingWrites.remove();
-		/*
-		 * XXX: Why not wait until request.done is called to do this?
-		 * Otherwise, the buffer size has not been returned yet and the
-		 * next write may fail.  -tjb@sun.com (03/03/2008)
-		 */
+                message = pendingWrites.remove();
                 isWriting = false;
             }
             if (logger.isLoggable(Level.FINEST)) {
+		ByteBuffer resetMessage = message.duplicate();
+		resetMessage.reset();
                 logger.log(Level.FINEST,
-			   "{0} completed write request {1}",
-			   ClientSessionHandler.this, request);
+			   "completed write session:{0} message:{1}",
+			   ClientSessionHandler.this,
+			   HexDumper.format(resetMessage, 0x50));
             }
-            /* Let the request do its cleanup, if any */
-            request.done();
             try {
                 result.getNow();
                 /* Keep writing */
@@ -535,8 +493,9 @@ class ClientSessionHandler {
 		 */
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, e,
-				    "{0} during completion of {1}",
-				    ClientSessionHandler.this, request);
+				    "write session:{0} message:{1} throws",
+				    ClientSessionHandler.this,
+				    HexDumper.format(message, 0x50));
                 }
                 scheduleHandleDisconnect(false);
             }
@@ -586,6 +545,7 @@ class ClientSessionHandler {
             sessionConnection.read(null, this);
         }
 
+	/** Handles the completed read operation. */
         public void completed(IoFuture<ByteBuffer, Void> result) {
             synchronized (lock) {
                 isReading = false;
@@ -599,8 +559,9 @@ class ClientSessionHandler {
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(
                         Level.FINEST,
-                        "Read completed on {0}, buffer:{1}",
-                        sessionConnection, HexDumper.format(message, 0x50));
+                        "completed read session:{0} message:{1}",
+                        ClientSessionHandler.this,
+			HexDumper.format(message, 0x50));
                 }
 
                 byte[] payload = new byte[message.remaining()];
@@ -623,6 +584,7 @@ class ClientSessionHandler {
             }
         }
 
+	/** Processes the received message. */
         private void bytesReceived(byte[] buffer) {
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
@@ -654,7 +616,7 @@ class ClientSessionHandler {
 		String password = msg.getString();
 		handleLoginRequest(name, password);
 
-                // Resume reads immediately
+                // Resume reading immediately
 		read();
 
 		break;
@@ -684,7 +646,7 @@ class ClientSessionHandler {
 			}
 		    }});
 
-		// Wait until processing is complete before resuming reads
+		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
 
 		break;
@@ -692,7 +654,7 @@ class ClientSessionHandler {
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		scheduleHandleDisconnect(isConnected());
 
-		// Resume reads immediately
+		// Resume reading immediately
                 read();
 
 		break;
@@ -701,8 +663,8 @@ class ClientSessionHandler {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
 			Level.SEVERE,
-			"unknown opcode:{0}",
-			opcode);
+			"unknown opcode 0x{0}",
+			Integer.toHexString(opcode));
 		}
 		scheduleHandleDisconnect(false);
 		break;
@@ -807,9 +769,8 @@ class ClientSessionHandler {
 		    getLoginRedirectMessage(node.getHostName());
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
-			sendRaw(
-			    ByteBuffer.wrap(loginRedirectMessage),
-			    Delivery.RELIABLE);
+			sendProtocolMessage(
+			    loginRedirectMessage, Delivery.RELIABLE);
 			try {
 			    // FIXME: this is a hack to make sure that
 			    // the client receives the login redirect
@@ -829,23 +790,25 @@ class ClientSessionHandler {
 	private void sendLoginFailureAndDisconnect() {
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
-		    sendRaw(ByteBuffer.wrap(loginFailureMessage),
-		            Delivery.RELIABLE);
+		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
 		    handleDisconnect(false);
 		}});
 	}
     }
 
+    /**
+     * Schedule a task to resume reading.  Use this method to delay reading
+     * until a task resulting from an earlier read request has been completed.
+     */
     void enqueueReadResume() {
         taskQueue.addTask(new AbstractKernelRunnable() {
             public void run() {
-                logger.log(
-                    Level.FINER,
-                    "session {0} resuming reads", this);
+                logger.log(Level.FINER, "resuming reads session:{0}", this);
                 if (isConnected()) {
                     readHandler.read();
                 }
-            }});
+            }
+	});
     }
 
     /* -- other private methods and classes -- */
