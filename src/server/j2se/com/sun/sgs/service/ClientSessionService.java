@@ -19,7 +19,6 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import java.math.BigInteger;
