@@ -993,7 +993,8 @@ public class ClientSessionServiceImpl
      * {@code Identity} as the owner.
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-        transactionScheduler.scheduleTask(task, ownerIdentity);
+        transactionScheduler.
+	    scheduleTask(task, getValidIdentity(ownerIdentity));
     }
 
     /**
@@ -1003,7 +1004,7 @@ public class ClientSessionServiceImpl
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)
     {
-        taskScheduler.scheduleTask(task, ownerIdentity);
+        taskScheduler.scheduleTask(task, getValidIdentity(ownerIdentity));
     }
 
     /**
@@ -1019,12 +1020,12 @@ public class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	Identity owner =
-	    (ownerIdentity == null) ?
-	    taskOwner :
-	    ownerIdentity;
-	    
-	transactionScheduler.runTask(task, owner);
+	transactionScheduler.runTask(task, getValidIdentity(ownerIdentity));
+    }
+
+    /** Returns the non-null user identity or the application's identity. */
+    private Identity getValidIdentity(Identity userIdentity) {
+	return userIdentity == null ? taskOwner : userIdentity;
     }
 
     /**
@@ -1047,7 +1048,7 @@ public class ClientSessionServiceImpl
 			public void run() {
 			    notifyDisconnectedSessions(node.getId());
 			}},
-		    taskOwner);
+		    getValidIdentity(taskOwner));
 		future.done();
 	    } catch (Exception e) {
 		logger.logThrow(

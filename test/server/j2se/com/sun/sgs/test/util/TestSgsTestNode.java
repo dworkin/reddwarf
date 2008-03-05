@@ -22,7 +22,7 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -79,21 +79,22 @@ public class TestSgsTestNode extends TestCase {
      */
     public void testContext() throws Exception {
         addNodes(null, 1);
-        TaskScheduler ts1 =
-            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
-        TaskScheduler ts2 =
+        TransactionScheduler ts1 =
+            serverNode.
+                getSystemRegistry().getComponent(TransactionScheduler.class);
+        TransactionScheduler ts2 =
             additionalNodes[0].
-                getSystemRegistry().getComponent(TaskScheduler.class);
+                getSystemRegistry().getComponent(TransactionScheduler.class);
         
         GetManagerTask task = new GetManagerTask();
-        ts1.runTransactionalTask(task, new DummyIdentity("first"));
+        ts1.runTask(task, new DummyIdentity("first"));
         Object o1 = task.getManager();
-        ts2.runTransactionalTask(task, new DummyIdentity("second"));
+        ts2.runTask(task, new DummyIdentity("second"));
         Object o2 = task.getManager();
         assertNotSame("expected different managers!", o1, o2);
         
         // Now reset to the first manager
-        ts1.runTransactionalTask(task, new DummyIdentity("first"));
+        ts1.runTask(task, new DummyIdentity("first"));
         assertSame("expected same object", o1, task.getManager());
     }
     

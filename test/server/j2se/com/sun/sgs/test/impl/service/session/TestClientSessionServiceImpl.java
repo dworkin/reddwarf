@@ -39,7 +39,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -118,8 +118,8 @@ public class TestClientSessionServiceImpl extends TestCase {
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
 
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -151,8 +151,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
-        taskScheduler = 
-            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
+        txnScheduler = 
+            serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
@@ -574,7 +575,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     private List<String> getServiceBindingKeys(String prefix) throws Exception {
         GetKeysTask task = new GetKeysTask(prefix);
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         return task.getKeys();
     }
 
@@ -607,7 +608,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -636,7 +637,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -674,7 +675,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 		new AbstractKernelRunnable() {
 		    int tryCount = 0;
 		    public void run() {

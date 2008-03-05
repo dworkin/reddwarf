@@ -64,7 +64,6 @@ public class TestDataServiceClientPerformance
      * Create a DataService, setting default properties, and starting the
      * server if needed.
      */
-    @Override
     protected DataService getDataService(Properties props,
 					 ComponentRegistry componentRegistry,
 					 TransactionProxy txnProxy)

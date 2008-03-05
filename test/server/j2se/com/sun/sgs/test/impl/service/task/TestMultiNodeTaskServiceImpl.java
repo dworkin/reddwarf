@@ -35,7 +35,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
@@ -77,8 +77,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     private SgsTestNode additionalNodes[];
 
     /** Common system components. */
-    private TaskScheduler taskSchedulerZero;
-    private TaskScheduler taskSchedulerOne;
+    private TransactionScheduler txnSchedulerZero;
+    private TransactionScheduler txnSchedulerOne;
     private DataService dataServiceZero;
     private DataService dataServiceOne;
     private TaskService taskServiceZero;
@@ -109,10 +109,10 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                                      createProps(true, appName, dbDirectory));
         addNodes(createProps(false, appName, dbDirectory), 1);
         
-        taskSchedulerZero = serverNode.getSystemRegistry().
-            getComponent(TaskScheduler.class);
-        taskSchedulerOne = additionalNodes[0].getSystemRegistry().
-            getComponent(TaskScheduler.class);
+        txnSchedulerZero = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        txnSchedulerOne = additionalNodes[0].getSystemRegistry().
+            getComponent(TransactionScheduler.class);
 
         dataServiceZero = serverNode.getDataService();
         dataServiceOne = additionalNodes[0].getDataService();
@@ -129,7 +129,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     dataServiceZero.setBinding("counter", new Counter());
@@ -151,7 +151,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -169,7 +169,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -187,7 +187,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -208,7 +208,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         long expectedNode = serverNode.getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -233,7 +233,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -255,7 +255,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         IdentityImpl id = new IdentityImpl("fred");
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -266,7 +266,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                 }
             }, id);
 
-        taskSchedulerOne.runTransactionalTask(
+        txnSchedulerOne.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
@@ -288,7 +288,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -302,7 +302,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(300);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
 
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -382,7 +382,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     private void assertCounterClearXAction(final String message) 
         throws Exception
     {
-        taskSchedulerZero.runTransactionalTask(
+        txnSchedulerZero.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     assertCounterClear(message);

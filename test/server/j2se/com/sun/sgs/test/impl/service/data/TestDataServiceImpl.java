@@ -39,7 +39,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
@@ -101,7 +100,7 @@ public class TestDataServiceImpl extends TestCase {
 	"TestDataServiceImpl.db";
 
     /** The component registry. */
-    private static DummyComponentRegistry componentRegistry;
+    private static ComponentRegistry componentRegistry;
 
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
@@ -142,12 +141,12 @@ public class TestDataServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
         MinimalTestKernel.create();
-        componentRegistry = MinimalTestKernel.getSystemRegistry();
+        componentRegistry = MinimalTestKernel.getRegistry();
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();
 	}
-        componentRegistry.setComponent(DataManager.class, service);
+	MinimalTestKernel.setComponent(service);
 	createTransaction();
 	dummy = new DummyManagedObject();
 	service.setBinding("dummy", dummy);
@@ -166,7 +165,7 @@ public class TestDataServiceImpl extends TestCase {
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
-		txn.abort(null);
+		txn.abort(new RuntimeException("abort"));
 	    }
 	    if (!passed && service != null) {
 		new ShutdownAction().waitForDone();
@@ -868,7 +867,7 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(dummy, getBinding(app, service, "dummy"));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	setBinding(app, service, "dummy", dummy2);
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	assertEquals(dummy, getBinding(app, service, "dummy"));
 	setBinding(app, service, "dummy", dummy2);
@@ -1031,7 +1030,7 @@ public class TestDataServiceImpl extends TestCase {
     private void testRemoveBindingSuccess(boolean app) {
 	setBinding(app, service, "dummy", dummy);
 	removeBinding(app, service, "dummy");
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	removeBinding(app, service, "dummy");	
 	try {
@@ -1051,7 +1050,7 @@ public class TestDataServiceImpl extends TestCase {
 	DummyManagedObject serviceResult =
 	    (DummyManagedObject) service.getServiceBinding("dummy");
 	assertEquals(serviceDummy, serviceResult);
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	service.removeServiceBinding("dummy");
 	DummyManagedObject result =
@@ -1177,7 +1176,7 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	removeBinding(app, service, "zzz-2");
 	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
@@ -1527,7 +1526,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.shutdown();
 	props.setProperty(getLockTimeoutPropertyName(props), "500");
 	service = getDataServiceImpl();
-	componentRegistry.setComponent(DataManager.class, service);
+	MinimalTestKernel.setComponent(service);
 	createTransaction(1000);
 	dummy = (DummyManagedObject) service.getBinding("dummy");
 	assertEquals("a", dummy.value);
@@ -1549,7 +1548,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort(null);
+		    txn2.abort(new RuntimeException("abort"));
 		}
 	    }
 	};
@@ -2407,7 +2406,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.shutdown();
 	props.setProperty(getLockTimeoutPropertyName(props), "500");
 	service = getDataServiceImpl();
-	componentRegistry.setComponent(DataManager.class, service);
+	MinimalTestKernel.setComponent(service);
 	createTransaction(1000);
 	dummy = (DummyManagedObject) service.getBinding("dummy");
 	dummy.getNext();
@@ -2428,7 +2427,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort(null);
+		    txn2.abort(new RuntimeException("abort"));
 		}
 	    }
 	};
@@ -2494,7 +2493,7 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test shutdown -- */
 
     public void testShutdownAgain() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = null;
 	service.shutdown();
 	ShutdownAction action = new ShutdownAction();
@@ -2527,7 +2526,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.interrupt();
 	action1.assertResult(false);
 	action2.assertBlocked();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	action2.assertResult(true);
 	txn = null;
 	service = null;
@@ -2538,7 +2537,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.assertBlocked();
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	boolean result1;
 	try {
 	    result1 = action1.waitForDone();
@@ -2561,7 +2560,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	service.shutdown();
 	service = getDataServiceImpl();
-	componentRegistry.setComponent(DataManager.class, service);
+	MinimalTestKernel.setComponent(service);
 	createTransaction();
 	assertEquals(dummy, service.getBinding("dummy"));
 	service = null;
@@ -2587,11 +2586,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = null;
     }
 
@@ -2614,11 +2613,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy");
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy");
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	service.getBinding("dummy");
     }
@@ -2877,7 +2876,7 @@ public class TestDataServiceImpl extends TestCase {
 			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 			if (txn2 != null) {
-			    txn2.abort(null);
+			    txn2.abort(new RuntimeException("abort"));
 			}
 		    }
 		}
@@ -3164,7 +3163,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
 	Participant participant = new Participant();
 	txn.join(participant);
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = null;
 	assertTrue("Action should throw", participant.ok);
     }
@@ -3172,7 +3171,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Tests running the action after abort. */
     private void testAborted(Action action) {
 	action.setUp();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	try {
 	    action.run();
 	    fail("Expected TransactionNotActiveException");
@@ -3282,13 +3281,13 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (IllegalStateException e) {
 		    assertEquals("Service is shutting down", e.getMessage());
 		} finally {
-		    txn.abort(null);
+		    txn.abort(new RuntimeException("abort"));
 		}
 		return null;
 	    }
 	};
 	threadAction.assertDone();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = null;
 	shutdownAction.assertResult(true);
 	service = null;
@@ -3297,7 +3296,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Tests running the action after shutdown. */
     void testShutdown(Action action) {
 	action.setUp();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	service.shutdown();
 	try {
 	    action.run();

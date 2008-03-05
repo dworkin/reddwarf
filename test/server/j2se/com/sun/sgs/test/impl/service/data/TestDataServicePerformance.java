@@ -23,20 +23,13 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyProfileCoordinator;
-import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import java.io.File;
-import java.io.IOException;
+import com.sun.sgs.test.util.SgsTestNode;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,17 +69,14 @@ public class TestDataServicePerformance extends TestCase {
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
-    /** A transaction proxy. */
-    private static DummyTransactionProxy txnProxy =
-	MinimalTestKernel.getTransactionProxy();
-
     /** The number of objects to read in a transaction. */
-    protected int items = Integer.getInteger("test.items", 100);
+    protected final int items = Integer.getInteger("test.items", 100);
 
     /**
      * The number of objects to modify in a transaction, if doing modification.
      */
-    protected int modifyItems = Integer.getInteger("test.modify.items", 50);
+    protected final int modifyItems =
+        Integer.getInteger("test.modify.items", 50);
 
     /** The number of times to run the test while timing. */
     protected int count = Integer.getInteger("test.count", 100);
@@ -100,20 +90,11 @@ public class TestDataServicePerformance extends TestCase {
     /** Set when the test passes. */
     protected boolean passed;
 
-    /** A per-test database directory, or null if not created. */
-    private String directory;
-
     /** Properties for creating services. */
     protected Properties props;
 
-    /** The component registry. */
-    private DummyComponentRegistry componentRegistry;
-
-    /** An initial, open transaction. */
-    private DummyTransaction txn;
-
-    /** The service to test. */
-    private DataService service;
+    /** The server node. */
+    private SgsTestNode serverNode = null;
 
     /** Creates the test. */
     public TestDataServicePerformance(String name) {
@@ -127,11 +108,13 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
-        MinimalTestKernel.create();
-        componentRegistry = MinimalTestKernel.getSystemRegistry();
-	props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "TestDataServicePerformance");
+	props = SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+                                                 null, null);
+	props.setProperty("com.sun.sgs.finalService", "DataService");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
+                          "com.sun.sgs.impl.profile.listener." +
+                          "OperationLoggingProfileOpListener");
     }
 
     /** Sets passed if the test passes. */
@@ -145,7 +128,7 @@ public class TestDataServicePerformance extends TestCase {
      * created.
      */
     protected void tearDown() throws Exception {
-	if (service != null) {
+	if (serverNode != null) {
 	    try {
 		shutdown();
 	    } catch (RuntimeException e) {
@@ -156,14 +139,11 @@ public class TestDataServicePerformance extends TestCase {
 		}
 	    }
 	}
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
-	}
     }
 
     /** Shuts down the service. */
-    protected boolean shutdown() {
-	return service.shutdown();
+    protected void shutdown() throws Exception {
+	serverNode.shutdown(passed);
     }
 
     /* -- Tests -- */
@@ -179,29 +159,33 @@ public class TestDataServicePerformance extends TestCase {
     private void doTestRead(boolean detectMods) throws Exception {
 	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
-	service = getDataService(props, componentRegistry, txnProxy);
-	if (service instanceof ProfileProducer) {
-	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
-	}
-	componentRegistry.setComponent(DataManager.class, service);
-	createTransaction(10000);
-	service.setBinding("counters", new Counters(items));
-	txn.commit();
-	for (int r = 0; r < repeat; r++) {
-	    long start = System.currentTimeMillis();
-	    for (int c = 0; c < count; c++) {
-		createTransaction(10000);
-		Counters counters = (Counters) service.getBinding("counters");
-		for (int i = 0; i < items; i++) {
-		    counters.get(i);
-		}
-		txn.commit();
-	    }
-	    long stop = System.currentTimeMillis();
-	    System.err.println(
-		"Time: " + (stop - start) / (float) count +
-		" ms per transaction");
-	}
+	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	serverNode = new SgsTestNode("TestDataServicePerformance", null, props);
+	final DataService service = serverNode.getDataService();
+        TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        Identity taskOwner = serverNode.getProxy().getCurrentOwner();
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    service.setBinding("counters", new Counters(items));
+                }}, taskOwner);
+        for (int r = 0; r < repeat; r++) {
+            long start = System.currentTimeMillis();
+            for (int c = 0; c < count; c++) {
+                txnScheduler.runTask(new AbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            Counters counters =
+                                (Counters) service.getBinding("counters");
+                            for (int i = 0; i < items; i++) {
+                                counters.get(i);
+                            }
+                        }}, taskOwner);
+            }
+            long stop = System.currentTimeMillis();
+            System.err.println(
+                "Time: " + (stop - start) / (float) count +
+                " ms per transaction");
+        }
     }
 
     public void testWrite() throws Exception {
@@ -225,80 +209,39 @@ public class TestDataServicePerformance extends TestCase {
 			  String.valueOf(detectMods));
 	props.setProperty(DataStoreImplClass + ".flush.to.disk",
 			  String.valueOf(flush));
-	service = getDataService(props, componentRegistry, txnProxy);
-	if (service instanceof ProfileProducer) {
-	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
-	}
-	componentRegistry.setComponent(DataManager.class, service);
-	createTransaction();
-	service.setBinding("counters", new Counters(items));
-	txn.commit();
-	for (int r = 0; r < repeat; r++) {
-	    long start = System.currentTimeMillis();
-	    for (int c = 0; c < count; c++) {
-		createTransaction();
-		Counters counters = (Counters) service.getBinding("counters");
-		for (int i = 0; i < items; i++) {
-		    Counter counter = counters.get(i);
-		    if (i < modifyItems) {
-			service.markForUpdate(counter);
-			counter.next();
-		    }
-		}
-		txn.commit();
-	    }
-	    long stop = System.currentTimeMillis();
-	    System.err.println(
-		"Time: " + (stop - start) / (float) count +
-		" ms per transaction");
-	}
+	serverNode = new SgsTestNode("TestDataServicePerformance", null, props);
+	final DataService service = serverNode.getDataService();
+        TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        Identity taskOwner = serverNode.getProxy().getCurrentOwner();
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    service.setBinding("counters", new Counters(items));
+                }}, taskOwner);
+        for (int r = 0; r < repeat; r++) {
+            long start = System.currentTimeMillis();
+            for (int c = 0; c < count; c++) {
+                txnScheduler.runTask(new AbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            Counters counters =
+                                (Counters) service.getBinding("counters");
+                            for (int i = 0; i < items; i++) {
+                                Counter counter = counters.get(i);
+                                if ( i < modifyItems) {
+                                    service.markForUpdate(counter);
+                                    counter.next();
+                                }
+                            }
+                        }}, taskOwner);
+            }
+            long stop = System.currentTimeMillis();
+            System.err.println(
+                "Time: " + (stop - start) / (float) count +
+                " ms per transaction");
+        }
     }
 
     /* -- Other methods and classes -- */
-
-    /** Creates a per-test directory. */
-    private String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
-	if (!dir.delete()) {
-	    throw new RuntimeException("Problem deleting file: " + dir);
-	}
-	if (!dir.mkdir()) {
-	    throw new RuntimeException(
-		"Failed to create directory: " + dir);
-	}
-	directory = dir.getPath();
-	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /** Creates a new transaction. */
-    private DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
-
-    /** Creates a new transaction with the specified timeout. */
-    DummyTransaction createTransaction(long timeout) {
-	txn = new DummyTransaction(timeout);
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
 
     /** A managed object that maintains a list of Counter instances. */
     static class Counters implements ManagedObject, Serializable {
@@ -324,14 +267,5 @@ public class TestDataServicePerformance extends TestCase {
         private int count;
 	Counter() { }
 	int next() { return ++count; }
-    }
-
-    /** Returns the data service to test. */
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry,
-					 TransactionProxy txnProxy)
-	throws Exception
-    {
-	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 }

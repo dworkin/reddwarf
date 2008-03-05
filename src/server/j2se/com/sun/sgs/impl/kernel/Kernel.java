@@ -125,11 +125,6 @@ class Kernel {
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
-    // NOTE: this transaction coordinator should not really be static;
-    // when we allow external transaction coordinators, we need to
-    // create a factory to create not-static instances.  
-    private static TransactionCoordinator transactionCoordinator;
-
     // the properties used to start the application
     private final Properties appProperties;
     
@@ -202,7 +197,8 @@ class Kernel {
                 new IdentityCoordinatorImpl(authenticators);
 
             // initialize the transaction coordinator
-            setupTransactionCoordinator(profileCollector);
+            TransactionCoordinator transactionCoordinator =
+                new TransactionCoordinatorImpl(appProperties, profileCollector);
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
@@ -242,23 +238,6 @@ class Kernel {
             throw e;
         }
     }
-
-    /**
-     * Private helper for initializing the transaction coordinator. 
-     * Note that we only expect to have more than one coordinator created
-     * when we're running multiple stacks in a single VM, for testing.
-     */
-    private void setupTransactionCoordinator(ProfileCollector
-                                             profileCollector) 
-    {
-        synchronized(Kernel.class) {
-            if (transactionCoordinator == null) {
-                transactionCoordinator = 
-                    new TransactionCoordinatorImpl(appProperties,
-                                                   profileCollector);
-            }
-        }
-    } 
 
     /**
      * Private helper routine that loads all of the requested listeners

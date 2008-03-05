@@ -27,7 +27,7 @@ import com.sun.sgs.auth.Identity;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -91,7 +91,7 @@ public class TestScalableHashMapStress extends Assert {
     static final Random random = new UndoableRandom(seed);
 
     private static SgsTestNode serverNode;
-    private static TaskScheduler taskScheduler;
+    private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
     private static DataService dataService;
 
@@ -483,12 +483,12 @@ public class TestScalableHashMapStress extends Assert {
 	new EntrySetNextRemove(1);
 
 	serverNode = new SgsTestNode("TestScalableHashMapStress", null, null);
-        taskScheduler = serverNode.getSystemRegistry().
-            getComponent(TaskScheduler.class);
+        txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
         dataService = serverNode.getDataService();
 
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    initialObjectCount = getObjectCount();
@@ -515,7 +515,7 @@ public class TestScalableHashMapStress extends Assert {
 
     /** Teardown. */
     @After public void tearDown() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		private int attempts = 0;
 		public void run() throws Exception {
@@ -531,7 +531,7 @@ public class TestScalableHashMapStress extends Assert {
 	    }, taskOwner);
 	final AtomicBoolean isDone = new AtomicBoolean(false);
 	while (! isDone.get()) {
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    private int attempts = 0;
 		    public void run() throws Exception {
@@ -548,7 +548,7 @@ public class TestScalableHashMapStress extends Assert {
 		    }
 	    }, taskOwner);
 	}
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		private int attempts = 0;
 		public void run() throws Exception {
@@ -562,7 +562,7 @@ public class TestScalableHashMapStress extends Assert {
 		}
 	    }, taskOwner);
 	DoneRemoving.await(1);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(initialObjectCount, getObjectCount());
@@ -585,7 +585,7 @@ public class TestScalableHashMapStress extends Assert {
 	final AtomicInteger opsPerTxn = new AtomicInteger(getRandomOpsPerTxn());
 	final AtomicInteger opnum = new AtomicInteger(0);
 	while (! isDone.get()) {
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    private int attempts = 0;
 		    public void run() throws Exception {
