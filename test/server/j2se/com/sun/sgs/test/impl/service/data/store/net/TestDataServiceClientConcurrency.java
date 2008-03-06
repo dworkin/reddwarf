@@ -66,26 +66,28 @@ public class TestDataServiceClientConcurrency
     }
 
     /**
-     * Create a DataService, set any default properties, and start the server,
-     * if needed.
+     * Return the properties to start the store in the right more for this
+     * test case.
      */
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry,
-					 TransactionProxy txnProxy)
+    @Override
+    protected Properties getNodeProps()
 	throws Exception
     {
+	Properties props = super.getNodeProps();
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
 	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
+	} else {
+	    props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry, txnProxy);
+	return props;
     }
 }

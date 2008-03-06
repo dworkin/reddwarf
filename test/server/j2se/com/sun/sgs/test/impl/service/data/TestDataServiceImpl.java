@@ -19,7 +19,6 @@
 
 package com.sun.sgs.test.impl.service.data;
 
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;

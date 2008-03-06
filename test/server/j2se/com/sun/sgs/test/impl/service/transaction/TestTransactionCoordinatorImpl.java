@@ -985,6 +985,15 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertAborted(abortCause);
     }
 
+    public void testAbortNoCause() throws Exception {
+	try {
+	    txn.abort(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testAbortActiveEmpty() throws Exception {
 	txn.abort(abortXcp);
 	assertAborted(abortXcp);

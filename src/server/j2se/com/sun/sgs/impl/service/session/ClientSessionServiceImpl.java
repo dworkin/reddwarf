@@ -993,8 +993,9 @@ public class ClientSessionServiceImpl
      * {@code Identity} as the owner.
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-        transactionScheduler.
-	    scheduleTask(task, getValidIdentity(ownerIdentity));
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+        transactionScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
@@ -1004,7 +1005,11 @@ public class ClientSessionServiceImpl
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)
     {
-        taskScheduler.scheduleTask(task, getValidIdentity(ownerIdentity));
+	// TBD: this check is done because there are known cases where the
+	// identity can be null, but when the Handler code changes to ensure
+	// that the identity is always valid, this check can be removed
+	Identity owner = (ownerIdentity == null ? taskOwner : ownerIdentity);
+        taskScheduler.scheduleTask(task, owner);
     }
 
     /**
@@ -1020,7 +1025,9 @@ public class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	transactionScheduler.runTask(task, getValidIdentity(ownerIdentity));
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+	transactionScheduler.runTask(task, ownerIdentity);
     }
 
     /** Returns the non-null user identity or the application's identity. */

@@ -363,6 +363,8 @@ class ClientSessionHandler {
 		}
 
 		if (!disconnectHandled) {
+		    // TBD: identity may be null. Fix to pass a non-null
+		    // identity when scheduling the task.
 		    scheduleHandleDisconnect(false);
 		}
 
@@ -472,6 +474,8 @@ class ClientSessionHandler {
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleHandleDisconnect(isConnected());
 		break;
 		
@@ -482,6 +486,8 @@ class ClientSessionHandler {
 			"Handler.messageReceived unknown operation code:{0}",
 			opcode);
 		}
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleHandleDisconnect(false);
 		break;
 	    }
@@ -579,6 +585,8 @@ class ClientSessionHandler {
 		}
 		final byte[] loginRedirectMessage =
 		    getLoginRedirectMessage(node.getHostName());
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			sendProtocolMessage(
@@ -600,6 +608,8 @@ class ClientSessionHandler {
 	 * disconnects the client session.
 	 */
 	private void sendLoginFailureAndDisconnect() {
+	    // TBD: identity may be null. Fix to pass a non-null identity
+	    // when scheduling the task.
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);

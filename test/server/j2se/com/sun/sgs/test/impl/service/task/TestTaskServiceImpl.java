@@ -27,7 +27,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
@@ -48,16 +47,13 @@ import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.SgsTestNode;
 
 import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 
-import java.util.LinkedHashSet;
 import java.util.MissingResourceException;
 import java.util.Properties;
 

@@ -277,7 +277,7 @@ public class TestTaskSchedulerImpl {
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
         taskScheduler.scheduleTask(new IncrementRunner(), taskOwner, time);
-        Thread.sleep(500L);
+        Thread.sleep(600L);
         assertEquals(6, taskCount);
     }
 

@@ -23,7 +23,6 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.kernel.ComponentRegistry;

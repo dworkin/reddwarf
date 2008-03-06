@@ -20,11 +20,8 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -115,9 +112,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
-    /** Properties for creating services. */
-    protected Properties props;
-
     /** The server node. */
     private SgsTestNode serverNode = null;
 
@@ -148,14 +142,9 @@ public class TestDataServiceConcurrency extends TestCase {
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
 
-        props = SgsTestNode.getDefaultProperties("TestDataServiceConcurrency",
-                                                 null, null);
-        props.setProperty("com.sun.sgs.finalService", "DataService");
-        props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
-        props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
-                          "com.sun.sgs.impl.profile.listener." +
-                          "OperationLoggingProfileOpListener");
-	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+        Properties props =
+	    SgsTestNode.getDefaultProperties("TestDataServiceConcurrency",
+					     null, null);
         serverNode = new SgsTestNode("TestDataServiceConcurrency", null, props);
 	txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
@@ -196,23 +185,18 @@ public class TestDataServiceConcurrency extends TestCase {
         /* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
             final AtomicInteger i = new AtomicInteger(0);
-	    final AtomicBoolean justReset = new AtomicBoolean(false);
 	    final int start = t * perThread;
             while (i.get() < perThread) {
                 txnScheduler.runTask(new AbstractKernelRunnable() {
                         public void run() throws Exception {
                             int ival = i.get();
                             while (ival < perThread) {
-				if (ival > 0 && ival % 100 == 0) {
-				    if (! justReset.get()) {
-					justReset.set(true);
-					return;
-				    }
-				    justReset.set(false);
-				}
-                                service.setBinding(getObjectName(start + ival),
+				service.setBinding(getObjectName(start + ival),
                                                    new ModifiableObject());
                                 ival = i.incrementAndGet();
+				if (ival > 0 && ival % 100 == 0) {
+				    return;
+				}
                             }
                         }}, taskOwner);
             }
@@ -230,6 +214,20 @@ public class TestDataServiceConcurrency extends TestCase {
     }
 
     /* -- Other methods and classes -- */
+
+    /** A utility to get the properties for the node. */
+    protected Properties getNodeProps() throws Exception {
+	Properties props =
+	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+					     null, null);
+	props.setProperty("com.sun.sgs.finalService", "DataService");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
+			  "com.sun.sgs.impl.profile.listener." +
+			  "OperationLoggingProfileOpListener");
+	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	return props;
+    }
 
     /** Perform operations in the specified number of threads. */
     private void runOperations(int threads) throws Throwable {
@@ -301,7 +299,6 @@ public class TestDataServiceConcurrency extends TestCase {
 
         public void run() {
             final AtomicInteger i = new AtomicInteger(0);
-            final AtomicBoolean skipRandomCheck = new AtomicBoolean(false);
             try {
                 while (i.get() < operations) {
                     txnScheduler.runTask(new AbstractKernelRunnable() {
@@ -313,17 +310,12 @@ public class TestDataServiceConcurrency extends TestCase {
                                                    i.get());
                                     }
                                     try {
-                                        if (! skipRandomCheck.get()) {
-                                            if (random.nextInt(10) == 0) {
-                                                commits++;
-                                                skipRandomCheck.set(true);
-                                                return;
-                                            }
-                                        } else {
-                                            skipRandomCheck.set(false);
-                                        }
-                                        op(i.get());
+					op(i.get());
                                         i.getAndIncrement();
+					if (random.nextInt(10) == 0) {
+					    commits++;
+					    return;
+					}
                                     } catch (TransactionAbortedException e) {
                                         if (logger.isLoggable(Level.FINE)) {
                                             logger.log(Level.FINE, "{0}: {1}",

@@ -47,7 +47,7 @@ final class StartupKernelContext extends KernelContext {
     /**
      * Adds a {@code Manager} to those avilable in this context.
      *
-     * @param service the {@code Manager} to add
+     * @param manager the {@code Manager} to add
      */
     void addManager(Object manager) {
         ((ComponentRegistryImpl)managerComponents).addComponent(manager);

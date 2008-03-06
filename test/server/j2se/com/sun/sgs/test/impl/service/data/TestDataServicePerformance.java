@@ -20,11 +20,9 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -90,9 +88,6 @@ public class TestDataServicePerformance extends TestCase {
     /** Set when the test passes. */
     protected boolean passed;
 
-    /** Properties for creating services. */
-    protected Properties props;
-
     /** The server node. */
     private SgsTestNode serverNode = null;
 
@@ -108,13 +103,6 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
-	props = SgsTestNode.getDefaultProperties("TestDataServicePerformance",
-                                                 null, null);
-	props.setProperty("com.sun.sgs.finalService", "DataService");
-	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
-	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
-                          "com.sun.sgs.impl.profile.listener." +
-                          "OperationLoggingProfileOpListener");
     }
 
     /** Sets passed if the test passes. */
@@ -157,6 +145,7 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     private void doTestRead(boolean detectMods) throws Exception {
+	Properties props = getNodeProps();
 	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
 	props.setProperty("com.sun.sgs.txn.timeout", "10000");
@@ -205,6 +194,7 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     void doTestWrite(boolean detectMods, boolean flush) throws Exception {
+	Properties props = getNodeProps();
 	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
 	props.setProperty(DataStoreImplClass + ".flush.to.disk",
@@ -242,6 +232,19 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     /* -- Other methods and classes -- */
+
+    /** A utility to get the properties for the node. */
+    protected Properties getNodeProps() throws Exception {
+	Properties props =
+	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+					     null, null);
+	props.setProperty("com.sun.sgs.finalService", "DataService");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
+			  "com.sun.sgs.impl.profile.listener." +
+			  "OperationLoggingProfileOpListener");
+	return props;
+    }
 
     /** A managed object that maintains a list of Counter instances. */
     static class Counters implements ManagedObject, Serializable {
