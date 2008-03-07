@@ -473,12 +473,6 @@ public class WatchdogServiceImpl implements WatchdogService {
 	}
 	return NodeImpl.getNode(dataService, nodeId);
     }
-    
-    /** {@inheritDoc} */
-    public Node getNode(String host, int port) {
-        checkState();
-        return NodeImpl.getNode(dataService, host, port);
-    }
 
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {

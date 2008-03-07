@@ -421,27 +421,21 @@ public class WatchdogServerImpl implements WatchdogServer, Service {
 	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
 	    assert ! aliveNodes.containsKey(nodeId);
 	
+            // Check for an existing alive node with this host and port
+            for (NodeImpl n : aliveNodes.values()) {
+                if (host.equals(n.getHostName()) && port == n.getPort()) {
+                    throw new IllegalArgumentException(
+                                    "configuration error: a node at " +
+                                    host + ":" + port + " already exists");
+                }
+            }
+            
 	    // Persist node
 	    try {
 		runTransactionally(new AbstractKernelRunnable() {
 		    public void run() {
-                        // See if a node exists at this host and port, 
-                        // which indicates a user configuration problem.
-                        // Should we also be checking for whether the node is
-                        // live?  How quickly are failed nodes cleared from the
-                        // data store?
-                        if (NodeImpl.getNode(dataService, host, port) != null) {
-                            throw new IllegalArgumentException(
-                                    "configuration error: a node at " +
-                                    host + ":" + port + " already exists");
-                        }
 			node.putNode(dataService);
 		    }});
-            } catch (IllegalArgumentException ill) {
-                // if there's a configuration error, throw the exception
-                // directly so it's easier to find, rather than wrapping
-                // it in a registration failure exception
-                throw ill;
 	    } catch (Exception e) {
 		throw new NodeRegistrationFailedException(
 		    "registration failed: " + nodeId, e);

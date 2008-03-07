@@ -54,10 +54,6 @@ class NodeImpl
 
     /** The prefix for NodeImpl state. */
     private static final String NODE_PREFIX = PKG_NAME + ".node";
-    
-    /** The prefix for a node saved by host and port location. */
-    private static final String NODE_LOCATION_PREFIX = 
-            PKG_NAME + ".location";
 
     /** The node id. */
     private final long id;
@@ -336,7 +332,6 @@ class NodeImpl
      */
     synchronized void putNode(DataService dataService) {
 	dataService.setServiceBinding(getNodeKey(id), this);
-        dataService.setServiceBinding(getNodeLocationKey(host, port), this);
     }
     
     /**
@@ -375,8 +370,6 @@ class NodeImpl
 	NodeImpl node;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
-            String locKey = getNodeLocationKey(node.host, node.port);
-            dataService.removeServiceBinding(locKey);
 	    dataService.removeServiceBinding(key);
 	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
@@ -398,31 +391,6 @@ class NodeImpl
     static NodeImpl getNode(DataService dataService, long nodeId) {
 	String key = getNodeKey(nodeId);
 	NodeImpl node = null;
-	try {
-	    node = (NodeImpl) dataService.getServiceBinding(key);
-	} catch (NameNotBoundException e) {
-	}
-	return node;
-    }
-
-    /**
-     * Returns the {@code Node} instance located at the given 
-     * {@code host} and {@code port}, retrieved from the specified
-     * {@code dataService}, or {@code null} if such a node isn't bound
-     * in the data service.  This method should only be called within
-     * a transaction.
-     * 
-     * @param dataService a data service
-     * @param host        the host where the node is expected to be bound
-     * @param port        the port where the node is expected to be bound
-     * @return the node bound to the given {@code host} and {@code port}, or
-     *         {@code null}
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    static Node getNode(DataService dataService, String host, int port) {
-        String key = getNodeLocationKey(host, port);
-        NodeImpl node = null;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
 	} catch (NameNotBoundException e) {
@@ -502,10 +470,6 @@ class NodeImpl
      */
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;
-    }
-    
-    private static String getNodeLocationKey(String host, int port) {
-        return NODE_LOCATION_PREFIX + "." + host + "." + port;
     }
     
     /**

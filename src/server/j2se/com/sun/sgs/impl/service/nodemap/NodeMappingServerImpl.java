@@ -861,9 +861,12 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
             // Tell our listeners
             notifyListeners(oldNode, atask.getNode(), id);
         } catch (Exception e) {
+            // We can get an IllegalStateException if this server shuts
+            // down while we're moving identities from failed nodes.
+            // TODO - check that those identities are properly removed.
             // Hmmm.  we've probably left some cruft in the data store.
             // The most likely problem is one in our own code.
-            logger.logThrow(Level.WARNING, e, 
+            logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
                             id, oldNode.getId(), newNodeId);
         }

@@ -19,8 +19,6 @@
 
 package com.sun.sgs.test.impl.kernel;
 
-import com.sun.sgs.test.util.SgsTestNode;
-
 /** Test restarting a simple application. */
 public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 
@@ -29,9 +27,9 @@ public class TestKernelSimpleAppRestart extends KernelSimpleAppTestCase {
 	super(name);
     }
 
-    /** Returns a unique port to use for this application. */
+    /** Returns the port to use for this application. */
     int getPort() {
-	return SgsTestNode.getNextAppPort();
+	return 33335;
     }
 
     /** Run a simple application */
