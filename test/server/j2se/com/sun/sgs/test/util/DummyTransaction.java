@@ -190,6 +190,8 @@ public class DummyTransaction implements Transaction {
     }
 
     public synchronized void abort(Throwable cause) {
+	if (cause == null)
+	    throw new NullPointerException("Cause cannot be null");
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "abort {0} cause:{1}", this, cause);
 	}

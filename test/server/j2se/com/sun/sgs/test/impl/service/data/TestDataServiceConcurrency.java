@@ -20,26 +20,17 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TransactionAbortedException;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.DummyManagedObject;
-import com.sun.sgs.test.util.DummyProfileCoordinator;
-import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
@@ -56,13 +47,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
-
-    /** The transaction proxy. */
-    static final DummyTransactionProxy txnProxy =
-	MinimalTestKernel.getTransactionProxy();
-
-    /** The component registry. */
-    static DummyComponentRegistry componentRegistry;
 
     /**
      * The types of operations to perform.  Each value includes the operations
@@ -112,9 +96,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /** Set when the test passes. */
     protected boolean passed;
 
-    /** A per-test database directory. */
-    private String directory = System.getProperty("test.directory");
-
     /**
      * The exception thrown by one of the threads, or null if none of the
      * threads have failed.
@@ -130,11 +111,17 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
-    /** Properties for creating services. */
-    protected Properties props;
+    /** The server node. */
+    private SgsTestNode serverNode = null;
 
-    /** The service to test. */
+    /** The data service. */
     private DataService service;
+
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
+
+    /** The owner of the tests. */
+    private Identity taskOwner;
 
     /** Creates the test. */
     public TestDataServiceConcurrency(String name) {
@@ -153,11 +140,13 @@ public class TestDataServiceConcurrency extends TestCase {
 	    (maxThreads != threads ?
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
-        MinimalTestKernel.create();
-        componentRegistry = MinimalTestKernel.getSystemRegistry();
-	props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
+
+        Properties props = getNodeProps();
+        serverNode = new SgsTestNode("TestDataServiceConcurrency", null, props);
+	txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+	service = serverNode.getDataService();
+	taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
     /** Sets passed if the test passes. */
@@ -168,7 +157,7 @@ public class TestDataServiceConcurrency extends TestCase {
 
     /** Deletes the directory if the test passes. */
     protected void tearDown() throws Exception {
-	if (service != null) {
+	if (serverNode != null) {
 	    try {
 		shutdown();
 	    } catch (RuntimeException e) {
@@ -179,55 +168,67 @@ public class TestDataServiceConcurrency extends TestCase {
 		}
 	    }
 	}
-	if (passed) {
-	    deleteDirectory(directory);
-	}
     }
 
     /** Shuts down the service. */
-    protected boolean shutdown() {
-	return service.shutdown();
+    protected void shutdown() throws Exception {
+	serverNode.shutdown(passed);
     }
 
     /* -- Tests -- */
 
     public void testConcurrency() throws Throwable {
-	service = getDataService(props, componentRegistry, txnProxy);
-	if (service instanceof ProfileProducer) {
-	    DummyProfileCoordinator.startProfiling(
-		((ProfileProducer) service));
-	}
-	componentRegistry.setComponent(DataManager.class, service);
-	int perThread = objects + objectsBuffer;
-	/* Create objects */
+        final int perThread = objects + objectsBuffer;
+        /* Create objects */
 	for (int t = 0; t < maxThreads; t++) {
-	    DummyTransaction txn = new DummyTransaction(10000);
-	    txnProxy.setCurrentTransaction(txn);
-	    int start = t * perThread;
-	    for (int i = 0; i < perThread; i++) {
-		if (i > 0 && i % 100 == 0) {
-		    txn.commit();
-		    txn = new DummyTransaction(10000);
-		    txnProxy.setCurrentTransaction(txn);
-		}
-		service.setBinding(
-		    getObjectName(start + i), new ModifiableObject());
-	    }
-	    txn.commit();
-	}
+            final AtomicInteger i = new AtomicInteger(0);
+	    final int start = t * perThread;
+            while (i.get() < perThread) {
+                txnScheduler.runTask(new AbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            int ival = i.get();
+                            while (ival < perThread) {
+				service.setBinding(getObjectName(start + ival),
+                                                   new ModifiableObject());
+                                ival = i.incrementAndGet();
+				if (ival > 0 && ival % 100 == 0) {
+				    return;
+				}
+                            }
+                        }}, taskOwner);
+            }
+        }
 	/* Warm up */
 	if (repeat != 1) {
 	    runOperations(1);
 	}
 	/* Test */
-	for (int t = threads; t <= maxThreads; t++) {
+	for (int i = threads; i <= maxThreads; i++) {
 	    for (int r = 0; r < repeat; r++) {
-		runOperations(t);
+		runOperations(i);
 	    }
 	}
     }
 
     /* -- Other methods and classes -- */
+
+    /** A utility to get the properties for the node. */
+    protected Properties getNodeProps() throws Exception {
+	Properties props =
+	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+					     null, null);
+	props.setProperty("com.sun.sgs.finalService", "DataService");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.level", "on");
+	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
+			  "com.sun.sgs.impl.profile.listener." +
+			  "OperationLoggingProfileOpListener");
+	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	props.setProperty("com.sun.sgs.server.start", "false");
+	props.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
+	                  "data.store.class",
+	                  "com.sun.sgs.impl.service.data.store.DataStoreImpl");
+	return props;
+    }
 
     /** Perform operations in the specified number of threads. */
     private void runOperations(int threads) throws Throwable {
@@ -287,7 +288,6 @@ public class TestDataServiceConcurrency extends TestCase {
 	private final DataService service;
 	private final int id;
 	private final Random random = new Random();
-	private DummyTransaction txn;
 	private int aborts;
 	private int commits;
 
@@ -298,46 +298,43 @@ public class TestDataServiceConcurrency extends TestCase {
 	    start();
 	}
 
-	public void run() {
-            MinimalTestKernel.registerCurrentThread();
-	    try {
-		createTxn();
-		for (int i = 0; i < operations; i++) {
-		    if (i % 1000 == 0 && logger.isLoggable(Level.FINE)) {
-			logger.log(Level.FINE, "Operation {0}", i);
-		    }
-		    while (true) {
-			try {
-			    op(i);
-			    break;
-			} catch (TransactionAbortedException e) {
-			    if (logger.isLoggable(Level.FINE)) {
-				logger.log(Level.FINE, "{0}: {1}", this, e);
-			    }
-			    aborts++;
-			    createTxn();
-			}
-		    }
-		}
-		txn.abort(null);
-		threadDone(aborts, commits);
-	    } catch (Throwable t) {
-		try {
-		    txn.abort(null);
-		} catch (RuntimeException e) {
-		}
-		threadFailed(t);
-	    }
-	}
+        public void run() {
+            final AtomicInteger i = new AtomicInteger(0);
+            try {
+                while (i.get() < operations) {
+                    txnScheduler.runTask(new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                while (i.get() < operations) {
+                                    if (i.get() % 1000 == 0 &&
+                                        logger.isLoggable(Level.FINE)) {
+                                        logger.log(Level.FINE, "Operation {0}",
+                                                   i.get());
+                                    }
+                                    try {
+					op(i.get());
+                                        i.getAndIncrement();
+					if (random.nextInt(10) == 0) {
+					    commits++;
+					    return;
+					}
+                                    } catch (TransactionAbortedException e) {
+                                        if (logger.isLoggable(Level.FINE)) {
+                                            logger.log(Level.FINE, "{0}: {1}",
+                                                       this, e);
+                                        }
+                                        aborts++;
+                                        return;
+                                    }
+                                }
+                            }}, taskOwner);
+                }
+                threadDone(aborts, commits);
+            } catch (Throwable t) {
+                threadFailed(t);
+            }
+        }
 
 	private void op(int i) throws Exception {
-	    if (random.nextInt(10) == 0) {
-		DummyTransaction t = txn;
-		txn = null;
-		t.commit();
-		commits++;
-		createTxn();
-	    }
 	    int start = id * (objects + objectsBuffer);
 	    String name = getObjectName(start + random.nextInt(objects));
 	    switch (random.nextInt(whichOperations.value)) {
@@ -368,54 +365,6 @@ public class TestDataServiceConcurrency extends TestCase {
 		throw new AssertionError();
 	    }
 	}
-
-	private void createTxn() {
-	    txn = new DummyTransaction();
-	    txnProxy.setCurrentTransaction(txn);
-	}
-    }
-
-    /** Creates a per-test directory. */
-    private String createDirectory() throws IOException {
-	if (directory != null) {
-	    new File(directory).mkdir();
-	} else {
-	    File dir = File.createTempFile(getName(), "dbdir");
-	    if (!dir.delete()) {
-		throw new RuntimeException("Problem deleting file: " + dir);
-	    }
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Failed to create directory: " + dir);
-	    }
-	    directory = dir.getPath();
-	}
-	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /** Returns the data service to test. */
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry,
-					 TransactionProxy txnProxy)
-	throws Exception
-    {
-	return new DataServiceImpl(props, componentRegistry, txnProxy);
     }
 
     /** Returns the binding name to use for the i'th object. */

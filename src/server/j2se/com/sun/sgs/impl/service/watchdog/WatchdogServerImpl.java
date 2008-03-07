@@ -28,7 +28,7 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
@@ -173,8 +173,8 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
     /** The exporter for this server. */
     private final Exporter<WatchdogServer> exporter;
 
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private final TransactionScheduler transactionScheduler;
 
     /** The lock for notifying the {@code NotifyClientsThread}. */
     final Object notifyClientsLock = new Object();
@@ -278,14 +278,15 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 	    IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
 	
 	dataService = txnProxy.getService(DataService.class);
-	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	transactionScheduler =
+	    systemRegistry.getComponent(TransactionScheduler.class);
 	taskOwner = txnProxy.getCurrentOwner();
 	
 	idGenerator =
 	    new IdGenerator(ID_GENERATOR_NAME,
 			    idBlockSize,
 			    txnProxy,
-			    taskScheduler);
+			    transactionScheduler);
 
 	FailedNodesRunnable failedNodesRunnable = new FailedNodesRunnable();
 	runTransactionally(failedNodesRunnable);
@@ -518,7 +519,7 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
      */
     private void runTransactionally(KernelRunnable task) throws Exception {
 	try {
-            taskScheduler.runTransactionalTask(task, taskOwner);
+            transactionScheduler.runTask(task, taskOwner);
 	} catch (Exception e) {
 	    logger.logThrow(Level.WARNING, e, "task failed: {0}", task);
 	    throw e;

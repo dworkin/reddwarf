@@ -37,8 +37,6 @@ import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.io.Acceptor;
@@ -46,6 +44,7 @@ import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -148,9 +147,6 @@ public final class ClientSessionServiceImpl
     /** The Acceptor for listening for new connections. */
     private final Acceptor<SocketAddress> acceptor;
 
-    /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
-
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
@@ -176,10 +172,9 @@ public final class ClientSessionServiceImpl
     private final ClientSessionServer serverProxy;
 
     /** The map of session task queues, keyed by session ID. */
-    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
-	sessionTaskQueues =
-	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
-    
+    private final ConcurrentHashMap<BigInteger, TaskQueue>
+	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
+
     /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
 
@@ -266,18 +261,14 @@ public final class ClientSessionServiceImpl
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    taskService = txnProxy.getService(TaskService.class);
-            nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner, taskService);
-	    localNodeId = watchdogService.getLocalNodeId();
+	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
 
 	    /*
 	     * Store the ClientSessionServer proxy in the data store.
 	     */
-	    taskScheduler.runTransactionalTask(
-		new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getClientSessionServerKey(localNodeId),
@@ -898,12 +889,10 @@ public final class ClientSessionServiceImpl
 		}
 
 		BigInteger sessionRefId = new BigInteger(1, sessionId);
-		NonDurableTaskQueue taskQueue =
-		    sessionTaskQueues.get(sessionRefId);
+		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
 		if (taskQueue == null) {
-		    NonDurableTaskQueue newTaskQueue =
-			new NonDurableTaskQueue(txnProxy, taskScheduler,
-						taskOwner);
+		    TaskQueue newTaskQueue =
+			transactionScheduler.createTaskQueue();
 		    taskQueue = sessionTaskQueues.
 			putIfAbsent(sessionRefId, newTaskQueue);
 		    if (taskQueue == null) {
@@ -913,7 +902,7 @@ public final class ClientSessionServiceImpl
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ClientSessionImpl.serviceEventQueue(sessionId);
-		    }});
+		    }}, taskOwner);
 	    } finally {
 		callFinished();
 	    }
@@ -1015,11 +1004,11 @@ public final class ClientSessionServiceImpl
     /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
-     * 
-     * @see NonDurableTaskScheduler#scheduleTask(KernelRunnable, Identity)
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+        transactionScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
@@ -1029,15 +1018,18 @@ public final class ClientSessionServiceImpl
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)
     {
-        nonDurableTaskScheduler.
-            scheduleNonTransactionalTask(task, ownerIdentity);
+	// TBD: this check is done because there are known cases where the
+	// identity can be null, but when the Handler code changes to ensure
+	// that the identity is always valid, this check can be removed
+	Identity owner = (ownerIdentity == null ? taskOwner : ownerIdentity);
+        taskScheduler.scheduleTask(task, owner);
     }
 
     /**
      * Schedules a non-durable, transactional task using the task service.
      */
     void scheduleTaskOnCommit(KernelRunnable task) {
-        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
+        taskService.scheduleNonDurableTask(task, true);
     }
 
     /**
@@ -1046,12 +1038,14 @@ public final class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	Identity owner =
-	    (ownerIdentity == null) ?
-	    taskOwner :
-	    ownerIdentity;
-	    
-	taskScheduler.runTransactionalTask(task, owner);
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+	transactionScheduler.runTask(task, ownerIdentity);
+    }
+
+    /** Returns the non-null user identity or the application's identity. */
+    private Identity getValidIdentity(Identity userIdentity) {
+	return userIdentity == null ? taskOwner : userIdentity;
     }
 
     /**
@@ -1070,14 +1064,14 @@ public final class ClientSessionServiceImpl
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    try {
-		taskScheduler.runTransactionalTask(
+		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    taskService.scheduleTask(
 				new RemoveClientSessionServerProxyTask(nodeId));
 			    notifyDisconnectedSessions(nodeId);
 			}},
-		    taskOwner);
+		    getValidIdentity(taskOwner));
 		future.done();
 	    } catch (Exception e) {
 		logger.logThrow(

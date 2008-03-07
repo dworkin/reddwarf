@@ -123,7 +123,7 @@ public class TestDataStoreImpl extends TestCase {
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
-		txn.abort(null);
+		txn.abort(new RuntimeException("abort"));
 	    }
 	    if (!passed && store != null) {
 		new ShutdownAction().waitForDone();
@@ -540,7 +540,7 @@ public class TestDataStoreImpl extends TestCase {
 	byte[] newData = new byte[] { 3 };
 	store.setObject(txn, id, newData);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
 	store.setObject(txn, id, newData);
@@ -671,7 +671,7 @@ public class TestDataStoreImpl extends TestCase {
 	    byte[] newData = new byte[] { (byte) i };
 	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
 	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-	    txn.abort(null);
+	    txn.abort(new RuntimeException("abort"));
 	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	    assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
 	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
@@ -746,7 +746,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	assertFalse(txn.prepare());
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	try {
@@ -908,7 +908,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.setBinding(txn, "foo", newId);
 	assertEquals(newId, store.getBinding(txn, "foo"));
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
     }
@@ -979,7 +979,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeBinding(txn, "foo");
 	assertFalse(txn.prepare());
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.removeBinding(txn, "foo");
@@ -1092,7 +1092,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-2", store.nextBoundName(txn, null));
 	store.removeBinding(txn, "name-2");
 	assertNull(store.nextBoundName(txn, null));
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
@@ -1383,7 +1383,7 @@ public class TestDataStoreImpl extends TestCase {
     /* -- Test shutdown -- */
 
     public void testShutdownAgain() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	txn = null;
 	store.shutdown();
 	ShutdownAction action = new ShutdownAction();
@@ -1418,7 +1418,7 @@ public class TestDataStoreImpl extends TestCase {
 	action1.interrupt();
 	action1.assertResult(false);
 	action2.assertBlocked();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	action2.assertResult(true);
 	txn = null;
 	store = null;
@@ -1429,7 +1429,7 @@ public class TestDataStoreImpl extends TestCase {
 	action1.assertBlocked();
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	boolean result1;
 	try {
 	    result1 = action1.waitForDone();
@@ -1766,7 +1766,7 @@ public class TestDataStoreImpl extends TestCase {
 			System.err.println(finalI + " txn2: " + e);
 			exception2 = e;
 			if (txn2 != null) {
-			    txn2.abort(null);
+			    txn2.abort(new RuntimeException("abort"));
 			}
 		    }
 		}
@@ -1873,7 +1873,7 @@ public class TestDataStoreImpl extends TestCase {
 	throws Exception
     {
 	action.setUp();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	try {
 	    action.run();
 	    fail("Expected exception");
@@ -1943,7 +1943,7 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	} finally {
-	    originalTxn.abort(null);
+	    originalTxn.abort(new RuntimeException("abort"));
 	}
     }
 
@@ -1979,7 +1979,7 @@ public class TestDataStoreImpl extends TestCase {
 		} catch (Throwable t) {
 		    exceptionHolder.set(t);
 		}
-		txn.abort(null);
+		txn.abort(new RuntimeException("abort"));
 		txn = null;
 	    }
 	};
@@ -1988,7 +1988,7 @@ public class TestDataStoreImpl extends TestCase {
 	Throwable exception = exceptionHolder.get();
 	assertTrue("Expected IllegalStateException: " + exception,
 		   exception instanceof IllegalStateException);
-	originalTxn.abort(null);
+	originalTxn.abort(new RuntimeException("abort"));
 	shutdownAction.assertResult(true);
 	store = null;
     }
@@ -1996,7 +1996,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Tests running the action after shutdown. */
     void testShutdown(Action action) throws Exception {
 	action.setUp();
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	try {
 	    action.run();

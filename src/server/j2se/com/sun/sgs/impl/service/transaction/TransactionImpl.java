@@ -87,7 +87,7 @@ final class TransactionImpl implements Transaction {
 
     /**
      * The exception that caused the transaction to be aborted, or null if no
-     * cause was provided or if no abort occurred.
+     * abort occurred.
      */
     private Throwable abortCause = null;
 
@@ -201,6 +201,8 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public void abort(Throwable cause) {
 	assert Thread.currentThread() == owner : "Wrong thread";
+	if (cause == null)
+	    throw new NullPointerException("The cause cannot be null");
 	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
 	case ACTIVE:

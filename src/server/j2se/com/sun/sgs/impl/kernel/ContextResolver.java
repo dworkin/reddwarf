@@ -23,26 +23,46 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
+
+import com.sun.sgs.auth.Identity;
+
+import com.sun.sgs.service.Transaction;
+
 
 /**
  * This class is used to resolve the state associated with the current task's
- * context.
+ * context, including its owner and active transaction.
  */
 public final class ContextResolver {
 
-    // the thread local that caches the context, so we don't need to cast
-    // the task thread with each query to find the context
+    // the context of any current thread, needed only so that we can run
+    // multiple stacks in the same VM
     private static ThreadLocal<KernelContext> context =
             new ThreadLocal<KernelContext>();
 
+    // the current owner of any given thread
+    private static ThreadLocal<Identity> currentOwner = 
+        new ThreadLocal<Identity>();
+
+    // the current transaction for any given thread
+    private static ThreadLocal<Transaction> currentTransaction =
+        new ThreadLocal<Transaction>();
 
     /**
-     * Returns the <code>ChannelManager</code> used in this context.
+     * Private constructor used to ensure that no one constructs an instance
+     * of this class.
+     */
+    private ContextResolver() { }
+
+    /**
+     * Returns the {@code ChannelManager} used in this context.
      *
-     * @return the context's <code>ChannelManager</code>.
+     * @return the context's {@code ChannelManager}.
      *
      * @throws IllegalStateException if there is no available
-     *                               <code>ChannelManager</code> in this
+     *                               {@code ChannelManager} in this
      *                               context
      */
     public static ChannelManager getChannelManager() {
@@ -50,12 +70,12 @@ public final class ContextResolver {
     }
 
     /**
-     * Returns the <code>DataManager</code> used in this context.
+     * Returns the {@code DataManager} used in this context.
      *
-     * @return the context's <code>DataManager</code>.
+     * @return the context's {@code DataManager}.
      *
      * @throws IllegalStateException if there is no available
-     *                               <code>DataManager</code> in this
+     *                               {@code DataManager} in this
      *                               context
      */
     public static DataManager getDataManager() {
@@ -63,12 +83,12 @@ public final class ContextResolver {
     }
 
     /**
-     * Returns the <code>TaskManager</code> used in this context.
+     * Returns the {@code TaskManager} used in this context.
      *
-     * @return the context's <code>TaskManager</code>.
+     * @return the context's {@code TaskManager}.
      *
      * @throws IllegalStateException if there is no available
-     *                               <code>TaskManager</code> in this
+     *                               {@code TaskManager} in this
      *                               context
      */
     public static TaskManager getTaskManager() {
@@ -79,7 +99,7 @@ public final class ContextResolver {
      * Returns the manager in this context that matches the given type.
      *
      * @param <T> the type of the manager
-     * @param type the <code>Class</code> of the requested manager
+     * @param type the {@code Class} of the requested manager
      *
      * @return the matching manager
      *
@@ -93,13 +113,15 @@ public final class ContextResolver {
     }
 
     /**
-     * Package-private method used to set the context. This is called each
-     * time the <code>TaskHandler</code> is invoked to run under a new owner.
+     * Package-private method used to set task state. This is called each
+     * time a task is run through a {@code Scheduler}
      *
-     * @param ctx the current context
+     * @param ctx the {@code KernelContext} for the current task
+     * @param owner the {@code Identity} that owns the current task
      */
-    static void setContext(KernelContext ctx) {
+    static void setTaskState(KernelContext ctx, Identity owner) {
         context.set(ctx);
+        currentOwner.set(owner);
     }
 
     /**
@@ -107,8 +129,96 @@ public final class ContextResolver {
      *
      * @return the current {@code AppKernelAppContext}
      */
-    public static KernelContext getContext() {
+    static KernelContext getContext() {
         return context.get();
+    }
+
+    /**
+     * Returns the current owner of the work being done by this thread.
+     *
+     * @return the {@code Identity} that owns the current task
+     */
+    static Identity getCurrentOwner() {
+        return currentOwner.get();
+    }
+
+    /**
+     * Returns the current <code>Transaction</code>, throwing an exception
+     * if there is no currently active transaction or if the currently
+     * active transaction has timed out.
+     *
+     * @return the currently active <code>Transaction</code>
+     *
+     * @throws TransactionNotActiveException if there is no currently active
+     *                                       transaction
+     * @throws TransactionTimeoutException if the transaction has timed out
+     */
+    static Transaction getCurrentTransaction() {
+        Transaction txn = currentTransaction.get();
+
+        if (txn == null)
+            throw new TransactionNotActiveException("no current transaction");
+
+        txn.checkTimeout();
+
+        return txn;
+    }
+
+    /**
+     * Sets the current <code>Transaction</code>, throwing an exception if
+     * there is already an active transaction.
+     *
+     * @param transaction the <code>Transaction</code> to set as currently
+     *                    active
+     *
+     * @throws IllegalStateException if there is already an active transaction
+     */
+    static void setCurrentTransaction(Transaction transaction) {
+        if (transaction == null)
+            throw new NullPointerException("null transactions not allowed");
+
+        Transaction txn = currentTransaction.get();
+        if (txn != null)
+            throw new IllegalStateException("an active transaction is " +
+                                            "currently running");
+
+        currentTransaction.set(transaction);
+    }
+
+    /**
+     * Clears the currently active <code>Transaction</code>. This is
+     * typically done once a transaction has finished.
+     *
+     * @param transaction the <code>Transaction</code> to clear, which
+     *                    must be the currently active transaction
+     *
+     * @throws IllegalStateException if there is no currently active
+     *                               transaction to clear
+     * @throws IllegalArgumentException if the given <code>Transaction</code>
+     *                                  is not the active transaction
+     */
+    static void clearCurrentTransaction(Transaction transaction) {
+        if (transaction == null)
+            throw new NullPointerException("transaction cannot be null");
+
+        Transaction txn = currentTransaction.get();
+        if (txn == null)
+            throw new IllegalStateException("no active transaction to clear");
+        if (! txn.equals(transaction))
+            throw new IllegalArgumentException("provided transaction is " +
+                                               "not currently active");
+
+        currentTransaction.set(null);
+    }
+
+    /**
+     * Returns whether there is a currently active transaction.
+     *
+     * @return <code>true</code> if there is currently an active transaction,
+     *         <code>false</code> otherwise
+     */
+    static boolean isCurrentTransaction() {
+        return (currentTransaction.get() != null);
     }
 
 } 

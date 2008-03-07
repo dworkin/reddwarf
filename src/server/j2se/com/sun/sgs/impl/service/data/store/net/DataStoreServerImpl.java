@@ -336,6 +336,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void abort(Throwable cause) {
+	    if (cause == null)
+	        throw new NullPointerException("Cause cannot be null");
 	    if (!aborting) {
 		aborting = true;
 		abortCause = cause;

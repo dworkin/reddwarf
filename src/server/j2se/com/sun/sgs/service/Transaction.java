@@ -115,31 +115,26 @@ public interface Transaction {
     public void join(TransactionParticipant participant);
 
     /**
-     * Aborts the transaction, optionally supplying the exception that caused
-     * the abort. This notifies all participants that the transaction has
-     * aborted, and invalidates all future use of this transaction. The caller
-     * should always follow a call to <code>abort</code> by throwing an
-     * exception that details why the transaction was aborted. This is needed
-     * not only to communicate the cause of the abort and whether to retry the
-     * exception, but also because the application code associated with this
-     * transaction will continue to execute normally unless an exception is
-     * raised. Supplying the cause to this method allows future calls to the
-     * transaction to include the cause to explain why the transaction is no
-     * longer active.
+     * Aborts the transaction, specifying the cause. This notifies all
+     * participants that the transaction has aborted, and invalidates all
+     * future use of this transaction. The caller should always follow a
+     * call to <code>abort</code> by throwing an exception that details
+     * why the transaction was aborted, which is typically the same exception
+     * provided to this method. This is needed not only to communicate the
+     * cause of the abort and whether to retry the exception, but also
+     * because the application code associated with this transaction will
+     * continue to execute normally unless an exception is raised. Supplying
+     * the cause to this method allows future calls to the transaction to
+     * include the cause to explain why the transaction is no longer active.
      * <p>
      * If the transaction has been aborted, then the exception thrown will have
      * as its cause the value provided in the first call to {@link #abort
      * abort}, if any.  If the cause implements {@link ExceptionRetryStatus},
      * then the exception thrown will, too, and its {@link
      * ExceptionRetryStatus#shouldRetry shouldRetry} method will return the
-     * value returned by calling that method on the cause.  If no cause was
-     * supplied, then the exception will either not implement {@code
-     * ExceptionRetryStatus} or its {@code shouldRetry} method will return
-     * {@code false}.
+     * value returned by calling that method on the cause.
      *
-     * @param cause the exception that caused the abort, or <code>null</code>
-     *		    if the cause is not known or the abort was not caused by an
-     *		    exception
+     * @param cause the exception that caused the abort
      *
      * @throws TransactionNotActiveException if the transaction has been
      *					     aborted

@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  * between users. This scheduler uses an un-bounded queue. Unless the system
  * runs out of memory, this should always accept any tasks from any user.
  */
-class FIFOApplicationScheduler implements ApplicationScheduler {
+public class FIFOApplicationScheduler implements ApplicationScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
