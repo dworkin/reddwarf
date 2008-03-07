@@ -47,25 +47,7 @@ class ComponentRegistryImpl implements ComponentRegistry {
     }
 
     /**
-     * Creates an instance of <code>ComponentRegistryImpl</code> with the
-     * given components.
-     *
-     * @param components an initial <code>Set</code> of components
-     */
-    ComponentRegistryImpl(Set<Object> components) {
-        componentSet = new LinkedHashSet<Object>(components);
-    }
-
-    /**
-     * Returns a matching component if there is exactly one, otherwise
-     * throws an exception.
-     *
-     * @param <T> the type of the component
-     * @param type a <code>Class</code> representing the type of the component
-     *
-     * @return a single component, if there is exactly one match
-     *
-     * @throws MissingResourceException if there isn't exactly one match
+     * {@inheritDoc}
      */
     public <T> T getComponent(Class<T> type) {
         Object matchingComponent = null;
@@ -105,13 +87,6 @@ class ComponentRegistryImpl implements ComponentRegistry {
      */
     public Iterator<Object> iterator() {
         return Collections.unmodifiableSet(componentSet).iterator();
-    }
-
-    /**
-     * Clears all components from the registry.
-     */
-    void clearComponents() {
-        componentSet.clear();
     }
 
 }

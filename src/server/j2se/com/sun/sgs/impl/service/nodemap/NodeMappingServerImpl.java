@@ -29,7 +29,7 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -156,8 +156,8 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     /** The exporter for this server */
     private final Exporter<NodeMappingServer> exporter;
 
-    /** The task scheduler, for our transactional, synchronous tasks. */
-    private final TaskScheduler taskScheduler;
+    /** The transaction scheduler, for our transactional, synchronous tasks. */
+    private final TransactionScheduler transactionScheduler;
     
     /** The proxy owner for our transactional, synchronous tasks. */
     private final Identity taskOwner;
@@ -173,8 +173,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     private final NodeAssignPolicy assignPolicy;
 
     /** The thread that removes inactive identities */
-    // TODO:  should this be a TaskScheduler.scheduleRecurringTask? Or
-    // maybe called via ResourceCoordinator.startTask?
+    // TODO:  should this be a TaskScheduler.scheduleRecurringTask?
     private final Thread removeThread;
     
      /** Our watchdog node listener. */
@@ -248,7 +247,8 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        transactionScheduler =
+            systemRegistry.getComponent(TransactionScheduler.class);
         dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);
         taskOwner = txnProxy.getCurrentOwner();
@@ -734,7 +734,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
      * @param task the task
      */
     void runTransactionally(KernelRunnable task) throws Exception {   
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        transactionScheduler.runTask(task, taskOwner);
     }
     
     /**

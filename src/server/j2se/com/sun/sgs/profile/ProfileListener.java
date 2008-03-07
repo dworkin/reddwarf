@@ -36,8 +36,7 @@ import java.beans.PropertyChangeEvent;
  * all implementations of <code>ProfileListener</code> must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
- * <code>com.sun.sgs.kernel.TaskScheduler</code>,
- * <code>com.sun.sgs.kernel.ResourceCoordinator</code>).
+ * <code>com.sun.sgs.kernel.ComponentRegistry</code>).
  *
  * <p>
  *

@@ -26,12 +26,14 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
+import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
@@ -58,16 +60,19 @@ public class ClientSessionImpl
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
-    /** The logger name and prefix for session keys and session node keys. */
+    /** The logger name and prefix for the various session keys. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.session.";
 
-    /** The prefix to add before a client session ID in a session key. */
+    /** The session component in a session key. */
     private static final String SESSION_COMPONENT = "impl.";
 
-    /** The prefix to add before a client session listener in a listener key. */
+    /** The listener component in a session's listener key. */
     private static final String LISTENER_COMPONENT = "listener.";
 
-    /** The node component session node keys. */
+    /** The event queue component in a session's event queue key. */
+    private static final String QUEUE_COMPONENT = "queue.";
+
+    /** The node component in a session's node key. */
     private static final String NODE_COMPONENT = "node.";
 
     /** The logger for this class. */
@@ -91,21 +96,12 @@ public class ClientSessionImpl
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
 
-    /** The client session server (possibly remote) for this client
-     * session.
-     *
-     * TBD: the session server for each node should be bound in the data
-     * service instead of holding a copy in each ClientSessionImpl
-     * instance.
-     */
-    private final ClientSessionServer sessionServer;
-
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
     /*
-     * Should a managed reference to the ClientSessionListener be cached in
-     * the ClientSessionImpl for efficiency?
+     * TBD: Should a managed reference to the ClientSessionListener be
+     * cached in the ClientSessionImpl for efficiency?
      */
 
     /**
@@ -134,7 +130,6 @@ public class ClientSessionImpl
 	    throw new IllegalStateException("session's identity is not set");
 	}
 	this.sessionService = sessionService;
-	this.sessionServer = sessionService.getServerProxy();
 	this.identity = identity;
 	this.nodeId = sessionService.getLocalNodeId();
 	DataService dataService = sessionService.getDataService();
@@ -144,6 +139,7 @@ public class ClientSessionImpl
 	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(), this);
 	dataService.setServiceBinding(getSessionNodeKey(), this);
+	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
 	logger.log(Level.FINEST, "Stored session, identity:{0} id:{1}",
 		   identity, id);
     }
@@ -178,8 +174,7 @@ public class ClientSessionImpl
             buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
                .put(message)
                .flip();
-	    sessionService.sendProtocolMessage(
-	        this, buf.asReadOnlyBuffer(), Delivery.RELIABLE);
+	    addEvent(new SendEvent(buf.array()));
 
 	    return this;
 
@@ -196,7 +191,7 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     public void disconnect() {
 	if (isConnected()) {
-	    sessionService.disconnect(this);
+	    addEvent(new DisconnectEvent());
 	    sessionService.getDataService().markForUpdate(this);
 	    connected = false;
 	}
@@ -322,6 +317,7 @@ public class ClientSessionImpl
 	String sessionKey = getSessionKey();
 	String sessionNodeKey = getSessionNodeKey();
 	String listenerKey = getListenerKey();
+	String eventQueueKey = getEventQueueKey();
 
 	/*
 	 * Get ClientSessionListener, and remove its binding and
@@ -345,6 +341,21 @@ public class ClientSessionImpl
 	    logger.logThrow(
 		Level.FINE, e,
 		"removing ClientSessionListener for session:{0} throws",
+		this);
+	}
+
+	/*
+	 * Remove event queue and associated binding.
+	 */
+	try {
+	    ManagedObject eventQueue =
+		dataService.getServiceBinding(eventQueueKey);
+	    dataService.removeServiceBinding(eventQueueKey);
+	    dataService.removeObject(eventQueue);
+	} catch (NameNotBoundException e) {
+	    logger.logThrow(
+		Level.FINE, e,
+		"removing EventQueue for session:{0} throws",
 		this);
 	}
 
@@ -397,8 +408,8 @@ public class ClientSessionImpl
     /**
      * Returns the {@code ClientSessionServer} for this instance.
      */
-    ClientSessionServer getClientSessionServer() {
-	return sessionServer;
+    private ClientSessionServer getClientSessionServer() {
+	return sessionService.getClientSessionServer(nodeId);
     }
     
     /**
@@ -422,6 +433,21 @@ public class ClientSessionImpl
     private String getListenerKey() {
 	return
 	    PKG_NAME + LISTENER_COMPONENT + HexDumper.toHexString(idBytes);
+    }
+
+    /**
+     * Returns the key to access the event queue of the session with the
+     * specified {@code sessionId}.
+     */
+    private static String getEventQueueKey(byte[] sessionId) {
+	return PKG_NAME + QUEUE_COMPONENT + HexDumper.toHexString(sessionId);
+    }
+	
+    /**
+     * Returns the key to access this session's event queue.
+     */
+    private String getEventQueueKey() {
+	return getEventQueueKey(idBytes);
     }
 
     /**
@@ -502,6 +528,252 @@ public class ClientSessionImpl
 
 	ClientSessionListener get() {
 	    return listener;
+	}
+    }
+
+    /**
+     * Returns the event queue for the client session with the specified
+     * {@code sessionId}, or null if the event queue is not bound in the
+     * data service.
+     */
+    private static EventQueue getEventQueue(byte[] sessionId) {
+	DataService dataService = ClientSessionServiceImpl.getDataService();
+	String eventQueueKey = getEventQueueKey(sessionId);
+	try {
+	    return (EventQueue) dataService.getServiceBinding(eventQueueKey);
+	} catch (NameNotBoundException e) {
+	    return null;
+	}
+    }
+	
+    /**
+     * Returns this client session's event queue, or null if the event
+     * queue is not bound in the data service.
+     */
+    private EventQueue getEventQueue() {
+	return getEventQueue(idBytes);
+    }
+
+    /**
+     * Adds the specified session {@code event} to this session's event
+     * queue and notifies the client session service on the session's node
+     * that there is an event to service.
+     */
+    private void addEvent(SessionEvent event) {
+
+	EventQueue eventQueue = getEventQueue();
+
+	if (eventQueue == null) {
+	    throw new IllegalStateException(
+		"event queue removed; session is disconnected");
+	}
+	    
+	if (! eventQueue.offer(event)) {
+	    throw new ResourceUnavailableException(
+	   	"not enough resources to add client session event");
+	}
+	
+	/*
+	 * If this session is connected to the local node, service events
+	 * locally; otherwise schedule a task to send a request to this
+	 * session's client session server to service this session's event
+	 * queue. 
+	 */
+	if (nodeId == sessionService.getLocalNodeId()) {
+	    eventQueue.serviceEvent();
+	    
+	} else {
+
+	    final ClientSessionServer sessionServer = getClientSessionServer();
+	    if (sessionServer == null) {
+		/*
+		 * If the ClientSessionServer for this session has been
+		 * removed, then this session's node has failed and the
+		 * session has been disconnected.  The event queue will be
+		 * cleaned up eventually, so there is no need to flag an
+		 * error here.
+		 */
+		return;
+	    }
+	    sessionService.scheduleNonTransactionalTask(
+	        new AbstractKernelRunnable() {
+		    public void run() {
+			try {
+			    sessionServer.serviceEventQueue(idBytes);
+			} catch (IOException e) {
+			    /*
+			     * It is likely that the session's node failed.
+			     */
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.logThrow(
+				    Level.FINEST, e,
+				    "serviceEventQueue session:{0} node:{1} " +
+				    "throws", HexDumper.toHexString(idBytes),
+				    nodeId);
+			    }
+			}
+		    }}, identity);
+	}
+    }
+
+    /**
+     * Services the event queue for the session with the specified {@code
+     * sessionId}.
+     */
+    static void serviceEventQueue(byte[] sessionId) {
+	EventQueue eventQueue = getEventQueue(sessionId);
+	if (eventQueue != null) {
+	    eventQueue.serviceEvent();
+	}
+    }
+    
+    /**
+     * Represents an event for a client session.
+     */
+    private static abstract class SessionEvent
+	implements ManagedObject, Serializable
+    {
+
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/**
+	 * Services this event, taken from the head of the given {@code
+	 * eventQueue}.
+	 */
+	public abstract void serviceEvent(EventQueue eventQueue);
+
+    }
+
+    private static class SendEvent extends SessionEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	private final byte[] message;
+	
+	/**
+	 * Constructs a send event with the given {@code message}.
+	 */
+	SendEvent(byte[] message) {
+	    this.message = message;
+	}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(EventQueue eventQueue) {
+	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
+	    sessionImpl.sessionService.sendProtocolMessage(
+		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public String toString() {
+	    return getClass().getName();
+	}
+    }
+
+    private static class DisconnectEvent extends SessionEvent {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/**
+	 * Constructs a disconnect event.
+	 */
+	DisconnectEvent() {}
+
+	/** {@inheritDoc} */
+	public void serviceEvent(EventQueue eventQueue) {
+	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
+	    sessionImpl.sessionService.disconnect(sessionImpl);
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public String toString() {
+	    return getClass().getName();
+	}
+    }
+    
+    /**
+     * The session's event queue.
+     */
+    private static class EventQueue implements ManagedObject, Serializable {
+
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The managed reference to the queue's session. */
+	private final ManagedReference<ClientSessionImpl> sessionRef;
+	/** The managed reference to the managed queue. */
+	private final ManagedReference<ManagedQueue<SessionEvent>> queueRef;
+
+	/**
+	 * Constructs an event queue for the specified {@code sessionImpl}.
+	 */
+	EventQueue(ClientSessionImpl sessionImpl) {
+	    DataService dataService = ClientSessionServiceImpl.getDataService();
+	    sessionRef = dataService.createReference(sessionImpl);
+	    queueRef = dataService.createReference(
+		new ManagedQueue<SessionEvent>());
+	}
+
+	/**
+	 * Attempts to enqueue the specified {@code event}, and returns
+	 * {@code true} if successful, and {@code false} otherwise.
+	 */
+	boolean offer(SessionEvent event) {
+	    return getQueue().offer(event);
+	}
+
+	/**
+	 * Returns the client session for this queue.
+	 */
+	ClientSessionImpl getClientSession() {
+	    return sessionRef.get();
+	}
+
+	/**
+	 * Returns the client session ID for this queue.
+	 */
+	BigInteger getSessionRefId() {
+	    return sessionRef.getId();
+	}
+	
+	/**
+	 * Returns the managed queue object.
+	 */
+	ManagedQueue<SessionEvent> getQueue() {
+	    return queueRef.get();
+	}
+
+	/**
+	 * Throws a retryable exception if the event queue is not in a
+	 * state to process the next event.
+	 */
+	void checkState() {
+	    // TBD: is there any state to check here?
+	}
+
+	/**
+	 * Processes (at least) the first event in the queue.
+	 */
+	void serviceEvent() {
+	    checkState();
+	    
+	    ClientSessionServiceImpl sessionService =
+		ClientSessionServiceImpl.getInstance();
+	    ManagedQueue<SessionEvent> eventQueue = getQueue();
+	    
+	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
+		SessionEvent event = eventQueue.poll();
+		if (event == null) {
+		    // no more events
+		    break;
+		}
+
+		logger.log(Level.FINEST, "processing event:{0}", event);
+		event.serviceEvent(this);
+	    }
 	}
     }
 }

@@ -32,11 +32,12 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -46,7 +47,6 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -76,7 +76,7 @@ import java.util.logging.Logger;
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
  */
-public class ChannelServiceImpl
+public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
 {
     /** The name of this class. */
@@ -145,9 +145,9 @@ public class ChannelServiceImpl
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
     /** The map of channel coordinator task queues, keyed by channel ID. */
-    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
+    private final ConcurrentHashMap<BigInteger, TaskQueue>
 	coordinatorTaskQueues =
-	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
+	    new ConcurrentHashMap<BigInteger, TaskQueue>();
 
     /** The maximum number of channel events to sevice per transaction. */
     final int eventsPerTxn;
@@ -191,7 +191,7 @@ public class ChannelServiceImpl
 	     */
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
-		0, Integer.MAX_VALUE);
+		1, Integer.MAX_VALUE);
 	    
 	    /*
 	     * Export the ChannelServer.
@@ -217,12 +217,12 @@ public class ChannelServiceImpl
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
-	    taskScheduler.runTransactionalTask(
+	    transactionScheduler.runTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
-			    new ChannelServerWrapper(serverProxy));
+			    new ManagedSerializable<ChannelServer>(serverProxy));
 		    }},
 		taskOwner);
 
@@ -304,12 +304,9 @@ public class ChannelServiceImpl
 		}
 
 		BigInteger channelIdRef = new BigInteger(1, channelId);
-		NonDurableTaskQueue taskQueue =
-		    coordinatorTaskQueues.get(channelIdRef);
+		TaskQueue taskQueue = coordinatorTaskQueues.get(channelIdRef);
 		if (taskQueue == null) {
-		    NonDurableTaskQueue newTaskQueue =
-			new NonDurableTaskQueue(txnProxy, taskScheduler,
-						taskOwner);
+		    TaskQueue newTaskQueue = createTaskQueue();
 		    taskQueue = coordinatorTaskQueues.
 			putIfAbsent(channelIdRef, newTaskQueue);
 		    if (taskQueue == null) {
@@ -319,7 +316,7 @@ public class ChannelServiceImpl
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ChannelImpl.serviceEventQueue(channelId);
-		    }});
+		    }}, taskOwner);
 					  
 	    } finally {
 		callFinished();
@@ -343,9 +340,14 @@ public class ChannelServiceImpl
 		GetLocalMembersTask getMembersTask =
 		    new GetLocalMembersTask(channelRefId);
 		try {
-		    taskScheduler.runTransactionalTask(
+		    transactionScheduler.runTask(
 			getMembersTask, taskOwner);
 		} catch (Exception e) {
+		    // FIXME: what is the right thing to do here?
+		    logger.logThrow(
+ 			Level.WARNING, e,
+			"obtaining members of channel:{0} throws",
+			HexDumper.toHexString(channelId));
 		}
 		Set<BigInteger> newLocalMembers =
 		    Collections.synchronizedSet(getMembersTask.getLocalMembers());
@@ -811,14 +813,13 @@ public class ChannelServiceImpl
 	     * disconnected session from all channels that it is
 	     * currently a member of.
 	     */
-	    taskScheduler.scheduleTask(
- 		 new TransactionRunner(
+	    transactionScheduler.scheduleTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    ChannelImpl.removeSessionFromAllChannels(
 				localNodeId, sessionRefId.toByteArray());
 			    }
-		    }),
+		    },
 		 taskOwner);
 	}
     }
@@ -862,7 +863,7 @@ public class ChannelServiceImpl
 
     /**
      * Returns the key for accessing the {@code ChannelServer}
-     * instance (which is wrapped in a {@code ChannelServerWrapper})
+     * instance (which is wrapped in a {@code ManagedSerializable})
      * for the specified {@code nodeId}.
      */
     private static String getChannelServerKey(long nodeId) {
@@ -883,16 +884,16 @@ public class ChannelServiceImpl
 	} else {
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    try {
-		return
-		    ((ChannelServerWrapper) getDataService().getServiceBinding(
-			channelServerKey)).get();
+		ManagedSerializable wrappedProxy = (ManagedSerializable)
+		    dataService.getServiceBinding(channelServerKey);
+		return (ChannelServer) wrappedProxy.get();
 	    } catch (NameNotBoundException e) {
 		return null;
 	    } catch (ObjectNotFoundException e) {
 		logger.logThrow(
 		    Level.SEVERE, e,
-		    "ChannelServerWrapper binding:{0} exists, " +
-		    "but object removed", channelServerKey);
+		    "ChannelServer binding:{0} exists, but object removed",
+		    channelServerKey);
 		throw e;
 	    }
 	}
@@ -918,7 +919,7 @@ public class ChannelServiceImpl
 		/*
 		 * Schedule persistent tasks to perform recovery.
 		 */
-		taskScheduler.runTransactionalTask(
+		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    /*
@@ -1059,10 +1060,8 @@ public class ChannelServiceImpl
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    DataService dataService = getDataService();
 	    try {
-		ChannelServerWrapper proxyWrapper =
-		    (ChannelServerWrapper) dataService.getServiceBinding(
-			channelServerKey);
-		dataService.removeObject(proxyWrapper);
+		dataService.removeObject(
+		    dataService.getServiceBinding(channelServerKey));
 	    } catch (NameNotBoundException e) {
 		// already removed
 		return;

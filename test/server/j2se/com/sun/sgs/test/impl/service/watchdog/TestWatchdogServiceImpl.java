@@ -26,7 +26,7 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -74,8 +74,8 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** A specific property we started with */
     private int renewTime;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
 
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -107,7 +107,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.renew.interval"));
 
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
 
         watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
@@ -343,7 +343,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test isLocalNodeAlive -- */
 
     public void testIsLocalNodeAlive() throws Exception {
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 if (! watchdogService.isLocalNodeAlive()) {
                     fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -362,7 +362,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (! watchdogService.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -375,7 +375,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // wait for watchdog's renew to fail...
 	    Thread.sleep(renewTime * 4);
 
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -475,7 +475,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         addNodes(null, NUM_WATCHDOGS);
         Thread.sleep(renewTime);
         CountNodesTask task = new CountNodesTask();
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         int numNodes = task.numNodes;
 
         int expectedNodes = NUM_WATCHDOGS + 1;
@@ -507,7 +507,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNodes();
@@ -536,7 +536,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -558,7 +558,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNode(0);
@@ -580,7 +580,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testGetNodeNonexistentNode() throws Exception {
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 Node node = watchdogService.getNode(29);
                 System.err.println(node);
@@ -597,7 +597,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
                     watchdog.addNodeListener(new DummyNodeListener());
@@ -647,7 +647,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -1142,7 +1142,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	throws Exception
     {
         CheckNodesFailedTask task = new CheckNodesFailedTask(ids, hasBackup);
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         return task.backups;
     }
 
@@ -1186,7 +1186,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
 	Thread.sleep(250);
 	System.err.println("Get shutdown nodes (should be removed)...");
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();
@@ -1203,7 +1203,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     private void checkNodesAlive(final Collection<Long> ids) throws Exception {
 	System.err.println("Get live nodes...");
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();

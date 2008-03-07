@@ -25,9 +25,9 @@ import com.sun.sgs.impl.profile.util.NetworkReporter;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileListener;
@@ -114,16 +114,13 @@ public class AggregateProfileListener implements ProfileListener {
      * @param properties the <code>Properties</code> for this listener
      * @param owner the <code>Identity</code> to use for all tasks run by
      *              this listener
-     * @param taskScheduler the <code>TaskScheduler</code> to use for
-     *                      running short-lived or recurring tasks
-     * @param resourceCoord the <code>ResourceCoordinator</code> used to
-     *                      run any long-lived tasks
+     * @param registry the {@code ComponentRegistry} containing the
+     *                 available system components
      *
      * @throws IOException if the server socket cannot be created
      */
     public AggregateProfileListener(Properties properties, Identity owner,
-                                    TaskScheduler taskScheduler,
-                                    ResourceCoordinator resourceCoord)
+                                    ComponentRegistry registry)
         throws IOException
     {
 	aggregateCounters = new ConcurrentHashMap<String,Long>();
@@ -132,11 +129,11 @@ public class AggregateProfileListener implements ProfileListener {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
-        networkReporter = new NetworkReporter(port, resourceCoord);
+        networkReporter = new NetworkReporter(port);
 
         long reportPeriod =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        handle = taskScheduler.
+        handle = registry.getComponent(TaskScheduler.class).
             scheduleRecurringTask(new AggregatingRunnable(), owner, 
                                   System.currentTimeMillis() + reportPeriod,
                                   reportPeriod);
