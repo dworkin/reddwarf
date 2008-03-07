@@ -345,15 +345,11 @@ class ClientSessionHandler {
      * Flags this session as shut down, and closes the connection.
      */
     void shutdown() {
-        synchronized (lock) {
+	synchronized (lock) {
 	    if (shutdown == true) {
 		return;
 	    }
 	    shutdown = true;
-	    /*
-	     * XXX: Why does this method set the field without calling
-	     * scheduleHandleDisconnect?  -tjb@sun.com (03/05/2008)
-	     */
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
 	    if (sessionConnection != null) {
@@ -572,8 +568,10 @@ class ClientSessionHandler {
 
             } catch (Exception e) {
 
-                // TODO if we're expecting the channel to close,
-                // don't complain.
+                /*
+		 * TODO: If we're expecting the channel to close, don't
+                 * complain.
+		 */
 
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(

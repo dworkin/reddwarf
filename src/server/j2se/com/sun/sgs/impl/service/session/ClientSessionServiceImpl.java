@@ -399,7 +399,8 @@ public final class ClientSessionServiceImpl
                 try {
                     future.cancel(true);
                 } catch (RuntimeException e) {
-                    logger.logThrow(Level.FINE, e, "cancelling future");
+                    logger.logThrow(
+			Level.FINEST, e, "cancelling future throws");
                     // swallow exception
                 }
             }
@@ -409,14 +410,14 @@ public final class ClientSessionServiceImpl
                     acceptor.close();
                 }
             } catch (IOException e) {
-                logger.logThrow(Level.FINE, e, "closing acceptor");
+                logger.logThrow(Level.FINEST, e, "closing acceptor throws");
                 // swallow exception
             }
 
             try {
                 asyncChannelGroup.shutdown();
             } catch (RuntimeException e) {
-                logger.logThrow(Level.FINE, e, "shutdown channel group");
+                logger.logThrow(Level.FINEST, e, "shutdown channel group");
                 // swallow exception
             }
 
@@ -425,26 +426,26 @@ public final class ClientSessionServiceImpl
                 asyncChannelGroup.shutdownNow();
             }
 
-            logger.log(Level.FINER, "acceptor shutdown");
+            logger.log(Level.FINEST, "acceptor shutdown");
 
         } catch (IOException e) {
-            logger.logThrow(Level.FINE, e, "shutdown exception occurred");
+            logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
             // swallow exception
         } catch (InterruptedException e) {
-            logger.logThrow(Level.FINE, e, "shutdown interrupted");
+            logger.logThrow(Level.FINEST, e, "shutdown acceptor interrupted");
             Thread.currentThread().interrupt();
         } catch (RuntimeException e) {
-            logger.logThrow(Level.FINE, e, "shutdown exception occurred");
+            logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
             // swallow exception
         }
 
 	try {
 	    if (exporter != null) {
 		exporter.unexport();
-		logger.log(Level.FINER, "client session server unexported");
+		logger.log(Level.FINEST, "client session server unexported");
 	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINE, e, "unexport server throws");
+	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
 	}
 

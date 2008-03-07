@@ -951,11 +951,9 @@
 	   debug="on"
 	   source="${javac.source}"
 	   target="${javac.target}"
+	   classpathref="server.classpath"
 	   includes="**/*.java">
       <compilerarg line="${javac.compilerargs}"/>
-      <classpath>
-        <path refid="server.classpath"/>
-      </classpath>
     </javac>
   </target>
 
