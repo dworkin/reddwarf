@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -191,8 +191,7 @@ public class TestDataServicePerformance extends TestCase {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
 		createTransaction(10000);
-		Counters counters =
-		    service.getBinding("counters", Counters.class);
+		Counters counters = (Counters) service.getBinding("counters");
 		for (int i = 0; i < items; i++) {
 		    counters.get(i);
 		}
@@ -238,8 +237,7 @@ public class TestDataServicePerformance extends TestCase {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
 		createTransaction();
-		Counters counters =
-		    service.getBinding("counters", Counters.class);
+		Counters counters = (Counters) service.getBinding("counters");
 		for (int i = 0; i < items; i++) {
 		    Counter counter = counters.get(i);
 		    if (i < modifyItems) {
@@ -305,8 +303,8 @@ public class TestDataServicePerformance extends TestCase {
     /** A managed object that maintains a list of Counter instances. */
     static class Counters implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
-	private List<ManagedReference> counters =
-	    new ArrayList<ManagedReference>();
+	private List<ManagedReference<Counter>> counters =
+	    new ArrayList<ManagedReference<Counter>>();
 	Counters(int count) {
 	    for (int i = 0; i < count; i++) {
 		counters.add(
@@ -315,7 +313,7 @@ public class TestDataServicePerformance extends TestCase {
 	    }
 	}
 	Counter get(int i) {
-	    return counters.get(i).get(Counter.class);
+	    return counters.get(i).get();
 	}
     }
 

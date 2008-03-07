@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -30,39 +29,12 @@ import java.rmi.Remote;
 public interface ClientSessionServer extends Remote {
 
     /**
-     * If a client session with the specified {@code sessionId} is
-     * connected to this server, sends the specified protocol {@code
-     * messages} according to the specified {@code delivery}
-     * requirements.
+     * Notifies this server that it should service the event queue of
+     * the client session with the specified {@code sessionId}.
      *
      * @param	sessionId a session ID
-     * @param	seq an array of message sequence numbers
-     * @param	messages an array of protocol messages, each contained
-     *		in a byte array
-     * @param	delivery an array of delivery requirements
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void sendProtocolMessages(byte[] sessionId,
-			      long[] seq,
-			      byte[][] messages,
-			      Delivery[] delivery)
-	throws IOException;
-    
-    /**
-     * If a client session with the specified {@code sessionId} is
-     * connected to this server, disconnects the client session and
-     * returns {@code true}.  If a client session with the specified
-     * {@code sessionId} is not connected to this server, {@code false}
-     * is returned.
-     *
-     * @param	sessionId a session ID
-     * @return	{@code true} if the client session with the specified
-     * 		{@code sessionId} is connected to this server, otherwise
-     *		{@code false}
-     * @throws	IOException if a communication problem occurs while
-     * 		invoking this method
-     */
-    boolean disconnect(byte[] sessionId)
-	throws IOException;
+    void serviceEventQueue(byte[] sessionId) throws IOException;
 }

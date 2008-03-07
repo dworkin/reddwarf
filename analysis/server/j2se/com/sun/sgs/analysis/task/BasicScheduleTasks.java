@@ -1,3 +1,22 @@
+/*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
@@ -59,7 +78,7 @@ public abstract class BasicScheduleTasks
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the object to notify when done. */
-	private final ManagedReference schedulerRef;
+	private final ManagedReference<BasicScheduleTasks> schedulerRef;
 	
 	/** How many tasks to schedule. */
 	private int tasks;
@@ -76,8 +95,7 @@ public abstract class BasicScheduleTasks
 
 	public void run() {
 	    TaskManager taskManager = AppContext.getTaskManager();
-	    BasicScheduleTasks scheduler =
-		schedulerRef.get(BasicScheduleTasks.class);
+	    BasicScheduleTasks scheduler = schedulerRef.get();
 	    taskManager.scheduleTask(scheduler.createTask());
 	    tasks--;
 	    if (tasks > 0) {

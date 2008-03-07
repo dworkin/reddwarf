@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -183,7 +183,7 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String toString() {
+    public synchronized String toString() {
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;
@@ -337,7 +337,7 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	    dataService.removeServiceBinding(key);
 	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
@@ -360,7 +360,7 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node = null;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	} catch (NameNotBoundException e) {
 	}
 	return node;
@@ -382,7 +382,7 @@ class NodeImpl
 	     BoundNamesUtil.getServiceBoundNamesIterable(
 		dataService, NODE_PREFIX))
 	{
-	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
+	    NodeImpl node = (NodeImpl) dataService.getServiceBinding(key);
 	    node.setFailed(dataService, null);
 	    nodes.add(node);
 	}
@@ -470,7 +470,7 @@ class NodeImpl
 	/** {@inheritDoc} */
 	public Node next() {
 	    String key = iterator.next();
-	    return dataService.getServiceBinding(key, NodeImpl.class);
+	    return (NodeImpl) dataService.getServiceBinding(key);
 	}
 
 	/** {@inheritDoc} */

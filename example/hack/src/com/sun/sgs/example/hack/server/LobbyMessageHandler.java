@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -102,8 +102,7 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         DataManager dataManager = AppContext.getDataManager();
         Game game = null;
         try {
-            game = dataManager.getBinding(Game.NAME_PREFIX + gameName,
-                                          Game.class);
+            game = (Game) dataManager.getBinding(Game.NAME_PREFIX + gameName);
         } catch (NameNotBoundException e) {
             // FIXME: we should send back some kind of error
             System.out.println("Couldn't find game: " +

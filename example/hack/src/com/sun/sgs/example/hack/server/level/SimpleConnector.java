@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -37,8 +37,8 @@ public class SimpleConnector implements Connector, Serializable {
     private static final long serialVersionUID = 1;
 
     // the two levels
-    private ManagedReference level1Ref;
-    private ManagedReference level2Ref;
+    private ManagedReference<Level> level1Ref;
+    private ManagedReference<Level> level2Ref;
 
     // the two sets of coordinates
     private int level1X;
@@ -105,23 +105,23 @@ public class SimpleConnector implements Connector, Serializable {
             if ((mgr.getLevelXPos() == level1X) &&
                 (mgr.getLevelYPos() == level1Y)) {
                 // we're on level1, moving to level2
-                level2Ref.get(Level.class).addCharacter(mgr, level2X, level2Y);
+                level2Ref.get().addCharacter(mgr, level2X, level2Y);
             } else {
                 // we're on level2, moving to level1
-                level1Ref.get(Level.class).addCharacter(mgr, level1X, level1Y);
+                level1Ref.get().addCharacter(mgr, level1X, level1Y);
             }
         } else {
             // we connect different levels, so look at the level where the
             // character is now
-            ManagedReference levelRef =
+            ManagedReference<Level> levelRef =
                 AppContext.getDataManager().
                 createReference(mgr.getCurrentLevel());
             if (levelRef.equals(level1Ref)) {
                 // we're moving to level2
-                level2Ref.get(Level.class).addCharacter(mgr, level2X, level2Y);
+                level2Ref.get().addCharacter(mgr, level2X, level2Y);
             } else {
                 // we're moving to level1
-                level1Ref.get(Level.class).addCharacter(mgr, level1X, level1Y);
+                level1Ref.get().addCharacter(mgr, level1X, level1Y);
             }
         }
     }

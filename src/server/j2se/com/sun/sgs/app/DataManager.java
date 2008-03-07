@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -60,12 +60,8 @@ public interface DataManager {
      * ManagedReference.getForUpdate} before modifying the returned object or
      * any of the non-managed objects it refers to.
      *
-     * @param	<T> the type of the object
      * @param	name the name
-     * @param	type a class representing the type of the object
      * @return	the object bound to the name
-     * @throws	ClassCastException if the object bound to the name is not of
-     *		the specified type
      * @throws	NameNotBoundException if no object is bound to the name
      * @throws	ObjectNotFoundException if the object bound to the name is not
      *		found
@@ -74,28 +70,29 @@ public interface DataManager {
      * @see	#markForUpdate markForUpdate
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate
      */
-    <T> T getBinding(String name, Class<T> type);
+    ManagedObject getBinding(String name);
 
     /**
-     * Binds an object to a name, replacing any previous binding.  The object,
-     * as well as any objects it refers to, must implement {@link
-     * Serializable}.  Note that this method will throw {@link
-     * IllegalArgumentException} if <code>object</code> does not implement
-     * <code>Serializable</code>, but is not guaranteed to check that all
-     * referred to objects implement <code>Serializable</code>.  Any instances
-     * of {@link ManagedObject} that <code>object</code> refers to directly, or
-     * indirectly through non-managed objects, need to be referred to through
-     * instances of {@link ManagedReference}.
+     * Binds an object to a name, replacing any previous binding.  The object
+     * must implement {@link ManagedObject}, and both the object and any
+     * objects it refers to must implement {@link Serializable}.  Note that
+     * this method will throw {@link IllegalArgumentException} if
+     * <code>object</code> does not implement <code>Serializable</code>, but is
+     * not guaranteed to check that all referred to objects implement
+     * <code>Serializable</code>.  Any instances of {@link ManagedObject} that
+     * <code>object</code> refers to directly, or indirectly through
+     * non-managed objects, need to be referred to through instances of {@link
+     * ManagedReference}.
      *
      * @param	name the name
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setBinding(String name, ManagedObject object);
+    void setBinding(String name, Object object);
 
     /**
      * Removes the binding for a name.  Note that the object previously bound
@@ -151,7 +148,7 @@ public interface DataManager {
      *
      * @param	object the object
      * @throws	IllegalArgumentException if {@code object} does not implement
-     *		{@link Serializable}
+     *		both {@link ManagedObject} and {@link Serializable}
      * @throws	IllegalStateException if {@code object} implements {@code
      *		ManagedObjectRemoval} and {@code removeObject} is called
      *		recursively on the object through a call to {@link
@@ -167,33 +164,34 @@ public interface DataManager {
      *		runtime exception
      * @see	ManagedObjectRemoval
      */
-    void removeObject(ManagedObject object);
+    void removeObject(Object object);
 
     /**
      * Notifies the system that an object is going to be modified.
      *
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate 
      */
-    void markForUpdate(ManagedObject object);
+    void markForUpdate(Object object);
 
     /**
      * Creates a managed reference to an object.  Applications should use
      * managed references when a managed object refers to another managed
      * object, either directly or indirectly through non-managed objects.
      *
+     * @param	<T> the type of the object
      * @param	object the object
      * @return	the managed reference
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    ManagedReference createReference(ManagedObject object);
+    <T> ManagedReference<T> createReference(T object);
 }

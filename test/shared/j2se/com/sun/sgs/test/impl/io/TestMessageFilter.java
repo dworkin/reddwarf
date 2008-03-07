@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -37,7 +37,7 @@ public class TestMessageFilter
         extends TestCase
         implements FilterTestHarness.Callback
 {
-    final ByteBuffer sizeBuf = ByteBuffer.allocate(4, false);
+    final ByteBuffer sizeBuf = ByteBuffer.allocate(2, false);
     final List<byte[]> receivedMessages = new ArrayList<byte[]>();
     final List<byte[]> sentMessages = new ArrayList<byte[]>();
 
@@ -93,10 +93,10 @@ public class TestMessageFilter
 
     /** Tests that a simple receive works. */
     public void testSimpleReceive() {
-        int len = 1000;
+        short len = 1000;
         byte[] expected = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(expected);
         buf = buf.asReadOnlyBuffer();
         buf.flip();
@@ -116,10 +116,10 @@ public class TestMessageFilter
 
     /** Tests that two simple receives work. */
     public void testMultipleSimpleReceives() {
-        int len = 1000;
+        short len = 1000;
         byte[] expected = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(expected);
         buf = buf.asReadOnlyBuffer();
         buf.flip();
@@ -150,17 +150,17 @@ public class TestMessageFilter
      * Tests that a big message gets reassembled by the filter.
      */
     public void testBigReceive() {
-        // Send a 62KB message in 1KB chunks
-        int len = 62 * 1024;
+        // Send a 7KB message in 1KB chunks
+        short len = 7 * 1024;
         byte[] expected = new byte[len];
-        sizeBuf.putInt(len).flip();
+        sizeBuf.putShort(len).flip();
         harness.recv(sizeBuf.asReadOnlyBuffer());
 
         ByteBuffer buf =
             ByteBuffer.wrap(getByteSequence(1024)).asReadOnlyBuffer();
 
         // Do the recvs
-        for (int i = 0; i < 62; ++i) {
+        for (int i = 0; i < 7; ++i) {
             assertEquals(0, sentMessages.size());
             assertEquals(0, receivedMessages.size());
 
@@ -183,9 +183,9 @@ public class TestMessageFilter
      * message delivery.
      */
     public void testPartialReceiveNoBytes() {
-        int len = 1000;
+        short len = 1000;
 
-        sizeBuf.putInt(len).flip();
+        sizeBuf.putShort(len).flip();
         harness.recv(sizeBuf.asReadOnlyBuffer());
 
         ByteBuffer emptyBuf = sizeBuf.slice().limit(0).asReadOnlyBuffer();
@@ -229,10 +229,10 @@ public class TestMessageFilter
      * second message can still be received all-at-once.
      */
     public void testPartialOneByteReceives() {
-        int len = 32;
+        short len = 32;
         byte[] expected = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(expected);
         buf = buf.asReadOnlyBuffer();
         buf.flip();
@@ -263,7 +263,7 @@ public class TestMessageFilter
 
     /** Tests handling of a valid message with payload length zero. */
     public void testReceiveValidZeroLength() {
-        sizeBuf.putInt(0).flip();
+        sizeBuf.putShort((short) 0).flip();
 
         harness.recv(sizeBuf.asReadOnlyBuffer());
 
@@ -275,10 +275,10 @@ public class TestMessageFilter
 
     /** Tests handling of exceptions during dispatch. */
     public void testReceiveHandlingException() {
-        int len = 1000;
+        short len = 1000;
         byte[] expected = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(expected);
         buf = buf.asReadOnlyBuffer();
         buf.flip();
@@ -306,12 +306,12 @@ public class TestMessageFilter
 
     /** Tests handling of exceptions during dispatch. */
     public void testReceiveHandlingExceptionPartial() {
-        int len1 = 400;
-        int len2 = 600;
-        int len = len1 + len2;
+        short len1 = 400;
+        short len2 = 600;
+        short len = (short) (len1 + len2);
         byte[] expected = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(expected);
         buf = buf.asReadOnlyBuffer();
         buf.flip();
@@ -319,15 +319,15 @@ public class TestMessageFilter
         assertEquals(0, sentMessages.size());
         assertEquals(0, receivedMessages.size());
 
-        ByteBuffer part1 = buf.slice().limit(len1 + 4);
+        ByteBuffer part1 = buf.slice().limit(len1 + 2);
 
-        ByteBuffer part2 = ByteBuffer.allocate(len2 + len2 + 4, false);
+        ByteBuffer part2 = ByteBuffer.allocate(len2 + len2 + 2, false);
         buf.rewind();
-        buf.skip(len1 + 4);
+        buf.skip(len1 + 2);
         part2.put(buf);
         buf.rewind();
-        buf.skip(len1 + 4);
-        part2.putInt(len2);
+        buf.skip(len1 + 2);
+        part2.putShort(len2);
         part2.put(buf);
         part2.flip();
 
@@ -356,10 +356,10 @@ public class TestMessageFilter
 
     /** Tests that the send filter correctly prepends the message length. */
     public void testSend() {
-        int len = 1000;
+        short len = 1000;
         byte[] sendData = getByteSequence(len);
-        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
-        buf.putInt(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 2 , false);
+        buf.putShort(len);
         buf.put(sendData);
         buf = buf.asReadOnlyBuffer();
         buf.flip();

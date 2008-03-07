@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -29,6 +29,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
+import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -69,6 +70,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
  *	</b></code> <br>
  *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
+ *	the {@code com.sun.sgs.server.start} property is {@code false}, else
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
@@ -243,7 +246,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
-	    super(contextMap);
+	    super(contextMap, CLASSNAME);
 	}
 	@Override protected Context createContext(Transaction txn) {
 	    /*
@@ -372,13 +375,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
-	    if (dataStoreClassName == null) {
-		store = new DataStoreImpl(properties, scheduler);
-	    } else {
+	    boolean serverStart = wrappedProps.getBooleanProperty(
+		StandardProperties.SERVER_START, true);
+	    if (dataStoreClassName != null) {
 		store = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
 		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
+	    } else if (serverStart) {
+		store = new DataStoreImpl(properties, scheduler);
+	    } else {
+		store = new DataStoreClient(properties);
 	    }
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
@@ -396,9 +403,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 			public void run() {
 			    DataServiceHeader header;
 			    try {
-				header = getServiceBinding(
-				    CLASSNAME + ".header",
-				    DataServiceHeader.class);
+				header = (DataServiceHeader) 
+				    getServiceBinding(CLASSNAME + ".header");
 				logger.log(Level.CONFIG,
 					   "Found existing header {0}",
 					   header);
@@ -436,12 +442,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Implement DataManager -- */
 
     /** {@inheritDoc} */
-    public <T> T getBinding(String name, Class<T> type) {
-	return getBindingInternal(name, type, false);
+    public ManagedObject getBinding(String name) {
+	return getBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
-     public void setBinding(String name, ManagedObject object) {
+     public void setBinding(String name, Object object) {
 	 setBindingInternal(name, object, false);
     }
 
@@ -456,16 +462,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public void removeObject(ManagedObject object) {
+    public void removeObject(Object object) {
 	Context context = null;
-	ManagedReferenceImpl ref = null;
+	ManagedReferenceImpl<?> ref = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
@@ -501,16 +502,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public void markForUpdate(ManagedObject object) {
+    public void markForUpdate(Object object) {
 	Context context = null;
-	ManagedReferenceImpl ref = null;
+	ManagedReferenceImpl<?> ref = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
@@ -538,17 +534,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public ManagedReference createReference(ManagedObject object) {
+    public <T> ManagedReference<T> createReference(T object) {
 	Context context = null;
 	try {
-	    if (object == null) {
-		throw new NullPointerException("The object must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
-	    }
+	    checkManagedObject(object);
 	    context = getContext();
-	    ManagedReference result = context.getReference(object);
+	    ManagedReference<T> result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -572,12 +563,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
-    public <T> T getServiceBinding(String name, Class<T> type) {
-	return getBindingInternal(name, type, true);
+    public ManagedObject getServiceBinding(String name) {
+	return getBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
-     public void setServiceBinding(String name, ManagedObject object) {
+     public void setServiceBinding(String name, Object object) {
 	 setBindingInternal(name, object, true);
     }
 
@@ -592,11 +583,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /** {@inheritDoc} */
-    public ManagedReference createReferenceForId(BigInteger id) {
+    public ManagedReference<?> createReferenceForId(BigInteger id) {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReference result = context.getReference(getOid(id));
+	    ManagedReference<?> result = context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
@@ -639,20 +630,19 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /* -- Generic binding methods -- */
 
     /** Implement getBinding and getServiceBinding. */
-    private <T> T getBindingInternal(
-	 String name, Class<T> type, boolean serviceBinding)
+    private ManagedObject getBindingInternal(
+	String name, boolean serviceBinding)
     {
 	Context context = null;
 	try {
-	    if (name == null || type == null) {
-		throw new NullPointerException(
-		    "The arguments must not be null");
+	    if (name == null) {
+		throw new NullPointerException("The name must not be null");
 	    }
 	    context = getContext();
-	    T result;
+	    ManagedObject result;
 	    try {
 		result = context.getBinding(
-		    getInternalName(name, serviceBinding), type);
+		    getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -660,19 +650,18 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, type:{3} returns {4}",
+		    "{0} tid:{1,number,#}, name:{2} returns {3}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, type,
-		    Objects.fastToString(result));
+		    contextTxnId(context), name, Objects.fastToString(result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST, e,
-		    "{0} tid:{1,number,#}, name:{2}, type:{3} throws",
+		    "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, type);
+		    contextTxnId(context), name);
 	    }
 	    throw e;
 	}
@@ -680,17 +669,14 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Implement setBinding and setServiceBinding. */
     private void setBindingInternal(
-	String name, ManagedObject object, boolean serviceBinding)
+	String name, Object object, boolean serviceBinding)
     {
 	Context context = null;
 	try {
-	    if (name == null || object == null) {
-		throw new NullPointerException(
-		    "The arguments must not be null");
-	    } else if (!(object instanceof Serializable)) {
-		throw new IllegalArgumentException(
-		    "The object must be serializable");
+	    if (name == null) {
+		throw new NullPointerException("The name must not be null");
 	    }
+	    checkManagedObject(object);
 	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -1007,7 +993,23 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * Returns the object ID for the reference, or null if the reference is
      * null.
      */
-    private static BigInteger refId(ManagedReference ref) {
+    private static BigInteger refId(ManagedReference<?> ref) {
 	return (ref != null) ? ref.getId() : null;
+    }
+
+    /**
+     * Checks that the argument is a legal managed object: non-null,
+     * serializable, and implements ManagedObject.
+     */
+    private static void checkManagedObject(Object object) {
+	if (object == null) {
+	    throw new NullPointerException("The object must not be null");
+	} else if (!(object instanceof Serializable)) {
+	    throw new IllegalArgumentException(
+		"The object must be serializable: " + object);
+	} else if (!(object instanceof ManagedObject)) {
+	    throw new IllegalArgumentException(
+		"The object must implement ManagedObject: " + object);
+	}
     }
 }

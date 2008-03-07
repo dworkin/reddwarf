@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -33,15 +33,15 @@ import java.util.TreeMap;
 final class ReferenceTable {
 
     /** Maps object IDs to managed references. */
-    private final SortedMap<Long, ManagedReferenceImpl> oids =
-	new TreeMap<Long, ManagedReferenceImpl>();
+    private final SortedMap<Long, ManagedReferenceImpl<?>> oids =
+	new TreeMap<Long, ManagedReferenceImpl<?>>();
 
     /**
      * Maps managed objects to managed references.  The objects are compared by
      * identity, not the equals method.
      */
-    private final Map<ManagedObject, ManagedReferenceImpl> objects =
-	new IdentityHashMap<ManagedObject, ManagedReferenceImpl>();
+    private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
+	new IdentityHashMap<ManagedObject, ManagedReferenceImpl<?>>();
 
     /** Creates an instance of this class. */
     ReferenceTable() { }
@@ -50,7 +50,7 @@ final class ReferenceTable {
      * Finds the managed reference associated with a managed object, returning
      * null if no reference is found.
      */
-    ManagedReferenceImpl find(ManagedObject object) {
+    ManagedReferenceImpl<?> find(Object object) {
 	assert object != null : "Object is null";
 	return objects.get(object);
     }
@@ -59,13 +59,13 @@ final class ReferenceTable {
      * Finds the managed reference associated with an object ID, returning null
      * if no reference is found.
      */
-    ManagedReferenceImpl find(long oid) {
+    ManagedReferenceImpl<?> find(long oid) {
 	assert oid >= 0 : "Object ID is negative";
 	return oids.get(oid);
     }
 
     /** Adds a new managed reference to this table. */
-    void add(ManagedReferenceImpl ref) {
+    void add(ManagedReferenceImpl<?> ref) {
 	assert !oids.containsKey(ref.oid)
 	    : "Found existing reference for oid:" + ref.oid;
 	oids.put(ref.oid, ref);
@@ -81,7 +81,7 @@ final class ReferenceTable {
      * Updates this table for a reference that has been newly associated with
      * an object.
      */
-    void registerObject(ManagedReferenceImpl ref) {
+    void registerObject(ManagedReferenceImpl<?> ref) {
 	assert oids.get(ref.oid) == ref
 	    : "Found duplicate references for oid: " + ref.oid;
 	assert ref.getObject() != null : "Object is null for oid:" + ref.oid;
@@ -100,7 +100,7 @@ final class ReferenceTable {
     }
 
     /** Removes a managed reference from this table. */
-    void remove(ManagedReferenceImpl ref) {
+    void remove(ManagedReferenceImpl<?> ref) {
 	Object existing = oids.remove(ref.oid);
 	assert existing == ref
 	    : "Found duplicate reference for oid:" + ref.oid;
@@ -118,7 +118,7 @@ final class ReferenceTable {
      * objects.  Specifying -1 requests the first ID.
      */
     long nextNewObjectId(long oid) {
-	for (Entry<Long, ManagedReferenceImpl> entry :
+	for (Entry<Long, ManagedReferenceImpl<?>> entry :
 		 oids.tailMap(oid).entrySet())
 	{
 	    long key = entry.getKey();
@@ -135,7 +135,7 @@ final class ReferenceTable {
      */
     FlushInfo flushModifiedObjects() {
 	FlushInfo flushInfo = null;
-	for (ManagedReferenceImpl ref : oids.values()) {
+	for (ManagedReferenceImpl<?> ref : oids.values()) {
 	    byte[] data = ref.flush();
 	    if (data != null) {
 		if (flushInfo == null) {
@@ -153,9 +153,9 @@ final class ReferenceTable {
      */
     void checkAllState() {
 	int objectCount = 0;
-	for (Entry<Long, ManagedReferenceImpl> entry : oids.entrySet()) {
+	for (Entry<Long, ManagedReferenceImpl<?>> entry : oids.entrySet()) {
 	    long oid = entry.getKey();
-	    ManagedReferenceImpl ref = entry.getValue();
+	    ManagedReferenceImpl<?> ref = entry.getValue();
 	    ref.checkState();
 	    if (oid != ref.oid) {
 		throw new AssertionError(
@@ -164,7 +164,7 @@ final class ReferenceTable {
 	    }
 	    Object object = ref.getObject();
 	    if (object != null) {
-		ManagedReferenceImpl objectsRef = objects.get(object);
+		ManagedReferenceImpl<?> objectsRef = objects.get(object);
 		if (objectsRef == null) {
 		    throw new AssertionError(
 			"Missing objects entry for oid = " + ref.oid);

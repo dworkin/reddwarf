@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,6 +20,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Interface representing a single, connected login session between a
@@ -63,6 +64,14 @@ import java.io.Serializable;
  * becomes invalid and can no longer be used to communicate with that
  * client.  When that client logs back in again, a new session is
  * established with the server.
+ *
+ * <p>TODO: modify class documentation to note that an application should
+ * not remove a client session object, and that attempting to remove a
+ * client session object (by invoking {@code DataManager.removeObject})
+ * will be ignored.  If a client session is no longer needed, the
+ * application should disconnect the session by invoking the {@link
+ * #disconnect disconnect} method, and at some point later on, the client
+ * session object will be removed by the server.
  */
 public interface ClientSession extends ManagedObject {
 
@@ -77,13 +86,13 @@ public interface ClientSession extends ManagedObject {
     String getName();
     
     /**
-     * Sends a message contained in the specified byte array to this
-     * session's client.
+     * Sends a message contained in the specified {@link ByteBuffer}
+     * to this session's client.
+     * <p>
+     * The specified buffer may be reused immediately, but changes
+     * to the buffer will have no effect on the message sent to the
+     * client by this invocation.
      *
-     * <p>The specified byte array must not be modified after invoking
-     * this method; if the byte array is modified, then this method
-     * may have unpredictable results.
-     
      * @param	message a message
      *
      * @return	this client session
@@ -94,7 +103,7 @@ public interface ClientSession extends ManagedObject {
      * @throws	TransactionException if the operation failed because of
      *		 a problem with the current transaction
      */
-    ClientSession send(byte[] message);
+    ClientSession send(ByteBuffer message);
 
     /**
      * Forcibly disconnects this client session.  If this session is

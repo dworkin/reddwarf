@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -34,6 +34,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
@@ -43,6 +44,7 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.MissingResourceException;
 import java.util.Properties;
 
 /**
@@ -226,14 +228,29 @@ public class SgsTestNode {
         txnProxy = (TransactionProxy) kernelProxy.get(kernel);
         systemRegistry = (ComponentRegistry) kernelReg.get(kernel);
 
-        dataService = txnProxy.getService(DataService.class);
-        watchdogService = txnProxy.getService(WatchdogService.class);
-        nodeMappingService = txnProxy.getService(NodeMappingService.class);
-        taskService = txnProxy.getService(TaskService.class);
-        sessionService = txnProxy.getService(ClientSessionService.class);
-        channelService = txnProxy.getService(ChannelServiceImpl.class);
+        dataService = getService(DataService.class);
+        watchdogService = getService(WatchdogService.class);
+        nodeMappingService = getService(NodeMappingService.class);
+        taskService = getService(TaskService.class);
+        sessionService = getService(ClientSessionService.class);
+        channelService = getService(ChannelServiceImpl.class);
 
-	appPort = ((ClientSessionServiceImpl) sessionService).getListenPort();
+	if (sessionService != null) {
+	    appPort =
+		((ClientSessionServiceImpl) sessionService).getListenPort();
+	}
+    }
+
+    /**
+     * Returns a service of the given {@code type}, or null, if no service
+     * is configured for this node.
+     */
+    private <T extends Service> T getService(Class<T> type) {
+	try {
+	    return txnProxy.getService(type);
+	} catch (MissingResourceException e) {
+	    return null;
+	}
     }
 
     /**
@@ -367,7 +384,7 @@ public class SgsTestNode {
             "com.sun.sgs.app.port", "0",
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
-            "com.sun.sgs.impl.service.data.store.net.server.run", 
+            "com.sun.sgs.impl.service.data.store.net.server.start", 
                 startServer,
             "com.sun.sgs.impl.service.data.store.net.server.port", 
                 String.valueOf(requestedDataPort),
@@ -383,7 +400,10 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
-            StandardProperties.APP_LISTENER, listenerClass.getName()
+	    StandardProperties.APP_LISTENER,
+	        (listenerClass != null ?
+		 listenerClass.getName() :
+		 StandardProperties.APP_LISTENER_NONE)
         );
 
         return retProps;

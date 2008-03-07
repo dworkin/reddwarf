@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -92,5 +92,41 @@ public final class Objects {
 	    return object.getClass().getName() + '#' +
 		Integer.toHexString(System.identityHashCode(object));
 	}
+    }
+
+    /**
+     * Casts an object to the required type with no unchecked warnings. <p>
+     *
+     * This method is similar to using the
+     * {@literal @SuppressWarnings("unchecked")} annotation, but is more
+     * flexible and often more succinct.  It is more flexible because it can be
+     * used to convert the type of an object passed as a method argument, while
+     * the annotation needs to be applied to a declaration.  It is more
+     * succinct because it avoids needing to restate the type. <p>
+     *
+     * For example, compare:
+     *
+     * <pre>
+     * &#64;SuppressWarnings("unchecked")
+     * Set&lt;Foo&gt; setOfFoo = (Set&lt;Foo&gt;) object;
+     * return foo(setOfFoo);
+     * </pre>
+     *
+     * with:
+     *
+     * <pre>
+     * return foo(uncheckedCast(object));
+     * </pre>
+     *
+     * Note that this method cannot be used when the return type is a type
+     * variable.
+     *
+     * @param <T> the result type
+     * @param object the object to cast
+     * @return the object cast to type {@code T}
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T uncheckedCast(Object object) {
+	return (T) object;
     }
 }

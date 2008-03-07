@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,10 +19,10 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 /**
  * The client session service manages client sessions.
@@ -30,49 +30,17 @@ import java.math.BigInteger;
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified protocol message listener for the
-     * specified service ID.  This method is non-transactional and
+     * Registers the specified disconnect listener with this service.
+     * This method is non-transactional and
      * should be called outside of a transaction.
+     * 
+     * TBD: This approach may be replaced with a scheme for registering
+     * interest in notification of a ClientSession's managed object removal.
      *
-     * <p>When a client session receives a protocol message with the
-     * specified service ID, the specified listener's {@link
-     * ProtocolMessageListener#receivedMessage receivedMessage} method is
-     * invoked with the {@link ClientSession client session} and
-     * the complete protocol message.
-     *
-     * <p>The reserved service IDs are 0-127.  The current ones in use are:
-     * <ul>
-     * <li> <code>0x01</code>, application service
-     * <li> <code>0x02</code>, channel service
-     * </ul>
-     *
-     * TODO: This method will go away when ProtocolMessageListener is
-     * removed.  ProtocolMessageListener is only used to receive
-     * 'disconnected' notifications.  The use of ProtocolMessageListener
-     * will be replaced with a scheme for registering interest in
-     * notification of a ClientSession's managed object removal.
-     *
-     * @param serviceId a service ID
-     * @param listener a protocol message listener
+     * @param   listener a listener to notify when a session disconnects
      */
-    void registerProtocolMessageListener(
-	byte serviceId, ProtocolMessageListener listener);
-
-    /**
-     * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method must be called within a transaction.
-     * The message is delivered when the transaction commits.
-     *
-     * @param	session	a client session
-     * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void sendProtocolMessage(
-	ClientSession session, byte[] message, Delivery delivery);
+    void registerSessionDisconnectListener(
+        ClientSessionDisconnectListener listener);
 
     /**
      * Sends the specified protocol {@code message} to the <i>local</i>
@@ -90,5 +58,5 @@ public interface ClientSessionService extends Service {
      * @param	delivery a delivery requirement
      */
     void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, byte[] message, Delivery delivery);
+	BigInteger sessionRefId, ByteBuffer message, Delivery delivery);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -37,7 +37,7 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 public abstract class MonsterCharacter extends AICharacter {
 
     // a self-reference
-    private ManagedReference mgrRef;
+    private ManagedReference<AICharacterManager> mgrRef;
 
     /**
      * Creates an instance of <code>MonsterCharacter</code>.
@@ -55,7 +55,7 @@ public abstract class MonsterCharacter extends AICharacter {
      * Returns the character manager for this character.
      */
     protected AICharacterManager getManager() {
-        return mgrRef.get(AICharacterManager.class);
+        return mgrRef.get();
     }
 
     /**
@@ -67,7 +67,7 @@ public abstract class MonsterCharacter extends AICharacter {
     public void notifyStatsChanged() {
         // if we have no hit points left, we were killed in battle
         if (getStatistics().getHitPoints() == 0) {
-            AICharacterManager mgr = mgrRef.get(AICharacterManager.class);
+            AICharacterManager mgr = mgrRef.get();
             mgr.getCurrentLevel().removeCharacter(mgr);
             mgr.notifyCharacterDied();
         }

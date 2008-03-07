@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -25,7 +25,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 
 /**
@@ -138,7 +137,7 @@ public class IdGenerator {
 	    DataService dataService = txnProxy.getService(DataService.class);
 	    State state;
 	    try {
-		state = dataService.getServiceBinding(name, State.class);
+		state = (State) dataService.getServiceBinding(name);
 	    } catch (NameNotBoundException e) {
 		state = new State(0);
 		dataService.setServiceBinding(name, state);

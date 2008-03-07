@@ -1,5 +1,5 @@
-/*
- * Copyright 2007 Sun Microsystems, Inc.
+ /*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -66,6 +66,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -83,7 +84,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static final String APP_NAME = "TestChannelServiceImpl";
     
-    private static final int WAIT_TIME = 5000;
+    private static final int WAIT_TIME = 3000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -179,6 +180,8 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
+	// This sleep cuts down on the exceptions output due to shutdwon.
+	Thread.sleep(750);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -448,7 +451,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		for (String user : users) {
 		    ClientSession session =
-			dataService.getBinding(user, ClientSession.class);
+			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
 		}
 	    }
@@ -543,7 +546,7 @@ public class TestChannelServiceImpl extends TestCase {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    ClientSession session =
-			dataService.getBinding(user, ClientSession.class);
+			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
 		    channel.close();
 		    try {
@@ -587,12 +590,12 @@ public class TestChannelServiceImpl extends TestCase {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			dataService.getBinding("moe", ClientSession.class);
+			(ClientSession) dataService.getBinding("moe");
 		    channel.join(moe);
 
 		    try {
 			ClientSession larry =
-			    dataService.getBinding("larry", ClientSession.class);
+			    (ClientSession) dataService.getBinding("larry");
 			channel.leave(larry);
 			System.err.println("leave of non-member session returned");
 			
@@ -611,10 +614,10 @@ public class TestChannelServiceImpl extends TestCase {
 		    Channel channel = getChannel(channelName);
 	
 		    ClientSession moe =
-			dataService.getBinding("moe", ClientSession.class);
+			(ClientSession) dataService.getBinding("moe");
 
 		    ClientSession larry =
-			dataService.getBinding("larry", ClientSession.class);
+			(ClientSession) dataService.getBinding("larry");
 		    
 		    Set<ClientSession> sessions = getSessions(channel);
 		    if (sessions.size() != 1) {
@@ -778,7 +781,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.send(testMessage);
+	    channel.send(ByteBuffer.wrap(testMessage));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -793,7 +796,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		channel.close();
 		try {
-		    channel.send(testMessage);
+		    channel.send(ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
 		} catch (IllegalStateException e) {
 		    System.err.println(e);
@@ -801,53 +804,142 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}, taskOwner);
     }
-
-    public void testChannelSendAll() throws Exception {
-	final String channelName = "test";
+    
+    public void testChannelSend() throws Exception {
+	
+	String channelName = "test";
 	createChannel(channelName);
 	ClientGroup group = new ClientGroup(sevenDwarfs);
-	
+	try {
+	    joinUsers(channelName, sevenDwarfs);
+	    sendMessagesToChannel(channelName, group, 5);
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    public void testChannelSendMultipleNodes() throws Exception {
+	addNodes("one", "two", "three");
+	testChannelSend();
+    }
+
+    public void testChannelSendToNewMembersAfterAllNodesFail() throws Exception {
+	testChannelSendMultipleNodes();
+	printServiceBindings();
+	System.err.println("simulate watchdog server crash...");
+	tearDown(false);
+	setUp(false);
+	//	Thread.sleep(WAIT_TIME);
+	printServiceBindings();
+	addNodes("ay", "bee", "sea");
+	ClientGroup group = new ClientGroup(sevenDwarfs);
+	try {
+	    joinUsers("test", sevenDwarfs);
+	    sendMessagesToChannel("test", group, 3);
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+
+    public void testChannelSendToExistingMembersAfterCoordinatorFailure()
+	throws Exception
+    {
+	String channelName = "talk";
+	addNodes("a", "b");
+	// create channel on specific node which will be the coordinator node
+	createChannel(channelName, "a");
+	ClientGroup group = new ClientGroup(sevenDwarfs);
+	try {
+	    joinUsers(channelName, sevenDwarfs);
+	    sendMessagesToChannel(channelName, group, 5);
+	    printServiceBindings();
+	    // nuke coordinator node
+	    System.err.println("shutting down node 'a'");
+	    shutdownNode("a");
+	    // remove disconnected sessions from client group
+	    System.err.println("remove disconnected sessions");
+	    ClientGroup disconnectedSessionsGroup =
+		group.removeSessionsFromGroup("a");
+	    // send messages to sessions that are left
+	    System.err.println("send messages to remaining members");
+	    sendMessagesToChannel(channelName, group, 2);
+	    if (!disconnectedSessionsGroup.isDisconnectedGroup()) {
+		fail("expected disconnected client(s)");
+	    }
+		
+	    disconnectedSessionsGroup.checkMembership(channelName, false);
+	    disconnectedSessionsGroup.checkChannelSets(false);
+	    
+	} finally {
+	    printServiceBindings();
+	    group.disconnect(false);
+	}
+    }
+
+    /**
+     * Shuts down the node with the specified host.
+     */
+    private void shutdownNode(String host) throws Exception {
+	additionalNodes.get(host).shutdown(false);
+	additionalNodes.remove(host);
+    }
+    
+    private void sendMessagesToChannel(
+	final String channelName, ClientGroup group, int numMessages)
+	throws Exception
+    {
 	try {
 	    boolean failed = false;
-	    joinUsers(channelName, sevenDwarfs);
 	    String messageString = "message";
-	    final MessageBuffer buf =
-		new MessageBuffer(MessageBuffer.getSize(messageString) +
-				  MessageBuffer.getSize(channelName) + 4);
-	    buf.putString(messageString).
-		putString(channelName).
-		putInt(0);
 
-	    // FIXME: send more than one message and verify ordering.
+	    for (int i = 0; i < numMessages; i++) {
+		final MessageBuffer buf =
+		    new MessageBuffer(MessageBuffer.getSize(messageString) +
+				      MessageBuffer.getSize(channelName) + 4);
+		buf.putString(messageString).
+		    putString(channelName).
+		    putInt(i);
 
-	    System.err.println("Sending message: " +
-			       HexDumper.format(buf.getBuffer()));
+		System.err.println("Sending message: " +
+				   HexDumper.format(buf.getBuffer()));
 
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Channel channel = getChannel(channelName);
-		    channel.send(buf.getBuffer());
-		}
-	    }, taskOwner);
+		taskScheduler.runTransactionalTask(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    Channel channel = getChannel(channelName);
+			    channel.send(ByteBuffer.wrap(buf.getBuffer()));
+			}
+		    }, taskOwner);
+	    }
 
+	    Thread.sleep(5000);
 	    for (DummyClient client : group.getClients()) {
-		MessageInfo info = client.nextChannelMessage();
-		if (info == null) {
-		    failed = true;
-		    System.err.println(
- 			"member:" + client.name + " did not get message");
-		} else {
-		    if (! info.channelName.equals(channelName)) {
-			fail("Got channel name: " + info.channelName +
-			     ", Expected: " + channelName);
+		for (int i = 0; i < numMessages; i++) {
+		    MessageInfo info = client.nextChannelMessage();
+		    if (info == null) {
+			failed = true;
+			System.err.println(
+			    "FAILURE: " + client.name +
+			    " did not get message: " + i);
+			continue;
+		    } else {
+			if (! info.channelName.equals(channelName)) {
+			    fail("Got channel name: " + info.channelName +
+				 ", Expected: " + channelName);
+			}
+			System.err.println(
+			    client.name + " got channel message: " + info.seq);
+			if (info.seq != i) {
+			    failed = true;
+			    System.err.println(
+				"\tFAILURE: expected sequence number: " + i);
+			}
 		    }
-		    System.err.println(
-			client.name + " got channel message: " + info.seq);
 		}
 	    }
 
 	    if (failed) {
-		fail("test failed");
+		fail("test failed: see output");
 	    }
 	    
 	} catch (RuntimeException e) {
@@ -855,16 +947,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    e.printStackTrace();
 	    printServiceBindings();
 	    fail("unexpected failure: " + e);
-	} finally {
-	    group.disconnect(false);
 	}
     }
 
-    public void testChannelSendAllMultipleNodes() throws Exception {
-	addNodes("one", "two", "three");
-	testChannelSendAll();
-    }
-    
     /* -- Test Channel.close -- */
 
     public void testChannelCloseNoTxn() throws Exception {
@@ -986,9 +1071,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    System.err.println("simulate watchdog server crash...");
 	    tearDown(false);
 	    setUp(false);
-	    addNodes("recoveryNode");
 
-	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
+	    Thread.sleep(WAIT_TIME); // await recovery actions
 	    group.checkMembership(channelName, false);
 	    group.checkChannelSets(false);
 	    printServiceBindings();
@@ -1006,24 +1090,24 @@ public class TestChannelServiceImpl extends TestCase {
 
     private class ClientGroup {
 
-	final List<String> users;
-	final Map<String, DummyClient> clients =
-	    new HashMap<String, DummyClient>();
-	// FIXME: This is a kludge for now
-	final long nodeId = serverNodeId;
+	Map<String, DummyClient> clients;
 
 	ClientGroup(String... users) {
 	    this(Arrays.asList(users));
 	}
 	
 	ClientGroup(List<String> users) {
-	    this.users = users;
+	    clients = new HashMap<String, DummyClient>();
 	    for (String user : users) {
 		DummyClient client = new DummyClient();
 		clients.put(user, client);
 		client.connect(port);
 		client.login(user, "password");
 	    }
+	}
+
+	private ClientGroup(Map<String, DummyClient> clients) {
+	    this.clients = clients;
 	}
 
 	void join(String channelName) {
@@ -1036,6 +1120,36 @@ public class TestChannelServiceImpl extends TestCase {
 	    for (DummyClient client : clients.values()) {
 		client.leave(channelName);
 	    }
+	}
+
+	/**
+	 * Removes the client sessions on the given host from  this group
+	 * and returns a ClientGroup with the removed sessions.
+	 */
+	ClientGroup removeSessionsFromGroup(String host) {
+	    Iterator<String> iter = clients.keySet().iterator();
+	    Map<String, DummyClient> removedClients =
+		new HashMap<String, DummyClient>();
+	    while (iter.hasNext()) {
+		String user = iter.next();
+		DummyClient client = clients.get(user);
+		System.err.println("user: " + user +
+				   ", redirectHost: " + client.redirectHost);
+		if (host.equals(client.redirectHost)) {
+		    iter.remove();
+		    removedClients.put(user, client);
+		}
+	    }
+	    return new ClientGroup(removedClients);
+	}
+
+	boolean isDisconnectedGroup() {
+	    for (DummyClient client : clients.values()) {
+		if (client.isConnected()) {
+		    return false;
+		}
+	    }
+	    return true;
 	}
 
 	void checkMembership(final String name, final boolean isMember)
@@ -1070,11 +1184,11 @@ public class TestChannelServiceImpl extends TestCase {
 	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    for (DummyClient client : clients.values()) {
+			long nodeId = client.getNodeId();
 			String sessionKey =
 			    getChannelSetKey(nodeId, client.getSessionId());
 			try {
-			    dataService.getServiceBinding(
- 				sessionKey, ManagedObject.class);
+			    dataService.getServiceBinding(sessionKey);
 			    if (!exists) {
 				fail("checkChannelSets: set exists: " +
 				     client.name);
@@ -1113,7 +1227,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private ClientSession getClientSession(String name) {
 	try {
-	    return dataService.getBinding(name, ClientSession.class);
+	    return (ClientSession) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1134,23 +1248,48 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private Channel createChannel(String name) throws Exception {
+	return createChannel(name,  null);
+    }
+
+    private Channel createChannel(String name, String host) throws Exception {
 	CreateChannelTask createChannelTask =
-	    new CreateChannelTask(name);
-	taskScheduler.runTransactionalTask(createChannelTask, taskOwner);
+	    new CreateChannelTask(name, host);
+	runTransactionalTask(createChannelTask, host);
 	return createChannelTask.getChannel();
     }
 
-    private class CreateChannelTask extends AbstractKernelRunnable {
+    /**
+     * Runs the given transactional task using the task scheduler on the
+     * specified host.
+     */
+    private void runTransactionalTask(AbstractKernelRunnable task, String host)
+	throws Exception
+    {
+	SgsTestNode node =
+	    host == null ? serverNode : additionalNodes.get(host);
+	if (node == null) {
+	    throw new NullPointerException("no node for host: " + host);
+	}
+	TaskScheduler nodeTaskScheduler =
+	    node.getSystemRegistry().getComponent(TaskScheduler.class);
+	Identity nodeTaskOwner =
+	    node.getProxy().getCurrentOwner();
+	nodeTaskScheduler.runTransactionalTask(task, nodeTaskOwner);
+    }
+
+    private static class CreateChannelTask extends AbstractKernelRunnable {
 	private final String name;
+	private final String host;
 	private Channel channel;
 	
-	CreateChannelTask(String name) {
+	CreateChannelTask(String name, String host) {
 	    this.name = name;
+	    this.host = host;
 	}
 	
 	public void run() throws Exception {
-	    channel = channelService.createChannel(Delivery.RELIABLE);
-	    dataService.setBinding(name, channel);
+	    channel = AppContext.getChannelManager().createChannel(Delivery.RELIABLE);
+	    AppContext.getDataManager().setBinding(name, channel);
 	}
 
 	Channel getChannel() {
@@ -1160,7 +1299,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private ClientSession getSession(String name) {
 	try {
-	    return dataService.getBinding(name, ClientSession.class);
+	    return (ClientSession) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1168,7 +1307,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private Channel getChannel(String name) {
 	try {
-	    return dataService.getBinding(name, Channel.class);
+	    return (Channel) dataService.getBinding(name);
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1260,6 +1399,7 @@ public class TestChannelServiceImpl extends TestCase {
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
+	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
 
 	
 	DummyClient() {
@@ -1267,6 +1407,16 @@ public class TestChannelServiceImpl extends TestCase {
 
 	byte[] getSessionId() {
 	    return sessionId.getId();
+	}
+
+	boolean isConnected() {
+	    synchronized (lock) {
+		return connected;
+	    }
+	}
+
+	long getNodeId() {
+	    return nodeId;
 	}
 
 	DummyClient connect(int port) {
@@ -1336,7 +1486,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-	    redirectHost = null;
+	    //redirectHost = null;
 	}
 
 	DummyClient login(String user, String pass) {
@@ -1349,11 +1499,10 @@ public class TestChannelServiceImpl extends TestCase {
 	    this.name = user;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(user) +
+		new MessageBuffer(2 + MessageBuffer.getSize(user) +
 				  MessageBuffer.getSize(pass));
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putByte(SimpleSgsProtocol.VERSION).
 		putString(user).
 		putString(pass);
 	    loginAck = false;
@@ -1386,8 +1535,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 
 	    // handle redirected login
-	    int redirectPort =
-		(additionalNodes.get(host)).getAppPort();
+	    SgsTestNode node = additionalNodes.get(host);
+	    int redirectPort = node.getAppPort();
+	    nodeId = node.getWatchdogService().getLocalNodeId();
 	    disconnect();
 	    connect(redirectPort);
 	    return login(user, pass);
@@ -1400,25 +1550,15 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the next sequence number for this session.
-	 */
-	private long nextSequenceNumber() {
-	    return sequenceNumber.getAndIncrement();
-	}
-
-	/**
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(13 + message.length);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(nextSequenceNumber()).
-		putByteArray(message);
+		new MessageBuffer(1 + message.length);
+	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putBytes(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1527,10 +1667,8 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(3);
-                buf.putByte(SimpleSgsProtocol.VERSION).
-                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                MessageBuffer buf = new MessageBuffer(1);
+                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
                 try {
@@ -1572,28 +1710,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		MessageBuffer buf = new MessageBuffer(buffer);
 
-		byte version = buf.getByte();
-		if (version != SimpleSgsProtocol.VERSION) {
-		    System.err.println(
-			"[" + name + "] bytesReceived: got version: " +
-			version + ", expected: " + SimpleSgsProtocol.VERSION);
-		    return;
-		}
-
-		byte serviceId = buf.getByte();
-		switch (serviceId) {
-		    
-		case SimpleSgsProtocol.APPLICATION_SERVICE:
-		    processAppProtocolMessage(buf);
-		    break;
-
-		default:
-		    System.err.println(
-			"[" + name + "] bytesReceived: got service id: " +
-                        serviceId + ", expected: " +
-                        SimpleSgsProtocol.APPLICATION_SERVICE);
-		    return;
-		}
+		processAppProtocolMessage(buf);
 	    }
 
 	    private void processAppProtocolMessage(MessageBuffer buf) {
@@ -1641,9 +1758,7 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.notifyAll();
 		    } break;
 
-		case SimpleSgsProtocol.SESSION_MESSAGE:
-                    buf.getLong(); // FIXME sequence number
-		    buf = new MessageBuffer(buf.getByteArray());
+		case SimpleSgsProtocol.SESSION_MESSAGE: {
 		    String action = buf.getString();
 		    if (action.equals("join")) {
 			String channelName = buf.getString();
@@ -1679,6 +1794,7 @@ public class TestChannelServiceImpl extends TestCase {
 			    action);
 		    }
 		    break;
+		}
 
 		default:
 		    System.err.println(	
@@ -1763,7 +1879,7 @@ public class TestChannelServiceImpl extends TestCase {
 	boolean receivedDisconnectedCallback = false;
 	boolean wasGracefulDisconnect = false;
 	
-	private final ManagedReference sessionRef;
+	private final ManagedReference<ClientSession> sessionRef;
 	
 	DummyClientSessionListener(ClientSession session) {
 	    DataManager dataManager = AppContext.getDataManager();
@@ -1784,37 +1900,39 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public void receivedMessage(byte[] message) {
-	    MessageBuffer buf = new MessageBuffer(message);
+	public void receivedMessage(ByteBuffer message) {
+            byte[] bytes = new byte[message.remaining()];
+            message.asReadOnlyBuffer().get(bytes);
+	    MessageBuffer buf = new MessageBuffer(bytes);
 	    String action = buf.getString();
 	    DataManager dataManager = AppContext.getDataManager();
-	    ClientSession session = sessionRef.get(ClientSession.class);
+	    ClientSession session = sessionRef.get();
 	    if (action.equals("join")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: join request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
 		channel.join(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("leave")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: leave request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
 		channel.leave(session);
-		session.send(message);
+		session.send(message.asReadOnlyBuffer());
 	    } else if (action.equals("message")) {
 		String channelName = buf.getString();
 		System.err.println("DummyClientSessionListener: send request, " +
 				   "channel name: " + channelName +
 				   ", user: " + name);
-		Channel channel = dataManager.
-		    	getBinding(channelName, Channel.class);
-		channel.send(message);
+		Channel channel =
+		    (Channel) dataManager.getBinding(channelName);
+		channel.send(message.asReadOnlyBuffer());
 	    }
 	}
     }
@@ -1829,7 +1947,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	public void run() {
-	    session = dataService.getBinding(name, ClientSession.class);
+	    session = (ClientSession) dataService.getBinding(name);
 	}
 
 	ClientSession getSession() {

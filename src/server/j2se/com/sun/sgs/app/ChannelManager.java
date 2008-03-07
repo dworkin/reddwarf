@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -18,8 +18,6 @@
  */
 
 package com.sun.sgs.app;
-
-import java.io.Serializable;
 
 /**
  * Manager for creating channels.  A {@link Channel} is a communication

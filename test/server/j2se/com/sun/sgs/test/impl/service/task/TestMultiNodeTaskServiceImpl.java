@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -270,8 +270,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
-                        dataServiceOne.
-                            getBinding("handle", ManagedHandle.class).cancel();
+                        ((ManagedHandle)
+			 dataServiceOne.getBinding("handle")).cancel();
                     } catch (Exception e) {
                         fail("Did not expect exception: " + e);
                     }
@@ -352,7 +352,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.period",
                 "50",
             "com.sun.sgs.impl.service.task.TaskServiceImpl.vote.delay", "50",
-            "com.sun.sgs.impl.service.data.store.net.server.run", isServer,
+            "com.sun.sgs.impl.service.data.store.net.server.start", isServer,
             "com.sun.sgs.impl.service.data.store.net.server.port", portStr,
             "DummyServer", isServer
         );
@@ -367,14 +367,14 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     }
 
     private Counter getClearedCounter() {
-        Counter counter = dataServiceZero.getBinding("counter", Counter.class);
+        Counter counter = (Counter) dataServiceZero.getBinding("counter");
         dataServiceZero.markForUpdate(counter);
         counter.clear();
         return counter;
     }
 
     private void assertCounterClear(String message) {
-        Counter counter = dataServiceZero.getBinding("counter", Counter.class);
+        Counter counter = (Counter) dataServiceZero.getBinding("counter");
         if (! counter.isZero())
             fail(message);
     }
@@ -398,7 +398,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             TestMultiNodeTaskServiceImpl.lastNodeUsed.
                 set(AppContext.getManager(NodeIdManager.class).getNodeId());
             DataManager dataManager = AppContext.getDataManager();
-            Counter counter = dataManager.getBinding("counter", Counter.class);
+            Counter counter = (Counter) dataManager.getBinding("counter");
             dataManager.markForUpdate(counter);
             counter.decrement();
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -49,7 +49,7 @@ class PendingTask implements ManagedObject, Serializable {
     // the task that is pending, one of which is null based on whether the
     // task was managed by the caller (see docs on constructor)
     private final Task task;
-    private final ManagedReference taskRef;
+    private final ManagedReference<Task> taskRef;
 
     // the task's meta-data
     private final String taskType;
@@ -94,7 +94,7 @@ class PendingTask implements ManagedObject, Serializable {
         // case we set one of the two fields to null to disambiguate
         // what the situation is.
         if (task instanceof ManagedObject) {
-            taskRef = dataService.createReference((ManagedObject)task); 
+            taskRef = dataService.createReference(task); 
             this.task = null;
         } else {
             this.task = task;
@@ -181,7 +181,7 @@ class PendingTask implements ManagedObject, Serializable {
         if (task != null)
             return true;
         try {
-            taskRef.get(Task.class);
+            taskRef.get();
             return true;
         } catch (ObjectNotFoundException onfe) {
             return false;
@@ -197,7 +197,7 @@ class PendingTask implements ManagedObject, Serializable {
     void run() throws Exception {
         Task actualTask = null;
         try {
-            actualTask = (task != null) ? task : taskRef.get(Task.class);
+            actualTask = (task != null) ? task : taskRef.get();
         } catch (ObjectNotFoundException onfe) {
             // This only happens when the application removed the task
             // object but didn't cancel the task, so we're done

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -206,7 +206,7 @@ final class Context extends TransactionContext {
     /* -- Methods for obtaining references -- */
 
     /** Obtains the reference associated with the specified object. */
-    ManagedReferenceImpl getReference(ManagedObject object) {
+    <T> ManagedReferenceImpl<T> getReference(T object) {
 	return ManagedReferenceImpl.getReference(this, object);
     }
 
@@ -214,26 +214,26 @@ final class Context extends TransactionContext {
      * Finds the existing reference associated with the specified object,
      * returning null if it is not found.
      */
-    ManagedReferenceImpl findReference(ManagedObject object) {
+    <T> ManagedReferenceImpl<T> findReference(T object) {
 	return ManagedReferenceImpl.findReference(this, object);
     }
 
     /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl getReference(long oid) {
+    ManagedReferenceImpl<?> getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 
     /* -- Methods for bindings -- */
 
     /** Obtains the object associated with the specified internal name. */
-    <T> T getBinding(String internalName, Class<T> type) {
+    ManagedObject getBinding(String internalName) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return getReference(id).get(type, false);
+	return (ManagedObject) getReference(id).get(false);
     }
 
     /** Sets the object associated with the specified internal name. */
-    void setBinding(String internalName, ManagedObject object) {
+    void setBinding(String internalName, Object object) {
 	store.setBinding(txn, internalName, getReference(object).oid);
     }
 

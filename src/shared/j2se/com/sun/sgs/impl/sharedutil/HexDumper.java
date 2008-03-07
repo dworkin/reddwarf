@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -40,6 +40,21 @@ public final class HexDumper {
     }
 
     /**
+     * Returns a string constructed with the contents of the byte
+     * array converted to hex format.  The entire string is enclosed
+     * in square brackets, and the octets are separated by a single
+     * space character.
+     *
+     * @param bytes a byte array to format
+     * @param limit the maximum number of bytes to format, or {@code 0}
+     *              meaning unlimited
+     * @return the contents of the byte array as a hex-formatted string
+     */
+    public static String format(byte[] bytes, int limit) {
+        return format(ByteBuffer.wrap(bytes), limit);
+    }
+
+    /**
      * Returns a string constructed with the contents of the ByteBuffer
      * converted to hex format.  The entire string is enclosed
      * in square brackets, and the octets are separated by a single
@@ -67,11 +82,15 @@ public final class HexDumper {
         if (! buf.hasRemaining())
             return "[]";
 
-        ByteBuffer readBuf = buf.slice();
-        if (limit > 0)
+        boolean truncate = false;
+        ByteBuffer readBuf = buf.slice().asReadOnlyBuffer();
+        if ((limit > 0) && (limit < buf.remaining())) {
+            truncate = true;
             readBuf.limit(limit);
+        }
 
-        StringBuilder s = new StringBuilder((3 * readBuf.remaining()) + 1);
+        StringBuilder s = new StringBuilder(
+            (3 * readBuf.remaining()) + (truncate ? 3 : 0) + 1);
         s.append('[');
         // First element
         s.append(String.format("%02x", readBuf.get()));
@@ -79,6 +98,11 @@ public final class HexDumper {
         while (readBuf.hasRemaining()) {
             s.append(String.format(" %02x", readBuf.get()));
         }
+
+        if (truncate) {
+            s.append("...");
+        }
+
         s.append(']');
         return s.toString();
     }

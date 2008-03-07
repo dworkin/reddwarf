@@ -1,3 +1,22 @@
+/*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.sun.sgs.analysis.task;
 
 import com.sun.sgs.app.AppContext;
@@ -64,7 +83,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the object to notify when done. */
-	final ManagedReference schedulerRef;
+	final ManagedReference<ScheduleSimpleTasks> schedulerRef;
 
 	/** The remaining number of operations to run. */
 	int count;
@@ -84,7 +103,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	/** Notifies the status object if done, else reschedules itself. */
 	public void run() {
 	    if (--count <= 0) {
-		schedulerRef.get(ScheduleSimpleTasks.class).taskDone();
+		schedulerRef.get().taskDone();
 	    } else {
 		AppContext.getTaskManager().scheduleTask(getNextTask());
 	    }
@@ -117,8 +136,7 @@ public class ScheduleSimpleTasks extends BasicScheduleTasks {
 	}
 
 	Task getNextTask() {
-	    return new ManagedSimpleTask(
-		schedulerRef.get(ScheduleSimpleTasks.class), count);
+	    return new ManagedSimpleTask(schedulerRef.get(), count);
 	}
     }
 }

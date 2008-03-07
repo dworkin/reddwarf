@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -36,7 +37,7 @@ import java.util.logging.Level;
  * progress call tracking for services with embedded remote servers,
  * and shutdown support.
  *
- * <p>The {@link getName getName} method invokes the instance's {@code
+ * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
  * should provide an implementation of the {@code toString} method.
  */
@@ -317,6 +318,22 @@ public abstract class AbstractService implements Service {
 	}
     }
 
+    /**
+     * Returns {@code true} if the specified exception is retryable, and
+     * {@code false} otherwise.  A retryable exception is one that
+     * implements {@link ExceptionRetryStatus} and invoking its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns {@code
+     * true}.
+     *
+     * @param	e an exception
+     * @return	{@code true} if the specified exception is retryable, annd
+     *		{@code false} otherwise
+     */
+    public static boolean isRetryableException(Exception e) {
+	return (e instanceof ExceptionRetryStatus) &&
+	    ((ExceptionRetryStatus) e).shouldRetry();
+    }
+    
     /**
      * Sets this service's state to {@code newState}.
      *

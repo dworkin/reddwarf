@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,6 +20,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Listener for messages sent from an associated client session to the
@@ -65,7 +66,7 @@ public interface ClientSessionListener {
      * @throws	MessageRejectedException if there are not enough resources
      *		to process the specified message
      */
-    void receivedMessage(byte[] message);
+    void receivedMessage(ByteBuffer message);
 
     /**
      * Notifies this listener that the associated session's client has

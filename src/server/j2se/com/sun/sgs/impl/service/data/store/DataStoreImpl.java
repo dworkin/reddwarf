@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -1352,6 +1352,11 @@ public class DataStoreImpl
 	    throw convertException(
 		txn, Level.FINER, e, "abort txn:" + txn);
 	}
+    }
+    
+    /** {@inheritDoc} */
+    public String getTypeName() {
+        return  this.getClass().getName();
     }
 
     /* -- Implements ProfileProducer -- */

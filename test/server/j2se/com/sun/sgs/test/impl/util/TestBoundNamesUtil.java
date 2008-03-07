@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -315,21 +315,21 @@ public class TestBoundNamesUtil extends TestCase {
     {
 	private static final long serialVersionUID = 1;
 	/* -- Stubs for DataManager -- */
-	public <T> T getBinding(String name, Class<T> type) { return null; }
-	public void setBinding(String name, ManagedObject object) { }
+	public ManagedObject getBinding(String name) { return null; }
+	public void setBinding(String name, Object object) { }
 	public void removeBinding(String name) { }
 	public String nextBoundName(String name) { return null; }
-	public void removeObject(ManagedObject object) { }
-	public void markForUpdate(ManagedObject object) { }
-	public ManagedReference createReference(ManagedObject object) {
+	public void removeObject(Object object) { }
+	public void markForUpdate(Object object) { }
+	public <T> ManagedReference<T> createReference(T object) {
 	    return null;
 	}
 	/* -- Stubs for DataService -- */
-	public <T> T getServiceBinding(String name, Class<T> type) {
+	public ManagedObject getServiceBinding(String name) {
 	    return null;
 	}
-	public void setServiceBinding(String name, ManagedObject object) { }
-	public ManagedReference createReferenceForId(BigInteger id) {
+	public void setServiceBinding(String name, Object object) { }
+	public ManagedReference<?> createReferenceForId(BigInteger id) {
 	    return null;
 	}
 	public BigInteger nextObjectId(BigInteger objectId) { return null; }

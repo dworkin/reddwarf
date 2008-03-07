@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,6 +20,7 @@
 package com.sun.sgs.tutorial.server.swordworld;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,10 +52,10 @@ public class SwordWorldPlayer
     protected static final String PLAYER_BIND_PREFIX = "Player.";
 
     /** The {@code ClientSession} for this player, or null if logged out. */
-    private ClientSession currentSession = null;
+    private ManagedReference<ClientSession> currentSessionRef = null;
 
     /** The {@link SwordWorldRoom} this player is in, or null if none. */
-    private ManagedReference currentRoomRef = null;
+    private ManagedReference<SwordWorldRoom> currentRoomRef = null;
 
     /**
      * Find or create the player object for the given session, and mark
@@ -71,7 +72,7 @@ public class SwordWorldPlayer
         SwordWorldPlayer player;
 
         try {
-            player = dataMgr.getBinding(playerBinding, SwordWorldPlayer.class);
+            player = (SwordWorldPlayer) dataMgr.getBinding(playerBinding);
         } catch (NameNotBoundException ex) {
             // this is a new player
             player = new SwordWorldPlayer(playerBinding);
@@ -92,14 +93,27 @@ public class SwordWorldPlayer
     }
 
     /**
+     * Returns the session for this listener.
+     * 
+     * @return the session for this listener
+     */
+    protected ClientSession getSession() {
+        if (currentSessionRef == null)
+            return null;
+
+        return currentSessionRef.get();
+    }
+
+    /**
      * Mark this player as logged in on the given session.
      *
      * @param session the session this player is logged in on
      */
     protected void setSession(ClientSession session) {
-        AppContext.getDataManager().markForUpdate(this);
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.markForUpdate(this);
 
-        currentSession = session;
+        currentSessionRef = dataMgr.createReference(session);
 
         logger.log(Level.INFO,
             "Set session for {0} to {1}",
@@ -120,7 +134,7 @@ public class SwordWorldPlayer
     }
 
     /** {@inheritDoc} */
-    public void receivedMessage(byte[] message) {
+    public void receivedMessage(ByteBuffer message) {
         String command = decodeString(message);
 
         logger.log(Level.INFO,
@@ -130,7 +144,7 @@ public class SwordWorldPlayer
 
         if (command.equalsIgnoreCase("look")) {
             String reply = getRoom().look(this);
-            currentSession.send(encodeString(reply));
+            getSession().send(encodeString(reply));
         } else {
             logger.log(Level.WARNING,
                 "{0} unknown command: {1}",
@@ -159,7 +173,7 @@ public class SwordWorldPlayer
         if (currentRoomRef == null)
             return null;
 
-        return currentRoomRef.get(SwordWorldRoom.class);
+        return currentRoomRef.get();
     }
 
     /**
@@ -185,23 +199,23 @@ public class SwordWorldPlayer
     public String toString() {
         StringBuilder buf = new StringBuilder(getName());
         buf.append('@');
-        if (currentSession == null) {
+        if (getSession() == null) {
             buf.append("null");
         } else {
-            buf.append(currentSession.getSessionId());
+            buf.append(currentSessionRef.getId());
         }
         return buf.toString();
     }
 
     /**
-     * Encodes a {@code String} into an array of bytes.
+     * Encodes a {@code String} into a {@link ByteBuffer}.
      *
      * @param s the string to encode
-     * @return the byte array which encodes the given string
+     * @return the {@code ByteBuffer} which encodes the given string
      */
-    protected static byte[] encodeString(String s) {
+    protected static ByteBuffer encodeString(String s) {
         try {
-            return s.getBytes(MESSAGE_CHARSET);
+            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required character set " + MESSAGE_CHARSET +
                 " not found", e);
@@ -209,13 +223,15 @@ public class SwordWorldPlayer
     }
 
     /**
-     * Decodes an array of bytes into a {@code String}.
+     * Decodes a message into a {@code String}.
      *
-     * @param bytes the bytes to decode
+     * @param message the message to decode
      * @return the decoded string
      */
-    protected static String decodeString(byte[] bytes) {
+    protected static String decodeString(ByteBuffer message) {
         try {
+            byte[] bytes = new byte[message.remaining()];
+            message.get(bytes);
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required character set " + MESSAGE_CHARSET +
