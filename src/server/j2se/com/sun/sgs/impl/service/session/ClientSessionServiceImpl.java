@@ -19,8 +19,10 @@
 
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
@@ -34,6 +36,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.io.Acceptor;
@@ -41,8 +44,10 @@ import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -51,6 +56,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -65,6 +71,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -81,7 +88,7 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
  */
-public class ClientSessionServiceImpl
+public final class ClientSessionServiceImpl
     extends AbstractService
     implements ClientSessionService
 {
@@ -102,6 +109,12 @@ public class ClientSessionServiceImpl
 	
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
+
+    private static final String EVENTS_PER_TXN_PROPERTY =
+	PKG_NAME + ".events.per.txn";
+
+    /** The default events per transaction. */
+    private static final int DEFAULT_EVENTS_PER_TXN = 1;
     
     /** The port for accepting connections. */
     private final int appPort;
@@ -158,6 +171,13 @@ public class ClientSessionServiceImpl
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
 
+    /** The map of session task queues, keyed by session ID. */
+    private final ConcurrentHashMap<BigInteger, TaskQueue>
+	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
+
+    /** The maximum number of session events to sevice per transaction. */
+    final int eventsPerTxn;
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -199,6 +219,16 @@ public class ClientSessionServiceImpl
 		    " property can be greater than 65535: " + appPort);
 	    }
 
+	    /*
+	     * Get the property for controlling session event processing.
+	     */
+	    eventsPerTxn = wrappedProps.getIntProperty(
+		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
+		1, Integer.MAX_VALUE);
+
+	    /*
+	     * Export the ClientSessionServer.
+	     */
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new SessionServerImpl();
@@ -220,18 +250,36 @@ public class ClientSessionServiceImpl
 		throw e;
 	    }
 
+	    /*
+	     * Get services and initialize service-related and other
+	     * instance fields.
+	     */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
-
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    taskService = txnProxy.getService(TaskService.class);
-            
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
+
+	    /*
+	     * Store the ClientSessionServer proxy in the data store.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			dataService.setServiceBinding(
+			    getClientSessionServerKey(localNodeId),
+			    new ManagedSerializable<ClientSessionServer>(
+				serverProxy));
+		    }},
+		taskOwner);
+	    
+	    /*
+	     * Listen for incoming client connections.
+	     */
 	    ServerSocketEndpoint endpoint =
 		new ServerSocketEndpoint(
 		    new InetSocketAddress(appPort), TransportType.RELIABLE);
@@ -313,12 +361,32 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Returns the proxy for the client session server
+     * Returns the proxy for the client session server on the specified
+     * {@code nodeId}, or {@code null} if no server exists.
      *
-     * @return	the proxy for the client session server
+     * @param	nodeId a node ID
+     * @return	the proxy for the client session server on the specified
+     * 		{@code nodeId}, or {@code null}
      */
-    ClientSessionServer getServerProxy() {
-	return serverProxy;
+    ClientSessionServer getClientSessionServer(long nodeId) {
+	if (nodeId == localNodeId) {
+	    return serverImpl;
+	} else {
+	    String sessionServerKey = getClientSessionServerKey(nodeId);
+	    try {
+		ManagedSerializable wrappedProxy = (ManagedSerializable)
+		    dataService.getServiceBinding(sessionServerKey);
+		return (ClientSessionServer) wrappedProxy.get();
+	    } catch (NameNotBoundException e) {
+		return null;
+	    }  catch (ObjectNotFoundException e) {
+		logger.logThrow(
+		    Level.SEVERE, e,
+		    "ClientSessionServer binding:{0} exists, " +
+		    "but object removed", sessionServerKey);
+		throw e;
+	    }
+	}
     }
 
     /* -- Implement ClientSessionService -- */
@@ -334,13 +402,47 @@ public class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public void sendProtocolMessage(
-	ClientSession session, ByteBuffer message, Delivery delivery)
+    public void sendProtocolMessageNonTransactional(
+	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
+    {
+	ClientSessionHandler handler = handlers.get(sessionRefId);
+	/*
+	 * If a local handler exists, forward message to local handler
+	 * to send to client session.
+	 */
+	if (handler != null) {
+	    byte[] bytes = new byte[message.remaining()];
+	    message.get(bytes);
+	    handler.sendProtocolMessage(bytes, delivery);
+	} else {
+	    logger.log(
+		Level.FINE,
+		"Discarding messages for unknown session:{0}",
+		sessionRefId);
+		return;
+	}
+    }
+
+    /* -- Package access methods for adding commit actions -- */
+    
+    /**
+     * Sends the specified protocol {@code message} to the specified
+     * client {@code session} with the specified {@code delivery}
+     * guarantee.  This method must be called within a transaction.
+     *
+     * @param	session	a client session
+     * @param	message a complete protocol message
+     * @param	delivery a delivery requirement
+     *
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    void sendProtocolMessage(
+	ClientSessionImpl session, ByteBuffer message, Delivery delivery)
     {
         byte[] bytes = new byte[message.remaining()];
         message.get(bytes);
-	checkContext().addMessage(
-	    getClientSessionImpl(session), bytes, delivery);
+	checkContext().addMessage(session, bytes, delivery);
     }
 
     /**
@@ -372,28 +474,6 @@ public class ClientSessionServiceImpl
 	context.addMessageFirst(session, message, delivery);
     }
 
-    /** {@inheritDoc} */
-    public void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
-    {
-	ClientSessionHandler handler = handlers.get(sessionRefId);
-	/*
-	 * If a local handler exists, forward message to local handler
-	 * to send to client session.
-	 */
-	if (handler != null) {
-	    byte[] bytes = new byte[message.remaining()];
-	    message.get(bytes);
-	    handler.sendProtocolMessage(bytes, delivery);
-	} else {
-	    logger.log(
-		Level.FINE,
-		"Discarding messages for unknown session:{0}",
-		sessionRefId);
-		return;
-	}
-    }
-
     /**
      * Disconnects the specified client {@code session}.  This method must
      * be invoked within a transaction.
@@ -403,8 +483,8 @@ public class ClientSessionServiceImpl
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void disconnect(ClientSession session) {
-	checkContext().requestDisconnect(getClientSessionImpl(session));
+    void disconnect(ClientSessionImpl session) {
+	checkContext().requestDisconnect(session);
     }
 
     /* -- Implement AcceptorListener -- */
@@ -652,9 +732,6 @@ public class ClientSessionServiceImpl
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
-	/** The client session server for the session. */
-	private final ClientSessionServer sessionServer;
-	
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -666,10 +743,6 @@ public class ClientSessionServiceImpl
 		throw new NullPointerException("null sessionImpl");
 	    } 
 	    this.sessionRefId = sessionImpl.getId();
-	    this.sessionServer =
-		sessionImpl.getNodeId() == localNodeId ?
-		serverImpl :
-		sessionImpl.getClientSessionServer();
 	}
 
 	void addMessage(byte[] message, boolean isFirst) {
@@ -678,7 +751,6 @@ public class ClientSessionServiceImpl
 	    } else {
 		messages.add(message);
 	    }
-	    
 	}
 
 	void clearMessages() {
@@ -694,70 +766,39 @@ public class ClientSessionServiceImpl
 	    if (disconnect) {
 		ClientSessionHandler handler = handlers.get(sessionRefId);
 		/*
-		 * If session is local, disconnect session, otherwise schedule
-		 * a task to disconnect the remote client session.
+		 * If session is local, disconnect session; otherwise, log
+		 * error message. 
 		 */
 		if (handler != null) {
 		    handler.handleDisconnect(false);
 		} else {
-		    byte[] sessionId = sessionRefId.toByteArray();
-		    try {
-			sessionServer.disconnect(sessionId);
-		    } catch (Exception e) {
-			logger.logThrow(
-			    Level.FINE, e,
-			    "invoking ClientSessionServer.disconnect " +
-			    "for session:{0} throws",
-			    HexDumper.toHexString(sessionId));
-			// TBD: retry?
-					
-		    }
+		    logger.log(
+		        Level.FINE,
+			"discarding request to disconnect unknown session:{0}",
+			sessionRefId);
 		}
 	    }
 	}
 
 	void sendMessages() {
 
-		ClientSessionHandler handler = handlers.get(sessionRefId);
-		/*
-		 * If a local handler exists, forward messages to
-		 * local handler to send to client session; otherwise
-		 * obtain remote server for client session and forward
-		 * messages for delivery.
-		 */
-		if (handler != null) {
-		    if (! handler.isConnected()) {
-			logger.log(
-			  Level.FINE,
-			    "Discarding messages for disconnected session:{0}",
-			handler);
-			return;
-		    }
-		    for (byte[] message : messages) {
-			handler.sendProtocolMessage(message, Delivery.RELIABLE);
-		    }
-
-		} else {
-		    int numMessages = messages.size();
-		    byte[][] messageData = messages.toArray(new byte[numMessages][]);
-		    Delivery[] deliveryData =
-			Collections.nCopies(numMessages, Delivery.RELIABLE).
-			    toArray(new Delivery[numMessages]);
-
-		    byte[] sessionId = sessionRefId.toByteArray();
-		    try {
-			sessionServer.sendProtocolMessages(
-			    sessionId, null, messageData, deliveryData);
-
-		    } catch (Exception e) {
-			logger.logThrow(
-		    	    Level.FINE, e,
-			    "Sending messages to session:{0} throws",
-			    HexDumper.toHexString(sessionId));
-			// TBD: retry?
-		    }
+	    ClientSessionHandler handler = handlers.get(sessionRefId);
+	    /*
+	     * If a local handler exists, forward messages to local
+	     * handler to send to client session; otherwise log
+	     * error message.
+	     */
+	    if (handler != null && handler.isConnected()) {
+		for (byte[] message : messages) {
+		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
 		}
+	    } else {
+		logger.log(
+		    Level.FINE,
+		    "Discarding messages for disconnected session:{0}",
+		    handler);
 	    }
+	}
     }
 
     /**
@@ -797,8 +838,8 @@ public class ClientSessionServiceImpl
 		 * Wait for a non-empty context queue, returning if
 		 * this thread is interrupted.
 		 */
-		if (contextQueue.isEmpty()) {
-		    synchronized (flushContextsLock) {
+		synchronized (flushContextsLock) {
+		    if (contextQueue.isEmpty()) {
 			try {
 			    flushContextsLock.wait();
 			} catch (InterruptedException e) {
@@ -839,60 +880,33 @@ public class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-	public void sendProtocolMessages(byte[] sessionId,
-					 long [] seq,
-					 byte[][] messages,
-					 Delivery[] delivery)
-	{
+	public void serviceEventQueue(final byte[] sessionId) {
 	    callStarted();
 	    try {
-		BigInteger id = new BigInteger(1, sessionId);
-		ClientSessionHandler handler = handlers.get(id);
-		if (handler == null || ! handler.isConnected()) {
-		    logger.log (
-			Level.FINE,
-			"Unable to send message to unknown or " +
-			"disconnected session:{0}", id);
-		    return;
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "serviceEventQueue sessionId:{0}",
+			       HexDumper.toHexString(sessionId));
 		}
 
-		if (messages.length != delivery.length) {
-		    throw new IllegalArgumentException(
-			"length of messages and delivery arrays must match");
-		}
-
-		for (int i = 0; i < messages.length; i++) {
-		    handler.sendProtocolMessage(messages[i], delivery[i]);
-		}
-	    } finally {
-		callFinished();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public boolean disconnect(byte[] sessionId) {
-	    callStarted();
-	    try {
-		BigInteger id = new BigInteger(1, sessionId);
-		ClientSessionHandler handler = handlers.get(id);
-		if (handler != null) {
-		    if (handler.isConnected()) {
-			handler.handleDisconnect(false);
-			return true;
-		    } else {
-			logger.log (
-		    	    Level.FINE,
-			    "Session:{0} already disconnected", id);
+		BigInteger sessionRefId = new BigInteger(1, sessionId);
+		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
+		if (taskQueue == null) {
+		    TaskQueue newTaskQueue =
+			transactionScheduler.createTaskQueue();
+		    taskQueue = sessionTaskQueues.
+			putIfAbsent(sessionRefId, newTaskQueue);
+		    if (taskQueue == null) {
+			taskQueue = newTaskQueue;
 		    }
-		} else {
-		    logger.log(
-			Level.FINE,
-			"Unable to disconnect unknown session:{0}", id);
 		}
-		return false;
+		taskQueue.addTask(new AbstractKernelRunnable() {
+		    public void run() {
+			ClientSessionImpl.serviceEventQueue(sessionId);
+		    }}, taskOwner);
 	    } finally {
 		callFinished();
 	    }
+	    
 	}
     }
     
@@ -911,16 +925,12 @@ public class ClientSessionServiceImpl
     }
     
     /**
-     * Returns the {@code ClientSessionImpl} corresponding to the
-     * specified client {@code session}.
+     * Returns the key for accessing the {@code ClientSessionServer}
+     * instance (which is wrapped in a {@code ManagedSerializable})
+     * for the specified {@code nodeId}.
      */
-    private ClientSessionImpl getClientSessionImpl(ClientSession session) {
-	if (session instanceof ClientSessionImpl) {
-	    return (ClientSessionImpl) session;
-	} else {
-	    throw new AssertionError(
-		"session not instanceof ClientSessionImpl: " + session);
-	}
+    private static String getClientSessionServerKey(long nodeId) {
+	return PKG_NAME + ".server." + nodeId;
     }
     
     /**
@@ -982,10 +992,13 @@ public class ClientSessionServiceImpl
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (ClientSessionDisconnectListener disconnectListener : sessionDisconnectListeners) {
+	for (ClientSessionDisconnectListener disconnectListener :
+		 sessionDisconnectListeners)
+	{
 	    disconnectListener.disconnected(sessionRefId);
 	}
 	handlers.remove(sessionRefId);
+	sessionTaskQueues.remove(sessionRefId);
     }
 
     /**
@@ -1049,11 +1062,14 @@ public class ClientSessionServiceImpl
 	 * be performed in a separate thread.
 	 */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
+	    final long nodeId = node.getId();
 	    try {
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
-			    notifyDisconnectedSessions(node.getId());
+			    taskService.scheduleTask(
+				new RemoveClientSessionServerProxyTask(nodeId));
+			    notifyDisconnectedSessions(nodeId);
 			}},
 		    getValidIdentity(taskOwner));
 		future.done();
@@ -1061,7 +1077,7 @@ public class ClientSessionServiceImpl
 		logger.logThrow(
  		    Level.WARNING, e,
 		    "notifying disconnected sessions for node:{0} throws",
-		    node.getId());
+		    nodeId);
 		// TBD: what should it do if it can't recover?
 	    }
 	}
@@ -1094,6 +1110,46 @@ public class ClientSessionServiceImpl
 		sessionImpl.notifyListenerAndRemoveSession(
 		    dataService, false, true);
 	    }
+	}
+    }
+
+    /**
+     * A persistent task to remove the client session server proxy for a
+     * specified node.
+     */
+    private static class RemoveClientSessionServerProxyTask
+	 implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	RemoveClientSessionServerProxyTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/**
+	 * Removes the client session server proxy and binding for the node
+	 * specified during construction.
+	 */
+	public void run() {
+	    String sessionServerKey = getClientSessionServerKey(nodeId);
+	    DataService dataService = getDataService();
+	    try {
+		dataService.removeObject(
+		    dataService.getServiceBinding(sessionServerKey));
+	    } catch (NameNotBoundException e) {
+		// already removed
+		return;
+	    } catch (ObjectNotFoundException e) {
+	    }
+	    dataService.removeServiceBinding(sessionServerKey);
 	}
     }
 }
