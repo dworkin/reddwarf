@@ -30,7 +30,6 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.DummyManagedObject;
 import java.util.Properties;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -142,9 +141,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
 
-        Properties props =
-	    SgsTestNode.getDefaultProperties("TestDataServiceConcurrency",
-					     null, null);
+        Properties props = getNodeProps();
         serverNode = new SgsTestNode("TestDataServiceConcurrency", null, props);
 	txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
@@ -226,6 +223,10 @@ public class TestDataServiceConcurrency extends TestCase {
 			  "com.sun.sgs.impl.profile.listener." +
 			  "OperationLoggingProfileOpListener");
 	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	props.setProperty("com.sun.sgs.server.start", "false");
+	props.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
+	                  "data.store.class",
+	                  "com.sun.sgs.impl.service.data.store.DataStoreImpl");
 	return props;
     }
 

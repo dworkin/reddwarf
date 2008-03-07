@@ -243,6 +243,10 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty("com.sun.sgs.impl.kernel.Kernel.profile.listeners",
 			  "com.sun.sgs.impl.profile.listener." +
 			  "OperationLoggingProfileOpListener");
+	props.setProperty("com.sun.sgs.server.start", "false");
+	props.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
+	                  "data.store.class",
+	                  "com.sun.sgs.impl.service.data.store.DataStoreImpl");
 	return props;
     }
 
