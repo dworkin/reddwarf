@@ -105,6 +105,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
         reporterThread.start();
      }
 
+    /** {@inheritDoc} */
     public void shutdown() {
         // Shut down the reporterThread, waiting for it to finish what
         // its doing
