@@ -144,6 +144,17 @@ class ChannelWrapper
 	return channelRef.hashCode();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+	ChannelImpl channelImpl = null;
+	try {
+	    channelImpl = channelRef.get();
+	} catch (ObjectNotFoundException e) {
+	}
+	return getClass().getName() + "[" +
+	    (channelImpl == null ? "(not found)" : channelImpl.toString()) + "]";
+    }
     /* -- Other methods -- */
 
     /**

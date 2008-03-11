@@ -115,12 +115,24 @@ public class ClientSessionWrapper
 	return sessionRef.hashCode();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+	ClientSessionImpl sessionImpl = null;
+	try {
+	    sessionImpl = sessionRef.get();
+	} catch (ObjectNotFoundException e) {
+	}
+	return getClass().getName() + "[" +
+	    (sessionImpl == null ? "(not found)" : sessionImpl.toString()) + "]";
+    }
+    
     /* -- Other methods -- */
 
     /**
      * Returns the underlying {@code ClientSessionImpl} instance for this
      * wrapper.  If the underlying client session has been removed, then
-     * the client session has been disconnected, so {@code *
+     * the client session has been disconnected, so {@code
      * IllegalStateException} is thrown.
      */
     public ClientSessionImpl getClientSession() {

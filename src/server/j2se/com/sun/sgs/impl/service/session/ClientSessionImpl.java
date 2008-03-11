@@ -149,8 +149,8 @@ public class ClientSessionImpl
 
     /** {@inheritDoc} */
     public String getName() {
-	if (identity == null) {
-	    throw new IllegalStateException("session identity not initialized");
+	if (! isConnected()) {
+	    throw new IllegalStateException("client session is not connected");
 	}
         String name = identity.getName();
 	return name;
@@ -161,7 +161,10 @@ public class ClientSessionImpl
 	return connected;
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * Enqueues a send event to this client session's event queue for servicing.
+     */
     public ClientSession send(ByteBuffer message) {
 	try {
             if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
@@ -189,8 +192,11 @@ public class ClientSessionImpl
 	}
     }
 
-    /** {@inheritDoc} */
-    public void disconnect() {
+    /**
+     * If the session is connected, enqueues a disconnect event to this
+     * client session's event queue, and marks this session as disconnected.
+     */
+    void disconnect() {
 	if (isConnected()) {
 	    addEvent(new DisconnectEvent());
 	    sessionService.getDataService().markForUpdate(this);

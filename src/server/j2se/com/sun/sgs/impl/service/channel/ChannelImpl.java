@@ -172,7 +172,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    /*
-	     * Enqueue join request.
+	     * Enqueue join request with underlying (unwrapped) client
+	     * session object. 
 	     */
 	    addEvent(new JoinEvent(unwrapSession(session)));
 	    
@@ -198,7 +199,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    
 	    /*
-	     * Enqueue join requests.
+	     * Enqueue join requests, each with underlying (unwrapped)
+	     * client session object.
 	     *
 	     * TBD: (optimization) add a single event instead of one for
 	     * each session.
@@ -215,6 +217,17 @@ abstract class ChannelImpl implements Channel, Serializable {
 	}
     }
 
+    /**
+     * Returns the underlying {@code ClientSession} for the specified
+     * {@code session}.  Note: The client session service wraps each client
+     * session object that it hands out to the application.  The channel
+     * service implementation relies on the assumption that a client
+     * session's {@code ManagedObject} ID is the client session's ID (used
+     * for identifiying the client session, e.g. for sending messages to
+     * the client session).  This method is invoked by the {@code join} and
+     * {@code leave} methods in order to access the underlying {@code
+     * ClientSession} so that the correct client session ID can be obtained.
+     */
     private ClientSession unwrapSession(ClientSession session) {
 	if (session instanceof ClientSessionWrapper) {
 	    return ((ClientSessionWrapper) session).getClientSession();
@@ -302,7 +315,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    /*
-	     * Enqueue leave request.
+	     * Enqueue leave request with underlying (unwrapped) client
+	     * session object.
 	     */
 	    addEvent(new LeaveEvent(unwrapSession(session)));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
@@ -327,7 +341,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 
 	    /*
-	     * Enqueue leave requests.
+	     * Enqueue leave requests, each with underlying (unwrapped)
+	     * client session object.
 	     *
 	     * TBD: (optimization) add a single event instead of one for
 	     * each session.

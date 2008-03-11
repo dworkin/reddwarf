@@ -36,18 +36,15 @@ import java.nio.ByteBuffer;
  * when a client session sends a message, is disconnected, or logs out.
  *
  * <p>A {@code ClientSession} is used to identify a client that is
- * logged in, to send messages to that client, to register a listener
- * to receive messages sent by that client, and to forcibly disconnect
+ * logged in, to send messages to that client, and to forcibly disconnect
  * that client from the server.
  *
  * <p>A session is considered disconnected if one of the following occurs:
  * <ul>
  * <li> the client logs out
- * <li> the client is forcibly disconnected by the server by invoking
- * its session's {@link #disconnect disconnect} method
  * <li> the client becomes disconnected due to a network failure, and
  * a connection to the client cannot be re-established in a timely manner
- * <li> the {@code ClientSession} object is removed
+ * <li> the {@code ClientSession} object is removed from the data manager
  * </ul>
  *
  * <p>If a client associated with a {@code ClientSession} becomes
@@ -97,15 +94,6 @@ public interface ClientSession extends ManagedObject {
      *		 a problem with the current transaction
      */
     ClientSession send(ByteBuffer message);
-
-    /**
-     * Forcibly disconnects this client session.  If this session is
-     * already disconnected, then no action is taken.
-     *
-     * @throws	TransactionException if the operation failed because of
-     *		a problem with the current transaction
-     */
-    void disconnect();
 
     /**
      * Returns {@code true} if the client is connected,
