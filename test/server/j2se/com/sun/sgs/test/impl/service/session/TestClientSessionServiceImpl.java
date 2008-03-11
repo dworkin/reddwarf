@@ -52,6 +52,7 @@ import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetAddress;
@@ -1393,7 +1394,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    throws Exception
 	{
 	    Thread.sleep(100);
-	    return method.invoke(obj, args);
+	    try {
+		return method.invoke(obj, args);
+	    } catch (InvocationTargetException e) {
+		Throwable cause = e.getCause();
+		if (cause instanceof Exception) {
+		    throw (Exception) cause;
+		} else if (cause instanceof Error) {
+		    throw (Error) cause;
+		} else {
+		    throw new RuntimeException(
+			"Unexpected exception:" + cause, cause);
+		}
+	    }
 	}
     }
 }

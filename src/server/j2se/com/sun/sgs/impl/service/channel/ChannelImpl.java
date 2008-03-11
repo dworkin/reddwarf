@@ -49,8 +49,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -61,12 +59,8 @@ import java.util.logging.Logger;
  *
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
- *
- * <p>TODO: This class needs to implement ManagedObjectRemoval and if the
- * application attempts to remove an instance, then 'removingObject' should
- * throw a non-retryable exception to prevent object removal.
  */
-public abstract class ChannelImpl implements Channel, Serializable {
+abstract class ChannelImpl implements Channel, Serializable {
 
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
@@ -93,6 +87,9 @@ public abstract class ChannelImpl implements Channel, Serializable {
     
     /** The ID from a managed reference to this instance. */
     protected final byte[] channelId;
+
+    /** The wrapped channel instance. */
+    private final ManagedReference<ChannelWrapper> wrappedChannelRef;
 
     /** The delivery requirement for messages sent on this channel. */
     protected final Delivery delivery;
@@ -131,6 +128,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
+	this.wrappedChannelRef =
+	    dataService.createReference(new ChannelWrapper(ref));
 	this.channelId = ref.getId().toByteArray();
 	this.coordNodeId = getLocalNodeId();
 	if (logger.isLoggable(Level.FINER)) {
@@ -143,12 +142,12 @@ public abstract class ChannelImpl implements Channel, Serializable {
     /* -- Factory methods -- */
 
     /**
-     * Constructs a new {@code ChannelImpl} with the given {@code
-     * delivery} requirement.
+     * Constructs a new {@code Channel} with the given {@code delivery}
+     * requirement.
      */
-    static ChannelImpl newInstance(Delivery delivery) {
+    static Channel newInstance(Delivery delivery) {
 	// TBD: create other channel types depending on delivery.
-	return new OrderedUnreliableChannelImpl(delivery);
+	return (new OrderedUnreliableChannelImpl(delivery)).getWrappedChannel();
     }
 
     /* -- Implement Channel -- */
@@ -398,12 +397,11 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
     }
 
-    /** {@inheritDoc} 
-     *
+    /**
      * Enqueues a close event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public void close() {
+    void close() {
 	checkContext();
 	if (!isClosed) {
 	    /*
@@ -414,25 +412,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
     }
     
-    /* -- Public methods *-- */
-    
-    /**
-     * Returns an iterator for the sessions that are joined to this
-     * channel.
-     *
-     * <p>Note: This method is for testing purposes only.
-     *
-     * <p>TODO:  This method should be changed to package-private and then
-     * it can be exposed using a class in the same package but in the test
-     * area. 
-     *
-     * @return	an iterator for the sessions that are joined to this channel
-     */
-    public Iterator<ClientSession> getSessions() {
-	checkClosed();
-	return new ClientSessionIterator(dataService, getSessionPrefix());
-    }
-
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
@@ -613,6 +592,13 @@ public abstract class ChannelImpl implements Channel, Serializable {
 		"session does not implement NodeAssignment: " +
 		session.getClass());
 	}
+    }
+
+    /**
+     * Returns the wrapped channel for this instance.
+     */
+    protected ChannelWrapper getWrappedChannel() {
+	return wrappedChannelRef.get();
     }
 
     /**
@@ -1071,8 +1057,10 @@ public abstract class ChannelImpl implements Channel, Serializable {
      * ID.  An instance of this class also provides a means of
      * obtaining the corresponding client session if the client
      * session still exists.
+     *
+     * Note: this class is package accessible to allow test access.
      */
-    private static class ClientSessionInfo
+    static class ClientSessionInfo
 	implements ManagedObject, Serializable
     {
 	private final static long serialVersionUID = 1L;
@@ -1649,67 +1637,6 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	}
     }
     
-    private static class ClientSessionIterator
-	implements Iterator<ClientSession>
-    {
-	/** The data service. */
-	protected final DataService dataService;
-
-	/** The underlying iterator for service bound names. */
-	protected final Iterator<String> iterator;
-
-	/** The client session to be returned by {@code next}. */
-	private ClientSession nextSession = null;
-
-	/**
-	 * Constructs an instance of this class with the specified
-	 * {@code dataService} and {@code keyPrefix}.
-	 */
-	ClientSessionIterator(DataService dataService, String keyPrefix) {
-	    this.dataService = dataService;
-	    this.iterator =
-		BoundNamesUtil.getServiceBoundNamesIterator(
-		    dataService, keyPrefix);
-	}
-
-	/** {@inheritDoc} */
-	public boolean hasNext() {
-	    if (! iterator.hasNext()) {
-		return false;
-	    }
-	    if (nextSession != null) {
-		return true;
-	    }
-	    String key = iterator.next();
-	    ClientSessionInfo info =
-		(ClientSessionInfo) dataService.getServiceBinding(key);
-	    ClientSession session = info.getClientSession();
-	    if (session == null) {
-		return hasNext();
-	    } else {
-		nextSession = session;
-		return true;
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public ClientSession next() {
-	    try {
-		if (nextSession == null && ! hasNext()) {
-		    throw new NoSuchElementException();
-		}
-		return nextSession;
-	    } finally {
-		nextSession = null;
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void remove() {
-	    throw new UnsupportedOperationException("remove is not supported");
-	}
-    }
-
     /**
      * Returns the next service bound name that starts with the given
      * {@code prefix}, or {@code null} if there is none.
