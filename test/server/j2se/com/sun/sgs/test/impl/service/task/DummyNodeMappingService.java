@@ -59,7 +59,7 @@ public class DummyNodeMappingService implements NodeMappingService,
     private static ConcurrentHashMap<Long,DummyNodeMappingService> serviceMap;
 
     // a node-local map from voting class to the identities it votes active
-    private final ConcurrentHashMap<Class,HashSet<Identity>> activeIdentities;
+    private final ConcurrentHashMap<Class<?>,HashSet<Identity>> activeIdentities;
     // a node-local collection of listeners
     private final ConcurrentLinkedQueue<NodeMappingListener> listeners;
     // a node-local collection of known available nodes
@@ -77,7 +77,7 @@ public class DummyNodeMappingService implements NodeMappingService,
             votes = new ConcurrentHashMap<Identity,AtomicLong>();
             serviceMap = new ConcurrentHashMap<Long,DummyNodeMappingService>();
         }
-        activeIdentities = new ConcurrentHashMap<Class,HashSet<Identity>>();
+        activeIdentities = new ConcurrentHashMap<Class<?>,HashSet<Identity>>();
         listeners = new ConcurrentLinkedQueue<NodeMappingListener>();
         availableNodes = new ConcurrentLinkedQueue<Node>();
         watchdogService = tp.getService(WatchdogService.class);
@@ -209,7 +209,7 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** Assigns the given identity to the given node. */
-    public static void assignIdentity(Class service, Identity identity,
+    public static void assignIdentity(Class<?> service, Identity identity,
                                       long nodeId) {
         DummyNodeMappingService newService = serviceMap.get(nodeId);
         Node node = newService.watchdogService.getNode(nodeId);
@@ -229,7 +229,7 @@ public class DummyNodeMappingService implements NodeMappingService,
      * node, throwing IllegalArgumentException if the identity is not mapped
      * to the local node or if nodeId is invalid.
      */
-    public void moveIdentity(Class service, Identity identity, long nodeId) {
+    public void moveIdentity(Class<?> service, Identity identity, long nodeId) {
         if (nodeId == localId)
             return;
 
@@ -250,7 +250,7 @@ public class DummyNodeMappingService implements NodeMappingService,
             } catch (UnknownIdentityException uie) {}
         }
 
-        for (Entry<Class,HashSet<Identity>> entry :
+        for (Entry<Class<?>,HashSet<Identity>> entry :
                  activeIdentities.entrySet()) {
             if (entry.getValue().contains(identity)) {
                 try {

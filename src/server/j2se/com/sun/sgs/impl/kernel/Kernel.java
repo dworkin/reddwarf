@@ -141,6 +141,9 @@ class Kernel {
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
+    // collector and reporter of profile information
+    private final ProfileCollectorImpl profileCollector;
+    
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
      * the code components of the system are running and ready. Creating
@@ -161,7 +164,6 @@ class Kernel {
         try {
             // see if we're doing any level of profiling, which for the
             // current version is as simple as "on" or "off"
-            ProfileCollectorImpl profileCollector = null;
             String profileLevel = appProperties.getProperty(PROFILE_PROPERTY);
             if (profileLevel != null) {
                 if (profileLevel.equals("on")) {
@@ -171,6 +173,7 @@ class Kernel {
                     profileRegistrar =
                         new ProfileRegistrarImpl(profileCollector);
                 } else {
+                    profileCollector = null;
                     profileRegistrar = null;
                     if (! profileLevel.equals("off")) {
                         if (logger.isLoggable(Level.WARNING))
@@ -180,6 +183,7 @@ class Kernel {
                     }
                 }
             } else {
+                profileCollector = null;
                 profileRegistrar = null;
             }
 
@@ -614,6 +618,8 @@ class Kernel {
             transactionScheduler.shutdown();
         if (taskScheduler != null)
             taskScheduler.shutdown();
+        if (profileCollector != null) 
+            profileCollector.shutdown();
     }
     
     /**

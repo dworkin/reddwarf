@@ -387,7 +387,10 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
 
         // stop the handoff and status processing tasks
-        handoffTaskHandle.cancel();
+        if (handoffTaskHandle != null) {
+            handoffTaskHandle.cancel();
+        }
+
         statusUpdateTimer.cancel();
 
         return true;

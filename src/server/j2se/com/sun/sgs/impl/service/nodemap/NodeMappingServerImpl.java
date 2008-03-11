@@ -116,7 +116,7 @@ import java.util.logging.Logger;
  *
  * This class is public for testing.
  */
-public class NodeMappingServerImpl implements NodeMappingServer {
+public final class NodeMappingServerImpl implements NodeMappingServer {
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -763,7 +763,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         try {
             newNodeId = assignPolicy.chooseNode(id);
         } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.WARNING, ex, "mapToNewNode: id {0} from {1}"
+            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
                     + " failed because no live nodes are available", 
                     id, oldNode);
             throw ex;
@@ -861,9 +861,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             // Tell our listeners
             notifyListeners(oldNode, atask.getNode(), id);
         } catch (Exception e) {
+            // We can get an IllegalStateException if this server shuts
+            // down while we're moving identities from failed nodes.
+            // TODO - check that those identities are properly removed.
             // Hmmm.  we've probably left some cruft in the data store.
             // The most likely problem is one in our own code.
-            logger.logThrow(Level.WARNING, e, 
+            logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
                             id, oldNode.getId(), newNodeId);
         }
@@ -1162,7 +1165,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 // Look for the identity in the map.
                 idmo = (IdentityMO) dataService.getServiceBinding(idkey);
                 foundKeys.add(idkey);
-            } catch (Exception e) {
+            } catch (NameNotBoundException e) {
                 // Do nothing: leave idmo as null to indicate not found
             }
             if (idmo != null) {

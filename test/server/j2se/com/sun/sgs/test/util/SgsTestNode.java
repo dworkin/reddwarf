@@ -46,6 +46,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.MissingResourceException;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A node, used for testing.  The node is created using the kernel.
@@ -56,10 +57,10 @@ public class SgsTestNode {
     // Reflective stuff.
 
     /** Kernel class */
-    private static Class kernelClass;
+    private static Class<?> kernelClass;
 
     /** kernel constructor */
-    private static Constructor kernelCtor;
+    private static Constructor<?> kernelCtor;
     /** kernel shutdown */
     private static Method kernelShutdownMethod;
     /** transaction proxy */
@@ -89,6 +90,23 @@ public class SgsTestNode {
         }
     }
 
+    /** The default initial application port for the this test suite. */
+    private final static int DEFAULT_PORT = 20000;
+    
+    /** The property that can be used to select an initial port. */
+    private final static String PORT_PROPERTY = "test.sgs.port";
+    
+    /** The next application port to use for this test suite. */
+    private static AtomicInteger nextAppPort;
+    
+    static {
+        Integer systemPort = Integer.getInteger(PORT_PROPERTY);
+        int port = systemPort == null ? DEFAULT_PORT 
+                                      : systemPort.intValue();
+        nextAppPort = new AtomicInteger(port);
+    }
+    
+    
     /** The app name. */
     private final String appName;
 
@@ -127,7 +145,7 @@ public class SgsTestNode {
      *                     defaults
      */
     public SgsTestNode(String appName,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties) throws Exception
     {
         this(appName, null, listenerClass, properties, true);
@@ -147,7 +165,7 @@ public class SgsTestNode {
      *                     fresh
      */
     public SgsTestNode(String appName,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties,
                        boolean clean) throws Exception
     {
@@ -166,7 +184,7 @@ public class SgsTestNode {
      *                     replaced by custom implementations
      */
     public SgsTestNode(SgsTestNode firstNode,
-                       Class listenerClass,
+                       Class<?> listenerClass,
                        Properties properties) throws Exception
     {
         this (firstNode.appName, firstNode, listenerClass, properties, false);
@@ -192,7 +210,7 @@ public class SgsTestNode {
      */
     public SgsTestNode(String appName, 
                 SgsTestNode serverNode,
-                Class listenerClass,
+                Class<?> listenerClass,
                 Properties properties,
                 boolean clean) 
         throws Exception
@@ -208,8 +226,7 @@ public class SgsTestNode {
         if (listenerClass == null) {
             listenerClass = DummyAppListener.class;
         }
-	
-        boolean isServerNode = serverNode == null;
+
         if (properties == null) {
 	    props = getDefaultProperties(appName, serverNode, listenerClass);
         } else {
@@ -353,7 +370,7 @@ public class SgsTestNode {
      */
     public static Properties getDefaultProperties(String appName, 
                                            SgsTestNode serverNode,
-                                           Class listenerClass) 
+                                           Class<?> listenerClass) 
         throws Exception
     {
         boolean isServerNode = serverNode == null;
@@ -377,11 +394,11 @@ public class SgsTestNode {
 				 serverNode.getNodeMappingService());
 
         String dir = System.getProperty("java.io.tmpdir") +
-                                File.separator +  appName + ".db";
+                                File.separator + appName + ".db";
 
         Properties retProps = createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.app.port", Integer.toString(getNextAppPort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.start", 
@@ -421,6 +438,13 @@ public class SgsTestNode {
      */
     public int getAppPort() {
 	return appPort;
+    }
+    
+    /**
+     * Returns a unique port number.
+     */
+    public static int getNextAppPort() {
+        return nextAppPort.getAndIncrement();
     }
     
     /** Creates the specified directory, if it does not already exist. */

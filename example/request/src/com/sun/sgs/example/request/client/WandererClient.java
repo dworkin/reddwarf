@@ -73,14 +73,14 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST Level.FINEST} - Exceptions
  * </ul>
  */
-public class WandererClient implements Runnable {
+public class WandererClient implements Runnable, SimpleClientListener {
 
     /** The prefix for properties. */
     private static final String PREFIX =
 	"com.sun.sgs.example.request.client.wanderer";
 
-    /** The initial application host name. */
-    private static final String INITIAL_HOST =
+    /** The application host name. */
+    private static final String HOST =
 	System.getProperty(PREFIX + ".host", "localhost");
 
     /** The application port. */
@@ -134,11 +134,11 @@ public class WandererClient implements Runnable {
     /** A random number generator used to random behavior. */
     private static final Random random = new Random();
 
-    /** The current application host. */
-    private String host;
-
     /** The client used to communicate with the server. */
-    private SimpleClient simpleClient;
+    private final SimpleClient simpleClient;
+
+    /** The login properties. */
+    private final Properties props;
 
     /** The name of the user. */
     private final String user = "User-" + random.nextInt(Integer.MAX_VALUE);
@@ -182,7 +182,7 @@ public class WandererClient implements Runnable {
 	if (logger.isLoggable(Level.INFO)) {
 	    logger.log(Level.INFO,
 		       "Creating WandererClients:" +
-		       "\n  host: " + INITIAL_HOST +
+		       "\n  host: " + HOST +
 		       "\n  port: " + PORT +
 		       "\n  clients: " + CLIENTS +
 		       "\n  sleep: " + (SLEEP - RANDOM) + "-" +
@@ -193,7 +193,7 @@ public class WandererClient implements Runnable {
 	}
 	WandererClient[] clients = new WandererClient[CLIENTS];
 	for (int i = 0; i < CLIENTS; i++) {
-	    clients[i] = new WandererClient(INITIAL_HOST);
+	    clients[i] = new WandererClient();
 	}
 	long interval = REPORT * 1000;
 	long start = System.currentTimeMillis();
@@ -214,11 +214,12 @@ public class WandererClient implements Runnable {
 
     /**
      * Creates an instance, and starts a thread to login and perform actions.
-     *
-     * @param host the application host
      */
-    public WandererClient(String host) {
-	this.host = host;
+    public WandererClient() {
+        props = new Properties();
+        props.setProperty("host", HOST);
+        props.setProperty("port", String.valueOf(PORT));
+        simpleClient = new SimpleClient(this);
 	new Thread(this, "WandererClient[" + user + "]").start();
     }
 
@@ -242,67 +243,118 @@ public class WandererClient implements Runnable {
 	    }
 	}
     }
+    
+    /* -- Implement SimpleClientListener -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation returns password authentication for the current
+     * user.
+     */
+    public PasswordAuthentication getPasswordAuthentication() {
+        return new PasswordAuthentication(user, new char[0]);
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation notifies the client thread that the client is
+     * active.
+     */
+    public void loggedIn() {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, user + ": Logged in");
+        }
+        noteActive();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void loginFailed(String reason) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE,
+                       user + ": Login failed: " + reason);
+        }
+    }
+
+    /* -- Implement ServerSessionListener -- */
+
+    /** {@inheritDoc} */
+    public void receivedMessage(ByteBuffer message) {
+        String string = bufferToString(message);
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, user + ": Received: " + string);
+        }
+        noteReceived();
+    }
+
+    /** {@inheritDoc} */
+    public void reconnecting() {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, user + ": Reconnecting");
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void reconnected() {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, user + ": Reconnected");
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void disconnected(boolean graceful, String reason) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE,
+                       user + ": Disconnected graceful:" + graceful +
+                       ", reason:" + reason);
+        }
+        noteDisconnected();
+    }
 
     /* -- Other methods -- */
 
     /** Performs a login to the current host, waiting as needed. */
     private void login() {
-	String lastHost = null;
-	long retry = LOGIN_MIN_RETRY;
-	while (true) {
-	    if (!host.equals(lastHost)) {
-		lastHost = host;
-		retry = LOGIN_MIN_RETRY;
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, user + ": Logging in to " + host);
-		}
-	    } else {
-		/* Back off by doubling the wait time, up to the maximum. */
-		retry = Math.min(retry * 2, LOGIN_MAX_RETRY);
-	    }
-	    /* Wait randomly, to avoid login storms. */
-	    try {
-		Thread.sleep(random.nextInt(RANDOM));
-	    } catch (InterruptedException e) {
-	    }
-	    long start = System.currentTimeMillis();
-	    /*
-	     * Use a new listener and client each time to avoid a bug in the
-	     * present implementation that prevents reusing a client after
-	     * login fails.  -tjb@sun.com (02/05/2008)
-	     */
-	    ClientListener listener = new ClientListener();
-	    simpleClient = new SimpleClient(listener);
-	    Properties props = new Properties();
-	    props.setProperty("host", host);
-	    props.setProperty("port", String.valueOf(PORT));
-	    try {
-		simpleClient.login(props);
-		long next = start + retry;
-		long wait = next - System.currentTimeMillis();
-		while (wait > 0 &&
-		       getDisconnected() &&
-		       /* Retry immediately if host is changed */
-		       host.equals(lastHost))
-		{
-		    try {
-			synchronized (this) {
-			    wait(wait);
-			}
-		    } catch (InterruptedException e) {
-		    }
-		    wait = next - System.currentTimeMillis();
-		}
-		if (!getDisconnected()) {
-		    return;
-		}
-	    } catch (Exception e) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, user + ": Login failed: " + e);
-		}
-	    }
-	    listener.setDisabled();
-	}
+        long retry = LOGIN_MIN_RETRY;
+        while (true) {    
+            /* Wait randomly, to avoid login storms. */
+            try {
+                Thread.sleep(random.nextInt(RANDOM));
+            } catch (InterruptedException e) {
+            }
+            
+            long start = System.currentTimeMillis();
+            
+            try {
+                simpleClient.login(props);
+                long next = start + retry;
+                long wait = next - System.currentTimeMillis();
+                while (wait > 0 &&
+                       getDisconnected())
+                {
+                    try {
+                        synchronized (this) {
+                            wait(wait);
+                        }
+                    } catch (InterruptedException e) {
+                    }
+                    wait = next - System.currentTimeMillis();
+                }
+                if (!getDisconnected()) {
+                    return;
+                }
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE, user + ": Login failed: " + e);
+                }
+            }
+            /* Back off by doubling the wait time, up to the maximum. */
+            retry = Math.min(retry * 2, LOGIN_MAX_RETRY);
+        }
+
     }
 
     /**
@@ -404,7 +456,6 @@ public class WandererClient implements Runnable {
     synchronized void noteFailing() {
 	active = false;
 	failing = true;
-	disconnected = false;
     }
 
     /** Records that the client is disconnected. */
@@ -484,128 +535,6 @@ public class WandererClient implements Runnable {
 		" active=" + active +
 		" failing=" + failing +
 		" disconnected=" + disconnected;
-	}
-    }
-
-    /** Implements SimpleClientListener. */
-    private class ClientListener implements SimpleClientListener {
-
-	/**
-	 * Set to true when callbacks to this listener should be ignored.  That
-	 * situation occurs when a login failure supplies a new host to login
-	 * to, which must be performed with a new client and listener, but may
-	 * still be followed by a disconnected callback to this listener.
-	 */
-	private boolean disabled;
-
-	/** Creates an instance of this class. */
-	ClientListener() { }
-
-	/* -- Implement SimpleClientListener -- */
-	
-	/**
-	 * {@inheritDoc} <p>
-	 *
-	 * This implementation returns password authentication for the current
-	 * user.
-	 */
-	public PasswordAuthentication getPasswordAuthentication() {
-	    return new PasswordAuthentication(user, new char[0]);
-	}
-
-	/**
-	 * {@inheritDoc} <p>
-	 *
-	 * This implementation notifies the client thread that the client is
-	 * active.
-	 */
-	public void loggedIn() {
-	    if (!getDisabled()) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, user + ": Logged in");
-		}
-		noteActive();
-	    }
-	}
-
-	/**
-	 * {@inheritDoc} <p>
-	 *
-	 * This implementation parses the reason to see if it was caused by an
-	 * attempt to redirect the login to a new host, which {@code
-	 * SimpleClient} does not currently support.
-	 */
-	public void loginFailed(String reason) {
-	    if (getDisabled()) {
-		return;
-	    }
-	    String reconnectMessage = "unimplemented, want redirect to ";
-	    if (reason.startsWith(reconnectMessage)) {
-		/*
-		 * Try another login to the new host, ignoring future callbacks
-		 * on this listener.
-		 */
-		host = reason.substring(reconnectMessage.length());
-	    } else {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE,
-			       user + ": Login failed: " + reason);
-		}
-	    }
-	    setDisabled();
-	}
-
-	/* -- Implement ServerSessionListener -- */
-
-	/** {@inheritDoc} */
-	public void receivedMessage(ByteBuffer message) {
-	    if (!getDisabled()) {
-		String string = bufferToString(message);
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER, user + ": Received: " + string);
-		}
-		noteReceived();
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void reconnecting() {
-	    if (!getDisabled()) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, user + ": Reconnecting");
-		}
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void reconnected() {
-	    if (!getDisabled()) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, user + ": Reconnected");
-		}
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void disconnected(boolean graceful, String reason) {
-	    if (!getDisabled()) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE,
-			       user + ": Disconnected graceful:" + graceful +
-			       ", reason:" + reason);
-		}
-		noteDisconnected();
-	    }
-	}
-
-	/* -- Other methods -- */
-
-	synchronized boolean getDisabled() {
-	    return disabled;
-	}
-
-	synchronized void setDisabled() {
-	    disabled = true;
 	}
     }
 }

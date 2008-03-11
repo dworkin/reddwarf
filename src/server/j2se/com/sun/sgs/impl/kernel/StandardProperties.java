@@ -25,7 +25,7 @@ package com.sun.sgs.impl.kernel;
  * (and may provide) on startup.
  * <p>
  * When when the kernel starts, it is given an application
- * <code>Properties</code> file. Any of the property keys identitied here will
+ * <code>Properties</code> file. Any of the property keys identified here will
  * set the associated behavior for that application. If no value is provided
  * for a given key, then the default or system-provided value is used.
  * Note that some keys are required to have values, specifically
