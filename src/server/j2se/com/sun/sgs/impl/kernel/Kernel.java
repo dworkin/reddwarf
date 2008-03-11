@@ -652,6 +652,25 @@ class Kernel {
                 properties = new Properties(backingProperties);
             inputStream = new FileInputStream(filename);
             properties.load(inputStream);
+            
+            // Expand any properties that encapsulate several defaults
+            String value =
+                    properties.getProperty(StandardProperties.DEFAULT_SERVER);
+            if (value != null && Boolean.valueOf(value)) {
+                // Don't start an application
+                properties.setProperty(StandardProperties.APP_LISTENER,
+                                       StandardProperties.APP_LISTENER_NONE);
+                // Only run basic services
+                properties.setProperty(StandardProperties.FINAL_SERVICE,
+                                       "NodeMappingService");
+                // Start servers for services
+                properties.setProperty(StandardProperties.SERVER_START, "true");
+                // Start the network server for the data store
+                properties.setProperty(
+                    "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
+                    "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+            }
+
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))

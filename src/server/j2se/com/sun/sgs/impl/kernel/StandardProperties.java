@@ -186,6 +186,24 @@ public class StandardProperties {
     public static final String AUTHENTICATORS = NS + "app.authenticators";
 
     /**
+     * An optional property that specifies that a server should be started
+     * in the default configuration, where the servers associated with 
+     * individual Darkstar services are started on a single physical machine
+     * using their default communication ports.  Setting this property to 
+     * {@code true} is equivalent to setting the following properties:
+     * <ul>
+     * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE}
+     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService}
+     * <li> {@value #SERVER_START} set to {@code true}
+     * <li> {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
+     *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
+     *
+     * </ul>
+     * 
+     */
+    public static final String DEFAULT_SERVER = NS + "default.server";
+    
+    /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
      */
