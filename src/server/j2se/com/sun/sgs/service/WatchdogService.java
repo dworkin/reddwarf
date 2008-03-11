@@ -91,7 +91,7 @@ public interface WatchdogService extends Service {
      *		current transaction
      */
     Node getNode(long nodeId);
-    
+
     /**
      * Returns the node that is designated as the backup for the node
      * with the specified {@code nodeId}, or {@code null} if no backup

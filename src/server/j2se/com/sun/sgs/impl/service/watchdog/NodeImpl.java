@@ -140,6 +140,7 @@ class NodeImpl
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
      * @param   port     a port, or {@code null}
+     * @param	client   a watchdog client
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)

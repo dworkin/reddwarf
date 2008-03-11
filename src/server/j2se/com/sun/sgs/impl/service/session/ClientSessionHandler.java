@@ -826,7 +826,7 @@ class ClientSessionHandler {
 
     /**
      * Returns a byte array containing a LOGIN_REDIRECT protocol
-     * message containing the given {@code hostname} and {@code port.
+     * message containing the given {@code hostname} and {@code port}.
      */
     private static byte[] getLoginRedirectMessage(String hostname, int port) {
 	int hostStringSize = MessageBuffer.getSize(hostname);

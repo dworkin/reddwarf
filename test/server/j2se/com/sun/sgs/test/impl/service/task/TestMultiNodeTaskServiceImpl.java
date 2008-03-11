@@ -30,6 +30,8 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.kernel.StandardProperties;
 
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -45,7 +47,9 @@ import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.Counter;
 import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.ManagedHandle;
 
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.UtilProperties;
 
+import java.io.File;
 import java.io.Serializable;
 
 import java.util.Properties;
@@ -53,6 +57,8 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
+
+import static org.junit.Assert.*;
 
 
 /**
@@ -96,9 +102,12 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         lastNodeUsed = new AtomicLong(-1);
 
         String appName = "TestMultiNodeTaskServiceImpl";
+        String dbDirectory = System.getProperty("java.io.tmpdir") +
+	    File.separator + appName + ".db";
 
-        serverNode = new SgsTestNode(appName, null, createProps(null, appName));
-        addNodes(createProps(serverNode, appName), 1);
+        serverNode = new SgsTestNode(appName, null,
+                                     createProps(true, appName, dbDirectory));
+        addNodes(createProps(false, appName, dbDirectory), 1);
         
         txnSchedulerZero = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
@@ -134,7 +143,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                 node.shutdown(false);
         }
         serverNode.shutdown(true);
-        Thread.sleep(100);
     }
 
     /** Tests. */
@@ -258,17 +266,17 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                 }
             }, id);
 
-        txnSchedulerOne.runTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    try {
+        try {
+            txnSchedulerOne.runTask(
+                new AbstractKernelRunnable() {
+                    public void run() {
                         ((ManagedHandle)
-			 dataServiceOne.getBinding("handle")).cancel();
-                    } catch (Exception e) {
-                        fail("Did not expect exception: " + e);
+                             dataServiceOne.getBinding("handle")).cancel();
                     }
-                }
-            }, id);
+                }, id);
+        } catch (Exception e) {
+            fail("Did not expect exception: " + e);
+        }
 
         Thread.sleep(500);
         assertCounterClearXAction("Unexpected run of a periodic task");
@@ -291,7 +299,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(300);
+        Thread.sleep(500);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
 
         txnSchedulerZero.runTask(
@@ -306,34 +314,53 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(300);
+        Thread.sleep(500);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
     }
 
     /** Utility methods. */
 
-    private Properties createProps(SgsTestNode server, String appName) 
-            throws Exception 
-    {
-        Properties props = SgsTestNode.getDefaultProperties(appName, server, 
-            SgsTestNode.DummyAppListener.class);
-        props.setProperty(StandardProperties.NODE_MAPPING_SERVICE,
-            "com.sun.sgs.test.impl.service.task.DummyNodeMappingService");
-        props.setProperty(StandardProperties.WATCHDOG_SERVICE,
-            "com.sun.sgs.test.impl.service.task.DummyWatchdogService");
-        props.setProperty(StandardProperties.MANAGERS,
-            "com.sun.sgs.test.impl.service.task." +
-            "TestMultiNodeTaskServiceImpl$NodeIdManagerImpl");
-        props.setProperty(StandardProperties.SERVICES,
-            "com.sun.sgs.test.impl.service.task." +
-            "TestMultiNodeTaskServiceImpl$NodeIdService");
-        props.setProperty(
-            "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.start", "0");
-        props.setProperty(
-            "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.period", "50");
-        props.setProperty(
-            "com.sun.sgs.impl.service.task.TaskServiceImpl.vote.delay", "50");
-        return props;
+    // We cannot simply use the SgsTestNode default properties because
+    // we have replaced some of the services.  The test node casts to
+    // the expected implementation type to have access to data like
+    // ports in use.
+    private Properties createProps(boolean server, String appName,
+                                   String dbDirectory) throws Exception {
+        String isServer = String.valueOf(server);
+        int port = server ? 0 :
+            SgsTestNode.getDataServerPort((DataServiceImpl)
+					  (serverNode.getDataService()));
+        String portStr = String.valueOf(port);
+
+        return UtilProperties.createProperties(
+            "com.sun.sgs.app.name", appName,
+            "com.sun.sgs.app.port", 
+                Integer.toString(SgsTestNode.getNextAppPort()),
+            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+                dbDirectory,
+            StandardProperties.APP_LISTENER,
+                SgsTestNode.DummyAppListener.class.getName(),
+            StandardProperties.NODE_MAPPING_SERVICE,
+                "com.sun.sgs.test.impl.service.task.DummyNodeMappingService",
+            StandardProperties.WATCHDOG_SERVICE,
+                "com.sun.sgs.test.impl.service.task.DummyWatchdogService",
+            StandardProperties.MANAGERS,
+                "com.sun.sgs.test.impl.service.task." +
+                "TestMultiNodeTaskServiceImpl$NodeIdManagerImpl",
+            StandardProperties.SERVICES,
+                "com.sun.sgs.test.impl.service.task." +
+                "TestMultiNodeTaskServiceImpl$NodeIdService",
+            "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
+                "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
+            "com.sun.sgs.impl.service.data.store.net.server.host", "localhost",
+            "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.start", "0",
+            "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.period",
+                "50",
+            "com.sun.sgs.impl.service.task.TaskServiceImpl.vote.delay", "50",
+            "com.sun.sgs.impl.service.data.store.net.server.start", isServer,
+            "com.sun.sgs.impl.service.data.store.net.server.port", portStr,
+            "DummyServer", isServer
+        );
     }
 
     private void addNodes(Properties props, int numNodes) throws Exception {

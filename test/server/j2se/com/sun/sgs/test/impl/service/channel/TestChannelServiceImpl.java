@@ -1602,11 +1602,11 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
+                logoutAck = false;
+                awaitGraceful = true;
             }
             MessageBuffer buf = new MessageBuffer(1);
             buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-            logoutAck = false;
-            awaitGraceful = true;
             try {
                 connection.sendBytes(buf.getBuffer());
             } catch (IOException e) {

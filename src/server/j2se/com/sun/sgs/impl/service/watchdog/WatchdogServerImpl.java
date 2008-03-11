@@ -34,10 +34,13 @@ import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -205,6 +208,10 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
     final SortedSet<NodeImpl> expirationSet =
 	Collections.synchronizedSortedSet(new TreeSet<NodeImpl>());
 
+    /** The map of alive node ports, keyed by host name. */
+    private final HashMap<String, Set<Long>> aliveNodeHostPortMap =
+         new HashMap<String, Set<Long>>();
+    
     /** The set of failed nodes that are currently recovering. */
     private final ConcurrentMap<Long, NodeImpl> recoveringNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
@@ -421,14 +428,22 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 	    }
 	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
 	    assert ! aliveNodes.containsKey(nodeId);
-	
-            // Check for an existing alive node with this host and port
-            for (NodeImpl n : aliveNodes.values()) {
-                if (host.equals(n.getHostName()) && port == n.getPort()) {
-                    throw new IllegalArgumentException(
-                                    "configuration error: a node at " +
-                                    host + ":" + port + " already exists");
+	          
+            synchronized (aliveNodeHostPortMap) {
+                Set<Long> ports = null;
+                if (aliveNodeHostPortMap.containsKey(host)) {
+                    ports = aliveNodeHostPortMap.get(host);
+                } else {
+                    // New node, need to set up a new ports set.
+                    ports = new HashSet<Long>();
                 }
+                boolean added = ports.add(Long.valueOf(port));
+                if (!added) {
+                    throw new IllegalArgumentException(
+                                "configuration error: a node at " +
+                                host + ":" + port + " already exists");
+                }
+                aliveNodeHostPortMap.put(host, ports);
             }
             
 	    // Persist node
@@ -438,6 +453,7 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 			node.putNode(dataService);
 		    }});
 	    } catch (Exception e) {
+                removeHostPortMapEntry(node);
 		throw new NodeRegistrationFailedException(
 		    "registration failed: " + nodeId, e);
 	    }
@@ -600,6 +616,25 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
     }
 
     /**
+     * Removes an entry in the host port map;  called when a node
+     * is found to have failed.
+     */
+    private void removeHostPortMapEntry(NodeImpl node) {
+        synchronized (aliveNodeHostPortMap) {
+            String host = node.getHostName();
+            Set<Long> ports = 
+                aliveNodeHostPortMap.get(host);
+            ports.remove(Long.valueOf(node.getPort()));
+            if (ports.isEmpty()) {
+                // No more ports in use on this host
+                aliveNodeHostPortMap.remove(host);
+            } else {
+                aliveNodeHostPortMap.put(host, ports);
+            }
+        }       
+    }
+    
+    /**
      * This thread checks the node map, sorted by expiration times to
      * determine if any nodes have failed and updates their state accordingly.
      * It also checks the recovered nodes to see if a given recovering node
@@ -642,11 +677,13 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 		    /*
 		     * Remove failed nodes from map of "alive" nodes so
 		     * that a failed node won't be assigned as a backup.
+                     * Also, clean up the host port map entry.
 		     */
 		    for (NodeImpl node: expiredNodes) {
 			aliveNodes.remove(node.getId());
+                        removeHostPortMapEntry(node);
 		    }
-
+                    
 		    /*
 		     * Mark each expired node as failed, assign it a
 		     * backup, and update the data store.  Add each

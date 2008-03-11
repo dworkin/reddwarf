@@ -1005,7 +1005,9 @@ public class TestWatchdogServiceImpl extends TestCase {
         } catch (InvocationTargetException e) {
             System.err.println(e);
             Throwable target = e.getTargetException();
-            // We wrap our exceptions a bit in the kernel....
+            // The kernel constructs the services through reflection, and the
+            // SgsTestNode creates the kernel through reflection - burrow down
+            // to the root cause to be sure it's of the expected type.
             while (target instanceof InvocationTargetException) {
                 System.err.println("unwrapping target exception");
                 target = ((InvocationTargetException) target).getTargetException();
@@ -1054,7 +1056,9 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
-    /** Check that we can restart a node at the same host and port. */
+    /** Test that an application node can be restarted on the same host
+     *  and port after a crash.
+     */
     public void testNodeCrashAndRestart() throws Exception {
         SgsTestNode node = null;
         SgsTestNode node1 = null;
@@ -1066,6 +1070,8 @@ public class TestWatchdogServiceImpl extends TestCase {
             System.err.println("shutting down node");
             node.shutdown(false);
             node = null;
+            // Note that we need to wait for the system to detect the
+            // failed node.
             Thread.sleep(renewTime * 2);
 
             System.err.println("attempting to restart failed node");
@@ -1081,6 +1087,9 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }       
     
+    /** Check that we can restart a single node system on the same
+     *  host and port after a crash.
+     */
     public void testSingleNodeServerCrashAndRestart() throws Exception {
         final String appName = "TestServerCrash";
         SgsTestNode node = null;
@@ -1094,6 +1103,9 @@ public class TestWatchdogServiceImpl extends TestCase {
             node.shutdown(false);
             node = null;
 
+            // Note that in this case we don't have to wait for the system
+            // to see the failed node - the entire system crashed, and the
+            // check for reuse is implemented with a transient data structure.
             System.err.println("attempting to restart failed single node");
             node1 = new SgsTestNode(appName, null, null, props, false);
         } finally {

@@ -82,6 +82,8 @@ public class ProfileCollectorImpl implements ProfileCollector {
     // the incoming report queue
     private LinkedBlockingQueue<ProfileReportImpl> queue;
 
+    // long-running thread to report data
+    private final Thread reporterThread;
     /**
      * Creates an instance of <code>ProfileCollectorImpl</code>.
      */
@@ -99,9 +101,20 @@ public class ProfileCollectorImpl implements ProfileCollector {
         taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
 
         // start a long-lived task to consume the other end of the queue
-        (new Thread(new CollectorRunnable())).start();
+        reporterThread = new Thread(new CollectorRunnable());
+        reporterThread.start();
      }
 
+    public void shutdown() {
+        // Shut down the reporterThread, waiting for it to finish what
+        // its doing
+        reporterThread.interrupt();
+	try {
+	    reporterThread.join();
+	} catch (InterruptedException e) {
+	    // do nothing
+	}
+    }
     /** {@inheritDoc} */
     public void addListener(ProfileListener listener) {
         listeners.add(listener);
