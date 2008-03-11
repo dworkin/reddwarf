@@ -26,7 +26,6 @@ import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import junit.framework.TestCase;
 
 

@@ -116,6 +116,7 @@ public interface SimpleSgsProtocol {
      * Payload:
      * <ul>
      * <li> (String) hostname
+     * <li> (int) port
      * </ul>
      */
     final byte LOGIN_REDIRECT = 0x13;

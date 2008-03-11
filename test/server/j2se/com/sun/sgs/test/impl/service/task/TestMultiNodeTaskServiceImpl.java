@@ -266,17 +266,17 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                 }
             }, id);
 
-        txnSchedulerOne.runTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    try {
+        try {
+            txnSchedulerOne.runTask(
+                new AbstractKernelRunnable() {
+                    public void run() {
                         ((ManagedHandle)
-			 dataServiceOne.getBinding("handle")).cancel();
-                    } catch (Exception e) {
-                        fail("Did not expect exception: " + e);
+                             dataServiceOne.getBinding("handle")).cancel();
                     }
-                }
-            }, id);
+                }, id);
+        } catch (Exception e) {
+            fail("Did not expect exception: " + e);
+        }
 
         Thread.sleep(500);
         assertCounterClearXAction("Unexpected run of a periodic task");
@@ -299,7 +299,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(300);
+        Thread.sleep(500);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
 
         txnSchedulerZero.runTask(
@@ -314,12 +314,16 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(300);
+        Thread.sleep(500);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
     }
 
     /** Utility methods. */
 
+    // We cannot simply use the SgsTestNode default properties because
+    // we have replaced some of the services.  The test node casts to
+    // the expected implementation type to have access to data like
+    // ports in use.
     private Properties createProps(boolean server, String appName,
                                    String dbDirectory) throws Exception {
         String isServer = String.valueOf(server);
@@ -330,7 +334,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
         return UtilProperties.createProperties(
             "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
+            "com.sun.sgs.app.port", 
+                Integer.toString(SgsTestNode.getNextAppPort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
             StandardProperties.APP_LISTENER,

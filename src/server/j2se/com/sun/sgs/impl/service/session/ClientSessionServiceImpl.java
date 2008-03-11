@@ -200,24 +200,8 @@ public final class ClientSessionServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-	    String portString =
-		wrappedProps.getProperty(StandardProperties.APP_PORT);
-	    if (portString == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property must be specified");
-	    }
-	    appPort = Integer.parseInt(portString);
-	    // TBD: do we want to restrict ports to > 1024?
-	    if (appPort < 0) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can't be negative: " + appPort);
-	    } else if (appPort > 65535) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can be greater than 65535: " + appPort);
-	    }
+            appPort = wrappedProps.getRequiredIntProperty(
+                StandardProperties.APP_PORT, 1, 65535);
 
 	    /*
 	     * Get the property for controlling session event processing.
@@ -280,9 +264,10 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Listen for incoming client connections.
 	     */
+            InetSocketAddress listenAddress = new InetSocketAddress(appPort);
 	    ServerSocketEndpoint endpoint =
-		new ServerSocketEndpoint(
-		    new InetSocketAddress(appPort), TransportType.RELIABLE);
+		new ServerSocketEndpoint(listenAddress,
+                                         TransportType.RELIABLE);
 	    acceptor = endpoint.createAcceptor();
 	    try {
 		acceptor.listen(acceptorListener);
@@ -292,6 +277,9 @@ public final class ClientSessionServiceImpl
 			getListenPort());
 		}
 	    } catch (Exception e) {
+		logger.logThrow(Level.WARNING, e,
+                                "acceptor failed to listen on {0}",
+                                listenAddress);
 		try {
 		    acceptor.shutdown();
 		} catch (RuntimeException re) {
