@@ -752,7 +752,8 @@ class ClientSessionHandler {
 	    ClientSessionImpl sessionImpl =
 		ClientSessionImpl.getSession(dataService, sessionRefId);
 	    try {
-		returnedListener = appListener.loggedIn(sessionImpl);
+		returnedListener =
+		    appListener.loggedIn(sessionImpl.getWrappedClientSession());
 	    } catch (RuntimeException e) {
 		ex = e;
 	    }

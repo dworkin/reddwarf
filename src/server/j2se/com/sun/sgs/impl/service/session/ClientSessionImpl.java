@@ -90,6 +90,9 @@ public class ClientSessionImpl
      */
     private final byte[] idBytes;
     
+    /** The wrapped client session instance. */
+    private final ManagedReference<ClientSessionWrapper> wrappedSessionRef;
+
     /** The identity for this session. */
     private final Identity identity;
 
@@ -136,6 +139,8 @@ public class ClientSessionImpl
 	ManagedReference<ClientSessionImpl> sessionRef =
 	    dataService.createReference(this);
 	id = sessionRef.getId();
+	this.wrappedSessionRef =
+	    dataService.createReference(new ClientSessionWrapper(sessionRef));
 	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(), this);
 	dataService.setServiceBinding(getSessionNodeKey(), this);
@@ -292,6 +297,13 @@ public class ClientSessionImpl
 	} catch (ObjectNotFoundException e)  {
 	}
 	return sessionImpl;
+    }
+
+    /**
+     * Returns the wrapped client session for this instance.
+     */
+    ClientSessionWrapper getWrappedClientSession() {
+	return wrappedSessionRef.get();
     }
 
     /**
