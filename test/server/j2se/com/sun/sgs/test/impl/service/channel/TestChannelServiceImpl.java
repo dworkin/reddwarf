@@ -41,6 +41,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.channel.ChannelUtil;
+import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -1831,6 +1832,14 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    private static ClientSession unwrapSession(ClientSession session) {
+	if (session instanceof ClientSessionWrapper) {
+	    return ((ClientSessionWrapper) session).getClientSession();
+	} else {
+	    return session;
+	}
+    }
+
     public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
@@ -1841,7 +1850,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.setBinding(session.getName(), session);
+	    dataManager.setBinding(session.getName(), unwrapSession(session));
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}

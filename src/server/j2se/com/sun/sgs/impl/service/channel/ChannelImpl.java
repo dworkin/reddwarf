@@ -28,6 +28,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -173,7 +174,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue join request.
 	     */
-	    addEvent(new JoinEvent(session));
+	    addEvent(new JoinEvent(unwrapSession(session)));
 	    
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
 	    return this;
@@ -203,7 +204,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		addEvent(new JoinEvent(session));
+		addEvent(new JoinEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
 	    return this;
@@ -211,6 +212,14 @@ abstract class ChannelImpl implements Channel, Serializable {
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "join throws");
 	    throw e;
+	}
+    }
+
+    private ClientSession unwrapSession(ClientSession session) {
+	if (session instanceof ClientSessionWrapper) {
+	    return ((ClientSessionWrapper) session).getClientSession();
+	} else {
+	    return session;
 	}
     }
 
@@ -295,7 +304,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue leave request.
 	     */
-	    addEvent(new LeaveEvent(session));
+	    addEvent(new LeaveEvent(unwrapSession(session)));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 	    return this;
 	    
@@ -324,7 +333,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		addEvent(new LeaveEvent(session));
+		addEvent(new LeaveEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
 	    return this;
@@ -650,7 +659,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 
 	/*
 	 * If client session is first session on a new node for this
-	 * channel, then add server's node ID server list.
+	 * channel, then add server's node ID to server list.
 	 */
 	long nodeId = getNodeId(session);
 	if (! hasServerNode(nodeId)) {

@@ -49,10 +49,6 @@ import java.util.logging.Logger;
  *
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
- *
- * <p>TODO: This class needs to implement ManagedObjectRemoval and if the
- * application attempts to remove an instance, then 'removingObject' should
- * throw a non-retryable exception to prevent object removal.
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable
