@@ -209,6 +209,7 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
 	Collections.synchronizedSortedSet(new TreeSet<NodeImpl>());
 
     /** The map of alive node ports, keyed by host name. */
+    /** TBD:  use a ConcurrentHashMap, to improve system start up time? */
     private final HashMap<String, Set<Long>> aliveNodeHostPortMap =
          new HashMap<String, Set<Long>>();
     
@@ -624,12 +625,14 @@ public final class WatchdogServerImpl implements WatchdogServer, Service {
             String host = node.getHostName();
             Set<Long> ports = 
                 aliveNodeHostPortMap.get(host);
+            if (ports == null) {
+                logger.log(Level.WARNING, "Unexpected null ports value");
+                return;
+            }
             ports.remove(Long.valueOf(node.getPort()));
             if (ports.isEmpty()) {
                 // No more ports in use on this host
                 aliveNodeHostPortMap.remove(host);
-            } else {
-                aliveNodeHostPortMap.put(host, ports);
             }
         }       
     }

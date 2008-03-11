@@ -75,8 +75,7 @@ public class SimpleClient implements ServerSession {
      * another host, we will use a different listener for the connection
      * to the new host.
      */
-    private ClientConnectionListener connListener =
-        new SimpleClientConnectionListener();
+    private ClientConnectionListener connListener;
     
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
@@ -438,11 +437,12 @@ public class SimpleClient implements ServerSession {
                 
                 // Disconnect our current connection, and connect to the
                 // new host and port
+                ClientConnection oldConnection = clientConnection;
                 synchronized (SimpleClient.this) {
-                    clientConnection.disconnect();
                     clientConnection = null;
                     connectionStateChanging = true;
                 }
+                oldConnection.disconnect();
                 redirect = true;
                 Properties props = new Properties();
                 props.setProperty("host", host);
