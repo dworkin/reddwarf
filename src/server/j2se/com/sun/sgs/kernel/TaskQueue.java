@@ -19,13 +19,22 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.auth.Identity;
+
 
 /**
- * This is just a place-holder for now. We know that we want some kind of
- * management interface for components, but we haven't designed it. This is
- * used (for example) to start and stop components.
+ * This interface defines a dependency between tasks, such that tasks are
+ * run in the order in which they are submitted, and the next task isn't
+ * started until the current task has completed.
  */
-public interface Manageable
-{
+public interface TaskQueue {
+
+    /**
+     * Adds a task to this dependency queue.
+     *
+     * @param task the {@code KernelRunnable} to add
+     * @param owner the {@code Identity} that owns the task
+     */
+    public void addTask(KernelRunnable task, Identity owner);
 
 }

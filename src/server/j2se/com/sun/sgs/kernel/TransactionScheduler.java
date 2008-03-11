@@ -25,26 +25,33 @@ import com.sun.sgs.auth.Identity;
 
 
 /**
- * This interface is used to run tasks that may take an arbitrarily long time
- * to complete, but are expected to complete eventually. These tasks may be
- * scheduled to run immediately or after some delay, possibly re-executing at
- * regular intervals.
+ * This interface is used to schedule transactional tasks for immediate,
+ * delayed, or periodic execution. Transactional tasks are short-lived:
+ * typically on the order of a few 10s of milliseconds) and not longer than
+ * the value of the property {@code com.sun.sgs.txn.timeout}. All tasks run
+ * through an implementation of {@code TransactionScheduler} will run
+ * transactionally, and may be re-tried in the event of failure.
  * <p>
- * Based on an implementation's policy, a task and its owner, that task may
- * not be accepted for execution. In this case {@code TaskRejectedException}
- * is thrown. To ensure that a task will be accepted methods are provided to
+ * Many methods will make a best effort to schedule a given task to run, but
+ * based on the policy of the implementation, the task and its owner, may be
+ * unable to accept the given task. In this case {@code TaskRejectedException}
+ * is thrown. To ensure that a task will be accepted, methods are provided to
  * get a {@code TaskReservation}. This is especially useful for {@code Service}
  * methods working within a transaction that need to ensure that a task will
  * be accepted before they can commit.
  * <p>
- * Note that, because the tasks submitted through this interface may run
- * any length of time, there are no guarantees about when a given task
- * will start. If a task is scheduled to run immediately, or at some point
- * in the future, then this means that the scheduler will try to acquire
- * resources to run the task at that point. It may still be some indefinite
- * length of time before the task can actually be run. 
+ * If the result of running a task via the {@code reserveTask} or
+ * {@code scheduleTask} methods is an {@code Exception} which implements
+ * {@code ExceptionRetryStatus}, then its {@code shouldRetry} method is
+ * called to decide if the task should be re-tried. It is up to the scheduler
+ * implementation's policy to decide how and when tasks are re-run, but all
+ * failing tasks run through a {@code TransactionScheduler} that wish to be
+ * re-tried will eventually be re-run given available resources.
+ * <p>
+ * Note that re-try is handled slightly differently for {@code runTask}. See
+ * the documentation on that method for more details.
  */
-public interface TaskScheduler {
+public interface TransactionScheduler {
 
     /**
      * Reserves the ability to run the given task.
@@ -130,5 +137,51 @@ public interface TaskScheduler {
                                                      Identity owner,
                                                      long startTime,
                                                      long period);
+
+    /**
+     * Runs the given task synchronously, returning when the task has
+     * completed or throwing an exception if the task fails. It is up to the
+     * {@code TransactionScheduler} implementation to decide when to run this
+     * task, so the task may be run immediately or it might be queued behind
+     * waiting tasks. The task may be handed off to another thread of control
+     * for execution. In all cases, the caller will block until the task
+     * completes or fails permanently.
+     * <p>
+     * As with all methods of {@code TransactionScheduler}, tasks run with
+     * {@code runTask} will be run transactionally. If the caller is not
+     * in an active transaction, then a transaction is created to run the
+     * task. If the caller is already part of an active transaction, then
+     * the task is run as part of that transaction, and the {@code owner}
+     * paramater is ignored.
+     * <p>
+     * When the caller is not part of an active transaction, then when the
+     * given task completes it will also attempt to commit. If committing
+     * the transaction fails, normal re-try behavior is applied. If the
+     * task requests to be re-tried, then it will be re-run according to the
+     * scheduler implementation's policy. In this case, {@code runTask}
+     * will not return until the task finally succeeds, or is no longer
+     * re-tried.
+     * <p>
+     * In the event that the caller is part of an active transaction, then
+     * there is no re-try applied in the case of a failure, and the
+     * transaction is not committed if the task completes successfully. This
+     * is because the system does not support nested transactions, and so
+     * the decision to commit or re-try is left to the active transaction.
+     *
+     * @throws TaskRejectedException if the given task is not accepted
+     * @throws Exception if the task fails and is not re-tried
+     */
+    public void runTask(KernelRunnable task, Identity owner) throws Exception;
+
+    /**
+     * Creates a new {@code TaskQueue} to use in scheduling dependent
+     * tasks. Each task added to the queue will be run in a separate
+     * transaction. Re-try is applied to each transaction, and the next
+     * task in the queue is run only after the current task either
+     * completes successfully or fails permanently.
+     *
+     * @return a new {@code TaskQueue}
+     */
+    public TaskQueue createTaskQueue();
 
 }

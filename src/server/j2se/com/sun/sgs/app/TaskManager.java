@@ -37,6 +37,14 @@ import java.io.Serializable;
  * <code>ManagedObject</code>, then it's assumed that the <code>Task</code>
  * is already managed, and it is up to the developer to remove it from
  * the <code>DataManager</code> when finished.
+ * <p>
+ * Note that there is no assumed ordering provided by implementations of
+ * this interface. If two tasks are scheduled in a given transaction, it is
+ * undefined which task will run or complete first. Likewise, if a task
+ * is scheduled and then a second scheduled in a later transaction, there
+ * is no guarantee that the task scheduled in the previous transaction
+ * will complete first. If any ordering or dependency is required, this
+ * should be implemented within the tasks themselves.
  */
 public interface TaskManager {
 

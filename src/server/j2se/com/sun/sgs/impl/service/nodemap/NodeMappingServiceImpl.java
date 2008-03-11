@@ -34,6 +34,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -317,6 +318,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
     
+    /** The transaction scheduler. */
+    private final TransactionScheduler transactionScheduler;
+
     /** The owner for tasks I initiate. */
     private final Identity taskOwner;
     
@@ -429,6 +433,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         
 	try {
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+            transactionScheduler =
+                systemRegistry.getComponent(TransactionScheduler.class);
             dataService = txnProxy.getService(DataService.class);
             watchdogService = txnProxy.getService(WatchdogService.class);
             taskOwner = txnProxy.getCurrentOwner();
@@ -925,7 +931,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {     
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        transactionScheduler.runTask(task, taskOwner);
     }
             
     /* -- Implement transaction participant/context for 'getNode' -- */

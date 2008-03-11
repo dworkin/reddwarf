@@ -35,7 +35,6 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -43,10 +42,9 @@ import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
@@ -68,8 +66,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
 import junit.framework.TestCase;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import junit.framework.TestSuite;
@@ -127,8 +125,8 @@ public class TestClientSessionServiceImpl extends TestCase {
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
 
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -160,8 +158,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
-        taskScheduler = 
-            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
+        txnScheduler = 
+            serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
@@ -177,12 +176,12 @@ public class TestClientSessionServiceImpl extends TestCase {
         additionalNodes = new HashMap<String, SgsTestNode>();
 
         for (String host : hosts) {
-	    Properties props = SgsTestNode.getDefaultProperties(
-	        APP_NAME, serverNode, DummyAppListener.class);
-	    props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
-            SgsTestNode node = 
+            Properties props = SgsTestNode.getDefaultProperties(
+                APP_NAME, serverNode, DummyAppListener.class);
+            props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+            SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
-	    additionalNodes.put(host, node);
+            additionalNodes.put(host, node);
         }
     }
 
@@ -197,6 +196,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void tearDown(boolean clean) throws Exception {
+        Thread.sleep(100);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -224,8 +224,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME,
-		    "com.sun.sgs.app.port", "0");
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "20000");
 	    new ClientSessionServiceImpl(props, null,
 					 serverNode.getProxy());
 	    fail("Expected NullPointerException");
@@ -238,8 +238,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME,
-		    "com.sun.sgs.app.port", "0");
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "20000");
 	    new ClientSessionServiceImpl(props,
 					 serverNode.getSystemRegistry(), null);
 	    fail("Expected NullPointerException");
@@ -263,7 +263,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    Properties props =
 		createProperties(
-		    "com.sun.sgs.app.name", APP_NAME);
+		    StandardProperties.APP_NAME, APP_NAME);
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());
@@ -288,7 +288,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    throw e;
 	    
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -298,7 +298,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login("password");
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -317,10 +317,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		if (! client.login("password")) {
 		    // login redirected
 		    redirectCount++;
-		    int redirectPort =
-			(additionalNodes.get(client.redirectHost)).getAppPort();
+                    int port = client.redirectPort;
 		    client = new DummyClient(user);
-		    client.connect(redirectPort);
+		    client.connect(port);
 		    if (!client.login("password")) {
 			failed = true;
 			System.err.println("login for user: " + user +
@@ -347,7 +346,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} finally {
 	    for (DummyClient client : clients) {
 		try {
-		    client.disconnect(false);
+		    client.disconnect();
 		} catch (Exception e) {
 		    System.err.println(
 			"Exception disconnecting client: " + client);
@@ -371,7 +370,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("notifyLoggedIn not invoked for identity: " + name);
 	    }
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -397,7 +396,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -423,7 +422,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -449,7 +448,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("unexpected login failure: " + e);
 	    }
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -466,7 +465,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    e.printStackTrace();
 	    fail("testLogout interrupted");
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -485,7 +484,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Thread.sleep(250);
 	    checkBindings(0);	    
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -511,7 +510,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("notifyLoggedOut not invoked for identity: " + name);
 	    }
 	} finally {
-            client.disconnect(false);
+            client.disconnect();
 	}
     }
 
@@ -548,7 +547,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -583,7 +582,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     private List<String> getServiceBindingKeys(String prefix) throws Exception {
         GetKeysTask task = new GetKeysTask(prefix);
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         return task.getKeys();
     }
 
@@ -616,7 +615,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -635,7 +634,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 }
             }, taskOwner);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -645,7 +644,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -665,7 +664,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 }
              }, taskOwner);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -689,7 +688,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	     * the message.
 	     */
 	    final DataService ds = dataService;
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    TransactionScheduler txnScheduler =
+		serverNode.getSystemRegistry().
+		    getComponent(TransactionScheduler.class);
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		@SuppressWarnings("unchecked")
 		public void run() {
 		    for (SgsTestNode node : nodes) {
@@ -713,12 +715,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
 	    for (int i = 0; i < iterations; i++) {
 		for (SgsTestNode node : nodes) {
-		    TaskScheduler scheduler = 
+		    TransactionScheduler localTxnScheduler = 
 			node.getSystemRegistry().
-			    getComponent(TaskScheduler.class);
+			    getComponent(TransactionScheduler.class);
 		    Identity identity = node.getProxy().getCurrentOwner();
-		    scheduler.scheduleTask(
-		        new TransactionRunner(
+		    localTxnScheduler.scheduleTask(
 		    	  new AbstractKernelRunnable() {
 			    public void run() {
 				DataManager dataManager =
@@ -735,12 +736,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 				MessageBuffer buf = new MessageBuffer(4);
 				buf.putInt(counter.getAndIncrement());
 				session.send(ByteBuffer.wrap(buf.getBuffer()));
-			    }}),
+			    }},
 			
 			identity);
 		}
 	    }
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    AppContext.getDataManager().
 			setBinding(counterName, new Counter());
@@ -749,7 +750,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.checkMessagesReceived(nodes.size() * iterations);
 
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -778,7 +779,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login("dummypassword");
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 		new AbstractKernelRunnable() {
 		    int tryCount = 0;
 		    public void run() {
@@ -796,7 +797,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		}, taskOwner);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -829,7 +830,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login("dummypassword");
 	    client.sendMessages(numMessages, expectedMessages, exception);
 	} finally {
-	    client.disconnect(false);
+	    client.disconnect();
 	}
     }
 
@@ -863,9 +864,8 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitLoginFailure = false;
 	private String reason;
 	private String redirectHost;
-	private CompactId sessionId;
-	private CompactId reconnectionKey;
-	private final AtomicLong sequenceNumber = new AtomicLong(0);
+        private int redirectPort;
+	private byte[] reconnectKey;
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -902,36 +902,35 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    if (connected != true) {
 			throw new RuntimeException(
- 			    "DummyClient.connect timed out");
+ 			    "DummyClient.connect timed out to " + port);
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.connect timed out", e);
+			"DummyClient.connect timed out to " + port, e);
 		}
 	    }
 	    
 	}
 
-	void disconnect(boolean graceful) {
-            System.err.println("DummyClient.disconnect: " + graceful);
-
-            if (graceful) {
-                logout();
-                return;
-            }
+	void disconnect() {
+            System.err.println("DummyClient.disconnect");
 
             synchronized (lock) {
                 if (connected == false) {
                     return;
                 }
-                try {
-                    connection.close();
-                } catch (IOException e) {
-                    System.err.println(
-                        "DummyClient.disconnect exception:" + e);
-                    connected = false;
-                    lock.notifyAll();
-                }
+                connected = false;
+            }
+
+            try {
+                connection.close();
+            } catch (IOException e) {
+                System.err.println(
+                    "DummyClient.disconnect exception:" + e);
+            }
+
+            synchronized (lock) {
+                lock.notifyAll();
             }
 	}
 
@@ -1076,28 +1075,31 @@ public class TestClientSessionServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(1);
-                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
+            }
+            MessageBuffer buf = new MessageBuffer(1);
+            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+            try {
+                connection.sendBytes(buf.getBuffer());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            synchronized (lock) {
                 try {
-                    connection.sendBytes(buf.getBuffer());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (lock) {
-                    try {
-                        if (logoutAck == false) {
-                            lock.wait(WAIT_TIME);
-                        }
-                        if (logoutAck != true) {
-                            throw new RuntimeException(
-                                "DummyClient.disconnect timed out");
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect timed out", e);
+                    if (logoutAck == false) {
+                        lock.wait(WAIT_TIME);
                     }
+                    if (logoutAck != true) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect timed out");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                        "DummyClient.disconnect timed out", e);
+                } finally {
+                    if (! logoutAck)
+                        disconnect();
                 }
             }
 	}
@@ -1137,7 +1139,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
+		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1159,11 +1161,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
 		    redirectHost = buf.getString();
+                    redirectPort = buf.getInt();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost);
+					   ", host:" + redirectHost +
+                                           ", port:" + redirectPort);
 			lock.notifyAll();
 		    } break;
 
@@ -1310,8 +1314,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final String name;
 	private final boolean disconnectedThrowsException;
 	private int seq = -1;
-	
-	
+
+
 	DummyClientSessionListener(
 	    String name, boolean disconnectedThrowsException)
 	{

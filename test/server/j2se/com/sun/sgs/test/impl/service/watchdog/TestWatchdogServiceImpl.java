@@ -26,7 +26,7 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -34,6 +34,9 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.net.BindException;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.util.ArrayList;
@@ -71,8 +74,8 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** A specific property we started with */
     private int renewTime;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
 
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -98,11 +101,13 @@ public class TestWatchdogServiceImpl extends TestCase {
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
+        serviceProps.setProperty(StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()));
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.renew.interval"));
 
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
 
         watchdogService = (WatchdogServiceImpl) serverNode.getWatchdogService();
@@ -197,7 +202,21 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
         WatchdogServiceImpl watchdog = null;
+        Properties properties = createProperties(
+            StandardProperties.APP_PORT, "20000",
+            WatchdogServerPropertyPrefix + ".port", "0");
+        try {
+            new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+    }
+
+    public void testConstructorNoAppPort() throws Exception {
+        WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
+            StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", "0");
 	try {
 	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
@@ -211,6 +230,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    watchdog = 
@@ -227,6 +247,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
 	    watchdog =
@@ -245,6 +266,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
@@ -265,6 +287,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
@@ -289,6 +312,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -318,7 +343,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test isLocalNodeAlive -- */
 
     public void testIsLocalNodeAlive() throws Exception {
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 if (! watchdogService.isLocalNodeAlive()) {
                     fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -330,12 +355,14 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (! watchdogService.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -348,7 +375,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // wait for watchdog's renew to fail...
 	    Thread.sleep(renewTime * 4);
 
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -394,6 +421,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -446,7 +475,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         addNodes(null, NUM_WATCHDOGS);
         Thread.sleep(renewTime);
         CountNodesTask task = new CountNodesTask();
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         int numNodes = task.numNodes;
 
         int expectedNodes = NUM_WATCHDOGS + 1;
@@ -478,7 +507,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
 
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNodes();
@@ -507,7 +536,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -529,7 +558,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNode(0);
@@ -551,7 +580,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testGetNodeNonexistentNode() throws Exception {
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 Node node = watchdogService.getNode(29);
                 System.err.println(node);
@@ -568,7 +597,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
 	watchdog.shutdown();
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
                     watchdog.addNodeListener(new DummyNodeListener());
@@ -618,7 +647,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -671,6 +700,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	try {
 	    for (int i = 0; i < 5; i++) {
+                props.put(StandardProperties.APP_PORT,
+                          Integer.toString(SgsTestNode.getNextAppPort()));
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		DummyNodeListener listener = new DummyNodeListener();
@@ -962,6 +993,130 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    }
 	}
     }
+    
+    /** Test creating two nodes at the same host and port  */
+    public void testReuseHostPort() throws Exception {
+        addNodes(null, 1);
+        Properties props = additionalNodes[0].getServiceProperties();
+        SgsTestNode node = null;
+        try {
+            node = new SgsTestNode(serverNode, null, props);
+            fail("Expected IllegalArgumentException");
+        } catch (InvocationTargetException e) {
+            System.err.println(e);
+            Throwable target = e.getTargetException();
+            // The kernel constructs the services through reflection, and the
+            // SgsTestNode creates the kernel through reflection - burrow down
+            // to the root cause to be sure it's of the expected type.
+            while (target instanceof InvocationTargetException) {
+                System.err.println("unwrapping target exception");
+                target = ((InvocationTargetException) target).getTargetException();
+            }
+            if (!(target instanceof IllegalArgumentException)) {
+                fail("Expected IllegalArgumentException");
+            }
+        } finally {
+            if (node != null) {
+                node.shutdown(false);
+            }
+        }
+    }
+    
+    /** Test creating two single nodes at the same host and port  */
+    public void testReuseHostPortSingleNode() throws Exception {
+        final String appName = "ReuseHostPort";
+        SgsTestNode node = null;
+        SgsTestNode node1 = null;
+        try {
+            node = new SgsTestNode(appName, null, serviceProps, true);
+            
+            // This node is independent of the one above;  it'll have a new
+            // server.  We expect to see a socket BindException rather
+            // than an IllegalArgumentException.
+            node1 = new SgsTestNode(appName, null, serviceProps, true);
+            fail ("Expected BindException");
+        } catch (InvocationTargetException e) {
+            System.err.println(e);
+            Throwable target = e.getTargetException();
+            // We wrap our exceptions a bit in the kernel....
+            while (target instanceof InvocationTargetException) {
+                System.err.println("unwrapping target exception");
+                target = ((InvocationTargetException) target).getTargetException();
+            }
+            if (!(target instanceof BindException)) {
+                fail("Expected BindException");
+            }
+        } finally {
+            if (node != null) {
+                node.shutdown(false);
+            }
+            if (node1 != null) {
+                node1.shutdown(false);
+            }
+        }
+    }
+
+    /** Test that an application node can be restarted on the same host
+     *  and port after a crash.
+     */
+    public void testNodeCrashAndRestart() throws Exception {
+        SgsTestNode node = null;
+        SgsTestNode node1 = null;
+        try {
+            node = new SgsTestNode(serverNode, null, null);
+            Properties props = node.getServiceProperties();
+            System.err.println("node properties are " + props);
+            
+            System.err.println("shutting down node");
+            node.shutdown(false);
+            node = null;
+            // Note that we need to wait for the system to detect the
+            // failed node.
+            Thread.sleep(renewTime * 2);
+
+            System.err.println("attempting to restart failed node");
+            node1 = new SgsTestNode("TestWatchdogServiceImpl", 
+				     null, null, props, false);
+        } finally {
+            if (node != null) {
+                node.shutdown(false);
+            }
+            if (node1 != null) {
+                node1.shutdown(false);
+            }
+        }
+    }       
+    
+    /** Check that we can restart a single node system on the same
+     *  host and port after a crash.
+     */
+    public void testSingleNodeServerCrashAndRestart() throws Exception {
+        final String appName = "TestServerCrash";
+        SgsTestNode node = null;
+        SgsTestNode node1 = null;
+        try {
+            node = new SgsTestNode(appName, null, serviceProps, true);
+            Properties props = node.getServiceProperties();
+            System.err.println("node properties are " + props);
+            
+            System.err.println("shutting down single node");
+            node.shutdown(false);
+            node = null;
+
+            // Note that in this case we don't have to wait for the system
+            // to see the failed node - the entire system crashed, and the
+            // check for reuse is implemented with a transient data structure.
+            System.err.println("attempting to restart failed single node");
+            node1 = new SgsTestNode(appName, null, null, props, false);
+        } finally {
+            if (node != null) {
+                node.shutdown(false);
+            }
+            if (node1 != null) {
+                node1.shutdown(false);
+            }
+        }
+    }
 
     /** Creates a watchdog service with the specified recovery listener. */
     private WatchdogServiceImpl createWatchdog(RecoveryListener listener)
@@ -969,6 +1124,8 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
@@ -979,7 +1136,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	System.err.println("Created node (" + watchdog.getLocalNodeId() + ")");
 	return watchdog;
     }
-
+    
     /** Tears down the server node and restarts it as a server-only stack. */
     private void crashAndRestartServer() throws Exception {
 	System.err.println("simulate watchdog server crash...");
@@ -997,7 +1154,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	throws Exception
     {
         CheckNodesFailedTask task = new CheckNodesFailedTask(ids, hasBackup);
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         return task.backups;
     }
 
@@ -1041,7 +1198,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
 	Thread.sleep(250);
 	System.err.println("Get shutdown nodes (should be removed)...");
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();
@@ -1058,7 +1215,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     private void checkNodesAlive(final Collection<Long> ids) throws Exception {
 	System.err.println("Get live nodes...");
-        taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();
