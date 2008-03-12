@@ -40,6 +40,13 @@ public interface Node {
     String getHostName();
 
     /**
+     * Returns this node's port.
+     * 
+     * @return this node's port
+     */
+    int getPort();
+    
+    /**
      * Returns {@code true} if the node is known to be alive, and
      * {@code false} if the node is thought to have failed or is
      * unknown.

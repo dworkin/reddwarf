@@ -25,7 +25,6 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -584,20 +583,21 @@ class ClientSessionHandler {
 			name, sessionService.getLocalNodeId(), node);
 		}
 		final byte[] loginRedirectMessage =
-		    getLoginRedirectMessage(node.getHostName());
+		    getLoginRedirectMessage(node.getHostName(), node.getPort());
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			sendProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
-			try {
-			    // FIXME: this is a hack to make sure that
-			    // the client receives the login redirect
-			    // message before disconnect.
-			    Thread.sleep(100);
-			} catch (InterruptedException e) {
-			}
+                        try {
+                            // FIXME: this is a hack to make sure that 
+                            // the client receives the login redirect 
+                            // message before disconnect. 
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            // ignore
+                        }
 			handleDisconnect(false);
 		    }});
 	    }
@@ -746,12 +746,15 @@ class ClientSessionHandler {
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    CompactId compactId = new CompactId(sessionRefId.toByteArray());
-	    MessageBuffer ack =
-		new MessageBuffer(1 + compactId.getExternalFormByteCount());
+	    // FIXME: currently we choose the reconnect key to be
+	    // the session ID, to facilitate the test of the Channel Service.
+	    // If the reconnect key is generated some other way, the test
+	    // will have to be updated to get the session key some other way.
+	    byte[] reconnectKey = sessionRefId.toByteArray();
+	    MessageBuffer ack = new MessageBuffer(1 + reconnectKey.length);
 	    ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		putBytes(compactId.getExternalForm());
-		
+		putBytes(reconnectKey);
+
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
 
@@ -823,13 +826,14 @@ class ClientSessionHandler {
 
     /**
      * Returns a byte array containing a LOGIN_REDIRECT protocol
-     * message containing the given {@code hostname}.
+     * message containing the given {@code hostname} and {@code port}.
      */
-    private static byte[] getLoginRedirectMessage(String hostname) {
+    private static byte[] getLoginRedirectMessage(String hostname, int port) {
 	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(1 + hostStringSize);
+	MessageBuffer ack = new MessageBuffer(1 + hostStringSize + 4);
         ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putString(hostname);
+            putString(hostname).
+            putInt(port);
         return ack.getBuffer();
     }	
 }

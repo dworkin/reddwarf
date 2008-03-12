@@ -29,9 +29,9 @@ public interface WatchdogClient extends Remote {
 
     /**
      * Notifies this client that the nodes specified by corresponding
-     * information in the {@code ids}, {@code hosts}, {@code status},
-     * and {@code backups} arrays have a status change ({@code true}
-     * for alive, and {@code false} for failed) and may need to
+     * information in the {@code ids}, {@code hosts}, {@code ports}, 
+     * {@code status}, and {@code backups} arrays have a status change 
+     * ({@code true} for alive, and {@code false} for failed) and may need to
      * recover (if the backup ID is equal to the local node ID). The
      * {@code backups} array is only only consulted if the corresponding
      * element in {@code status} is {@code false}.  If no node has been
@@ -40,6 +40,7 @@ public interface WatchdogClient extends Remote {
      *
      * @param	ids an array of node IDs
      * @param	hosts an array of host names
+     * @param   ports an array of ports
      * @param	status an array of node status
      * @param	backups an array of backup node IDs
      *
@@ -47,7 +48,7 @@ public interface WatchdogClient extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void nodeStatusChanges(long[] ids, String[] hosts,
+    void nodeStatusChanges(long[] ids, String[] hosts, int[] ports,
 			   boolean[] status, long[] backups)
 	throws IOException;
 }

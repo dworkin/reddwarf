@@ -37,6 +37,12 @@ import com.sun.sgs.kernel.KernelRunnable;
  */
 public interface ProfileCollector {
 
+    /** 
+     * Shuts down the ProfileCollector, reclaiming resources as necessary.
+     */
+    
+    public void shutdown();
+    
     /**
      * Adds a <code>ProfileOperationListener</code> as a listener for
      * profiling data reports. The listener is immediately updated on

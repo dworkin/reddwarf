@@ -1,4 +1,4 @@
- /*
+/*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -33,15 +33,11 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -51,7 +47,6 @@ import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -77,7 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -114,21 +109,12 @@ public class TestChannelServiceImpl extends TestCase {
     /** The channel service on the server node. */
     private ChannelManager channelService;
 
-    /** The client session service on the server node. */
-    private ClientSessionService sessionService;
-
-    /** True if test passes. */
-    private boolean passed;
-
-    /** The test clients, keyed by user name. */
-    private static Map<String, DummyClient> dummyClients;
-
     /** The listen port for the client session service. */
     private int port;
 
     /** The node ID for the local node. */
     private long serverNodeId;
-
+    
     /** A list of users for test purposes. */
     private List<String> someUsers =
 	Arrays.asList(new String[] { "moe", "larry", "curly" });
@@ -140,8 +126,6 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Creates and configures the channel service. */
     protected void setUp() throws Exception {
-	passed = false;
-        dummyClients = new HashMap<String, DummyClient>();
 	System.err.println("Testcase: " + getName());
         setUp(true);
     }
@@ -162,7 +146,6 @@ public class TestChannelServiceImpl extends TestCase {
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
-	sessionService = serverNode.getClientSessionService();
 	channelService = serverNode.getChannelService();
 	
 	serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
@@ -172,7 +155,6 @@ public class TestChannelServiceImpl extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
         Thread.sleep(100);
-	passed = true;
     }
     
     /** Cleans up the transaction. */
@@ -227,7 +209,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
 	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
+		createProperties(StandardProperties.APP_NAME, APP_NAME);
 	    new ChannelServiceImpl(props, null,
 				   new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
@@ -239,7 +221,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
 	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
+		createProperties(StandardProperties.APP_NAME, APP_NAME);
 	    new ChannelServiceImpl(props, new DummyComponentRegistry(),
 				   null);
 	    fail("Expected NullPointerException");
@@ -1136,6 +1118,11 @@ public class TestChannelServiceImpl extends TestCase {
 		DummyClient client = clients.get(user);
 		System.err.println("user: " + user +
 				   ", redirectHost: " + client.redirectHost);
+                // Note that the redirectHost can sometimes be null,
+                // as it won't be assigned if the initial login request
+                // was successful.  That would occur if the initial node 
+                // assignment for the client is the localhost, where the
+                // serverNode is running.
 		if (host.equals(client.redirectHost)) {
 		    iter.remove();
 		    removedClients.put(user, client);
@@ -1326,60 +1313,12 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- other classes -- */
 
     /**
-     * Dummy identity coordinator for testing purposes.
-     */
-    private static class DummyIdentityCoordinator implements IdentityCoordinator {
-	public Identity authenticateIdentity(IdentityCredentials credentials) {
-	    return new DummyIdentity(credentials);
-	}
-    }
-    
-    /**
-     * Identity returned by the DummyIdentityCoordinator.
-     */
-    private static class DummyIdentity implements Identity, Serializable {
-
-        private static final long serialVersionUID = 1L;
-        private final String name;
-
-        DummyIdentity(String name) {
-            this.name = name;
-        }
-
-	DummyIdentity(IdentityCredentials credentials) {
-	    this.name = ((NamePasswordCredentials) credentials).getName();
-	}
-	
-	public String getName() {
-	    return name;
-	}
-
-	public void notifyLoggedIn() {}
-
-	public void notifyLoggedOut() {}
-        
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (! (o instanceof DummyIdentity))
-                return false;
-            return ((DummyIdentity)o).name.equals(name);
-        }
-        
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
-    }
-
-    /**
      * Dummy client code for testing purposes.
      */
     private class DummyClient {
 
 	String name;
-	CompactId sessionId;
+	byte[] sessionId;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -1393,13 +1332,12 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean leaveAck = false;
         private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
-	//private String channelName = null;
-	//private CompactId channelId = null;
 	private String reason;	
 	private String redirectHost;
+        private int redirectPort;
+        private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
 
 	
@@ -1407,7 +1345,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	byte[] getSessionId() {
-	    return sessionId.getId();
+	    return sessionId;
 	}
 
 	boolean isConnected() {
@@ -1487,7 +1425,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-	    //redirectHost = null;
+//            redirectHost = null;
+//            redirectPort = 0;
+            
 	}
 
 	DummyClient login(String user, String pass) {
@@ -1537,10 +1477,12 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    // handle redirected login
 	    SgsTestNode node = additionalNodes.get(host);
-	    int redirectPort = node.getAppPort();
 	    nodeId = node.getWatchdogService().getLocalNodeId();
+            // cache a local copy of redirect port, in case it's ever
+            // cleared by disconnect
+            int port = redirectPort;
 	    disconnect();
-	    connect(redirectPort);
+	    connect(port);
 	    return login(user, pass);
 	}
 
@@ -1580,14 +1522,6 @@ public class TestChannelServiceImpl extends TestCase {
 		    null :
 		    channelMessages.remove(0);
 	    }
-	}
-
-	private int getSize(Set<CompactId> ids) {
-	    int size = 0;
-	    for (CompactId id : ids) {
-		size += id.getExternalFormByteCount();
-	    }
-	    return size;
 	}
 
 	/**
@@ -1668,31 +1602,33 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(1);
-                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
+            }
+            MessageBuffer buf = new MessageBuffer(1);
+            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+            try {
+                connection.sendBytes(buf.getBuffer());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            synchronized (lock) {
                 try {
-                    connection.sendBytes(buf.getBuffer());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (lock) {
-                    try {
-                        if (logoutAck == false) {
-                            lock.wait(WAIT_TIME);
-                        }
-                        if (logoutAck != true) {
-                            throw new RuntimeException(
-                                "DummyClient.disconnect[" + name + "] timed out");
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect[" + name + "] timed out", e);
+                    if (logoutAck == false) {
+                        lock.wait(WAIT_TIME);
                     }
+                    if (logoutAck != true) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect[" + name + "] timed out");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                        "DummyClient.disconnect[" + name + "] timed out", e);
+                } finally {
+                    if (! logoutAck)
+                        disconnect();
                 }
             }
-	    disconnect();
 	}
 
 	private class Listener implements ConnectionListener {
@@ -1721,7 +1657,11 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
+                    // FIXME: this is actually the reconnect key, but the
+                    // current implementation sends the sessionId to aid
+                    // this test.
+                    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+                    sessionId = reconnectKey;
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1751,11 +1691,13 @@ public class TestChannelServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
 		    redirectHost = buf.getString();
+                    redirectPort = buf.getInt();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost);
+					   ", host:" + redirectHost +
+                                           ", port:" + redirectPort);
 			lock.notifyAll();
 		    } break;
 

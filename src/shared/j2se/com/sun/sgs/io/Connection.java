@@ -24,7 +24,7 @@ import java.io.IOException;
 /**
  * Represents a connection for data communication, independent of
  * the QoS properties of the connection's transport or protocol.
- * An associated {@link ConnectionListener} is notified of asynchonous
+ * An associated {@link ConnectionListener} is notified of asynchronous
  * events on the connection.
  */
 public interface Connection {
