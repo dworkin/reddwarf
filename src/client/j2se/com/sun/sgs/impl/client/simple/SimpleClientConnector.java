@@ -64,7 +64,7 @@ import com.sun.sgs.io.Connector;
  *	Specifies the server port.
  * <p>
  * <li> <i>Key:</i> {@code connectTimeout} <br>
- *	<i>Default:</i> {@value SimpleClientConnector#DEFAULT_CONNECT_TIMEOUT}
+ *	<i>Default:</i> {@value com.sun.sgs.impl.client.simple.SimpleClientConnector#DEFAULT_CONNECT_TIMEOUT}
  *      <br>
  *	Specifies the timeout (in milliseconds) for a connect attempt
  *	to the server.

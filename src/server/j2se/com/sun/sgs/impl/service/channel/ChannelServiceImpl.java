@@ -89,6 +89,15 @@ public final class ChannelServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -215,6 +224,15 @@ public final class ChannelServiceImpl
 	    }
 
 	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    }},  taskOwner);
+	    
+	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
 	    transactionScheduler.runTask(
@@ -250,6 +268,13 @@ public final class ChannelServiceImpl
     /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException("version mismatch not handled");
+    }
+    
+     /** {@inheritDoc} */
     protected void doReady() {
     }
 
