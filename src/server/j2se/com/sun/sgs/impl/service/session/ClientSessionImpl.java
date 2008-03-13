@@ -417,6 +417,15 @@ public class ClientSessionImpl
 		Level.WARNING, e, "session binding already removed:{0}",
 		sessionKey);
 	}
+
+	/*
+	 * Remove this session's wrapper object, if it still exists.
+	 */
+	try {
+	    dataService.removeObject(wrappedSessionRef.get());
+	} catch (ObjectNotFoundException e) {
+	    // already removed
+	}
     }
 
     /**

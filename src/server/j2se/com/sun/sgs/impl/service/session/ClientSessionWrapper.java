@@ -79,20 +79,15 @@ public class ClientSessionWrapper
 	return this;
     }
 
+    /* -- Implement ManagedObjectRemoval -- */
+
     /** {@inheritDoc} */
-    public void disconnect() {
+    public void removingObject() {
 	try {
 	    sessionRef.get().disconnect();
 	} catch (ObjectNotFoundException e) {
 	    // already disconnected.
 	}
-    }
-
-    /* -- Implement ManagedObjectRemoval -- */
-
-    /** {@inheritDoc} */
-    public void removingObject() {
-	disconnect();
     }
 
     /* -- Implement Object -- */

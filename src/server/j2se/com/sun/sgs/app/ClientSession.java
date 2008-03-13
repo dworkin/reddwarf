@@ -19,6 +19,7 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
@@ -54,13 +55,10 @@ import java.nio.ByteBuffer;
  * {@code ClientSessionListener} with a {@code boolean} that
  * if {@code true} indicates the client logged out gracefully.
  *
- * <p>If the application removes a {@code ClientSession} object from
- * the data manager, that session will be forcibly disconnected.
- *
  * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that
- * client.  When that client logs back in again, a new session is
- * established with the server.
+ * client and should be removed from the data manager. When that client
+ * logs back in again, a new session is established with the server.
  */
 public interface ClientSession extends ManagedObject {
 
@@ -88,6 +86,11 @@ public interface ClientSession extends ManagedObject {
      * @return	this client session
      *
      * @throws	IllegalStateException if this session is disconnected
+     * @throws	IllegalArgumentException if the message exceeds the allowed
+     *		payload length defined by the constant {@link
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		whose value is {@value
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH} 
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of
