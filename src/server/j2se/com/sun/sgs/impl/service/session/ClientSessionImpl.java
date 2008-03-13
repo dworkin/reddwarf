@@ -49,10 +49,6 @@ import java.util.logging.Logger;
  *
  * <p>TODO: service bindings should be versioned, and old bindings should be
  * converted to the new scheme (or removed if applicable).
- *
- * <p>TODO: This class needs to implement ManagedObjectRemoval and if the
- * application attempts to remove an instance, then 'removingObject' should
- * throw a non-retryable exception to prevent object removal.
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable
@@ -90,6 +86,9 @@ public class ClientSessionImpl
      */
     private final byte[] idBytes;
     
+    /** The wrapped client session instance. */
+    private final ManagedReference<ClientSessionWrapper> wrappedSessionRef;
+
     /** The identity for this session. */
     private final Identity identity;
 
@@ -136,6 +135,8 @@ public class ClientSessionImpl
 	ManagedReference<ClientSessionImpl> sessionRef =
 	    dataService.createReference(this);
 	id = sessionRef.getId();
+	this.wrappedSessionRef =
+	    dataService.createReference(new ClientSessionWrapper(sessionRef));
 	idBytes = id.toByteArray();
 	dataService.setServiceBinding(getSessionKey(), this);
 	dataService.setServiceBinding(getSessionNodeKey(), this);
@@ -148,8 +149,8 @@ public class ClientSessionImpl
 
     /** {@inheritDoc} */
     public String getName() {
-	if (identity == null) {
-	    throw new IllegalStateException("session identity not initialized");
+	if (! isConnected()) {
+	    throw new IllegalStateException("client session is not connected");
 	}
         String name = identity.getName();
 	return name;
@@ -160,7 +161,10 @@ public class ClientSessionImpl
 	return connected;
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     *
+     * Enqueues a send event to this client session's event queue for servicing.
+     */
     public ClientSession send(ByteBuffer message) {
 	try {
             if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
@@ -188,8 +192,11 @@ public class ClientSessionImpl
 	}
     }
 
-    /** {@inheritDoc} */
-    public void disconnect() {
+    /**
+     * If the session is connected, enqueues a disconnect event to this
+     * client session's event queue, and marks this session as disconnected.
+     */
+    void disconnect() {
 	if (isConnected()) {
 	    addEvent(new DisconnectEvent());
 	    sessionService.getDataService().markForUpdate(this);
@@ -292,6 +299,13 @@ public class ClientSessionImpl
 	} catch (ObjectNotFoundException e)  {
 	}
 	return sessionImpl;
+    }
+
+    /**
+     * Returns the wrapped client session for this instance.
+     */
+    ClientSessionWrapper getWrappedClientSession() {
+	return wrappedSessionRef.get();
     }
 
     /**
@@ -402,6 +416,15 @@ public class ClientSessionImpl
 	    logger.logThrow(
 		Level.WARNING, e, "session binding already removed:{0}",
 		sessionKey);
+	}
+
+	/*
+	 * Remove this session's wrapper object, if it still exists.
+	 */
+	try {
+	    dataService.removeObject(wrappedSessionRef.get());
+	} catch (ObjectNotFoundException e) {
+	    // already removed
 	}
     }
 
