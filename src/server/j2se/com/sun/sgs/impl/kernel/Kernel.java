@@ -655,7 +655,7 @@ class Kernel {
             
             // Expand any properties that encapsulate several defaults
             String value =
-                    properties.getProperty(StandardProperties.DEFAULT_SERVER);
+                properties.getProperty(StandardProperties.DEFAULT_CORE_SERVER);
             if (value != null && Boolean.valueOf(value)) {
                 // Don't start an application
                 properties.setProperty(StandardProperties.APP_LISTENER,

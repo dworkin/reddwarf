@@ -50,6 +50,52 @@ properties may be specified by system properties
 (using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
 the application properties file named on the command line.
 
+<p>
+By default, the Project Darkstar Server consists of a single node, using 
+the <a href="#GeneralProperties">General Properties</a>.
+For increased scalibility and availability of the Project Darkstar Server,
+multiple nodes can be configured to work together in a cluster.  This
+multi-node configuration requires one special core server node to run
+critical Project Darkstar operations, with the remaining nodes cooperating
+to run the application.  
+<p>
+The core server node must be started before the application nodes.
+<p>
+Each application node must specify the location of the core server node using
+the <a href="#com.sun.sgs.server.host"> com.sun.sgs.server.host</a> property.
+
+
+
+<h2>Core Server Node Properties</h2>
+These properties control the configuration of the Project Darkstar core
+server node if a multi-node configuration is being used.
+
+<dl>
+    
+<dt>com.sun.sgs.default.core.server
+<span class="default">false</span>
+<dd> If set to <code>true</code>, start the non-application node which
+ runs critical Project Darkstar Server operations. 
+</dl>
+
+The core server node's configuration must also include the 
+<a href="#com.sun.sgs.app.name">com.sun.sgs.app.name</a> and
+<a href="#app.root">com.sun.sgs.app.root</a> properties.  Additionally,
+it can specify ports to be used on the core server machine.
+
+<dl>
+<dt>com.sun.sgs.impl.service.data.store.net.server.port
+<span class="default">44530</span>
+<dd>The network port for the core data service server.  
+<dt>com.sun.sgs.impl.service.watchdog.server.port
+<span class="default">44533</span>
+<dd>The network port for the core watchdog service server.
+<dt>com.sun.sgs.impl.service.nodemap.server.port
+<span class="default">44535</span>
+<dd>The network port for the core node mapping service server.
+</dl>
+
+<a name="GeneralProperties"></a>
 <h2>General Properties</h2>
 
 These properties control various general facilities in the Project Darkstar
@@ -61,11 +107,11 @@ Server.
 <span class="required"></span>
 <dd>The name of the application.
 
-<dt>com.sun.sgs.app.root
+<dt><a name="app.root">com.sun.sgs.app.root</a>
 <span class="required"></span>
 <dd>The root directory for the application.
 
-<dt>com.sun.sgs.app.listener
+<dt><a name="app.listener">com.sun.sgs.app.listener</a>
 <span class="required"></span>
 <dd>The <a href="../AppListener.html"><code>AppListener</code></a> for
   the application, specified as a fully qualified class name.
@@ -73,6 +119,10 @@ Server.
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
 <span class="required"></span>
 <dd>The TCP port on which to listen for client connections.
+
+<dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
+<span class="required"></span>
+<dd> The name of the host the core Project Darkstar Server node is running on.
 
 <dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
 <span class="default">100</span>
@@ -177,21 +227,6 @@ underlying Berkeley DB database.
 
 </dl>
 
-<a name="ClientSessionService"></a>
-<h2>ClientSessionService Properties</h2>
-
-These properties control the implementation of the
-<code>ClientSessionService</code>.
-
-<dl>
-
-<dt>com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size
-<span class="default">256</span>
-<dd>The block size to use when reserving session IDs.  The value must be
-  greater than <code>8</code>.
-
-</dl>
-
 <a name="Kernel"></a>
 <h2>Kernel Properties</h2>
 
@@ -208,25 +243,6 @@ components that make up the system.
 
 </dl>
 
-<a name="ResourceCoordinator"></a>
-<h3>ResourceCoordinator Properties</h3>
-
-These properties control the implementation
-of <code>ResourceCoordinator</code>, which is the part of
-the <code>Kernel</code> that creates and manages threads.
-
-<dl>
-
-<dt>com.sun.sgs.kernel.CorePoolSize
-<span class="default">8</span>
-<dd>The initial thread pool size.
-
-<dt>com.sun.sgs.kernel.MaximumPoolSize
-<span class="default">16</span>
-<dd>The maximum thread pool size.
-
-</dl>
-
 <a name="TaskScheduler"></a>
 <h3>TaskScheduler Properties</h3>
 
@@ -235,10 +251,15 @@ the <code>TaskScheduler</code>, which is the part of
 the <code>Kernel</code> that schedules tasks.
 
 <dl>
-
-<dt>com.sun.sgs.impl.kernel.schedule.InitialConsumerThreads
+<dt>com.sun.sgs.impl.kernel.TransactionConsumerThreads
 <span class="default">4</span>
-<dd>The number of initial consumer threads used to process tasks.
+<dd>The number of initial consumer threads used to process 
+<a href="../TaskManager.html"><code>TaskManager</code></a> tasks.
+More threads will be created and used if necessary.
+
+<dt>com.sun.sgs.impl.kernel.TaskConsumerThreads
+<span class="default">4</span>
+<dd>The number of threads used to process Project Darkstar Server tasks.
 
 </dl>
 
