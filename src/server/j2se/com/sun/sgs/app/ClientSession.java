@@ -19,6 +19,7 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
@@ -36,18 +37,15 @@ import java.nio.ByteBuffer;
  * when a client session sends a message, is disconnected, or logs out.
  *
  * <p>A {@code ClientSession} is used to identify a client that is
- * logged in, to send messages to that client, to register a listener
- * to receive messages sent by that client, and to forcibly disconnect
+ * logged in, to send messages to that client, and to forcibly disconnect
  * that client from the server.
  *
  * <p>A session is considered disconnected if one of the following occurs:
  * <ul>
  * <li> the client logs out
- * <li> the client is forcibly disconnected by the server by invoking
- * its session's {@link #disconnect disconnect} method
  * <li> the client becomes disconnected due to a network failure, and
  * a connection to the client cannot be re-established in a timely manner
- * <li> the {@code ClientSession} object is removed
+ * <li> the {@code ClientSession} object is removed from the data manager
  * </ul>
  *
  * <p>If a client associated with a {@code ClientSession} becomes
@@ -57,21 +55,10 @@ import java.nio.ByteBuffer;
  * {@code ClientSessionListener} with a {@code boolean} that
  * if {@code true} indicates the client logged out gracefully.
  *
- * <p>If the application removes a {@code ClientSession} object from
- * the data manager, that session will be forcibly disconnected.
- *
  * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that
- * client.  When that client logs back in again, a new session is
- * established with the server.
- *
- * <p>TODO: modify class documentation to note that an application should
- * not remove a client session object, and that attempting to remove a
- * client session object (by invoking {@code DataManager.removeObject})
- * will be ignored.  If a client session is no longer needed, the
- * application should disconnect the session by invoking the {@link
- * #disconnect disconnect} method, and at some point later on, the client
- * session object will be removed by the server.
+ * client and should be removed from the data manager. When that client
+ * logs back in again, a new session is established with the server.
  */
 public interface ClientSession extends ManagedObject {
 
@@ -80,6 +67,7 @@ public interface ClientSession extends ManagedObject {
      *
      * @return	the name used to authenticate this session
      *
+     * @throws	IllegalStateException if this session is disconnected
      * @throws 	TransactionException if the operation failed because of
      * 		a problem with the current transaction
      */
@@ -98,21 +86,17 @@ public interface ClientSession extends ManagedObject {
      * @return	this client session
      *
      * @throws	IllegalStateException if this session is disconnected
+     * @throws	IllegalArgumentException if the message exceeds the allowed
+     *		payload length defined by the constant {@link
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		whose value is {@value
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH} 
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of
      *		 a problem with the current transaction
      */
     ClientSession send(ByteBuffer message);
-
-    /**
-     * Forcibly disconnects this client session.  If this session is
-     * already disconnected, then no action is taken.
-     *
-     * @throws	TransactionException if the operation failed because of
-     *		a problem with the current transaction
-     */
-    void disconnect();
 
     /**
      * Returns {@code true} if the client is connected,

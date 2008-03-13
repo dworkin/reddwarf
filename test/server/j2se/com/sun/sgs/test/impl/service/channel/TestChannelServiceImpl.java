@@ -36,8 +36,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.channel.ChannelUtil;
+import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -340,10 +341,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(delivery);
-		    channel.close();
-		    if (!delivery.equals(channel.getDeliveryRequirement())) {
-			fail("Expected: " + delivery + ", got: " +
-			     channel.getDeliveryRequirement());
+		    dataService.removeObject(channel);
+		    try {
+			channel.getDeliveryRequirement();
+			fail("Expected IllegalStateException");
+		    } catch (IllegalStateException e) {
+			System.err.println(e);
 		    }
 		}
 		System.err.println("Got delivery requirement on close channel");
@@ -379,7 +382,7 @@ public class TestChannelServiceImpl extends TestCase {
 		public void run() throws Exception {
 		    Channel channel =
 			channelService.createChannel(Delivery.RELIABLE);
-		    channel.close();
+		    dataService.removeObject(channel);
 		    try {
 			channel.join(client.getSession());
 			fail("Expected IllegalStateException");
@@ -531,7 +534,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    ClientSession session =
 			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
-		    channel.close();
+		    dataService.removeObject(channel);
 		    try {
 			channel.leave(session);
 			fail("Expected IllegalStateException");
@@ -611,7 +614,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (! sessions.contains(moe)) {
 			fail("Expected session: " + moe);
 		    }
-		    channel.close();
+		    dataService.removeObject(channel);
 		}
  	    }, taskOwner);
 	    
@@ -659,7 +662,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    System.err.println("All sessions left");
 		    
-		    channel.close();
+		    dataService.removeObject(channel);
 		}}, taskOwner);
 
 	} finally {
@@ -685,7 +688,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
-		channel.close();
+		dataService.removeObject(channel);
 		try {
 		    channel.leaveAll();
 		    fail("Expected IllegalStateException");
@@ -734,7 +737,7 @@ public class TestChannelServiceImpl extends TestCase {
 			fail("Expected no sessions, got " + numJoinedSessions);
 		    }
 		    System.err.println("All sessions left");
-		    channel.close();
+		    dataService.removeObject(channel);
 		}
 	    }, taskOwner);
 	} finally {
@@ -777,7 +780,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
-		channel.close();
+		dataService.removeObject(channel);
 		try {
 		    channel.send(ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
@@ -938,7 +941,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelCloseNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.close();
+	    dataService.removeObject(channel);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -952,7 +955,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
-		channel.close();
+		dataService.removeObject(channel);
 	    }
 	}, taskOwner);
 	Thread.sleep(100);
@@ -967,28 +970,6 @@ public class TestChannelServiceImpl extends TestCase {
 	printServiceBindings();
     }
 
-    public void testChannelCloseTwice() throws Exception {
-	final String channelName = "closeTest";
-	createChannel(channelName);
-	
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-		channel.close();
-		channel.close();
-		System.err.println("Channel closed twice");
-	    }
-	}, taskOwner);
-	Thread.sleep(100);
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-	    public void run() {
-		if (getChannel(channelName) != null) {
-		    fail("obtained closed channel");
-		}
-	    }
-	}, taskOwner);
-    }
-    
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
@@ -1303,7 +1284,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private Set<ClientSession> getSessions(Channel channel) {
 	Set<ClientSession> sessions = new HashSet<ClientSession>();
-	Iterator<ClientSession> iter = ((ChannelImpl) channel).getSessions();
+	Iterator<ClientSession> iter = ChannelUtil.getSessions(channel);
 	while (iter.hasNext()) {
 	    sessions.add(iter.next());
 	}
@@ -1794,6 +1775,14 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    private static ClientSession unwrapSession(ClientSession session) {
+	if (session instanceof ClientSessionWrapper) {
+	    return ((ClientSessionWrapper) session).getClientSession();
+	} else {
+	    return session;
+	}
+    }
+
     public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
@@ -1804,7 +1793,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.setBinding(session.getName(), session);
+	    dataManager.setBinding(session.getName(), unwrapSession(session));
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
