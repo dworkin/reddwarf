@@ -42,15 +42,15 @@ package com.sun.sgs.service;
  * on startup. The {@code Properties} parameter provides application and
  * service-specific properties. The {@code ComponentRegistry} provides
  * access to non-transactional kernel and system components like the
- * {@code TaskScheduler}. The {@code TransactionProxy} provides access to
- * transactional state (when active) and the other available {@code Service}s.
- * If any error occurs in creating a {@code Service}, the constructor may
- * throw any {@code Exception}, causing the application to shutdown.
+ * {@code TransactionScheduler}. The {@code TransactionProxy} provides
+ * access to transactional state (when active) and the other available
+ * {@code Service}s. If any error occurs in creating a {@code Service},
+ * the constructor may throw any {@code Exception}, causing the application
+ * to shutdown.
  * <p>
  * Note that {@code Service}s are not created in the context of a
  * transaction. If a given constructor needs to do any work transactionally,
- * it should do so by calling {@code TaskScheduler.runTask} with an instance
- * of {@code TransactionRunner}.
+ * it may do so by calling {@code TransactionScheduler.runTask}.
  */
 public interface Service {
 

@@ -36,7 +36,7 @@ import java.io.IOException;
 public interface Connector<T> {
 
     /**
-     * Actively initates a connection to the associated {@link Endpoint}.
+     * Actively initiates a connection to the associated {@link Endpoint}.
      * This call is non-blocking.
      * {@link ConnectionListener#connected connected} will be called
      * asynchronously on the given {@code listener} upon successful
@@ -46,14 +46,14 @@ public interface Connector<T> {
      * @param listener the listener for all IO events on the connection,
      *        including the result of the connection attempt
      *
-     * @throws IOException if there was a problem initating the connection
+     * @throws IOException if there was a problem initiating the connection
      * @throws IllegalStateException if the {@code Connector} has been shut
      *         down or has already attempted a connection
      */
     void connect(ConnectionListener listener) throws IOException;
 
     /**
-     * Waits for the connect attempt, initated by invoking the {@link
+     * Waits for the connect attempt, initiated by invoking the {@link
      * #connect connect} method, to complete with the given {@code
      * timeout} (specified in milliseconds), and returns {@code true}
      * if the connect attempt completed.

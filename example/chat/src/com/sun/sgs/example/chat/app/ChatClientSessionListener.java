@@ -33,9 +33,11 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 
 /**
  * Listener for events from a particular {@link ClientSession} logged into a
@@ -67,7 +69,7 @@ public class ChatClientSessionListener
     private static final String COMMAND_PREFIX = "/";
 
     /** The {@link ClientSession} this listener receives events for. */
-    private final ManagedReference sessionRef;
+    private final ManagedReference<ClientSession> sessionRef;
 
     /**
      * Creates a new listener for the given {@code ClientSession}.
@@ -134,7 +136,7 @@ public class ChatClientSessionListener
                 logger.log(Level.INFO,
                            "Disconnect request from {0}",
                            session());
-                session().disconnect();
+		disconnect();
                 break;
 
             case SHUTDOWN:
@@ -153,12 +155,20 @@ public class ChatClientSessionListener
                 logger.log(rec);
             }
             
-            session().disconnect();
+	    disconnect();
         }
     }
 
     private ClientSession session() {
-        return sessionRef.get(ClientSession.class);
+        return sessionRef.get();
+    }
+
+    private void disconnect() {
+	try {
+	    AppContext.getDataManager().removeObject(session());
+	} catch (ObjectNotFoundException e) {
+	    // already disconnected
+	}
     }
 
     private static Channel findOrCreateChannel(String channelName) {
@@ -175,7 +185,7 @@ public class ChatClientSessionListener
 
     private static Channel findChannel(String channelName) {
         String key = channelKey(channelName);
-        return AppContext.getDataManager().getBinding(key, Channel.class);
+        return (Channel) AppContext.getDataManager().getBinding(key);
     }
     
     private static String channelKey(String channelName) {
@@ -186,7 +196,7 @@ public class ChatClientSessionListener
         return getIdString(sessionRef);
     }
 
-    private String getIdString(ManagedReference ref) {
+    private String getIdString(ManagedReference<?> ref) {
         return ref.getId().toString(16);
     }
 
@@ -226,8 +236,10 @@ public class ChatClientSessionListener
         // Send the membership list to the joining session.
         StringBuilder listMessage = new StringBuilder("/members ");
         listMessage.append(channelName);
-        for (ManagedReference memberRef : getChannelMemberRefs(channelName)) {
-            ClientSession member = memberRef.get(ClientSession.class);
+        for (ManagedReference<ClientSession> memberRef
+		 : getChannelMemberRefs(channelName))
+	{
+            ClientSession member = memberRef.get();
             listMessage.append(' ');
             listMessage.append(getIdString(memberRef));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
@@ -238,7 +250,9 @@ public class ChatClientSessionListener
         session().send(toMessageBuffer(listMessage.toString()));
     }
 
-    private Set<ManagedReference> getChannelMemberRefs(String channelName) {
+    private Set<ManagedReference<ClientSession>> getChannelMemberRefs(
+	String channelName)
+    {
         // FIXME implement
         return null;
     }
@@ -283,17 +297,20 @@ public class ChatClientSessionListener
             channel.leave(session());
         }
 
-        // If the channel has no more sessions, close it.
         if (! channelHasSessions(channelName)) {
-            channel.close();
-            return;
-        }
-
-        // Tell the rest of the channel about the removal.
-        String changeMessage = "/left " + 
-                               channelName + " " +
-                               getSessionIdString();
-        channel.send(toMessageBuffer(changeMessage));
+	    // The channel has no more sessions, so close it and remove
+	    // its binding
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.removeBinding(channelKey(channelName));
+	    dataManager.removeObject(channel);
+	    
+        } else {
+	    // Tell the rest of the channel about the session removal.
+	    String changeMessage = "/left " + 
+		channelName + " " +
+		getSessionIdString();
+	    channel.send(toMessageBuffer(changeMessage));
+	}
     }
 
     /**

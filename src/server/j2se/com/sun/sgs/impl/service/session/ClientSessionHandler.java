@@ -22,19 +22,18 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
+import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -85,7 +84,7 @@ class ClientSessionHandler {
     private final ConnectionListener connectionListener;
 
     /** The Connection for sending messages to the client. */
-    private volatile Connection sessionConnection;
+    private volatile Connection sessionConnection = null;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -108,7 +107,7 @@ class ClientSessionHandler {
     private boolean shutdown = false;
 
     /** The queue of tasks for notifying listeners of received messages. */
-    private volatile NonDurableTaskQueue taskQueue = null;
+    private volatile TaskQueue taskQueue = null;
 
     /**
      * Constructs an instance of this class.
@@ -152,7 +151,6 @@ class ClientSessionHandler {
 	    currentState == State.CONNECTING ||
 	    currentState == State.CONNECTED;
 
-	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -186,7 +184,7 @@ class ClientSessionHandler {
 	    logger.log(
 		Level.FINEST,
 		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message));
+		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -268,8 +266,8 @@ class ClientSessionHandler {
 		public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
-		    sessionImpl.
-			notifyListenerAndRemoveSession(dataService, graceful);
+		    sessionImpl. notifyListenerAndRemoveSession(
+			dataService, graceful, true);
 		}
 	    });
 	}
@@ -364,6 +362,8 @@ class ClientSessionHandler {
 		}
 
 		if (!disconnectHandled) {
+		    // TBD: identity may be null. Fix to pass a non-null
+		    // identity when scheduling the task.
 		    scheduleHandleDisconnect(false);
 		}
 
@@ -469,10 +469,12 @@ class ClientSessionHandler {
 			} else {
 			    scheduleHandleDisconnect(false);
 			}
-		    }});
+		    }}, identity);
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleHandleDisconnect(isConnected());
 		break;
 		
@@ -483,6 +485,8 @@ class ClientSessionHandler {
 			"Handler.messageReceived unknown operation code:{0}",
 			opcode);
 		}
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleHandleDisconnect(false);
 		break;
 	    }
@@ -550,11 +554,7 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue =
-		    new NonDurableTaskQueue(
-			sessionService.getTransactionProxy(),
-			sessionService.nonDurableTaskScheduler,
-			authenticatedIdentity);
+		taskQueue = sessionService.createTaskQueue();
 		identity = authenticatedIdentity;
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
@@ -583,22 +583,23 @@ class ClientSessionHandler {
 			name, sessionService.getLocalNodeId(), node);
 		}
 		final byte[] loginRedirectMessage =
-		    getLoginRedirectMessage(node.getHostName());
+		    getLoginRedirectMessage(node.getHostName(), node.getPort());
+		// TBD: identity may be null. Fix to pass a non-null identity
+		// when scheduling the task.
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			sendProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
-			try {
-			    // FIXME: this is a hack to make sure that
-			    // the client receives the login redirect
-			    // message before disconnect.
-			    Thread.sleep(100);
-			} catch (InterruptedException e) {
-			}
+                        try {
+                            // FIXME: this is a hack to make sure that 
+                            // the client receives the login redirect 
+                            // message before disconnect. 
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            // ignore
+                        }
 			handleDisconnect(false);
 		    }});
-
-		deactivateIdentity(authenticatedIdentity);
 	    }
 	}
 
@@ -607,6 +608,8 @@ class ClientSessionHandler {
 	 * disconnects the client session.
 	 */
 	private void sendLoginFailureAndDisconnect() {
+	    // TBD: identity may be null. Fix to pass a non-null identity
+	    // when scheduling the task.
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
@@ -737,25 +740,29 @@ class ClientSessionHandler {
 	 */
 	public void run() {
 	    AppListener appListener =
-		dataService.getServiceBinding(
-		    StandardProperties.APP_LISTENER, AppListener.class);
+		(AppListener) dataService.getServiceBinding(
+		    StandardProperties.APP_LISTENER);
 	    logger.log(
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    CompactId compactId = new CompactId(sessionRefId.toByteArray());
-	    MessageBuffer ack =
-		new MessageBuffer(1 + compactId.getExternalFormByteCount());
+	    // FIXME: currently we choose the reconnect key to be
+	    // the session ID, to facilitate the test of the Channel Service.
+	    // If the reconnect key is generated some other way, the test
+	    // will have to be updated to get the session key some other way.
+	    byte[] reconnectKey = sessionRefId.toByteArray();
+	    MessageBuffer ack = new MessageBuffer(1 + reconnectKey.length);
 	    ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		putBytes(compactId.getExternalForm());
-		
+		putBytes(reconnectKey);
+
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
 
 	    ClientSessionImpl sessionImpl =
 		ClientSessionImpl.getSession(dataService, sessionRefId);
 	    try {
-		returnedListener = appListener.loggedIn(sessionImpl);
+		returnedListener =
+		    appListener.loggedIn(sessionImpl.getWrappedClientSession());
 	    } catch (RuntimeException e) {
 		ex = e;
 	    }
@@ -791,8 +798,7 @@ class ClientSessionHandler {
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
-		} else if (!(ex instanceof ExceptionRetryStatus) ||
-			   ((ExceptionRetryStatus) ex).shouldRetry() == false) {
+		} else if (! isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +
@@ -821,13 +827,14 @@ class ClientSessionHandler {
 
     /**
      * Returns a byte array containing a LOGIN_REDIRECT protocol
-     * message containing the given {@code hostname}.
+     * message containing the given {@code hostname} and {@code port}.
      */
-    private static byte[] getLoginRedirectMessage(String hostname) {
+    private static byte[] getLoginRedirectMessage(String hostname, int port) {
 	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(1 + hostStringSize);
+	MessageBuffer ack = new MessageBuffer(1 + hostStringSize + 4);
         ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putString(hostname);
+            putString(hostname).
+            putInt(port);
         return ack.getBuffer();
     }	
 }

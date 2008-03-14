@@ -53,7 +53,7 @@ public class HelloPersistence3
     public static final int PERIOD_MS = 500;
 
     /** A reference to our subtask, a {@link TrivialTimedTask}.  */
-    private ManagedReference subTaskRef = null;
+    private ManagedReference<TrivialTimedTask> subTaskRef = null;
 
     /**
      * Gets the subtask this task delegates to.  Dereferences a
@@ -67,7 +67,7 @@ public class HelloPersistence3
         if (subTaskRef == null)
             return null;
 
-        return subTaskRef.get(TrivialTimedTask.class);
+        return subTaskRef.get();
     }
 
     /**

@@ -32,7 +32,8 @@ import java.util.Set;
  * ChannelManager#createChannel ChannelManager.createChannel} method
  * with a {@link Delivery} requirement.  A {@link ClientSession} can
  * be added or removed from a channel using that {@code Channel}'s
- * {@link #join join} and {@link #leave leave} methods respectively.
+ * {@link #join(ClientSession) join} and
+ * {@link #leave(ClientSession) leave} methods respectively.
  * All client sessions can be removed from a channel by invoking
  * {@link #leaveAll leaveAll} on the channel.
  *
@@ -52,13 +53,9 @@ import java.util.Set;
  * from each channel that it is a member of.
  *
  * <p>When the application is finished using a channel, the
- * application should invoke that channel's {@link #close close}
- * method so that its resources can be reclaimed.  Once a channel is
- * closed, any of its side-effecting operations will throw {@link
- * IllegalStateException} if invoked.
- *
- * <p>If the application removes a {@code Channel} object from the
- * data manager, that channel will be closed.
+ * application should remove the channel from the data manager, which
+ * closes the channel and releases all resources associated with the
+ * channel. 
  *
  * @see ChannelManager#createChannel ChannelManager.createChannel
  */
@@ -69,8 +66,9 @@ public interface Channel extends ManagedObject {
      *
      * @return the delivery requirement
      *
+     * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Delivery getDeliveryRequirement();
 
@@ -116,7 +114,7 @@ public interface Channel extends ManagedObject {
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Channel leave(ClientSession session);
 
@@ -131,7 +129,7 @@ public interface Channel extends ManagedObject {
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Channel leave(Set<ClientSession> sessions);
     
@@ -142,7 +140,7 @@ public interface Channel extends ManagedObject {
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     *	       a problem with the current transaction
      */
     Channel leaveAll();
 
@@ -167,12 +165,4 @@ public interface Channel extends ManagedObject {
      */
     Channel send(ByteBuffer message);
 
-    /**
-     * Closes this channel.  If this channel is already closed, then
-     * no action is taken.
-     *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
-     */
-    void close();
 }

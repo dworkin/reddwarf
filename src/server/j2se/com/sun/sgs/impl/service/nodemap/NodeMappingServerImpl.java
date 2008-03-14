@@ -29,7 +29,7 @@ import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -116,7 +116,7 @@ import java.util.logging.Logger;
  *
  * This class is public for testing.
  */
-public class NodeMappingServerImpl implements NodeMappingServer {
+public final class NodeMappingServerImpl implements NodeMappingServer {
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -156,8 +156,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     /** The exporter for this server */
     private final Exporter<NodeMappingServer> exporter;
 
-    /** The task scheduler, for our transactional, synchronous tasks. */
-    private final TaskScheduler taskScheduler;
+    /** The transaction scheduler, for our transactional, synchronous tasks. */
+    private final TransactionScheduler transactionScheduler;
     
     /** The proxy owner for our transactional, synchronous tasks. */
     private final Identity taskOwner;
@@ -173,8 +173,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final NodeAssignPolicy assignPolicy;
 
     /** The thread that removes inactive identities */
-    // TODO:  should this be a TaskScheduler.scheduleRecurringTask? Or
-    // maybe called via ResourceCoordinator.startTask?
+    // TODO:  should this be a TaskScheduler.scheduleRecurringTask?
     private final Thread removeThread;
     
      /** Our watchdog node listener. */
@@ -248,7 +247,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        transactionScheduler =
+            systemRegistry.getComponent(TransactionScheduler.class);
         dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);
         taskOwner = txnProxy.getCurrentOwner();
@@ -460,7 +460,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         public void run() {
             try {
                 IdentityMO idmo = 
-                    dataService.getServiceBinding(idkey, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(idkey);
 
                 found = true;
                 long nodeId = idmo.getNodeId();
@@ -610,7 +610,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
             if (dead) {
                 IdentityMO idmo = 
-                        dataService.getServiceBinding(idkey, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(idkey);
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -734,7 +734,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @param task the task
      */
     void runTransactionally(KernelRunnable task) throws Exception {   
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        transactionScheduler.runTask(task, taskOwner);
     }
     
     /**
@@ -763,7 +763,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         try {
             newNodeId = assignPolicy.chooseNode(id);
         } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.WARNING, ex, "mapToNewNode: id {0} from {1}"
+            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
                     + " failed because no live nodes are available", 
                     id, oldNode);
             throw ex;
@@ -803,9 +803,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                     if (oldNode != null) {
                         try {
                             // Find the old IdentityMO, with the old node info.
-                            IdentityMO oldidmo = 
-                                dataService.getServiceBinding(idkey, 
-                                                              IdentityMO.class);
+                            IdentityMO oldidmo = (IdentityMO)
+				dataService.getServiceBinding(idkey);
 
                             // Check once more for the assigned node - someone
                             // else could have mapped it before we got here.
@@ -862,9 +861,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             // Tell our listeners
             notifyListeners(oldNode, atask.getNode(), id);
         } catch (Exception e) {
+            // We can get an IllegalStateException if this server shuts
+            // down while we're moving identities from failed nodes.
+            // TODO - check that those identities are properly removed.
             // Hmmm.  we've probably left some cruft in the data store.
             // The most likely problem is one in our own code.
-            logger.logThrow(Level.WARNING, e, 
+            logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
                             id, oldNode.getId(), newNodeId);
         }
@@ -999,7 +1001,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 String key = dataService.nextServiceBoundName(nodekey);
                 done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = dataService.getServiceBinding(key, IdentityMO.class);
+                    idmo = (IdentityMO) dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
                 // TODO: this kind of check may need to be applied to more
@@ -1096,7 +1098,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
          * @throws ObjectNotFoundException if the object has been removed
          */
         public void run() {
-            idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+            idmo = (IdentityMO) dataService.getServiceBinding(idkey);
         }
         
         /**
@@ -1161,9 +1163,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             IdentityMO idmo = null;
             try {
                 // Look for the identity in the map.
-                idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                idmo = (IdentityMO) dataService.getServiceBinding(idkey);
                 foundKeys.add(idkey);
-            } catch (Exception e) {
+            } catch (NameNotBoundException e) {
                 // Do nothing: leave idmo as null to indicate not found
             }
             if (idmo != null) {
@@ -1171,7 +1173,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
 
                 try {
-                    dataService.getServiceBinding(nodekey, IdentityMO.class);
+		    dataService.getServiceBinding(nodekey);
                     foundKeys.add(nodekey);
                 } catch (Exception e) {
                     logger.log(Level.SEVERE, 

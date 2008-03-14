@@ -46,7 +46,7 @@ public class Dungeon implements Game, Serializable {
     private static final long serialVersionUID = 1;
 
     // the channel used for all players currently in this dungeon
-    private ManagedReference channelRef;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the name of this particular dungeon
     private String name;
@@ -55,16 +55,16 @@ public class Dungeon implements Game, Serializable {
     private int spriteMapId;
 
     // a reference to the game change manager
-    private ManagedReference gcmRef;
+    private ManagedReference<GameChangeManager> gcmRef;
 
     // the connection into the dungeon
-    private ManagedReference connectorRef;
+    private ManagedReference<GameConnector> connectorRef;
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
 
     private UtilChannel channel() {
-        return channelRef.get(UtilChannel.class);
+        return channelRef.get();
     }
 
     /**
@@ -93,10 +93,9 @@ public class Dungeon implements Game, Serializable {
         playerMap = new HashMap<ClientSession,String>();
 
         // get a reference to the membership change manager
-        gcmRef = dataManager.
-            createReference(dataManager.
-                            getBinding(GameChangeManager.IDENTIFIER,
-                                       GameChangeManager.class));
+        gcmRef = dataManager.createReference(
+	    (GameChangeManager) dataManager.getBinding(
+		GameChangeManager.IDENTIFIER));
     }
 
     /**
@@ -126,9 +125,8 @@ public class Dungeon implements Game, Serializable {
         sendCountChanged();
 
         // notify the client of the sprites we're using
-        SpriteMap spriteMap =
-            dataManager.getBinding(SpriteMap.NAME_PREFIX + spriteMapId,
-                                   SpriteMap.class);
+        SpriteMap spriteMap = (SpriteMap) dataManager.getBinding(
+	    SpriteMap.NAME_PREFIX + spriteMapId);
         Messages.sendSpriteMap(spriteMap, channel(), session);
 
         Messages.sendPlayerJoined(player.getCurrentSession(), channel());
@@ -143,8 +141,7 @@ public class Dungeon implements Game, Serializable {
             (PlayerCharacter)(player.getCharacterManager().
                               getCurrentCharacter());
         player.sendCharacter(pc);
-        connectorRef.get(GameConnector.class).
-            enteredConnection(player.getCharacterManager());
+        connectorRef.get().enteredConnection(player.getCharacterManager());
     }
 
     /**
@@ -178,7 +175,7 @@ public class Dungeon implements Game, Serializable {
     private void sendCountChanged() {
         GameMembershipDetail detail =
                 new GameMembershipDetail(getName(), numPlayers());
-        gcmRef.get(GameChangeManager.class).notifyMembershipChanged(detail);
+        gcmRef.get().notifyMembershipChanged(detail);
 
         // FIXME: we used to do the following, but the classloader bug got
         // tripped...now that classloading is fixed, should we go back

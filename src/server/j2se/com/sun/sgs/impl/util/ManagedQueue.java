@@ -55,9 +55,9 @@ public class ManagedQueue<E>
     private static final long serialVersionUID = 1L;
 
     /** The head of the queue, or null. */
-    private ManagedReference headRef;
+    private ManagedReference<Entry<E>> headRef = null;
     /** The tail of the queue, or null. */
-    private ManagedReference tailRef;
+    private ManagedReference<Entry<E>> tailRef = null;
 
     /**
      * A queue entry consisting of a reference to the element object
@@ -68,9 +68,9 @@ public class ManagedQueue<E>
 	private static final long serialVersionUID = 1L;
 	
 	/** The element. */
-	final ManagedReference elementRef;
+	final ManagedReference<E> elementRef;
 	/** The reference to the next queue entry, or null. */
-	ManagedReference nextEntryRef = null;
+	ManagedReference<Entry<E>> nextEntryRef = null;
 
 	/** Constructs an entry with the specified element. */
 	Entry(E element) {
@@ -82,16 +82,14 @@ public class ManagedQueue<E>
 		throw new IllegalArgumentException(
 		    "element does not implement ManagedObject");
 	    }
-	    elementRef = AppContext.getDataManager().
-		createReference((ManagedObject) element);
+	    elementRef = AppContext.getDataManager().createReference(element);
 	}
 
-	@SuppressWarnings("unchecked")
 	/**
 	 * Returns the element associated with this entry.
 	 */
 	E getElement() {
-	    return (E) elementRef.get(ManagedObject.class);
+	    return elementRef.get();
 	}
    }
 
@@ -103,11 +101,12 @@ public class ManagedQueue<E>
 	Entry<E> entry = new Entry<E>(o);
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
-	ManagedReference entryRef = dataManager.createReference(entry);
+	ManagedReference<Entry<E>> entryRef =
+	    dataManager.createReference(entry);
 	if (tailRef == null) {
 	    headRef = tailRef = entryRef;
 	} else {
-	    Entry<?> tail = tailRef.getForUpdate(Entry.class);
+	    Entry<E> tail = tailRef.getForUpdate();
 	    tail.nextEntryRef = entryRef;
 	    tailRef = entryRef;
 	}
@@ -135,7 +134,7 @@ public class ManagedQueue<E>
 	    }
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.removeObject(head);
-	    dataManager.removeObject((ManagedObject) element);
+	    dataManager.removeObject(element);
 	}
 	return element;
     }
@@ -192,13 +191,11 @@ public class ManagedQueue<E>
 
     /* -- Other methods -- */
     
-    @SuppressWarnings("unchecked")
     private Entry<E> getHead() {
-	return headRef.get(Entry.class);
+	return headRef.get();
     }
     
-    @SuppressWarnings("unchecked")
     private Entry<E> getHeadForUpdate() {
-	return headRef.getForUpdate(Entry.class);
+	return headRef.getForUpdate();
     }
 }

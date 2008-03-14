@@ -24,9 +24,10 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -90,7 +91,7 @@ public class TestScalableHashMapStress extends Assert {
     static final Random random = new UndoableRandom(seed);
 
     private static SgsTestNode serverNode;
-    private static TaskScheduler taskScheduler;
+    private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
     private static DataService dataService;
 
@@ -185,7 +186,7 @@ public class TestScalableHashMapStress extends Assert {
      */
     private static class Value extends Int {
 	private static final long serialVersionUID = 1;
-	private ManagedReference key;
+	private ManagedReference<ManagedKey> key;
 	static Value create(int i) {
 	    return random.nextBoolean() ? new Value(i) : new ManagedValue(i);
 	}
@@ -201,12 +202,11 @@ public class TestScalableHashMapStress extends Assert {
 	    setKey(key);
 	}
 	Key getKey() {
-	    return (key == null) ? null : key.get(Key.class);
+	    return (key == null) ? null : key.get();
 	}
 	void setKey(Key key) {
-	    this.key = (key instanceof ManagedObject)
-		? AppContext.getDataManager().createReference(
-		    (ManagedObject) key)
+	    this.key = (key instanceof ManagedKey)
+		? AppContext.getDataManager().createReference((ManagedKey) key)
 		: null;
 	}
 	public boolean equals(Object object) {
@@ -308,9 +308,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !keys.hasNext();
 	    if (startAgain) {
 		keys = map.keySet().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Key>> ms =
-		    dataService.getBinding("keys", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("keys"));
 		ms.set(keys);
 		keysSeen.clear();
 		currentKey = -1;
@@ -363,10 +362,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !values.hasNext();
 	    if (startAgain) {
 		values = map.values().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Value>> ms =
-		    dataService.getBinding(
-			"values", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("values"));
 		ms.set(values);
 		valuesSeen.clear();
 		currentValue = -1;
@@ -418,10 +415,8 @@ public class TestScalableHashMapStress extends Assert {
 	    boolean startAgain = !entries.hasNext();
 	    if (startAgain) {
 		entries = map.entrySet().iterator();
-		@SuppressWarnings("unchecked")
 		ManagedSerializable<Iterator<Entry<Key, Value>>> ms =
-		    dataService.getBinding(
-			"entries", ManagedSerializable.class);
+		    uncheckedCast(dataService.getBinding("entries"));
 		ms.set(entries);
 		entriesSeen.clear();
 		currentEntry = -1;
@@ -488,12 +483,12 @@ public class TestScalableHashMapStress extends Assert {
 	new EntrySetNextRemove(1);
 
 	serverNode = new SgsTestNode("TestScalableHashMapStress", null, null);
-        taskScheduler = serverNode.getSystemRegistry().
-            getComponent(TaskScheduler.class);
+        txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
         dataService = serverNode.getDataService();
 
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    initialObjectCount = getObjectCount();
@@ -520,15 +515,13 @@ public class TestScalableHashMapStress extends Assert {
 
     /** Teardown. */
     @After public void tearDown() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		private int attempts = 0;
 		public void run() throws Exception {
 		    initTxnState(++attempts);
-		    dataService.
-			removeObject(dataService.
-				     getBinding("entries",
-						ManagedSerializable.class));
+		    dataService.removeObject(
+			dataService.getBinding("entries"));
 		    entries = map.entrySet().iterator();
 		    dataService.setBinding("entries",
 		        new ManagedSerializable<Iterator<Entry<Key, Value>>>
@@ -538,7 +531,7 @@ public class TestScalableHashMapStress extends Assert {
 	    }, taskOwner);
 	final AtomicBoolean isDone = new AtomicBoolean(false);
 	while (! isDone.get()) {
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    private int attempts = 0;
 		    public void run() throws Exception {
@@ -555,29 +548,21 @@ public class TestScalableHashMapStress extends Assert {
 		    }
 	    }, taskOwner);
 	}
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		private int attempts = 0;
 		public void run() throws Exception {
 		    initTxnState(++attempts);
 		    DoneRemoving.init();
 		    dataService.removeObject(map);
-		    dataService.
-			removeObject(dataService.
-				     getBinding("keys",
-						ManagedSerializable.class));
-		    dataService.
-			removeObject(dataService.
-				     getBinding("values",
-						ManagedSerializable.class));
-		    dataService.
-			removeObject(dataService.
-				     getBinding("entries",
-						ManagedSerializable.class));
+		    dataService.removeObject(dataService.getBinding("keys"));
+		    dataService.removeObject(dataService.getBinding("values"));
+		    dataService.removeObject(
+			dataService.getBinding("entries"));
 		}
 	    }, taskOwner);
 	DoneRemoving.await(1);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(initialObjectCount, getObjectCount());
@@ -600,7 +585,7 @@ public class TestScalableHashMapStress extends Assert {
 	final AtomicInteger opsPerTxn = new AtomicInteger(getRandomOpsPerTxn());
 	final AtomicInteger opnum = new AtomicInteger(0);
 	while (! isDone.get()) {
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    private int attempts = 0;
 		    public void run() throws Exception {
@@ -641,13 +626,16 @@ public class TestScalableHashMapStress extends Assert {
 	} else {
 	    AbstractUndoable.undoAll();
 	}
-	map = dataService.getBinding("map", ScalableHashMap.class);
-	keys = (Iterator<Key>)
-	    dataService.getBinding("keys", ManagedSerializable.class).get();
-	values = (Iterator<Value>)
-	    dataService.getBinding("values", ManagedSerializable.class).get();
-	entries = (Iterator<Entry<Key, Value>>)
-	    dataService.getBinding("entries", ManagedSerializable.class).get();
+	map = (ScalableHashMap) dataService.getBinding("map");
+	ManagedSerializable<Iterator<Key>> msKeys =
+	    uncheckedCast(dataService.getBinding("keys"));
+	keys = msKeys.get();
+	ManagedSerializable<Iterator<Value>> msValues =
+	    uncheckedCast(dataService.getBinding("values"));
+	values = msValues.get();
+	ManagedSerializable<Iterator<Entry<Key, Value>>> msEntries =
+	    uncheckedCast(dataService.getBinding("entries"));
+	entries = msEntries.get();
 	if (debug) {
 	    System.err.println("new transaction");
 	}
@@ -701,7 +689,7 @@ public class TestScalableHashMapStress extends Assert {
      */
     static void maybeRemoveObject(Object object) {
 	if (object instanceof ManagedObject) {
-	    AppContext.getDataManager().removeObject((ManagedObject) object);
+	    AppContext.getDataManager().removeObject(object);
 	}
     }
 
@@ -728,8 +716,7 @@ public class TestScalableHashMapStress extends Assert {
 		break;
 	    }
 	    try {
-		ManagedObject obj = dataService.createReferenceForId(id).get(
-		    ManagedObject.class);
+		Object obj = dataService.createReferenceForId(id).get();
 		System.err.println(id + ": (" + obj.getClass().getName() +
 				   ") " + obj);
 	    } catch (Exception e) {

@@ -79,11 +79,9 @@ import java.io.Serializable;
  * public class MyPlayerObj {
  *     String name;
  *
- *     // a reference of type ManagedSerializable&lt;Collection&lt;Item&gt;&gt;
- *     ManagedReference inventoryRef;
+ *     ManagedReference&lt;ManagedSerializable&lt;Collection&lt;Item&gt;&gt;&gt; inventoryRef;
  *
- *     // a reference of type ManagedSerializable&lt;MapArea&gt;
- *     ManagedReference currentLocationRef;
+ *     ManagedReference&lt;ManagedSerializable&lt;MapArea&gt;&gt; currentLocationRef;
  *
  *     public MyPlayerObj(...) {
  *         ...
@@ -97,7 +95,7 @@ import java.io.Serializable;
  *
  *     public void findNearbyPlayers() {
  *         ManagedSerializable&lt;MapArea&gt; curLocWrapper =
- *             currentLocationRef.get(ManagerSerializable.class);
+ *             currentLocationRef.get();
  *         MapArea currentLocation = curLocWrapper.get();
  *
  *         for (Player p : currentLocation.getPlayers())

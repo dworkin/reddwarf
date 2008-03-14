@@ -23,10 +23,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IdGenerator;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import junit.framework.TestCase;
 
 
@@ -34,7 +33,7 @@ public class TestIdGenerator extends TestCase {
 
     private SgsTestNode serverNode;
     private TransactionProxy txnProxy;
-    private TaskScheduler taskScheduler;
+    private TransactionScheduler txnScheduler;
     private Identity taskOwner;
 
     /** Constructs a test instance. */
@@ -48,8 +47,8 @@ public class TestIdGenerator extends TestCase {
 
         serverNode = new SgsTestNode("TestIdGenerator", null, null);
         txnProxy = serverNode.getProxy();
-        taskScheduler = serverNode.getSystemRegistry().
-            getComponent(TaskScheduler.class);
+        txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
     }
 
@@ -69,7 +68,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullName() {
 	try {
 	    new IdGenerator(null, IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, taskScheduler);
+			    txnProxy, txnScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -79,7 +78,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorEmptyName() {
 	try {
 	    new IdGenerator("", IdGenerator.MIN_BLOCK_SIZE,
-			    txnProxy, taskScheduler);
+			    txnProxy, txnScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -89,7 +88,7 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorBadBlockSize() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE-1,
-			    txnProxy, taskScheduler);
+			    txnProxy, txnScheduler);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -99,14 +98,14 @@ public class TestIdGenerator extends TestCase {
     public void testConstructorNullProxy() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
-			    null, taskScheduler);
+			    null, txnScheduler);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
     }
 	
-    public void testConstructorNullTaskScheduler() {
+    public void testConstructorNullTransactionScheduler() {
 	try {
 	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
 			    txnProxy, null);
@@ -121,7 +120,7 @@ public class TestIdGenerator extends TestCase {
     }
 
     public void testNextWithTransaction() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     doNextTest(IdGenerator.MIN_BLOCK_SIZE, 4);
@@ -134,7 +133,7 @@ public class TestIdGenerator extends TestCase {
     }
 
     public void testNextBytesWithTransaction() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     doNextBytesTest(1024, 8);
@@ -145,7 +144,7 @@ public class TestIdGenerator extends TestCase {
     private void doNextTest(int blockSize, int iterations) throws Exception {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, taskScheduler);
+			    txnProxy, txnScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    long generatedId = generator.next();
@@ -161,7 +160,7 @@ public class TestIdGenerator extends TestCase {
     {
 	IdGenerator generator =
 	    new IdGenerator("generator", blockSize,
-			    txnProxy, taskScheduler);
+			    txnProxy, txnScheduler);
 	long nextId = 1;
 	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
 	    byte[] generatedIdBytes = generator.nextBytes();

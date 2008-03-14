@@ -78,7 +78,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
@@ -141,7 +141,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     /* -- Test constructor -- */
 
     public void testConstructorBadPort() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -155,7 +155,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorNegativePort() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -169,7 +169,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorBigPort() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -184,11 +184,11 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorZeroPort() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port", "0");
 	try {
@@ -200,7 +200,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorBadMaxTimeout() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -215,7 +215,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 	
     public void testConstructorNegativeMaxTimeout() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -230,7 +230,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     }
 
     public void testConstructorZeroMaxTimeout() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	txn = new DummyTransaction();
@@ -251,7 +251,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
      * timeout.
      */
     public void testGetObjectMaxTxnTimeout() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
 	props.setProperty("com.sun.sgs.txn.timeout", "2000");
@@ -271,14 +271,14 @@ public class TestDataStoreClient extends TestDataStoreImpl {
      * Test what happens when joining a transaction when the server has failed.
      */
     public void testJoinTxnServerFailed() throws Exception {
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	store.shutdown();
 	store = null;
 	DataStoreServerImpl server = new DataStoreServerImpl(props);
 	props.setProperty(DataStoreNetPackage + ".server.host", "localhost");
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(server.getPort()));
-	props.setProperty(DataStoreNetPackage + ".server.run", "false");
+	props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	txn = new DummyTransaction();	
 	store = createDataStore(props);
 	server.shutdown();
@@ -289,7 +289,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	    System.err.println(e);
 	}
 	try {
-	    txn.abort(null);
+	    txn.abort(new RuntimeException("abort"));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);

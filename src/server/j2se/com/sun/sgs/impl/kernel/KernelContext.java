@@ -42,19 +42,16 @@ import java.util.MissingResourceException;
  * FIXME:  the context should check that it isn't shutdown before
  *  handing out services and managers
  */
-
-// Cannot be final because tests extend it
 class KernelContext {
 
-    // the application's name and cached hash code
+    // the application's name
     private final String applicationName;
-    private final int applicationCode;
     
     // the managers available in this context
-    private final ComponentRegistry managerComponents;
+    protected final ComponentRegistry managerComponents;
 
     // the services used in this context
-    private final ComponentRegistry serviceComponents;
+    protected final ComponentRegistry serviceComponents;
 
     // the three standard managers, which are cached since they are used
     // extremely frequently
@@ -63,28 +60,38 @@ class KernelContext {
     private final TaskManager taskManager;
 
     /**
-     * Creates an instance of <code>KernelContext</code>.
+     * Creates an instance of <code>KernelContext</code> based on the
+     * components that have already been collected in another instance.
+     *
+     * @param context the existing <code>KernelContext</code> to use as a
+     *                source of components
+     */
+    KernelContext(KernelContext context) {
+        this(context.applicationName, context.serviceComponents,
+             context.managerComponents);
+    }
+
+    /**
+     * Creates an instance <code>KernelContext</code> with the given name
+     * and components. This is used by sub-classes to create an instance
+     * that can be provided components as needed by adding to the provided
+     * <code>ComponentRegistry</code> instances.
      *
      * @param applicationName the name of the application represented by
      *                        this context
      * @param serviceComponents the services available in this context
      * @param managerComponents the managers available in this context
      */
-    KernelContext (String applicationName,
-                   ComponentRegistry serviceComponents,
-                   ComponentRegistry managerComponents) {
+    protected KernelContext(String applicationName,
+                            ComponentRegistry serviceComponents,
+                            ComponentRegistry managerComponents) {
         this.applicationName = applicationName;
-
-        // the hash code is the hash of the application name, which never
-        // changes, so the hash code gets pre-cached here
-        applicationCode = applicationName.hashCode();
-
         this.serviceComponents = serviceComponents;
         this.managerComponents = managerComponents;
 
         // pre-fetch the three standard managers...if any of them isn't
         // present then we're running without an application and with a
-        // sub-set of services, so just that manager to null
+        // sub-set of services, so just set that manager to null
 
         ChannelManager cm;
         try {
@@ -190,17 +197,27 @@ class KernelContext {
     }
 
     /**
+     * Notifies all included Services that the system is now ready.
+     *
+     * @throws Exception if there is any failure during notification
+     */
+    void notifyReady() throws Exception {
+        for (Object service : serviceComponents)
+            ((Service)service).ready();
+    }
+
+    /**
      * Shut down all the service components in the reverse order that
      * they were added.
      */
     void shutdownServices() {
         // reverse the list of services
         ArrayList<Object> list = new ArrayList<Object>();
-        for (Object service: serviceComponents) {
+        for (Object service : serviceComponents) {
             list.add(service);
         }
         Collections.reverse(list);
-        for (Object service: list) {
+        for (Object service : list) {
             ((Service) service).shutdown();
         }
     }
@@ -215,29 +232,4 @@ class KernelContext {
         return applicationName;
     }
 
-    /**
-     * Returns <code>true</code> if the provided object is an instance of
-     * <code>AppKernelAppContext</code> that represents the same
-     * application context.
-     *
-     * @param o an instance of <code>KernelContext</code>
-     *
-     * @return <code>true</code> if the provided object represents the same
-     *         context as this object, <code>false</code> otherwise
-     */
-    public boolean equals(Object o) {
-        if ((o == null) || (! (o instanceof KernelContext)))
-            return false;
-
-        KernelContext other = (KernelContext)o;
-
-        return other.applicationName.equals(applicationName);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public int hashCode() {
-        return applicationCode;
-    }
 }

@@ -23,14 +23,14 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
+import com.sun.sgs.kernel.TaskQueue;
 
 
 /**
- * This package-private class is a simple container class used to represent
- * the main aspects of a task that has been accepted by the scheduler for
- * running.
+ * This class is a simple container class used to represent the main aspects
+ * of a task that has been accepted by the scheduler for running.
  */
-class ScheduledTask {
+public class ScheduledTask {
 
     // the common aspects of a task
     private final KernelRunnable task;
@@ -39,6 +39,8 @@ class ScheduledTask {
     private final long startTime;
     private final long period;
     private InternalRecurringTaskHandle recurringTaskHandle = null;
+    private int tryCount = 0;
+    private TaskQueue queue = null;
 
     // identifier that represents a non-recurring task.
     static final int NON_RECURRING = -1;
@@ -52,7 +54,7 @@ class ScheduledTask {
      * @param newStartTime the new starting time for the task in milliseconds
      *                     since January 1, 1970
      */
-    ScheduledTask(ScheduledTask task, long newStartTime) {
+    public ScheduledTask(ScheduledTask task, long newStartTime) {
         this(task.task, task.owner, task.priority, newStartTime, task.period);
         this.recurringTaskHandle = task.recurringTaskHandle;
     }
@@ -67,8 +69,8 @@ class ScheduledTask {
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
      */
-    ScheduledTask(KernelRunnable task, Identity owner, Priority priority,
-                  long startTime) {
+    public ScheduledTask(KernelRunnable task, Identity owner,
+                         Priority priority, long startTime) {
         this(task, owner, priority, startTime, NON_RECURRING);
     }
 
@@ -83,8 +85,8 @@ class ScheduledTask {
      * @param period the delay between recurring executions, or
      *               <code>NON_RECURRING</code>
      */
-    ScheduledTask(KernelRunnable task, Identity owner, Priority priority,
-                  long startTime, long period) {
+    public ScheduledTask(KernelRunnable task, Identity owner,
+                         Priority priority, long startTime, long period) {
         if (task == null)
             throw new NullPointerException("Task cannot be null");
         if (owner == null)
@@ -104,7 +106,7 @@ class ScheduledTask {
      *
      * @return the <code>KernelRunnable</code> to run
      */
-    KernelRunnable getTask() {
+    public KernelRunnable getTask() {
         return task;
     }
 
@@ -113,7 +115,7 @@ class ScheduledTask {
      *
      * @return the <code>Identity</code> that owns the task
      */
-    Identity getOwner() {
+    public Identity getOwner() {
         return owner;
     }
 
@@ -122,7 +124,7 @@ class ScheduledTask {
      *
      * @return the <code>Priority</code>
      */
-    Priority getPriority() {
+    public Priority getPriority() {
         return priority;
     }
 
@@ -131,7 +133,7 @@ class ScheduledTask {
      *
      * @return the scheduled run time for the task
      */
-    long getStartTime() {
+    public long getStartTime() {
         return startTime;
     }
 
@@ -141,7 +143,7 @@ class ScheduledTask {
      *
      * @return the period between recurring executions.
      */
-    long getPeriod() {
+    public long getPeriod() {
         return period;
     }
 
@@ -151,7 +153,7 @@ class ScheduledTask {
      * @return <code>true</code> if this task is a recurring task,
      * <code>false</code> otherwise.
      */
-    boolean isRecurring() {
+    public boolean isRecurring() {
         return period != NON_RECURRING;
     }
 
@@ -178,6 +180,59 @@ class ScheduledTask {
      */
     InternalRecurringTaskHandle getRecurringTaskHandle() {
         return recurringTaskHandle;
+    }
+
+    /**
+     * If this task is recurring, then this method schedules the next
+     * recurrence. Typically this is done immediately after each run of the
+     * task. This has the effect of setting the try count to zero in
+     * preparation for the next run.
+     */
+    public void scheduleNextRecurrence() {
+        tryCount = 0;
+        if (recurringTaskHandle != null)
+            recurringTaskHandle.scheduleNextRecurrence();
+    }
+
+    /**
+     * Increments the try count (the number of times that this task has been
+     * attempted). This is only meaningful for {@code Scheduler}s that
+     * implement some notion of re-try, like {@code TransactionScheduler}.
+     */
+    public void incrementTryCount() {
+        tryCount++;
+    }
+
+    /**
+     * Returns the try count (the number of times that this task has been
+     * attempted).
+     *
+     * @return the try count
+     */
+    public int getTryCount() {
+        return tryCount;
+    }
+
+    /**
+     * Sets the {@code TaskQueue} associated with this task. Typically this
+     * is used to track dependency, so that when this task is completed,
+     * the next task can be fetched from the queue.
+     *
+     * @param queue the associated {@code TaskQueue}
+     */
+    public void setTaskQueue(TaskQueue queue) {
+        this.queue = queue;
+    }
+
+    /**
+     * Returns the {@code TaskQueue} associated with this task. This is
+     * typically the source of dependent tasks where this task was submitted.
+     *
+     * @return the associated {@code TaskQueue} or {@code null} if no
+     *         queue was set
+     */
+    public TaskQueue getTaskQueue() {
+        return queue;
     }
 
     /**

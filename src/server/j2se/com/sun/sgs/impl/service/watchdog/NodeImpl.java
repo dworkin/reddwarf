@@ -60,6 +60,9 @@ class NodeImpl
     
     /** The host name, or {@code null}. */
     private final String host;
+    
+    /** The port, or {@code null}. */
+    private final int port;
 
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
@@ -75,60 +78,83 @@ class NodeImpl
 
     /**
      * The expiration time for this node. A value of {@code 0} means
-     * that either the value has not been intialized or the value is
+     * that either the value has not been initialized or the value is
      * not meaningful because the node has failed.
      */
     private transient long expiration;
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code client}.  This instance's
-     * alive status is set to {@code true}.  The expiration time for
-     * this instance should be set as soon as it is known.
+     * nodeId}, {@code hostName}, {@code port}, and {@code client}.  
+     * This instance's alive status is set to {@code true}.  The expiration 
+     * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
+     * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
-	this.id = nodeId;
-	this.host = hostName;
-	this.client = client;
-	this.isAlive = true;
+    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
+        this (nodeId, hostName, port, client, true, INVALID_ID);
     }
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code isAlive} status.  This
+     * nodeId}, {@code hostName}, and {@code isAlive} status.  This
      * instance's watchdog client is set to {@code null} and its
      * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
+	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
     }
 	
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, {@code backupId}, and {@code
-     * isAlive} status.  This instance's watchdog client is set to
+     * nodeId}, {@code hostName}, {@code port}, {@code isAlive} status, and 
+     * {@code backupId}.  This instance's watchdog client is set to
      * {@code null}.
      *
      * @param 	nodeId a node ID
-     * @param 	hostName a host name, or {@code null}
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
-	this.id = nodeId;
+    NodeImpl(long nodeId, String hostName, int port, 
+             boolean isAlive, long backupId) 
+    {
+        this(nodeId, hostName, port, null, isAlive, backupId);
+    }
+    
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostName}, {@code port}, {@code client}, 
+     * {@code isAlive} status, and {@code backupId}.
+     *
+     * @param 	nodeId a node ID
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
+     * @param	client   a watchdog client
+     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	backupId the ID of the node's backup (-1 if no backup
+     *		is assigned)
+     */
+    private NodeImpl(long nodeId, String hostName, int port, 
+                     WatchdogClient client, boolean isAlive, long backupId) 
+    {
+        this.id = nodeId;
+
 	this.host = hostName;
-	this.client = null;
-	this.isAlive = isAlive;
-	this.backupId = backupId;
+        this.port = port;
+        this.client = client;
+        this.isAlive = isAlive;
+        this.backupId = backupId;
     }
 
     /* -- Implement Node -- */
@@ -141,6 +167,11 @@ class NodeImpl
     /** {@inheritDoc} */
     public String getHostName() {
 	return host;
+    }
+    
+    /** {@inheritDoc} */
+    public int getPort() {
+        return port;
     }
 
     /** {@inheritDoc} */
@@ -172,7 +203,8 @@ class NodeImpl
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && compareStrings(host, node.host) == 0;
+	    return id == node.id && compareStrings(host, node.host) == 0 &&
+                     port == node.port;
 	}
 	return false;
     }
@@ -183,10 +215,11 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String toString() {
+    public synchronized String toString() {
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
-	    (backupId == INVALID_ID ? "(none)" : backupId) + "]@" + host;
+	    (backupId == INVALID_ID ? "(none)" : backupId) + 
+            "]@" + host + ":" + port;
     }
 
     /* -- package access methods -- */
@@ -200,7 +233,7 @@ class NodeImpl
     
     /**
      * Returns the expiration time.  A value of {@code 0} means that
-     * either the value has not been intialized or the value is not
+     * either the value has not been initialized or the value is not
      * meaningful because the node has failed.  If {@link #isAlive}
      * returns {@code false} the value returned from this method is
      * not meaningful.
@@ -337,7 +370,7 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	    dataService.removeServiceBinding(key);
 	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
@@ -360,12 +393,12 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node = null;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	} catch (NameNotBoundException e) {
 	}
 	return node;
     }
-
+    
     /**
      * Marks all nodes currently bound in the specified {@code
      * dataService} as failed, and returns a collection of those
@@ -382,7 +415,7 @@ class NodeImpl
 	     BoundNamesUtil.getServiceBoundNamesIterable(
 		dataService, NODE_PREFIX))
 	{
-	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
+	    NodeImpl node = (NodeImpl) dataService.getServiceBinding(key);
 	    node.setFailed(dataService, null);
 	    nodes.add(node);
 	}
@@ -470,7 +503,7 @@ class NodeImpl
 	/** {@inheritDoc} */
 	public Node next() {
 	    String key = iterator.next();
-	    return dataService.getServiceBinding(key, NodeImpl.class);
+	    return (NodeImpl) dataService.getServiceBinding(key);
 	}
 
 	/** {@inheritDoc} */

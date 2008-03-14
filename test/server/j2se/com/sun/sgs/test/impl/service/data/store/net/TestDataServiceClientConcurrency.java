@@ -21,9 +21,6 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
 import java.util.Properties;
 
@@ -66,27 +63,28 @@ public class TestDataServiceClientConcurrency
     }
 
     /**
-     * Create a DataService, set any default properties, and start the server,
-     * if needed.
+     * Return the properties to start the store in the right more for this
+     * test case.
      */
     @Override
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry,
-					 TransactionProxy txnProxy)
+    protected Properties getNodeProps()
 	throws Exception
     {
+	Properties props = super.getNodeProps();
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
+	} else {
+	    props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry, txnProxy);
+	return props;
     }
 }

@@ -34,6 +34,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -69,16 +70,18 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.start
  *	</b></code><br>
- *	<i>Default:</i> <code>true</code>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else <code>true</code>
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link NodeMappingServerImpl}, using the properties provided
  *	to this instance's constructor. <p>
-
+ *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
- *	<i>Default:</i> the local host name <br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, else the local host name <br>
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	NodeMappingServer}. <p>
@@ -91,9 +94,9 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	NodeMappingServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.nodemap.start.server}
- *	property is {@code true}, and means that an anonymous port will be
- *	chosen for running the server. <p>
+ *	if the {@code com.sun.sgs.impl.service.nodemap.server.start} property
+ *	is {@code true}, and means that an anonymous port will be chosen for
+ *	running the server. <p>
  *
  *  <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.client.port
@@ -315,6 +318,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
     
+    /** The transaction scheduler. */
+    private final TransactionScheduler transactionScheduler;
+
     /** The owner for tasks I initiate. */
     private final Identity taskOwner;
     
@@ -427,6 +433,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
         
 	try {
             taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+            transactionScheduler =
+                systemRegistry.getComponent(TransactionScheduler.class);
             dataService = txnProxy.getService(DataService.class);
             watchdogService = txnProxy.getService(WatchdogService.class);
             taskOwner = txnProxy.getCurrentOwner();
@@ -434,8 +442,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
             contextFactory = new ContextFactory(txnProxy);
                 
             // Find or create our server.   
-            boolean instantiateServer =  wrappedProps.getBooleanProperty(
-                                                SERVER_START_PROPERTY, true);
+            boolean instantiateServer =
+		wrappedProps.getBooleanProperty(
+		    SERVER_START_PROPERTY,
+		    wrappedProps.getBooleanProperty(
+			StandardProperties.SERVER_START, true));
             String localHost = InetAddress.getLocalHost().getHostName();            
             String host;
             int port;
@@ -450,7 +461,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
             } else {
                 serverImpl = null;
                 host = 
-                    wrappedProps.getProperty(SERVER_HOST_PROPERTY, localHost);
+                    wrappedProps.getProperty(
+			SERVER_HOST_PROPERTY,
+			wrappedProps.getProperty(
+			    StandardProperties.SERVER_HOST, localHost));
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
@@ -700,7 +714,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         public void run() throws UnknownIdentityException { 
             // Exceptions thrown by getServiceBinding are handled by caller.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(idKey, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(idKey);
             
             if (active) {
                 dataService.setServiceBinding(statusKey, idmo);
@@ -772,7 +786,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // We look up the identity in the data service. Most applications
             // will use a customized Identity object.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(key, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(key);
             return idmo.getIdentity();
         }
         
@@ -917,7 +931,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
      * @param task the task
      */
     private void runTransactionally(KernelRunnable task) throws Exception {     
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        transactionScheduler.runTask(task, taskOwner);
     }
             
     /* -- Implement transaction participant/context for 'getNode' -- */
@@ -971,7 +985,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	    String key = NodeMapUtil.getIdentityKey(identity);
 	    try {                
 		IdentityMO idmo = 
-                        dataService.getServiceBinding(key, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(key);
                 node = watchdogService.getNode(idmo.getNodeId());
                 if (node == null) {
                     // The identity is on a failed node, where the node has

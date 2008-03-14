@@ -22,10 +22,9 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import java.io.Serializable;
 
 /**
@@ -40,7 +39,7 @@ public class IdGenerator {
     private final String name;
     private final int blockSize;
     private final TransactionProxy txnProxy;
-    private final TaskScheduler scheduler;
+    private final TransactionScheduler scheduler;
     private final Identity owner;
     private final Object lock = new Object();
     private long nextId = 1;
@@ -53,7 +52,7 @@ public class IdGenerator {
      * @param	name the service binding name for this generator
      * @param	blockSize the block size for ID reservation
      * @param	proxy the transaction proxy
-     * @param	scheduler a task scheduler
+     * @param	scheduler a transaction scheduler
      *
      * @throws	IllegalArgumentException if the specified {@code name}
      *		is empty or if the specified {@code blockSize} is less
@@ -62,7 +61,7 @@ public class IdGenerator {
     public IdGenerator(
 	String name, int blockSize,
 	TransactionProxy proxy,
-	TaskScheduler scheduler)
+	TransactionScheduler scheduler)
     {
 	if (name == null) {
 	    throw new NullPointerException("null name");
@@ -97,7 +96,7 @@ public class IdGenerator {
 	synchronized (lock) {
 	    if (nextId > lastReservedId) {
 		ReserveIdBlockTask reserveTask = new ReserveIdBlockTask();
-		scheduler.runTransactionalTask(reserveTask, owner);
+		scheduler.runTask(reserveTask, owner);
 		nextId = reserveTask.firstId;
 		lastReservedId = reserveTask.lastId;
 	    }
@@ -138,7 +137,7 @@ public class IdGenerator {
 	    DataService dataService = txnProxy.getService(DataService.class);
 	    State state;
 	    try {
-		state = dataService.getServiceBinding(name, State.class);
+		state = (State) dataService.getServiceBinding(name);
 	    } catch (NameNotBoundException e) {
 		state = new State(0);
 		dataService.setServiceBinding(name, state);

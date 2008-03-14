@@ -21,14 +21,14 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCoordinator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
-import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
+import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
@@ -37,20 +37,18 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
-import com.sun.sgs.service.DataService;
 
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
@@ -61,7 +59,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -128,29 +125,24 @@ class Kernel {
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
-    // NOTE: this transaction coordinator should not really be static;
-    // when we allow external transaction coordinators, we need to
-    // create a factory to create not-static instances.  
-    private static TransactionCoordinator transactionCoordinator;
-
     // the properties used to start the application
     private final Properties appProperties;
     
     // the registration point for producers of profiling data
     private final ProfileRegistrar profileRegistrar;
 
-    // the task handler
-    private final TaskHandler taskHandler;
-    
-    // the scheduler
-    private final MasterTaskScheduler scheduler;
+    // the schedulers used for transactional and non-transactional tasks
+    private final TransactionSchedulerImpl transactionScheduler;
+    private final TaskSchedulerImpl taskScheduler;
 
     // the application that is running in this kernel
     private KernelContext application;
 
-    // The system registry which will, by the time ready() is called,
-    // contain all services and components.
-    private final ComponentRegistry systemRegistry;
+    // The system registry which contains all shared system components
+    private final ComponentRegistryImpl systemRegistry;
+    
+    // collector and reporter of profile information
+    private final ProfileCollectorImpl profileCollector;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -170,22 +162,18 @@ class Kernel {
         this.appProperties = appProperties;
 
         try {
-            // create the resource coordinator
-            ResourceCoordinatorImpl resourceCoordinator =
-                new ResourceCoordinatorImpl(appProperties);
-
             // see if we're doing any level of profiling, which for the
             // current version is as simple as "on" or "off"
-            ProfileCollectorImpl profileCollector = null;
             String profileLevel = appProperties.getProperty(PROFILE_PROPERTY);
             if (profileLevel != null) {
                 if (profileLevel.equals("on")) {
                     logger.log(Level.CONFIG, "System profiling is on");
                     profileCollector =
-                        new ProfileCollectorImpl(resourceCoordinator);
+                        new ProfileCollectorImpl();
                     profileRegistrar =
                         new ProfileRegistrarImpl(profileCollector);
                 } else {
+                    profileCollector = null;
                     profileRegistrar = null;
                     if (! profileLevel.equals("off")) {
                         if (logger.isLoggable(Level.WARNING))
@@ -195,71 +183,55 @@ class Kernel {
                     }
                 }
             } else {
+                profileCollector = null;
                 profileRegistrar = null;
             }
 
-            // create the task handler and scheduler
-            taskHandler =
-                new TaskHandler(
-                  getTransactionCoordinator(appProperties, profileCollector), 
-                  profileCollector);
-            
-            scheduler =
-                new MasterTaskScheduler(appProperties, resourceCoordinator,
-                                        taskHandler, profileCollector);
-
-            // with the scheduler created, if profiling is on then create
-            // the listeners for profiling data
-            if (profileCollector != null)
-                loadProfileListeners(appProperties, profileCollector,
-                                     scheduler, resourceCoordinator);
-
-            // create the authentication coordinator used for the application
+            // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
                 new ArrayList<IdentityAuthenticator>();
             String [] authenticatorClassNames =
                 appProperties.getProperty(StandardProperties.AUTHENTICATORS,
                                     DEFAULT_IDENTITY_AUTHENTICATOR).split(":");
 
-            for (String authenticatorClassName : authenticatorClassNames) {
-                try {
-                    authenticators.add(getAuthenticator(authenticatorClassName,
-                                                        appProperties));
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.SEVERE))
-                        logger.logThrow(Level.SEVERE, e, "Failed to load " +
-                                        "IdentityAuthenticator: {0}",
-                                        authenticatorClassName);
-                    throw e;
-                }
-            }
+            for (String authenticatorClassName : authenticatorClassNames)
+                authenticators.add(getAuthenticator(authenticatorClassName,
+                                                    appProperties));
+            IdentityCoordinator identityCoordinator =
+                new IdentityCoordinatorImpl(authenticators);
 
-            IdentityCoordinator appIdentityCoordinator;
-            try {
-                appIdentityCoordinator = 
-                        new IdentityCoordinatorImpl(authenticators);
-            } catch (Exception e) {
-                if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE, e,
-                                    "Failed to created Identity Coordinator");
-                throw e;
-            }
-            
-            // finally, collect some of the system components to be shared
-            // with services as they are created
-            HashSet<Object> systemComponents = new HashSet<Object>();
-            systemComponents.add(resourceCoordinator);
-            systemComponents.add(scheduler);
-            systemComponents.add(appIdentityCoordinator);
-            
-            // create the system registry for use in setting up the services
-            systemRegistry = new ComponentRegistryImpl(systemComponents);
-            
-            if (logger.isLoggable(Level.INFO)) {
+            // initialize the transaction coordinator
+            TransactionCoordinator transactionCoordinator =
+                new TransactionCoordinatorImpl(appProperties, profileCollector);
+
+            // create the schedulers, and provide an empty context in case
+            // any profiling components try to do transactional work
+            transactionScheduler =
+                new TransactionSchedulerImpl(appProperties,
+                                             transactionCoordinator,
+                                             profileCollector);
+            taskScheduler =
+                new TaskSchedulerImpl(appProperties, profileCollector);
+                        
+            KernelContext ctx = new StartupKernelContext("Kernel");
+            transactionScheduler.setContext(ctx);
+            taskScheduler.setContext(ctx);
+
+            // collect the shared system components into a registry
+            systemRegistry = new ComponentRegistryImpl();
+            systemRegistry.addComponent(transactionScheduler);
+            systemRegistry.addComponent(taskScheduler);
+            systemRegistry.addComponent(identityCoordinator);
+
+            // if profiling is on then create the profiling listeners
+            if (profileCollector != null)
+                loadProfileListeners(profileCollector);
+
+            if (logger.isLoggable(Level.INFO))
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
                         Version.getVersion());
-            }
-            // now start up the application
+
+            // the core system is ready, so start up the application
             createAndStartApplication();
 
         } catch (Exception e) {
@@ -272,34 +244,13 @@ class Kernel {
     }
 
     /**
-     * Private factory for setting up our transaction coordinator. 
-     * Note that we only expect to have more than one coordinator created
-     * when we're running multiple stacks in a single VM, for testing.
-     */
-    private TransactionCoordinator getTransactionCoordinator(
-                    Properties props, ProfileCollectorImpl profileCollector) 
-    {
-        synchronized(Kernel.class) {
-            if (transactionCoordinator == null) {
-                transactionCoordinator = 
-                    new TransactionCoordinatorImpl(props, profileCollector);
-            }
-        }
-        return transactionCoordinator;
-    } 
-
-    /**
      * Private helper routine that loads all of the requested listeners
      * for profiling data.
      */
-    private void loadProfileListeners(Properties systemProperties,
-                                      ProfileCollector profileCollector,
-                                      TaskScheduler taskScheduler,
-                                      ResourceCoordinator resourceCoordinator)
-    {
+    private void loadProfileListeners(ProfileCollector profileCollector) {
         String listenerList =
-            systemProperties.getProperty(PROFILE_LISTENERS,
-                                         DEFAULT_PROFILE_LISTENERS);
+            appProperties.getProperty(PROFILE_LISTENERS,
+                                      DEFAULT_PROFILE_LISTENERS);
 
         for (String listenerClassName : listenerList.split(":")) {
             try {
@@ -308,17 +259,15 @@ class Kernel {
                 Constructor<?> listenerConstructor =
                     listenerClass.getConstructor(Properties.class,
                                                  Identity.class,
-                                                 TaskScheduler.class,
-                                                 ResourceCoordinator.class);
+                                                 ComponentRegistry.class);
 
                 // create a new identity for the listener
                 IdentityImpl owner = new IdentityImpl(listenerClassName);
 
                 // try to create and register the listener
                 Object obj =
-                    listenerConstructor.newInstance(systemProperties,
-                                                    owner, taskScheduler,
-                                                    resourceCoordinator);
+                    listenerConstructor.newInstance(appProperties, owner,
+                                                    systemRegistry);
                 ProfileListener listener = (ProfileListener)obj;
                 profileCollector.addListener(listener);
             } catch (InvocationTargetException e) {
@@ -337,9 +286,10 @@ class Kernel {
         }
 
         // finally, register the scheduler as a listener too
-        if (taskScheduler instanceof ProfileListener)
-            profileCollector.
-                addListener((ProfileListener)taskScheduler);
+        // NOTE: if we make the schedulers pluggable, or add other components
+        // that are listeners, then we should scan through all of the system
+        // components and check if they are listeners
+        profileCollector.addListener(transactionScheduler);
     }
 
     /**
@@ -362,9 +312,9 @@ class Kernel {
     }
 
     /**
-     * Creates each of the <code>Service</code>s in order, in preparation
-     * for starting up an application. At completion, this schedules an
-     * <code>AppStartupRunner</code> to finish application startup.
+     * Creates each of the <code>Service</code>s and their corresponding
+     * <code>Manager</code>s (if any) in order, in preparation for starting
+     * up an application.
      */
     private void createServices(String appName, Identity owner) 
         throws Exception
@@ -372,55 +322,34 @@ class Kernel {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: starting services", appName);
 
-        // create an empty context
-        ComponentRegistryImpl services = new ComponentRegistryImpl();
-        ComponentRegistryImpl managers = new ComponentRegistryImpl();
-        KernelContext ctx = 
-                new KernelContext(appName, services, managers);
+        // create and install a temporary context to use during startup
+        application = new StartupKernelContext(appName);
+        transactionScheduler.setContext(application);
+        taskScheduler.setContext(application);
+        ContextResolver.setTaskState(application, owner);
 
-        // set as the current owner   
-        ThreadState.setCurrentOwner(owner);
-        taskHandler.setContext(ctx);
-
-        // get the managers and services that we're using
-        HashSet<Object> managerSet = new HashSet<Object>();
         try {
-            fetchServices(services, managerSet);
+            fetchServices((StartupKernelContext)application);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e, "{0}: failed to create " +
                                 "services", appName);
-            // set the application to the ctx so far, so we can shut down
-            // the services
-            application = ctx;
             throw e;
         }
 
-        // register any profiling managers and fill in the manager registry
-        for (Object manager : managerSet) {
-            if (profileRegistrar != null) {
-                if (manager instanceof ProfileProducer)
-                    ((ProfileProducer)manager).
-                        setProfileRegistrar(profileRegistrar);
-            }
-            managers.addComponent(manager);
-        }
-
-        // with the managers created, setup the AppContext
-        // the thread owner has not changed
-        application = new KernelContext(appName, services, managers);
-        taskHandler.setContext(application);
+        // with the managers fully created, swap in a permanent context
+        application = new KernelContext(application);
+        transactionScheduler.setContext(application);
+        taskScheduler.setContext(application);
+        ContextResolver.setTaskState(application, owner);
 
         // notify all of the services that the application state is ready
         try {
-            for (Object s : services)
-                ((Service)s).ready();
+            application.notifyReady();
         } catch (Exception e) {
-            logger.logThrow(
-                Level.SEVERE, e,
-                "{0}: failed when notifying services that application is " +
-                "ready",
-                appName);
+            if (logger.isLoggable(Level.SEVERE))
+                logger.logThrow(Level.SEVERE, e, "{0}: failed when notifying " +
+                                "services that application is ready", appName);
             throw e;
         }
     }
@@ -430,8 +359,7 @@ class Kernel {
      * taking care to call out the standard services first, because we need
      * to get the ordering constant and make sure that they're all present.
      */
-    private void fetchServices(ComponentRegistryImpl services,
-                               HashSet<Object> managerSet) 
+    private void fetchServices(StartupKernelContext startupContext) 
        throws Exception 
     {
         // before we start, figure out if we're running with only a sub-set
@@ -477,8 +405,7 @@ class Kernel {
         String dataManagerClass =
             appProperties.getProperty(StandardProperties.DATA_MANAGER,
                                       DEFAULT_DATA_MANAGER);
-        services.addComponent(setupService(dataServiceClass,
-                                           dataManagerClass, managerSet));
+        setupService(dataServiceClass, dataManagerClass, startupContext);
 
         // load the watch-dog service, which has no associated manager
 
@@ -489,9 +416,7 @@ class Kernel {
         String watchdogServiceClass =
             appProperties.getProperty(StandardProperties.WATCHDOG_SERVICE,
                                       DEFAULT_WATCHDOG_SERVICE);
-        Service watchdogService =
-            setupServiceNoManager(watchdogServiceClass);
-        services.addComponent(watchdogService);
+        setupServiceNoManager(watchdogServiceClass, startupContext);
 
         // load the node mapping service, which has no associated manager
 
@@ -502,9 +427,7 @@ class Kernel {
         String nodemapServiceClass =
             appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
                                       DEFAULT_NODE_MAPPING_SERVICE);
-        Service nodemapService =
-                setupServiceNoManager(nodemapServiceClass);
-        services.addComponent(nodemapService);
+        setupServiceNoManager(nodemapServiceClass, startupContext);
 
         // load the task service
 
@@ -518,8 +441,7 @@ class Kernel {
         String taskManagerClass =
             appProperties.getProperty(StandardProperties.TASK_MANAGER,
                                       DEFAULT_TASK_MANAGER);
-        services.addComponent(setupService(taskServiceClass,
-                                           taskManagerClass, managerSet));
+        setupService(taskServiceClass, taskManagerClass, startupContext);
 
         // load the client session service, which has no associated manager
 
@@ -531,9 +453,7 @@ class Kernel {
             appProperties.getProperty(StandardProperties.
                                       CLIENT_SESSION_SERVICE,
                                       DEFAULT_CLIENT_SESSION_SERVICE);
-        Service clientSessionService =
-                setupServiceNoManager(clientSessionServiceClass);
-        services.addComponent(clientSessionService);
+        setupServiceNoManager(clientSessionServiceClass, startupContext);
 
         // load the channel service
 
@@ -547,8 +467,7 @@ class Kernel {
         String channelManagerClass =
             appProperties.getProperty(StandardProperties.CHANNEL_MANAGER,
                                       DEFAULT_CHANNEL_MANAGER);
-        services.addComponent(setupService(channelServiceClass,
-                                           channelManagerClass, managerSet));
+        setupService(channelServiceClass, channelManagerClass, startupContext);
 
         // finally, load any external services and their associated managers
         if ((externalServices != null) && (externalManagers != null)) {
@@ -565,15 +484,11 @@ class Kernel {
             }
 
             for (int i = 0; i < serviceClassNames.length; i++) {
-                if (! managerClassNames[i].equals("")) {
-                    services.addComponent(setupService(serviceClassNames[i],
-                                                       managerClassNames[i],
-                                                       managerSet));
-                } else {
-                    Service service = 
-                        setupServiceNoManager(serviceClassNames[i]);
-                    services.addComponent(service);
-                }
+                if (! managerClassNames[i].equals(""))
+                    setupService(serviceClassNames[i], managerClassNames[i],
+                                 startupContext);
+                else
+                    setupServiceNoManager(serviceClassNames[i], startupContext);
             }
         }
     }
@@ -581,38 +496,22 @@ class Kernel {
     /**
      * Sets up a service with no manager based on fully qualified class name.
      */
-    private Service setupServiceNoManager(String className) throws Exception {
-        Class<?> serviceClass = Class.forName(className);
-        Service service = createService(serviceClass);
-        if ((profileRegistrar != null) &&
-            (service instanceof ProfileProducer))
-            ((ProfileProducer)service).
-                setProfileRegistrar(profileRegistrar);
-        return service;
-    }
-    /**
-     * Creates a service with no manager based on fully qualified class names.
-     */
-    private Service createService(Class<?> serviceClass)
+    private void setupServiceNoManager(String className,
+                                       StartupKernelContext startupContext) 
         throws Exception
     {
-        // find the appropriate constructor
-        Constructor<?> serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class,
-                                        TransactionProxy.class);
-
-        // return a new instance
-        return (Service)(serviceConstructor.
-                         newInstance(appProperties, systemRegistry, proxy));
+        Class<?> serviceClass = Class.forName(className);
+        Service service = createService(serviceClass);
+        registerProducer(service);
+        startupContext.addService(service);
     }
 
     /**
      * Creates a service and its associated manager based on fully qualified
      * class names.
      */
-    private Service setupService(String serviceName, String managerName,
-                                 HashSet<Object> managerSet)
+    private void setupService(String serviceName, String managerName,
+                              StartupKernelContext startupContext)
         throws Exception
     {
         // get the service class and instance
@@ -639,32 +538,61 @@ class Kernel {
             throw new NoSuchMethodException("Could not find a constructor " +
                                             "that accepted the Service");
 
-        // create the manager and put it in the collection
-        managerSet.add(managerConstructor.newInstance(service));
+        // create the manager and put it and the service in the collections
+        // and the temporary startup context
+        Object manager = managerConstructor.newInstance(service);
+        registerProducer(manager);
+        startupContext.addService(service);
+        startupContext.addManager(manager);
+    }
 
-        return service;
+    /**
+     * Private helper that creates an instance of a <code>service</code> with
+     * no manager, based on fully qualified class names.
+     */
+    private Service createService(Class<?> serviceClass)
+        throws Exception
+    {
+        // find the appropriate constructor
+        Constructor<?> serviceConstructor =
+            serviceClass.getConstructor(Properties.class,
+                                        ComponentRegistry.class,
+                                        TransactionProxy.class);
+
+        // return a new instance
+        return (Service)(serviceConstructor.
+                         newInstance(appProperties, systemRegistry, proxy));
     }
     
+    /**
+     * Private helper that notifies the given {@code Object} of the
+     * {@code ProfileRegistrar} if the {@code Object} is an instance of
+     * {@code ProfileProducer} and profiling is enabled.
+     */
+    private void registerProducer(Object obj) {
+        if ((profileRegistrar != null) && (obj instanceof ProfileProducer))
+            ((ProfileProducer)obj).setProfileRegistrar(profileRegistrar);
+    }
+
     /** Start the application, throwing an exception if there is a problem. */
     private void startApplication(String appName, Identity owner) 
         throws Exception
     {
-        // At this point the services are now created, so the final step
-        // is to try booting the application by running a special
-        // KernelRunnable in an unbounded transaction. Note that if we're
-        // running as a "server" then we don't actually start an app
+        // at this point the services are ready, so the final step
+        // is to initialize the application by running a special
+        // KernelRunnable in an unbounded transaction, unless we're
+        // running without an application
         if (! appProperties.getProperty(StandardProperties.APP_LISTENER).
             equals(StandardProperties.APP_LISTENER_NONE)) {
-            AppStartupRunner startupRunner =
-                new AppStartupRunner(application, appProperties);
-            UnboundedTransactionRunner unboundedTransactionRunner =
-                new UnboundedTransactionRunner(startupRunner);
             try {
                 if (logger.isLoggable(Level.CONFIG))
                     logger.log(Level.CONFIG, "{0}: starting application",
                                appName);
-                // run the startup task, notifying the kernel on success
-                scheduler.runTask(unboundedTransactionRunner, owner, true);
+
+                transactionScheduler.
+                    runUnboundedTask(new AppStartupRunner(appProperties),
+                                     owner);
+
                 logger.log(Level.INFO, 
                            "{0}: application is ready", application);
             } catch (Exception e) {
@@ -681,17 +609,17 @@ class Kernel {
     }
         
     /**
-     * Shut down all services in this kernel in reverse
-     * order of how they were started, and also shutdown the
-     * task scheduler.
+     * Shut down all services (in reverse order) and the schedulers.
      */
     void shutdown() {
-        if (application != null) {
+        if (application != null)
             application.shutdownServices();
-        }
-        if (scheduler != null) {
-            scheduler.shutdown();
-        }
+        if (transactionScheduler != null)
+            transactionScheduler.shutdown();
+        if (taskScheduler != null)
+            taskScheduler.shutdown();
+        if (profileCollector != null) 
+            profileCollector.shutdown();
     }
     
     /**
@@ -768,7 +696,6 @@ class Kernel {
                     configFile);
         }
         
-        
         if (appProperties.getProperty(StandardProperties.APP_ROOT) == null) {
             logger.log(Level.SEVERE, "Missing required property " +
                        StandardProperties.APP_ROOT + " for application: " +
@@ -788,7 +715,10 @@ class Kernel {
                        "for application: " + appName);
         }
         
-        if (appProperties.getProperty(StandardProperties.APP_PORT) == null) {
+        if (!StandardProperties.APP_LISTENER_NONE.equals(
+		appProperties.getProperty(StandardProperties.APP_LISTENER)) &&
+	    appProperties.getProperty(StandardProperties.APP_PORT) == null)
+	{
             logger.log(Level.SEVERE, "Missing required property " +
                        StandardProperties.APP_PORT + " for application: " +
                        appName);
@@ -799,43 +729,27 @@ class Kernel {
     }
     
     /**
-     * This runnable is responsible for
-     * calling the application's listener, which actually starts the application
-     * running, and then reporting the successful startup to the kernel.
-     * <p>
-     * This runnable must be run in a transactional context.
+     * This runnable calls the application's <code>initialize</code> method,
+     * if it hasn't been called before, to start the application for the
+     * first time. This runnable must be called in the context of an
+     * unbounded transaction.
      */
     private static final class AppStartupRunner extends AbstractKernelRunnable {
-        // the context in which this will run
-        private final KernelContext appContext;
-
         // the properties for the application
         private final Properties properties;
 
-        /**
-         * Creates an instance of <code>AppStartupRunner</code>.
-         *
-         * @param appContext the context in which the application will run
-         * @param properties the <code>Properties</code> to provide to the
-         *                   application on startup
-         */
-        AppStartupRunner(KernelContext appContext, Properties properties) 
-        {
-            this.appContext = appContext;
+        /** Creates an instance of <code>AppStartupRunner</code>. */
+        AppStartupRunner(Properties properties) {
             this.properties = properties;
         }
 
-        /**
-         * Starts the application.
-         *
-         * @throws Exception if anything fails in starting the application
-         */
+        /** Starts the application, throwing an exception on failure. */
         public void run() throws Exception {
-            DataService dataService = appContext.getService(DataService.class);
+            DataService dataService =
+                Kernel.proxy.getService(DataService.class);
             try {
                 // test to see if this name if the listener is already bound...
-                dataService.getServiceBinding(StandardProperties.APP_LISTENER,
-                                              AppListener.class);
+                dataService.getServiceBinding(StandardProperties.APP_LISTENER);
             } catch (NameNotBoundException nnbe) {
                 // ...if it's not, create and then bind the listener
                 String appClass =
@@ -850,10 +764,9 @@ class Kernel {
                 listener.initialize(properties);
             }
         }
-
     }
     
-        /**
+    /**
      * Main-line method that starts the {@code Kernel}. Each kernel
      * instance runs a single application.
      * <p>
@@ -896,4 +809,5 @@ class Kernel {
         // boot the kernel
         new Kernel(appProperties);
     }
+
 }
