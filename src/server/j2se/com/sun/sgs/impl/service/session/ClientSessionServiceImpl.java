@@ -323,12 +323,13 @@ public final class ClientSessionServiceImpl
     protected void handleServiceVersionMismatch(
 	Version oldVersion, Version currentVersion)
     {
-	throw new IllegalStateException("version mismatch not handled");
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
     }
     
     /** {@inheritDoc} */
     public void doReady() {
-
     }
 
     /** {@inheritDoc} */
