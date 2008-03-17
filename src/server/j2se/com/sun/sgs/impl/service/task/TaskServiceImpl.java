@@ -34,6 +34,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 
@@ -41,15 +43,12 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
-import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
@@ -117,8 +116,11 @@ import java.util.logging.Logger;
  * time in milliseconds for delaying this vote is {@code VOTE_DELAY_DEFAULT}.
  * The delay may be changed using the property {@code VOTE_DELAY_PROPERTY}.
  */
-public class TaskServiceImpl implements ProfileProducer, TaskService,
-                                        NodeMappingListener, RecoveryListener {
+public class TaskServiceImpl 
+        extends AbstractService
+        implements ProfileProducer, TaskService, 
+                   NodeMappingListener, RecoveryListener 
+{
 
     /**
      * The identifier used for this {@code Service}.
@@ -139,6 +141,15 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // followed by the pending task's identity)
     private static final String DS_PENDING_SPACE = DS_PREFIX + "Pending.";
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     // the transient set of identities known to be active on the current node,
     // and how many tasks are pending for that identity
     private HashMap<Identity,Integer> activeIdentityMap;
@@ -199,21 +210,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     // the internal value used to represent a task that does not repeat
     static final long PERIOD_NONE = -1;
 
-    // the system's schedulers, where tasks actually run
-    private final TaskScheduler taskScheduler;
-    private final TransactionScheduler transactionScheduler;
-
-    // a proxy providing access to the transaction state
-    private static TransactionProxy transactionProxy = null;
-
-    // the owning application context used for re-starting tasks
-    private final Identity appOwner;
-
     // the identifier for the local node
     private final long nodeId;
-
-    // the data service used in the same context
-    private final DataService dataService;
 
     // the mapping service used in the same context
     private final NodeMappingService nodeMappingService;
@@ -226,9 +224,6 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     // the transient map for all recurring handles based on identity
     private HashMap<Identity,Set<RecurringTaskHandle>> identityRecurringMap;
-
-    // a flag noting whether this service has shutdown
-    private volatile boolean isShutdown = false;
 
     // the profiled operations
     private ProfileOperation scheduleNDTaskOp = null;
@@ -249,13 +244,8 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                            TransactionProxy transactionProxy)
         throws Exception
     {
-        if (properties == null)
-            throw new NullPointerException("Null properties not allowed");
-        if (systemRegistry == null)
-            throw new NullPointerException("Null registry not allowed");
-        if (transactionProxy == null)
-            throw new NullPointerException("Null proxy not allowed");
-
+        super(properties, systemRegistry, transactionProxy, logger);
+        
         logger.log(Level.CONFIG, "creating TaskServiceImpl");
 
         // create the transient local collections
@@ -267,32 +257,31 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             new HashMap<Identity,Set<RecurringTaskHandle>>();
 
         // create the factory for managing transaction context
-        ctxFactory = new TransactionContextFactoryImpl(transactionProxy);
+        ctxFactory = new TransactionContextFactoryImpl(txnProxy);
 
-        // keep a reference to the system components...
-        TaskServiceImpl.transactionProxy = transactionProxy;
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-        transactionScheduler =
-            systemRegistry.getComponent(TransactionScheduler.class);
-
-        // ...and to the other Services that are needed
-        dataService = transactionProxy.getService(DataService.class);
-        nodeMappingService =
-            transactionProxy.getService(NodeMappingService.class);
-
-        appOwner = transactionProxy.getCurrentOwner();
+        // keep a reference to the other Services that are needed
+        nodeMappingService = txnProxy.getService(NodeMappingService.class);
         
         // note that the application is always active locally, so there's
         // no chance of voting the application as inactive
-        activeIdentityMap.put(appOwner, 1);
+        activeIdentityMap.put(taskOwner, 1);
 
         // register for identity mapping updates
         nodeMappingService.addNodeMappingListener(this);
 
+        /*
+         * Check service version.
+         */
+        transactionScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    checkServiceVersion(
+                        VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+                }},  taskOwner);
+                
         // get the current node id for the hand-off namespace, and register
         // for recovery notices to manage cleanup of hand-off bindings
-        WatchdogService watchdogService =
-            transactionProxy.getService(WatchdogService.class);
+        WatchdogService watchdogService = 
+                txnProxy.getService(WatchdogService.class);
         nodeId = watchdogService.getLocalNodeId();
         localHandoffSpace = DS_HANDOFF_SPACE + nodeId;
         watchdogService.addRecoveryListener(this);
@@ -327,13 +316,21 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         return NAME;
     }
 
+    /* -- Implement AbstractService -- */
+
+    /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
     /**
      * {@inheritDoc}
      */
-    public void ready() {
-        if (isShutdown)
-            throw new IllegalStateException("Service is shutdown");
-
+    public void doReady() {
         logger.log(Level.CONFIG, "readying TaskService");
 
         // bind the node-local hand-off set, noting that there's a (very
@@ -352,7 +349,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                                                           new StringHashSet());
                         }
                     }
-                }, appOwner);
+                }, taskOwner);
         } catch (Exception e) {
             throw new AssertionError("Failed to setup node-local sets");
         }
@@ -363,12 +360,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         // tasks owned by the application (e.g., any tasks started
         // during the application's initialize() method), but hopefully
         // this will change when we add APIs for creating identities
-        nodeMappingService.assignNode(getClass(), appOwner);
+        nodeMappingService.assignNode(getClass(), taskOwner);
 
         // kick-off a periodic hand-off task, but delay a little while so
         // that the system has a chance to finish setup
         handoffTaskHandle = transactionScheduler.
-            scheduleRecurringTask(new HandoffRunner(), appOwner,
+            scheduleRecurringTask(new HandoffRunner(), taskOwner,
                                   System.currentTimeMillis() + handoffStart,
                                   handoffPeriod);
         handoffTaskHandle.start();
@@ -379,21 +376,13 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     /**
      * {@inheritDoc}
      */
-    public boolean shutdown() {
-        synchronized (this) {
-            if (isShutdown)
-                throw new IllegalStateException("Service is shutdown");
-            isShutdown = true;
-        }
-
+    public void doShutdown() {
         // stop the handoff and status processing tasks
         if (handoffTaskHandle != null) {
             handoffTaskHandle.cancel();
         }
 
         statusUpdateTimer.cancel();
-
-        return true;
     }
 
     /**
@@ -427,7 +416,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                             logger.log(Level.INFO, "Cleaned up handoff set " +
                                        "for failed node: " + failedNodeId);
                    }
-                }, appOwner);
+                }, taskOwner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.WARNING))
                 logger.logThrow(Level.WARNING, e, "Failed to cleanup handoff " +
@@ -475,11 +464,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
     private void scheduleSingleTask(Task task, long startTime) {
         if (task == null)
             throw new NullPointerException("Task must not be null");
-        if (isShutdown)
+        if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
 
         // persist the task regardless of where it will ultimately run
-        Identity owner = transactionProxy.getCurrentOwner();
+        Identity owner = txnProxy.getCurrentOwner();
         TaskRunner runner = getRunner(task, owner, startTime, PERIOD_NONE);
 
         // check where the owner is active to get the task running
@@ -503,7 +492,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new NullPointerException("Task must not be null");
         if ((delay < 0) || (period < 0))
             throw new IllegalArgumentException("Times must not be null");
-        if (isShutdown)
+        if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
 
         if (logger.isLoggable(Level.FINEST))
@@ -511,7 +500,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                        "at {0}", startTime);
 
         // persist the task regardless of where it will ultimately run
-        Identity owner = transactionProxy.getCurrentOwner();
+        Identity owner = txnProxy.getCurrentOwner();
         TaskRunner runner = getRunner(task, owner, startTime, period);
         String objName = runner.getObjName();
 
@@ -541,12 +530,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                                        boolean transactional) {
         if (task == null)
             throw new NullPointerException("Task must not be null");
-        if (isShutdown)
+        if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskOp != null)
             scheduleNDTaskOp.report();
 
-        Identity owner = transactionProxy.getCurrentOwner();
+        Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
                      START_NOW, false);
     }
@@ -560,12 +549,12 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             throw new NullPointerException("Task must not be null");
         if (delay < 0)
             throw new IllegalArgumentException("Delay must not be negative");
-        if (isShutdown)
+        if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskDelayedOp != null)
             scheduleNDTaskDelayedOp.report();
 
-        Identity owner = transactionProxy.getCurrentOwner();
+        Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
                      System.currentTimeMillis() + delay, false);
     }
@@ -655,11 +644,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             // currently running)
             if (recurringMap.containsKey(objName))
                 ctxFactory.joinTransaction().
-                    cancelRecurringTask(objName, transactionProxy.
+                    cancelRecurringTask(objName, txnProxy.
                                                  getCurrentOwner());
             else
                 ctxFactory.joinTransaction().
-                    decrementStatusCount(transactionProxy.getCurrentOwner());
+                    decrementStatusCount(txnProxy.getCurrentOwner());
             return null;
         }
         boolean isAvailable = ptask.isTaskAvailable();
@@ -740,7 +729,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         try {
             transactionScheduler.
                 scheduleTask(new NonRetryCleanupRunnable(objName),
-                             transactionProxy.getCurrentOwner());
+                             txnProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
             // Note that this should (essentially) never happen, but if it
             // does then the pending task will always remain, and this node
@@ -768,7 +757,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
-            if (isShutdown) {
+            if (shuttingDown()) {
                 if (logger.isLoggable(Level.WARNING))
                     logger.log(Level.WARNING, "Service is shutdown, so a " +
                                "non-retried task {0} will not be removed",
@@ -935,7 +924,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
-            if (isShutdown)
+            if (shuttingDown())
                 return;
 
             // check that the task's identity is still active on this node,
@@ -1006,7 +995,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
             return runnable.getBaseTaskType();
         }
         public void run() throws Exception {
-            if (isShutdown)
+            if (shuttingDown())
                 return;
             try {
                 if (transactional)
@@ -1155,10 +1144,11 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                                          Identity identity) {
         synchronized (identityRecurringMap) {
             Set<RecurringTaskHandle> set = identityRecurringMap.get(identity);
-            if (set != null)
+            if (set != null) {
                 set.remove(handle);
-            if (set.isEmpty())
-                identityRecurringMap.remove(identity);
+                if (set.isEmpty())
+                    identityRecurringMap.remove(identity);
+            }
         }
     }
 
@@ -1371,7 +1361,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     /** {@inheritDoc} */
     public void mappingAdded(Identity id, Node oldNode) {
-        if (isShutdown)
+        if (shuttingDown())
             return;
 
         // keep track of the new identity, returning if the identity was
@@ -1391,7 +1381,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
                     public void run() throws Exception {
                         restartTasks(identityName);
                     }
-                }, appOwner);
+                }, taskOwner);
         } catch (Exception e) {
             // this should only happen if the restart task fails, which
             // would indicate some kind of corrupted state
@@ -1402,7 +1392,7 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
 
     /** {@inheritDoc} */
     public void mappingRemoved(Identity id, Node newNode) {
-        if (isShutdown)
+        if (shuttingDown())
             return;
 
         // if the newNode is null, this means that the identity has been
@@ -1448,9 +1438,9 @@ public class TaskServiceImpl implements ProfileProducer, TaskService,
         }
         /** {@inheritDoc} */
         public void cancel() {
-            TaskServiceImpl service = TaskServiceImpl.transactionProxy.
+            TaskServiceImpl service = TaskServiceImpl.txnProxy.
                 getService(TaskServiceImpl.class);
-            if (service.isShutdown)
+            if (service.shuttingDown())
                 throw new IllegalStateException("Service is shutdown");
             service.cancelPeriodicTask(objName);
         }
