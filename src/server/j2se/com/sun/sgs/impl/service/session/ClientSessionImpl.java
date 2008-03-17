@@ -46,9 +46,6 @@ import java.util.logging.Logger;
 
 /**
  * Implements a client session.
- *
- * <p>TODO: service bindings should be versioned, and old bindings should be
- * converted to the new scheme (or removed if applicable).
  */
 public class ClientSessionImpl
     implements ClientSession, NodeAssignment, Serializable

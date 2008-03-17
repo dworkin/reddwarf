@@ -42,6 +42,7 @@ import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -49,8 +50,6 @@ import com.sun.sgs.io.Connector;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.ByteArrayInputStream;
@@ -59,6 +58,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -91,12 +91,21 @@ public class TestChannelServiceImpl extends TestCase {
 			  "bashful", "doc", "dopey", "grumpy",
 			  "happy", "sleepy", "sneezy"});
 
+    /** The Channel service properties. */
+    private static final Properties serviceProps =
+	createProperties(StandardProperties.APP_NAME, APP_NAME);
+    
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
     /** Any additional nodes, keyed by node hostname (for tests
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
+
+    /** Version information from ChannelServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
 
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
@@ -119,10 +128,20 @@ public class TestChannelServiceImpl extends TestCase {
     /** A list of users for test purposes. */
     private List<String> someUsers =
 	Arrays.asList(new String[] { "moe", "larry", "curly" });
+
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     
     /** Constructs a test instance. */
-    public TestChannelServiceImpl(String name) {
+    public TestChannelServiceImpl(String name) throws Exception  {
 	super(name);
+	Class cl = ChannelServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     /** Creates and configures the channel service. */
@@ -199,8 +218,8 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullProperties() throws Exception {
 	try {
-	    new ChannelServiceImpl(null, new DummyComponentRegistry(),
-				   new DummyTransactionProxy());
+	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -209,10 +228,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
-	    Properties props =
-		createProperties(StandardProperties.APP_NAME, APP_NAME);
-	    new ChannelServiceImpl(props, null,
-				   new DummyTransactionProxy());
+	    new ChannelServiceImpl(serviceProps, null, serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -221,9 +237,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
-	    Properties props =
-		createProperties(StandardProperties.APP_NAME, APP_NAME);
-	    new ChannelServiceImpl(props, new DummyComponentRegistry(),
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
 				   null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -234,7 +248,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ChannelServiceImpl(
-		new Properties(), new DummyComponentRegistry(),
+		new Properties(), serverNode.getSystemRegistry(),
 		serverNode.getProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
@@ -242,6 +256,66 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			dataService.getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+			       serverNode.getProxy());
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+    
     /* -- Test createChannel -- */
 
     public void testCreateChannelNoTxn() throws Exception { 

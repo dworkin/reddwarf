@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -28,8 +27,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -189,9 +186,6 @@ public final class WatchdogServiceImpl
     /** The minimum renew interval. */
     private static final long MIN_RENEW_INTERVAL = 25;
 
-    /** The lock for {@code isAlive} field. */
-    private final Object lock = new Object();
-    
     /** The exporter for this server. */
     private final Exporter<WatchdogClient> exporter;
 
@@ -236,7 +230,12 @@ public final class WatchdogServiceImpl
 	recoveryFutures =
 	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
 
-    /** If true, this node is alive; initially, true. */
+    /** The lock for {@code isAlive} field. */
+    private final Object lock = new Object();
+    
+    /** If {@code true}, this node is alive; initially, the field is {@code
+     * true}. Accesses to this field should be protected by {@code lock}.
+     */
     private boolean isAlive = true;
     
     /**

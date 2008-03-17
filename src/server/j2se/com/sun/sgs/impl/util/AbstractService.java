@@ -437,7 +437,7 @@ public abstract class AbstractService implements Service {
 	 * @param major a major version number
 	 * @param minor a minor version number
 	 */
-        Version(int major, int minor) {
+        public Version(int major, int minor) {
             majorVersion = major;
             minorVersion = minor;
         }
