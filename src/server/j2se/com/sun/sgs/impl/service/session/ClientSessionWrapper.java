@@ -24,7 +24,6 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 /**
@@ -129,6 +128,9 @@ public class ClientSessionWrapper
      * wrapper.  If the underlying client session has been removed, then
      * the client session has been disconnected, so {@code
      * IllegalStateException} is thrown.
+     *
+     * @return the underlying {@code ClientSessionImpl} instance for this
+     * wrapper
      */
     public ClientSessionImpl getClientSession() {
 	try {

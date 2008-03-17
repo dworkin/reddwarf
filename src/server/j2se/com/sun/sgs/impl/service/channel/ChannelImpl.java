@@ -57,9 +57,6 @@ import java.util.logging.Logger;
 
 /**
  * Channel implementation for use within a single transaction.
- *
- * <p>TODO: service bindings should be versioned, and old bindings should be
- * converted to the new scheme (or removed if applicable).
  */
 abstract class ChannelImpl implements Channel, Serializable {
 
