@@ -51,37 +51,47 @@ properties may be specified by system properties
 the application properties file named on the command line.
 
 <p>
-By default, the Project Darkstar Server consists of a single node, using 
-the <a href="#GeneralProperties">General Properties</a>.
+By default, the Project Darkstar Server consists of a single node, and is 
+configured with the <a href="#GeneralProperties">General Properties</a>. 
+Optionally, multiple nodes can be configured to work together using the
+<a href="#MultiNodeProperties">Multi-Node Properties</a>.
+
+
+<a name="MultiNodeProperties"></a>
+<h2>Multi-Node Properties</h2>
 For increased scalibility and availability of the Project Darkstar Server,
 multiple nodes can be configured to work together in a cluster.  This
 multi-node configuration requires one special core server node to run
 critical Project Darkstar operations, with the remaining nodes cooperating
 to run the application.  
 <p>
-The core server node must be started before the application nodes.
+The core server node <b>must</b> be started before the application nodes.
 <p>
-Each application node must specify the location of the core server node using
-the <a href="#com.sun.sgs.server.host"> com.sun.sgs.server.host</a> property.
+In addition to the <a href="#GeneralProperties">General Properties</a>,
+these properties specify which node is the core server node, which
+are the application nodes, and how the application nodes can discover the
+core node.
 
 
-
-<h2>Core Server Node Properties</h2>
+<h3>Core Server Node Properties</h3>
 These properties control the configuration of the Project Darkstar core
-server node if a multi-node configuration is being used.
+server node if a multi-node configuration is being used. There is only one 
+core server per cluster of Project Darkstar nodes;  if more than one core 
+server is started, it forms an independent cluster from other core servers.
 
 <dl>
     
 <dt>com.sun.sgs.default.core.server
 <span class="default">false</span>
 <dd> If set to <code>true</code>, start the non-application node which
- runs critical Project Darkstar Server operations. 
+ runs critical Project Darkstar Server operations. This property is expanded
+ to several properties when it is first read.  
 </dl>
 
 The core server node's configuration must also include the 
 <a href="#com.sun.sgs.app.name">com.sun.sgs.app.name</a> and
 <a href="#app.root">com.sun.sgs.app.root</a> properties.  Additionally,
-it can specify ports to be used on the core server machine.
+it can specify ports to be used on the core server machine:
 
 <dl>
 <dt>com.sun.sgs.impl.service.data.store.net.server.port
@@ -95,21 +105,41 @@ it can specify ports to be used on the core server machine.
 <dd>The network port for the core node mapping service server.
 </dl>
 
+
+<h3>Application Node Properties</h3>
+These properties control the configuration of the Project Darkstar application
+nodes if a multi-node configuration is being used.
+
+<dl>
+    
+<dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
+<span class="required"></span>
+<dd> The name of the host the core Project Darkstar Server node is running on.
+
+<dt><a name="com.sun.sgs.server.start">com.sun.sgs.server.start</a>
+<span class="default">true</span>
+<dd> This property must be set to <code>false</code> for application nodes.
+</dl>
+
+
 <a name="GeneralProperties"></a>
 <h2>General Properties</h2>
 
 These properties control various general facilities in the Project Darkstar
-Server.
+Server, and can be used in the core server node, application nodes, or in
+single node configurations.
 
 <dl>
 
 <dt><a name="com.sun.sgs.app.name">com.sun.sgs.app.name</a>
 <span class="required"></span>
-<dd>The name of the application.
+<dd>The name of the application.  If running in a multi-node configuration, 
+this name must be the same for each node.
 
 <dt><a name="app.root">com.sun.sgs.app.root</a>
 <span class="required"></span>
-<dd>The root directory for the application.
+<dd>The root directory for the application, which specifies local file system 
+space available for Project Darkstar use.
 
 <dt><a name="app.listener">com.sun.sgs.app.listener</a>
 <span class="required"></span>
@@ -119,10 +149,6 @@ Server.
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
 <span class="required"></span>
 <dd>The TCP port on which to listen for client connections.
-
-<dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
-<span class="required"></span>
-<dd> The name of the host the core Project Darkstar Server node is running on.
 
 <dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
 <span class="default">100</span>
