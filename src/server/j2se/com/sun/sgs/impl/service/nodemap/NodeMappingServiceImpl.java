@@ -499,7 +499,6 @@ public class NodeMappingServiceImpl
         return toString();
     }
     
-   
     /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
@@ -515,8 +514,10 @@ public class NodeMappingServiceImpl
     protected void doReady() {
         // At this point, we should never be adding to the pendingNotifications
         // list, as our state is RUNNING.
-        for (TaskReservation pending: pendingNotifications) {
-            pending.use();
+        synchronized (lock) {
+            for (TaskReservation pending: pendingNotifications) {
+                pending.use();
+            }
         }
     }
     
