@@ -34,7 +34,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -272,7 +271,10 @@ public class TaskServiceImpl
         /*
          * Check service version.
          */
-        transactionScheduler.runTask(new AbstractKernelRunnable() {
+        transactionScheduler.runTask(new KernelRunnable() {
+            public String getBaseTaskType() {
+                        return NAME + ".VersionCheckRunner";
+                    }
                 public void run() {
                     checkServiceVersion(
                         VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
