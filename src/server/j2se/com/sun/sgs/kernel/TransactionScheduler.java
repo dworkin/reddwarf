@@ -169,6 +169,8 @@ public interface TransactionScheduler {
      * the decision to commit or re-try is left to the active transaction.
      *
      * @throws TaskRejectedException if the given task is not accepted
+     * @throws InterruptedException if the calling thread is interrupted and
+     *                              the associated task does not complete
      * @throws Exception if the task fails and is not re-tried
      */
     public void runTask(KernelRunnable task, Identity owner) throws Exception;

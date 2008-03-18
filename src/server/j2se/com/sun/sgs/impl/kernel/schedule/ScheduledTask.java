@@ -23,225 +23,87 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 
 
 /**
- * This class is a simple container class used to represent the main aspects
- * of a task that has been accepted by the scheduler for running.
+ * This interface represents a single task that has been accepted by a
+ * scheduler. It is used by implementations of {@code SchedulerQueue}
+ * to manage the tasks in the queue.
  */
-public class ScheduledTask {
+public interface ScheduledTask {
 
-    // the common aspects of a task
-    private final KernelRunnable task;
-    private final Identity owner;
-    private final Priority priority;
-    private final long startTime;
-    private final long period;
-    private InternalRecurringTaskHandle recurringTaskHandle = null;
-    private int tryCount = 0;
-    private TaskQueue queue = null;
-
-    // identifier that represents a non-recurring task.
-    static final int NON_RECURRING = -1;
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code> with all the same
-     * values of an existing <code>ScheduledTask</code> except its starting
-     * time, which is set to the new value.
-     *
-     * @param task existing <code>ScheduledTask</code>
-     * @param newStartTime the new starting time for the task in milliseconds
-     *                     since January 1, 1970
-     */
-    public ScheduledTask(ScheduledTask task, long newStartTime) {
-        this(task.task, task.owner, task.priority, newStartTime, task.period);
-        this.recurringTaskHandle = task.recurringTaskHandle;
-    }
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code> that does not
-     * represent a recurring task.
-     *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>Identity</code> of the task owner
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
-     */
-    public ScheduledTask(KernelRunnable task, Identity owner,
-                         Priority priority, long startTime) {
-        this(task, owner, priority, startTime, NON_RECURRING);
-    }
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>Identity</code> of the task owner
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
-     * @param period the delay between recurring executions, or
-     *               <code>NON_RECURRING</code>
-     */
-    public ScheduledTask(KernelRunnable task, Identity owner,
-                         Priority priority, long startTime, long period) {
-        if (task == null)
-            throw new NullPointerException("Task cannot be null");
-        if (owner == null)
-            throw new NullPointerException("Owner cannot be null");
-        if (priority == null)
-            throw new NullPointerException("Priority cannot be null");
-
-        this.task = task;
-        this.owner = owner;
-        this.priority = priority;
-        this.startTime = startTime;
-        this.period = period;
-    }
+    /** Identifier that represents a non-recurring task. */
+    public static final int NON_RECURRING = -1;
 
     /**
      * Returns the task.
      *
-     * @return the <code>KernelRunnable</code> to run
+     * @return the {@code KernelRunnable} to run
      */
-    public KernelRunnable getTask() {
-        return task;
-    }
+    public KernelRunnable getTask();
 
     /**
      * Returns the owner.
      *
-     * @return the <code>Identity</code> that owns the task
+     * @return the {@code Identity} that owns the task
      */
-    public Identity getOwner() {
-        return owner;
-    }
+    public Identity getOwner();
 
     /**
      * Returns the priority.
      *
-     * @return the <code>Priority</code>
+     * @return the {@code Priority}
      */
-    public Priority getPriority() {
-        return priority;
-    }
+    public Priority getPriority();
 
     /**
      * Returns the time at which this task is scheduled to start.
      *
      * @return the scheduled run time for the task
      */
-    public long getStartTime() {
-        return startTime;
-    }
+    public long getStartTime();
 
     /**
      * Returns the period for the task if it's recurring, or
-     * <code>NON_RECURRING</code> if this is not a recurring task.
+     * {@code NON_RECURRING} if this is not a recurring task.
      *
      * @return the period between recurring executions.
      */
-    public long getPeriod() {
-        return period;
-    }
+    public long getPeriod();
 
     /**
-     * Returns whether this is a recurring task.
+     * Returns whether this is a recurring task. If this is not a recurring
+     * task then {@code getPeriod} should always return {@code NON_RECURRING}.
      *
-     * @return <code>true</code> if this task is a recurring task,
-     * <code>false</code> otherwise.
+     * @return {@code true} if this task is a recurring task,
+     *         {@code false} otherwise.
      */
-    public boolean isRecurring() {
-        return period != NON_RECURRING;
-    }
+    public boolean isRecurring();
 
     /**
-     * Sets the <code>InternalRecurringTaskHandle</code> for this task if
-     * the task is recurring and if the handle has not already been set.
+     * Returns the {@code RecurringTaskHandle} associated with this task if
+     * this task is recurring, or {@code null} if this is not recurring.
      *
-     * @return <code>true</code> if the task is recurring and the handle
-     *         has not already been set, <code>false</code> otherwise
+     * @return the associated {@code RecurringTaskHandle} or {@code null}
      */
-    boolean setRecurringTaskHandle(InternalRecurringTaskHandle handle) {
-        if ((! isRecurring()) || (recurringTaskHandle != null))
-            return false;
-        recurringTaskHandle = handle;
-        return true;
-    }
+    public RecurringTaskHandle getRecurringTaskHandle();
 
     /**
-     * Returns the <code>InternalRecurringTaskHandle</code> for this task, or
-     * <code>null</code> if this not a recurring task.
+     * Returns whether this task has been cancelled.
      *
-     * @return the task's <code>InternalRecurringTaskHandle</code> or
-     *         <code>null</code>
+     * @return {@code true} if this {@code ScheduledTask} has been cancelled,
+     *         {@code false} otherwise
      */
-    InternalRecurringTaskHandle getRecurringTaskHandle() {
-        return recurringTaskHandle;
-    }
+    public boolean isCancelled();
 
     /**
-     * If this task is recurring, then this method schedules the next
-     * recurrence. Typically this is done immediately after each run of the
-     * task. This has the effect of setting the try count to zero in
-     * preparation for the next run.
-     */
-    public void scheduleNextRecurrence() {
-        tryCount = 0;
-        if (recurringTaskHandle != null)
-            recurringTaskHandle.scheduleNextRecurrence();
-    }
-
-    /**
-     * Increments the try count (the number of times that this task has been
-     * attempted). This is only meaningful for {@code Scheduler}s that
-     * implement some notion of re-try, like {@code TransactionScheduler}.
-     */
-    public void incrementTryCount() {
-        tryCount++;
-    }
-
-    /**
-     * Returns the try count (the number of times that this task has been
-     * attempted).
+     * Cancel this {@code ScheduledTask}. Note that if the task is already
+     * running then calling this method may not have any affect.
      *
-     * @return the try count
+     * @return {@code true} if the task was cancelled, {@code false} if
+     *         the task was already cancelled or has completed
      */
-    public int getTryCount() {
-        return tryCount;
-    }
-
-    /**
-     * Sets the {@code TaskQueue} associated with this task. Typically this
-     * is used to track dependency, so that when this task is completed,
-     * the next task can be fetched from the queue.
-     *
-     * @param queue the associated {@code TaskQueue}
-     */
-    public void setTaskQueue(TaskQueue queue) {
-        this.queue = queue;
-    }
-
-    /**
-     * Returns the {@code TaskQueue} associated with this task. This is
-     * typically the source of dependent tasks where this task was submitted.
-     *
-     * @return the associated {@code TaskQueue} or {@code null} if no
-     *         queue was set
-     */
-    public TaskQueue getTaskQueue() {
-        return queue;
-    }
-
-    /**
-     * Provides some diagnostic detail about this task.
-     *
-     * @return a <code>String</code> representation of the task.
-     */
-    public String toString() {
-        return task.getBaseTaskType() + "[owner:" + owner.toString() + "]";
-    }
+    public boolean cancel();
 
 }
