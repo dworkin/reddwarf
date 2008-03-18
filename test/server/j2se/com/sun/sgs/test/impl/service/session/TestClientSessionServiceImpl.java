@@ -39,6 +39,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
@@ -50,6 +51,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -119,6 +121,13 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String NODE_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.node";
 
+
+    /** The ClientSession service properties. */
+    private static final Properties serviceProps =
+	createProperties(
+	    StandardProperties.APP_NAME, APP_NAME,
+	    StandardProperties.APP_PORT, "20000");
+
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
@@ -126,6 +135,11 @@ public class TestClientSessionServiceImpl extends TestCase {
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
+    /** Version information from ClientSessionServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
+    
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
 
@@ -137,10 +151,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** The test clients, keyed by user name. */
     private static Map<String, DummyClient> dummyClients;
+    
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
 
     /** Constructs a test instance. */
     public TestClientSessionServiceImpl(String name) throws Exception {
 	super(name);
+	Class cl = ClientSessionServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     protected void setUp() throws Exception {
@@ -223,11 +247,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
-	    Properties props =
-		createProperties(
-		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_PORT, "20000");
-	    new ClientSessionServiceImpl(props, null,
+	    new ClientSessionServiceImpl(serviceProps, null,
 					 serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -237,11 +257,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
-	    Properties props =
-		createProperties(
-		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_PORT, "20000");
-	    new ClientSessionServiceImpl(props,
+	    new ClientSessionServiceImpl(serviceProps,
 					 serverNode.getSystemRegistry(), null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -275,6 +291,69 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			dataService.getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+    
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	new ClientSessionServiceImpl(
+	    serviceProps, serverNode.getSystemRegistry(),
+	    serverNode.getProxy());
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ClientSessionServiceImpl(
+		serviceProps, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ClientSessionServiceImpl(
+		serviceProps, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+    
     /* -- Test connecting, logging in, logging out with server -- */
 
     public void testConnection() throws Exception {
