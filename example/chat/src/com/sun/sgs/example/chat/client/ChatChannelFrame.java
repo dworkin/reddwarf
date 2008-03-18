@@ -69,7 +69,7 @@ public class ChatChannelFrame extends JInternalFrame
      * channel.
      *
      * @param client the parent {@code ChatClient} of this frame.
-     * @param channel the channel that this class will manage.
+     * @param channelName the channel that this class will manage.
      */
     public ChatChannelFrame(ChatClient client, String channelName) {
         super("Channel: " + channelName);

@@ -49,23 +49,13 @@ public interface SimpleSgsProtocol {
      * The maximum length of a protocol message:
      * {@value #MAX_MESSAGE_LENGTH} bytes.
      */
-    // TODO This has been bumped up temporarily to support the hack
-    // example.  Set this limit back down to 8032 once fragmentation
-    // is implemented in the example utilities. -JM
-    //
-//  final int MAX_MESSAGE_LENGTH = 8032;
-    final int MAX_MESSAGE_LENGTH = 64032;
+    final int MAX_MESSAGE_LENGTH = 65535;
 
     /**
      * The maximum payload length:
      * {@value #MAX_PAYLOAD_LENGTH} bytes.
      */
-    // TODO This has been bumped up temporarily to support the hack
-    // example.  Set this limit back down to 8000 once fragmentation
-    // is implemented in the example utilities. -JM
-    // 
-//  final int MAX_PAYLOAD_LENGTH = 8000;
-    final int MAX_PAYLOAD_LENGTH = 64000;
+    final int MAX_PAYLOAD_LENGTH = 65532;
 
     /** The version number, currently {@code 0x03}. */
     final byte VERSION = 0x03;

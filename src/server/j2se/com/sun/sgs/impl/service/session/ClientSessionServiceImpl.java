@@ -103,10 +103,19 @@ public final class ClientSessionServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
-	
+
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
@@ -250,6 +259,15 @@ public final class ClientSessionServiceImpl
 		new ClientSessionServiceRecoveryListener());
 
 	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    }},  taskOwner);
+	    
+	    /*
 	     * Store the ClientSessionServer proxy in the data store.
 	     */
 	    transactionScheduler.runTask(new AbstractKernelRunnable() {
@@ -302,8 +320,16 @@ public final class ClientSessionServiceImpl
     /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+    /** {@inheritDoc} */
     public void doReady() {
-
     }
 
     /** {@inheritDoc} */

@@ -332,7 +332,7 @@ public class ChatClientSessionListener
     /**
      * Decodes the given {@code buffer} into a message string.
      *
-     * @param bytes the encoded message
+     * @param buffer the encoded message
      * @return the decoded message string
      */
     static String fromMessageBuffer(ByteBuffer buffer) {
