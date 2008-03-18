@@ -25,11 +25,11 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -116,7 +116,10 @@ import java.util.logging.Logger;
  *
  * This class is public for testing.
  */
-public final class NodeMappingServerImpl implements NodeMappingServer {
+public final class NodeMappingServerImpl 
+        extends AbstractService 
+        implements NodeMappingServer 
+{
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -155,15 +158,6 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The exporter for this server */
     private final Exporter<NodeMappingServer> exporter;
-
-    /** The transaction scheduler, for our transactional, synchronous tasks. */
-    private final TransactionScheduler transactionScheduler;
-    
-    /** The proxy owner for our transactional, synchronous tasks. */
-    private final Identity taskOwner;
-    
-    /** The data service. */
-    final DataService dataService;
     
     /** The watchdog service. */
     final WatchdogService watchdogService;
@@ -178,25 +172,6 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     
      /** Our watchdog node listener. */
     private final NodeListener watchdogNodeListener;
-    
-    /** Lock object for service state */
-    private final Object stateLock = new Object();
-    
-    /** The possible states of this instance. */
-    enum State {
-	/** After ready call and before shutdown */
-	RUNNING,
-	/** After start of a call to shutdown and before call finishes */
-	SHUTTING_DOWN,
-	/** After shutdown has completed successfully */
-	SHUTDOWN
-    }
-
-    /** The current state of this instance. */
-    private State state;
-    
-    /** The count of calls in progress, protected by stateLock. */
-    private int callsInProgress = 0;
     
     /** Our string representation, used by toString(). */
     private final String fullName;
@@ -238,20 +213,12 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
                                  TransactionProxy txnProxy)  
          throws Exception 
     {     
-        if (systemRegistry == null) {
-            throw new NullPointerException("null system registry");
-        } else if (txnProxy == null) {
-            throw new NullPointerException("null transaction proxy");
-        }
-        
+        super(properties, systemRegistry, txnProxy, logger);
+
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
-        transactionScheduler =
-            systemRegistry.getComponent(TransactionScheduler.class);
-        dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);
-        taskOwner = txnProxy.getCurrentOwner();
        
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
@@ -268,13 +235,16 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
                 properties, this);
         }
         
-        // Restore any old data from the data service.
-        runTransactionally(
-                new AbstractKernelRunnable() {
-                    public void run() {
-                        NodeMapUtil.handleDataVersion(dataService, logger);
-                    }
-                });
+        /*
+         * Check service version.
+         */
+        transactionScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    checkServiceVersion(
+                        NodeMapUtil.VERSION_KEY, 
+                        NodeMapUtil.MAJOR_VERSION, 
+                        NodeMapUtil.MINOR_VERSION);
+                }},  taskOwner);
         
         // Create and start the remove thread, which removes unused identities
         // from the map.
@@ -288,10 +258,6 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
         
-        synchronized(stateLock) {
-            state = State.RUNNING;
-        }
-        
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
         port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
@@ -304,42 +270,36 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
                    ", port:" + port + "]";
     }
     
-    /*- service like methods, which support lifecycle activities -*/
+    /* -- Implement AbstractService -- */
+
+    /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+    /** {@inheritDoc} */
+    protected void doReady() {
+        // Do nothing.
+    }
     
     /** 
-     * Shut down this server.  Called from the instantiating service.
-     * 
-     * @return {@code true} if everything shut down cleanly
+     * {@inheritDoc} 
+     * Called from the instantiating service
      */
-    boolean shutdown() {
-        logger.log(Level.FINEST, "Shutting down");
-        synchronized(stateLock) {
-            state = State.SHUTTING_DOWN;
-            while (callsInProgress > 0) {
-		try {
-		    stateLock.wait();
-		} catch (InterruptedException e) {
-		    return false;
-		}
-	    }
-        }
-
-        boolean ok = exporter.unexport();
+    protected void doShutdown() {
+        exporter.unexport();
         try {
-        if (removeThread != null) {
-            removeThread.interrupt();
-            removeThread.join();
-        }
+            if (removeThread != null) {
+                removeThread.interrupt();
+                removeThread.join();
+            }
         } catch (InterruptedException e) {
-            logger.logThrow(Level.WARNING, e, "Failure while shutting down");
-            ok = false;
+            // Do nothing
         }
-
-        synchronized(stateLock) {
-            state = State.SHUTDOWN;
-        }
-
-        return ok;
     }
 
     /**
@@ -351,48 +311,13 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     public String toString() {
 	return fullName;
     }
-    
-    /**
-     * Increments the number of calls in progress.  This method should
-     * be invoked by remote methods to both increment in progress call
-     * count and to check the state of this server.  When the call has
-     * completed processing, the remote method should invoke {@link
-     * #callFinished callFinished} before returning.
-     *
-     * @param check {@code true} if we should check the state
-     * @throws	IllegalStateException if this service is not configured
-     *		or is shutting down
-     */
-    private void callStarted(boolean check) {
-	synchronized (stateLock) {
-            if (check && state != State.RUNNING) {
-		throw new IllegalStateException("service not running");
-            }
-	    callsInProgress++;
-	}
-    }
 
-    /**
-     * Decrements the in progress call count, and if this server is
-     * shutting down and the count reaches 0, then notify the waiting
-     * shutdown thread that it is safe to continue.  A remote method
-     * should invoke this method when it has completed processing.
-     */
-    private void callFinished() {
-	synchronized (stateLock) {
-	    callsInProgress--;
-	    if (state == State.SHUTTING_DOWN && callsInProgress == 0) {
-		stateLock.notifyAll();
-	    }
-	}
-    }
-    
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
     public void assignNode(Class service, Identity identity) throws IOException 
     {
-        callStarted(true);    
+        callStarted();    
         try {
             if (identity == null) {
                 throw new NullPointerException("null id");
@@ -492,7 +417,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
 
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
-        callStarted(true);
+        callStarted();
         
         try {
             removeQueue.add(new RemoveInfo(id));
@@ -639,8 +564,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
-        // OK to call any time
-        callStarted(false);
+        callStarted();
         
         try {
             notifyMap.put(nodeId, client);
@@ -657,8 +581,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
      * Also called internally when we hear a node has died.
      */
     public void unregisterNodeListener(long nodeId) throws IOException {
-        // OK to call at any time
-        callStarted(false);
+        callStarted();
         
         try {
             // Tell the assign policy to stop assigning to the node
@@ -707,7 +630,7 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
     
     /** {@inheritDoc} */
     public boolean assertValid(Identity identity) throws Exception {
-        callStarted(true);
+        callStarted();
         
         try {
             AssertTask atask = new AssertTask(identity, dataService);
@@ -931,12 +854,10 @@ public final class NodeMappingServerImpl implements NodeMappingServer {
             
             boolean done = false;
             while (!done) {
-                synchronized(stateLock) {
-                    // Break out of the loop if we're shutting down.
-                    if (state != State.RUNNING) {
-                        done = true;
-                        break;
-                    }
+                // Break out of the loop if we're shutting down.
+                if (shuttingDown()) {
+                    done = true;
+                    break;
                 }
                 try {
                     // Find an identity on the node

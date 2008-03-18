@@ -385,6 +385,18 @@ public abstract class AbstractService implements Service {
 	}
     }
     
+    /** 
+     * Returns {@code true} if this service is in the initialized state
+     * but is not yet ready to run.
+     * 
+     * @return {@code true} if this service is in the initialized state
+     */
+    protected boolean isInInitializedState() {
+        synchronized (lock) {
+            return state == State.INITIALIZED;
+        }
+    }
+    
     /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
     public TaskQueue createTaskQueue() {
 	return transactionScheduler.createTaskQueue();

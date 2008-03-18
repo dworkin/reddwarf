@@ -144,7 +144,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 long nodeId = liveNodes.get((tryNode + i) % liveNodes.size());
                 // Find an identity on node.
                 GetIdOnNodeTask task =
-                    new GetIdOnNodeTask(server.dataService, 
+                    new GetIdOnNodeTask(server.getDataService(), 
                         server.watchdogService, nodeId, logger);
                 try {
                     server.runTransactionally(task);
