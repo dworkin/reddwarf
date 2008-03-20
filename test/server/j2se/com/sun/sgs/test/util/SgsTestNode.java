@@ -488,7 +488,7 @@ public class SgsTestNode {
     /**
      * Returns the bound port for the node mapping server.
      */
-    public static int getNodeMapServerPort(
+    private static int getNodeMapServerPort(
         NodeMappingServiceImpl nodemapService)
 	throws Exception
     {
