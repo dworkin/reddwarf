@@ -50,8 +50,8 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
     /**
      * Creates an instance of <code>RecurringTaskHandleImpl</code>.
      *
-     * @param scheduler the <code>SchedulerQueue</code> that is using
-     *                  this handle
+     * @param queue the <code>SchedulerQueue</code> that is using
+     *              this handle
      * @param task the task for this handle
      *
      * @throws IllegalArgumentException if the task is not recurring

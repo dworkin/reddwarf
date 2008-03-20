@@ -353,6 +353,8 @@ final class TransactionSchedulerImpl
 
         try {
             // wait for the task to complete
+            // FIXME: does having this method here affect interruption in
+            // a way that I didn't want?
             executeTask(task, unbounded);
             t = task.get();
         } catch (InterruptedException ie) {

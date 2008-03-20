@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
  * passed on its backing {@code SchedulerQueue}.
  * <p>
  * This class implements the {@code Future} interface so that the
- * associated task can be cancelled or waitied on to finish. The resulting
+ * associated task can be cancelled or waited on to finish. The resulting
  * value provided by the {@code Future} is {@code null} if the task
  * completed successfully, or the {@code Throwable} that caused the task
  * to fail permanently in the case of failure. See the documentation on
@@ -59,9 +59,20 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
     private TaskQueue queue = null;
 
     // state associated with the lifetime of the task
-    private boolean done = false;
-    private boolean cancelled = false;
-    private boolean running = false;
+    private enum State {
+        /* The task can be started running. */
+        RUNNABLE,
+        /* The task is currently running. */
+        RUNNING,
+        /* The task has completed. */
+        COMPLETED,
+        /* The task was cancelled. */
+        CANCELLED
+    }
+    private State state = State.RUNNABLE;
+
+    // the result of the task, if the state is COMPLETED; null if the task
+    // completed successfully, or the cause of a permanent failure
     private Throwable result = null;
 
     /**
@@ -118,7 +129,6 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
         this.priority = priority;
         this.startTime = startTime;
         this.period = period;
-        this.recurringTaskHandle = recurringTaskHandle;
     }
 
     /** Implementation of ScheduledTask interface. */
@@ -160,22 +170,23 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
 
     /** {@inheritDoc} */
     public synchronized boolean isCancelled() {
-        return cancelled;
+        return state == State.CANCELLED;
     }
 
     /** {@inheritDoc} */
     public synchronized boolean cancel() {
-        if (done || cancelled)
+        if (isFinished())
             return false;
-        while (running) {
+        while (state == State.RUNNING) {
             try {
                 wait();
             } catch (InterruptedException ie) {
                 // TODO: should this actually just return false?
             }
         }
-        if (! cancelled) {
-            cancelled = true;
+        if (state != State.CANCELLED) {
+            state = State.CANCELLED;
+            notifyAll();
             return true;
         }
         return false;
@@ -191,21 +202,28 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
     /** {@inheritDoc} */
     public synchronized Throwable get() throws InterruptedException {
         // if not done, then wait ... return result
-        while ((! done) && (! cancelled))
+        while (! isFinished())
             wait();
-        if (cancelled)
+        if (state == State.CANCELLED)
             throw new InterruptedException("interrupted while getting result");
         return result;
     }
 
-    // FIXME: implement this if it proves useful
+    // TODO: implement this if it proves useful
     public Throwable get(long timeout, TimeUnit unit) {
         throw new UnsupportedOperationException("not yet implemented");
     }
 
     /** {@inheritDoc} */
     synchronized public boolean isDone() {
-        return done;
+        return (isFinished());
+    }
+
+    /** Private utility methods. */
+
+    /** Returns whether the task has finished. */
+    private boolean isFinished() {
+        return ((state == State.COMPLETED) || (state == State.CANCELLED));
     }
 
     /** Package-private utility methods. */
@@ -215,9 +233,9 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
      * the task has already been cancelled or has completed.
      */
     synchronized boolean setRunning(boolean running) {
-        if (cancelled || done)
+        if (isFinished())
             return false;
-        this.running = running;
+        state = running ? State.RUNNING : State.RUNNABLE;
         if (! running)
             notifyAll();
         return true;
@@ -225,7 +243,7 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
 
     /** Returns whether this task is currently running. */
     synchronized boolean isRunning() {
-        return running;
+        return state == State.RUNNING;
     }
 
     /**
@@ -237,10 +255,9 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
      * the task is set as no longer running.
      */
     synchronized void setDone(Throwable result) {
-        if ((! running) || cancelled)
+        if (state != State.RUNNING)
             return;
-        done = true;
-        running = false;
+        state = State.COMPLETED;
         this.result = result;
         notifyAll();
     }

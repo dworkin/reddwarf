@@ -100,7 +100,7 @@ public interface SchedulerQueue {
      * Note that if this is a recurring task, then a call to its
      * {@code getRecurringTaskHandle} method must return a handle provided
      * by a call to this implementation's {@code createRecurringTaskHandle}
-     * method. Note also that it us up to the caller to re-schedule this
+     * method. Note also that it is up to the caller to re-schedule this
      * task for each recurrence, and that each such call must provide a
      * unique instance of {@code ScheduledTask}.
      *
