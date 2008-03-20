@@ -656,7 +656,7 @@ class Kernel {
             // Expand any properties that encapsulate several defaults
             String value =
                 properties.getProperty(StandardProperties.DEFAULT_CORE_SERVER);
-            if (value != null && Boolean.valueOf(value)) {
+            if (Boolean.valueOf(value) == Boolean.TRUE) {
                 // Don't start an application
                 properties.setProperty(StandardProperties.APP_LISTENER,
                                        StandardProperties.APP_LISTENER_NONE);
@@ -669,8 +669,16 @@ class Kernel {
                 properties.setProperty(
                     "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
                     "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+                if (logger.isLoggable(Level.CONFIG)) {
+                    logger.log(Level.CONFIG, 
+                        StandardProperties.DEFAULT_CORE_SERVER + " is true, " +
+                        "setting defaults for properties " +
+                        StandardProperties.APP_LISTENER + ", " +
+                        StandardProperties.FINAL_SERVICE + ", " +
+                        StandardProperties.SERVER_START + ", and " +
+                        "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"); 
+                }
             }
-
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))
