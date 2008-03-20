@@ -55,6 +55,10 @@ public class TestAbstractService extends TestCase {
 	System.err.println("Testcase: " + getName());
 	serverNode = new SgsTestNode("TestAbstractSevice", null,  null);
     }
+    
+    protected void tearDown() throws Exception {
+        serverNode.shutdown(true);
+    }
 
     public void testConstructorNullProperties() {
 	try {
