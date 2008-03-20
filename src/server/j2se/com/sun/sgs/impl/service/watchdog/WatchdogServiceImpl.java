@@ -329,7 +329,11 @@ public final class WatchdogServiceImpl
 		host = wrappedProps.getProperty(
 		    HOST_PROPERTY,
 		    wrappedProps.getProperty(
-			StandardProperties.SERVER_HOST, localHost));
+			StandardProperties.SERVER_HOST));
+                if (host == null) {
+                    throw new IllegalArgumentException(
+                                           "A server host must be specified");
+                }
 		serverPort = wrappedProps.getIntProperty(
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
@@ -397,6 +401,7 @@ public final class WatchdogServiceImpl
 	    renewThread.join();
 	} catch (InterruptedException e) {
 	}
+        exporter.unexport();
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}

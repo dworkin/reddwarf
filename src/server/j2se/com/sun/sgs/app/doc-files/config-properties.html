@@ -99,6 +99,7 @@ are started, there are multiple independent Project Darkstar clusters.
  property as no clients will connect to this node.
 </dl>
 
+<a name="CoreServerPorts"></a>
 The core server node may also specify ports to be used on the core 
 server machine:
 
@@ -130,6 +131,10 @@ nodes if a multi-node configuration is being used.
 <dd> The name of the host the core Project Darkstar Server node is running on. 
 
 </dl>
+
+Additionally, if any of the <a href="#CoreServerPorts">core server port</a> 
+properties are set when starting the core server node, they must also be set 
+to the same value on each application node.
 
 
 <a name="GeneralProperties"></a>

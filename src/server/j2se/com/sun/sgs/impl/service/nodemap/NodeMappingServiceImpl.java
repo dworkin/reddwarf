@@ -438,7 +438,11 @@ public class NodeMappingServiceImpl
                     wrappedProps.getProperty(
 			SERVER_HOST_PROPERTY,
 			wrappedProps.getProperty(
-			    StandardProperties.SERVER_HOST, localHost));
+			    StandardProperties.SERVER_HOST));
+                if (host == null) {
+                    throw new IllegalArgumentException(
+                                           "A server host must be specified");
+                }
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
