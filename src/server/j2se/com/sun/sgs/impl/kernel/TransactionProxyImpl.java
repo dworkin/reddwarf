@@ -49,14 +49,14 @@ final class TransactionProxyImpl implements TransactionProxy {
      * {@inheritDoc}
      */
     public Transaction getCurrentTransaction() {
-        return ThreadState.getCurrentTransaction();
+        return ContextResolver.getCurrentTransaction();
     }
 
     /**
      * {@inheritDoc}
      */
     public Identity getCurrentOwner() {
-        return ThreadState.getCurrentOwner();
+        return ContextResolver.getCurrentOwner();
     }
 
     /**

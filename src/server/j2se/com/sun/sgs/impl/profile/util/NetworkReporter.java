@@ -19,8 +19,6 @@
 
 package com.sun.sgs.impl.profile.util;
 
-import com.sun.sgs.kernel.ResourceCoordinator;
-
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -46,18 +44,15 @@ public class NetworkReporter {
      * Creates an instance of <code>NetworkReporter</code>.
      *
      * @param port the port on which to listen for client connections
-     * @param resourceCoordinator the <code>ResourceCoordinator</code> used
-     *                            to start the server listener task
      *
      * @throws IOException if the server socket cannot be created
      */
-    public NetworkReporter(int port, ResourceCoordinator resourceCoordinator)
+    public NetworkReporter(int port)
         throws IOException
     {
         listeners = new HashSet<Socket>();
-        resourceCoordinator.
-            startTask(new NetworkReporterRunnable(new ServerSocket(port)),
-                      null);
+        (new Thread(new NetworkReporterRunnable(new ServerSocket(port)))).
+            start();
     }
 
     /**

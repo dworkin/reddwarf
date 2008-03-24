@@ -27,7 +27,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
@@ -38,30 +37,29 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.SgsTestNode;
 
 import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 
-import java.util.LinkedHashSet;
+import java.lang.reflect.Field;
 import java.util.MissingResourceException;
 import java.util.Properties;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
@@ -74,6 +72,11 @@ public class TestTaskServiceImpl extends TestCase {
     private static final String PENDING_NS =
         TaskServiceImpl.DS_PREFIX + "Pending.";
     
+    /** Version information from WatchdogServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
+    
     /** The node that creates the servers */
     private SgsTestNode serverNode;
 
@@ -81,8 +84,8 @@ public class TestTaskServiceImpl extends TestCase {
     private ComponentRegistry systemRegistry;
     private Properties serviceProps;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
     
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -91,12 +94,21 @@ public class TestTaskServiceImpl extends TestCase {
     private NodeMappingService mappingService;
     private TaskService taskService;
         
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     /**
      * Test management.
      */
 
-    public TestTaskServiceImpl(String name) {
+    public TestTaskServiceImpl(String name) throws Exception {
         super(name);
+        Class cl = TaskServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     protected void setUp() throws Exception {
@@ -111,7 +123,7 @@ public class TestTaskServiceImpl extends TestCase {
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
         
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
         
         dataService = serverNode.getDataService();
@@ -120,7 +132,7 @@ public class TestTaskServiceImpl extends TestCase {
         
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     dataService.setBinding("counter", new Counter());
@@ -158,13 +170,13 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testConstructorNoScheduler() throws Exception {
-        Class criClass = 
+        Class<?> criClass = 
             Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
                 
-        Constructor criCtor =  criClass.getDeclaredConstructor(new Class[] {});
+        Constructor<?> criCtor =  criClass.getDeclaredConstructor(new Class[] {});
         criCtor.setAccessible(true);
         try {
-            new TaskServiceImpl(new Properties(),
+            new TaskServiceImpl(serviceProps,
                                 (ComponentRegistry) 
                                     criCtor.newInstance(new Object[] {}),
                                 txnProxy);
@@ -173,20 +185,67 @@ public class TestTaskServiceImpl extends TestCase {
             System.err.println(e);
         }
     }
+    
+    /**  Version tests */
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			serverNode.getDataService()
+                        .getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+    
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
 
-    public void testConstructorPendingSingleTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
+	new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
     }
 
-    public void testConstructorPendingRecurringTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
-    public void testConstructorPendingAnyTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
     /**
@@ -202,7 +261,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     public void testScheduleTaskNullArgs() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
@@ -228,7 +287,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskNotSerializable() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Task task = new NonSerializableTask();
@@ -255,7 +314,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskNotManagedObject() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Task task = new NonManagedTask();
@@ -281,7 +340,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskIsManagedObject() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Task task = new ManagedTask();
@@ -307,7 +366,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleNegativeTime() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Task task = new ManagedTask();
@@ -355,51 +414,6 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    public void testScheduleRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(true);
-        DummyComponentRegistry registry = new DummyComponentRegistry();
-        registry.setComponent(TaskScheduler.class, rejSched);
-        final TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), registry, txnProxy);
-        mappingService.assignNode(TestTaskServiceImpl.class,
-                                  taskOwner);
-                                  Thread.sleep(5000);
-        registry = new DummyComponentRegistry();
-        taskScheduler.runTransactionalTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    Task task = new ManagedTask();
-                    try {
-                        service.scheduleTask(task);
-                        fail("Expected TaskRejectedException");
-                    } catch (TaskRejectedException e) {
-                        System.err.println(e);
-                    }
-                }
-        }, taskOwner);
-    }
-
-    public void testScheduleDelayedRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(true);
-        DummyComponentRegistry registry = new DummyComponentRegistry();
-        registry.setComponent(TaskScheduler.class, rejSched);
-        final TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), registry, txnProxy);
-        registry = new DummyComponentRegistry();
-        taskScheduler.runTransactionalTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    Task task = new ManagedTask();
-                    try {
-                        service.scheduleTask(task, 100L);
-                        fail("Expected TaskRejectedException");
-                    } catch (TaskRejectedException e) {
-                        System.err.println(e);
-                    }
-                }
-        }, taskOwner);
-    }
-
     public void testRunImmediateTasks() throws Exception {
         // test with application identity
         runImmediateTest(taskOwner);
@@ -413,7 +427,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     private void runImmediateTest(Identity owner) throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -432,7 +446,7 @@ public class TestTaskServiceImpl extends TestCase {
         // NOTE: this test assumes a certain structure in the TaskService.
         clearPendingTasksInStore();
 
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     taskService.scheduleTask(new NonRetryNonManagedTask(false));
@@ -440,7 +454,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
 
         Thread.sleep(200);
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
@@ -451,7 +465,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
 
         clearPendingTasksInStore();
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     taskService.scheduleTask(new NonRetryNonManagedTask(true));
@@ -459,7 +473,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
 
         Thread.sleep(200);
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
@@ -482,7 +496,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     private void runPendingTest(Identity owner) throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     AppContext.getDataManager();
@@ -511,7 +525,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void runPeriodicTest(Identity owner) throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
@@ -528,7 +542,7 @@ public class TestTaskServiceImpl extends TestCase {
         }, owner);
 
         Thread.sleep(750);
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     String name = dataService.nextBoundName("runHandle.");
@@ -546,7 +560,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksBasic() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     getClearedCounter();
@@ -570,7 +584,7 @@ public class TestTaskServiceImpl extends TestCase {
                 }
         }, taskOwner);
 
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     ManagedHandle mHandle = (ManagedHandle)
@@ -591,7 +605,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testCancelPeriodicTasksTxnCommitted() throws Exception {
         final CancelPeriodicTask task = new CancelPeriodicTask();
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         try {
             task.handle.cancel();
             fail("Expected TransactionNotActiveException");
@@ -602,7 +616,7 @@ public class TestTaskServiceImpl extends TestCase {
         assertCounterClearXAction("Cancel outside of transaction took effect");
         
         // Now cancel the task for real, to quiet messages during shutdown
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     task.handle.cancel();
@@ -623,7 +637,7 @@ public class TestTaskServiceImpl extends TestCase {
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
         CancelPeriodTaskAbort task = new CancelPeriodTaskAbort();
         try {
-            taskScheduler.runTransactionalTask(task, taskOwner);
+            txnScheduler.runTask(task, taskOwner);
             fail("Expected the TransactionException we threw from task");
         } catch (TransactionException expected) {
             // Do nothing
@@ -647,7 +661,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksTwice() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {    
                     // test the basic cancel operation, within a transaction
@@ -672,9 +686,9 @@ public class TestTaskServiceImpl extends TestCase {
         }, taskOwner);
 
         final GetManagedHandleTask task = new GetManagedHandleTask();
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        txnScheduler.runTask(task, taskOwner);
         
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {   
                     try {
@@ -699,7 +713,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksTaskRemoved() throws Exception {
-         taskScheduler.runTransactionalTask(
+         txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() { 
                     getClearedCounter();
@@ -712,7 +726,7 @@ public class TestTaskServiceImpl extends TestCase {
                 }
          }, taskOwner);
 
-         taskScheduler.runTransactionalTask(
+         txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     dataService.removeObject(
@@ -720,7 +734,7 @@ public class TestTaskServiceImpl extends TestCase {
                 }
          }, taskOwner);
 
-         taskScheduler.runTransactionalTask(
+         txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     ManagedHandle mHandle =
@@ -745,39 +759,18 @@ public class TestTaskServiceImpl extends TestCase {
      * TaskService tests.
      */
 
-    public void testNonDurableTasksNonDurable() {
-        // FIXME: when we can do shutdown, make sure that non-durable tasks
-        // are indeed non-durable (i.e., they don't get saved and re-started
-        // when the system comes back up)
-    }
-
     public void testScheduleNonDurableTaskNullArgs() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
-                        taskService.scheduleNonDurableTask(null);
+                        taskService.scheduleNonDurableTask(null, false);
                         fail("Expected NullPointerException");
                     } catch (NullPointerException e) {
                         System.err.println(e);
                     }
                     try {
-                        taskService.scheduleNonDurableTask(null, 10);
-                        fail("Expected NullPointerException");
-                    } catch (NullPointerException e) {
-                        System.err.println(e);
-                    }
-                    try {
-                        taskService.scheduleNonDurableTask(null, 
-                                                           Priority.MEDIUM);
-                        fail("Expected NullPointerException");
-                    } catch (NullPointerException e) {
-                        System.err.println(e);
-                    }
-                    try {
-                        taskService.
-                            scheduleNonDurableTask(new KernelRunnableImpl(null),
-                                                   null);
+                        taskService.scheduleNonDurableTask(null, 10, false);
                         fail("Expected NullPointerException");
                     } catch (NullPointerException e) {
                         System.err.println(e);
@@ -787,12 +780,12 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleNonDurableTaskNegativeTime() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     KernelRunnable r = new DummyKernelRunnable();
                     try {
-                        taskService.scheduleNonDurableTask(r, -1L);
+                        taskService.scheduleNonDurableTask(r, -1L, false);
                         fail("Expected IllegalArgumentException");
                     } catch (IllegalArgumentException e) {
                         System.err.println(e);
@@ -804,19 +797,13 @@ public class TestTaskServiceImpl extends TestCase {
     public void testScheduleNonDurableTaskNoTransaction() {
         KernelRunnableImpl task = new KernelRunnableImpl(null);
         try {
-            taskService.scheduleNonDurableTask(task);
+            taskService.scheduleNonDurableTask(task, false);
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
         }
         try {
-            taskService.scheduleNonDurableTask(task, 100L);
-            fail("Expected TransactionNotActiveException");
-        } catch (TransactionNotActiveException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleNonDurableTask(task, Priority.MEDIUM);
+            taskService.scheduleNonDurableTask(task, 100L, false);
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
@@ -824,43 +811,83 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunImmediateNonDurableTasks() throws Exception {
-        final Counter counter = new Counter();
-        taskScheduler.runTransactionalTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    dataService.markForUpdate(counter);
-                    for (int i = 0; i < 3; i++) {
-                        taskService.
-                            scheduleNonDurableTask(new
-                                                   KernelRunnableImpl(counter));
-                        counter.increment();
-                    }
+        final AtomicInteger count = new AtomicInteger(3);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                count.decrementAndGet();
+                            }
+                        };
+                    for (int i = 0; i < 3; i++)
+                        taskService.scheduleNonDurableTask(r, false);
                 }
-        }, taskOwner);
+            }, taskOwner);
 
-        Thread.sleep(500);
-        if (! counter.isZero())
-            fail("Some immediate non-durable tasks did not run");
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
     }
 
     public void testRunPendingNonDurableTasks() throws Exception {
-        final Counter counter = new Counter();
-        taskScheduler.runTransactionalTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    dataService.markForUpdate(counter);
-                    for (long i = 0; i < 3; i++) {
-                        taskService.
-                            scheduleNonDurableTask(new
-                                                   KernelRunnableImpl(counter),
-                                                   i * 100L);
-                        counter.increment();
-                    }
+        final AtomicInteger count = new AtomicInteger(3);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                count.decrementAndGet();
+                            }
+                        };
+                    for (int i = 0; i < 3; i++)
+                        taskService.scheduleNonDurableTask(r, i * 100L, false);
                 }
-        }, taskOwner);
-        Thread.sleep(500);
-        if (! counter.isZero())
-            fail("Some pending non-durable tasks did not run");
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
+    }
+
+    public void testRunNonDurableTransactionalTasks() throws Exception {
+        final AtomicInteger count = new AtomicInteger(2);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                // make sure that we're run in a transaction
+                                serverNode.getProxy().getCurrentTransaction();
+                                count.decrementAndGet();
+                            }
+                        };
+                    taskService.scheduleNonDurableTask(r, true);
+                    taskService.scheduleNonDurableTask(r, 100, true);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
+    }
+
+    public void testRunNonDurableNonTransactionalTasks() throws Exception {
+        final AtomicInteger count = new AtomicInteger(2);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                try {
+                                    serverNode.getProxy().
+                                        getCurrentTransaction();
+                                } catch (TransactionNotActiveException tnae) {
+                                    // make sure we're not in a transaction
+                                    count.decrementAndGet();
+                                }
+                            }
+                        };
+                    taskService.scheduleNonDurableTask(r, false);
+                    taskService.scheduleNonDurableTask(r, 100, false);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
     }
 
     public void testRecoveryCleanup() throws Exception {
@@ -869,7 +896,7 @@ public class TestTaskServiceImpl extends TestCase {
         final String name =
             TaskServiceImpl.DS_PREFIX + "Handoff." + node.getNodeId();
         // verify that the handoff binding exists
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
@@ -886,8 +913,8 @@ public class TestTaskServiceImpl extends TestCase {
         String interval = serverNode.getServiceProperties().
             getProperty("com.sun.sgs.impl.service.watchdog.renew.interval",
                         "500");
-        Thread.sleep(2 * Long.valueOf(interval));
-        taskScheduler.runTransactionalTask(
+        Thread.sleep(3 * Long.valueOf(interval));
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     try {
@@ -904,7 +931,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     private void clearPendingTasksInStore() throws Exception {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
@@ -935,7 +962,7 @@ public class TestTaskServiceImpl extends TestCase {
     private void assertCounterClearXAction(final String message) 
         throws Exception
     {
-        taskScheduler.runTransactionalTask(
+        txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
                     assertCounterClear(message);

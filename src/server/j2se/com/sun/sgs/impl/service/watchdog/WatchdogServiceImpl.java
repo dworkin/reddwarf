@@ -19,15 +19,14 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -125,24 +124,37 @@ import java.util.logging.Logger;
  *	{@code 65535}.<p>
  * </dl> <p>
  */
-public final class WatchdogServiceImpl implements WatchdogService {
+public final class WatchdogServiceImpl
+    extends AbstractService
+    implements WatchdogService
+{
 
     /**  The name of this class. */
     private static final String CLASSNAME =
 	WatchdogServiceImpl.class.getName();
 
+    /** The package name. */
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.watchdog";
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(
-	    Logger.getLogger("com.sun.sgs.impl.service.watchdog.service"));
+	    Logger.getLogger(PKG_NAME + ".service"));
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     /** The prefix for server properties. */
-    private static final String SERVER_PROPERTY_PREFIX =
-	"com.sun.sgs.impl.service.watchdog.server";
+    private static final String SERVER_PROPERTY_PREFIX = PKG_NAME + ".server";
 
     /** The prefix for client properties. */
-    private static final String CLIENT_PROPERTY_PREFIX =
-	"com.sun.sgs.impl.service.watchdog.client";
+    private static final String CLIENT_PROPERTY_PREFIX = PKG_NAME + ".client";
 
     /** The property to specify that the watchdog server should be started. */
     private static final String START_SERVER_PROPERTY =
@@ -174,23 +186,8 @@ public final class WatchdogServiceImpl implements WatchdogService {
     /** The minimum renew interval. */
     private static final long MIN_RENEW_INTERVAL = 25;
 
-    /** The transaction proxy for this class. */
-    private static TransactionProxy txnProxy;
-
-    /** The lock for this service's state. */
-    final Object stateLock = new Object();
-    
-    /** The application name */
-    private final String appName;
-
     /** The exporter for this server or {@code null}. */
     private Exporter<WatchdogClient> exporter = null;
-
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-
-    /** The task owner. */
-    volatile Identity taskOwner;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;
@@ -206,6 +203,9 @@ public final class WatchdogServiceImpl implements WatchdogService {
 
     /** The name of the local host. */
     final String localHost;
+    
+    /** The application port. */
+    final int appPort;
     
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
@@ -230,14 +230,13 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	recoveryFutures =
 	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
 
-    /** The data service. */
-    final DataService dataService;
-
-    /** If true, this node is alive; initially, true. */
+    /** The lock for {@code isAlive} field. */
+    private final Object lock = new Object();
+    
+    /** If {@code true}, this node is alive; initially, the field is {@code
+     * true}. Accesses to this field should be protected by {@code lock}.
+     */
     private boolean isAlive = true;
-
-    /** If true, this service is shutting down; initially, false. */
-    private boolean shuttingDown = false;
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -254,33 +253,63 @@ public final class WatchdogServiceImpl implements WatchdogService {
 			       TransactionProxy txnProxy)
 	throws Exception
     {
+	super(properties, systemRegistry, txnProxy, logger);
 	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	try {
-	    if (systemRegistry == null) {
-		throw new NullPointerException("null systemRegistry");
-	    } else if (txnProxy == null) {
-		throw new NullPointerException("null txnProxy");
-	    }
-	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
-	    if (appName == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_NAME +
-		    " property must be specified");
-	    }
 	    boolean startServer = wrappedProps.getBooleanProperty(
  		START_SERVER_PROPERTY,
 		wrappedProps.getBooleanProperty(
 		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
-            
+           
+             String finalService =
+                properties.getProperty(StandardProperties.FINAL_SERVICE);
+             StandardService finalStandardService = null;
+             boolean isFullStack = true;
+             if (finalService == null) {
+                 finalStandardService = StandardService.LAST_SERVICE;
+                 isFullStack = true;
+             } else {
+                 finalStandardService =
+                    Enum.valueOf(StandardService.class, finalService);
+                 isFullStack = 
+                    !(properties.getProperty(StandardProperties.APP_LISTENER)
+                     .equals(StandardProperties.APP_LISTENER_NONE));
+             }
+        
 	    int clientPort = wrappedProps.getIntProperty(
 		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
-
+            
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
+
+            // If we're running on a full stack (the usual case), or a
+            // partial stack that includes the client session service,
+            // insist that a valid port number be specfied.
+            // The client session service will attempt to open that port.
+            //
+            // Otherwise, no port is needed or required, and we simply use
+            // -1 as a placeholder for the port number.
+            if (isFullStack || 
+                (StandardService.ClientSessionService.ordinal() <=
+                    finalStandardService.ordinal()) ) {
+                appPort = wrappedProps.getRequiredIntProperty(
+                    StandardProperties.APP_PORT, 1, 65535);
+            } else {
+                appPort = -1;
+            }
+
+	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    }},  taskOwner);
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
@@ -292,7 +321,7 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-                    clientHost, clientProxy);
+		    clientHost, appPort, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -308,26 +337,12 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
-	    
-	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-
-	    synchronized (WatchdogServiceImpl.class) {
-		if (WatchdogServiceImpl.txnProxy == null) {
-		    WatchdogServiceImpl.txnProxy = txnProxy;
-		} else {
-		    assert WatchdogServiceImpl.txnProxy == txnProxy;
-		}
-	    }
-	    dataService = txnProxy.getService(DataService.class);
-	    // TBD: This task owner is probably not correct because it
-	    // contains the system context.
-	    taskOwner = txnProxy.getCurrentOwner();
 
             if (startServer) {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(clientHost, 
+                long[] values = serverProxy.registerNode(clientHost, appPort, 
                                                          clientProxy);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
@@ -342,8 +357,8 @@ public final class WatchdogServiceImpl implements WatchdogService {
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, localNodeId:{1}",
-			   clientHost, localNodeId);
+			   "node registered, host:{0}, port:{1} localNodeId:{2}",
+			   clientHost, appPort, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -357,38 +372,33 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	}
     }
 
-    /* -- Implement Service -- */
+    /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
-    public String getName() {
-	return toString();
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
     }
     
     /** {@inheritDoc} */
-    public void ready() {
+    protected void doReady() {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
-	// chance to register and ensure that the taskOwner has the
-	// correct context for callbacks.
-	taskOwner = txnProxy.getCurrentOwner();
+	// chance to register.
         if (serverImpl != null) {
             serverImpl.ready();
         }
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
-	synchronized (stateLock) {
-	    if (shuttingDown) {
-		return false;
-	    }
-	    shuttingDown = true;
-	}
+    protected void doShutdown() {
 	renewThread.interrupt();
 	try {
 	    renewThread.join();
 	} catch (InterruptedException e) {
-	    return false;
 	}
 	if (exporter != null) {
 	    exporter.unexport();
@@ -396,7 +406,6 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}
-	return true;
     }
 	
     /* -- Implement WatchdogService -- */
@@ -498,7 +507,7 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	    while (getIsAlive() == true && ! shuttingDown()) {
 
 		try {
-		    Thread.currentThread().sleep(nextRenewInterval);
+		    Thread.sleep(nextRenewInterval);
 		} catch (InterruptedException e) {
 		    return;
 		}
@@ -556,20 +565,11 @@ public final class WatchdogServiceImpl implements WatchdogService {
     }
 
     /**
-     * Returns {@code true} if this service is shutting down.
-     */
-    private boolean shuttingDown() {
-	synchronized (stateLock) {
-	    return shuttingDown;
-	}
-    }
-    
-    /**
      * Returns the local alive status: {@code true} if this node is
      * considered alive.
      */
     private boolean getIsAlive() {
-	synchronized (stateLock) {
+	synchronized (lock) {
 	    return isAlive;
 	}
     }
@@ -587,7 +587,7 @@ public final class WatchdogServiceImpl implements WatchdogService {
      *		node listeners of this node's failure
      */
     private void setFailedThenNotify(boolean notify) {
-	synchronized (stateLock) {
+	synchronized (lock) {
 	    if (! isAlive) {
 		return;
 	    }
@@ -595,7 +595,7 @@ public final class WatchdogServiceImpl implements WatchdogService {
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, false);
+	    Node node = new NodeImpl(localNodeId, localHost, appPort, false);
 	    notifyNodeListeners(node);
 	}
     }
@@ -685,7 +685,8 @@ public final class WatchdogServiceImpl implements WatchdogService {
 
 	/** {@inheritDoc} */
 	public void nodeStatusChanges(
- 	    long[] ids, String hosts[], boolean[] status, long[] backups)
+ 	    long[] ids, String hosts[], int[] ports, 
+            boolean[] status, long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
 		status.length != backups.length)
@@ -698,7 +699,8 @@ public final class WatchdogServiceImpl implements WatchdogService {
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
+		    new NodeImpl(ids[i], hosts[i], ports[i], 
+                                 status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (status[i] == false && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);

@@ -1,4 +1,4 @@
- /*
+/*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -33,28 +33,23 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.channel.ChannelImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
-import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.service.channel.ChannelUtil;
+import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.ByteArrayInputStream;
@@ -63,6 +58,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -77,7 +73,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -95,6 +91,10 @@ public class TestChannelServiceImpl extends TestCase {
 			  "bashful", "doc", "dopey", "grumpy",
 			  "happy", "sleepy", "sneezy"});
 
+    /** The Channel service properties. */
+    private static final Properties serviceProps =
+	createProperties(StandardProperties.APP_NAME, APP_NAME);
+    
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
@@ -102,8 +102,13 @@ public class TestChannelServiceImpl extends TestCase {
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
-    /** The task scheduler. */
-    private TaskScheduler taskScheduler;
+    /** Version information from ChannelServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
+
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
 
     /** The owner for tasks I initiate. */
     private Identity taskOwner;
@@ -114,34 +119,33 @@ public class TestChannelServiceImpl extends TestCase {
     /** The channel service on the server node. */
     private ChannelManager channelService;
 
-    /** The client session service on the server node. */
-    private ClientSessionService sessionService;
-
-    /** True if test passes. */
-    private boolean passed;
-
-    /** The test clients, keyed by user name. */
-    private static Map<String, DummyClient> dummyClients;
-
     /** The listen port for the client session service. */
     private int port;
 
     /** The node ID for the local node. */
     private long serverNodeId;
-
+    
     /** A list of users for test purposes. */
     private List<String> someUsers =
 	Arrays.asList(new String[] { "moe", "larry", "curly" });
+
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     
     /** Constructs a test instance. */
-    public TestChannelServiceImpl(String name) {
+    public TestChannelServiceImpl(String name) throws Exception  {
 	super(name);
+	Class cl = ChannelServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     /** Creates and configures the channel service. */
     protected void setUp() throws Exception {
-	passed = false;
-        dummyClients = new HashMap<String, DummyClient>();
 	System.err.println("Testcase: " + getName());
         setUp(true);
     }
@@ -156,12 +160,12 @@ public class TestChannelServiceImpl extends TestCase {
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 	port = serverNode.getAppPort();
 
-        taskScheduler = 
-            serverNode.getSystemRegistry().getComponent(TaskScheduler.class);
+        txnScheduler = 
+            serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
 
         dataService = serverNode.getDataService();
-	sessionService = serverNode.getClientSessionService();
 	channelService = serverNode.getChannelService();
 	
 	serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
@@ -171,7 +175,6 @@ public class TestChannelServiceImpl extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
         Thread.sleep(100);
-	passed = true;
     }
     
     /** Cleans up the transaction. */
@@ -215,8 +218,8 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullProperties() throws Exception {
 	try {
-	    new ChannelServiceImpl(null, new DummyComponentRegistry(),
-				   new DummyTransactionProxy());
+	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -225,10 +228,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullComponentRegistry() throws Exception {
 	try {
-	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
-	    new ChannelServiceImpl(props, null,
-				   new DummyTransactionProxy());
+	    new ChannelServiceImpl(serviceProps, null, serverNode.getProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -237,9 +237,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNullTransactionProxy() throws Exception {
 	try {
-	    Properties props =
-		createProperties("com.sun.sgs.app.name", APP_NAME);
-	    new ChannelServiceImpl(props, new DummyComponentRegistry(),
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
 				   null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
@@ -250,7 +248,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ChannelServiceImpl(
-		new Properties(), new DummyComponentRegistry(),
+		new Properties(), serverNode.getSystemRegistry(),
 		serverNode.getProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
@@ -258,6 +256,66 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			dataService.getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+			       serverNode.getProxy());
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+    
     /* -- Test createChannel -- */
 
     public void testCreateChannelNoTxn() throws Exception { 
@@ -272,7 +330,7 @@ public class TestChannelServiceImpl extends TestCase {
     /* TBD: how is this test implemented?
     public void testCreateChannelAndAbort() {
 	createChannel("foo");
-	txn.abort(null);
+	txn.abort(new RuntimeException("abort"));
 	createTransaction();
 	try {
 	    getChannel("foo");
@@ -286,7 +344,7 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- Test Channel serialization -- */
 
     public void testChannelWriteReadObject() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
 		Channel savedChannel =
 		    channelService.createChannel(Delivery.RELIABLE);
@@ -325,7 +383,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelGetDeliveryMismatchedTxn() throws Exception {
 	// TBD: should the implementation work this way?
 	final Channel channel = createChannel();
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channel.getDeliveryRequirement();
@@ -338,7 +396,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetDelivery() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(delivery);
@@ -353,14 +411,16 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetDeliveryClosedChannel() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(delivery);
-		    channel.close();
-		    if (!delivery.equals(channel.getDeliveryRequirement())) {
-			fail("Expected: " + delivery + ", got: " +
-			     channel.getDeliveryRequirement());
+		    dataService.removeObject(channel);
+		    try {
+			channel.getDeliveryRequirement();
+			fail("Expected IllegalStateException");
+		    } catch (IllegalStateException e) {
+			System.err.println(e);
 		    }
 		}
 		System.err.println("Got delivery requirement on close channel");
@@ -392,11 +452,11 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelJoinClosedChannel() throws Exception {
 	final DummyClient client = newClient();
 	try {
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Channel channel =
 			channelService.createChannel(Delivery.RELIABLE);
-		    channel.close();
+		    dataService.removeObject(channel);
 		    try {
 			channel.join(client.getSession());
 			fail("Expected IllegalStateException");
@@ -414,7 +474,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelJoinNullClientSession() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
@@ -446,7 +506,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName, final List<String> users)
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		for (String user : users) {
@@ -476,7 +536,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName, final List<String> users)
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		Set<ClientSession> sessions = getSessions(channel);
@@ -517,7 +577,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final Channel channel = createChannel(channelName);
 	final DummyClient client = newClient();
 	try {
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
 			channel.leave(client.getSession());
@@ -542,13 +602,13 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(users);
 
 	try {
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    ClientSession session =
 			(ClientSession) dataService.getBinding(user);
 		    channel.join(session);
-		    channel.close();
+		    dataService.removeObject(channel);
 		    try {
 			channel.leave(session);
 			fail("Expected IllegalStateException");
@@ -565,7 +625,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelLeaveNullClientSession() throws Exception {
 	
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
@@ -585,7 +645,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(someUsers);
 	
 	try {
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 	
@@ -609,7 +669,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    Thread.sleep(100);
 	    
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 	
@@ -628,7 +688,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (! sessions.contains(moe)) {
 			fail("Expected session: " + moe);
 		    }
-		    channel.close();
+		    dataService.removeObject(channel);
 		}
  	    }, taskOwner);
 	    
@@ -648,7 +708,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    for (final String user : someUsers) {
 		
-		taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
 		    public void run() {
 			Channel channel = getChannel(channelName);
 			ClientSession session = getSession(user);
@@ -657,7 +717,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		Thread.sleep(100);
 		
-		taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
 		    public void run() {
 			Channel channel = getChannel(channelName);
 			ClientSession session = getSession(user);
@@ -666,7 +726,7 @@ public class TestChannelServiceImpl extends TestCase {
 			}}}, taskOwner);
 	    }
 	    
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 
@@ -676,7 +736,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    System.err.println("All sessions left");
 		    
-		    channel.close();
+		    dataService.removeObject(channel);
 		}}, taskOwner);
 
 	} finally {
@@ -698,11 +758,11 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelLeaveAllClosedChannel() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
-		channel.close();
+		dataService.removeObject(channel);
 		try {
 		    channel.leaveAll();
 		    fail("Expected IllegalStateException");
@@ -714,7 +774,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelLeaveAllNoSessionsJoined() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel(Delivery.RELIABLE);
@@ -734,7 +794,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
 
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    channel.leaveAll();
@@ -743,7 +803,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    
 	    Thread.sleep(100);
 	    
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    int numJoinedSessions = getSessions(channel).size();
@@ -751,7 +811,7 @@ public class TestChannelServiceImpl extends TestCase {
 			fail("Expected no sessions, got " + numJoinedSessions);
 		    }
 		    System.err.println("All sessions left");
-		    channel.close();
+		    dataService.removeObject(channel);
 		}
 	    }, taskOwner);
 	} finally {
@@ -760,7 +820,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private void printServiceBindings() throws Exception {
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		System.err.println("Service bindings----------");
 		Iterator<String> iter =
@@ -791,10 +851,10 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllClosedChannel() throws Exception {
 	final String channelName = "test";
 	createChannel(channelName);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
-		channel.close();
+		dataService.removeObject(channel);
 		try {
 		    channel.send(ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
@@ -903,7 +963,7 @@ public class TestChannelServiceImpl extends TestCase {
 		System.err.println("Sending message: " +
 				   HexDumper.format(buf.getBuffer()));
 
-		taskScheduler.runTransactionalTask(
+		txnScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    Channel channel = getChannel(channelName);
@@ -955,7 +1015,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelCloseNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.close();
+	    dataService.removeObject(channel);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -966,14 +1026,14 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName = "closeTest";
 	createChannel(channelName);
 	printServiceBindings();
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
-		channel.close();
+		dataService.removeObject(channel);
 	    }
 	}, taskOwner);
 	Thread.sleep(100);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		if (getChannel(channelName) != null) {
@@ -984,28 +1044,6 @@ public class TestChannelServiceImpl extends TestCase {
 	printServiceBindings();
     }
 
-    public void testChannelCloseTwice() throws Exception {
-	final String channelName = "closeTest";
-	createChannel(channelName);
-	
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		Channel channel = getChannel(channelName);
-		channel.close();
-		channel.close();
-		System.err.println("Channel closed twice");
-	    }
-	}, taskOwner);
-	Thread.sleep(100);
-	taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
-	    public void run() {
-		if (getChannel(channelName) != null) {
-		    fail("obtained closed channel");
-		}
-	    }
-	}, taskOwner);
-    }
-    
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
@@ -1135,6 +1173,11 @@ public class TestChannelServiceImpl extends TestCase {
 		DummyClient client = clients.get(user);
 		System.err.println("user: " + user +
 				   ", redirectHost: " + client.redirectHost);
+                // Note that the redirectHost can sometimes be null,
+                // as it won't be assigned if the initial login request
+                // was successful.  That would occur if the initial node 
+                // assignment for the client is the localhost, where the
+                // serverNode is running.
 		if (host.equals(client.redirectHost)) {
 		    iter.remove();
 		    removedClients.put(user, client);
@@ -1155,7 +1198,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void checkMembership(final String name, final boolean isMember)
 	    throws Exception
 	{
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(name);
 		    Set<ClientSession> sessions = getSessions(channel);
@@ -1181,7 +1224,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	void checkChannelSets(final boolean exists) throws Exception {
-	    taskScheduler.runTransactionalTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    for (DummyClient client : clients.values()) {
 			long nodeId = client.getNodeId();
@@ -1270,11 +1313,11 @@ public class TestChannelServiceImpl extends TestCase {
 	if (node == null) {
 	    throw new NullPointerException("no node for host: " + host);
 	}
-	TaskScheduler nodeTaskScheduler =
-	    node.getSystemRegistry().getComponent(TaskScheduler.class);
+	TransactionScheduler nodeTxnScheduler =
+	    node.getSystemRegistry().getComponent(TransactionScheduler.class);
 	Identity nodeTaskOwner =
 	    node.getProxy().getCurrentOwner();
-	nodeTaskScheduler.runTransactionalTask(task, nodeTaskOwner);
+	nodeTxnScheduler.runTask(task, nodeTaskOwner);
     }
 
     private static class CreateChannelTask extends AbstractKernelRunnable {
@@ -1315,7 +1358,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private Set<ClientSession> getSessions(Channel channel) {
 	Set<ClientSession> sessions = new HashSet<ClientSession>();
-	Iterator<ClientSession> iter = ((ChannelImpl) channel).getSessions();
+	Iterator<ClientSession> iter = ChannelUtil.getSessions(channel);
 	while (iter.hasNext()) {
 	    sessions.add(iter.next());
 	}
@@ -1325,60 +1368,12 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- other classes -- */
 
     /**
-     * Dummy identity coordinator for testing purposes.
-     */
-    private static class DummyIdentityCoordinator implements IdentityCoordinator {
-	public Identity authenticateIdentity(IdentityCredentials credentials) {
-	    return new DummyIdentity(credentials);
-	}
-    }
-    
-    /**
-     * Identity returned by the DummyIdentityCoordinator.
-     */
-    private static class DummyIdentity implements Identity, Serializable {
-
-        private static final long serialVersionUID = 1L;
-        private final String name;
-
-        DummyIdentity(String name) {
-            this.name = name;
-        }
-
-	DummyIdentity(IdentityCredentials credentials) {
-	    this.name = ((NamePasswordCredentials) credentials).getName();
-	}
-	
-	public String getName() {
-	    return name;
-	}
-
-	public void notifyLoggedIn() {}
-
-	public void notifyLoggedOut() {}
-        
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (! (o instanceof DummyIdentity))
-                return false;
-            return ((DummyIdentity)o).name.equals(name);
-        }
-        
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
-    }
-
-    /**
      * Dummy client code for testing purposes.
      */
     private class DummyClient {
 
 	String name;
-	CompactId sessionId;
+	byte[] sessionId;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -1392,13 +1387,12 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean leaveAck = false;
         private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
-	//private String channelName = null;
-	//private CompactId channelId = null;
 	private String reason;	
 	private String redirectHost;
+        private int redirectPort;
+        private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
 
 	
@@ -1406,7 +1400,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	byte[] getSessionId() {
-	    return sessionId.getId();
+	    return sessionId;
 	}
 
 	boolean isConnected() {
@@ -1486,7 +1480,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-	    //redirectHost = null;
+//            redirectHost = null;
+//            redirectPort = 0;
+            
 	}
 
 	DummyClient login(String user, String pass) {
@@ -1536,16 +1532,18 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    // handle redirected login
 	    SgsTestNode node = additionalNodes.get(host);
-	    int redirectPort = node.getAppPort();
 	    nodeId = node.getWatchdogService().getLocalNodeId();
+            // cache a local copy of redirect port, in case it's ever
+            // cleared by disconnect
+            int port = redirectPort;
 	    disconnect();
-	    connect(redirectPort);
+	    connect(port);
 	    return login(user, pass);
 	}
 
 	ClientSession getSession() throws Exception {
 	    GetSessionTask task = new GetSessionTask(name);
-	    taskScheduler.runTransactionalTask(task, taskOwner);
+	    txnScheduler.runTask(task, taskOwner);
 	    return task.getSession();
 	}
 
@@ -1579,14 +1577,6 @@ public class TestChannelServiceImpl extends TestCase {
 		    null :
 		    channelMessages.remove(0);
 	    }
-	}
-
-	private int getSize(Set<CompactId> ids) {
-	    int size = 0;
-	    for (CompactId id : ids) {
-		size += id.getExternalFormByteCount();
-	    }
-	    return size;
 	}
 
 	/**
@@ -1667,31 +1657,33 @@ public class TestChannelServiceImpl extends TestCase {
                 if (connected == false) {
                     return;
                 }
-                MessageBuffer buf = new MessageBuffer(1);
-                buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
                 logoutAck = false;
                 awaitGraceful = true;
+            }
+            MessageBuffer buf = new MessageBuffer(1);
+            buf.putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+            try {
+                connection.sendBytes(buf.getBuffer());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            synchronized (lock) {
                 try {
-                    connection.sendBytes(buf.getBuffer());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (lock) {
-                    try {
-                        if (logoutAck == false) {
-                            lock.wait(WAIT_TIME);
-                        }
-                        if (logoutAck != true) {
-                            throw new RuntimeException(
-                                "DummyClient.disconnect[" + name + "] timed out");
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(
-                            "DummyClient.disconnect[" + name + "] timed out", e);
+                    if (logoutAck == false) {
+                        lock.wait(WAIT_TIME);
                     }
+                    if (logoutAck != true) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect[" + name + "] timed out");
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(
+                        "DummyClient.disconnect[" + name + "] timed out", e);
+                } finally {
+                    if (! logoutAck)
+                        disconnect();
                 }
             }
-	    disconnect();
 	}
 
 	private class Listener implements ConnectionListener {
@@ -1720,7 +1712,11 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = CompactId.getCompactId(buf);
+                    // FIXME: this is actually the reconnect key, but the
+                    // current implementation sends the sessionId to aid
+                    // this test.
+                    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+                    sessionId = reconnectKey;
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1750,11 +1746,13 @@ public class TestChannelServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_REDIRECT:
 		    redirectHost = buf.getString();
+                    redirectPort = buf.getInt();
 		    synchronized (lock) {
 			loginAck = true;
 			loginRedirect = true;
 			System.err.println("login redirected: " + name +
-					   ", host:" + redirectHost);
+					   ", host:" + redirectHost +
+                                           ", port:" + redirectPort);
 			lock.notifyAll();
 		    } break;
 
@@ -1851,6 +1849,14 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    private static ClientSession unwrapSession(ClientSession session) {
+	if (session instanceof ClientSessionWrapper) {
+	    return ((ClientSessionWrapper) session).getClientSession();
+	} else {
+	    return session;
+	}
+    }
+
     public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
@@ -1861,7 +1867,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.setBinding(session.getName(), session);
+	    dataManager.setBinding(session.getName(), unwrapSession(session));
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}

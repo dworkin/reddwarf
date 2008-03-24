@@ -364,7 +364,7 @@ public class ChatClient extends JFrame
     /**
      * {@inheritDoc}
      * <p>
-     * This implementation renders a {@link SessionId} using a name
+     * This implementation renders a {@link ChatUser} using a name
      * mapping maintained by the client.
      */
     public Component getListCellRendererComponent(JList list, Object value,
@@ -418,7 +418,7 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Returns the user name associated with the given {@link SessionId},
+     * Returns the user name associated with the given {@link ChatUser},
      * if any.
      *
      * @param s the {@code SessionId} whose name to lookup
@@ -724,7 +724,7 @@ public class ChatClient extends JFrame
     /**
      * Decodes the given {@code buffer} into a message string.
      *
-     * @param bytes the encoded message
+     * @param buffer the encoded message
      * @return the decoded message string
      */
     static String fromMessageBuffer(ByteBuffer buffer) {

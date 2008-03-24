@@ -23,20 +23,17 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.UtilProperties;
 import static com.sun.sgs.test.util.UtilReflection.getConstructor;
 import static com.sun.sgs.test.util.UtilReflection.getMethod;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -69,7 +66,7 @@ import org.junit.runner.RunWith;
 public class TestScalableHashMap extends Assert {
 
     private static SgsTestNode serverNode;
-    private static TaskScheduler taskScheduler;
+    private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
     private static DataService dataService;
 
@@ -104,8 +101,8 @@ public class TestScalableHashMap extends Assert {
     @BeforeClass public static void setUpClass() throws Exception {
 	serverNode = new SgsTestNode("TestScalableHashMap", null,
 				     createProps("TestScalableHashMap"));
-        taskScheduler = serverNode.getSystemRegistry().
-            getComponent(TaskScheduler.class);
+        txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
         taskOwner = serverNode.getProxy().getCurrentOwner();
         dataService = serverNode.getDataService();
     }
@@ -119,7 +116,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testConstructorNoArg() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -129,7 +126,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -145,7 +142,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testConstructorOneArgDepth() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -157,7 +154,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testConstructorOneArgDepth3() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -169,7 +166,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testConstructorOneArgDepth4() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -183,7 +180,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testConstructorOneArgWithZeroMaxConcurrencyException()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
@@ -204,7 +201,7 @@ public class TestScalableHashMap extends Assert {
 
     @Test public void testCopyConstructor() throws Exception {
 	final Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    for (int i = 0; i < 32; i++) {
@@ -216,7 +213,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -227,7 +224,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testNullCopyConstructor() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
@@ -244,7 +241,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testMultiParamConstructor() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    createScalableHashMap(Integer.class, Integer.class,
@@ -258,7 +255,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testMultiParamConstructorBadMinConcurrency()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
@@ -274,7 +271,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testMultiParamConstructorBadSplitThreshold()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
@@ -290,7 +287,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testMultiParamConstructorBadDirectorySize()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
@@ -308,7 +305,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testPutAllMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> control =
@@ -325,7 +322,7 @@ public class TestScalableHashMap extends Assert {
      }
 
     @Test public void testPutAllNullArg() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -340,7 +337,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAllNotSerializable() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
@@ -365,7 +362,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAllNullItems() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
@@ -386,7 +383,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testPutMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -401,7 +398,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutNotSerializable() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
@@ -425,7 +422,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testPutOldValueNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -435,7 +432,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(Boolean.TRUE, bar);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -449,7 +446,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -466,7 +463,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testPutOldKeyNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -477,7 +474,7 @@ public class TestScalableHashMap extends Assert {
 		}
 	    }, taskOwner);
 	try {
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			dataService.removeObject(
@@ -490,7 +487,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 		}, taskOwner);
 	} catch (RuntimeException re) {}
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -498,7 +495,7 @@ public class TestScalableHashMap extends Assert {
 			(ScalableHashMap) dataService.getBinding("test");
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -511,7 +508,7 @@ public class TestScalableHashMap extends Assert {
 
     @Test public void testPutNullKey() throws Exception {
 	final Map<String,Integer> control = new HashMap<String,Integer>();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<String,Integer> test =
@@ -522,7 +519,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(control, dataService.getBinding("test"));
@@ -532,7 +529,7 @@ public class TestScalableHashMap extends Assert {
 
     @Test public void testPutNullValue() throws Exception {
 	final Map<Integer,String> control = new HashMap<Integer,String>();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,String> test =
@@ -543,7 +540,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(control, dataService.getBinding("test"));
@@ -556,7 +553,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testGetMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -571,7 +568,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testGetValueNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -581,7 +578,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(Boolean.TRUE, bar);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -595,7 +592,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -612,7 +609,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testGetKeyNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -622,7 +619,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(bar, Boolean.TRUE);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -631,7 +628,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(null, test.get(new Bar(1)));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -642,7 +639,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testGetNullKey() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<String,Integer> test =
@@ -652,7 +649,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(
@@ -663,7 +660,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testGetNullValue() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,String> test =
@@ -673,7 +670,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertEquals(null,
@@ -688,7 +685,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testContainsKeyMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -702,7 +699,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsKeyNull() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<String,Integer> test =
@@ -712,7 +709,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertTrue(((Map) dataService.getBinding(
@@ -722,7 +719,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsKeyNullOnEmptyMap() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<String,Integer> test =
@@ -731,7 +728,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    assertFalse(((Map) dataService.getBinding(
@@ -742,7 +739,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsKeyKeyNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap(16);
@@ -753,7 +750,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(new Bar(2), 2);
 		    }
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -763,7 +760,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(2, test.size());
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -776,7 +773,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsKeyValueNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap(16);
@@ -787,7 +784,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(2, new Bar(2));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -797,7 +794,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(2, test.size());
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -809,7 +806,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsKeyOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -837,7 +834,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testContainsValueMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -852,7 +849,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsValueNull() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -862,7 +859,7 @@ public class TestScalableHashMap extends Assert {
 		    assertTrue(test.containsValue(null));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -874,7 +871,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsValueNullEmptyMap() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -883,7 +880,7 @@ public class TestScalableHashMap extends Assert {
 		    assertFalse(test.containsValue(null));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -895,7 +892,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsValueValueNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -906,7 +903,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(2, new Bar(2));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -916,7 +913,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(2, test.size());
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -929,7 +926,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testContainsValueKeyNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -940,7 +937,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(new Bar(2), 2);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -950,7 +947,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(2, test.size());
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -962,7 +959,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsValueNullOnSplitMap() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -974,7 +971,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsValue() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -998,7 +995,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testContainsValueOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1029,7 +1026,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testValues() throws Exception {
 	final Map<Integer,Integer> control = new HashMap<Integer,Integer>();
 	final Collection<Integer> controlValues = control.values();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1053,7 +1050,7 @@ public class TestScalableHashMap extends Assert {
 					   new ManagedSerializable(values));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ManagedSerializable<Collection<Integer>> ms =
@@ -1067,7 +1064,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testValuesOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1096,7 +1093,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testKeySet() throws Exception {
 	final Map control = new HashMap();
 	final Set controlKeys = control.keySet();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map test = new ScalableHashMap();
@@ -1116,7 +1113,7 @@ public class TestScalableHashMap extends Assert {
 					   new ManagedSerializable(keys));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ManagedSerializable<Set> ms =
@@ -1137,7 +1134,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testEntrySet() throws Exception {
 	final Map control = new HashMap();
 	final Set controlEntries = control.entrySet();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map test = new ScalableHashMap();
@@ -1157,7 +1154,7 @@ public class TestScalableHashMap extends Assert {
 					   new ManagedSerializable(entries));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ManagedSerializable<Set> ms =
@@ -1176,7 +1173,7 @@ public class TestScalableHashMap extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testEquals() throws Exception {
 	final Map control = new HashMap();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -1194,7 +1191,7 @@ public class TestScalableHashMap extends Assert {
 		    dataService.setBinding("test", test);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -1210,7 +1207,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testToString() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1227,7 +1224,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testRemoveMisc() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -1243,7 +1240,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testRemoveNullKey() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<String,Integer> test =
@@ -1261,7 +1258,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testRemoveValueNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -1271,7 +1268,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(1, bar);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -1285,7 +1282,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(null, test.remove(2));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -1302,7 +1299,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testRemoveKeyNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -1312,7 +1309,7 @@ public class TestScalableHashMap extends Assert {
 		    test.put(bar, 1);
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    dataService.removeObject(dataService.getBinding("bar"));
@@ -1323,7 +1320,7 @@ public class TestScalableHashMap extends Assert {
 		    assertEquals(null, test.remove(new Bar(2)));
 		}
 	    }, taskOwner);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test =
@@ -1340,7 +1337,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testClear() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1376,7 +1373,7 @@ public class TestScalableHashMap extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testMultipleClearOperations() throws Exception {
 	final Map<Integer,Integer> control = new HashMap<Integer,Integer>();
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1389,7 +1386,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 	    }, taskOwner);
 	DoneRemoving.await(1);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1405,7 +1402,7 @@ public class TestScalableHashMap extends Assert {
 		}
 	    }, taskOwner);
 	DoneRemoving.await(1);
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1429,7 +1426,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testPutAndGetOnSingleLeaf() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1450,7 +1447,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndGetOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1469,7 +1466,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveSingleLeaf() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1495,7 +1492,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveLopsidedPositiveKeys() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1521,7 +1518,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveLopsidedNegativeKeys() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1547,7 +1544,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveDoublyLopsided() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1574,7 +1571,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveHalfRandomKeys() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1604,7 +1601,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveHalfNegativeKeys() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1630,7 +1627,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveOnSplitTree0() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -1680,7 +1677,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1708,7 +1705,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testPutAndRemoveOnNoMergeTreeWithNoCollapse()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1739,7 +1736,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testPutAndRemoveOnNoMergeTreeWithCollapse()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1768,7 +1765,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testRepeatedPutAndRemove() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1811,7 +1808,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testRepeatedPutAndRemoveWithNoMergeAndNoCollapse()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1861,7 +1858,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testRepeatedPutAndRemoveWithNoMergeAndCollapse()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1905,7 +1902,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testPutAndRemoveOnSplitTree5() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1939,7 +1936,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testInvalidGet() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1963,7 +1960,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testLeafSize() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -1999,7 +1996,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testLeafSizeAfterRemove() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2034,7 +2031,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testTreeSizeOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
@@ -2065,7 +2062,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testTreeSizeOnSplitTreeWithRemovals() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
@@ -2126,7 +2123,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testIteratorRemove() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test = new ScalableHashMap<Integer,Foo>();
@@ -2174,7 +2171,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testIteratorNotFound() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap test = new ScalableHashMap();
@@ -2187,7 +2184,7 @@ public class TestScalableHashMap extends Assert {
 	    }, taskOwner);
 	for (int i = 0; i < 2; i++) {
 	    final int local = i;
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			ScalableHashMap test =
@@ -2196,7 +2193,7 @@ public class TestScalableHashMap extends Assert {
 			    new ManagedSerializable(test.values().iterator()));
 		    }
 		}, taskOwner);
-	    taskScheduler.runTransactionalTask(
+	    txnScheduler.runTask(
 	        new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			if (local == 0) {
@@ -2221,7 +2218,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testIteratorOnSplitTree() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2245,7 +2242,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testIteratorOnSplitTreeWithRemovals() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
@@ -2313,7 +2310,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testKeyIterator() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2336,7 +2333,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testKeyIteratorOnSplitMap() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2359,7 +2356,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testValuesIterator() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2382,7 +2379,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testValuesIteratorOnSplitMap() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2405,7 +2402,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testInvalidRemove() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2426,7 +2423,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
 	@Test public void testLeafSerialization() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2463,7 +2460,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testSplitTreeSerialization() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
@@ -2507,7 +2504,7 @@ public class TestScalableHashMap extends Assert {
      */
 
     @Test public void testOnManagedObjectKeys() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Bar,Foo> test = new ScalableHashMap<Bar,Foo>();
@@ -2523,7 +2520,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testOnManagedObjectValues() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Foo,Bar> test = new ScalableHashMap<Foo,Bar>();
@@ -2539,7 +2536,7 @@ public class TestScalableHashMap extends Assert {
     }
 
     @Test public void testOnManagedObjectKeysAndValues() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Bar,Bar> test = new ScalableHashMap<Bar,Bar>();
@@ -2557,7 +2554,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testSerializableKeysReplacedWithManagedObjects()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Foo,Foo> test = new ScalableHashMap<Foo,Foo>();
@@ -2581,7 +2578,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testSerializableValuesReplacedWithManagedObjects()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Foo,Foo> test = new ScalableHashMap<Foo,Foo>();
@@ -2613,7 +2610,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIterator() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -2649,7 +2646,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorSerialization() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -2704,7 +2701,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithRemovals() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -2764,7 +2761,7 @@ public class TestScalableHashMap extends Assert {
 
     @SuppressWarnings("unchecked")
     @Test public void testConcurrentIteratorWithAdditions() throws Exception {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -2820,7 +2817,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testConcurrentIteratorWithReplacements()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Integer,Integer> test =
@@ -2899,7 +2896,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testConcurrentIteratorSerializationEqualHashCodes()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Equals,Integer> test =
@@ -2950,7 +2947,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Equals,Integer> test =
@@ -3009,7 +3006,7 @@ public class TestScalableHashMap extends Assert {
     @Test public void testConcurrentIteratorWithAdditionsEqualHashCodes()
 	throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Equals,Integer> test =
@@ -3060,7 +3057,7 @@ public class TestScalableHashMap extends Assert {
      @Test public void testConcurrentIteratorWithReplacementsOnEqualHashCodes()
 	 throws Exception
     {
-	taskScheduler.runTransactionalTask(
+	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableHashMap<Equals,Integer> test =
@@ -3266,27 +3263,10 @@ public class TestScalableHashMap extends Assert {
     }
 
     private static Properties createProps(String appName) throws Exception {
-        // TODO: we don't currently support creating transactions with
-        // specific timeout values, so currently the default timeout is being
-        // set very high, but when we can run specific transactions longer,
-        // this should be used for the few tests that actually need this
-        return UtilProperties.createProperties(
-            "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", "0",
-            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-                System.getProperty("java.io.tmpdir") +
-                                    File.separator + appName + ".db",
-            StandardProperties.APP_LISTENER,
-                SgsTestNode.DummyAppListener.class.getName(),
-            "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
-                "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
-	    "com.sun.sgs.txn.timeout", "1000000",
-            "com.sun.sgs.impl.service.data.store.net.server.host", "localhost",
-            "com.sun.sgs.impl.service.data.store.net.server.start", "true",
-            "com.sun.sgs.impl.service.data.store.net.server.port", "0",
-	    "com.sun.sgs.impl.service.watchdog.server.start", "true",
-	    "com.sun.sgs.impl.service.nodemap.server.start", "true"
-        );
+        Properties props = SgsTestNode.getDefaultProperties(appName, null, 
+                                           SgsTestNode.DummyAppListener.class);
+        props.setProperty("com.sun.sgs.txn.timeout", "1000000");
+        return props;
     }
 
     /*

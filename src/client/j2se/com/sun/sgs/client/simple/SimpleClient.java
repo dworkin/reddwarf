@@ -71,11 +71,12 @@ public class SimpleClient implements ServerSession {
     
     /**
      * The listener for the {@code ClientConnection} the session
-     * is communicating on.
+     * is communicating on.  If our login attempt is redirected to
+     * another host, we will use a different listener for the connection
+     * to the new host.
      */
-    private final ClientConnectionListener connListener =
-        new SimpleClientConnectionListener();
-
+    private ClientConnectionListener connListener;
+    
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
 
@@ -85,14 +86,18 @@ public class SimpleClient implements ServerSession {
      */
     private volatile ClientConnection clientConnection = null;
 
+    /** The password authentication used for the initial client
+     *  login attempt.  If the client receives a LOGIN_REDIRECT
+     *  message, we don't want the user (typing at a keyboard)
+     *  to have to supply their login information again.
+     */
+    PasswordAuthentication authentication = null;
+    
     /**
      * Indicates that either a connection or disconnection attempt
      * is in progress.
      */
     private volatile boolean connectionStateChanging = false;
-    
-    /** Indicates whether this client expects a disconnect message. */
-    private volatile boolean expectingDisconnect = false;
 
     /** Indicates whether this client is logged in. */
     private volatile boolean loggedIn = false;
@@ -117,6 +122,7 @@ public class SimpleClient implements ServerSession {
             throw new NullPointerException(
                 "The SimpleClientListener argument must not be null");
         }
+        connListener = new SimpleClientConnectionListener();
         this.clientListener = listener;
     }
 
@@ -176,6 +182,8 @@ public class SimpleClient implements ServerSession {
         connector.connect(connListener);
     }
 
+    /* -- Implement ServerSession -- */
+    
     /**
      * {@inheritDoc}
      */
@@ -279,8 +287,19 @@ public class SimpleClient implements ServerSession {
     final class SimpleClientConnectionListener
         implements ClientConnectionListener
     {
-        // Implement ClientConnectionListener
+            
+        /** Indicates whether this listener expects a disconnect message. */
+        private volatile boolean expectingDisconnect = false;
 
+        /** Indicates whether this listener has been disabled because
+         *  of an automatic login redirect to another host and port.
+         *  We need to disconnect our previous connection, but we don't
+         *  want to tell the client listener.  We'll accept no messages
+         *  when we're in this state.
+         */
+        private volatile boolean redirect = false;
+        
+        /* -- Implement ClientConnectionListener -- */
         /**
          * {@inheritDoc}
          */
@@ -292,8 +311,12 @@ public class SimpleClient implements ServerSession {
                 clientConnection = connection;
             }
 
-            PasswordAuthentication authentication =
-                clientListener.getPasswordAuthentication();
+            // First time through, we haven't authenticated yet.
+            // We don't want to have to reauthenticate for each login
+            // redirect.
+            if (authentication == null) {
+                authentication = clientListener.getPasswordAuthentication();
+            }
 
             if (authentication == null) {
                 logout(true);
@@ -323,6 +346,16 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void disconnected(boolean graceful, byte[] message) {
+            if (redirect) {
+                // This listener has been redirected, and this callback 
+                // should be ignored.  In particular, we don't want to
+                // change the clientConnection state (this could be a 
+                // real problem if the disconnected callback was delayed
+                // to after the connected callback from the automatic
+                // login redirect), and we don't want to notify the
+                // client listener of the redirect.
+                return;
+            }
             synchronized (SimpleClient.this) {
                 if (clientConnection == null && (! connectionStateChanging)) {
                     // Someone else beat us here
@@ -336,7 +369,7 @@ public class SimpleClient implements ServerSession {
                 MessageBuffer msg = new MessageBuffer(message);
                 reason = msg.getString();
             }
-
+            
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting disconnect
             clientListener.disconnected(expectingDisconnect, reason);
@@ -371,7 +404,7 @@ public class SimpleClient implements ServerSession {
                 }
             }
         }
-
+        
         /**
          * Processes an application message.
          * 
@@ -397,13 +430,31 @@ public class SimpleClient implements ServerSession {
                 break;
             }
 
-            case SimpleSgsProtocol.LOGIN_REDIRECT:
-                String hostname = msg.getString();
-                logger.log(Level.FINER, "Login redirect: {0}", hostname);
-                // TBI login redirect
-                clientListener.loginFailed(
-                    "unimplemented, want redirect to " + hostname);
+            case SimpleSgsProtocol.LOGIN_REDIRECT: {
+                String host = msg.getString();
+                int port = msg.getInt();
+                logger.log(Level.FINER, "Login redirect: {0}:{1}", host, port);
+                
+                // Disconnect our current connection, and connect to the
+                // new host and port
+                ClientConnection oldConnection = clientConnection;
+                synchronized (SimpleClient.this) {
+                    clientConnection = null;
+                    connectionStateChanging = true;
+                }
+                oldConnection.disconnect();
+                redirect = true;
+                Properties props = new Properties();
+                props.setProperty("host", host);
+                props.setProperty("port", String.valueOf(port));
+                ClientConnector connector = ClientConnector.create(props);
+                // We use a new listener so we don't have to worry about
+                // "redirect" being incorrect.
+                connListener = new SimpleClientConnectionListener();
+                // This eventually causes connected to be called
+                connector.connect(connListener);
                 break;
+            }
 
             case SimpleSgsProtocol.SESSION_MESSAGE: {
                 logger.log(Level.FINEST, "Direct receive");

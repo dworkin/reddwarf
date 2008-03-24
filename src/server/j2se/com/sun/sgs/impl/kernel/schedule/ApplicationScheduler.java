@@ -28,15 +28,13 @@ import java.util.Collection;
 
 
 /**
- * This interface is used to define a scheduler that is tied to a single
- * application. It is used by a <code>SystemScheduler</code> to handle
- * the tasks it recieves that are associated with a given application.
+ * This interface is used to define a scheduler that is used by an application.
  * Implementations of this interface are essentially just responsible for
  * ordering the tasks associated with a given application.  All
  * implementations must implement a constructor of the form
  * <code>(java.util.Properties)</code>.
  */
-interface ApplicationScheduler {
+public interface ApplicationScheduler {
 
     /**
      * The default location to specify an application's scheduler.

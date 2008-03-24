@@ -35,12 +35,11 @@ import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
-import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -110,10 +109,19 @@ public final class ClientSessionServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
-	
+
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
@@ -184,9 +192,6 @@ public final class ClientSessionServiceImpl
     /** Lock for notifying the thread that flushes committed contexts. */
     private final Object flushContextsLock = new Object();
 
-    /** The task scheduler for non-durable tasks. */
-    final NonDurableTaskScheduler nonDurableTaskScheduler;
-
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
@@ -212,10 +217,9 @@ public final class ClientSessionServiceImpl
     private final ClientSessionServer serverProxy;
 
     /** The map of session task queues, keyed by session ID. */
-    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
-	sessionTaskQueues =
-	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
-    
+    private final ConcurrentHashMap<BigInteger, TaskQueue>
+	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
+
     /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
 
@@ -241,24 +245,8 @@ public final class ClientSessionServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-	    String portString =
-		wrappedProps.getProperty(StandardProperties.APP_PORT);
-	    if (portString == null) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property must be specified");
-	    }
-	    appPort = Integer.parseInt(portString);
-	    // TBD: do we want to restrict ports to > 1024?
-	    if (appPort < 0) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can't be negative: " + appPort);
-	    } else if (appPort > 65535) {
-		throw new IllegalArgumentException(
-		    "The " + StandardProperties.APP_PORT +
-		    " property can be greater than 65535: " + appPort);
-	    }
+            appPort = wrappedProps.getRequiredIntProperty(
+                StandardProperties.APP_PORT, 1, 65535);
 
 	    /*
 	     * Get the property for controlling session event processing.
@@ -310,20 +298,25 @@ public final class ClientSessionServiceImpl
 	    watchdogService = txnProxy.getService(WatchdogService.class);
 	    nodeMapService = txnProxy.getService(NodeMappingService.class);
 	    taskService = txnProxy.getService(TaskService.class);
-            nonDurableTaskScheduler =
-		new NonDurableTaskScheduler(
-		    taskScheduler, taskOwner, taskService);
-	    localNodeId = watchdogService.getLocalNodeId();
+	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
 	    int acceptorBacklog = wrappedProps.getIntProperty(
 	                ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
 
 	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    }},  taskOwner);
+	    
+	    /*
 	     * Store the ClientSessionServer proxy in the data store.
 	     */
-	    taskScheduler.runTransactionalTask(
-		new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getClientSessionServerKey(localNodeId),
@@ -353,6 +346,9 @@ public final class ClientSessionServiceImpl
 			getListenPort());
 		}
 	    } catch (Exception e) {
+		logger.logThrow(Level.WARNING, e,
+                                "acceptor failed to listen on {0}",
+                                listenAddress);
 		try {
 		    acceptor.close();
                 } catch (IOException ioe) {
@@ -376,6 +372,15 @@ public final class ClientSessionServiceImpl
 
     /* -- Implement AbstractService -- */
 
+    /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
     /** {@inheritDoc} */
     public void doReady() {
         acceptFuture = acceptor.accept(new AcceptorListener());
@@ -1019,12 +1024,10 @@ public final class ClientSessionServiceImpl
 		}
 
 		BigInteger sessionRefId = new BigInteger(1, sessionId);
-		NonDurableTaskQueue taskQueue =
-		    sessionTaskQueues.get(sessionRefId);
+		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
 		if (taskQueue == null) {
-		    NonDurableTaskQueue newTaskQueue =
-			new NonDurableTaskQueue(txnProxy, taskScheduler,
-						taskOwner);
+		    TaskQueue newTaskQueue =
+			transactionScheduler.createTaskQueue();
 		    taskQueue = sessionTaskQueues.
 			putIfAbsent(sessionRefId, newTaskQueue);
 		    if (taskQueue == null) {
@@ -1034,7 +1037,7 @@ public final class ClientSessionServiceImpl
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ClientSessionImpl.serviceEventQueue(sessionId);
-		    }});
+		    }}, taskOwner);
 	    } finally {
 		callFinished();
 	    }
@@ -1136,11 +1139,11 @@ public final class ClientSessionServiceImpl
     /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
-     * 
-     * @see NonDurableTaskScheduler#scheduleTask(KernelRunnable, Identity)
      */
     void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
-        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+        transactionScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
@@ -1150,15 +1153,18 @@ public final class ClientSessionServiceImpl
     void scheduleNonTransactionalTask(
 	KernelRunnable task, Identity ownerIdentity)
     {
-        nonDurableTaskScheduler.
-            scheduleNonTransactionalTask(task, ownerIdentity);
+	// TBD: this check is done because there are known cases where the
+	// identity can be null, but when the Handler code changes to ensure
+	// that the identity is always valid, this check can be removed
+	Identity owner = (ownerIdentity == null ? taskOwner : ownerIdentity);
+        taskScheduler.scheduleTask(task, owner);
     }
 
     /**
      * Schedules a non-durable, transactional task using the task service.
      */
     void scheduleTaskOnCommit(KernelRunnable task) {
-        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
+        taskService.scheduleNonDurableTask(task, true);
     }
 
     /**
@@ -1167,12 +1173,14 @@ public final class ClientSessionServiceImpl
     void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
 	throws Exception
     {
-	Identity owner =
-	    (ownerIdentity == null) ?
-	    taskOwner :
-	    ownerIdentity;
-	    
-	taskScheduler.runTransactionalTask(task, owner);
+	if (ownerIdentity == null)
+	    throw new NullPointerException("Owner identity cannot be null");
+	transactionScheduler.runTask(task, ownerIdentity);
+    }
+
+    /** Returns the non-null user identity or the application's identity. */
+    private Identity getValidIdentity(Identity userIdentity) {
+	return userIdentity == null ? taskOwner : userIdentity;
     }
 
     /**
@@ -1191,14 +1199,14 @@ public final class ClientSessionServiceImpl
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    try {
-		taskScheduler.runTransactionalTask(
+		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    taskService.scheduleTask(
 				new RemoveClientSessionServerProxyTask(nodeId));
 			    notifyDisconnectedSessions(nodeId);
 			}},
-		    taskOwner);
+		    getValidIdentity(taskOwner));
 		future.done();
 	    } catch (Exception e) {
 		logger.logThrow(

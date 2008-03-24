@@ -33,11 +33,11 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.ManagedSerializable;
-import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -47,7 +47,6 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.service.WatchdogService;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -90,6 +89,15 @@ public final class ChannelServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -156,9 +164,9 @@ public final class ChannelServiceImpl
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
     /** The map of channel coordinator task queues, keyed by channel ID. */
-    private final ConcurrentHashMap<BigInteger, NonDurableTaskQueue>
+    private final ConcurrentHashMap<BigInteger, TaskQueue>
 	coordinatorTaskQueues =
-	    new ConcurrentHashMap<BigInteger, NonDurableTaskQueue>();
+	    new ConcurrentHashMap<BigInteger, TaskQueue>();
 
     /** The maximum number of channel events to sevice per transaction. */
     final int eventsPerTxn;
@@ -229,9 +237,18 @@ public final class ChannelServiceImpl
 	    }
 
 	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    }},  taskOwner);
+	    
+	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
-	    taskScheduler.runTransactionalTask(
+	    transactionScheduler.runTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
 			dataService.setServiceBinding(
@@ -264,6 +281,15 @@ public final class ChannelServiceImpl
     /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+     /** {@inheritDoc} */
     protected void doReady() {
     }
 
@@ -319,12 +345,9 @@ public final class ChannelServiceImpl
 		}
 
 		BigInteger channelIdRef = new BigInteger(1, channelId);
-		NonDurableTaskQueue taskQueue =
-		    coordinatorTaskQueues.get(channelIdRef);
+		TaskQueue taskQueue = coordinatorTaskQueues.get(channelIdRef);
 		if (taskQueue == null) {
-		    NonDurableTaskQueue newTaskQueue =
-			new NonDurableTaskQueue(txnProxy, taskScheduler,
-						taskOwner);
+		    TaskQueue newTaskQueue = createTaskQueue();
 		    taskQueue = coordinatorTaskQueues.
 			putIfAbsent(channelIdRef, newTaskQueue);
 		    if (taskQueue == null) {
@@ -334,7 +357,7 @@ public final class ChannelServiceImpl
 		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			ChannelImpl.serviceEventQueue(channelId);
-		    }});
+		    }}, taskOwner);
 					  
 	    } finally {
 		callFinished();
@@ -358,7 +381,7 @@ public final class ChannelServiceImpl
 		GetLocalMembersTask getMembersTask =
 		    new GetLocalMembersTask(channelRefId);
 		try {
-		    taskScheduler.runTransactionalTask(
+		    transactionScheduler.runTask(
 			getMembersTask, taskOwner);
 		} catch (Exception e) {
 		    // FIXME: what is the right thing to do here?
@@ -833,14 +856,13 @@ public final class ChannelServiceImpl
 	     * disconnected session from all channels that it is
 	     * currently a member of.
 	     */
-	    taskScheduler.scheduleTask(
- 		 new TransactionRunner(
+	    transactionScheduler.scheduleTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    ChannelImpl.removeSessionFromAllChannels(
 				localNodeId, sessionRefId.toByteArray());
 			    }
-		    }),
+		    },
 		 taskOwner);
 	}
     }
@@ -940,7 +962,7 @@ public final class ChannelServiceImpl
 		/*
 		 * Schedule persistent tasks to perform recovery.
 		 */
-		taskScheduler.runTransactionalTask(
+		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    /*

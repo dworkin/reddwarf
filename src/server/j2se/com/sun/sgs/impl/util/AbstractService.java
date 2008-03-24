@@ -20,14 +20,19 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
+import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
 
@@ -66,9 +71,12 @@ public abstract class AbstractService implements Service {
 
     /** The data service. */
     protected final DataService dataService;
-    
+
     /** The task scheduler. */
     protected final TaskScheduler taskScheduler;
+    
+    /** The transaction scheduler. */
+    protected final TransactionScheduler transactionScheduler;
 
     /** The task owner. */
     protected final Identity taskOwner;
@@ -86,11 +94,10 @@ public abstract class AbstractService implements Service {
     private volatile Thread shutdownThread;
 
     /**
-     * Constructs an instance with the specified {@code properties},
-     * {@code systemRegistry}, {@code txnProxy} and {@code logger}.
-     * It initializes the {@code appName} field to the value of the
-     * {@code com.sun.sgs.app.name} property and sets this service's
-     * state to {@code INITIALIZED}.
+     * Constructs an instance with the specified {@code properties}, {@code
+     * systemRegistry}, {@code txnProxy}, and {@code logger}.  It initializes
+     * the {@code appName} field to the value of the {@code com.sun.sgs.app.name}
+     * property and sets this service's state to {@code INITIALIZED}.
      *
      * @param	properties service properties
      * @param	systemRegistry system registry
@@ -114,6 +121,7 @@ public abstract class AbstractService implements Service {
 	} else if (logger == null) {
 	    throw new NullPointerException("null logger");
 	}
+	
 	synchronized (AbstractService.class) {
 	    if (AbstractService.txnProxy == null) {
 		AbstractService.txnProxy = txnProxy;
@@ -130,8 +138,11 @@ public abstract class AbstractService implements Service {
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	this.transactionScheduler =
+	    systemRegistry.getComponent(TransactionScheduler.class);
 	this.dataService = txnProxy.getService(DataService.class);
 	this.taskOwner = txnProxy.getCurrentOwner();
+
 	setState(State.INITIALIZED);
     }
 
@@ -249,6 +260,75 @@ public abstract class AbstractService implements Service {
     protected abstract void doShutdown();
 
     /**
+     * Checks the service version.  If a version is not associated with the
+     * given {@code versionKey}, then a new {@link Version} object
+     * (constructed with the specified {@code majorVersion} and {@code
+     * minorVersion}) is bound in the data service with the specified key.
+     *
+     * <p>If an old version is bound to the specified key and that old
+     * version is not equal to the current version (as specified by {@code
+     * majorVersion}/{@code minorVersion}), then the {@link
+     * #handleServiceVersionMismatch handleServiceVersionMismatch} method is
+     * invoked to convert the old version to the new version.  If the {@code
+     * handleVersionMismatch} method returns normally, the old version is
+     * removed and the current version is bound to the specified key.
+     *
+     * <p>This method must be called within a transaction.
+     *
+     * @param	versionKey a key for the version
+     * @param	majorVersion a major version
+     * @param	minorVersion a minor version
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     * @throws	IllegalStateException if {@code handleVersionMismatch} is
+     *		invoked and throws a {@code RuntimeException}
+     */
+    protected final void checkServiceVersion(
+	String versionKey, int majorVersion, int minorVersion)
+    {
+	if (versionKey ==  null) {
+	    throw new NullPointerException("null versionKey");
+	}
+	Version currentVersion = new Version(majorVersion, minorVersion);
+	try {
+	    Version oldVersion = (Version)
+		dataService.getServiceBinding(versionKey);
+	    
+	    if (! currentVersion.equals(oldVersion)) {
+		try {
+		    handleServiceVersionMismatch(oldVersion, currentVersion);
+		    dataService.removeObject(oldVersion);
+		    dataService.setServiceBinding(versionKey, currentVersion);
+		} catch (IllegalStateException e) {
+		    throw e;
+		} catch (RuntimeException e) {
+		    throw new IllegalStateException(
+		        "exception occurred while upgrading from version: " +
+		        oldVersion + ", to: " + currentVersion, e);
+		}
+	    }
+
+	} catch (NameNotBoundException e) {
+	    // No version exists yet; store first version in data service.
+	    dataService.setServiceBinding(versionKey, currentVersion);
+	}
+    }
+    
+    /**
+     * Handles conversion from the {@code oldVersion} to the {@code
+     * currentVersion}.  This method is invoked by {@link #checkServiceVersion
+     * checkServiceVersion} if a version mismatch is detected and is invoked from
+     * within a transaction.
+     *
+     * @param	oldVersion the old version
+     * @param	currentVersion the current version
+     * @throws	IllegalStateException if the old version cannot be upgraded
+     *		to the current version
+     */
+    protected abstract void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion);
+    
+    /**
      * Returns this service's state.
      *
      * @return this service's state
@@ -305,6 +385,23 @@ public abstract class AbstractService implements Service {
 	}
     }
     
+    /** 
+     * Returns {@code true} if this service is in the initialized state
+     * but is not yet ready to run.
+     * 
+     * @return {@code true} if this service is in the initialized state
+     */
+    protected boolean isInInitializedState() {
+        synchronized (lock) {
+            return state == State.INITIALIZED;
+        }
+    }
+    
+    /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
+    public TaskQueue createTaskQueue() {
+	return transactionScheduler.createTaskQueue();
+    }
+    
     /**
      * Returns the data service relevant to the current context.
      *
@@ -332,6 +429,78 @@ public abstract class AbstractService implements Service {
     public static boolean isRetryableException(Exception e) {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
+    }
+    
+    /**
+     * An immutable class to hold the current version of the keys
+     * and data persisted by a service.
+     */   
+    public static class Version implements ManagedObject, Serializable {
+        /** Serialization version. */
+        private static final long serialVersionUID = 1L;
+        
+        private final int majorVersion;
+        private final int minorVersion;
+
+	/**
+	 * Constructs an instance with the specified {@code major} and
+	 * {@code minor} version numbers.
+	 *
+	 * @param major a major version number
+	 * @param minor a minor version number
+	 */
+        public Version(int major, int minor) {
+            majorVersion = major;
+            minorVersion = minor;
+        }
+        
+        /**
+         * Returns the major version number.
+         * @return the major version number
+         */
+        public int getMajorVersion() {
+            return majorVersion;
+        }
+        
+        /**
+         * Returns the minor version number.
+         * @return the minor version number
+         */
+        public int getMinorVersion() {
+            return minorVersion;
+        }
+        
+        /** {@inheritDoc} */
+        @Override
+        public String toString() {
+            return "Version[major:" + majorVersion + 
+                    ", minor:" + minorVersion + "]";
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            } else if (obj == null) {
+                return false;
+            } else if (obj.getClass() == this.getClass()) {
+                Version other = (Version) obj;
+                return majorVersion == other.majorVersion && 
+                       minorVersion == other.minorVersion;
+
+            }
+            return false;
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public int hashCode() {
+            int result = 17;
+            result = 37*result + majorVersion;
+            result = 37*result + minorVersion;
+            return result;              
+        }
     }
     
     /**
@@ -368,4 +537,5 @@ public abstract class AbstractService implements Service {
 	    setState(AbstractService.State.SHUTDOWN);
 	}
     }
+
 }
