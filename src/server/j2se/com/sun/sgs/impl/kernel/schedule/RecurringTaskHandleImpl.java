@@ -109,8 +109,12 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
                 throw new IllegalStateException("cannot cancel task");
             cancelled = true;
         }
-        if (task.cancel())
-            queue.notifyCancelled(task);
+        try {
+            if (task.cancel(false))
+                queue.notifyCancelled(task);
+        } catch (InterruptedException ie) {
+            // this will never happen because false was passed to cancel()
+        }
         if (currentTimerTask != null)
             currentTimerTask.cancel();
     }

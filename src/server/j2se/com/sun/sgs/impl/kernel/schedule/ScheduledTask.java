@@ -101,9 +101,20 @@ public interface ScheduledTask {
      * Cancel this {@code ScheduledTask}. Note that if the task is already
      * running then calling this method may not have any affect.
      *
+     * @param allowInterrupt {@code true} if this call is allowed to throw
+     *                       {@code InterruptedException} if the calling
+     *                       thread is interrupted, {@code false} if the
+     *                       call should always block until the task is
+     *                       cancelled or has completed
+     *
      * @return {@code true} if the task was cancelled, {@code false} if
      *         the task was already cancelled or has completed
+     *
+     * @throws InterruptedException if the caller is interrupted while
+     *                              waiting to learn if the cancellation
+     *                              succeeded and {@code allowInterrupt}
+     *                              is {@code true}
      */
-    public boolean cancel();
+    public boolean cancel(boolean allowInterrupt) throws InterruptedException;
 
 }

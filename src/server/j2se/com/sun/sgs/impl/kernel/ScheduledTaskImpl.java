@@ -28,23 +28,20 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
 
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
 
 /**
  * Package-private implementation of {@code ScheduledTask} that is used to
  * maintain state about tasks accepted by {@code TransactionScheduler} and
  * passed on its backing {@code SchedulerQueue}.
  * <p>
- * This class implements the {@code Future} interface so that the
+ * This class implements some of the {@code Future} interface so that the
  * associated task can be cancelled or waited on to finish. The resulting
- * value provided by the {@code Future} is {@code null} if the task
+ * value provided by a call to {@code get} is {@code null} if the task
  * completed successfully, or the {@code Throwable} that caused the task
  * to fail permanently in the case of failure. See the documentation on
  * the associated methods for more details on how interruption is handled.
  */
-class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
+class ScheduledTaskImpl implements ScheduledTask {
 
     // the common, immutable aspects of a task
     private final KernelRunnable task;
@@ -174,14 +171,17 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
     }
 
     /** {@inheritDoc} */
-    public synchronized boolean cancel() {
-        if (isFinished())
+    public synchronized boolean cancel(boolean allowInterrupt)
+        throws InterruptedException
+    {
+        if (isDone())
             return false;
         while (state == State.RUNNING) {
             try {
                 wait();
             } catch (InterruptedException ie) {
-                // TODO: should this actually just return false?
+                if (allowInterrupt)
+                    throw ie;
             }
         }
         if (state != State.CANCELLED) {
@@ -192,48 +192,36 @@ class ScheduledTaskImpl implements ScheduledTask, Future<Throwable> {
         return false;
     }
 
-    /** Implementation of Future interface. */
+    /** Package-private utility methods. */
 
-    // TODO: implement this if it proves useful
-    public boolean cancel(boolean mayInterruptIfRunning) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    /** {@inheritDoc} */
-    public synchronized Throwable get() throws InterruptedException {
-        // if not done, then wait ... return result
-        while (! isFinished())
+    /**
+     * Returns {@code null} if the task completed successfully, or the
+     * {@code Throwable} that caused the task to fail permanently. If the
+     * task has not yet completed then this will block until the result
+     * is known or the caller is interrupted. An {@code InterruptedException}
+     * is thrown either if the calling thread is interrupted before a result
+     * is known or if the task is cancelled meaning that no result is known.
+     */
+    synchronized Throwable get() throws InterruptedException {
+        // wait for the task to finish
+        while (! isDone())
             wait();
         if (state == State.CANCELLED)
             throw new InterruptedException("interrupted while getting result");
         return result;
     }
 
-    // TODO: implement this if it proves useful
-    public Throwable get(long timeout, TimeUnit unit) {
-        throw new UnsupportedOperationException("not yet implemented");
-    }
-
-    /** {@inheritDoc} */
-    synchronized public boolean isDone() {
-        return (isFinished());
-    }
-
-    /** Private utility methods. */
-
     /** Returns whether the task has finished. */
-    private boolean isFinished() {
+    synchronized boolean isDone() {
         return ((state == State.COMPLETED) || (state == State.CANCELLED));
     }
-
-    /** Package-private utility methods. */
 
     /**
      * Sets the state of this task to running, returning {@code false} if
      * the task has already been cancelled or has completed.
      */
     synchronized boolean setRunning(boolean running) {
-        if (isFinished())
+        if (isDone())
             return false;
         state = running ? State.RUNNING : State.RUNNABLE;
         if (! running)

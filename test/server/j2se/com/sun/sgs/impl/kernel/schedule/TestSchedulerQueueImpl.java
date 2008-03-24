@@ -663,7 +663,7 @@ public class TestSchedulerQueueImpl {
         public synchronized boolean isCancelled() {
             return cancelled;
         }
-        public synchronized boolean cancel() {
+        public synchronized boolean cancel(boolean allowInterrupt) {
             if (cancelled)
                 return false;
             cancelled = true;

@@ -112,11 +112,12 @@ public interface SchedulerQueue {
 
     /**
      * Creates a {@code RecurringTaskHandle} for the associated task. The
-     * associated task will not actually start executing until {@code start}
-     * is called on the returned handle. The {@code ScheduledTask} instance
-     * must never have been previously used to schedule a recurring task.
-     * Note that after the initial execution of this task, it is up to the
-     * caller to schedule each recurrence through a call to {@code addTask}.
+     * associated task will not actually be available through this queue
+     * until {@code start} is called on the returned handle. The
+     * {@code ScheduledTask} instance must never have been previously used
+     * to schedule a recurring task. Note that after the initial execution
+     * of this task, it is up to the caller to schedule each recurrence
+     * through a call to {@code addTask}.
      *
      * @param task the {@code ScheduledTask} to run recurringly
      *

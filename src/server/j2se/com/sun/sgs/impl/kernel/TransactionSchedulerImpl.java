@@ -353,15 +353,13 @@ final class TransactionSchedulerImpl
 
         try {
             // wait for the task to complete
-            // FIXME: does having this method here affect interruption in
-            // a way that I didn't want?
             executeTask(task, unbounded);
             t = task.get();
         } catch (InterruptedException ie) {
             // we were interrupted, so try to cancel the task, re-throwing
             // the interruption if that succeeds or looking at the result
             // if the task completes before it can be cancelled
-            if (task.cancel()) {
+            if (task.cancel(false)) {
                 backingQueue.notifyCancelled(task);
                 throw ie;
             }
@@ -499,9 +497,9 @@ final class TransactionSchedulerImpl
      * This method returns {@code true} if the task was completed or failed
      * permanently, and {@code false} otherwise. If {@code false} is returned
      * then the task is scheduled to be re-tried at some point in the future,
-     * possibly by another thread. The caller may query the status of the
-     * task and wait for the task to complete or fail permanently through
-     * the {@code ScheduledTaskImpl} interface.
+     * possibly by another thread, by this method. The caller may query the
+     * status of the task and wait for the task to complete or fail permanently
+     * through the {@code ScheduledTaskImpl} interface.
      */
     private boolean executeTask(ScheduledTaskImpl task, boolean unbounded)
         throws InterruptedException
