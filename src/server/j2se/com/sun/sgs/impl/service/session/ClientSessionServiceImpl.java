@@ -392,61 +392,53 @@ public final class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public void doShutdown() {
-        try {
-            final IoFuture<?, ?> future = acceptFuture;
-            acceptFuture = null;
-            if (future != null) {
-                try {
-                    future.cancel(true);
-                } catch (RuntimeException e) {
-                    logger.logThrow(
-			Level.FINEST, e, "cancelling future throws");
-                    // swallow exception
-                }
-            }
-            
-            try {
-                if (acceptor != null) {
-                    acceptor.close();
-                }
+	final IoFuture<?, ?> future = acceptFuture;
+	acceptFuture = null;
+	if (future != null) {
+	    future.cancel(true);
+	}
+
+	if (acceptor != null) {
+	    try {
+		acceptor.close();
             } catch (IOException e) {
                 logger.logThrow(Level.FINEST, e, "closing acceptor throws");
                 // swallow exception
             }
+	}
 
-            try {
-                asyncChannelGroup.shutdown();
-            } catch (RuntimeException e) {
-                logger.logThrow(Level.FINEST, e, "shutdown channel group");
-                // swallow exception
-            }
+	if (asyncChannelGroup != null) {
+	    asyncChannelGroup.shutdown();
+	    boolean groupShutdownCompleted = false;
+	    try {
+		groupShutdownCompleted =
+		    asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS);
+	    } catch (InterruptedException e) {
+		logger.logThrow(Level.FINEST, e,
+				"shutdown acceptor interrupted");
+		Thread.currentThread().interrupt();
+	    }
+	    if (!groupShutdownCompleted) {
+		logger.log(Level.WARNING, "forcing async group shutdown");
+		try {
+		    asyncChannelGroup.shutdownNow();
+		} catch (IOException e) {
+		    logger.logThrow(Level.FINEST, e,
+				    "shutdown acceptor throws");
+		    // swallow exception
+		}
+	    }
+	}
+	logger.log(Level.FINEST, "acceptor shutdown");
 
-            if (! asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS)) {
-                logger.log(Level.WARNING, "forcing async group shutdown");
-                asyncChannelGroup.shutdownNow();
-            }
-
-            logger.log(Level.FINEST, "acceptor shutdown");
-
-        } catch (IOException e) {
-            logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
-            // swallow exception
-        } catch (InterruptedException e) {
-            logger.logThrow(Level.FINEST, e, "shutdown acceptor interrupted");
-            Thread.currentThread().interrupt();
-        } catch (RuntimeException e) {
-            logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
-            // swallow exception
-        }
-
-	try {
-	    if (exporter != null) {
+	if (exporter != null) {
+	    try {
 		exporter.unexport();
 		logger.log(Level.FINEST, "client session server unexported");
+	    } catch (RuntimeException e) {
+		logger.logThrow(Level.FINEST, e, "unexport server throws");
+		// swallow exception
 	    }
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "unexport server throws");
-	    // swallow exception
 	}
 
 	for (ClientSessionHandler handler : handlers.values()) {
@@ -629,12 +621,9 @@ public final class ClientSessionServiceImpl
 
                     ClientSessionHandler handler =
                         new ClientSessionHandler(
-                            ClientSessionServiceImpl.this, dataService);
-
-                    // Startup the new session handler
-                    handler.connected(
-			new AsynchronousMessageChannel(
-			    newChannel, readBufferSize));
+                            ClientSessionServiceImpl.this, dataService,
+			    new AsynchronousMessageChannel(
+				newChannel, readBufferSize));
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);
@@ -657,14 +646,6 @@ public final class ClientSessionServiceImpl
 		    Level.SEVERE, e, "acceptor error on {0}", addr);
 
                 // TBD: take other actions, such as restarting acceptor?
-
-                if (e instanceof RuntimeException) {
-                    throw (RuntimeException) e;
-                } else if (e instanceof Error) {
-                    throw (Error) e;
-                } else {
-                    throw new RuntimeException(e.getMessage(), e);
-                }
             }
 	}
     }

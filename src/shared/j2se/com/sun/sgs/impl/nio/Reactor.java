@@ -401,7 +401,11 @@ class Reactor {
                 if (key == null || (! key.isValid()))
                     throw new ClosedAsynchronousChannelException();
 
-                interestOps = key.interestOps();
+		try {
+		    interestOps = key.interestOps();
+		} catch (CancelledKeyException e) {
+		    throw new ClosedAsynchronousChannelException();
+		}
 
                 // These precondition checks don't belong here; they
                 // should be refactored to AsyncSocketChannelImpl.
@@ -429,7 +433,11 @@ class Reactor {
                 assert (interestOps & op) == 0;
 
                 interestOps |= op;
-                key.interestOps(interestOps);
+		try {
+		    key.interestOps(interestOps);
+		} catch (CancelledKeyException e) {
+		    throw new ClosedAsynchronousChannelException();
+		}
             }
 
             if (log.isLoggable(Level.FINEST)) {

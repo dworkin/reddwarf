@@ -58,8 +58,6 @@ class ClientSessionHandler {
 
     /** Connection state. */
     private static enum State {
-        /** A connection is in progress */
-	CONNECTING,
         /** Session is connected */
         CONNECTED,
         /** Disconnection is in progress */
@@ -85,17 +83,14 @@ class ClientSessionHandler {
     /** The data service. */
     private final DataService dataService;
 
-    /**
-     * The I/O channel for sending messages to the client, or null if
-     * not connected.
-     */
-    private AsynchronousMessageChannel sessionConnection = null;
+    /** The I/O channel for sending messages to the client. */
+    private final AsynchronousMessageChannel sessionConnection;
 
     /** The completion handler for reading from the I/O channel. */
-    private ReadHandler readHandler = new ClosedReadHandler();
+    private volatile ReadHandler readHandler = new ConnectedReadHandler();
 
     /** The completion handler for writing to the I/O channel. */
-    private WriteHandler writeHandler = new ClosedWriteHandler();
+    private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -109,7 +104,7 @@ class ClientSessionHandler {
     private final Object lock = new Object();
     
     /** The connection state. */
-    private State state = State.CONNECTING;
+    private State state = State.CONNECTED;
 
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
@@ -121,19 +116,30 @@ class ClientSessionHandler {
     private volatile NonDurableTaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class.
+     * Constructs an instance of this class using the provided I/O connection,
+     * and starts reading from the connection.
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
-			 DataService dataService)
+			 DataService dataService,
+			 AsynchronousMessageChannel sessionConnection)
     {
 	this.sessionService = sessionService;
         this.dataService = dataService;
+	this.sessionConnection = sessionConnection;
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
 		       "creating new ClientSessionHandler on nodeId:{0}",
 		        sessionService.getLocalNodeId());
 	}
+
+	/*
+	 * TODO: It might be a good idea to implement high- and low-water marks
+	 * for the buffers, so they don't go into hysteresis when they get
+	 * full. -JM
+	 */
+
+        readHandler.read();
     }
 
     /* -- Instance methods -- */
@@ -148,9 +154,7 @@ class ClientSessionHandler {
 
 	State currentState = getCurrentState();
 
-	boolean connected =
-	    currentState == State.CONNECTING ||
-	    currentState == State.CONNECTED;
+	boolean connected = (currentState == State.CONNECTED);
 
 	return connected;
     }
@@ -278,69 +282,16 @@ class ClientSessionHandler {
      * 		disconnecting the client session)
      */
     private void scheduleHandleDisconnect(final boolean graceful) {
-
-        // TODO: Should we set the state to DISCONNECTING? -JM
-        /*
         synchronized (lock) {
             if (state != State.DISCONNECTED)
                 state = State.DISCONNECTING;
         }
-        */
-        
 	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
 		handleDisconnect(graceful);
 	    }});
     }
 
-    /**
-     * Notifies this handler that a new I/O connection has become active.
-     * 
-     * @param conn the new connection
-     */
-    void connected(AsynchronousMessageChannel conn) {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "connected handle:{0}", conn);
-        }
-
-        synchronized (lock) {
-            // check if there is already a handle set
-            if (sessionConnection != null) {
-                logger.log(
-		    Level.WARNING,
-                    "session already connected to {0}", sessionConnection);
-                try {
-                    conn.close();
-                } catch (IOException e) {
-                    // ignore
-                }
-                return;
-            }
-
-            sessionConnection = conn;
-
-            /*
-             * TODO: It might be a good idea to implement high- and low-water
-             * marks for the buffers, so they don't go into hysteresis when
-             * they get full. -JM
-             */
-
-            readHandler = new ConnectedReadHandler();
-            writeHandler = new ConnectedWriteHandler();
-
-            switch (state) {
-
-            case CONNECTING:
-                state = State.CONNECTED;
-                break;
-            default:
-                break;
-            }
-        }
-
-        readHandler.read();
-    }
-    
     /**
      * Flags this session as shut down, and closes the connection.
      */
@@ -437,23 +388,20 @@ class ClientSessionHandler {
                     return;
 		}
                 message = pendingWrites.peek();
-                if (message != null) {
-                    isWriting = true;
-                }
+                if (message == null) {
+		    return;
+		}
+		isWriting = true;
             }
             if (logger.isLoggable(Level.FINEST)) {
-                pendingWrites.size();
                 logger.log(
 		    Level.FINEST,
 		    "processQueue session:{0} size:{1,number,#} head={2}",
 		    ClientSessionHandler.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
             }
-            if (message == null) {
-                return;
-            }
             try {
-                sessionConnection.write(message, null, this);
+                sessionConnection.write(message, this);
             } catch (RuntimeException e) {
                 logger.logThrow(Level.SEVERE, e,
 				"{0} processing message {1}",
@@ -538,7 +486,7 @@ class ClientSessionHandler {
                     throw new ReadPendingException();
                 isReading = true;
             }
-            sessionConnection.read(null, this);
+            sessionConnection.read(this);
         }
 
 	/** Handles the completed read operation. */

@@ -777,8 +777,8 @@ public class ClientSessionImpl
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
-	    boolean result = getQueue().offer(event);
-	    if (result && cost > 0) {
+	    boolean success = getQueue().offer(event);
+	    if (success && cost > 0) {
 		ClientSessionServiceImpl.getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
                 if (logger.isLoggable(Level.FINEST)) {
@@ -787,7 +787,7 @@ public class ClientSessionImpl
                         this, cost, writeBufferAvailable);
                 }
 	    }
-	    return result;
+	    return success;
 	}
 
 	/**

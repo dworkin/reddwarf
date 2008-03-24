@@ -90,92 +90,46 @@ public class AsynchronousMessageChannel implements Channel {
 
     /**
      * Initiates reading a complete message from this channel.  Returns a
-     * future which will contain the specified attachment and a read-only view
-     * of a buffer containing the complete message.  Calls {@code handler} when
-     * the read operation has completed, if {@code handler} is not {@code
-     * null}.  The buffer's position will be set to {@code 0} and it's limit
-     * will be set to the length of the complete message.  The contents of the
-     * buffer will remain valid until the next call to {@code read}.
+     * future which will contain a read-only view of a buffer containing the
+     * complete message.  Calls {@code handler} when the read operation has
+     * completed, if {@code handler} is not {@code null}.  The buffer's
+     * position will be set to {@code 0} and it's limit will be set to the
+     * length of the complete message.  The contents of the buffer will remain
+     * valid until the next call to {@code read}.
      * 
-     * @param	<A> the attachment type
-     * @param	attachment the object to {@link IoFuture#attach attach} to the
-     *		returned {@link IoFuture} object; can be {@code null}
      * @param	handler the completion handler object; can be {@code null}
      * @return	a future representing the result of the operation
      * @throws	BufferOverflowException if the buffer does not contain enough
      *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
-    public <A> IoFuture<ByteBuffer, A> read(
-	A attachment, CompletionHandler<ByteBuffer, A> handler)
+    public IoFuture<ByteBuffer, Void> read(
+	CompletionHandler<ByteBuffer, Void> handler)
     {
         if (!readPending.compareAndSet(false, true)) {
             throw new ReadPendingException();
 	}
-        return new Reader<A>(attachment, handler).start(null);
-    }
-
-    /**
-     * Initiates reading a complete message from this channel.  Returns a
-     * future which will contain a {@code null} attachment and a read-only view
-     * of a buffer containing the complete message.  Calls {@code handler} when
-     * the read operation has completed, if {@code handler} is not {@code
-     * null}.  The buffer's position will be set to {@code 0} and it's limit
-     * will be set to the length of the complete message.  The contents of the
-     * buffer will remain valid until the next call to {@code read}.
-     * 
-     * @param	<A> the attachment type
-     * @param	handler the completion handler object; can be {@code null}
-     * @return	a future representing the result of the operation
-     * @throws	BufferOverflowException if the buffer does not contain enough
-     *		space to read the next message
-     * @throws	ReadPendingException if a read is in progress
-     */
-    public final <A> IoFuture<ByteBuffer, A> read(
-	CompletionHandler<ByteBuffer, A> handler)
-    {
-        return read(null, handler);
+        return new Reader(handler).start();
     }
 
     /**
      * Initiates writing a complete message from the given buffer to the
-     * underlying channel, and returns a future which will contain the
-     * specified attachment.  Writes bytes starting at the buffer's current
-     * position and up to its limit.
+     * underlying channel, and returns a future for controlling the operation.
+     * Writes bytes starting at the buffer's current position and up to its
+     * limit.
      * 
-     * @param	<A> the attachment type
      * @param	src the buffer from which bytes are to be retrieved
-     * @param	attachment the object to {@link IoFuture#attach attach} to the
-     *		returned {@link IoFuture} object; can be {@code null}
      * @param	handler the completion handler object; can be {@code null}
      * @return	a future representing the result of the operation
      * @throws	WritePendingException if a write is in progress
      */
-    public <A> IoFuture<Void, A> write(
-	ByteBuffer src, A attachment, CompletionHandler<Void, A> handler)
+    public IoFuture<Void, Void> write(
+	ByteBuffer src, CompletionHandler<Void, Void> handler)
     {
         if (!writePending.compareAndSet(false, true)) {
             throw new WritePendingException();
 	}
-        return new Writer<A>(attachment, handler).start(src);
-    }
-
-    /**
-     * Initiates writing a complete message from the given buffer to the
-     * underlying channel, and returns a future which will contains a {@code
-     * null} attachment.  Writes bytes starting at the buffer's current
-     * position and up to its limit.
-     * 
-     * @param	<A> the attachment type
-     * @param	src the buffer from which bytes are to be retrieved
-     * @param	handler the completion handler object; can be {@code null}
-     * @return	a future representing the result of the operation
-     * @throws	WritePendingException if a write is in progress
-     */
-    public final <A> IoFuture<Void, A> write(
-	ByteBuffer src, CompletionHandler<Void, A> handler)
-    {
-        return write(src, null, handler);
+        return new Writer(handler, src).start();
     }
 
     /* -- Implement Channel -- */
@@ -208,15 +162,15 @@ public class AsynchronousMessageChannel implements Channel {
      * Implement a completion handler for reading a complete message from the
      * underlying byte stream.
      */
-    private final class Reader<A>
-	extends DelegatingCompletionHandler<ByteBuffer, A, Integer, ByteBuffer>
+    private final class Reader
+	extends DelegatingCompletionHandler<ByteBuffer, Void, Integer, Void>
     {
 	/** The length of the message, or -1 if not yet known. */
         private int messageLen = -1;
 
 	/** Creates an instance with the specified attachment and handler. */
-        Reader(A attachment, CompletionHandler<ByteBuffer, A> handler) {
-            super(attachment, handler);
+        Reader(CompletionHandler<ByteBuffer, Void> handler) {
+            super(null, handler);
         }
 
 	/** Clear the readPending flag. */
@@ -228,7 +182,7 @@ public class AsynchronousMessageChannel implements Channel {
 
         /** Start reading into the buffer. */
         @Override
-        protected IoFuture<Integer, ByteBuffer> implStart(ByteBuffer ignore) {
+        protected IoFuture<Integer, Void> implStart() {
 	    int position = readBuffer.position();
 	    if (position > 0) {
 		/* Skip previous message, moving remaining bytes to front */
@@ -247,8 +201,8 @@ public class AsynchronousMessageChannel implements Channel {
 
 	/** Process the results of reading so far and read more if needed. */
         @Override
-        protected IoFuture<Integer, ByteBuffer> implCompleted(
-	    IoFuture<Integer, ByteBuffer> result)
+        protected IoFuture<Integer, Void> implCompleted(
+	    IoFuture<Integer, Void> result)
             throws ExecutionException, EOFException
         {
             int bytesRead = result.getNow();
@@ -262,7 +216,7 @@ public class AsynchronousMessageChannel implements Channel {
 	 * Process the results of reading into the buffer, and return a future
 	 * to read more if needed.
 	 */
-        private IoFuture<Integer, ByteBuffer> processBuffer() {
+        private IoFuture<Integer, Void> processBuffer() {
             if (messageLen < 0) {
                 messageLen = getMessageLength();
                 if (messageLen >= 0) {
@@ -291,7 +245,7 @@ public class AsynchronousMessageChannel implements Channel {
 		    logger.log(Level.FINER, "{0} read incomplete {1}:{2}",
 			       this, messageLen, readBuffer.position());
 		}
-		return channel.read(readBuffer, null, this);
+		return channel.read(readBuffer, this);
 	    }
         }
     }
@@ -300,12 +254,32 @@ public class AsynchronousMessageChannel implements Channel {
      * Implement a completion handler for writing a complete message to the
      * underlying byte stream.
      */
-    private final class Writer<A>
-	extends DelegatingCompletionHandler<Void, A, Integer, ByteBuffer>
+    private final class Writer
+	extends DelegatingCompletionHandler<Void, Void, Integer, Void>
     {
-	/** Creates an instance with the specified attachment and handler. */
-        Writer(A attachment, CompletionHandler<Void, A> handler) {
-            super(attachment, handler);
+	/**
+	 * The byte buffer containing the bytes to send, with the size
+	 * prepended.
+	 */
+	private final ByteBuffer srcWithSize;
+
+	/**
+	 * Creates an instance with the specified attachment and handler, and
+	 * sending the bytes in the specified buffer.
+	 */
+        Writer(CompletionHandler<Void, Void> handler, ByteBuffer src) {
+            super(null, handler);
+	    int size = src.remaining();
+	    assert size < Short.MAX_VALUE;
+	    /* Prepend the size as a short. */
+	    /*
+	     * XXX: Maybe avoid copying by doing two writes?  -tjb@sun.com
+	     * (02/29/2008)
+	     */
+	    srcWithSize = ByteBuffer.allocate(2 + size);
+	    srcWithSize.putShort((short) size)
+		.put(src)
+		.flip();
         }
 
 	/** Clear the writePending flag. */
@@ -317,32 +291,21 @@ public class AsynchronousMessageChannel implements Channel {
 
 	/** Start writing from the buffer. */
         @Override
-        protected IoFuture<Integer, ByteBuffer> implStart(ByteBuffer src) {
-	    int size = src.remaining();
-	    assert size < Short.MAX_VALUE;
-	    /* Prepend the size as a short. */
-	    /*
-	     * XXX: Maybe avoid copying by doing two writes?  -tjb@sun.com
-	     * (02/29/2008)
-	     */
-	    ByteBuffer withSize = ByteBuffer.allocate(2 + size);
-	    withSize.putShort((short) size)
-		.put(src)
-		.flip();
-            return channel.write(withSize, withSize, this);
+        protected IoFuture<Integer, Void> implStart() {
+            return channel.write(srcWithSize, this);
         }
 
 	/** Process the results of writing so far and write more if needed. */
         @Override
-        protected IoFuture<Integer, ByteBuffer> implCompleted(
-	    IoFuture<Integer, ByteBuffer> result)
+        protected IoFuture<Integer, Void> implCompleted(
+	    IoFuture<Integer, Void> result)
             throws ExecutionException
         {
-            ByteBuffer src = result.attach(null);
-            result.getNow();
-            if (src.hasRemaining()) {
+	    /* See if computation already failed. */
+	    result.getNow();
+            if (srcWithSize.hasRemaining()) {
                 /* Write some more */
-                return channel.write(src, src, this);
+                return channel.write(srcWithSize, this);
             } else {
                 /* Finished */
                 return null;

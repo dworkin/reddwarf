@@ -1204,8 +1204,8 @@ public abstract class ChannelImpl implements Channel, Serializable {
 	            "Not enough queue space: " + writeBufferAvailable +
 		    " bytes available, " + cost + " requested");
 	    }
-	    boolean result = getQueue().offer(event);
-	    if (result && (cost > 0)) {
+	    boolean success = getQueue().offer(event);
+	    if (success && (cost > 0)) {
 		ChannelServiceImpl.getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
                 if (logger.isLoggable(Level.FINEST)) {
@@ -1214,7 +1214,7 @@ public abstract class ChannelImpl implements Channel, Serializable {
                         this, cost, writeBufferAvailable);
                 }
 	    }
-	    return result;
+	    return success;
 	}
 
 	/**

@@ -28,7 +28,49 @@ import java.util.concurrent.ExecutionException;
  * An abstract base class for defining a {@code CompletionHandler} to use when
  * implementing methods that return an {@code IoFuture}, have a {@code
  * CompletionHandler} parameter, and are implemented by making calls to similar
- * methods. <p>
+ * methods.  This class is intended to support the interaction between the
+ * internal (involving to the delegating function) and external (involving the
+ * caller) futures and completion handlers, allowing subclasses supply the
+ * desired behavior by customizing the three protected methods: {@link
+ * #implStart}, {@link #implCompleted}, and {@link #done}. <p>
+ *
+ * For example, suppose you wanted to implement a method like {@code
+ * AsynchronousByteChannel.read} that delegated to an existing channel, but
+ * printed a message before and after reading.  A simple implementation might
+ * look like: 
+ * <pre>
+ * public class PrintReader<A>
+ *     extends DelegatingCompletionHandler<Integer, A, Integer, A>
+ * {
+ *     private final AsynchronousByteChannel channel;
+ *     private final ByteBuffer dst;
+ * 
+ *     public static <A> IoFuture<Integer, A> read(
+ *         AsynchronousByteChannel channel, ByteBuffer dst,
+ *         A attachment, CompletionHandler<Integer, A> handler)
+ *     {
+ *         return new PrintReader<A>(channel, dst, attachment, handler).start();
+ *     }
+ * 
+ *     private PrintReader(AsynchronousByteChannel channel, ByteBuffer dst,
+ *                      A attachment, CompletionHandler<Integer, A> handler)
+ *     {
+ *         super(attachment, handler);
+ *         this.channel = channel;
+ *         this.dst = dst;
+ *     }
+ * 
+ *     protected IoFuture<Integer, A> implStart() {
+ *         System.err.println("Begin reading");
+ *         return channel.read(dst, null);
+ *     }
+ * 
+ *     protected IoFuture<Integer, A> implCompleted(IoFuture<Integer, A> result) {
+ *         System.err.println("Done reading");
+ *         return null;
+ *     }
+ * }
+ * </pre>
  *
  * @param <OR> the result type for the outer handler
  * @param <OA> the attachment type for the outer handler
@@ -133,15 +175,13 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      * Starts the computation and returns a future representing the result of
      * the computation.
      *
-     * @param	innerAttachment the attachment for starting the inner
-     *		computation
      * @return	a future representing the result of the computation
      */
-    public final IoFuture<OR, OA> start(IA innerAttachment) {
+    public final IoFuture<OR, OA> start() {
 	synchronized (lock) {
 	    if (!isDone()) {
 		try {
-		    innerFuture = implStart(innerAttachment);
+		    innerFuture = implStart();
 		    if (innerFuture == null) {
 			set(null);
 		    }
@@ -160,10 +200,9 @@ public abstract class DelegatingCompletionHandler<OR, OA, IR, IA>
      * computation or {@code null} to indicate that the computation is
      * completed.  Any exception thrown will terminate the computation.
      *
-     * @param	innerAttachment the attachment for the inner computation
      * @return	the future or {@code null}
      */
-    protected abstract IoFuture<IR, IA> implStart(IA innerAttachment);
+    protected abstract IoFuture<IR, IA> implStart();
 
     /**
      * Called when the delegated computation completes.  The implementation
