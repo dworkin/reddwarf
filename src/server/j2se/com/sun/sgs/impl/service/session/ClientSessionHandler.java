@@ -758,7 +758,7 @@ class ClientSessionHandler {
                     readHandler.read();
                 }
             }
-	});
+	}, identity);
     }
 
     /* -- other private methods and classes -- */

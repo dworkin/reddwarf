@@ -328,7 +328,7 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Listen for incoming client connections.
 	     */
-            InetSocketAddress endpoint = new InetSocketAddress(appPort);
+            InetSocketAddress listenAddress = new InetSocketAddress(appPort);
             AsynchronousChannelProvider provider =
                 // TODO fetch from config
                 AsynchronousChannelProvider.provider();
@@ -339,7 +339,7 @@ public final class ClientSessionServiceImpl
             acceptor =
                 provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
 	    try {
-                acceptor.bind(endpoint, acceptorBacklog);
+                acceptor.bind(listenAddress, acceptorBacklog);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(
 			Level.CONFIG, "bound to port:{0,number,#}",

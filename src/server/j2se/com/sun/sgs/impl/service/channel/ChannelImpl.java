@@ -155,7 +155,7 @@ abstract class ChannelImpl implements Channel, Serializable {
     static Channel newInstance(Delivery delivery, int writeBufferCapacity) {
 	// TBD: create other channel types depending on delivery.
 	return new OrderedUnreliableChannelImpl(
-	    delivery, writeBufferCapacity).getWrappedChannel()
+	    delivery, writeBufferCapacity).getWrappedChannel();
     }
 
     /* -- Implement Channel -- */
