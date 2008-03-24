@@ -52,23 +52,30 @@ the application properties file named on the command line.
 
 <p>
 By default, the Project Darkstar Server consists of a single node, and is 
-configured with the <a href="#GeneralProperties">General</a>,
-<a href="#DataService">Data Service</a>, and 
-<a href="#Kernel">Kernel</a> properties. 
+configured with the <a href="#SingleNodeProperties">Single Node</a> and
+<a href="#CommonProperties">Common</a> properties. 
 Additionally, multiple nodes can be configured to work together using the
-<a href="#MultiNodeProperties">Multi-Node Properties</a>.  The multi-node
-properties should not be specified when configuring a system to run on
-a single node.
+<a href="#MultiNodeProperties">Multi-Node Properties</a>.  
 
+<a name="SingleNodeProperties"></a>
+<h2>Single Node Properties</h2>
+
+Starts the Server in a single Java Virtual Machine. This is the default 
+mode for Project Darkstar.
+<dl>
+<dt><a name="com.sun.sgs.server.start">com.sun.sgs.server.start</a>
+<span class="default">true</span>
+<dd> Starts a Darkstar Server in single-node mode.
+</dl>
 
 <a name="MultiNodeProperties"></a>
 <h2>Multi-Node Properties</h2>
 For increased scalibility and availability of the Project Darkstar Server,
 multiple nodes can be configured to work together in a cluster.  This
-multi-node configuration requires one special core server node to run
-critical Project Darkstar operations, with the remaining nodes cooperating
-to run the application.  Application nodes can be dynamically added
-or removed from the cluster.
+multi-node configuration requires one special <i>core server node</i> to run
+critical Project Darkstar operations, with the remaining nodes, the
+<i>application nodes</i>, cooperating to run the application.  Application nodes 
+can be dynamically added or removed from the cluster.
 <p>
 The core server node <b>must</b> be started before the application nodes.
 <p>
@@ -89,30 +96,31 @@ are started, there are multiple independent Project Darkstar clusters.
 <a name="CoreServer"></a>
 <dt>com.sun.sgs.default.core.server
 <span class="default">false</span>
-<dd> If set to <code>true</code>, start the non-application node which
- runs critical Project Darkstar Server operations. This property is expanded
- to several properties, including
+<dd> If set to <code>true</code>, start the <b>core server node</b>, the 
+ non-application node which runs critical Project Darkstar Server operations. 
+ The properties
  <a href="#com.sun.sgs.app.listener">com.sun.sgs.app.listener</a> and
- <a href="#com.sun.sgs.server.start">com.sun.sgs.server.start</a>.  Those
- properties should not be set when using this property.  Also, there is no
+ <a href="#com.sun.sgs.server.start">com.sun.sgs.server.start</a>
+ should not be set when configuring the core server node.  Also, there is no
  need to specify the <a href="#app.sun.sgs.app.port">com.sun.sgs.app.port</a>
  property as no clients will connect to this node.
 </dl>
 
 <a name="CoreServerPorts"></a>
-The core server node may also specify ports to be used on the core 
+<h4>Core Server Ports</h4>
+The core server node may be configured to specify ports to be used on the core 
 server machine:
 
 <dl>
 <dt>com.sun.sgs.impl.service.data.store.net.server.port
 <span class="default">44530</span>
-<dd>The network port for the core data service server.  
+<dd>The TCP port for the data service's shared network server.  
 <dt>com.sun.sgs.impl.service.watchdog.server.port
 <span class="default">44533</span>
-<dd>The network port for the core watchdog service server.
+<dd>The TCP port for the watchdog service's internal server.
 <dt>com.sun.sgs.impl.service.nodemap.server.port
 <span class="default">44535</span>
-<dd>The network port for the core node mapping service server.
+<dd>The TCP port for the node mapping service's internal server.
 </dl>
 
 
@@ -122,8 +130,8 @@ nodes if a multi-node configuration is being used.
 
 <dl>
     
-<dt><a name="com.sun.sgs.server.start">com.sun.sgs.server.start</a>
-<span class="required"> for application nodes</span>
+<dt>com.sun.sgs.server.start
+<span class="default">true</span>
 <dd> This property must be set to <code>false</code> for application nodes.
 
 <dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
@@ -136,9 +144,13 @@ Additionally, if any of the <a href="#CoreServerPorts">core server port</a>
 properties are set when starting the core server node, they must also be set 
 to the same value on each application node.
 
+<a name="CommonProperties"></a>
+<h2>Common Properties</h2>
+
+These properties are used in either single node or multi-node configurations.
 
 <a name="GeneralProperties"></a>
-<h2>General Properties</h2>
+<h3>General Properties</h3>
 
 These properties control various general facilities in the Project Darkstar
 Server, and can be used in the core server node, application nodes, or in
@@ -179,7 +191,7 @@ space available for Project Darkstar use.
 </dl>
 
 <a name="DataService"></a>
-<h2>DataService Properties</h2>
+<h3>DataService Properties</h3>
 
 These properties control the implementation of the
 <code>DataService</code>.
@@ -203,7 +215,7 @@ These properties control the implementation of the
 </dl>
 
 <a name="DataStore"></a>
-<h3>DataStore Properties</h3>
+<h4>DataStore Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
@@ -219,7 +231,7 @@ underlying <code>DataStore</code>.
 </dl>
 
 <a name="Bdb"></a>
-<h3>Berkeley DB Properties</h3>
+<h4>Berkeley DB Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
@@ -269,7 +281,7 @@ underlying Berkeley DB database.
 </dl>
 
 <a name="Kernel"></a>
-<h2>Kernel Properties</h2>
+<h3>Kernel Properties</h3>
 
 These properties control the implementation of the <code>Kernel</code>,
 which is the part of the system that manages applications and the
@@ -285,7 +297,7 @@ components that make up the system.
 </dl>
 
 <a name="TaskScheduler"></a>
-<h3>TaskScheduler Properties</h3>
+<h4>TaskScheduler Properties</h4>
 
 These properties control the implementation of
 the <code>TaskScheduler</code>, which is the part of
