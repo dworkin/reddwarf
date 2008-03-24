@@ -39,33 +39,33 @@ import java.util.concurrent.ExecutionException;
  * printed a message before and after reading.  A simple implementation might
  * look like: 
  * <pre>
- * public class PrintReader<A>
- *     extends DelegatingCompletionHandler<Integer, A, Integer, A>
+ * public class PrintReader&lt;A&gt;
+ *     extends DelegatingCompletionHandler&lt;Integer, A, Integer, A&gt;
  * {
  *     private final AsynchronousByteChannel channel;
  *     private final ByteBuffer dst;
  * 
- *     public static <A> IoFuture<Integer, A> read(
+ *     public static &lt;A&gt; IoFuture&lt;Integer, A&gt; read(
  *         AsynchronousByteChannel channel, ByteBuffer dst,
- *         A attachment, CompletionHandler<Integer, A> handler)
+ *         A attachment, CompletionHandler&lt;Integer, A&gt; handler)
  *     {
- *         return new PrintReader<A>(channel, dst, attachment, handler).start();
+ *         return new PrintReader&lt;A&gt;(channel, dst, attachment, handler).start();
  *     }
  * 
  *     private PrintReader(AsynchronousByteChannel channel, ByteBuffer dst,
- *                      A attachment, CompletionHandler<Integer, A> handler)
+ *                      A attachment, CompletionHandler&lt;Integer, A&gt; handler)
  *     {
  *         super(attachment, handler);
  *         this.channel = channel;
  *         this.dst = dst;
  *     }
  * 
- *     protected IoFuture<Integer, A> implStart() {
+ *     protected IoFuture&lt;Integer, A&gt; implStart() {
  *         System.err.println("Begin reading");
  *         return channel.read(dst, null);
  *     }
  * 
- *     protected IoFuture<Integer, A> implCompleted(IoFuture<Integer, A> result) {
+ *     protected IoFuture&lt;Integer, A&gt; implCompleted(IoFuture&lt;Integer, A&gt; result) {
  *         System.err.println("Done reading");
  *         return null;
  *     }

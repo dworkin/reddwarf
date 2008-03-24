@@ -619,11 +619,10 @@ public final class ClientSessionServiceImpl
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
-                    ClientSessionHandler handler =
-                        new ClientSessionHandler(
-                            ClientSessionServiceImpl.this, dataService,
-			    new AsynchronousMessageChannel(
-				newChannel, readBufferSize));
+		    new ClientSessionHandler(
+			ClientSessionServiceImpl.this, dataService,
+			new AsynchronousMessageChannel(
+			    newChannel, readBufferSize));
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);
