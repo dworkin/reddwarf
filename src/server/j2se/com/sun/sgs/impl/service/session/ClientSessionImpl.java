@@ -27,6 +27,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -36,6 +37,7 @@ import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -333,9 +335,10 @@ public class ClientSessionImpl
 	/*
 	 * Get ClientSessionListener, and remove its binding and
 	 * wrapper if applicable.  The listener may not be bound
-	 * in the data service if the AppListener.loggedIn callback
+	 * in the data service if: the AppListener.loggedIn callback
 	 * either threw a non-retryable exception or returned a
-	 * null listener.
+	 * null listener, or the application removed the
+	 * ClientSessionListener object from the data service.
 	 */
 	ClientSessionListener listener = null;
 	try {
@@ -484,7 +487,7 @@ public class ClientSessionImpl
      * Returns the prefix to access from the data service {@code
      * ClientSessionImpl} instances with the the specified {@code nodeId}.
      */
-    static String getNodePrefix(long nodeId) {
+    private static String getNodePrefix(long nodeId) {
 	return PKG_NAME + NODE_COMPONENT + nodeId + ".";
     }
 
@@ -794,6 +797,85 @@ public class ClientSessionImpl
 		logger.log(Level.FINEST, "processing event:{0}", event);
 		event.serviceEvent(this);
 	    }
+	}
+    }
+    
+    /**
+     * A persistent task to schedule tasks to notify (in succession) the
+     * client session listener of each disconnected session on a given
+     * failed node and to clean up the persistent data and bindings of
+     * those client sessions.  In a single task, one disconnected session
+     * is scheduled to be handled, and then this task is rescheduled to
+     * schedule the handling of the next disconnected client session (if
+     * one exists).
+     */
+    static class HandleNextDisconnectedSessionTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The prefix for client sessions on the failed node. */
+	private final String nodePrefix;
+
+	/** The last session key handled (initially the {@code nodePrefix}. */
+	private String lastKey;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId}.
+	 */
+	HandleNextDisconnectedSessionTask(long nodeId) {
+	    this.nodePrefix = this.lastKey = getNodePrefix(nodeId);
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService =
+		ClientSessionServiceImpl.getDataService();
+	    String key = dataService.nextServiceBoundName(lastKey);
+	    if (key != null && key.startsWith(nodePrefix)) {
+		TaskService taskService =
+		    ClientSessionServiceImpl.getTaskService();
+		taskService.scheduleTask(
+		    new CleanupDisconnectedSessionTask(key));
+		lastKey = key;
+		taskService.scheduleTask(this);
+	    }
+	}
+    }
+
+    /**
+     * A persistent task to clean up a client session bound to a
+     * given {@code key} (specified during construction), by
+     * invoking the {@code notifyListenerAndRemoveSession} method
+     * on that client session.
+     */
+    private static class CleanupDisconnectedSessionTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The key for the client session. */
+	private final String key;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code key}.
+	 */
+	CleanupDisconnectedSessionTask(String key) {
+	    this.key = key;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService =
+		ClientSessionServiceImpl.getDataService();
+	    ClientSessionImpl sessionImpl =
+		(ClientSessionImpl) dataService.getServiceBinding(key);
+	    sessionImpl.notifyListenerAndRemoveSession(
+		dataService, false, true);
 	}
     }
 }

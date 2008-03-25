@@ -29,12 +29,13 @@ import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.session.ClientSessionImpl.
+    HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
-import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -1056,10 +1057,12 @@ public final class ClientSessionServiceImpl
 	    throw new NullPointerException("Owner identity cannot be null");
 	transactionScheduler.runTask(task, ownerIdentity);
     }
-
-    /** Returns the non-null user identity or the application's identity. */
-    private Identity getValidIdentity(Identity userIdentity) {
-	return userIdentity == null ? taskOwner : userIdentity;
+    
+    /**
+     * Returns the task service.
+     */
+    static TaskService getTaskService() {
+	return txnProxy.getService(TaskService.class);
     }
 
     /**
@@ -1069,60 +1072,49 @@ public final class ClientSessionServiceImpl
     private class ClientSessionServiceRecoveryListener
 	implements RecoveryListener
     {
-	/** {@inheritDoc}
-	 *
-	 * TBD: Recovery (due to being possibly-lengthy) should not be
-	 * performed in this remote method.  Recovery operations should
-	 * be performed in a separate thread.
-	 */
+	/** {@inheritDoc} */
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
+	    final TaskService taskService = getTaskService();
+	    
 	    try {
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
+			       localNodeId, nodeId);
+		}
+
+		/*
+		 * Schedule persistent tasks to perform recovery.
+		 */
 		transactionScheduler.runTask(
 		    new AbstractKernelRunnable() {
 			public void run() {
+			    /*
+			     * For each session on the failed node, notify
+			     * the session's ClientSessionListener and
+			     * clean up the session's persistent data and
+			     * bindings. 
+			     */
+			    taskService.scheduleTask(
+				new HandleNextDisconnectedSessionTask(nodeId));
+				
+			    /*
+			     * Remove client session server proxy and
+			     * associated binding for failed node.
+			     */
 			    taskService.scheduleTask(
 				new RemoveClientSessionServerProxyTask(nodeId));
-			    notifyDisconnectedSessions(nodeId);
 			}},
-		    getValidIdentity(taskOwner));
+		    taskOwner);
+					     
 		future.done();
+		    
 	    } catch (Exception e) {
 		logger.logThrow(
  		    Level.WARNING, e,
-		    "notifying disconnected sessions for node:{0} throws",
-		    nodeId);
+		    "Node:{0} recovering for node:{1} throws",
+		    localNodeId, nodeId);
 		// TBD: what should it do if it can't recover?
-	    }
-	}
-	
-	/**
-	 * For each {@code ClientSession} assigned to the specified
-	 * failed node, notifies the {@code ClientSessionListener} (if
-	 * any) that its corresponding session has been forcibly
-	 * disconnected, removes the listener's binding from the data
-	 * service, and then removes the client session's state and
-	 * its bindings from the data service.
-	 */
-	private void notifyDisconnectedSessions(long nodeId) {
-	    String nodePrefix = ClientSessionImpl.getNodePrefix(nodeId);
-	    for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
- 				    dataService, nodePrefix))
-	    {
-		logger.log(
-		    Level.FINEST,
-		    "notifyDisconnectedSessions key: {0}",
-		    key);
-
-		final String sessionKey = key;		
-
-		// TBD: should each notification/removal happen as a
-		// separate task?
-		ClientSessionImpl sessionImpl = 
-		    (ClientSessionImpl) dataService.getServiceBinding(
-			sessionKey);
-		sessionImpl.notifyListenerAndRemoveSession(
-		    dataService, false, true);
 	    }
 	}
     }

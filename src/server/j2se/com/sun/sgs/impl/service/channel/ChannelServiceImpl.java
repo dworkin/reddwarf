@@ -69,12 +69,12 @@ import java.util.logging.Logger;
  * 
  * <p>The {@link #ChannelServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property. <p>
+ * <code>com.sun.sgs.app.name</code></a> property and supports
+ * these public configuration <a
+ * href="../../../app/doc-files/config-properties.html#ChannelService">
+ * properties</a>. <p>
  *
  * <p>TODO: add summary comment about how the implementation works.
- *
- * <p>TODO: service bindings should be versioned, and old bindings should be
- * converted to the new scheme (or removed if applicable).
  */
 public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
