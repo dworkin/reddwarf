@@ -624,6 +624,7 @@ public final class ClientSessionServiceImpl
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
+		    /* The handler will call addHandler if login succeeds */
 		    new ClientSessionHandler(
 			ClientSessionServiceImpl.this, dataService,
 			new AsynchronousMessageChannel(
