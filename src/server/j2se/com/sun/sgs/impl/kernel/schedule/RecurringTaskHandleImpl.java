@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.kernel.RecurringTaskHandle;
+
 import java.util.TimerTask;
 
 
@@ -27,10 +29,10 @@ import java.util.TimerTask;
  * the handle be associated with a <code>TimerTask</code> so that cancelling
  * the handle also cancels the associated <code>TimerTask</code>.
  */
-class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
+class RecurringTaskHandleImpl implements RecurringTaskHandle {
 
-    // the scheduler using this handle
-    private final ApplicationScheduler scheduler;
+    // the queue using this handle
+    private final SchedulerQueue queue;
 
     // the actual task to run
     private ScheduledTask task;
@@ -48,39 +50,34 @@ class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
     /**
      * Creates an instance of <code>RecurringTaskHandleImpl</code>.
      *
-     * @param scheduler the <code>ApplicationScheduler</code> that is using
-     *                  this handle
+     * @param queue the <code>SchedulerQueue</code> that is using
+     *              this handle
      * @param task the task for this handle
      *
      * @throws IllegalArgumentException if the task is not recurring
      */
-    public RecurringTaskHandleImpl(ApplicationScheduler scheduler,
+    public RecurringTaskHandleImpl(SchedulerQueue queue,
                                    ScheduledTask task) {
-        if (scheduler == null)
-            throw new NullPointerException("Scheduler cannot be null");
+        if (queue == null)
+            throw new NullPointerException("Queue cannot be null");
         if (task == null)
             throw new NullPointerException("Task cannot be null");
         if (! task.isRecurring())
             throw new IllegalArgumentException("Task must be recurring");
 
-        this.scheduler = scheduler;
+        this.queue = queue;
         this.task = task;
     }
 
     /**
-     * {@inheritDoc}
+     * Sets the associated <code>TimerTask</code> for this handle. This
+     * method may be called any number of times on a handle. Typically
+     * a recurring task will re-set the associated <code>TimerTask</code>
+     * with each recurrence of execution.
+     *
+     * @param timerTask the associated <code>TimerTask</code>
      */
-    public synchronized void scheduleNextRecurrence() {
-        if (cancelled)
-            return;
-        task = new ScheduledTask(task, task.getStartTime() + task.getPeriod());
-        scheduler.addTask(task);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public synchronized void setTimerTask(TimerTask timerTask) {
+    synchronized void setTimerTask(TimerTask timerTask) {
         if (timerTask == null)
             throw new NullPointerException("TimerTask cannot be null");
 
@@ -88,15 +85,19 @@ class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns whether this handle has been cancelled. This does not say
+     * anything about the state of any associated <code>TimerTask</code>.
+     *
+     * @return <code>true</code> if this handle has been cancelled,
+     *         <code>false</code> otherwise
      */
-    public synchronized boolean isCancelled() {
+    synchronized boolean isCancelled() {
         return cancelled;
     }
 
     /**
      * Cancels this handle, which will also cancel the associated
-     * <code>TimerTask</code> and notify the <code>ApplicationScheduler</code>
+     * <code>TimerTask</code> and notify the <code>SchedulerQueue</code>
      * about the task being cancelled. If this handle has already been
      * cancelled, then an exception is thrown.
      *
@@ -108,14 +109,19 @@ class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
                 throw new IllegalStateException("cannot cancel task");
             cancelled = true;
         }
-        scheduler.notifyCancelled(task);
+        try {
+            if (task.cancel(false))
+                queue.notifyCancelled(task);
+        } catch (InterruptedException ie) {
+            // this will never happen because false was passed to cancel()
+        }
         if (currentTimerTask != null)
             currentTimerTask.cancel();
     }
 
     /**
      * Starts the associated task running by passing the task to the
-     * <code>ApplicationScheduler</code> via a call to <code>addTask</code>.
+     * <code>SchedulerQueue</code> via a call to <code>addTask</code>.
      * If this handle has already been started or cancelled, then an
      * exception is thrown.
      *
@@ -128,7 +134,7 @@ class RecurringTaskHandleImpl implements InternalRecurringTaskHandle {
                 throw new IllegalStateException("cannot start task");
             started = true;
         }
-        scheduler.addTask(task);
+        queue.addTask(task);
     }
 
 }
