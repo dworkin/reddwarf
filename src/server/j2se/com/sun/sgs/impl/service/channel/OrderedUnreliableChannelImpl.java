@@ -33,9 +33,9 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
 
     /**
      * Constructs an instance with the specified {@code delivery}
-     * requirement.
+     * requirement and write capacity.
      */
-    OrderedUnreliableChannelImpl(Delivery delivery) {
-	super(delivery);
+    OrderedUnreliableChannelImpl(Delivery delivery, int writeBufferCapacity) {
+	super(delivery, writeBufferCapacity);
     }
 }
