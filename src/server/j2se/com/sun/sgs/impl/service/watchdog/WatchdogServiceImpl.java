@@ -187,8 +187,8 @@ public final class WatchdogServiceImpl
     /** The minimum renew interval. */
     private static final long MIN_RENEW_INTERVAL = 25;
 
-    /** The exporter for this server. */
-    private final Exporter<WatchdogClient> exporter;
+    /** The exporter for this server or {@code null}. */
+    private Exporter<WatchdogClient> exporter = null;
 
     /** The watchdog server impl. */
     final WatchdogServerImpl serverImpl;
@@ -370,6 +370,9 @@ public final class WatchdogServiceImpl
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
+	    if (exporter != null) {
+		exporter.unexport();
+	    }
 	    throw e;
 	}
     }
@@ -401,6 +404,9 @@ public final class WatchdogServiceImpl
 	try {
 	    renewThread.join();
 	} catch (InterruptedException e) {
+	}
+	if (exporter != null) {
+	    exporter.unexport();
 	}
 	if (serverImpl != null) {
 	    serverImpl.shutdown();

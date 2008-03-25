@@ -29,8 +29,8 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.Collection;
-import java.util.Properties
-;
+import java.util.Properties;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 
@@ -39,21 +39,20 @@ import java.util.logging.Logger;
 
 
 /**
- * This implementation of <code>WindowApplicationScheduler</code> tries to
+ * This implementation of <code>SchedulerQueue</code> tries to
  * provide fairness between users without taking too long to service any
  * given user's tasks. This is typified by the phrase "no one gets seconds
  * until everyone who wants them has had firsts."
  * <p>
  * The implementation uses a priority queue, keyed off what is called a
  * window value. Users submit tasks into increasing window values, and
- * may never submit tasks into windows that have already passed. See
- * SUN070191 for more details.
+ * may never submit tasks into windows that have already passed.
  */
-public class WindowApplicationScheduler implements ApplicationScheduler {
+public class WindowSchedulerQueue implements SchedulerQueue, TimedTaskListener {
 
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(WindowApplicationScheduler.
+        new LoggerWrapper(Logger.getLogger(WindowSchedulerQueue.
                                            class.getName()));
 
     // the priority queue
@@ -66,12 +65,12 @@ public class WindowApplicationScheduler implements ApplicationScheduler {
     private final TimedTaskHandler timedTaskHandler;
 
     /**
-     * Creates an instance of <code>WindowApplicationScheduler</code>.
+     * Creates an instance of <code>WindowSchedulerQueue</code>.
      *
      * @param properties the application <code>Properties</code>
      */
-    public WindowApplicationScheduler(Properties properties) {
-        logger.log(Level.CONFIG, "Creating a Window Application Scheduler");
+    public WindowSchedulerQueue(Properties properties) {
+        logger.log(Level.CONFIG, "Creating a Window Scheduler Queue");
 
         if (properties == null)
             throw new NullPointerException("Properties cannot be null");
@@ -142,20 +141,13 @@ public class WindowApplicationScheduler implements ApplicationScheduler {
     /**
      * {@inheritDoc}
      */
-    public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
+    public RecurringTaskHandle createRecurringTaskHandle(ScheduledTask task) {
         if (task == null)
             throw new NullPointerException("Task cannot be null");
         if (! task.isRecurring())
             throw new IllegalArgumentException("Not a recurring task");
 
-        InternalRecurringTaskHandle handle =
-            new RecurringTaskHandleImpl(this, task);
-        if (! task.setRecurringTaskHandle(handle)) {
-            logger.log(Level.SEVERE, "a scheduled task was given a new " +
-                       "RecurringTaskHandle");
-            throw new IllegalArgumentException("cannot re-assign handle");
-        }
-        return handle;
+        return new RecurringTaskHandleImpl(this, task);
     }
 
     /**

@@ -19,6 +19,7 @@
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
+  <property name="javac.target" value="1.5"/>
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
@@ -113,12 +114,16 @@
        the server binary distribution -->
   <property name="bdb.je.jar" location="lib/je-${bdb.je.version}.jar"/>
 
-  <!-- Shared code class path -->
-  <path id="shared.classpath">
-    <pathelement location="${build.dir}/classes/shared"/>
+  <!-- Mina class path -->
+  <path id="mina.classpath">
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
     <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
     <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
+  </path>
+
+  <!-- Shared code class path -->
+  <path id="shared.classpath">
+    <pathelement location="${build.dir}/classes/shared"/>
   </path>
 
   <!-- Server class path -->
@@ -133,6 +138,7 @@
   <path id="client.classpath">
     <pathelement location="${build.dir}/classes/client"/>
     <path refid="shared.classpath"/>
+    <path refid="mina.classpath"/>
   </path>
 
   <!-- Server example class path -->
@@ -166,8 +172,12 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/shared/j2se" destdir="${build.dir}/classes/shared"
-           classpathref="shared.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+        <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
+      </classpath>
     </javac>
   </target>
 
@@ -183,8 +193,9 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpathref="server.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           classpathref="server.classpath"
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -198,8 +209,9 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
-           classpathref="client.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           classpathref="client.classpath"
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -634,7 +646,7 @@
     <exec outputproperty="project.revision"
 	  executable="svnversion"
 	  logError="true">
-      <arg line="-c"/>
+      <arg value="-c"/>
       <redirector>
 	<outputfilterchain>
 	  <tokenfilter>
@@ -719,7 +731,7 @@
       <javac srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
 	     classpath="${checkstyle.jar}" includeAntRuntime="no"
 	     debug="${build.debug}" debuglevel="${build.debug.level}"
-	     source="${javac.source}">
+	     source="${javac.source}" target="${javac.target}">
 	<compilerarg line="${javac.compilerargs}"/>
       </javac>
       <taskdef resource="checkstyletask.properties"
@@ -809,6 +821,7 @@
       <classpath>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
       </classpath>
       <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
@@ -850,6 +863,7 @@
       <classpath>
         <pathelement location="${build.dir}/test/classes/server"/>
         <path refid="server.classpath"/>
+        <path refid="mina.classpath"/>
       </classpath>
       <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
@@ -915,9 +929,13 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpathref="shared.classpath"
+	   target="${javac.target}"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+        <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
+      </classpath>
     </javac>
   </target>
 
@@ -932,9 +950,10 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
+	   target="${javac.target}"
 	   classpathref="server.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -949,9 +968,10 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
+	   target="${javac.target}"
 	   classpathref="client.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -1091,7 +1111,8 @@
 	    closure="true"/>
     <javac destdir="${build.dir}/example/classes"
 	   debug="on"
-	   source="${javac.source}">
+	   source="${javac.source}"
+	   target="${javac.target}">
       <src>
         <dirset dir="example" includes="*/src"/>
       </src>
@@ -1100,7 +1121,7 @@
         <pathelement location="${build.dir}/classes/client"/>
         <pathelement location="${build.dir}/classes/shared"/>
       </classpath>
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -1119,7 +1140,7 @@
 	   source="${javac.source}"
 	   classpathref="server.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
