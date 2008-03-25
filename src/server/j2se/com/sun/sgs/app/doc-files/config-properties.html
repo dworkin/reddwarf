@@ -44,11 +44,10 @@
 
 <h1>Project Darkstar Server Configuration Properties</h1>
 
-This page documents the configuration properties supported by the
-current implementation of the Project Darkstar Server.  Configuration
-properties may be specified by system properties
-(using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
-the application properties file named on the command line.
+This page documents the configuration properties supported by version 1.0
+of the Project Darkstar Server.  Configuration properties may be specified by
+system properties (using <code>-D</code><i>property</i><code>=</code>
+<i>value</i>) or in the application properties file named on the command line.
 
 <p>
 By default, the Project Darkstar Server consists of a single node, and is 
@@ -87,9 +86,9 @@ mode for Project Darkstar.
 
 <a name="MultiNodeProperties"></a>
 <h2>Multi-Node Properties</h2>
-For increased scalability and availability of the Project Darkstar Server,
+For increased availability of the Project Darkstar Server,
 multiple nodes can be configured to work together in a cluster.  This
-multi-node configuration requires one special <i>core server node</i> to run
+multi-node configuration requires a special <i>core server node</i> to run
 critical Project Darkstar operations, with the remaining nodes, the 
 <i>application nodes</i>, cooperating to run the application.  Application nodes 
 can be dynamically added or removed from the cluster.
@@ -105,33 +104,16 @@ are required and must be specified by all nodes.
 
 <h3>Core Server Node Properties</h3>
 These properties control the configuration of the Project Darkstar core
-server node if a multi-node configuration is being used. There is only one 
-core server per cluster of Project Darkstar nodes; if multiple core servers
-are started, then each will be associated with its own independent Project
-Darkstart cluster.
+server node if a multi-node configuration is being used. Currently, there is 
+only one core server per cluster of Project Darkstar nodes; if multiple core 
+servers are started, then each will be associated with its own independent 
+Project Darkstart cluster.
 
 <dl>
     
 <dt>com.sun.sgs.node.type
 <span class="default">singleNode</span>
 <dd> Must be set to <code>coreServerNode</code> to start the core server.
-</dl>
-
-<a name="CoreServerPorts"></a>
-<h4>Core Server Port Properties</h4>
-The core server node may be configured to specify ports to be used on the core 
-server machine:
-
-<dl>
-<dt>com.sun.sgs.impl.service.data.store.net.server.port
-<span class="default">44530</span>
-<dd>The TCP port for the data service's shared network server.  
-<dt>com.sun.sgs.impl.service.watchdog.server.port
-<span class="default">44533</span>
-<dd>The TCP port for the watchdog service's internal server.
-<dt>com.sun.sgs.impl.service.nodemap.server.port
-<span class="default">44535</span>
-<dd>The TCP port for the node mapping service's internal server.
 </dl>
 
 
@@ -151,9 +133,27 @@ nodes if a multi-node configuration is being used.
 
 </dl>
 
-Additionally, if any of the <a href="#CoreServerPorts">core server port</a> 
-properties are set when starting the core server node, they must also be set 
-to the same value on each application node.
+<h3>General Multi-node Properties</h3>
+These properties can be used by either core server or application nodes.
+
+<a name="CoreServerPorts"></a>
+<h4>Core Server Port Properties</h4>
+The core server node may be configured to specify ports to be used on the core 
+server machine.  If these properties are used, they must be set to the same
+value on each application node.
+
+<dl>
+<dt>com.sun.sgs.impl.service.data.store.net.server.port
+<span class="default">44530</span>
+<dd>The TCP port for the data service's shared network server.  
+<dt>com.sun.sgs.impl.service.watchdog.server.port
+<span class="default">44533</span>
+<dd>The TCP port for the watchdog service's internal server.
+<dt>com.sun.sgs.impl.service.nodemap.server.port
+<span class="default">44535</span>
+<dd>The TCP port for the node mapping service's internal server.
+</dl>
+
 
 <a name="CommonProperties"></a>
 <h2>Common Properties</h2>
