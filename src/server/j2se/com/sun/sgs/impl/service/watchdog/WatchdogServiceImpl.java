@@ -80,7 +80,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
  *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
- *	property, if present, else the local host name <br>
+ *	property, if present, or localhost if this node is starting the 
+ *      server <br> <br>
  *
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
@@ -401,7 +402,6 @@ public final class WatchdogServiceImpl
 	    renewThread.join();
 	} catch (InterruptedException e) {
 	}
-        exporter.unexport();
 	if (serverImpl != null) {
 	    serverImpl.shutdown();
 	}

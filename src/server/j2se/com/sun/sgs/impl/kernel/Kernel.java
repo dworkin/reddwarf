@@ -653,32 +653,49 @@ class Kernel {
             inputStream = new FileInputStream(filename);
             properties.load(inputStream);
             
-            // Expand any properties that encapsulate several defaults
-            String value =
-                properties.getProperty(StandardProperties.DEFAULT_CORE_SERVER);
-            if (Boolean.valueOf(value) == Boolean.TRUE) {
-                // Don't start an application
-                properties.setProperty(StandardProperties.APP_LISTENER,
-                                       StandardProperties.APP_LISTENER_NONE);
-                // Only run basic services
-                properties.setProperty(StandardProperties.FINAL_SERVICE,
-                                       "NodeMappingService");
-                // Start servers for services
-                properties.setProperty(StandardProperties.SERVER_START, "true");
-                // Start the network server for the data store
-                properties.setProperty(
-                    "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
-                    "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
-                if (logger.isLoggable(Level.CONFIG)) {
-                    logger.log(Level.CONFIG, 
-                        StandardProperties.DEFAULT_CORE_SERVER + " is true, " +
-                        "setting defaults for properties " +
-                        StandardProperties.APP_LISTENER + ", " +
-                        StandardProperties.FINAL_SERVICE + ", " +
-                        StandardProperties.SERVER_START + ", and " +
-                        "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"); 
-                }
+            // Expand properties as needed.
+            String value = properties.getProperty(StandardProperties.NODE_TYPE);
+            if (value == null) {
+                // Default is single node
+                value = StandardProperties.NodeType.singleNode.name();
             }
+
+            StandardProperties.NodeType type;
+            // Throws IllegalArgumentExcpetion if not one of the enum types
+            // but let's improve the error message
+            try {
+                type = StandardProperties.NodeType.valueOf(value);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Illegal value for " +
+                        StandardProperties.NODE_TYPE);
+            }
+            
+           
+            switch (type) {
+                case singleNode:
+                    break;    // do nothing, this is the default
+                case coreServerNode:
+                    // Don't start an application
+                    properties.setProperty(StandardProperties.APP_LISTENER,
+                                           StandardProperties.APP_LISTENER_NONE);
+                    // Only run basic services
+                    properties.setProperty(StandardProperties.FINAL_SERVICE,
+                                           "NodeMappingService");
+                    // Start servers for services
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "true");
+                    // Start the network server for the data store
+                    properties.setProperty(
+                        "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
+                        "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+                    break;
+                case appNode:
+                    // Don't start the servers
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "false");
+                    break;
+            }
+
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))

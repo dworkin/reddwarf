@@ -243,6 +243,21 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	    System.err.println(e);
 	}
     }
+    
+    public void testConstructorAppButNoServerHost() throws Exception {
+        txn.abort(new RuntimeException("abort"));
+	store.shutdown();
+	store = null;
+	txn = new DummyTransaction();
+        props.setProperty(DataStoreNetPackage + ".server.start", "false");
+	props.remove(DataStoreNetPackage + ".server.host");
+	try {
+	    createDataStore(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
 
     /* -- Other tests -- */
 

@@ -54,30 +54,48 @@ the application properties file named on the command line.
 By default, the Project Darkstar Server consists of a single node, and is 
 configured with the <a href="#SingleNodeProperties">Single Node</a> and
 <a href="#CommonProperties">Common</a> properties. 
-Additionally, multiple nodes can be configured to work together using the
-<a href="#MultiNodeProperties">Multi-Node Properties</a>.  
+Alternatively, multiple nodes can be configured to work together using the
+<a href="#MultiNodeProperties">Multi-Node Properties</a> and the 
+<a href="#CommonProperties">Common</a> properties.  
+<p>
+The type of node being configured is specified by the 
+<a href="#node.type">com.sun.sgs.node.type</a> property, which
+has valid settings of 
+<ul>
+    <li><code>singleNode</code>
+    <li><code>coreServerNode</code>
+    <li><code>appNode</code>
+</ul>
+
+<p>
+For example configuration files of the different node types, see the
+<a href="single-node.properties">single-node.properties</a>,
+<a href="core-server.properties">core-server.properties</a>, and
+<a href="app-node.properties">app-node.properties</a> files.
+
 
 <a name="SingleNodeProperties"></a>
 <h2>Single Node Properties</h2>
 
-Starts the Server in a single Java Virtual Machine. This is the default 
+Starts the Darkstar Server in a single Java Virtual Machine. This is the default 
 mode for Project Darkstar.
 <dl>
-<dt><a name="com.sun.sgs.server.start">com.sun.sgs.server.start</a>
-<span class="default">true</span>
+<dt><a name="node.type">com.sun.sgs.node.type</a>
+<span class="default">singleNode</span>
 <dd> Starts a Darkstar Server in single-node mode.
 </dl>
 
 <a name="MultiNodeProperties"></a>
 <h2>Multi-Node Properties</h2>
-For increased scalibility and availability of the Project Darkstar Server,
+For increased scalability and availability of the Project Darkstar Server,
 multiple nodes can be configured to work together in a cluster.  This
 multi-node configuration requires one special <i>core server node</i> to run
-critical Project Darkstar operations, with the remaining nodes, the
+critical Project Darkstar operations, with the remaining nodes, the 
 <i>application nodes</i>, cooperating to run the application.  Application nodes 
 can be dynamically added or removed from the cluster.
 <p>
-The core server node <b>must</b> be started before the application nodes.
+The core server node <b>must</b> be running before starting the application 
+nodes.
 <p>
 Properties in this section specify which node is the core server node, which
 are the application nodes, and how the application nodes discover the
@@ -88,26 +106,19 @@ are required and must be specified by all nodes.
 <h3>Core Server Node Properties</h3>
 These properties control the configuration of the Project Darkstar core
 server node if a multi-node configuration is being used. There is only one 
-core server per cluster of Project Darkstar nodes;  if multiple core servers
-are started, there are multiple independent Project Darkstar clusters.
+core server per cluster of Project Darkstar nodes; if multiple core servers
+are started, then each will be associated with its own independent Project
+Darkstart cluster.
 
 <dl>
     
-<a name="CoreServer"></a>
-<dt>com.sun.sgs.default.core.server
-<span class="default">false</span>
-<dd> If set to <code>true</code>, start the <b>core server node</b>, the 
- non-application node which runs critical Project Darkstar Server operations. 
- The properties
- <a href="#com.sun.sgs.app.listener">com.sun.sgs.app.listener</a> and
- <a href="#com.sun.sgs.server.start">com.sun.sgs.server.start</a>
- should not be set when configuring the core server node.  Also, there is no
- need to specify the <a href="#app.sun.sgs.app.port">com.sun.sgs.app.port</a>
- property as no clients will connect to this node.
+<dt>com.sun.sgs.node.type
+<span class="default">singleNode</span>
+<dd> Must be set to <code>coreServerNode</code> to start the core server.
 </dl>
 
 <a name="CoreServerPorts"></a>
-<h4>Core Server Ports</h4>
+<h4>Core Server Port Properties</h4>
 The core server node may be configured to specify ports to be used on the core 
 server machine:
 
@@ -130,9 +141,9 @@ nodes if a multi-node configuration is being used.
 
 <dl>
     
-<dt>com.sun.sgs.server.start
-<span class="default">true</span>
-<dd> This property must be set to <code>false</code> for application nodes.
+<dt>com.sun.sgs.node.type
+<span class="default">singleNode</span>
+<dd> Must be set to <code>appNode</code> to start an application node.
 
 <dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
 <span class="required"> for application nodes</span>
@@ -219,7 +230,8 @@ These properties control the implementation of the
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying <code>DataStore</code>.
+underlying <code>DataStore</code>.  Setting these properties has no
+effect on application nodes.
 
 <dl>
 
@@ -318,7 +330,7 @@ More threads will be created and used if necessary.
 
 <hr>
 <font size="-1">
-  Copyright &copy; 2007 Sun Microsystems, Inc. All rights reserved
+  Copyright &copy; 2007-2008 Sun Microsystems, Inc. All rights reserved
 </font>
 
 </body>

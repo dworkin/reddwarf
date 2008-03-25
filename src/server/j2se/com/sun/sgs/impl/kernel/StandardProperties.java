@@ -184,13 +184,15 @@ public class StandardProperties {
      * an identity.
      */
     public static final String AUTHENTICATORS = NS + "app.authenticators";
-
+    
     /**
-     * An optional property that specifies a core server node should be started
-     * in the default configuration, where the servers associated with 
-     * individual Darkstar services are started on a single physical machine
-     * using their default communication ports.  Setting this property to 
-     * {@code true} is equivalent to setting the following properties:
+     *  A required property that specifies the type of node being started.
+     *  It must be set to a value in {@link NodeType} and defaults to
+     *  {@code singleNode}.  This property may be expanded into several
+     *  properties, perhaps overriding other properties.
+     *  <p>
+     *  In particular, setting this property to {@code coreServerNode} causes
+     *  the following properties to be set:
      * <ul>
      * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
      *      is {@value #APP_LISTENER_NONE} to indicate that no application code
@@ -204,10 +206,27 @@ public class StandardProperties {
      *   to indicate the multi-node data service should be used
      *
      * </ul>
+     * <p>
+     * Setting this property to {@code appNode} causes the following to be
+     * set:
+     * <ul>
+     * <li> {@value #SERVER_START} set to {@code false} 
+     * </ul>
      * 
      */
-    public static final String DEFAULT_CORE_SERVER = NS + "default.core.server";
+    public static final String NODE_TYPE = NS + "node.type";
     
+    /**
+     *  The valid choices for {@link #NODE_TYPE}.
+     */
+    public enum NodeType {
+        /** A single node configuration */
+        singleNode,
+        /** The core server for multi-node configurations */
+        coreServerNode,
+        /** An application node for multi-node configurations */
+        appNode,
+    }
     /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
