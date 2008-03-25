@@ -114,6 +114,16 @@ public final class ChannelServiceImpl
     /** The default events per transaction. */
     private static final int DEFAULT_EVENTS_PER_TXN = 1;
     
+    /** The name of the write buffer size property. */
+    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+        PKG_NAME + ".buffer.write.max";
+
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
+    /** The write buffer size for new channels. */
+    private final int writeBufferSize;
+    
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
 
@@ -195,6 +205,9 @@ public final class ChannelServiceImpl
 	    sessionService = txnProxy.getService(ClientSessionService.class);
 	    localNodeId = watchdogService.getLocalNodeId();
 
+            writeBufferSize = wrappedProps.getIntProperty(
+                WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
 	    /*
 	     * Get the property for controlling channel event processing.
 	     */
@@ -299,7 +312,8 @@ public final class ChannelServiceImpl
     /** {@inheritDoc} */
     public Channel createChannel(Delivery delivery) {
 	try {
-	    Channel channel = ChannelImpl.newInstance(delivery);
+	    Channel channel =
+	        ChannelImpl.newInstance(delivery, writeBufferSize);
 	    return channel;
 	    
 	} catch (RuntimeException e) {
@@ -511,9 +525,11 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
+		ByteBuffer buf = ByteBuffer.wrap(message);
 		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, ByteBuffer.wrap(message), Delivery.RELIABLE);
+ 			sessionRefId, buf.asReadOnlyBuffer(),
+			Delivery.RELIABLE);
 		}
 
 	    } finally {
