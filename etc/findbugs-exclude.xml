@@ -59,11 +59,18 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
+  <!-- Return value can be ignored, since it always true. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.TransactionSchedulerImpl$TaskQueueImpl"/>
+    <Method name="addTask"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.kernel.schedule -->
 
   <!-- Currently unused fields. -->
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.schedule.WindowApplicationScheduler$QueueUser"/>
+    <Class name="com.sun.sgs.impl.kernel.schedule.WindowSchedulerQueue$QueueUser"/>
     <Field name="lastScheduled"/>
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>

@@ -50,7 +50,7 @@ import java.util.logging.Logger;
  * Package-private implementation of {@code TaskScheduler} that is used by
  * the system scheduling and running all non-transactional, arbitrary-length
  * tasks. This is an intentionally simple implementation that uses a backing
- * {@code Executor} instead of an {@code ApplicationScheduler} until there
+ * {@code Executor} instead of a {@code SchedulerQueue} until there
  * is better understanding of what (if any) custom scheduling behavior will
  * help these kinds of tasks.
  * <p>

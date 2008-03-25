@@ -1102,19 +1102,22 @@ public class TestWatchdogServiceImpl extends TestCase {
             }
         }
     }
-    
+
     /** Test creating two single nodes at the same host and port  */
     public void testReuseHostPortSingleNode() throws Exception {
         final String appName = "ReuseHostPort";
         SgsTestNode node = null;
         SgsTestNode node1 = null;
         try {
-            node = new SgsTestNode(appName, null, serviceProps, true);
+            node = new SgsTestNode(appName, null,
+                                   getPropsForApplication(appName), true);
             
             // This node is independent of the one above;  it'll have a new
             // server.  We expect to see a socket BindException rather
             // than an IllegalArgumentException.
-            node1 = new SgsTestNode(appName, null, serviceProps, true);
+            node1 = new SgsTestNode(appName, null,
+                                    getPropsForApplication(appName + "1"),
+                                    true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {
             System.err.println(e);
@@ -1129,10 +1132,10 @@ public class TestWatchdogServiceImpl extends TestCase {
             }
         } finally {
             if (node != null) {
-                node.shutdown(false);
+                node.shutdown(true);
             }
             if (node1 != null) {
-                node1.shutdown(false);
+                node1.shutdown(true);
             }
         }
     }
@@ -1176,7 +1179,8 @@ public class TestWatchdogServiceImpl extends TestCase {
         SgsTestNode node = null;
         SgsTestNode node1 = null;
         try {
-            node = new SgsTestNode(appName, null, serviceProps, true);
+            node = new SgsTestNode(appName, null,
+                                   getPropsForApplication(appName), true);
             Properties props = node.getServiceProperties();
             System.err.println("node properties are " + props);
             
@@ -1190,13 +1194,24 @@ public class TestWatchdogServiceImpl extends TestCase {
             System.err.println("attempting to restart failed single node");
             node1 = new SgsTestNode(appName, null, null, props, false);
         } finally {
-            if (node != null) {
-                node.shutdown(false);
-            }
             if (node1 != null) {
                 node1.shutdown(false);
             }
+            if (node != null) {
+                node.shutdown(true);
+            }
         }
+    }
+
+    /** Creates node properties with a db directory based on the app name. */
+    private Properties getPropsForApplication(String appName) {
+        String dir = System.getProperty("java.io.tmpdir") +
+            File.separator + appName + ".db";
+        Properties props = new Properties(serviceProps);
+        props.setProperty(
+            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+            dir);
+        return props;
     }
 
     /** Creates a watchdog service with the specified recovery listener. */
