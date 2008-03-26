@@ -24,6 +24,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
@@ -116,13 +117,21 @@ abstract class ChannelImpl implements Channel, Serializable {
     private boolean isClosed = false;
 
     /**
+     * The maximum number of message bytes that can be queued for delivery on
+     * this channel.
+     */
+    private final int writeBufferCapacity;
+
+    /**
      * Constructs an instance of this class with the specified
      * {@code delivery} requirement.
      *
      * @param delivery a delivery requirement
+     * @param writeBufferCapacity the capacity of the write buffer, in bytes
      */
-    protected ChannelImpl(Delivery delivery) {
+    protected ChannelImpl(Delivery delivery, int writeBufferCapacity) {
 	this.delivery = delivery;
+	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
 	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
@@ -141,11 +150,12 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Constructs a new {@code Channel} with the given {@code delivery}
-     * requirement.
+     * requirement and write-buffer capacity.
      */
-    static Channel newInstance(Delivery delivery) {
+    static Channel newInstance(Delivery delivery, int writeBufferCapacity) {
 	// TBD: create other channel types depending on delivery.
-	return (new OrderedUnreliableChannelImpl(delivery)).getWrappedChannel();
+	return new OrderedUnreliableChannelImpl(
+	    delivery, writeBufferCapacity).getWrappedChannel();
     }
 
     /* -- Implement Channel -- */
@@ -1171,20 +1181,48 @@ abstract class ChannelImpl implements Channel, Serializable {
 	private boolean sendRefresh = false;
 
 	/**
+	 * The number of bytes of the write buffer that are currently
+	 * available.
+	 */
+	private int writeBufferAvailable;
+
+	/**
 	 * Constructs an event queue for the specified {@code channel}.
 	 */
 	EventQueue(ChannelImpl channel) {
 	    channelRef = channel.dataService.createReference(channel);
 	    queueRef = channel.dataService.createReference(
 		new ManagedQueue<ChannelEvent>());
+	    writeBufferAvailable = channel.getWriteBufferCapacity();
 	}
 
 	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
 	 * {@code true} if successful, and {@code false} otherwise.
+	 * 
+	 * @param event the event
+	 * @return {@code true} if successful, and {@code false} otherwise
+	 * @throws MessageRejectedException if the cost of the event
+	 *         exceeds the available buffer space in the queue
 	 */
 	boolean offer(ChannelEvent event) {
-	    return getQueue().offer(event);
+	    int cost = event.getCost();
+	    if (cost > writeBufferAvailable) {
+	        throw new MessageRejectedException(
+	            "Not enough queue space: " + writeBufferAvailable +
+		    " bytes available, " + cost + " requested");
+	    }
+	    boolean success = getQueue().offer(event);
+	    if (success && (cost > 0)) {
+		ChannelServiceImpl.getDataService().markForUpdate(this);
+                writeBufferAvailable -= cost;
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(Level.FINEST,
+                        "{0} reserved {1,number,#} leaving {2,number,#}",
+                        this, cost, writeBufferAvailable);
+                }
+	    }
+	    return success;
 	}
 
 	/**
@@ -1251,6 +1289,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
+	    DataService dataService =
+		ChannelServiceImpl.getDataService();
 	    /*
 	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
 	     * true), then all pending events should to be serviced, since
@@ -1291,7 +1331,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 			    }
 			}
 		    });
-		ChannelServiceImpl.getDataService().markForUpdate(this);
+		dataService.markForUpdate(this);
 		sendRefresh = false;
 	    }
 
@@ -1307,7 +1347,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    return;
 		}
 
-		logger.log(Level.FINEST, "processing event:{0}", event);
+                logger.log(Level.FINEST, "processing event:{0}", event);
+                int cost = event.getCost();
+		if (cost > 0) {
+		    writeBufferAvailable += cost;
+
+		    if (logger.isLoggable(Level.FINEST)) {
+		        logger.log(Level.FINEST,
+				   "{0} cleared reservation of " +
+				   "{1,number,#} bytes, leaving {2,number,#}",
+				   this, cost, writeBufferAvailable);
+		    }
+		}
 		event.serviceEvent(this);
 		
 	    } while (serviceAllEvents || --eventsToService > 0);
@@ -1328,8 +1379,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 * Services this event, taken from the head of the given {@code
 	 * eventQueue}.
 	 */
-	public abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(EventQueue eventQueue);
 
+	/**
+	 * Returns the cost of this event, which the {@code EventQueue}
+	 * may use to reject events when the total cost is too large.
+	 * The default implementation returns a cost of zero.
+	 * 
+	 * @return the cost of this event
+	 */
+	int getCost() {
+	    return 0;
+	}
     }
 
     /**
@@ -1553,11 +1614,26 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    }});
 	}
 
+	/** Use the message length as the cost for sending messages. */
+	@Override
+	int getCost() {
+	    return message.length;
+	}
+
 	/** {@inheritDoc} */
         @Override
 	public String toString() {
 	    return getClass().getName();
 	}
+    }
+
+    /**
+     * Returns the write buffer capacity for this channel.
+     * 
+     * @return the write buffer capacity
+     */
+    int getWriteBufferCapacity() {
+        return writeBufferCapacity;
     }
 
     /**

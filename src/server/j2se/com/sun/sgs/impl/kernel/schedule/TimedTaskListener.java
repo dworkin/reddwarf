@@ -17,25 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.channel;
+package com.sun.sgs.impl.kernel.schedule;
 
-import com.sun.sgs.app.Delivery;
 
-/**
- * Represents an ordered unreliable channel.  This is currently a
- * placeholder that will eventually handle message delivery details in the
- * subclass instead of handling them in the {@code ChannelImpl} superclass.
- */
-class OrderedUnreliableChannelImpl extends ChannelImpl {
-    
-    /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+/** Package-private interface for notifying when delayed tasks are ready. */
+interface TimedTaskListener {
 
     /**
-     * Constructs an instance with the specified {@code delivery}
-     * requirement and write capacity.
+     * Called when a delayed task has reached its time to run.
+     *
+     * @param task the {@code ScheduledTask} that is ready to run
      */
-    OrderedUnreliableChannelImpl(Delivery delivery, int writeBufferCapacity) {
-	super(delivery, writeBufferCapacity);
-    }
+    public void timedTaskReady(ScheduledTask task);
+
 }

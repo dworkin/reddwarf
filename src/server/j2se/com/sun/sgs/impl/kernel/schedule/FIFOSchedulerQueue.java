@@ -36,17 +36,17 @@ import java.util.logging.Logger;
 
 
 /**
- * This is a simple implemenation of <code>ApplicationScheduler</code> that
+ * This is a simple implemenation of <code>SchedulerQueue</code> that
  * accepts tasks and runs them in the order that they are ready. No attempt
  * is made to support priority, or to provide any degree of fairness
- * between users. This scheduler uses an un-bounded queue. Unless the system
+ * between users. This class uses an un-bounded queue. Unless the system
  * runs out of memory, this should always accept any tasks from any user.
  */
-public class FIFOApplicationScheduler implements ApplicationScheduler {
+public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
 
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(FIFOApplicationScheduler.
+        new LoggerWrapper(Logger.getLogger(FIFOSchedulerQueue.
                                            class.getName()));
 
     // the single queue of tasks
@@ -56,12 +56,12 @@ public class FIFOApplicationScheduler implements ApplicationScheduler {
     private final TimedTaskHandler timedTaskHandler;
 
     /**
-     * Creates an instance of <code>FIFOApplicationScheduler</code>.
+     * Creates an instance of <code>FIFOSchedulerQueue</code>.
      *
      * @param properties the available system properties
      */
-    public FIFOApplicationScheduler(Properties properties) {
-        logger.log(Level.CONFIG, "Creating a FIFO Application Scheduler");
+    public FIFOSchedulerQueue(Properties properties) {
+        logger.log(Level.CONFIG, "Creating a FIFO Scheduler Queue");
 
         if (properties == null)
             throw new NullPointerException("Properties cannot be null");
@@ -129,20 +129,13 @@ public class FIFOApplicationScheduler implements ApplicationScheduler {
     /**
      * {@inheritDoc}
      */
-    public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
+    public RecurringTaskHandle createRecurringTaskHandle(ScheduledTask task) {
         if (task == null)
             throw new NullPointerException("Task cannot be null");
         if (! task.isRecurring())
             throw new IllegalArgumentException("Not a recurring task");
 
-        InternalRecurringTaskHandle handle =
-            new RecurringTaskHandleImpl(this, task);
-        if (! task.setRecurringTaskHandle(handle)) {
-            logger.log(Level.SEVERE, "a scheduled task was given a new " +
-                       "RecurringTaskHandle");
-            throw new IllegalArgumentException("cannot re-assign handle");
-        }
-        return handle;
+        return new RecurringTaskHandleImpl(this, task);
     }
 
     /**

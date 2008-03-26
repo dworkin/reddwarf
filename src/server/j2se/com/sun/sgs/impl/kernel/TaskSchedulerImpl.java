@@ -50,7 +50,7 @@ import java.util.logging.Logger;
  * Package-private implementation of {@code TaskScheduler} that is used by
  * the system scheduling and running all non-transactional, arbitrary-length
  * tasks. This is an intentionally simple implementation that uses a backing
- * {@code Executor} instead of an {@code ApplicationScheduler} until there
+ * {@code Executor} instead of a {@code SchedulerQueue} until there
  * is better understanding of what (if any) custom scheduling behavior will
  * help these kinds of tasks.
  * <p>
@@ -193,8 +193,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
             throw new IllegalArgumentException("Illegal period: " + period);
 
         return new RecurringTaskHandleImpl(new TaskDetail(task, owner,
-                                                          startTime, true),
-                                           period);
+                                                          startTime, period));
     }
 
     /*
@@ -260,16 +259,14 @@ final class TaskSchedulerImpl implements TaskScheduler {
     /** Private implementation of {@code RecurringTaskHandle}.  */
     private class RecurringTaskHandleImpl implements RecurringTaskHandle {
         private final TaskDetail taskDetail;
-        private final long period;
         private boolean isCancelled = false;
         private boolean isStarted = false;
         private volatile ScheduledFuture<?> future = null;
         /** Creates an instance of {@code RecurringTaskHandleImpl}. */
-        RecurringTaskHandleImpl(TaskDetail taskDetail, long period) {
+        RecurringTaskHandleImpl(TaskDetail taskDetail) {
             if (isShutdown)
                 throw new IllegalStateException("Scheduler is shutdown");
             this.taskDetail = taskDetail;
-            this.period = period;
         }
         /** {@inheritDoc} */
         public void cancel() {
@@ -295,7 +292,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
             try {
                 future =
                     executor.scheduleAtFixedRate(new TaskRunner(taskDetail),
-                                                 delay, period,
+                                                 delay, taskDetail.period,
                                                  TimeUnit.MILLISECONDS);
             } catch (RejectedExecutionException ree) {
                 throw new TaskRejectedException("The system has run out of " +
@@ -309,15 +306,15 @@ final class TaskSchedulerImpl implements TaskScheduler {
     private static class TaskDetail {
         final KernelRunnable task;
         final Identity owner;
-        final long startTime;
-        final boolean isRecurring;
+        volatile long startTime;
+        final long period;
         /** Creates an instance of {@code TaskDetail}. */
         TaskDetail(KernelRunnable task, Identity owner, long startTime) {
-            this(task, owner, startTime, false);
+            this(task, owner, startTime, 0);
         }
         /** Creates an instance of {@code TaskDetail}. */
         TaskDetail(KernelRunnable task, Identity owner, long startTime,
-                   boolean isRecurring) {
+                   long period) {
             if (task == null)
                 throw new NullPointerException("Task cannot be null");
             if (owner == null)
@@ -326,7 +323,11 @@ final class TaskSchedulerImpl implements TaskScheduler {
             this.task = task;
             this.owner = owner;
             this.startTime = startTime;
-            this.isRecurring = isRecurring;
+            this.period = period;
+        }
+        /** Returns whether this task is recurring. */
+        boolean isRecurring() {
+            return period != 0;
         }
     }
 
@@ -344,11 +345,13 @@ final class TaskSchedulerImpl implements TaskScheduler {
         public void run() {
             logger.log(Level.FINE, "Running a non-transactional task");
 
-            int queueSize = (taskDetail.isRecurring ? waitingSize.get() :
+            int queueSize = (taskDetail.isRecurring() ? waitingSize.get() :
                              waitingSize.decrementAndGet());
             if (profileCollector != null)
                 profileCollector.startTask(taskDetail.task, taskDetail.owner,
                                            taskDetail.startTime, queueSize);
+            if (taskDetail.isRecurring())
+                taskDetail.startTime += taskDetail.period;
 
             // store the current owner, and then push the new thread detail
             Identity parent = ContextResolver.getCurrentOwner();
@@ -362,7 +365,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
                 if (profileCollector != null)
                     profileCollector.finishTask(1, e);
                 if (logger.isLoggable(Level.WARNING)) {
-                    if (taskDetail.isRecurring)
+                    if (taskDetail.isRecurring())
                         logger.logThrow(Level.WARNING, e, "failed to run " +
                                         "task {0}", taskDetail.task);
                     else

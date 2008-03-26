@@ -163,6 +163,42 @@ public class TestTransactionSchedulerImpl {
     }
 
     /**
+     * Test interruption.
+     */
+
+    @Test public void scheduleTransactionRetryAfterInterrupt()
+        throws Exception
+    {
+        final AtomicInteger i = new AtomicInteger(0);
+        final KernelRunnable r = new AbstractKernelRunnable() {
+                public int runCount = 0;
+                public void run() throws Exception {
+                    if (i.getAndIncrement() == 0)
+                        throw new InterruptedException("test");
+                }
+            };
+        txnScheduler.scheduleTask(r, taskOwner);
+        Thread.sleep(200L);
+        assertEquals(i.get(), 2);
+    }
+
+    @Test public void runTransactionInterrupted() throws Exception {
+        final AtomicInteger i = new AtomicInteger(0);
+        final KernelRunnable r = new AbstractKernelRunnable() {
+                public int runCount = 0;
+                public void run() throws Exception {
+                    if (i.getAndIncrement() == 0)
+                        throw new InterruptedException("test");
+                }
+            };
+        try {
+            txnScheduler.runTask(r, taskOwner);
+            fail("Expected Interrupted Exception");
+        } catch (InterruptedException ie) {}
+        assertEquals(i.get(), 1);
+    }
+
+    /**
      * Test transaction handling.
      */
 

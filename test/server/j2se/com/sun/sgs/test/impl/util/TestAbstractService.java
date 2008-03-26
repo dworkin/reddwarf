@@ -43,7 +43,7 @@ public class TestAbstractService extends TestCase {
     private static final Properties serviceProps =
 	createProperties(StandardProperties.APP_NAME, "TestAbstractService");
     
-    private SgsTestNode serverNode;
+    private SgsTestNode serverNode = null;
 
     /** Creates an instance. */
     public TestAbstractService(String name) {
@@ -55,9 +55,11 @@ public class TestAbstractService extends TestCase {
 	System.err.println("Testcase: " + getName());
 	serverNode = new SgsTestNode("TestAbstractSevice", null,  null);
     }
-    
+
+    /** Shuts down the server node. */
     protected void tearDown() throws Exception {
-        serverNode.shutdown(true);
+	if (serverNode != null)
+	    serverNode.shutdown(true);
     }
 
     public void testConstructorNullProperties() {

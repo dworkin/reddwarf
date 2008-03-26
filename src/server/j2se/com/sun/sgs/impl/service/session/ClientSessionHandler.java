@@ -30,10 +30,12 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
+import com.sun.sgs.nio.channels.CompletionHandler;
+import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -41,6 +43,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -53,8 +57,6 @@ class ClientSessionHandler {
 
     /** Connection state. */
     private static enum State {
-        /** A connection is in progress */
-	CONNECTING,
         /** Session is connected */
         CONNECTED,
         /** Disconnection is in progress */
@@ -80,11 +82,14 @@ class ClientSessionHandler {
     /** The data service. */
     private final DataService dataService;
 
-    /** The ConnectionListener for receiving messages from the client. */
-    private final ConnectionListener connectionListener;
+    /** The I/O channel for sending messages to the client. */
+    private final AsynchronousMessageChannel sessionConnection;
 
-    /** The Connection for sending messages to the client. */
-    private volatile Connection sessionConnection = null;
+    /** The completion handler for reading from the I/O channel. */
+    private volatile ReadHandler readHandler = new ConnectedReadHandler();
+
+    /** The completion handler for writing to the I/O channel. */
+    private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -98,7 +103,7 @@ class ClientSessionHandler {
     private final Object lock = new Object();
     
     /** The connection state. */
-    private State state = State.CONNECTING;
+    private State state = State.CONNECTED;
 
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
@@ -110,32 +115,33 @@ class ClientSessionHandler {
     private volatile TaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class.
+     * Constructs an instance of this class using the provided I/O connection,
+     * and starts reading from the connection.
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
-			 DataService dataService)
+			 DataService dataService,
+			 AsynchronousMessageChannel sessionConnection)
     {
 	this.sessionService = sessionService;
         this.dataService = dataService;
-	this.connectionListener = new Listener();
+	this.sessionConnection = sessionConnection;
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
 		       "creating new ClientSessionHandler on nodeId:{0}",
 		        sessionService.getLocalNodeId());
 	}
+
+	/*
+	 * TODO: It might be a good idea to implement high- and low-water marks
+	 * for the buffers, so they don't go into hysteresis when they get
+	 * full. -JM
+	 */
+
+        readHandler.read();
     }
 
     /* -- Instance methods -- */
-
-    /**
-     * Returns the {@code ConnectionListener} for this session.
-     *
-     * @return	the {@code ConnectionListener} for this session
-     */
-    ConnectionListener getConnectionListener() {
-	return connectionListener;
-    }
 
     /**
      * Returns {@code true} if this handler is connected, otherwise
@@ -147,9 +153,7 @@ class ClientSessionHandler {
 
 	State currentState = getCurrentState();
 
-	boolean connected =
-	    currentState == State.CONNECTING ||
-	    currentState == State.CONNECTED;
+	boolean connected = (currentState == State.CONNECTED);
 
 	return connected;
     }
@@ -162,7 +166,7 @@ class ClientSessionHandler {
 	// TBI: ignore delivery for now...
 	try {
 	    if (isConnected()) {
-		sessionConnection.sendBytes(message);
+	        writeHandler.write(ByteBuffer.wrap(message));
 	    } else {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
@@ -172,19 +176,12 @@ class ClientSessionHandler {
 		}
 	    }
 		    
-	} catch (IOException e) {
+	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "sendProtocolMessage session:{0} throws", this);
 	    }
-	}
-	
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST,
-		"sendProtocolMessage session:{0} message:{1} returns",
-		this, HexDumper.format(message, 0x50));
 	}
     }
 
@@ -261,6 +258,9 @@ class ClientSessionHandler {
 	    }
 	}
 
+	readHandler = new ClosedReadHandler();
+        writeHandler = new ClosedWriteHandler();
+
 	if (sessionRefId != null) {
 	    scheduleTask(new AbstractKernelRunnable() {
 		public void run() {
@@ -281,12 +281,16 @@ class ClientSessionHandler {
      * 		disconnecting the client session)
      */
     private void scheduleHandleDisconnect(final boolean graceful) {
+        synchronized (lock) {
+            if (state != State.DISCONNECTED)
+                state = State.DISCONNECTING;
+        }
 	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
 		handleDisconnect(graceful);
 	    }});
     }
-    
+
     /**
      * Flags this session as shut down, and closes the connection.
      */
@@ -315,107 +319,218 @@ class ClientSessionHandler {
 	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
     }
 
-    /* -- ConnectionListener implementation -- */
+    /* -- I/O completion handlers -- */
 
-    /**
-     * Listener for connection-related events for this session's
-     * Connection.
-     */
-    private class Listener implements ConnectionListener {
+    /** A completion handler for writing to a connection. */
+    private abstract class WriteHandler
+        implements CompletionHandler<Void, Void>
+    {
+	/** Writes the specified message. */
+        abstract void write(ByteBuffer message);
+    }
 
-	/** {@inheritDoc} */
-	public void connected(Connection conn) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER, "Handler.connected handle:{0}", conn);
-	    }
+    /** A completion handler for writing that always fails. */
+    private class ClosedWriteHandler extends WriteHandler {
 
-	    synchronized (lock) {
-		// check if there is already a handle set
-		if (sessionConnection != null) {
-		    return;
-		}
+	ClosedWriteHandler() { }
 
-		sessionConnection = conn;
-		
-		switch (state) {
-		    
-		case CONNECTING:
-		    state = State.CONNECTED;
-		    break;
-		default:
-		    break;
-		}
-	    }
-	}
+        @Override
+        void write(ByteBuffer message) {
+            throw new ClosedAsynchronousChannelException();
+        }
+        
+        public void completed(IoFuture<Void, Void> result) {
+            throw new AssertionError("should be unreachable");
+        }    
+    }
 
-	/** {@inheritDoc} */
-	public void disconnected(Connection conn) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER, "Handler.disconnected handle:{0}", conn);
-	    }
+    /** A completion handler for writing to the session's channel. */
+    private class ConnectedWriteHandler extends WriteHandler {
 
-	    synchronized (lock) {
-		if (conn != sessionConnection) {
-		    return;
-		}
+	/** An unbounded queue of messages waiting to be written. */
+        private final LinkedList<ByteBuffer> pendingWrites =
+            new LinkedList<ByteBuffer>();
 
-		if (!disconnectHandled) {
-		    // TBD: identity may be null. Fix to pass a non-null
-		    // identity when scheduling the task.
-		    scheduleHandleDisconnect(false);
-		}
+	/** Whether a write is underway. */
+        private boolean isWriting = false;
 
-		state = State.DISCONNECTED;
-	    }
-	}
+	/** Creates an instance of this class. */
+        ConnectedWriteHandler() { }
 
-	/** {@inheritDoc}
-	 *
-	 * NOTE: if the exception thrown is an instance of IOException,
-	 * MINA will close the connection when this callback returns.
+	/**
+	 * Adds the message to the queue, and starts processing the queue if
+	 * needed.
 	 */
-	public void exceptionThrown(Connection conn, Throwable exception) {
+        @Override
+        void write(ByteBuffer message) {
+            boolean first;
+            synchronized (lock) {
+                first = pendingWrites.isEmpty();
+                pendingWrites.add(message);
+            }
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST,
+			   "write session:{0} message:{1} first:{2}",
+                           ClientSessionHandler.this,
+			   HexDumper.format(message, 0x50), first);
+            }
+            if (first) {
+                processQueue();
+            }
+        }
 
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, exception,
-		    "Handler.exceptionThrown handle:{0}", conn);
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public void bytesReceived(Connection conn, byte[] buffer) {
+	/** Start processing the first element of the queue, if present. */
+        private void processQueue() {
+            ByteBuffer message;
+            synchronized (lock) {
+                if (isWriting) {
+                    return;
+		}
+                message = pendingWrites.peek();
+                if (message == null) {
+		    return;
+		}
+		isWriting = true;
+            }
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
-                    Level.FINEST,
-                    "Handler.messageReceived handle:{0}, buffer:{1}",
-                    conn, buffer);
+		    Level.FINEST,
+		    "processQueue session:{0} size:{1,number,#} head={2}",
+		    ClientSessionHandler.this, pendingWrites.size(),
+		    HexDumper.format(message, 0x50));
             }
-	    
-	    synchronized (lock) {
-		if (conn != sessionConnection) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.log(
-                            Level.FINE, 
-                            "Handle mismatch: expected: {0}, got: {1}",
-                            sessionConnection, conn);
-                    }
-		    return;
-		}
-	    }
-	    
-	    if (buffer.length < 1) {
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-		        Level.SEVERE,
-			"Handler.messageReceived malformed protocol message:{0}",
-			buffer);
-		}
-		// TBD: should the connection be disconnected?
-		return;
-	    }
+            try {
+                sessionConnection.write(message, this);
+            } catch (RuntimeException e) {
+                logger.logThrow(Level.SEVERE, e,
+				"{0} processing message {1}",
+				ClientSessionHandler.this,
+				HexDumper.format(message, 0x50));
+                throw e;
+            }
+        }
+
+	/** Done writing the first request in the queue. */
+        public void completed(IoFuture<Void, Void> result) {
+	    ByteBuffer message;
+            synchronized (lock) {
+                message = pendingWrites.remove();
+                isWriting = false;
+            }
+            if (logger.isLoggable(Level.FINEST)) {
+		ByteBuffer resetMessage = message.duplicate();
+		resetMessage.reset();
+                logger.log(Level.FINEST,
+			   "completed write session:{0} message:{1}",
+			   ClientSessionHandler.this,
+			   HexDumper.format(resetMessage, 0x50));
+            }
+            try {
+                result.getNow();
+                /* Keep writing */
+                processQueue();
+            } catch (ExecutionException e) {
+                /*
+		 * TODO: If we're expecting the session to close, don't
+                 * complain.
+		 */
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+				    "write session:{0} message:{1} throws",
+				    ClientSessionHandler.this,
+				    HexDumper.format(message, 0x50));
+                }
+                scheduleHandleDisconnect(false);
+            }
+        }
+    }
+
+    /** A completion handler for reading from a connection. */
+    private abstract class ReadHandler
+        implements CompletionHandler<ByteBuffer, Void>
+    {
+	/** Initiates the read request. */
+        abstract void read();
+    }
+
+    /** A completion handler for reading that always fails. */
+    private class ClosedReadHandler extends ReadHandler {
+
+	ClosedReadHandler() { }
+
+        @Override
+        void read() {
+            throw new ClosedAsynchronousChannelException();
+        }
+
+        public void completed(IoFuture<ByteBuffer, Void> result) {
+            throw new AssertionError("should be unreachable");
+        }
+    }
+
+    /** A completion handler for reading from the session's channel. */
+    private class ConnectedReadHandler extends ReadHandler {
+
+	/** Whether a read is underway. */
+        private boolean isReading = false;
+
+	/** Creates an instance of this class. */
+        ConnectedReadHandler() { }
+
+	/** Reads a message from the connection. */
+        @Override
+        void read() {
+            synchronized (lock) {
+                if (isReading)
+                    throw new ReadPendingException();
+                isReading = true;
+            }
+            sessionConnection.read(this);
+        }
+
+	/** Handles the completed read operation. */
+        public void completed(IoFuture<ByteBuffer, Void> result) {
+            synchronized (lock) {
+                isReading = false;
+            }
+            try {
+                ByteBuffer message = result.getNow();
+                if (message == null) {
+                    scheduleHandleDisconnect(false);
+                    return;
+                }
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(
+                        Level.FINEST,
+                        "completed read session:{0} message:{1}",
+                        ClientSessionHandler.this,
+			HexDumper.format(message, 0x50));
+                }
+
+                byte[] payload = new byte[message.remaining()];
+                message.get(payload);
+
+                // Dispatch
+                bytesReceived(payload);
+
+            } catch (Exception e) {
+
+                /*
+		 * TODO: If we're expecting the channel to close, don't
+                 * complain.
+		 */
+
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+                        Level.FINE, e,
+                        "Read completion exception {0}", sessionConnection);
+                }
+                scheduleHandleDisconnect(false);
+            }
+        }
+
+	/** Processes the received message. */
+        private void bytesReceived(byte[] buffer) {
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
 	    byte opcode = msg.getByte();
@@ -423,7 +538,7 @@ class ClientSessionHandler {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
  		    Level.FINEST,
-		    "Handler.messageReceived processing opcode:{0}",
+		    "processing opcode 0x{0}",
 		    Integer.toHexString(opcode));
 	    }
 	    
@@ -438,12 +553,17 @@ class ClientSessionHandler {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
+	            scheduleHandleDisconnect(false);
 	            break;
 	        }
 
 		String name = msg.getString();
 		String password = msg.getString();
 		handleLoginRequest(name, password);
+
+                // Resume reading immediately
+		read();
+
 		break;
 	    }
 		
@@ -470,20 +590,28 @@ class ClientSessionHandler {
 			    scheduleHandleDisconnect(false);
 			}
 		    }}, identity);
+
+		// Wait until processing is complete before resuming reading
+		enqueueReadResume();
+
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
 		scheduleHandleDisconnect(isConnected());
+
+		// Resume reading immediately
+                read();
+
 		break;
 		
 	    default:
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
 			Level.SEVERE,
-			"Handler.messageReceived unknown operation code:{0}",
-			opcode);
+			"unknown opcode 0x{0}",
+			Integer.toHexString(opcode));
 		}
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
@@ -616,6 +744,21 @@ class ClientSessionHandler {
 		    handleDisconnect(false);
 		}});
 	}
+    }
+
+    /**
+     * Schedule a task to resume reading.  Use this method to delay reading
+     * until a task resulting from an earlier read request has been completed.
+     */
+    void enqueueReadResume() {
+        taskQueue.addTask(new AbstractKernelRunnable() {
+            public void run() {
+                logger.log(Level.FINER, "resuming reads session:{0}", this);
+                if (isConnected()) {
+                    readHandler.read();
+                }
+            }
+	}, identity);
     }
 
     /* -- other private methods and classes -- */
