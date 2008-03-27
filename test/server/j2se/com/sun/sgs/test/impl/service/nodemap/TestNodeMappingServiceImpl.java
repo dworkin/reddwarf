@@ -23,7 +23,9 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
+import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
@@ -55,7 +57,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** Reflective stuff */
     private static Method assertValidMethod;
     private static Field localNodeIdField;
-    
+    private static String VERSION_KEY;
+    private static int MAJOR_VERSION;
+    private static int MINOR_VERSION;
     static {
         try {
             localNodeIdField = 
@@ -66,6 +70,16 @@ public class TestNodeMappingServiceImpl extends TestCase {
                     NodeMappingServiceImpl.class.getDeclaredMethod(
                         "assertValid", Identity.class);
             assertValidMethod.setAccessible(true);
+            
+            Class nodeMapUtilClass = 
+                Class.forName("com.sun.sgs.impl.service.nodemap.NodeMapUtil");
+            
+            VERSION_KEY = (String) 
+                    getField(nodeMapUtilClass, "VERSION_KEY").get(null);
+            MAJOR_VERSION = 
+                    getField(nodeMapUtilClass, "MAJOR_VERSION").getInt(null);
+            MINOR_VERSION =
+                    getField(nodeMapUtilClass, "MINOR_VERSION").getInt(null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -94,6 +108,11 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** A mapping of node id ->NodeMappingListener, for listener checks */
     private Map<Long, TestListener> nodeListenerMap;
  
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     
     /** Constructs a test instance. */
     public TestNodeMappingServiceImpl(String name) throws Exception {
@@ -210,6 +229,67 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
+        public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			serverNode.getDataService()
+                        .getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+    
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+    
     public void testReady() throws Exception {
         NodeMappingService nodemap = null;
         try {
@@ -260,7 +340,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /* -- Test Service -- */
-    public void testgetName() {
+    public void testGetName() {
         System.out.println(nodeMappingService.getName());
     }
     

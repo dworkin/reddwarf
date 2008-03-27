@@ -26,8 +26,6 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.io.ServerSocketEndpoint;
-import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -40,12 +38,15 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
-import com.sun.sgs.io.Acceptor;
-import com.sun.sgs.io.AcceptorListener;
-import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
+import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
+import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
+import com.sun.sgs.nio.channels.CompletionHandler;
+import com.sun.sgs.nio.channels.IoFuture;
+import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -57,6 +58,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
@@ -72,8 +74,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -120,11 +126,38 @@ public final class ClientSessionServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
+    /** The name of the acceptor backlog property. */
+    private static final String ACCEPTOR_BACKLOG_PROPERTY =
+        PKG_NAME + ".acceptor.backlog";
+
+    /** The default acceptor backlog (&lt;= 0 means default). */
+    private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
+
     private static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
 
     /** The default events per transaction. */
     private static final int DEFAULT_EVENTS_PER_TXN = 1;
+
+    /** The name of the read buffer size property. */
+    private static final String READ_BUFFER_SIZE_PROPERTY =
+        PKG_NAME + ".buffer.read.max";
+
+    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
+    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    
+    /** The name of the write buffer size property. */
+    private static final String WRITE_BUFFER_SIZE_PROPERTY =
+        PKG_NAME + ".buffer.write.max";
+
+    /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
+
+    /** The read buffer size for new connections. */
+    private final int readBufferSize;
+
+    /** The write buffer size for new connections. */
+    private final int writeBufferSize;
     
     /** The port for accepting connections. */
     private final int appPort;
@@ -132,8 +165,14 @@ public final class ClientSessionServiceImpl
     /** The local node's ID. */
     private final long localNodeId;
 
-    /** The listener for accepted connections. */
-    private final AcceptorListener acceptorListener = new Listener();
+    /** The async channel group for this service. */
+    private final AsynchronousChannelGroup asyncChannelGroup;
+
+    /** The acceptor for listening for new connections. */
+    private final AsynchronousServerSocketChannel acceptor;
+
+    /** The currently-active accept operation, or {@code null} if none. */
+    volatile IoFuture<?, ?> acceptFuture;
 
     /** The registered session disconnect listeners. */
     private final Set<ClientSessionDisconnectListener> sessionDisconnectListeners =
@@ -153,9 +192,6 @@ public final class ClientSessionServiceImpl
     
     /** Lock for notifying the thread that flushes committed contexts. */
     private final Object flushContextsLock = new Object();
-
-    /** The Acceptor for listening for new connections. */
-    private final Acceptor<SocketAddress> acceptor;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -220,6 +256,14 @@ public final class ClientSessionServiceImpl
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
 
+            readBufferSize = wrappedProps.getIntProperty(
+                READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
+
+            writeBufferSize = wrappedProps.getIntProperty(
+                WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
+                8192, Integer.MAX_VALUE);
+
 	    /*
 	     * Export the ClientSessionServer.
 	     */
@@ -258,6 +302,8 @@ public final class ClientSessionServiceImpl
 	    localNodeId = watchdogService. getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
+	    int acceptorBacklog = wrappedProps.getIntProperty(
+	                ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
 
 	    /*
 	     * Check service version.
@@ -284,15 +330,20 @@ public final class ClientSessionServiceImpl
 	     * Listen for incoming client connections.
 	     */
             InetSocketAddress listenAddress = new InetSocketAddress(appPort);
-	    ServerSocketEndpoint endpoint =
-		new ServerSocketEndpoint(listenAddress,
-                                         TransportType.RELIABLE);
-	    acceptor = endpoint.createAcceptor();
+            AsynchronousChannelProvider provider =
+                // TODO fetch from config
+                AsynchronousChannelProvider.provider();
+            asyncChannelGroup =
+                // TODO fetch from config
+                provider.openAsynchronousChannelGroup(
+                    Executors.newCachedThreadPool());
+            acceptor =
+                provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
 	    try {
-		acceptor.listen(acceptorListener);
+                acceptor.bind(listenAddress, acceptorBacklog);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(
-			Level.CONFIG, "listen successful. port:{0,number,#}",
+			Level.CONFIG, "bound to port:{0,number,#}",
 			getListenPort());
 		}
 	    } catch (Exception e) {
@@ -300,9 +351,11 @@ public final class ClientSessionServiceImpl
                                 "acceptor failed to listen on {0}",
                                 listenAddress);
 		try {
-		    acceptor.shutdown();
-		} catch (RuntimeException re) {
-		}
+		    acceptor.close();
+                } catch (IOException ioe) {
+                    logger.logThrow(Level.WARNING, ioe,
+                        "problem closing acceptor");
+                }
 		throw e;
 	    }
 	    // TBD: listen for UNRELIABLE connections as well?
@@ -331,29 +384,67 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     public void doReady() {
+        acceptFuture = acceptor.accept(new AcceptorListener());
+        try {
+            if (logger.isLoggable(Level.CONFIG)) {
+                logger.log(
+                    Level.CONFIG, "listening on {0}",
+                    acceptor.getLocalAddress());
+            }
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe.getMessage(), ioe);
+        }
     }
 
     /** {@inheritDoc} */
     public void doShutdown() {
-	try {
-	    if (acceptor != null) {
-		acceptor.shutdown();
-
-		logger.log(Level.FINEST, "acceptor shutdown");
-	    }
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "shutdown acceptor throws");
-	    // swallow exception
+	final IoFuture<?, ?> future = acceptFuture;
+	acceptFuture = null;
+	if (future != null) {
+	    future.cancel(true);
 	}
 
-	try {
-	    if (exporter != null) {
+	if (acceptor != null) {
+	    try {
+		acceptor.close();
+            } catch (IOException e) {
+                logger.logThrow(Level.FINEST, e, "closing acceptor throws");
+                // swallow exception
+            }
+	}
+
+	if (asyncChannelGroup != null) {
+	    asyncChannelGroup.shutdown();
+	    boolean groupShutdownCompleted = false;
+	    try {
+		groupShutdownCompleted =
+		    asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS);
+	    } catch (InterruptedException e) {
+		logger.logThrow(Level.FINEST, e,
+				"shutdown acceptor interrupted");
+		Thread.currentThread().interrupt();
+	    }
+	    if (!groupShutdownCompleted) {
+		logger.log(Level.WARNING, "forcing async group shutdown");
+		try {
+		    asyncChannelGroup.shutdownNow();
+		} catch (IOException e) {
+		    logger.logThrow(Level.FINEST, e,
+				    "shutdown acceptor throws");
+		    // swallow exception
+		}
+	    }
+	}
+	logger.log(Level.FINEST, "acceptor shutdown");
+
+	if (exporter != null) {
+	    try {
 		exporter.unexport();
 		logger.log(Level.FINEST, "client session server unexported");
+	    } catch (RuntimeException e) {
+		logger.logThrow(Level.FINEST, e, "unexport server throws");
+		// swallow exception
 	    }
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "unexport server throws");
-	    // swallow exception
 	}
 
 	for (ClientSessionHandler handler : handlers.values()) {
@@ -369,10 +460,10 @@ public final class ClientSessionServiceImpl
      * client session connections.
      *
      * @return the port this service is listening on
+     * @throws IOException if an IO problem occurs
      */
-    public int getListenPort() {
-	return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
-	    getPort();
+    public int getListenPort() throws IOException {
+        return ((InetSocketAddress) acceptor.getLocalAddress()).getPort();
     }
 
     /**
@@ -502,35 +593,66 @@ public final class ClientSessionServiceImpl
 	checkContext().requestDisconnect(session);
     }
 
-    /* -- Implement AcceptorListener -- */
+    /**
+     * Returns the size of the read buffer to use for new connections.
+     * 
+     * @return the size of the read buffer to use for new connections
+     */
+    int getReadBufferSize() {
+        return readBufferSize;
+    }
 
-    private class Listener implements AcceptorListener {
+    /**
+     * Returns the size of the write buffer to use for new connections.
+     * 
+     * @return the size of the write buffer to use for new connections
+     */
+    int getWriteBufferSize() {
+        return writeBufferSize;
+    }
 
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>Creates a new client session with the specified handle,
-	 * and adds the session to the internal session map.  If the
-	 * handler determine that the session should not be
-	 * redirected, then the handler should be stored locally by
-	 * invoking the {@link connected} method.
-	 */
-	public ConnectionListener newConnection() {
-	    if (shuttingDown()) {
-		return null;
-	    }
-	    ClientSessionHandler handler =
-		new ClientSessionHandler(
-		    ClientSessionServiceImpl.this, dataService);
-	    return handler.getConnectionListener();
-	}
+    /** A completion handler for accepting connections. */
+    private class AcceptorListener
+        implements CompletionHandler<AsynchronousSocketChannel, Void>
+    {
 
-        /** {@inheritDoc} */
-	public void disconnected() {
-	    logger.log(
-	        Level.SEVERE,
-		"The acceptor has become disconnected from port: {0}", appPort);
-	    // TBD: take other actions, such as restarting acceptor?
+	/** Handle new connection or report failure. */
+        public void completed(
+	    IoFuture<AsynchronousSocketChannel, Void> result)
+        {
+            try {
+                try {
+                    AsynchronousSocketChannel newChannel = result.getNow();
+                    logger.log(Level.FINER, "Accepted {0}", newChannel);
+
+		    /* The handler will call addHandler if login succeeds */
+		    new ClientSessionHandler(
+			ClientSessionServiceImpl.this, dataService,
+			new AsynchronousMessageChannel(
+			    newChannel, readBufferSize));
+
+                    // Resume accepting connections
+                    acceptFuture = acceptor.accept(this);
+
+                } catch (ExecutionException e) {
+                    throw (e.getCause() == null) ? e : e.getCause();
+                }
+            } catch (CancellationException e) {               
+                logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
+                //ignore
+            } catch (Throwable e) {
+                SocketAddress addr = null;
+                try {
+                    addr = acceptor.getLocalAddress();
+                } catch (IOException ioe) {
+                    // ignore
+                }
+
+                logger.logThrow(
+		    Level.SEVERE, e, "acceptor error on {0}", addr);
+
+                // TBD: take other actions, such as restarting acceptor?
+            }
 	}
     }
 

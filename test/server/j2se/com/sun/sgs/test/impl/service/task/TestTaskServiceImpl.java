@@ -37,6 +37,7 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -54,6 +55,7 @@ import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
 
+import java.lang.reflect.Field;
 import java.util.MissingResourceException;
 import java.util.Properties;
 
@@ -69,6 +71,11 @@ public class TestTaskServiceImpl extends TestCase {
     // NOTE: this assumes certain private structure in the task service
     private static final String PENDING_NS =
         TaskServiceImpl.DS_PREFIX + "Pending.";
+    
+    /** Version information from WatchdogServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
     
     /** The node that creates the servers */
     private SgsTestNode serverNode;
@@ -87,12 +94,21 @@ public class TestTaskServiceImpl extends TestCase {
     private NodeMappingService mappingService;
     private TaskService taskService;
         
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     /**
      * Test management.
      */
 
-    public TestTaskServiceImpl(String name) {
+    public TestTaskServiceImpl(String name) throws Exception {
         super(name);
+        Class cl = TaskServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     protected void setUp() throws Exception {
@@ -160,7 +176,7 @@ public class TestTaskServiceImpl extends TestCase {
         Constructor<?> criCtor =  criClass.getDeclaredConstructor(new Class[] {});
         criCtor.setAccessible(true);
         try {
-            new TaskServiceImpl(new Properties(),
+            new TaskServiceImpl(serviceProps,
                                 (ComponentRegistry) 
                                     criCtor.newInstance(new Object[] {}),
                                 txnProxy);
@@ -168,6 +184,68 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (MissingResourceException e) {
             System.err.println(e);
         }
+    }
+    
+    /**  Version tests */
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			serverNode.getDataService()
+                        .getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+    
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
     /**

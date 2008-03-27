@@ -34,10 +34,10 @@ class TimedTaskHandler {
      * The milliseconds in the future that a task must be to be accepted
      * by the handler.
      */
-    public static final int FUTURE_THRESHOLD = 15;
+    static final int FUTURE_THRESHOLD = 15;
 
-    // the scheduler for all future tasks
-    private final ApplicationScheduler scheduler;
+    // the listener that will consume ready tasks
+    private final TimedTaskListener listener;
 
     // the timer used for future execution
     private Timer timer;
@@ -47,14 +47,14 @@ class TimedTaskHandler {
      * effect of creating a new <code>Timer</code> which involves creating
      * at least one new thread.
      *
-     * @param scheduler the <code>ApplicationScheduler</code> that will consume
+     * @param listener the <code>TimedTaskListener</code> that will consume
      *                 the task when its time comes, causing it to be executed
      */
-    public TimedTaskHandler(ApplicationScheduler scheduler) {
-        if (scheduler == null)
-            throw new NullPointerException("Scheduler cannot be null");
+    TimedTaskHandler(TimedTaskListener listener) {
+        if (listener == null)
+            throw new NullPointerException("Listener cannot be null");
 
-        this.scheduler = scheduler;
+        this.listener = listener;
         timer = new Timer();
     }
 
@@ -68,7 +68,7 @@ class TimedTaskHandler {
      * @return <code>true</code> if the task is accepted to run delayed,
      *         <code>false</code> otherwise
      */
-    public boolean runDelayed(ScheduledTask task) {
+    boolean runDelayed(ScheduledTask task) {
         // see if this is far enough in the future that it's worth handling
         if (task.getStartTime() < (System.currentTimeMillis() +
                                    FUTURE_THRESHOLD))
@@ -78,7 +78,8 @@ class TimedTaskHandler {
 
         // if this task is recurring, set the timer task if it's still active
         if (task.isRecurring()) {
-            InternalRecurringTaskHandle handle = task.getRecurringTaskHandle();
+            RecurringTaskHandleImpl handle =
+                (RecurringTaskHandleImpl)(task.getRecurringTaskHandle());
             synchronized (handle) {
                 // if the recurring task is cancelled, then say that we're
                 // handling it, which has the effect of the task being dropped
@@ -93,9 +94,9 @@ class TimedTaskHandler {
     }
 
     /**
-     * Testing method.
+     * Shuts down this handler, cancelling the associated timer.
      */
-    public void shutdown() {
+    void shutdown() {
         timer.cancel();
     }
 
@@ -124,7 +125,7 @@ class TimedTaskHandler {
         /** {@inheritDoc} */
         public synchronized void run() {
             if (! cancelled)
-                scheduler.timedTaskReady(task);
+                listener.timedTaskReady(task);
             cancelled = true;
         }
     }
