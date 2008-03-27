@@ -236,6 +236,7 @@
     <Or>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$ClientSessionServiceRecoveryListener$1"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$SessionServerImpl$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
