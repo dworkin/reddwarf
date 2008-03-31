@@ -585,8 +585,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	String name = "logout";
 	DummyClient client = new DummyClient(name);
 	try {
-	    client.connect(serverNode.getAppPort());
-	    client.login();
+	    client.connect(serverNode.getAppPort()).login();
 	    client.logout();
 	    if (SimpleTestIdentityAuthenticator.allIdentities.
                     getNotifyLoggedIn(name)) {
@@ -609,8 +608,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
-	String name = "testRemoveListener";
-	DummyClient client = new DummyClient(name);
+	int numClients = 4;
 	try {
 	    List<String> nodeKeys = getServiceBindingKeys(NODE_PREFIX);
 	    System.err.println("Node keys: " + nodeKeys);
@@ -619,20 +617,41 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else if (nodeKeys.size() > 1) {
 		fail("more than one node key");
 	    }
-	    
-	    client.connect(serverNode.getAppPort());
-	    client.login();
-	    checkBindings(1);
+
+	    int appPort = serverNode.getAppPort();
+	    for (int i = 0; i < numClients; i++) {
+		/*
+		 * Create half of the clients with a name that starts with
+		 * "badClient" which will cause the associated session's
+		 * ClientSessionListener's 'disconnected' method to throw a
+		 * non-retryable exception.  We want to make sure that all the
+		 * client sessions are cleaned up after a crash, even if
+		 * invoking a session's listener's 'disconnected' callback
+		 * throws a non-retryable exception.
+		 */
+		String name = (i % 2 == 0) ? "client" : "badClient";
+		DummyClient client = new DummyClient(name + String.valueOf(i));
+		client.connect(appPort).login();
+	    }
+	    checkBindings(numClients);
 
             // Simulate "crash"
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
             setUp(false);
-	    client.checkDisconnected(false);
+
+	    for (DummyClient client : dummyClients.values()) {
+		client.checkDisconnected(false);
+	    }
+	    
+	    // Wait to make sure that bindings and node key are cleaned up.
+	    // Some extra time is needed when a ClientSessionListener throws a
+	    // non-retryable exception because a separate task is scheduled to
+	    // clean up the client session and bindings.
+	    Thread.sleep(WAIT_TIME);
+	    
 	    System.err.println("check for session bindings being removed.");
 	    checkBindings(0);
-	    // Wait to make sure that node key is cleaned up.
-	    Thread.sleep(WAIT_TIME);
 	    nodeKeys = getServiceBindingKeys(NODE_PREFIX);
 	    System.err.println("Node keys: " + nodeKeys);
 	    if (nodeKeys.contains(failedNodeKey)) {
@@ -640,7 +659,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    
 	} finally {
-	    client.disconnect();
+	    for (DummyClient client : dummyClients.values()) {
+		try {
+		    client.disconnect();
+		} catch (Exception e) {
+		    // ignore
+		}
+	    }
 	}
     }
 
@@ -973,7 +998,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    dummyClients.put(name, this);
 	}
 
-	void connect(int port) {
+	DummyClient connect(int port) {
 	    connected = false;
 	    listener = new Listener();
 	    try {
@@ -984,7 +1009,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		connector = endpoint.createConnector();
 		connector.connect(listener);
 	    } catch (Exception e) {
-		System.err.println("DummyClient.connect throws: " + e);
+		System.err.println(toString() + " connect throws: " + e);
 		e.printStackTrace();
 		throw new RuntimeException("DummyClient.connect failed", e);
 	    }
@@ -995,18 +1020,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    if (connected != true) {
 			throw new RuntimeException(
- 			    "DummyClient.connect timed out to " + port);
+			    toString() + " connect timed out to " + port);
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.connect timed out to " + port, e);
+			toString() + " connect timed out to " + port, e);
 		}
 	    }
-	    
+	    return this;
 	}
 
 	void disconnect() {
-            System.err.println("DummyClient.disconnect");
+            System.err.println(toString() + " disconnecting");
 
             synchronized (lock) {
                 if (connected == false) {
@@ -1018,8 +1043,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             try {
                 connection.close();
             } catch (IOException e) {
-                System.err.println(
-                    "DummyClient.disconnect exception:" + e);
+                System.err.println(toString() + " disconnect exception:" + e);
             }
 
             synchronized (lock) {
@@ -1034,8 +1058,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	boolean login() {
 	    synchronized (lock) {
 		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
+		    throw new RuntimeException(toString() + " not connected");
 		}
 	    }
 	    this.password = "password";
@@ -1060,7 +1083,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    if (loginAck != true) {
 			throw new RuntimeException(
-			    "DummyClient.login timed out");
+			    toString() + " login timed out");
 		    }
 		    if (loginRedirect == true) {
 			return false;
@@ -1070,7 +1093,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			"DummyClient.login timed out", e);
+			toString() + " login timed out", e);
 		}
 	    }
 	    return true;
@@ -1084,7 +1107,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    synchronized (lock) {
 		if (!connected || !loginSuccess) {
 		    throw new RuntimeException(
-			"DummyClient.login not connected or loggedIn");
+			toString() + " not connected or loggedIn");
 		}
 	    }
 	}
@@ -1126,8 +1149,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    int receivedMessages = messages.size();
 		    if (receivedMessages != expectedMessages) {
-			fail("expected " + expectedMessages + ", received " +
-			     receivedMessages);
+			fail(toString() + " expected " + expectedMessages +
+			     ", received " + receivedMessages);
 		    }
 		}
 	    }
@@ -1145,8 +1168,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		    int receivedMessages = listener.messageList.size();
 		    if (receivedMessages != expectedMessages) {
-			fail("expected " + expectedMessages + ", received " +
-			     receivedMessages);
+			fail(toString() + " expected " + expectedMessages +
+			     ", received " + receivedMessages);
 		    }
 		}
 	    }
@@ -1155,7 +1178,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (byte[] message : listener.messageList) {
 		MessageBuffer buf = new MessageBuffer(message);
 		int value = buf.getInt();
-		System.err.println("[" + name + "] received message " + value);
+		System.err.println(toString() + " received message " + value);
 		if (value != i) {
 		    fail("expected message " + i + ", got " + value);
 		}
@@ -1185,11 +1208,11 @@ public class TestClientSessionServiceImpl extends TestCase {
                     }
                     if (logoutAck != true) {
                         throw new RuntimeException(
-                            "DummyClient.disconnect timed out");
+ 			    toString() + " disconnect timed out");
                     }
                 } catch (InterruptedException e) {
                     throw new RuntimeException(
-                        "DummyClient.disconnect timed out", e);
+                        toString() + " disconnect timed out", e);
                 } finally {
                     if (! logoutAck)
                         disconnect();
@@ -1204,12 +1227,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    if (!receivedDisconnectedCallback) {
-		fail("disconnected callback not invoked");
+		fail(toString() + " disconnected callback not invoked");
 	    } else if (this.graceful != graceful) {
-		fail("graceful was: " + this.graceful +
+		fail(toString() + " graceful was: " + this.graceful +
 		     ", expected: " + graceful);
 	    }
-	    System.err.println("disconnect successful");
+	    System.err.println(toString() + " disconnect successful");
+	}
+
+	public String toString() {
+	    return "[" + name + "]";
 	}
 	
 	private class Listener implements ConnectionListener {
@@ -1355,7 +1382,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		return new NonSerializableClientSessionListener();
 	    } else if (name.equals(THROW_RUNTIME_EXCEPTION)) {
 		throw new RuntimeException("loggedIn throwing an exception");
-	    } else if (name.equals(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION)) {
+	    } else if (name.equals(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION) ||
+		       name.startsWith("badClient")) {
 		listener = new DummyClientSessionListener(name, true);
 	    } else {
 		listener = new DummyClientSessionListener(name, false);
