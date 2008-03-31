@@ -38,6 +38,7 @@
   </tstamp>
 
   <property name="javadoc.excludepackages" value="com.sun.sgs.example.hack.*"/>
+  <property name="javadoc.config.properties.file" value="com/sun/sgs/app/doc-files/config-properties.html"/>
 
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
@@ -276,6 +277,13 @@
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
+    <copy file="${build.dir}/javadoc/internal/${javadoc.config.properties.file}"
+          tofile="${build.dir}/javadoc/internal/${javadoc.config.properties.file}.bak" >
+      <filterset refid="versions"/>
+    </copy>
+    <move file="${build.dir}/javadoc/internal/${javadoc.config.properties.file}.bak"
+          tofile="${build.dir}/javadoc/internal/${javadoc.config.properties.file}" >
+    </move>
   </target>
 
   <!-- Build the public Application API JavaDoc -->
@@ -304,6 +312,13 @@
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
+    <copy file="${build.dir}/javadoc/apidoc/sgs-server-apidoc/${javadoc.config.properties.file}"
+          tofile="${build.dir}/javadoc/apidoc/sgs-server-apidoc/${javadoc.config.properties.file}.bak" >
+      <filterset refid="versions"/>
+    </copy>
+    <move file="${build.dir}/javadoc/apidoc/sgs-server-apidoc/${javadoc.config.properties.file}.bak"
+          tofile="${build.dir}/javadoc/apidoc/sgs-server-apidoc/${javadoc.config.properties.file}" >
+    </move>
   </target>
 
   <!-- Build the public Client API JavaDoc -->

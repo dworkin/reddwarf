@@ -186,10 +186,10 @@ public class StandardProperties {
     public static final String AUTHENTICATORS = NS + "app.authenticators";
     
     /**
-     *  A required property that specifies the type of node being started.
+     *  An optional property that specifies the type of node being started.
      *  It must be set to a value in {@link NodeType} and defaults to
-     *  {@code singleNode}.  This property may be expanded into several
-     *  properties, perhaps overriding other properties.
+     *  {@code singleNode}.  The value of this property may cause other
+     *  property settings to be overridden.
      *  <p>
      *  In particular, setting this property to {@code coreServerNode} causes
      *  the following properties to be set:
@@ -212,7 +212,8 @@ public class StandardProperties {
      * <ul>
      * <li> {@value #SERVER_START} set to {@code false} 
      * </ul>
-     * 
+     * <p>
+     * The unit tests rely on the default not modifying any other properties.
      */
     public static final String NODE_TYPE = NS + "node.type";
     

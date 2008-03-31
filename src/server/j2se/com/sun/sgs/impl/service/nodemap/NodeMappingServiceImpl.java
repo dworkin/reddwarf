@@ -79,7 +79,7 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
  *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
- *	property, if present, or localhost if this node is starting the 
+ *	property, if present, or {@code localhost} if this node is starting the 
  *      server <br>
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code

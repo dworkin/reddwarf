@@ -44,7 +44,7 @@
 
 <h1>Project Darkstar Server Configuration Properties</h1>
 
-This page documents the configuration properties supported by version 1.0
+This page documents the configuration properties supported by version @VERSION@
 of the Project Darkstar Server.  Configuration properties may be specified by
 system properties (using <code>-D</code><i>property</i><code>=</code>
 <i>value</i>) or in the application properties file named on the command line.
@@ -54,7 +54,7 @@ By default, the Project Darkstar Server consists of a single node, and is
 configured with the <a href="#SingleNodeProperties">Single Node</a> and
 <a href="#CommonProperties">Common</a> properties. 
 Alternatively, multiple nodes can be configured to work together using the
-<a href="#MultiNodeProperties">Multi-Node Properties</a> and the 
+<a href="#MultiNodeProperties">Multi-Node</a> and the 
 <a href="#CommonProperties">Common</a> properties.  
 <p>
 The type of node being configured is specified by the 
@@ -74,10 +74,11 @@ For example configuration files of the different node types, see the
 
 
 <a name="SingleNodeProperties"></a>
-<h2>Single Node Properties</h2>
+<h2>Configuring a Single Node System</h2>
 
-Starts the Darkstar Server in a single Java Virtual Machine. This is the default 
-mode for Project Darkstar.
+A single node systems consists of a Darkstar Server running in a single
+Java Virtual Machine.  This is the default server type for Project Darkstar.
+
 <dl>
 <dt><a name="node.type">com.sun.sgs.node.type</a>
 <span class="default">singleNode</span>
@@ -85,21 +86,21 @@ mode for Project Darkstar.
 </dl>
 
 <a name="MultiNodeProperties"></a>
-<h2>Multi-Node Properties</h2>
-Starts the Project Darkstar Server on multiple nodes configured to work together 
-in a cluster.  This multi-node configuration requires a special <i>core server 
-node</i> to run critical Project Darkstar operations, with the remaining nodes, 
-the <i>application nodes</i>, cooperating to run the application.  Application 
-nodes can be dynamically added or removed from the cluster.
+<h2>Configuring a Multi-Node System</h2>
+The Project Darkstar Server can be run on multiple nodes configured to work 
+together in a cluster.  This multi-node configuration requires a special 
+<i>core server node</i> to run critical Project Darkstar operations, with the 
+remaining nodes, the <i>application nodes</i>, cooperating to run the 
+application.  Application nodes can be dynamically added or removed from the
+cluster.
 <p>
 The core server node <b>must</b> be running before starting the application 
 nodes.
 <p>
 Properties in this section specify which node is the core server node, which
 are the application nodes, and how the application nodes discover the
-core node.  Note that some <a href="#GeneralProperties">General Properties</a> 
-are required and must be specified by all nodes.
-
+core node.  Note that some <a href="#RequiredProperties">Required Properties</a>
+will also need to be specified.
 
 <h3>Core Server Node Properties</h3>
 These properties control the configuration of the Project Darkstar core
@@ -132,7 +133,7 @@ nodes if a multi-node configuration is being used.
 
 </dl>
 
-<h3>General Multi-node Properties</h3>
+<h3>Other Multi-Node Properties</h3>
 These properties can be used by either core server or application nodes.
 
 <a name="CoreServerPorts"></a>
@@ -157,14 +158,14 @@ value on each application node.
 <a name="CommonProperties"></a>
 <h2>Common Properties</h2>
 
-These properties are used in either single node or multi-node configurations.
-
-<a name="GeneralProperties"></a>
-<h3>General Properties</h3>
-
 These properties control various general facilities in the Project Darkstar
 Server, and can be used in the core server node, application nodes, or in
 single node configurations.
+
+<a name="RequiredProperties"></a>
+<h3>Required Properties</h3>
+
+These properties are required for some or all node types.
 
 <dl>
 
@@ -186,17 +187,6 @@ space available for Project Darkstar use.
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
 <span class="required"> for application and single nodes</span>
 <dd>The TCP port on which to listen for client connections.
-
-<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
-<span class="default">100</span>
-<dd>The maximum amount of time in milliseconds that a transaction will
-  be permitted to run before it is a candidate for being aborted.
-
-<dt>com.sun.sgs.txn.timeout.unbounded
-<span class="default">Long.MAX_VALUE</span>
-<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
-  transaction will be permitted to run before it is a candidate for
-  being aborted.
 
 </dl>
 
@@ -221,7 +211,17 @@ These properties control the implementation of the
   <code>ManagedReference.getForUpdate</code></a> for any modified
   objects to make sure that the modifications are recorded by
   the <code>DataService</code>.
+  
+<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
+<span class="default">100</span>
+<dd>The maximum amount of time in milliseconds that a transaction will
+  be permitted to run before it is a candidate for being aborted.
 
+<dt>com.sun.sgs.txn.timeout.unbounded
+<span class="default">Long.MAX_VALUE</span>
+<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
+  transaction will be permitted to run before it is a candidate for
+  being aborted.
 </dl>
 
 <a name="DataStore"></a>
@@ -307,23 +307,24 @@ components that make up the system.
 
 </dl>
 
-<a name="TaskScheduler"></a>
-<h4>TaskScheduler Properties</h4>
+<a name="Scheduler"></a>
+<h4>Scheduler Properties</h4>
 
 These properties control the implementation of
-the <code>TaskScheduler</code>, which is the part of
+the <code>Scheduler</code>, which is the part of
 the <code>Kernel</code> that schedules tasks.
 
 <dl>
 <dt>com.sun.sgs.impl.kernel.TransactionConsumerThreads
 <span class="default">4</span>
-<dd>The number of initial consumer threads used to process 
-<a href="../TaskManager.html"><code>TaskManager</code></a> tasks.
-More threads will be created and used if necessary.
+<dd>The number of initial consumer threads used to processed transactional 
+tasks, such as those started through the 
+<a href="../TaskManager.html"><code>TaskManager</code></a>.
 
 <dt>com.sun.sgs.impl.kernel.TaskConsumerThreads
 <span class="default">4</span>
-<dd>The number of threads used to process Project Darkstar Server tasks.
+<dd>The number of initial consumer threads used to process non-transactional 
+tasks.
 
 </dl>
 

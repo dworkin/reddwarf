@@ -33,6 +33,8 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -661,7 +663,7 @@ class Kernel {
             }
 
             StandardProperties.NodeType type;
-            // Throws IllegalArgumentExcpetion if not one of the enum types
+            // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
                 type = StandardProperties.NodeType.valueOf(value);
@@ -686,7 +688,7 @@ class Kernel {
                                            "true");
                     // Start the network server for the data store
                     properties.setProperty(
-                        "com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class",
+                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
                         "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
                     break;
                 case appNode:

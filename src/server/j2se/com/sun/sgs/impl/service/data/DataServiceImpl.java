@@ -152,7 +152,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * The property that specifies the name of the class that implements
      * DataStore.
      */
-    private static final String DATA_STORE_CLASS_PROPERTY =
+    public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
     /** The logger for this class. */
