@@ -46,16 +46,17 @@
 
 This page documents the configuration properties supported by version @VERSION@
 of the Project Darkstar Server.  Configuration properties may be specified by
-system properties (using <code>-D</code><i>property</i><code>=</code>
-<i>value</i>) or in the application properties file named on the command line.
+system properties (using 
+<code>-D</code><i>property</i><code>=</code><i>value</i>)
+or in the application properties file named on the command line. Any changes to
+configuration properties from previous releases will be noted in the 
+release documentation.
 
 <p>
-By default, the Project Darkstar Server consists of a single node, and is 
-configured with the <a href="#SingleNodeProperties">Single Node</a> and
-<a href="#CommonProperties">Common</a> properties. 
-Alternatively, multiple nodes can be configured to work together using the
-<a href="#MultiNodeProperties">Multi-Node</a> and the 
-<a href="#CommonProperties">Common</a> properties.  
+By default, the Project Darkstar Server consistes of a single node, as described
+in <a href="#SingleNodeConfig">Configuring a Single Node System</a>.
+Alternatively, multiple nodes can be configured to work together, as
+described in <a href="#MultiNodeConfig">Configuring a Multi-Node System</a>.
 <p>
 The type of node being configured is specified by the 
 <a href="#node.type">com.sun.sgs.node.type</a> property, which
@@ -73,19 +74,20 @@ For example configuration files of the different node types, see the
 <a href="app-node.properties">app-node.properties</a> files.
 
 
-<a name="SingleNodeProperties"></a>
+<a name="SingleNodeConfig"></a>
 <h2>Configuring a Single Node System</h2>
 
 A single node systems consists of a Darkstar Server running in a single
 Java Virtual Machine.  This is the default server type for Project Darkstar.
-
+Note that the <a href="#RequiredProperties">Required Properties</a>
+will also need to be specified.
 <dl>
 <dt><a name="node.type">com.sun.sgs.node.type</a>
 <span class="default">singleNode</span>
 <dd> Starts a Darkstar Server in single-node mode.
 </dl>
 
-<a name="MultiNodeProperties"></a>
+<a name="MultiNodeConfig"></a>
 <h2>Configuring a Multi-Node System</h2>
 The Project Darkstar Server can be run on multiple nodes configured to work 
 together in a cluster.  This multi-node configuration requires a special 
@@ -133,37 +135,8 @@ nodes if a multi-node configuration is being used.
 
 </dl>
 
-<h3>Other Multi-Node Properties</h3>
-These properties can be used by either core server or application nodes.
-
-<a name="CoreServerPorts"></a>
-<h4>Core Server Port Properties</h4>
-The core server node may be configured to specify ports to be used on the core 
-server machine.  If these properties are used, they must be set to the same
-value on each application node.
-
-<dl>
-<dt>com.sun.sgs.impl.service.data.store.net.server.port
-<span class="default">44530</span>
-<dd>The TCP port for the data service's shared network server.  
-<dt>com.sun.sgs.impl.service.watchdog.server.port
-<span class="default">44533</span>
-<dd>The TCP port for the watchdog service's internal server.
-<dt>com.sun.sgs.impl.service.nodemap.server.port
-<span class="default">44535</span>
-<dd>The TCP port for the node mapping service's internal server.
-</dl>
-
-
-<a name="CommonProperties"></a>
-<h2>Common Properties</h2>
-
-These properties control various general facilities in the Project Darkstar
-Server, and can be used in the core server node, application nodes, or in
-single node configurations.
-
 <a name="RequiredProperties"></a>
-<h3>Required Properties</h3>
+<h2>Required Properties</h2>
 
 These properties are required for some or all node types.
 
@@ -190,6 +163,31 @@ space available for Project Darkstar use.
 
 </dl>
 
+<a name="CommonProperties"></a>
+<h2>Other Common Properties</h2>
+
+These properties control various general facilities in the Project Darkstar
+Server, and can be used in any node configuration unless otherwise specified.
+
+<a name="CoreServerPorts"></a>
+<h3>Core Server Port Properties</h3>
+These properties can be used by either core server or application nodes in
+a multi-node configuration.  The core server node may be configured to specify 
+ports to be used on the core server machine.  If these properties are used, 
+they must be set to the same value on each application node.
+
+<dl>
+<dt>com.sun.sgs.impl.service.data.store.net.server.port
+<span class="default">44530</span>
+<dd>The TCP port for the data service's shared network server.  
+<dt>com.sun.sgs.impl.service.watchdog.server.port
+<span class="default">44533</span>
+<dd>The TCP port for the watchdog service's internal server.
+<dt>com.sun.sgs.impl.service.nodemap.server.port
+<span class="default">44535</span>
+<dd>The TCP port for the node mapping service's internal server.
+</dl>
+
 <a name="DataService"></a>
 <h3>DataService Properties</h3>
 
@@ -212,16 +210,6 @@ These properties control the implementation of the
   objects to make sure that the modifications are recorded by
   the <code>DataService</code>.
   
-<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
-<span class="default">100</span>
-<dd>The maximum amount of time in milliseconds that a transaction will
-  be permitted to run before it is a candidate for being aborted.
-
-<dt>com.sun.sgs.txn.timeout.unbounded
-<span class="default">Long.MAX_VALUE</span>
-<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
-  transaction will be permitted to run before it is a candidate for
-  being aborted.
 </dl>
 
 <a name="DataStore"></a>
@@ -246,7 +234,8 @@ effect on application nodes.
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying Berkeley DB database.
+underlying Berkeley DB database. Setting these properties has no
+effect on application nodes.
 
 <dl>
 
@@ -326,6 +315,27 @@ tasks, such as those started through the
 <dd>The number of initial consumer threads used to process non-transactional 
 tasks.
 
+</dl>
+
+<a name="DebugProperties"></a>
+<h2>Debug and Test Properties</h2>
+
+These properties are most useful for debugging and testing, and are not
+typically useful for production deployments.
+
+<dl>
+<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
+<span class="default">100</span>
+<dd>The maximum amount of time in milliseconds that a transaction will
+  be permitted to run before it is a candidate for being aborted.  Increasing
+  this timeout is useful when attaching a debugger to a node, but can 
+  increase game latency.
+
+<dt>com.sun.sgs.txn.timeout.unbounded
+<span class="default">Long.MAX_VALUE</span>
+<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
+  transaction will be permitted to run before it is a candidate for
+  being aborted.
 </dl>
 
 <hr>

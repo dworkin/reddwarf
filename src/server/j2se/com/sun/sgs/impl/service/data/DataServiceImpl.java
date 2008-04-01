@@ -67,7 +67,7 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
+ *      {@value #DATA_STORE_CLASS_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
@@ -79,7 +79,7 @@ import java.util.logging.Logger;
  *	provide a public constructor with a {@link Properties} parameter. <p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+ *      {@value #DEBUG_CHECK_INTERVAL_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code>
  *
@@ -132,13 +132,13 @@ import java.util.logging.Logger;
 public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** The name of this class. */
-    private static final String CLASSNAME = DataServiceImpl.class.getName();
+    private static final String CLASSNAME = "com.sun.sgs.impl.service.data";
 
     /**
      * The property that specifies the number of operations to skip between
      * checks of the consistency of the managed references table.
      */
-    private static final String DEBUG_CHECK_INTERVAL_PROPERTY =
+    public static final String DEBUG_CHECK_INTERVAL_PROPERTY =
 	CLASSNAME + ".debug.check.interval";
 
     /**
