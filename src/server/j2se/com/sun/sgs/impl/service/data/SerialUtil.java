@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -293,7 +294,7 @@ final class SerialUtil {
 	    if (object != topLevelObject && object instanceof ManagedObject) {
 		throw new ObjectIOException(
 		    "ManagedObject was not referenced through a " +
-		    "ManagedReference: " + safeToString(object),
+		    "ManagedReference: " + Objects.safeToString(object),
 		    false);
 	    } else if (object != null) {
 		Class<?> cl = object.getClass();
@@ -303,14 +304,14 @@ final class SerialUtil {
 			    Level.FINE,
 			    "Storing an instance of an anonymous class: " +
 			    "{0}, {1}",
-			    safeToString(object), cl);
+			    Objects.safeToString(object), cl);
 		    }
 		} else if (cl.isLocalClass()) {
 		    if (logger.isLoggable(Level.FINE)) {
 			logger.log(
 			    Level.FINE,
 			    "Storing an instance of a local class: {0}, {1}",
-			    safeToString(object), cl);
+			    Objects.safeToString(object), cl);
 		    }
 		}
 	    }
@@ -400,7 +401,7 @@ final class SerialUtil {
 		Class<?> cl = object.getClass();
 		if (object != topObject && object instanceof ManagedObject) {
 		    stack.push("object (class \"" + cl.getName() + "\", " +
-			       safeToString(object) + ")");
+			       Objects.safeToString(object) + ")");
 		    throw new ObjectIOException(
 			"ManagedObject was not referenced through a " +
 			"ManagedReference:\n" + stack,
@@ -436,7 +437,7 @@ final class SerialUtil {
 	private void checkNonArray(Object object) {
 	    Class<?> cl = object.getClass();
 	    stack.push("object (class \"" + cl.getName() + "\", " +
-		       safeToString(object) + ")");
+		       Objects.safeToString(object) + ")");
 	    for ( ; cl != null; cl = cl.getSuperclass()) {
 		for (Field f : cl.getDeclaredFields()) {
 		    if (!Modifier.isStatic(f.getModifiers()) &&
@@ -471,23 +472,5 @@ final class SerialUtil {
 	    sb.insert(0, className);
 	    return sb.toString();
 	}
-    }
-
-    /**
-     * Returns a string representing the object, returning a failsafe value if
-     * the toString or hashCode methods throw exceptions.
-     */
-    private static String safeToString(Object object) {
-	try {
-	    return object.toString();
-	} catch (Exception e) {
-	}
-	try {
-	    return object.getClass().getName() + '@' +
-		Integer.toHexString(object.hashCode());
-	} catch (Exception e) {
-	}
-	return object.getClass().getName() + "[identityHashCode=0x" +
-	    Integer.toHexString(System.identityHashCode(object)) + "]";
     }
 }

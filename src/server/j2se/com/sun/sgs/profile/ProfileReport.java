@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,8 +19,9 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.List;
 import java.util.Map;
@@ -43,9 +44,9 @@ public interface ProfileReport {
     /**
      * Returns the owner of the run task.
      *
-     * @return the <code>TaskOwner</code> for the task
+     * @return the <code>Identity</code> of the task owner
      */
-    public TaskOwner getTaskOwner();
+    public Identity getTaskOwner();
 
     /**
      * Returns whether any of the task was transactional.
@@ -152,7 +153,7 @@ public interface ProfileReport {
      * application.
      *
      * @return a <code>Map</code> from sample name to a list of values
-     *         added during the task.     
+     *         added during the task  
      */
     public Map<String,List<Long>> getUpdatedAggregateSamples();
 
@@ -164,7 +165,7 @@ public interface ProfileReport {
      * to an oldest-first list of sample values.
      *
      * @return a <code>Map</code> from sample name to a list of values
-     *         added during the task.
+     *         added during the task
      */
     public Map<String,List<Long>> getUpdatedTaskSamples();  
 
@@ -176,20 +177,21 @@ public interface ProfileReport {
      * count, such as the total number of tasks ready to run across all
      * contexts.
      *
-     * @return the number of ready tasks in the same context.
+     * @return the number of ready tasks in the same context
      */
     public int getReadyCount();
 
 
     /**
-     * Returns any exception that occurred during the execution of
-     * this report's task, or <code>null</code> if no exception
-     * occurred.  This exception will always be <code>null</code> if
-     * {@link #wasTaskSuccessful()} returns <code>true</code>.
+     * Returns any failure that occurred during the execution of
+     * this report's task, or <code>null</code> if no failure
+     * occurred.  This <code>Throwable</code> will always be
+     * <code>null</code> if {@link #wasTaskSuccessful()} returns
+     * <code>true</code>.
      * 
-     * @return the exception that occurred or <code>null</code> if
-     *         none occurred.
+     * @return the <code>Throwable</code> thrown during task execution
+     *         or <code>null</code> if no failure occurred
      */
-    public Exception getException();
+    public Throwable getFailureCause();
 
 }

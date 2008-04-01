@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -41,6 +41,13 @@ public enum Delivery {
      * order.
      */
     ORDERED_UNRELIABLE,
+	
+    /**
+     * Unordered reliable delivery: Message delivery is guaranteed
+     * unless there is a node or network failure.  No message order is
+     * preserved.
+     */
+    UNORDERED_RELIABLE,
 	
     /**
      * Reliable delivery: Message delivery is guaranteed unless

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -83,6 +83,14 @@ public interface AppListener extends ManagedObject {
      * if the client logged out gracefully, and is {@code false}
      * otherwise.
      * </ul>
+     *
+     * <p>The {@code session} passed to this method is persisted in
+     * the data manager.  The application may remove the {@code
+     * session} from the data manager in order to disconnect the
+     * session.  If the application does not remove the specified
+     * client session, the client session is removed when the {@link
+     * ClientSessionListener#disconnected disconnected} method invoked
+     * on the returned listener completes.
      * 
      * <p>A return value of {@code null} has special meaning,
      * indicating that the specified client session should not

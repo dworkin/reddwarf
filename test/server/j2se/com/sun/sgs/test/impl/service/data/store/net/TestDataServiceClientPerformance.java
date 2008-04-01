@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,9 +21,6 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.impl.service.data.TestDataServicePerformance;
 import java.util.Properties;
 
@@ -61,27 +58,27 @@ public class TestDataServiceClientPerformance
     }
 
     /**
-     * Create a DataService, setting default properties, and starting the
-     * server if needed.
+     * Return the properties to start the store in the right more for this
+     * test case.
      */
     @Override
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry,
-					 TransactionProxy txnProxy)
-	throws Exception
-    {
+    protected Properties getNodeProps() throws Exception {
+	Properties props = super.getNodeProps();
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.run", "true");
+	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
+	} else {
+	    props.setProperty(DataStoreNetPackage + ".server.start", "false");
 	}
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			  DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry, txnProxy);
+	return props;
     }
+    
 }

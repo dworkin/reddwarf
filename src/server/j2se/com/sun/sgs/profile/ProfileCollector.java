@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,8 +19,9 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -36,6 +37,12 @@ import com.sun.sgs.kernel.TaskOwner;
  */
 public interface ProfileCollector {
 
+    /** 
+     * Shuts down the ProfileCollector, reclaiming resources as necessary.
+     */
+    
+    public void shutdown();
+    
     /**
      * Adds a <code>ProfileOperationListener</code> as a listener for
      * profiling data reports. The listener is immediately updated on
@@ -59,17 +66,17 @@ public interface ProfileCollector {
 
     /**
      * Tells the collector that a new task is starting in the context of
-     * the calling thread. Any previous task must have been cleared from the
-     * context of this thread via a call to <code>finishTask</code>.
+     * the calling thread. If another task was alrady being profiled in the
+     * context of the calling thread then that profiling data is pushed
+     * onto a stack until the new task finishes from a call to
+     * <code>finishTask</code>.
      *
      * @param task the <code>KernelRunnable</code> that is starting
-     * @param owner the <code>TaskOwner</code> of the task
+     * @param owner the <code>Identity</code> of the task owner
      * @param scheduledStartTime the requested starting time for the task
      * @param readyCount the number of ready tasks at the scheduler
-     *
-     * @throws IllegalStateException if a task is already bound to this thread
      */
-    public void startTask(KernelRunnable task, TaskOwner owner,
+    public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount);
 
     /**
@@ -115,11 +122,10 @@ public interface ProfileCollector {
      * finished and that an exception occured during its execution.
      *
      * @param tryCount the number of times that the task has tried to run
-     * @param exception the exception that occured during the
-     *        execution of the task
+     * @param t the <code>Throwable</code> thrown during task execution
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void finishTask(int tryCount, Exception exception);
+    public void finishTask(int tryCount, Throwable t);
 
 }

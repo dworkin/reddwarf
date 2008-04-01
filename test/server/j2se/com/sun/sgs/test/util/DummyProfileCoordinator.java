@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,7 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
@@ -30,14 +30,9 @@ import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileProducer;
 
-import java.util.Properties;
-
 
 /** Simple profiling utility to support tests. */
 public class DummyProfileCoordinator {
-
-    // the resource coordinator used to run report consuming threads
-    private final TestResourceCoordinator coordinator;
 
     // the production collector
     private final ProfileCollectorImpl collector;
@@ -49,7 +44,7 @@ public class DummyProfileCoordinator {
     private static final KernelRunnable task = new DummyKernelRunnable();
 
     // a dummy owner for all reports
-    private static final DummyTaskOwner owner = new DummyTaskOwner();
+    private static final Identity owner = new DummyIdentity();
 
     // a single instance that will be non-null if we're profiling
     private static DummyProfileCoordinator instance = null;
@@ -59,12 +54,11 @@ public class DummyProfileCoordinator {
 
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
-        coordinator = new TestResourceCoordinator();
-        collector = new ProfileCollectorImpl(coordinator);
+        collector = new ProfileCollectorImpl();
         registrar = new ProfileRegistrarImpl(collector);
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),
-                                                  owner, null, coordinator);
+                                                  owner, null);
         collector.addListener(listener);
     }
 
@@ -114,7 +108,6 @@ public class DummyProfileCoordinator {
     /** Shuts down the associated resource coordinator */
     public void shutdown() {
         synchronized (lockObject) {
-            coordinator.shutdown();
             instance = null;
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -28,7 +28,9 @@ import com.sun.sgs.service.Node;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 /**
  * Implements the {@link Node} interface.  The state for a given
@@ -40,21 +42,27 @@ import java.util.Iterator;
 class NodeImpl
     implements Node, ManagedObject, Serializable, Comparable<NodeImpl>
 {
-    
     /** The serialVersionUID of this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The ID for an unknown node. */
+    static final long INVALID_ID = -1L;
+
     /** The name of this class. */
-    private static final String CLASSNAME = NodeImpl.class.getName();
+    private static final String PKG_NAME =
+	"com.sun.sgs.impl.service.watchdog";
 
     /** The prefix for NodeImpl state. */
-    private static final String NODE_PREFIX = CLASSNAME;
+    private static final String NODE_PREFIX = PKG_NAME + ".node";
 
     /** The node id. */
     private final long id;
     
     /** The host name, or {@code null}. */
     private final String host;
+    
+    /** The port, or {@code null}. */
+    private final int port;
 
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
@@ -62,44 +70,91 @@ class NodeImpl
     /** If true, this node is considered alive. */
     private boolean isAlive;
 
+    /** The ID of the backup for this node. */
+    private long backupId = INVALID_ID;
+
+    /** The set of primaries for which this node is a backup. */
+    private final Set<Long> primaryIds = new HashSet<Long>();
+
     /**
      * The expiration time for this node. A value of {@code 0} means
-     * that either the value has not been intialized or the value is
+     * that either the value has not been initialized or the value is
      * not meaningful because the node has failed.
      */
     private transient long expiration;
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code client}.  This instance's
-     * alive status is set to {@code true}.  The expiration time for
-     * this instance should be set as soon as it is known.
+     * nodeId}, {@code hostName}, {@code port}, and {@code client}.  
+     * This instance's alive status is set to {@code true}.  The expiration 
+     * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
+     * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
-	this.id = nodeId;
-	this.host = hostName;
-	this.client = client;
-	this.isAlive = true;
+    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
+        this (nodeId, hostName, port, client, true, INVALID_ID);
     }
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostname}, and {@code isAlive} status.  This
-     * instance's watchdog client is set to {@code null}.
+     * nodeId}, {@code hostName}, and {@code isAlive} status.  This
+     * instance's watchdog client is set to {@code null} and its
+     * backup is unassigned (backup ID is -1).
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this.id = nodeId;
+    NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
+	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
+    }
+	
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostName}, {@code port}, {@code isAlive} status, and 
+     * {@code backupId}.  This instance's watchdog client is set to
+     * {@code null}.
+     *
+     * @param 	nodeId a node ID
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
+     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	backupId the ID of the node's backup (-1 if no backup
+     *		is assigned)
+     */
+    NodeImpl(long nodeId, String hostName, int port, 
+             boolean isAlive, long backupId) 
+    {
+        this(nodeId, hostName, port, null, isAlive, backupId);
+    }
+    
+    /**
+     * Constructs an instance of this class with the given {@code
+     * nodeId}, {@code hostName}, {@code port}, {@code client}, 
+     * {@code isAlive} status, and {@code backupId}.
+     *
+     * @param 	nodeId a node ID
+     * @param   hostName a host name, or {@code null}
+     * @param   port     a port, or {@code null}
+     * @param	client   a watchdog client
+     * @param	isAlive if {@code true}, this node is considered alive
+     * @param	backupId the ID of the node's backup (-1 if no backup
+     *		is assigned)
+     */
+    private NodeImpl(long nodeId, String hostName, int port, 
+                     WatchdogClient client, boolean isAlive, long backupId) 
+    {
+        this.id = nodeId;
+
 	this.host = hostName;
-	this.client = null;
-	this.isAlive = isAlive;
+        this.port = port;
+        this.client = client;
+        this.isAlive = isAlive;
+        this.backupId = backupId;
     }
 
     /* -- Implement Node -- */
@@ -112,6 +167,11 @@ class NodeImpl
     /** {@inheritDoc} */
     public String getHostName() {
 	return host;
+    }
+    
+    /** {@inheritDoc} */
+    public int getPort() {
+        return port;
     }
 
     /** {@inheritDoc} */
@@ -143,7 +203,8 @@ class NodeImpl
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && compareStrings(host, node.host) == 0;
+	    return id == node.id && compareStrings(host, node.host) == 0 &&
+                     port == node.port;
 	}
 	return false;
     }
@@ -154,9 +215,11 @@ class NodeImpl
     }
 
     /** {@inheritDoc} */
-    public String toString() {
+    public synchronized String toString() {
 	return getClass().getName() + "[" + id + "," +
-	    (isAlive() ? "alive" : "failed") + "]@" + host;
+	    (isAlive() ? "alive" : "failed") + ",backup:" +
+	    (backupId == INVALID_ID ? "(none)" : backupId) + 
+            "]@" + host + ":" + port;
     }
 
     /* -- package access methods -- */
@@ -170,7 +233,7 @@ class NodeImpl
     
     /**
      * Returns the expiration time.  A value of {@code 0} means that
-     * either the value has not been intialized or the value is not
+     * either the value has not been initialized or the value is not
      * meaningful because the node has failed.  If {@link #isAlive}
      * returns {@code false} the value returned from this method is
      * not meaningful.
@@ -181,6 +244,8 @@ class NodeImpl
 
     /**
      * Sets the expiration time for this node instance.
+     *
+     * @param	newExpiration the new expiration value
      */
     synchronized void setExpiration(long newExpiration) {
 	expiration = newExpiration;
@@ -199,18 +264,63 @@ class NodeImpl
     
     /**
      * Sets the alive status of this node instance to {@code false},
+     * sets this node's backup to the specified {@code backup},
+     * empties the set of primaries for which this node is recovering,
      * and updates the node's state in the specified {@code
      * dataService}.  Subsequent calls to {@link #isAlive isAlive}
      * will return {@code false}.
      *
      * @param	dataService a data service
+     * @param	backup a chosen backup
      * @throws	ObjectNotFoundException if this node has been removed
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    synchronized void setFailed(DataService dataService) {
-	isAlive = false;
-	dataService.markForUpdate(this);
+    synchronized void setFailed(DataService dataService, NodeImpl backup) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	this.isAlive = nodeImpl.isAlive = false;
+	this.backupId = nodeImpl.backupId =
+	    (backup != null) ?
+	    backup.getId() :
+	    INVALID_ID;
+	this.primaryIds.clear();
+	nodeImpl.primaryIds.clear();
+    }
+
+    /**
+     * Adds the specified {@code primaryId} to the list of primaries
+     * for which this node is a backup, and updates the node's state
+     * in the specified {@code dataService}.
+     *
+     * @param	dataService a data service
+     * @param	primaryId the ID of a primary for which this node is a
+     *		backup
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    synchronized void addPrimary(DataService dataService, long primaryId) {
+	NodeImpl nodeImpl = getForUpdate(dataService);
+	primaryIds.add(primaryId);
+	nodeImpl.primaryIds.add(primaryId);
+    }
+
+    /** Returns the set of primary nodes for which this node is a backup. */
+    synchronized Set<Long> getPrimaries() {
+	return primaryIds;
+    }
+
+    /** Returns {@code true} if this node has a backup. */
+    synchronized boolean hasBackup() {
+	return backupId != INVALID_ID;
+    }
+
+    /**
+     * Returns the backup for this node, or {@value INVALID_ID} if there
+     * is no backup.
+     */
+    synchronized long getBackupId() {
+	return backupId;
     }
 
     /**
@@ -225,6 +335,25 @@ class NodeImpl
 	dataService.setServiceBinding(getNodeKey(id), this);
     }
     
+    /**
+     * Fetches this node's state from the specified {@code
+     * dataService}, marked for update.
+     *
+     * @param	dataService a data service
+     * @throws	ObjectNotFoundException if this node has been removed
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+     private NodeImpl getForUpdate(DataService dataService) {
+	NodeImpl nodeImpl = getNode(dataService, id);
+	if (nodeImpl == null) {
+	    throw new ObjectNotFoundException("node is removed");
+	}
+	// update non-final fields before
+	dataService.markForUpdate(nodeImpl);
+	return nodeImpl;
+    }
+
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding
@@ -241,7 +370,7 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	    dataService.removeServiceBinding(key);
 	    dataService.removeObject(node);
 	} catch (NameNotBoundException e) {
@@ -264,12 +393,12 @@ class NodeImpl
 	String key = getNodeKey(nodeId);
 	NodeImpl node = null;
 	try {
-	    node = dataService.getServiceBinding(key, NodeImpl.class);
+	    node = (NodeImpl) dataService.getServiceBinding(key);
 	} catch (NameNotBoundException e) {
 	}
 	return node;
     }
-
+    
     /**
      * Marks all nodes currently bound in the specified {@code
      * dataService} as failed, and returns a collection of those
@@ -286,8 +415,8 @@ class NodeImpl
 	     BoundNamesUtil.getServiceBoundNamesIterable(
 		dataService, NODE_PREFIX))
 	{
-	    NodeImpl node = dataService.getServiceBinding(key, NodeImpl.class);
-	    node.setFailed(dataService);
+	    NodeImpl node = (NodeImpl) dataService.getServiceBinding(key);
+	    node.setFailed(dataService, null);
 	    nodes.add(node);
 	}
 	return nodes;
@@ -374,7 +503,7 @@ class NodeImpl
 	/** {@inheritDoc} */
 	public Node next() {
 	    String key = iterator.next();
-	    return dataService.getServiceBinding(key, NodeImpl.class);
+	    return (NodeImpl) dataService.getServiceBinding(key);
 	}
 
 	/** {@inheritDoc} */

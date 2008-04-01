@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,33 +19,21 @@
 
 package com.sun.sgs.impl.profile.listener;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.util.Histogram;
-import com.sun.sgs.impl.profile.util.LinearHistogram;
 import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
 
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
-import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.kernel.ComponentRegistry;
+
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
-
-import java.io.IOException;
-
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
-
-import java.util.concurrent.atomic.AtomicLong;
-
 
 /**
  * A text-output listener that displays the distribution of successful
@@ -58,8 +46,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Note that this class uses a fixed number of tasks between outputs,
  * rather than a period of time.  The number of tasks can be
- * comfigured by defining the {@code
- * com.sun.sgs.kernel.profile.listener.window.size} property in the
+ * configured by defining the {@code
+ * com.sun.sgs.profile.listener.window.size} property in the
  * application properties file.  The default window size for this
  * class is {@code 5000}.
  *
@@ -98,17 +86,14 @@ public class RuntimeHistogramListener implements ProfileListener {
      * Creates an instance of {@code RuntimeHistogramListener}.
      *
      * @param properties the {@code Properties} for this listener
-     * @param owner the {@code TaskOwner} to use for all tasks run by
+     * @param owner the {@code Identity} to use for all tasks run by
      *        this listener
-     * @param taskScheduler the {@code TaskScheduler} to use for
-     *        running short-lived or recurring tasks
-     * @param resourceCoord the {@code ResourceCoordinator} used to
-     *        run any long-lived tasks
+     * @param registry the {@code ComponentRegistry} containing the
+     *        available system components
      *
      */
-    public RuntimeHistogramListener(Properties properties, TaskOwner owner,
-				    TaskScheduler taskScheduler,
-				    ResourceCoordinator resourceCoord) {
+    public RuntimeHistogramListener(Properties properties, Identity owner,
+                                    ComponentRegistry registry) {
   	taskCount = 0;
 	lifetimeHistogram = new PowerOfTwoHistogram();
 	windowHistogram = new PowerOfTwoHistogram();
@@ -147,9 +132,9 @@ public class RuntimeHistogramListener implements ProfileListener {
 	if (count % windowSize == 0) {
 	    
 	    // print out the results
-	    System.out.printf("past %d tasks:\n%s", windowSize,
+	    System.out.printf("past %d tasks:%n%s", windowSize,
 			      windowHistogram.toString("ms"));
-	    System.out.printf("lifetime of %d tasks:\n%s", count,
+	    System.out.printf("lifetime of %d tasks:%n%s", count,
 			      lifetimeHistogram.toString("ms"));
 
 	    windowHistogram.clear();

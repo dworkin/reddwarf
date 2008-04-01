@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -31,9 +31,6 @@ import com.sun.sgs.service.DataService;
 
 import java.io.Serializable;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 
 /**
  * Utility, package-private class for managing durable implementations of
@@ -41,12 +38,6 @@ import java.util.logging.Logger;
  * have not yet run to completion or been dropped. This class maintains all
  * of the meta-data associated with these pending tasks, and if needed, makes
  * sure that the {@code Task} itself is persisted.
- * <p>
- * FIXME: The identity is being kept here only because we need it given the
- * current APIs. When notification of node joins is added, the Identity will
- * be provided, and we will no longer need to have it in the pending data
- * for this purpose. We need to figure out if it's still useful for other
- * applications (e.g., handoff on cancelled periodic tasks).
  */
 class PendingTask implements ManagedObject, Serializable {
 
@@ -55,7 +46,7 @@ class PendingTask implements ManagedObject, Serializable {
     // the task that is pending, one of which is null based on whether the
     // task was managed by the caller (see docs on constructor)
     private final Task task;
-    private final ManagedReference taskRef;
+    private final ManagedReference<Task> taskRef;
 
     // the task's meta-data
     private final String taskType;
@@ -65,6 +56,9 @@ class PendingTask implements ManagedObject, Serializable {
 
     // whether this task has been marked as cancelled
     private boolean cancelled = false;
+
+    // if this is a periodic task, where it's currently running
+    private long runningNode = -1;
 
     /**
      * Creates an instance of {@code PendingTask}, handling the task
@@ -97,7 +91,7 @@ class PendingTask implements ManagedObject, Serializable {
         // case we set one of the two fields to null to disambiguate
         // what the situation is.
         if (task instanceof ManagedObject) {
-            taskRef = dataService.createReference((ManagedObject)task); 
+            taskRef = dataService.createReference(task); 
             this.task = null;
         } else {
             this.task = task;
@@ -138,9 +132,35 @@ class PendingTask implements ManagedObject, Serializable {
         cancelled = true;
     }
 
+    /**
+     * Returns the node where the associated task is running if the task
+     * is periodic, or -1 if the task is non-periodic or the node hasn't
+     * been assigned.
+     */
+    long getRunningNode() {
+        return runningNode;
+    }
+
+    /**
+     * Sets the node where the associated task is running if the task is
+     * periodic. If the task is not periodic, {@code IllegalStateException}
+     * is thrown.
+     */
+    void setRunningNode(long nodeId) {
+        if (! isPeriodic())
+            throw new IllegalStateException("Cannot assign running node " +
+                                            "for a non-periodic task");
+        runningNode = nodeId;
+    }
+
     /** Checks if this task has been marked as cancelled. */
     boolean isCancelled() {
         return cancelled;
+    }
+
+    /** Checks if this is a periodic task. */
+    boolean isPeriodic() {
+        return (period != TaskServiceImpl.PERIOD_NONE);
     }
 
     /** Returns the identity that owns this task. */
@@ -158,7 +178,7 @@ class PendingTask implements ManagedObject, Serializable {
         if (task != null)
             return true;
         try {
-            taskRef.get(Task.class);
+            taskRef.get();
             return true;
         } catch (ObjectNotFoundException onfe) {
             return false;
@@ -174,7 +194,7 @@ class PendingTask implements ManagedObject, Serializable {
     void run() throws Exception {
         Task actualTask = null;
         try {
-            actualTask = (task != null) ? task : taskRef.get(Task.class);
+            actualTask = (task != null) ? task : taskRef.get();
         } catch (ObjectNotFoundException onfe) {
             // This only happens when the application removed the task
             // object but didn't cancel the task, so we're done

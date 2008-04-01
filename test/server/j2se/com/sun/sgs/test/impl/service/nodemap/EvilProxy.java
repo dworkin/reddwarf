@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -40,7 +40,7 @@ public class EvilProxy implements InvocationHandler {
     /** Creates a new instance of EvilProxy */
     private EvilProxy(Object obj) throws Exception {
         this.obj = obj;
-        Class serverClass = 
+        Class<?> serverClass = 
            Class.forName("com.sun.sgs.impl.service.nodemap.NodeMappingServer");
         Method[] methods = serverClass.getDeclaredMethods();
         for (Method m : methods ) {

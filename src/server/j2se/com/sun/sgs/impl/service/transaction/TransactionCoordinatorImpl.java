@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -61,13 +61,17 @@ public final class TransactionCoordinatorImpl
     /** The optional collector for reporting participant details. */
     private final ProfileCollector collector;
 
-    /** The value and default for bounded timeout. */
+    /** The value for bounded timeout. */
     private final long boundedTimeout;
-    private static final long BOUNDED_TIMEOUT_DEFAULT = 100L;
 
-    /** The value and default for unbounded timeout. */
+    /** The default for bounded timeout. */
+    public static final long BOUNDED_TIMEOUT_DEFAULT = 100L;
+
+    /** The value for unbounded timeout. */
     private final long unboundedTimeout;
-    private static final long UNBOUNDED_TIMEOUT_DEFAULT = Long.MAX_VALUE;
+
+    /** The default for unbounded timeout. */
+    public static final long UNBOUNDED_TIMEOUT_DEFAULT = Long.MAX_VALUE;
 
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
@@ -102,7 +106,7 @@ public final class TransactionCoordinatorImpl
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  No properties are currently supported.
+     * properties.
      *
      * @param	properties the properties for configuring this service
      * @param	collector the <code>ProfileCollector</code> used to report

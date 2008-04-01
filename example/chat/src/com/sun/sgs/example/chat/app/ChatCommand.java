@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -49,7 +49,7 @@ public enum ChatCommand {
     PING,
 
     /**
-     * Forcibly disconnects this session to the named channel.
+     * Forcibly disconnects this session.
      * <pre>
      *    /disconnect
      * </pre>
@@ -57,7 +57,7 @@ public enum ChatCommand {
     DISCONNECT,
 
     /**
-     * Join this session to the named channel.
+     * Shuts down the server.
      * <pre>
      *    /shutdown
      * </pre>

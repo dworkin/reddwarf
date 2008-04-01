@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,17 +19,17 @@
 
 package com.sun.sgs.impl.profile.listener;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.util.NetworkReporter;
 
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
@@ -38,8 +38,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
-import java.text.DecimalFormat;
-
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -86,29 +85,19 @@ public class SnapshotParticipantListener implements ProfileListener {
     // the number of transactional tasks from the current snapshot window
     private int taskCount = 0;
 
-    // a simple formatter used to make decimal numbers easier to read
-    static final DecimalFormat df = new DecimalFormat();
-    static {
-        df.setMaximumFractionDigits(2);
-        df.setMinimumFractionDigits(2);
-    }
-
     /**
      * Creates an instance of <code>SnapshotParticipantListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
-     * @param owner the <code>TaskOwner</code> to use for all tasks run by
+     * @param owner the <code>Identity</code> to use for all tasks run by
      *              this listener
-     * @param taskScheduler the <code>TaskScheduler</code> to use for
-     *                      running short-lived or recurring tasks
-     * @param resourceCoord the <code>ResourceCoordinator</code> used to
-     *                      run any long-lived tasks
+     * @param registry the {@code ComponentRegistry} containing the
+     *                 available system components
      *
      * @throws IOException if the server socket cannot be created
      */
-    public SnapshotParticipantListener(Properties properties, TaskOwner owner,
-				       TaskScheduler taskScheduler,
-				       ResourceCoordinator resourceCoord)
+    public SnapshotParticipantListener(Properties properties, Identity owner,
+                                       ComponentRegistry registry)
 	throws IOException
     {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -116,11 +105,11 @@ public class SnapshotParticipantListener implements ProfileListener {
         participantMap = new HashMap<String,ParticipantCounts>();
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
-        networkReporter = new NetworkReporter(port, resourceCoord);
+        networkReporter = new NetworkReporter(port);
 
         long reportPeriod =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        handle = taskScheduler.
+        handle = registry.getComponent(TaskScheduler.class).
             scheduleRecurringTask(new ParticipantRunnable(), owner, 
                                   System.currentTimeMillis() + reportPeriod,
                                   reportPeriod);
@@ -175,9 +164,11 @@ public class SnapshotParticipantListener implements ProfileListener {
 	    double taskTotal = (double)(commits + aborts);
 	    double participationPct = (taskTotal / (double)taskCount) * 100.0;
 	    double commitPct = ((double)commits / taskTotal) * 100.0;
-	    return " participated=" + df.format(participationPct) +
-		"% committed=" + df.format(commitPct) + "% avgTime=" +
-		df.format((double)time / taskTotal) + "ms";
+	    Formatter formatter = new Formatter();
+	    formatter.format(" participated=%2.2f%%", participationPct);
+	    formatter.format(" committed=%2.2f%%", commitPct);
+	    formatter.format(" avgTime=%2.2fms", (double)time / taskTotal);
+	    return formatter.toString();
 	}
     }
 
@@ -197,18 +188,20 @@ public class SnapshotParticipantListener implements ProfileListener {
             return ParticipantRunnable.class.getName();
         }
         public void run() throws Exception {
-	    String reportStr;
+	    Formatter reportStr = new Formatter();
 	    synchronized (participantMap) {
-		reportStr = "Participants for last " + taskCount +
-		    " transactional tasks:\n";
+		reportStr.format(
+		    "Participants for last %d transactional tasks:%n",
+		    taskCount);
                 for (Entry<String,ParticipantCounts> entry :
 			 participantMap.entrySet())
-		    reportStr += entry.getKey() + entry.getValue() + "\n";
+		    reportStr.format(
+			"%s%s%n", entry.getKey(), entry.getValue());
 		participantMap.clear();
 		taskCount = 0;
 	    }
-	    reportStr += "\n";
-	    networkReporter.report(reportStr);
+	    reportStr.format("%n");
+	    networkReporter.report(reportStr.toString());
 	}
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,14 +20,24 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import java.math.BigInteger;
+import java.util.IdentityHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Stores information for a specific transaction. */
 final class Context extends TransactionContext {
+
+    /** The logger for the data service class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(DataServiceImpl.class.getName()));
 
     /** The data service. */
     private final DataServiceImpl service;
@@ -73,6 +83,14 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /**
+     * A map that records all managed objects that are currently having
+     * ManagedObjectRemoval.removingObject called on them, to detect recursion,
+     * or null.  Uses identity comparison to avoid confusion by value-based
+     * equals methods.
+     */
+    private IdentityHashMap<ManagedObjectRemoval, Boolean> removing = null;
+
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
 	    DataStore store,
@@ -90,6 +108,10 @@ final class Context extends TransactionContext {
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
 	classSerial = classesTable.createClassSerialization(this.txn);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
+		       getTxnId(), Thread.currentThread().getName());
+	}
     }
 
     /**
@@ -98,7 +120,7 @@ final class Context extends TransactionContext {
      * instances of this class to the DataStore in order to mediate its
      * participation in the transaction.
      */
-    private final class TxnTrampoline implements Transaction {
+    final class TxnTrampoline implements Transaction {
 
 	/** The original transaction. */
 	private final Transaction originalTxn;
@@ -184,7 +206,7 @@ final class Context extends TransactionContext {
     /* -- Methods for obtaining references -- */
 
     /** Obtains the reference associated with the specified object. */
-    ManagedReferenceImpl getReference(ManagedObject object) {
+    <T> ManagedReferenceImpl<T> getReference(T object) {
 	return ManagedReferenceImpl.getReference(this, object);
     }
 
@@ -192,26 +214,26 @@ final class Context extends TransactionContext {
      * Finds the existing reference associated with the specified object,
      * returning null if it is not found.
      */
-    ManagedReferenceImpl findReference(ManagedObject object) {
+    <T> ManagedReferenceImpl<T> findReference(T object) {
 	return ManagedReferenceImpl.findReference(this, object);
     }
 
     /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl getReference(long oid) {
+    ManagedReferenceImpl<?> getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 
     /* -- Methods for bindings -- */
 
     /** Obtains the object associated with the specified internal name. */
-    <T> T getBinding(String internalName, Class<T> type) {
+    ManagedObject getBinding(String internalName) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return getReference(id).get(type, false);
+	return (ManagedObject) getReference(id).get(false);
     }
 
     /** Sets the object associated with the specified internal name. */
-    void setBinding(String internalName, ManagedObject object) {
+    void setBinding(String internalName, Object object) {
 	store.setBinding(txn, internalName, getReference(object).oid);
     }
 
@@ -225,45 +247,108 @@ final class Context extends TransactionContext {
 	return store.nextBoundName(txn, internalName);
     }
 
+    /* -- Methods for object IDs -- */
+
+    /**
+     * Returns the next object ID, or -1 if there are no more objects.  Does
+     * not return IDs for removed objects.  Specifying -1 requests the first
+     * ID.
+     */
+    long nextObjectId(long oid) {
+	return ManagedReferenceImpl.nextObjectId(this, oid);
+    }
+
     /* -- Methods for TransactionContext -- */
 
     @Override
     public boolean prepare() throws Exception {
-	isPrepared = true;
-	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
-	if (storeParticipant == null) {
-	    isCommitted = true;
-	    return true;
-	} else {
-	    return storeParticipant.prepare(txn);
+	try {
+	    isPrepared = true;
+	    txn.setInactive();
+	    ManagedReferenceImpl.flushAll(this);
+	    boolean result;
+	    if (storeParticipant == null) {
+		isCommitted = true;
+		result = true;
+	    } else {
+		result = storeParticipant.prepare(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "prepare tid:{0,number,#} returns {1}",
+			   getTxnId(), result);
+	    }
+	    return result;
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"prepare tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void commit() {
-	isCommitted = true;
-	txn.setInactive();
-	if (storeParticipant != null) {
-	    storeParticipant.commit(txn);
+	try {
+	    isCommitted = true;
+	    txn.setInactive();
+	    if (storeParticipant != null) {
+		storeParticipant.commit(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "commit tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"commit tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void prepareAndCommit() throws Exception {
-	isCommitted = true;
-	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
-	if (storeParticipant != null) {
-	    storeParticipant.prepareAndCommit(txn);
+	try {
+	    isCommitted = true;
+	    txn.setInactive();
+	    ManagedReferenceImpl.flushAll(this);
+	    if (storeParticipant != null) {
+		storeParticipant.prepareAndCommit(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "prepareAndCommit tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"prepareAndCommit tid:{0,number,#} throws",
+				getTxnId());
+	    }
+	    throw e;
 	}
     }
 
     @Override
     public void abort(boolean retryable) {
-	txn.setInactive();
-	if (storeParticipant != null) {
-	    storeParticipant.abort(txn);
+	try {
+	    txn.setInactive();
+	    if (storeParticipant != null) {
+		storeParticipant.abort(txn);
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "abort tid:{0,number,#} returns",
+			   getTxnId());
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e,
+				"abort tid:{0,number,#} throws", getTxnId());
+	    }
+	    throw e;
 	}
     }
 
@@ -284,5 +369,27 @@ final class Context extends TransactionContext {
     /** Checks that the service is running or shutting down. */
     void checkState() {
 	service.checkState();
+    }
+
+    /** Calls removingObject on the argument, and checks for recursion. */
+    void removingObject(ManagedObjectRemoval object) {
+	if (removing == null) {
+	    removing = new IdentityHashMap<ManagedObjectRemoval, Boolean>();
+	}
+	if (removing.containsKey(object)) {
+	    throw new IllegalStateException(
+		"Attempt to remove object recursively: " + object);
+	}
+	try {
+	    removing.put(object, Boolean.TRUE);
+	    object.removingObject();
+	} finally {
+	    removing.remove(object);
+	}
+    }
+
+    /** Returns the ID of the associated transaction as a BigInteger. */
+    BigInteger getTxnId() {
+	return new BigInteger(1, txn.getId());
     }
 }

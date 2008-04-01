@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -144,7 +144,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 long nodeId = liveNodes.get((tryNode + i) % liveNodes.size());
                 // Find an identity on node.
                 GetIdOnNodeTask task =
-                    new GetIdOnNodeTask(server.dataService, 
+                    new GetIdOnNodeTask(server.getDataService(), 
                         server.watchdogService, nodeId, logger);
                 try {
                     server.runTransactionally(task);
@@ -223,7 +223,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 String key = dataService.nextServiceBoundName(nodekey);
                 boolean done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = dataService.getServiceBinding(key, IdentityMO.class); 
+                    idmo = (IdentityMO) dataService.getServiceBinding(key); 
                 }
                 node = watchdogService.getNode(nodeId);
             } catch (Exception e) {
@@ -244,7 +244,8 @@ class RoundRobinPolicy implements NodeAssignPolicy {
         }
         
         /** 
-         * The node for nodeId.
+         * The node for nodeId, or null if the node has failed and been
+         * removed from the data store.
          * @return the Node 
          */
         public Node getNode() {

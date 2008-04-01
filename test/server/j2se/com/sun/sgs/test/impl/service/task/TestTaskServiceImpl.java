@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -23,39 +23,43 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.TaskRejectedException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
-import com.sun.sgs.impl.kernel.MinimalTestKernel;
-import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService.Version;
+
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.DummyTaskScheduler;
-import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.SgsTestNode;
 
-import java.io.File;
 import java.io.Serializable;
 
+import java.lang.reflect.Constructor;
+
+import java.lang.reflect.Field;
 import java.util.MissingResourceException;
 import java.util.Properties;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
@@ -63,100 +67,83 @@ import junit.framework.TestCase;
 /** Test the TaskServiceImpl class */
 public class TestTaskServiceImpl extends TestCase {
 
-    // the location for the database files
-    private static String DB_DIRECTORY =
-        System.getProperty("java.io.tmpdir") + File.separator +
-        "TestTaskServiceImpl.db";
-
     // the pending namespace in the TaskService
     // NOTE: this assumes certain private structure in the task service
     private static final String PENDING_NS =
         TaskServiceImpl.DS_PREFIX + "Pending.";
+    
+    /** Version information from WatchdogServiceImpl class. */
+    private final String VERSION_KEY;
+    private final int MAJOR_VERSION;
+    private final int MINOR_VERSION;
+    
+    /** The node that creates the servers */
+    private SgsTestNode serverNode;
 
-    // the proxy used for all these tests
-    private static DummyTransactionProxy txnProxy =
-        MinimalTestKernel.getTransactionProxy();
+    private TransactionProxy txnProxy;
+    private ComponentRegistry systemRegistry;
+    private Properties serviceProps;
 
-    // the context in which tasks are run
-    private DummyAbstractKernelAppContext appContext;
-
-    // cached services and registries from the context
-    private DataServiceImpl dataService;
-    private TaskServiceImpl taskService;
-    private DummyComponentRegistry systemRegistry;
-    private DummyComponentRegistry serviceRegistry;
-
-    // the transaction used, which is class state so that it can be aborted
-    // (if it's still active) at teardown
-    private DummyTransaction txn;
-
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
+    
+    /** The owner for tasks I initiate. */
+    private Identity taskOwner;
+    
+    private DataService dataService;
+    private NodeMappingService mappingService;
+    private TaskService taskService;
+        
+    private static Field getField(Class cl, String name) throws Exception {
+	Field field = cl.getDeclaredField(name);
+	field.setAccessible(true);
+	return field;
+    }
     /**
      * Test management.
      */
 
-    public TestTaskServiceImpl(String name) {
+    public TestTaskServiceImpl(String name) throws Exception {
         super(name);
+        Class cl = TaskServiceImpl.class;
+	VERSION_KEY = (String) getField(cl, "VERSION_KEY").get(null);
+	MAJOR_VERSION = getField(cl, "MAJOR_VERSION").getInt(null);
+	MINOR_VERSION = getField(cl, "MINOR_VERSION").getInt(null);
     }
 
     protected void setUp() throws Exception {
         System.err.println("Testcase: " + getName());
+        setUp(null);
+    }
 
-        appContext = MinimalTestKernel.createContext();
-        systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
-        serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-        
-        // create the task and data services used by most of the tests
-        // NOTE: this should probably be done on demand for those tests
-        // that actually need services
-        // register the main service instances that will be used throughout
-        // NOTE: this could be factored into some other utility class if it
-        // seems valuable to do so
-        deleteDirectory(DB_DIRECTORY);
-        dataService = createDataService(DB_DIRECTORY);
-        txnProxy.setComponent(DataService.class, dataService);
-        txnProxy.setComponent(DataServiceImpl.class, dataService);
-        serviceRegistry.setComponent(DataManager.class, dataService);
-        serviceRegistry.setComponent(DataService.class, dataService);
-        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
-        taskService = new TaskServiceImpl(
-	    new Properties(), systemRegistry, txnProxy);
-        txnProxy.setComponent(TaskService.class, taskService);
-        txnProxy.setComponent(TaskServiceImpl.class, taskService);
-        serviceRegistry.setComponent(TaskManager.class, taskService);
-        serviceRegistry.setComponent(TaskService.class, taskService);
-        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-        
-	// services ready
-	dataService.ready();
-	taskService.ready();
+    protected void setUp(Properties props) throws Exception {     
+        serverNode = new SgsTestNode("TestTaskServiceImpl", null, props);
 
+        txnProxy = serverNode.getProxy();
+        systemRegistry = serverNode.getSystemRegistry();
+        serviceProps = serverNode.getServiceProperties();
+        
+        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
+        taskOwner = txnProxy.getCurrentOwner();
+        
+        dataService = serverNode.getDataService();
+        mappingService = serverNode.getNodeMappingService();
+        taskService = serverNode.getTaskService();
+        
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
-        txn = createTransaction(10000);
-        dataService.setBinding("counter", new Counter());
-	txn.commit();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    dataService.setBinding("counter", new Counter());
+                }
+            }, taskOwner);
     }
 
-    protected void tearDown() {
-        // if a transaction is still active, abort it now (this is only a
-        // problem if some tested failed)
-        if ((txn != null) &&
-            (txn.getState() == DummyTransaction.State.ACTIVE)) {
-            System.err.println("had to abort txn for test: " + getName());
-            txn.abort(null);
-        }
-
-        // FIXME: This should move into the Minimal Kernel, where Services
-        // can all be shutdown correctly, but since we're not really
-        // supporting shutdown yet, the call is here for now
-        if (dataService != null)
-            dataService.shutdown();
-        deleteDirectory(DB_DIRECTORY);
-
-        // clean up after this app
-        MinimalTestKernel.destroyContext(appContext);
+    protected void tearDown() throws Exception {
+        serverNode.shutdown(true);
     }
-
+    
     /**
      * Constructor tests.
      */
@@ -183,42 +170,82 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testConstructorNoScheduler() throws Exception {
+        Class<?> criClass = 
+            Class.forName("com.sun.sgs.impl.kernel.ComponentRegistryImpl");
+                
+        Constructor<?> criCtor =  criClass.getDeclaredConstructor(new Class[] {});
+        criCtor.setAccessible(true);
         try {
-            new TaskServiceImpl(new Properties(),
-                                new DummyComponentRegistry(),
-				new DummyTransactionProxy());
+            new TaskServiceImpl(serviceProps,
+                                (ComponentRegistry) 
+                                    criCtor.newInstance(new Object[] {}),
+                                txnProxy);
             fail("Expected MissingResourceException");
         } catch (MissingResourceException e) {
             System.err.println(e);
         }
     }
+    
+    /**  Version tests */
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			serverNode.getDataService()
+                        .getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+    
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
 
-    public void testConstructorNoDataService() throws Exception {
-        DummyComponentRegistry registry = new DummyComponentRegistry();
-        registry.setComponent(
-	    TaskScheduler.class, new DummyTaskScheduler(appContext, false));
-        try {
-            new TaskServiceImpl(
-		new Properties(), registry, new DummyTransactionProxy());
-            fail("Expected MissingResourceException");
-        } catch (MissingResourceException e) {
-            System.err.println(e);
-        }
+	new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
     }
 
-    public void testConstructorPendingSingleTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
-    public void testConstructorPendingRecurringTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
-    }
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    serverNode.getDataService()
+                              .setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
 
-    public void testConstructorPendingAnyTasks() throws Exception {
-        //clearPendingTasksInStore();
-        // FIXME: implement this once service shutdown is available
+	try {
+	    new TaskServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
     /**
@@ -233,117 +260,136 @@ public class TestTaskServiceImpl extends TestCase {
      * TaskManager tests.
      */
 
-    public void testScheduleTaskNullArgs() {
-        txn = createTransaction();
-        try {
-            taskService.scheduleTask(null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleTask(null, 100L);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.schedulePeriodicTask(null, 100L, 100L);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
+    public void testScheduleTaskNullArgs() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    try {
+                        taskService.scheduleTask(null);
+                        fail("Expected NullPointerException");
+                    } catch (NullPointerException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.scheduleTask(null, 100L);
+                        fail("Expected NullPointerException");
+                    } catch (NullPointerException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.schedulePeriodicTask(null, 100L, 100L);
+                        fail("Expected NullPointerException");
+                    } catch (NullPointerException e) {
+                        System.err.println(e);
+                    }
+                }
+            }, taskOwner);
     }
 
-    public void testScheduleTaskNotSerializable() {
-        txn = createTransaction();
-        Task task = new NonSerializableTask();
-        try {
-            taskService.scheduleTask(task);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleTask(task, 100L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.schedulePeriodicTask(task, 100L, 100L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
+    public void testScheduleTaskNotSerializable() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Task task = new NonSerializableTask();
+                    try {
+                        taskService.scheduleTask(task);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.scheduleTask(task, 100L);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.schedulePeriodicTask(task, 100L, 100L);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                }              
+        }, taskOwner);
     }
 
-    public void testScheduleTaskNotManagedObject() {
-        txn = createTransaction();
-        Task task = new NonManagedTask();
-        try {
-            taskService.scheduleTask(task);
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
-        try {
-            taskService.scheduleTask(task, 100L);
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
-        try {
-            taskService.schedulePeriodicTask(task, 100L, 100L);
-        } catch (Exception e) {
-             fail("Did not expect Exception: " + e);
-        }
-        txn.abort(null);
+    public void testScheduleTaskNotManagedObject() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Task task = new NonManagedTask();
+                    try {
+                        taskService.scheduleTask(task);
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+                    try {
+                        taskService.scheduleTask(task, 100L);
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+                    try {
+                        PeriodicTaskHandle handle =
+                            taskService.schedulePeriodicTask(task, 100L, 100L);
+                        handle.cancel();
+                    } catch (Exception e) {
+                         fail("Did not expect Exception: " + e);
+                    }
+                }
+        }, taskOwner);
     }
 
-    public void testScheduleTaskIsManagedObject() {
-        txn = createTransaction();
-        Task task = new ManagedTask();
-        try {
-            taskService.scheduleTask(task);
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
-        try {
-            taskService.scheduleTask(task, 100L);
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
-        try {
-            taskService.schedulePeriodicTask(task, 100L, 100L);
-        } catch (Exception e) {
-             fail("Did not expect Exception: " + e);
-        }
-        txn.abort(null);
+    public void testScheduleTaskIsManagedObject() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Task task = new ManagedTask();
+                    try {
+                        taskService.scheduleTask(task);
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+                    try {
+                        taskService.scheduleTask(task, 100L);
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+                    try {
+                        PeriodicTaskHandle handle =
+                            taskService.schedulePeriodicTask(task, 100L, 100L);
+                        handle.cancel();
+                    } catch (Exception e) {
+                         fail("Did not expect Exception: " + e);
+                    }
+                }
+        }, taskOwner);
     }
 
-    public void testScheduleNegativeTime() {
-        txn = createTransaction();
-        Task task = new ManagedTask();
-        try {
-            taskService.scheduleTask(task, -1L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.schedulePeriodicTask(task, -1L, 100L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.schedulePeriodicTask(task, 100L, -1L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
+    public void testScheduleNegativeTime() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Task task = new ManagedTask();
+                    try {
+                        taskService.scheduleTask(task, -1L);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.schedulePeriodicTask(task, -1L, 100L);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.schedulePeriodicTask(task, 100L, -1L);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                }
+        }, taskOwner);
     }
 
     public void testScheduleTaskNoTransaction() {
@@ -368,333 +414,396 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    public void testScheduleRejected() throws Exception {
-        DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
-        DummyComponentRegistry registry = new DummyComponentRegistry();
-        registry.setComponent(TaskScheduler.class, rejSched);
-        TaskServiceImpl service =
-            new TaskServiceImpl(new Properties(), registry, txnProxy);
-        registry = new DummyComponentRegistry();
-        txn = createTransaction();
-        Task task = new ManagedTask();
-        try {
-            service.scheduleTask(task);
-            fail("Expected TaskRejectedException");
-        } catch (TaskRejectedException e) {
-            System.err.println(e);
-        }
-        try {
-            service.scheduleTask(task, 100L);
-            fail("Expected TaskRejectedException");
-        } catch (TaskRejectedException e) {
-            System.err.println(e);
-        }
-        try {
-            service.schedulePeriodicTask(task, 100L, 100L);
-            fail("Expected TaskRejectedException");
-        } catch (TaskRejectedException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
+    public void testRunImmediateTasks() throws Exception {
+        // test with application identity
+        runImmediateTest(taskOwner);
+        // test with un-mapped identity
+        Identity newOwner = new IdentityImpl("id");
+        runImmediateTest(newOwner);
+        // test with mapped identity
+        mappingService.assignNode(TestTaskServiceImpl.class,
+                                  newOwner);
+        runImmediateTest(newOwner);
     }
 
-    public void testRunImmediateTasks() throws Exception {
-        txn = createTransaction();
-        Counter counter = getClearedCounter();
-        for (int i = 0; i < 3; i++) {
-            taskService.scheduleTask(new NonManagedTask());
-	    dataService.markForUpdate(counter);
-            counter.increment();
-        }
-        txn.commit();
-        Thread.sleep(500);
-        txn = createTransaction();
-        assertCounterClear("Some immediate tasks did not run");
-        txn.abort(null);
+    private void runImmediateTest(Identity owner) throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    for (int i = 0; i < 3; i++) {
+                        taskService.scheduleTask(new NonManagedTask());
+                        counter.increment();
+                    }
+                }
+        }, owner);
+
+        Thread.sleep(200);
+        assertCounterClearXAction("Some immediate tasks did not run");
     }
 
     public void testRunNonRetriedTasks() throws Exception {
         // NOTE: this test assumes a certain structure in the TaskService.
         clearPendingTasksInStore();
 
-        txn = createTransaction();
-        taskService.scheduleTask(new NonRetryNonManagedTask(false));
-        txn.commit();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    taskService.scheduleTask(new NonRetryNonManagedTask(false));
+                }
+        }, taskOwner);
+
         Thread.sleep(200);
-        txn = createTransaction();
-        String name = dataService.nextServiceBoundName(PENDING_NS);
-        if ((name != null) && (name.startsWith(PENDING_NS)))
-            fail("Non-retried task didn't get removed from the pending set");
-        txn.abort(null);
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    String name = dataService.nextServiceBoundName(PENDING_NS);
+                    if ((name != null) && (name.startsWith(PENDING_NS)))
+                        fail("Non-retried task didn't get removed from " +
+                                "the pending set");
+                }
+        }, taskOwner);
 
         clearPendingTasksInStore();
-        txn = createTransaction();
-        taskService.scheduleTask(new NonRetryNonManagedTask(true));
-        txn.commit();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    taskService.scheduleTask(new NonRetryNonManagedTask(true));
+                }
+        }, taskOwner);
+
         Thread.sleep(200);
-        txn = createTransaction();
-        name = dataService.nextServiceBoundName(PENDING_NS);
-        if ((name != null) && (name.startsWith(PENDING_NS)))
-            fail("Non-retried task didn't get removed from the pending set");
-        txn.abort(null);
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    String name = dataService.nextServiceBoundName(PENDING_NS);
+                    if ((name != null) && (name.startsWith(PENDING_NS)))
+                        fail("Non-retried task didn't get removed from " +
+                                "the pending set");
+                }
+        }, taskOwner);
     }
 
     public void testRunPendingTasks() throws Exception {
-        txn = createTransaction();
-        Counter counter = getClearedCounter();
-        for (long i = 0; i < 3; i++) {
-            taskService.scheduleTask(new NonManagedTask(), i * 100L);
-	    dataService.markForUpdate(counter);
-            counter.increment();
-        }
-        txn.commit();
+        // test with application identity
+        runPendingTest(taskOwner);
+        // test with un-mapped identity
+        Identity newOwner = new IdentityImpl("id");
+        runPendingTest(newOwner);
+        // test with mapped identity
+        mappingService.assignNode(TestTaskServiceImpl.class, newOwner);
+        runPendingTest(newOwner);
+    }
+
+    private void runPendingTest(Identity owner) throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    AppContext.getDataManager();
+                    Counter counter = getClearedCounter();
+                    for (long i = 0; i < 3; i++) {
+                        taskService.scheduleTask(new NonManagedTask(),
+                                                 i * 100L);
+                        counter.increment();
+                    }
+                }
+        }, owner);
+
         Thread.sleep(500);
-        txn = createTransaction();
-        assertCounterClear("Some pending tasks did not run");
-        txn.abort(null);
+        assertCounterClearXAction("Some pending tasks did not run");
     }
 
     public void testRunPeriodicTasks() throws Exception {
-        txn = createTransaction();
-        Counter counter = getClearedCounter();
-        for (int i = 0; i < 3; i++) {
-            PeriodicTaskHandle handle =
-                taskService.schedulePeriodicTask(new NonManagedTask(),
-                                                 0L, 500L);
-            dataService.setBinding("runHandle." + i,
-                                   new ManagedHandle(handle));
-	    dataService.markForUpdate(counter);
-            counter.increment();
-            counter.increment();
-        }
-        txn.commit();
+        // test with application identity
+        runPeriodicTest(taskOwner);
+        // test with un-mapped identity
+        Identity newOwner = new IdentityImpl("id");
+        runPeriodicTest(newOwner);
+        // test with mapped identity
+        mappingService.assignNode(TestTaskServiceImpl.class, newOwner);
+        runPeriodicTest(newOwner);
+    }
+
+    public void runPeriodicTest(Identity owner) throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    Counter counter = getClearedCounter();
+                    for (int i = 0; i < 3; i++) {
+                        PeriodicTaskHandle handle =
+                            taskService.schedulePeriodicTask(
+                                new NonManagedTask(), 20L * i, 500L);
+                        dataService.setBinding("runHandle." + i,
+                                               new ManagedHandle(handle));
+                        counter.increment();
+                        counter.increment();
+                    }
+                }
+        }, owner);
+
         Thread.sleep(750);
-        txn = createTransaction();
-        String name = dataService.nextBoundName("runHandle.");
-        while ((name != null) && (name.startsWith("runHandle."))) {
-            ManagedHandle mHandle =
-                dataService.getBinding(name, ManagedHandle.class);
-            mHandle.cancel();
-            dataService.removeObject(mHandle);
-            dataService.removeBinding(name);
-            name = dataService.nextBoundName(name);
-        }
-        assertCounterClear("Some periodic tasks did not run");
-        txn.commit();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    String name = dataService.nextBoundName("runHandle.");
+                    while ((name != null) && (name.startsWith("runHandle."))) {
+                        ManagedHandle mHandle =
+                            (ManagedHandle) dataService.getBinding(name);
+                        mHandle.cancel();
+                        dataService.removeObject(mHandle);
+                        dataService.removeBinding(name);
+                        name = dataService.nextBoundName(name);
+                    }
+                    assertCounterClear("Some periodic tasks did not run");
+                }
+        }, taskOwner);
     }
 
     public void testCancelPeriodicTasksBasic() throws Exception {
-        txn = createTransaction();
-        getClearedCounter();
-        
-        // test the basic cancel operation, within a transaction
-        PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 100L, 100L);
-        try {
-            handle.cancel();
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    getClearedCounter();
 
-        // test the basic cancel operation, between transactions
-        handle =
-            taskService.schedulePeriodicTask(new NonManagedTask(), 500L, 100L);
-        dataService.setBinding("TestTaskServiceImpl.handle",
-                               new ManagedHandle(handle));
-        txn.commit();
-        txn = createTransaction();
-        ManagedHandle mHandle =
-            dataService.getBinding("TestTaskServiceImpl.handle",
-                                   ManagedHandle.class);
-        try {
-            mHandle.cancel();
-        } catch (Exception e) {
-            fail("Did not expect Exception: " + e);
-        }
-        dataService.removeObject(mHandle);
-        dataService.removeBinding("TestTaskServiceImpl.handle");
-        txn.commit();
-        Thread.sleep(800);
-        txn = createTransaction();
-        assertCounterClear("Basic cancel of periodic tasks failed");
-        txn.abort(null);
+                    // test the basic cancel operation, within a transaction
+                    PeriodicTaskHandle handle =
+                        taskService.schedulePeriodicTask(
+                                            new ManagedTask(), 100L, 100L);
+                    try {
+                        handle.cancel();
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+
+                    // test the basic cancel operation, between transactions
+                    handle =
+                        taskService.schedulePeriodicTask(
+                                        new NonManagedTask(), 500L, 100L);
+                    dataService.setBinding("TestTaskServiceImpl.handle",
+                                           new ManagedHandle(handle));
+                }
+        }, taskOwner);
+
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    ManagedHandle mHandle = (ManagedHandle)
+			dataService.getBinding("TestTaskServiceImpl.handle");
+                    try {
+                        mHandle.cancel();
+                    } catch (Exception e) {
+                        fail("Did not expect Exception: " + e);
+                    }
+                    dataService.removeObject(mHandle);
+                    dataService.removeBinding("TestTaskServiceImpl.handle");
+                }
+        }, taskOwner);
+
+        Thread.sleep(500);
+        assertCounterClearXAction("Basic cancel of periodic tasks failed");
     }
 
     public void testCancelPeriodicTasksTxnCommitted() throws Exception {
-        txn = createTransaction();
-        Counter counter = getClearedCounter();
-        PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
-	dataService.markForUpdate(counter);
-        counter.increment();
-        txn.commit();
+        final CancelPeriodicTask task = new CancelPeriodicTask();
+        txnScheduler.runTask(task, taskOwner);
         try {
-            handle.cancel();
+            task.handle.cancel();
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
         }
-        Thread.sleep(300);
-        txn = createTransaction();
-        assertCounterClear("Cancel outside of transaction took effect");
-        txn.abort(null);
+        Thread.sleep(400);
+        assertCounterClearXAction("Cancel outside of transaction took effect");
+        
+        // Now cancel the task for real, to quiet messages during shutdown
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    task.handle.cancel();
+                }
+        }, taskOwner);
+    }
+    
+    private class CancelPeriodicTask extends AbstractKernelRunnable {
+        PeriodicTaskHandle handle;
+        public void run() {
+            Counter counter = getClearedCounter();
+            handle =
+                taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+            counter.increment();
+        }
     }
 
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
-        txn = createTransaction();
-        PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
-        txn.abort(null);
+        CancelPeriodTaskAbort task = new CancelPeriodTaskAbort();
         try {
-            handle.cancel();
+            txnScheduler.runTask(task, taskOwner);
+            fail("Expected the TransactionException we threw from task");
+        } catch (TransactionException expected) {
+            // Do nothing
+        }
+
+        try {
+            task.handle.cancel();
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
+        }
+    }
+    
+    private class CancelPeriodTaskAbort extends AbstractKernelRunnable {
+        PeriodicTaskHandle handle;
+        public void run() throws Exception {
+            handle = 
+                taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+            throw new TransactionException("simulate a transaction abort");
         }
     }
 
     public void testCancelPeriodicTasksTwice() throws Exception {
-        txn = createTransaction();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {    
+                    // test the basic cancel operation, within a transaction
+                    PeriodicTaskHandle handle =
+                        taskService.schedulePeriodicTask(
+                                            new ManagedTask(), 100L, 100L);
+                    handle.cancel();
+                    try {
+                        handle.cancel();
+                        fail("Expected ObjectNotFoundException");
+                    } catch (ObjectNotFoundException e) {
+                        System.err.println(e);
+                    }
 
-        // test the basic cancel operation, within a transaction
-        PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 100L, 100L);
-        handle.cancel();
-        try {
-            handle.cancel();
-            fail("Expected ObjectNotFoundException");
-        } catch (ObjectNotFoundException e) {
-            System.err.println(e);
-        }
+                    // test the basic cancel operation, between transactions
+                    handle =
+                        taskService.schedulePeriodicTask(new NonManagedTask(),
+                                                         500L, 500L);
+                    dataService.setBinding("TestTaskServiceImpl.handle",
+                                           new ManagedHandle(handle));
+                }
+        }, taskOwner);
 
-        // test the basic cancel operation, between transactions
-        handle =
-            taskService.schedulePeriodicTask(new NonManagedTask(),
-                                             500L, 500L);
-        dataService.setBinding("TestTaskServiceImpl.handle",
-                               new ManagedHandle(handle));
-        txn.commit();
-        txn = createTransaction();
-        ManagedHandle mHandle =
-            dataService.getBinding("TestTaskServiceImpl.handle",
-                                   ManagedHandle.class);
-        mHandle.cancel();
-        txn.commit();
-        txn = createTransaction();
-        try {
-            mHandle.cancel();
-            fail("Expected ObjectNotFoundException");
-        } catch (ObjectNotFoundException e) {
-            System.err.println(e);
+        final GetManagedHandleTask task = new GetManagedHandleTask();
+        txnScheduler.runTask(task, taskOwner);
+        
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {   
+                    try {
+                        task.mHandle.cancel();
+                        fail("Expected ObjectNotFoundException");
+                    } catch (ObjectNotFoundException e) {
+                        System.err.println(e);
+                    }
+                    dataService.removeObject(task.mHandle);
+                    dataService.removeBinding("TestTaskServiceImpl.handle");
+                }
+        }, taskOwner);
+    }
+    
+    private class GetManagedHandleTask extends AbstractKernelRunnable {
+        ManagedHandle mHandle;
+        public void run() {
+            mHandle = (ManagedHandle) dataService.getBinding(
+		"TestTaskServiceImpl.handle");
+            mHandle.cancel(); 
         }
-        dataService.removeObject(mHandle);
-        dataService.removeBinding("TestTaskServiceImpl.handle");
-        txn.commit();
     }
 
     public void testCancelPeriodicTasksTaskRemoved() throws Exception {
-        txn = createTransaction();
-        getClearedCounter();
-        ManagedTask task = new ManagedTask();
-        dataService.setBinding("TestTaskServiceImpl.task", task);
-        PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(task, 500L, 100L);
-        dataService.setBinding("TestTaskServiceImpl.handle",
-                               new ManagedHandle(handle));
-        txn.commit();
-        txn = createTransaction();
-        dataService.
-            removeObject(dataService.
-                         getBinding("TestTaskServiceImpl.task",
-                                    ManagedObject.class));
-        txn.commit();
-        txn = createTransaction();
-        ManagedHandle mHandle =
-            dataService.getBinding("TestTaskServiceImpl.handle",
-                                   ManagedHandle.class);
-        try {
-            mHandle.cancel();
-        } catch (ObjectNotFoundException e) {
-            fail("Did not exxpect ObjectNotFoundException");
-        }
-        dataService.removeObject(mHandle);
-        dataService.removeBinding("TestTaskServiceImpl.handle");
-        dataService.removeBinding("TestTaskServiceImpl.task");
-        txn.commit();
+         txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() { 
+                    getClearedCounter();
+                    ManagedTask task = new ManagedTask();
+                    dataService.setBinding("TestTaskServiceImpl.task", task);
+                    PeriodicTaskHandle handle =
+                        taskService.schedulePeriodicTask(task, 500L, 100L);
+                    dataService.setBinding("TestTaskServiceImpl.handle",
+                                           new ManagedHandle(handle));
+                }
+         }, taskOwner);
+
+         txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    dataService.removeObject(
+			dataService.getBinding("TestTaskServiceImpl.task"));
+                }
+         }, taskOwner);
+
+         txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    ManagedHandle mHandle =
+                        (ManagedHandle) dataService.getBinding(
+			    "TestTaskServiceImpl.handle");
+                    try {
+                        mHandle.cancel();
+                    } catch (ObjectNotFoundException e) {
+                        fail("Did not exxpect ObjectNotFoundException");
+                    }
+                    dataService.removeObject(mHandle);
+                    dataService.removeBinding("TestTaskServiceImpl.handle");
+                    dataService.removeBinding("TestTaskServiceImpl.task");
+                }
+         }, taskOwner);
+
         Thread.sleep(800);
-        txn = createTransaction();
-        assertCounterClear("TaskRemoved cancel of periodic tasks failed");
-        txn.abort(null);
+        assertCounterClearXAction("cancel of periodic tasks failed");
     }
 
     /**
      * TaskService tests.
      */
 
-    public void testNonDurableTasksNonDurable() {
-        // FIXME: when we can do shutdown, make sure that non-durable tasks
-        // are indeed non-durable (i.e., they don't get saved and re-started
-        // when the system comes back up)
+    public void testScheduleNonDurableTaskNullArgs() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    try {
+                        taskService.scheduleNonDurableTask(null, false);
+                        fail("Expected NullPointerException");
+                    } catch (NullPointerException e) {
+                        System.err.println(e);
+                    }
+                    try {
+                        taskService.scheduleNonDurableTask(null, 10, false);
+                        fail("Expected NullPointerException");
+                    } catch (NullPointerException e) {
+                        System.err.println(e);
+                    }
+                }
+        }, taskOwner);
     }
 
-    public void testScheduleNonDurableTaskNullArgs() {
-        txn = createTransaction();
-        try {
-            taskService.scheduleNonDurableTask(null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleNonDurableTask(null, 10);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleNonDurableTask(null, Priority.MEDIUM);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleNonDurableTask(new KernelRunnableImpl(null),
-                                               null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
-    }
-
-    public void testScheduleNonDurableTaskNegativeTime() {
-        txn = createTransaction();
-        KernelRunnable r = new DummyKernelRunnable();
-        try {
-            taskService.scheduleNonDurableTask(r, -1L);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
-        txn.abort(null);
+    public void testScheduleNonDurableTaskNegativeTime() throws Exception {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    KernelRunnable r = new DummyKernelRunnable();
+                    try {
+                        taskService.scheduleNonDurableTask(r, -1L, false);
+                        fail("Expected IllegalArgumentException");
+                    } catch (IllegalArgumentException e) {
+                        System.err.println(e);
+                    }
+                }
+        }, taskOwner);
     }
 
     public void testScheduleNonDurableTaskNoTransaction() {
         KernelRunnableImpl task = new KernelRunnableImpl(null);
         try {
-            taskService.scheduleNonDurableTask(task);
+            taskService.scheduleNonDurableTask(task, false);
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
         }
         try {
-            taskService.scheduleNonDurableTask(task, 100L);
-            fail("Expected TransactionNotActiveException");
-        } catch (TransactionNotActiveException e) {
-            System.err.println(e);
-        }
-        try {
-            taskService.scheduleNonDurableTask(task, Priority.MEDIUM);
+            taskService.scheduleNonDurableTask(task, 100L, false);
             fail("Expected TransactionNotActiveException");
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
@@ -702,105 +811,163 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunImmediateNonDurableTasks() throws Exception {
-        Counter counter = new Counter();
-        txn = createTransaction();
-        for (int i = 0; i < 3; i++) {
-            taskService.
-                scheduleNonDurableTask(new KernelRunnableImpl(counter));
-	    dataService.markForUpdate(counter);
-            counter.increment();
-        }
-        txn.commit();
-        Thread.sleep(500);
-        if (! counter.isZero())
-            fail("Some immediate non-durable tasks did not run");
+        final AtomicInteger count = new AtomicInteger(3);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                count.decrementAndGet();
+                            }
+                        };
+                    for (int i = 0; i < 3; i++)
+                        taskService.scheduleNonDurableTask(r, false);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
     }
 
     public void testRunPendingNonDurableTasks() throws Exception {
-        Counter counter = new Counter();
-        txn = createTransaction();
-        for (long i = 0; i < 3; i++) {
-            taskService.
-                scheduleNonDurableTask(new KernelRunnableImpl(counter),
-                                       i * 100L);
-	    dataService.markForUpdate(counter);
-            counter.increment();
-        }
-        txn.commit();
-        Thread.sleep(500);
-        if (! counter.isZero())
-            fail("Some pending non-durable tasks did not run");
+        final AtomicInteger count = new AtomicInteger(3);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                count.decrementAndGet();
+                            }
+                        };
+                    for (int i = 0; i < 3; i++)
+                        taskService.scheduleNonDurableTask(r, i * 100L, false);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
+    }
+
+    public void testRunNonDurableTransactionalTasks() throws Exception {
+        final AtomicInteger count = new AtomicInteger(2);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                // make sure that we're run in a transaction
+                                serverNode.getProxy().getCurrentTransaction();
+                                count.decrementAndGet();
+                            }
+                        };
+                    taskService.scheduleNonDurableTask(r, true);
+                    taskService.scheduleNonDurableTask(r, 100, true);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
+    }
+
+    public void testRunNonDurableNonTransactionalTasks() throws Exception {
+        final AtomicInteger count = new AtomicInteger(2);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    KernelRunnable r = new AbstractKernelRunnable() {
+                            public void run() throws Exception {
+                                try {
+                                    serverNode.getProxy().
+                                        getCurrentTransaction();
+                                } catch (TransactionNotActiveException tnae) {
+                                    // make sure we're not in a transaction
+                                    count.decrementAndGet();
+                                }
+                            }
+                        };
+                    taskService.scheduleNonDurableTask(r, false);
+                    taskService.scheduleNonDurableTask(r, 100, false);
+                }
+            }, taskOwner);
+
+        Thread.sleep(500L);
+        assertEquals(0, count.get());
+    }
+
+    public void testRecoveryCleanup() throws Exception {
+        final SgsTestNode node = new SgsTestNode(serverNode, null, null);
+        final SgsTestNode node2 = new SgsTestNode(serverNode, null, null);
+        final String name =
+            TaskServiceImpl.DS_PREFIX + "Handoff." + node.getNodeId();
+        // verify that the handoff binding exists
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() throws Exception {
+                    try {
+                        dataService.getServiceBinding(name);
+                    } catch (NameNotBoundException nnbe) {
+                        node.shutdown(false);
+                        node2.shutdown(false);
+                        throw nnbe;
+                    }
+                }
+        }, taskOwner);
+        // shutdown the node and verify that the handoff removal happens
+        node.shutdown(false);
+        String interval = serverNode.getServiceProperties().
+            getProperty("com.sun.sgs.impl.service.watchdog.renew.interval",
+                        "500");
+        Thread.sleep(3 * Long.valueOf(interval));
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    try {
+                        dataService.getServiceBinding(name);
+                        fail("Expected NameNotBoundException");
+                    } catch (NameNotBoundException nnbe) {}
+                }
+        }, taskOwner);
+        node2.shutdown(false);
     }
 
     /**
      * Utility routines.
      */
 
-    private DummyTransaction createTransaction() {
-        DummyTransaction txn = new DummyTransaction();
-        txnProxy.setCurrentTransaction(txn);
-        return txn;
-    }
-
-    private DummyTransaction createTransaction(long timeout) {
-        DummyTransaction txn = new DummyTransaction(timeout);
-        txnProxy.setCurrentTransaction(txn);
-        return txn;
-    }
-
-    private DataServiceImpl createDataService(String directory)
-	throws Exception
-    {
-        File dir = new File(directory);
-        if (! dir.exists()) {
-            if (! dir.mkdir()) {
-                throw new RuntimeException("couldn't create db directory: " +
-                                           directory);
-            }
-        }
-
-        Properties properties = new Properties();
-        properties.setProperty("com.sun.sgs.impl.service.data.store." +
-                               "DataStoreImpl.directory", directory);
-        properties.setProperty(StandardProperties.APP_NAME,
-                               "TestTaskServiceImpl");
-        return new DataServiceImpl(properties, systemRegistry, txnProxy);
-    }
-
-    private void deleteDirectory(String directory) {
-        File dir = new File(directory);
-        if (dir.exists()) {
-            for (File file : dir.listFiles())
-                if (! file.delete())
-                    throw new RuntimeException("couldn't delete: " + file);
-            if (! dir.delete())
-                throw new RuntimeException("couldn't remove: " + dir);
-        }
-    }
-
     private void clearPendingTasksInStore() throws Exception {
-        txn = createTransaction();
-        String name = dataService.nextServiceBoundName(PENDING_NS);
-        while ((name != null) && (name.startsWith(PENDING_NS))) {
-            ManagedObject obj =
-                dataService.getBinding(name, ManagedObject.class);
-            dataService.removeObject(obj);
-            dataService.removeBinding(name);
-        }
-        txn.commit();
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    String name = dataService.nextServiceBoundName(PENDING_NS);
+                    while ((name != null) && (name.startsWith(PENDING_NS))) {
+                        ManagedObject obj = dataService.getBinding(name);
+                        dataService.removeObject(obj);
+                        dataService.removeBinding(name);
+                    }
+                }
+        }, taskOwner);
     }
 
     private Counter getClearedCounter() {
-        Counter counter = dataService.getBinding("counter", Counter.class);
-	dataService.markForUpdate(counter);
+        Counter counter = (Counter) dataService.getBinding("counter");
+        dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }
 
     private void assertCounterClear(String message) {
-        Counter counter = dataService.getBinding("counter", Counter.class);
-        if (! counter.isZero())
+        Counter counter = (Counter) dataService.getBinding("counter");
+        if (! counter.isZero()) {
+            System.err.println("Counter assert failed: " + counter);
             fail(message);
+        }
+    }
+    
+    private void assertCounterClearXAction(final String message) 
+        throws Exception
+    {
+        txnScheduler.runTask(
+            new AbstractKernelRunnable() {
+                public void run() {
+                    assertCounterClear(message);
+                }
+        }, taskOwner);
     }
 
     /**
@@ -814,13 +981,14 @@ public class TestTaskServiceImpl extends TestCase {
         public void increment() { count++; }
         public void decrement() { count--; }
         public boolean isZero() { return count == 0; }
+        public String toString() { return "Counter value = " + count; }
     }
 
     public static abstract class AbstractTask implements Task, Serializable {
         public void run() throws Exception {
             DataManager dataManager = AppContext.getDataManager();
-            Counter counter = dataManager.getBinding("counter", Counter.class);
-	    dataManager.markForUpdate(counter);
+            Counter counter = (Counter) dataManager.getBinding("counter");
+            dataManager.markForUpdate(counter);
             counter.decrement();
         }
     }

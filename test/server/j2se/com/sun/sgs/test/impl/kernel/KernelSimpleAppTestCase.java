@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -155,6 +156,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 		}
 	    }
 	    void handleLine(String line) {
+		System.err.println("stdin: " + line);
 		handleInput(line);
 	    }
 	}
@@ -164,6 +166,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 		super(err);
 	    }
 	    void handleLine(String line) {
+		System.err.println("stderr: " + line);
 		handleError(line);
 	    }
 	}
@@ -224,17 +227,5 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	abstract void handleInput(String line);
 	/** Handles a line of input from standard error. */
 	abstract void handleError(String line);
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 }

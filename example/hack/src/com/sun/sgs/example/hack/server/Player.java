@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,7 +20,6 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
@@ -29,12 +28,15 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
 import com.sun.sgs.example.hack.server.level.Level;
+import com.sun.sgs.example.hack.server.util.UtilChannel;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.io.Serializable;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 import java.util.Collection;
 
@@ -71,17 +73,21 @@ public class Player
     private String name;
 
     // the uid currently assigned to this player
-    private ClientSession currentSession;
+    private ManagedReference<ClientSession> currentSessionRef;
 
     // the channel that this player is currently using
-    private Channel channel;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the game the user is currently playing, and its message handler
-    private ManagedReference gameRef;
+    private ManagedReference<Game> gameRef;
     private MessageHandler messageHandler = null;
 
     // this player's character manager
-    private ManagedReference characterManagerRef;
+    private ManagedReference<PlayerCharacterManager> characterManagerRef;
+
+    private UtilChannel channel() {
+        return channelRef == null ? null : channelRef.get();
+    }
 
     /**
      * Creates a <code>Player</code> instance.
@@ -90,8 +96,8 @@ public class Player
      */
     private Player(String name) {
         playing = false;
-        channel = null;
-        currentSession = null;
+        channelRef = null;
+        currentSessionRef = null;
         this.name = name;
         characterManagerRef = AppContext.getDataManager().
             createReference(new PlayerCharacterManager(this));
@@ -112,7 +118,7 @@ public class Player
         // try to lookup the existing Player
         Player player = null;
         try {
-            player = dataManager.getBinding(NAME_PREFIX + name, Player.class);
+            player = (Player) dataManager.getBinding(NAME_PREFIX + name);
         } catch (NameNotBoundException e) {
             player = new Player(name);
             dataManager.setBinding(NAME_PREFIX + name, player);
@@ -148,7 +154,7 @@ public class Player
      * @return the character manager
      */
     public PlayerCharacterManager getCharacterManager() {
-        return characterManagerRef.get(PlayerCharacterManager.class);
+        return characterManagerRef.get();
     }
 
     /**
@@ -160,8 +166,16 @@ public class Player
      * @param uid the player's user identifier
      */
     public void setCurrentSession(ClientSession session) {
-        AppContext.getDataManager().markForUpdate(this);
-        this.currentSession = session;
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.markForUpdate(this);
+        currentSessionRef = dataMgr.createReference(session);
+        
+        // Also inform the client of the session ID
+        // FIXME, this is hacked in as the only non-channel message
+        // for ease of porting -JM
+        BigInteger sid = currentSessionRef.getId();
+        byte[] bytes = sid.toByteArray();
+        session.send(ByteBuffer.wrap(bytes));
     }
 
     /**
@@ -173,7 +187,7 @@ public class Player
      *         currently playing
      */
     public ClientSession getCurrentSession() {
-        return currentSession;
+        return currentSessionRef == null ? null : currentSessionRef.get();
     }
 
     /**
@@ -196,9 +210,8 @@ public class Player
 
         // if we were previously playing a game, leave it
         if (isPlaying()) {
-            gameRef.getForUpdate(Game.class).leave(this);
-            characterManagerRef.getForUpdate(PlayerCharacterManager.class).
-                setCurrentLevel(null);
+            gameRef.getForUpdate().leave(this);
+            characterManagerRef.getForUpdate().setCurrentLevel(null);
             playing = false;
         }
 
@@ -216,7 +229,7 @@ public class Player
 
         // if we're no longer playing, then our user id is no longer valid
         if (! playing)
-            this.currentSession = null;
+            this.currentSessionRef = null;
     }
 
     /**
@@ -226,8 +239,7 @@ public class Player
      * checking when leaving dungeons).
      */
     public void leaveCurrentLevel() {
-        PlayerCharacterManager pcm =
-            characterManagerRef.get(PlayerCharacterManager.class);
+        PlayerCharacterManager pcm = characterManagerRef.get();
         Level level = pcm.getCurrentLevel();
 
         if (level != null) {
@@ -243,17 +255,18 @@ public class Player
      *
      * @param cid the new channel
      */
-    public void userJoinedChannel(Channel newChannel) {
-        AppContext.getDataManager().markForUpdate(this);
-        channel = newChannel;
+    public void userJoinedChannel(UtilChannel newChannel) {
+        DataManager dataManager = AppContext.getDataManager();
+        dataManager.markForUpdate(this);
+        channelRef = dataManager.createReference(newChannel);
     }
 
     /**
      * Called when data arrives from the a user. In this case, this is called
      * any time the client associated with this <code>Player</code> sends
-     * a message directly to the server (ie, not a broadcast message like a
+     * a message directly to the server (i.e., not a broadcast message like a
      * chat comment). This method, therefore, is the handler for all client
-     * messages, and so we hold the lock on the <code>Plyer</code> and not
+     * messages, and so we hold the lock on the <code>Player</code> and not
      * some more generally shared logic while we're processing messages.
      * <p>
      * Note that this method only gets called when the client sends messages
@@ -265,11 +278,13 @@ public class Player
      *            current uid
      * @param data the message
      */
-    public void receivedMessage(byte [] message) {
+    public void receivedMessage(ByteBuffer message) {
         // call the message handler to interpret the message ... note that the
         // proxy model here means that we're blocking the player, and not the
         // game itself, while we're handling the message
-        messageHandler.handleMessage(this, message);
+        byte[] messageBytes = new byte[message.remaining()];
+        message.get(messageBytes);
+        messageHandler.handleMessage(this, messageBytes);
     }
 
     public void disconnected(boolean graceful) {
@@ -283,7 +298,7 @@ public class Player
      * @param board the <code>Board</code> to send
      */
     public void sendBoard(Board board) {
-        Messages.sendBoard(board, channel, currentSession);
+        Messages.sendBoard(board, channel(), getCurrentSession());
     }
 
     /**
@@ -293,8 +308,8 @@ public class Player
      * @param updates the updates to send
      */
     public void sendUpdate(Collection<BoardSpace> updates) {
-        Messages.sendUpdate(updates, channel,
-                            new ClientSession [] {currentSession});
+        Messages.sendUpdate(updates, channel(),
+                            new ClientSession [] {getCurrentSession()});
     }
 
     /**
@@ -305,7 +320,7 @@ public class Player
      */
     public void sendCharacter(PlayerCharacter character) {
         Messages.sendCharacter(character.getID(), character.getStatistics(),
-                               channel, currentSession);
+                               channel(), getCurrentSession());
     }
 
     /**
@@ -316,7 +331,7 @@ public class Player
      * @param stats the character statistics
      */
     public void sendCharacterStats(int id, CharacterStats stats) {
-        Messages.sendCharacter(id, stats, channel, currentSession);
+        Messages.sendCharacter(id, stats, channel(), getCurrentSession());
     }
 
     /**
@@ -327,7 +342,7 @@ public class Player
      * @param message the message to send
      */
     public void sendTextMessage(String message) {
-        Messages.sendTextMessage(message, channel, currentSession);
+        Messages.sendTextMessage(message, channel(), getCurrentSession());
     }
 
 }

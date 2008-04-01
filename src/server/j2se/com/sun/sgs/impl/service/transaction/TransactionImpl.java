@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -87,7 +87,7 @@ final class TransactionImpl implements Transaction {
 
     /**
      * The exception that caused the transaction to be aborted, or null if no
-     * cause was provided or if no abort occurred.
+     * abort occurred.
      */
     private Throwable abortCause = null;
 
@@ -135,10 +135,30 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void checkTimeout() {
+	assert Thread.currentThread() == owner : "Wrong thread";
+	logger.log(Level.FINEST, "checkTimeout {0}", this);
+	switch (state) {
+	case ABORTED:
+	case COMMITTED:
+	    throw new TransactionNotActiveException(
+		"Transaction is not active: " + state);
+	case ABORTING:
+	case COMMITTING:
+	    return;
+	case ACTIVE:
+	case PREPARING:
+	    break;
+	default:
+	    throw new AssertionError();
+	}
 	long runningTime = System.currentTimeMillis() - getCreationTime();
-	if (runningTime > getTimeout())
-	    throw new TransactionTimeoutException("transaction timed out: " +
-						  runningTime + " ms");
+	if (runningTime > getTimeout()) {
+	    TransactionTimeoutException exception =
+		new TransactionTimeoutException(
+		    "transaction timed out: " + runningTime + " ms");
+	    abort(exception);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */
@@ -172,7 +192,7 @@ final class TransactionImpl implements Transaction {
 		    "Attempt to add multiple durable participants");
 	    }
 	    if (collector != null) {
-		String name = participant.getClass().getName();
+		String name = participant.getTypeName();
 		detailMap.put(name, new ProfileParticipantDetailImpl(name));
 	    }
 	}
@@ -181,6 +201,8 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public void abort(Throwable cause) {
 	assert Thread.currentThread() == owner : "Wrong thread";
+	if (cause == null)
+	    throw new NullPointerException("The cause cannot be null");
 	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
 	case ACTIVE:
@@ -194,7 +216,7 @@ final class TransactionImpl implements Transaction {
 	case COMMITTING:
 	case COMMITTED:
 	    throw new IllegalStateException(
-		"Transaction is not active: " + state);
+		"Transaction is not active: " + state, cause);
 	default:
 	    throw new AssertionError();
 	}
@@ -221,7 +243,7 @@ final class TransactionImpl implements Transaction {
 	    if (collector != null) {
 		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
-		    detailMap.get(participant.getClass().getName());
+		    detailMap.get(participant.getTypeName());
 		detail.setAborted(finishTime - startTime);
 		collector.addParticipant(detail);
 	    }
@@ -247,7 +269,10 @@ final class TransactionImpl implements Transaction {
      * @return	a string representation of this instance
      */
     public String toString() {
-	return "TransactionImpl[tid:" + tid + "]";
+	return "TransactionImpl[tid:" + tid +
+	    ", creationTime:" + creationTime +
+	    ", timeout:" + timeout +
+	    ", state:" + state + "]";
     }
 
     /**
@@ -307,7 +332,7 @@ final class TransactionImpl implements Transaction {
 	{
 	    TransactionParticipant participant = iter.next();
 	    if (collector != null) {
-		detail = detailMap.get(participant.getClass().getName());
+		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -367,7 +392,7 @@ final class TransactionImpl implements Transaction {
 			   this, participant);
 	    }
 	    if (collector != null) {
-		detail = detailMap.get(participant.getClass().getName());
+		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,17 +19,17 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
@@ -116,7 +116,10 @@ import java.util.logging.Logger;
  *
  * This class is public for testing.
  */
-public class NodeMappingServerImpl implements NodeMappingServer {
+public final class NodeMappingServerImpl 
+        extends AbstractService 
+        implements NodeMappingServer 
+{
     /** Package name for this class. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
@@ -155,15 +158,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** The exporter for this server */
     private final Exporter<NodeMappingServer> exporter;
-
-    /** The task scheduler, for our transactional, synchronous tasks. */
-    private final TaskScheduler taskScheduler;
-    
-    /** The proxy owner for our transactional, synchronous tasks. */
-    private final TaskOwner taskOwner;
-    
-    /** The data service. */
-    final DataService dataService;
     
     /** The watchdog service. */
     final WatchdogService watchdogService;
@@ -173,31 +167,11 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     private final NodeAssignPolicy assignPolicy;
 
     /** The thread that removes inactive identities */
-    // TODO:  should this be a TaskScheduler.scheduleRecurringTask? Or
-    // maybe called via ResourceCoordinator.startTask?
+    // TODO:  should this be a TaskScheduler.scheduleRecurringTask?
     private final Thread removeThread;
     
      /** Our watchdog node listener. */
     private final NodeListener watchdogNodeListener;
-    
-    /** Lock object for service state */
-    private final Object stateLock = new Object();
-    
-    /** The possible states of this instance. */
-    enum State {
-	/** After ready call and before shutdown */
-	RUNNING,
-	/** After start of a call to shutdown and before call finishes */
-	SHUTTING_DOWN,
-	/** After shutdown has completed successfully */
-	SHUTDOWN
-    }
-
-    /** The current state of this instance. */
-    private State state;
-    
-    /** The count of calls in progress, protected by stateLock. */
-    private int callsInProgress = 0;
     
     /** Our string representation, used by toString(). */
     private final String fullName;
@@ -239,19 +213,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                                  TransactionProxy txnProxy)  
          throws Exception 
     {     
-        if (systemRegistry == null) {
-            throw new NullPointerException("null system registry");
-        } else if (txnProxy == null) {
-            throw new NullPointerException("null transaction proxy");
-        }
-        
+        super(properties, systemRegistry, txnProxy, logger);
+
         logger.log(Level.CONFIG, 
                    "Creating NodeMappingServerImpl properties:{0}", properties); 
         
-        taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-        dataService = txnProxy.getService(DataService.class);
         watchdogService = txnProxy.getService(WatchdogService.class);
-        taskOwner = txnProxy.getCurrentOwner();
        
  	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         int requestedPort = wrappedProps.getIntProperty(
@@ -268,13 +235,16 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 properties, this);
         }
         
-        // Restore any old data from the data service.
-        runTransactionally(
-                new AbstractKernelRunnable() {
-                    public void run() {
-                        NodeMapUtil.handleDataVersion(dataService, logger);
-                    }
-                });
+        /*
+         * Check service version.
+         */
+        transactionScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    checkServiceVersion(
+                        NodeMapUtil.VERSION_KEY, 
+                        NodeMapUtil.MAJOR_VERSION, 
+                        NodeMapUtil.MINOR_VERSION);
+                }},  taskOwner);
         
         // Create and start the remove thread, which removes unused identities
         // from the map.
@@ -288,10 +258,6 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         watchdogNodeListener = new Listener();
         watchdogService.addNodeListener(watchdogNodeListener);   
         
-        synchronized(stateLock) {
-            state = State.RUNNING;
-        }
-        
         // Export ourselves.  At this point, this object is public.
         exporter = new Exporter<NodeMappingServer>(NodeMappingServer.class);
         port = exporter.export(this, SERVER_EXPORT_NAME, requestedPort);
@@ -304,42 +270,36 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                    ", port:" + port + "]";
     }
     
-    /*- service like methods, which support lifecycle activities -*/
+    /* -- Implement AbstractService -- */
+
+    /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+    /** {@inheritDoc} */
+    protected void doReady() {
+        // Do nothing.
+    }
     
     /** 
-     * Shut down this server.  Called from the instantiating service.
-     * 
-     * @return {@code true} if everything shut down cleanly
+     * {@inheritDoc} 
+     * Called from the instantiating service
      */
-    boolean shutdown() {
-        logger.log(Level.FINEST, "Shutting down");
-        synchronized(stateLock) {
-            state = State.SHUTTING_DOWN;
-            while (callsInProgress > 0) {
-		try {
-		    stateLock.wait();
-		} catch (InterruptedException e) {
-		    return false;
-		}
-	    }
-        }
-
-        boolean ok = exporter.unexport();
+    protected void doShutdown() {
+        exporter.unexport();
         try {
-        if (removeThread != null) {
-            removeThread.interrupt();
-            removeThread.join();
-        }
+            if (removeThread != null) {
+                removeThread.interrupt();
+                removeThread.join();
+            }
         } catch (InterruptedException e) {
-            logger.logThrow(Level.WARNING, e, "Failure while shutting down");
-            ok = false;
+            // Do nothing
         }
-
-        synchronized(stateLock) {
-            state = State.SHUTDOWN;
-        }
-
-        return ok;
     }
 
     /**
@@ -351,48 +311,13 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     public String toString() {
 	return fullName;
     }
-    
-    /**
-     * Increments the number of calls in progress.  This method should
-     * be invoked by remote methods to both increment in progress call
-     * count and to check the state of this server.  When the call has
-     * completed processing, the remote method should invoke {@link
-     * #callFinished callFinished} before returning.
-     *
-     * @param check {@code true} if we should check the state
-     * @throws	IllegalStateException if this service is not configured
-     *		or is shutting down
-     */
-    private void callStarted(boolean check) {
-	synchronized (stateLock) {
-            if (check && state != State.RUNNING) {
-		throw new IllegalStateException("service not running");
-            }
-	    callsInProgress++;
-	}
-    }
 
-    /**
-     * Decrements the in progress call count, and if this server is
-     * shutting down and the count reaches 0, then notify the waiting
-     * shutdown thread that it is safe to continue.  A remote method
-     * should invoke this method when it has completed processing.
-     */
-    private void callFinished() {
-	synchronized (stateLock) {
-	    callsInProgress--;
-	    if (state == State.SHUTTING_DOWN && callsInProgress == 0) {
-		stateLock.notifyAll();
-	    }
-	}
-    }
-    
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
     public void assignNode(Class service, Identity identity) throws IOException 
     {
-        callStarted(true);    
+        callStarted();    
         try {
             if (identity == null) {
                 throw new NullPointerException("null id");
@@ -407,15 +332,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 CheckTask checkTask = new CheckTask(identity, serviceName);
                 runTransactionally(checkTask);
 
-                if (checkTask.isAssignedToLiveNode()) {
+                if (checkTask.idFound() && checkTask.isAssignedToLiveNode()) {
                     return;
                 } else {
                     // The node is dead.  We need to map to a new node.
                     node = checkTask.getNode();
                 }
-            } catch (NameNotBoundException nnbe) {
-                // Do nothing.  We expect this exception if the id isn't in
-                // the map yet.
             } catch (Exception ex) {
                 // Log the failure, but continue on - treat it as though the
                 // identity wasn't found.
@@ -449,8 +371,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         private final String idkey;
         private final String serviceName;
         private final Identity id;
+        /** return value, was the identity found? */
+        private boolean found = false;
         /** return value, was node alive? */
-        boolean isAlive = false;
+        private boolean isAlive = false;
         /** return value, node assignment */
         private Node node;
         CheckTask(Identity id, String serviceName) {
@@ -459,33 +383,41 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             this.id = id;
         }
         public void run() {
-            IdentityMO idmo = 
-                dataService.getServiceBinding(idkey, IdentityMO.class);
-            long nodeId = idmo.getNodeId();
-            
-            isAlive = watchdogService.getNode(nodeId).isAlive();
-            if (!isAlive) {
-                // Caller can get result from getNodeId()
+            try {
+                IdentityMO idmo = 
+		    (IdentityMO) dataService.getServiceBinding(idkey);
+
+                found = true;
+                long nodeId = idmo.getNodeId();
+
                 node = watchdogService.getNode(nodeId);
-                return;
+                isAlive = (node != null && node.isAlive());
+                if (!isAlive) {
+                    return;
+                }
+                // The identity already has an assignment but we still 
+                // need to update the status.  TODO functionality still
+                // required?  Should assignNode not set the status?
+                final String statuskey = 
+                        NodeMapUtil.getStatusKey(id, nodeId, serviceName);
+                dataService.setServiceBinding(statuskey, idmo);
+                logger.log(Level.FINEST, "assignNode id:{0} already on {1}", 
+                           id, nodeId);
+            } catch (NameNotBoundException nnbe) {
+                // Do nothing.  We expect this exception if the id isn't in
+                // the map yet.   Found is already set to false.
+                found = false;
             }
-            // The identity already has an assignment but we still 
-            // need to update the status.  TODO functionality still
-            // required?  Should assignNode not set the status?
-            final String statuskey = 
-                    NodeMapUtil.getStatusKey(id, nodeId, serviceName);
-            dataService.setServiceBinding(statuskey, idmo);
-            logger.log(Level.FINEST, "assignNode id:{0} already on {1}", 
-                       id, nodeId);
         }
         
+        public boolean idFound()                { return found;   }
         public boolean isAssignedToLiveNode()   { return isAlive; }
         public Node getNode()                   { return node;    }
     }
 
     /** {@inheritDoc} */
     public void canRemove(Identity id) throws IOException {
-        callStarted(true);
+        callStarted();
         
         try {
             removeQueue.add(new RemoveInfo(id));
@@ -603,7 +535,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
 
             if (dead) {
                 IdentityMO idmo = 
-                        dataService.getServiceBinding(idkey, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(idkey);
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -620,7 +552,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         boolean isDead() {
             return dead;
         }
-        /** Returns the node id for the node the identity was removed from. */
+        /** Returns the node the identity was removed from, which can be
+         *  null if the node has failed and been removed from the data store.
+         */
         Node getNode() {
             return node;
         } 
@@ -630,8 +564,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     public void registerNodeListener(NotifyClient client, long nodeId) 
         throws IOException
     {
-        // OK to call any time
-        callStarted(false);
+        callStarted();
         
         try {
             notifyMap.put(nodeId, client);
@@ -648,8 +581,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * Also called internally when we hear a node has died.
      */
     public void unregisterNodeListener(long nodeId) throws IOException {
-        // OK to call at any time
-        callStarted(false);
+        callStarted();
         
         try {
             // Tell the assign policy to stop assigning to the node
@@ -698,7 +630,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
     
     /** {@inheritDoc} */
     public boolean assertValid(Identity identity) throws Exception {
-        callStarted(true);
+        callStarted();
         
         try {
             AssertTask atask = new AssertTask(identity, dataService);
@@ -725,7 +657,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
      * @param task the task
      */
     void runTransactionally(KernelRunnable task) throws Exception {   
-        taskScheduler.runTransactionalTask(task, taskOwner);
+        transactionScheduler.runTask(task, taskOwner);
     }
     
     /**
@@ -754,7 +686,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
         try {
             newNodeId = assignPolicy.chooseNode(id);
         } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.WARNING, ex, "mapToNewNode: id {0} from {1}"
+            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
                     + " failed because no live nodes are available", 
                     id, oldNode);
             throw ex;
@@ -792,24 +724,38 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 public void run() {                   
                     // First, we clean up any old mappings.
                     if (oldNode != null) {
-                        // Find the old IdentityMO, with the old node info.
-                        IdentityMO oldidmo = 
-                            dataService.getServiceBinding(idkey, 
-                                                          IdentityMO.class);
-                        //Remove the old node->id key.
-                        dataService.removeServiceBinding(oldNodeKey);
+                        try {
+                            // Find the old IdentityMO, with the old node info.
+                            IdentityMO oldidmo = (IdentityMO)
+				dataService.getServiceBinding(idkey);
 
-                        // Remove the old status information.  We don't 
-                        // retain any info about the old node's status.
-                        Iterator<String> iter =
-                            BoundNamesUtil.getServiceBoundNamesIterator(
-                                dataService, oldStatusKey);
-                        while (iter.hasNext()) {
-                            iter.next();
-                            iter.remove();
+                            // Check once more for the assigned node - someone
+                            // else could have mapped it before we got here.
+                            // If so, just return.
+                            if (oldidmo.getNodeId() != oldNode.getId()) {
+                                return;
+                            }
+
+                            //Remove the old node->id key.
+                            dataService.removeServiceBinding(oldNodeKey);
+
+                            // Remove the old status information.  We don't 
+                            // retain any info about the old node's status.
+                            Iterator<String> iter =
+                                BoundNamesUtil.getServiceBoundNamesIterator(
+                                    dataService, oldStatusKey);
+                            while (iter.hasNext()) {
+                                iter.next();
+                                iter.remove();
+                            }
+                            // Remove the old IdentityMO with the old node info.
+                            dataService.removeObject(oldidmo);
+                        } catch (NameNotBoundException e) {
+                            // The identity was removed before we could
+                            // reassign it to a new node.
+                            // Simply make the new assignment, as if oldNode
+                            // was null to begin with.
                         }
-                        // Remove the old IdentityMO with the old node info.
-                        dataService.removeObject(oldidmo);
                     }
                     // Add (or update) the id->node mapping. 
                     dataService.setServiceBinding(idkey, newidmo);
@@ -838,9 +784,12 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             // Tell our listeners
             notifyListeners(oldNode, atask.getNode(), id);
         } catch (Exception e) {
+            // We can get an IllegalStateException if this server shuts
+            // down while we're moving identities from failed nodes.
+            // TODO - check that those identities are properly removed.
             // Hmmm.  we've probably left some cruft in the data store.
             // The most likely problem is one in our own code.
-            logger.logThrow(Level.WARNING, e, 
+            logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
                             id, oldNode.getId(), newNodeId);
         }
@@ -864,7 +813,8 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                              
         /**             
          * Returns the node found by the watchdog service, or null if
-         * this task has not run.
+         * this task has not run or the node has failed and been removed
+         * from the data store.
          */
         public Node getNode() {
             return node;
@@ -904,12 +854,10 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             
             boolean done = false;
             while (!done) {
-                synchronized(stateLock) {
-                    // Break out of the loop if we're shutting down.
-                    if (state != State.RUNNING) {
-                        done = true;
-                        break;
-                    }
+                // Break out of the loop if we're shutting down.
+                if (shuttingDown()) {
+                    done = true;
+                    break;
                 }
                 try {
                     // Find an identity on the node
@@ -974,9 +922,15 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 String key = dataService.nextServiceBoundName(nodekey);
                 done = (key == null || !key.contains(nodekey));
                 if (!done) {
-                    idmo = dataService.getServiceBinding(key, IdentityMO.class);
+                    idmo = (IdentityMO) dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
+                // TODO: this kind of check may need to be applied to more
+                // of the exceptions in the class, so all exception handling
+                // should be reviewed
+                if ((e instanceof ExceptionRetryStatus) &&
+                    (((ExceptionRetryStatus)e).shouldRetry()))
+                    return;
                 done = true;
                 logger.logThrow(Level.WARNING, e, 
                         "Failed to get key or binding for {0}", nodekey);
@@ -1065,7 +1019,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
          * @throws ObjectNotFoundException if the object has been removed
          */
         public void run() {
-            idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+            idmo = (IdentityMO) dataService.getServiceBinding(idkey);
         }
         
         /**
@@ -1130,9 +1084,9 @@ public class NodeMappingServerImpl implements NodeMappingServer {
             IdentityMO idmo = null;
             try {
                 // Look for the identity in the map.
-                idmo = dataService.getServiceBinding(idkey, IdentityMO.class);
+                idmo = (IdentityMO) dataService.getServiceBinding(idkey);
                 foundKeys.add(idkey);
-            } catch (Exception e) {
+            } catch (NameNotBoundException e) {
                 // Do nothing: leave idmo as null to indicate not found
             }
             if (idmo != null) {
@@ -1140,7 +1094,7 @@ public class NodeMappingServerImpl implements NodeMappingServer {
                 final String nodekey = NodeMapUtil.getNodeKey(nodeId, id);
 
                 try {
-                    dataService.getServiceBinding(nodekey, IdentityMO.class);
+		    dataService.getServiceBinding(nodekey);
                     foundKeys.add(nodekey);
                 } catch (Exception e) {
                     logger.log(Level.SEVERE, 

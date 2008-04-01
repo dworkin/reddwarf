@@ -48,7 +48,7 @@ This page documents the configuration properties supported by the
 current implementation of the Project Darkstar Server.  Configuration
 properties may be specified by system properties
 (using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
-the application properties files named on the command line.
+the application properties file named on the command line.
 
 <h2>General Properties</h2>
 
@@ -73,13 +73,6 @@ Server.
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
 <span class="required"></span>
 <dd>The TCP port on which to listen for client connections.
-
-<dt>com.sun.sgs.app.config.file
-<span class="nodefault"></span>
-<dd>The pathname of a file containing system properties.  If specified,
-  each property within that file is provided to the system and to all
-  applications. Each property may be overridden by a system property
-  provided at startup, or by a property for an individual application.
 
 <dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
 <span class="default">100</span>
@@ -127,27 +120,38 @@ underlying <code>DataStore</code>.
 
 <dl>
 
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
-<span class="default">1000000</span>
-<dd>The size in bytes of the Berkeley DB cache.  The value must not be
-  less than <code>20000</code>.
-
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.interval
-<span class="default">60000</span>
-<dd>The interval in milliseconds between checkpoint operations that
-  flush changes from the database log to the database.
-
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.size
-<span class="default">100000</span>
-<dd>The number of bytes that needs to have been written since the last
-  checkpoint operation was performed to require another checkpoint.
-
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
 <span class="default"><i>${com.sun.sgs.app.root}</i>/dsdb</span>
 <dd>The directory in which to store database files.  Each instance of
   requires its own, unique directory.
 
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
+</dl>
+
+<a name="Bdb"></a>
+<h3>Berkeley DB Properties</h3>
+
+These properties are the subset of the properties supported by
+the <code>DataService</code> that control the implementation of the
+underlying Berkeley DB database.
+
+<dl>
+
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.cache.size
+<span class="default">1000000</span>
+<dd>The size in bytes of the Berkeley DB cache.  The value must not be
+  less than <code>20000</code>.
+
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.interval
+<span class="default">60000</span>
+<dd>The interval in milliseconds between checkpoint operations that
+  flush changes from the database log to the database.
+
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.size
+<span class="default">100000</span>
+<dd>The number of bytes that needs to have been written since the last
+  checkpoint operation was performed to require another checkpoint.
+
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.flush.to.disk
 <span class="default">false</span>
 <dd>Whether to flush changes to disk when a transaction commits.  If
   <code>false</code>, the modifications made in some of the most recent
@@ -155,7 +159,16 @@ underlying <code>DataStore</code>.
   will be maintained.  Flushing changes to disk avoids data loss but
   introduces a significant reduction in performance.
 
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.lock.timeout
+<span class="default" style="font-family: serif"><code>0.1</code> times
+  the value of the <code>com.sun.sgs.txn.timeout</code> property, if
+  specified, otherwise <code>10</code></span>
+<dd>The maximum amount of time in milliseconds that an attempt to obtain
+  a lock will be allowed to continue before being aborted.  The value
+  must be greater than <code>0</code>, and should be less than the
+  transaction timeout.
+
+<dt>com.sun.sgs.impl.service.data.store.db.bdb.remove.logs
 <span class="default">false</span>
 <dd>Whether to automatically remove database log files that are no
   longer needed.  Note that automatic log file removal is likely to make

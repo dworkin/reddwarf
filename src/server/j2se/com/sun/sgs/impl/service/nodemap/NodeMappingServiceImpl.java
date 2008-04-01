@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -26,15 +26,13 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -70,16 +68,18 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.start
  *	</b></code><br>
- *	<i>Default:</i> <code>false</code>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else <code>true</code>
  *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link NodeMappingServerImpl}, using the properties provided
  *	to this instance's constructor. <p>
-
+ *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
- *	<i>Default:</i> the local host name <br>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, else the local host name <br>
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	NodeMappingServer}. <p>
@@ -92,9 +92,9 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	NodeMappingServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.nodemap.start.server}
- *	property is {@code true}, and means that an anonymous port will be
- *	chosen for running the server. <p>
+ *	if the {@code com.sun.sgs.impl.service.nodemap.server.start} property
+ *	is {@code true}, and means that an anonymous port will be chosen for
+ *	running the server. <p>
  *
  *  <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.client.port
@@ -132,7 +132,9 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Trace operations
  * </ul> <p>
  */
-public class NodeMappingServiceImpl implements NodeMappingService 
+public class NodeMappingServiceImpl 
+        extends AbstractService
+        implements NodeMappingService 
 {
     // Design notes:  
     //
@@ -284,6 +286,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** Package name for this class */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.nodemap";
     
+    /** Class name. */
+    private static final String CLASSNAME = 
+            NodeMappingServiceImpl.class.getName();
     /**
      * The property that specifies whether the server should be instantiated
      * in this stack.  Also used by the unit tests.
@@ -309,15 +314,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** The logger for this class. */
     private static final LoggerWrapper logger =
             new LoggerWrapper(Logger.getLogger(PKG_NAME));
-    
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-    
-    /** The owner for tasks I initiate. */
-    private final TaskOwner taskOwner;
-    
-    /** The data service. */
-    private final DataService dataService;
     
     /** The watchdog service. */
     private final WatchdogService watchdogService;
@@ -356,25 +352,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
     private final Exporter<NotifyClient> exporter;
     
     /** The local node id, as determined from the watchdog */
-    private long localNodeId;
-    
-    /** Lock object for service state */
-    private final Object stateLock = new Object();
-    
-    /** The possible states of this instance. */
-    enum State {
-        /** After construction, but before ready call */
-        CONSTRUCTED,
-	/** After ready call and before shutdown */
-	RUNNING,
-	/** After start of a call to shutdown and before call finishes */
-	SHUTTING_DOWN,
-	/** After shutdown has completed successfully */
-	SHUTDOWN
-    }
-
-    /** The current state of this instance. */
-    private State state;
+    private final long localNodeId;
     
     /** Are we running an application?  If not, assume that we don't
      *  have a full stack.
@@ -384,11 +362,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
     /** Our string representation, used by toString() and getName(). */
     private final String fullName;
 
+    /** Lock object for pending notifications */
+    private final Object lock = new Object();
+    
     /**
      * The list of notifications which couldn't be sent because
-     * we weren't in State.RUNNING yet.  This list is added to
-     * while we're in State.CONSTRUCTED, and emptied in the ready method.
-     * Protected by the stateLock.
+     * we weren't in ready yet.  This list is added to while we're
+     * in the initialized state, and emptied in the ready method.
+     * Protected by the lock.
      */
     private final List<TaskReservation> pendingNotifications =
                 new ArrayList<TaskReservation>();
@@ -412,28 +393,34 @@ public class NodeMappingServiceImpl implements NodeMappingService
                                   TransactionProxy txnProxy)
         throws Exception
     {
+        super(properties, systemRegistry, txnProxy, logger);
+        
         logger.log(Level.CONFIG, 
                  "Creating NodeMappingServiceImpl properties:{0}", properties);
-
-        if (systemRegistry == null) {
-            throw new NullPointerException("null systemRegistry");
-	}
-        if (txnProxy == null) {
-            throw new NullPointerException("null transaction proxy");
-        }
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         
 	try {
-            taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-            dataService = txnProxy.getService(DataService.class);
             watchdogService = txnProxy.getService(WatchdogService.class);
-            taskOwner = txnProxy.getCurrentOwner();
             
             contextFactory = new ContextFactory(txnProxy);
                 
+            /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			checkServiceVersion(
+			    NodeMapUtil.VERSION_KEY, 
+                            NodeMapUtil.MAJOR_VERSION, 
+                            NodeMapUtil.MINOR_VERSION);
+		    }},  taskOwner);
+                    
             // Find or create our server.   
-            boolean instantiateServer =  wrappedProps.getBooleanProperty(
-                                                SERVER_START_PROPERTY, false);
+            boolean instantiateServer =
+		wrappedProps.getBooleanProperty(
+		    SERVER_START_PROPERTY,
+		    wrappedProps.getBooleanProperty(
+			StandardProperties.SERVER_START, true));
             String localHost = InetAddress.getLocalHost().getHostName();            
             String host;
             int port;
@@ -448,7 +435,10 @@ public class NodeMappingServiceImpl implements NodeMappingService
             } else {
                 serverImpl = null;
                 host = 
-                    wrappedProps.getProperty(SERVER_HOST_PROPERTY, localHost);
+                    wrappedProps.getProperty(
+			SERVER_HOST_PROPERTY,
+			wrappedProps.getProperty(
+			    StandardProperties.SERVER_HOST, localHost));
                 port = wrappedProps.getIntProperty(
                         NodeMappingServerImpl.SERVER_PORT_PROPERTY, 
                         NodeMappingServerImpl.DEFAULT_SERVER_PORT, 0, 65535);   
@@ -459,11 +449,6 @@ public class NodeMappingServiceImpl implements NodeMappingService
             Registry registry = LocateRegistry.getRegistry(host, port);
             server = (NodeMappingServer) 
                       registry.lookup(NodeMappingServerImpl.SERVER_EXPORT_NAME);	    
-            
-            // Set our state before we export ourselves.
-            synchronized(stateLock) {
-                state = State.CONSTRUCTED;
-            }
             
             // Export our client object for server callbacks.
             int clientPort = wrappedProps.getIntProperty(
@@ -514,38 +499,30 @@ public class NodeMappingServiceImpl implements NodeMappingService
         return toString();
     }
     
-   
+    /* -- Implement AbstractService -- */
+
     /** {@inheritDoc} */
-    public void ready() {
-        // We don't update our taskOwner because we know the initial
-        // context used during construction time is sufficient (this service
-        // does not need to run application code, and does not require
-        // Managers.
-        
-        synchronized(stateLock) {
-            state = State.RUNNING;
-        }
-        
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+    /** {@inheritDoc} */
+    protected void doReady() {
         // At this point, we should never be adding to the pendingNotifications
         // list, as our state is RUNNING.
-        for (TaskReservation pending: pendingNotifications) {
-            pending.use();
+        synchronized (lock) {
+            for (TaskReservation pending: pendingNotifications) {
+                pending.use();
+            }
         }
     }
     
     /** {@inheritDoc} */
-    public boolean shutdown() {
-        synchronized(stateLock) {
-            if (state == State.SHUTTING_DOWN) {
-                return false;
-            } else if (state == State.SHUTDOWN) {
-                throw new IllegalStateException("Service is already shut down");
-            }
-            state = State.SHUTTING_DOWN;
-        }
-
-        boolean ok = true;
-
+    protected void doShutdown() {
         try {
             exporter.unexport();
             if (dataService != null) {
@@ -555,22 +532,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
         } catch (IOException ex) {
             logger.logThrow(Level.WARNING, ex, 
                     "Problem encountered during shutdown");
-            ok = false;
         }
         
         // Ordering counts here.  We need to do whatever we might with
         // the server (say, unregister the node listeners) before we
         // cause it to shut down.
         if (serverImpl != null) {
-            ok = serverImpl.shutdown();
+            serverImpl.shutdown();
         }
-
-        if (ok) {
-            synchronized(stateLock) {
-                state = State.SHUTDOWN;
-            }
-        }
-        return ok;
     }
     
     /**
@@ -582,20 +551,9 @@ public class NodeMappingServiceImpl implements NodeMappingService
             throw 
                 new IllegalStateException("No application running");
         }
-	synchronized (stateLock) {
-	    switch (state) {
-            case CONSTRUCTED:
-                break;
-	    case RUNNING:
-		break;
-	    case SHUTTING_DOWN:
-		break;
-	    case SHUTDOWN:
-		throw new IllegalStateException("Service is shut down");
-	    default:
-		throw new AssertionError();
-	    }
-	}
+        if (shuttingDown()) {
+	    throw new IllegalStateException("service shutting down");
+        }
     }
     
     /* -- Implement NodeMappingService -- */
@@ -658,7 +616,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         SetStatusTask stask = 
                 new SetStatusTask(identity, service.getName(), active);
         try {
-            runTransactionally(stask);
+            transactionScheduler.runTask(stask, taskOwner);
         } catch (Exception e) {
             logger.logThrow(Level.WARNING, e, 
                                 "Setting status for {0} failed", identity);
@@ -705,7 +663,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
         public void run() throws UnknownIdentityException { 
             // Exceptions thrown by getServiceBinding are handled by caller.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(idKey, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(idKey);
             
             if (active) {
                 dataService.setServiceBinding(statusKey, idmo);
@@ -746,11 +704,11 @@ public class NodeMappingServiceImpl implements NodeMappingService
     {
         checkState();
         // Verify that the nodeId is valid.
-        watchdogService.getNode(nodeId);
-        IdentityIterator iter = new IdentityIterator(dataService, nodeId);
-        if (!iter.hasNext()) {
+        Node node = watchdogService.getNode(nodeId);
+        if (node == null) {
             throw new UnknownNodeException("node id: " + nodeId);
         }
+        IdentityIterator iter = new IdentityIterator(dataService, nodeId);
         logger.log(Level.FINEST, "getIdentities successful");
         return iter;
     }
@@ -777,7 +735,7 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // We look up the identity in the data service. Most applications
             // will use a customized Identity object.
             IdentityMO idmo = 
-                    dataService.getServiceBinding(key, IdentityMO.class);
+		(IdentityMO) dataService.getServiceBinding(key);
             return idmo.getIdentity();
         }
         
@@ -812,8 +770,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
             // in this case, and will use them when ready() has been called.
-            synchronized(stateLock) {
-                if (state == State.CONSTRUCTED) {
+            synchronized(lock) {
+                if (isInInitializedState()) {
                     logger.log(Level.FINEST, 
                                "Queuing remove notification for " +
                                "identity: {0}, " + "newNode: {1}}", 
@@ -840,8 +798,8 @@ public class NodeMappingServiceImpl implements NodeMappingService
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
             // in this case, and will use them when ready() has been called.
-            synchronized(stateLock) {
-                if (state == State.CONSTRUCTED) {
+            synchronized(lock) {
+                if (isInInitializedState()) {
                     logger.log(Level.FINEST, 
                                "Queuing added notification for " +
                                "identity: {0}, " + "oldNode: {1}}", 
@@ -916,22 +874,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
     public String toString() {
 	return fullName;
     }
-    
-    /**
-     *  Run the given task synchronously, and transactionally.
-     * @param task the task
-     */
-    private void runTransactionally(KernelRunnable task) throws Exception {     
-        taskScheduler.runTransactionalTask(task, taskOwner);
-    }
-            
+ 
     /* -- Implement transaction participant/context for 'getNode' -- */
 
     private class ContextFactory
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy);
+	    super(txnProxy, CLASSNAME);
 	}
 	
 	/** {@inheritDoc} */
@@ -976,8 +926,14 @@ public class NodeMappingServiceImpl implements NodeMappingService
 	    String key = NodeMapUtil.getIdentityKey(identity);
 	    try {                
 		IdentityMO idmo = 
-                        dataService.getServiceBinding(key, IdentityMO.class);
+		    (IdentityMO) dataService.getServiceBinding(key);
                 node = watchdogService.getNode(idmo.getNodeId());
+                if (node == null) {
+                    // The identity is on a failed node, where the node has
+                    // been removed from the data store but the identity hasn't
+                    // yet.
+                    throw new UnknownIdentityException("id: " + identity);
+                }
                 Node old = idcache.put(identity, node);
                 assert (old == null);
                 return node;

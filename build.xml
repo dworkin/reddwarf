@@ -19,6 +19,7 @@
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
+  <property name="javac.target" value="1.5"/>
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
@@ -26,7 +27,7 @@
   <property name="ruby" location="/usr/bin/ruby"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9.4"/>
+  <property name="project.release" value="0.9.6"/>
   <!-- Set to true when building an external release -->
   <property name="external.release" value="false"/>
 
@@ -50,13 +51,59 @@
   <property name="apidoc.client.zip"
             location="${build.dir}/sgs-client-apidoc.zip"/>
 
+  <!-- Versions of referenced software, for creating subdirectories in
+       the server binary distribution -->
+  <property name="bdb.version" value="4.5.20"/>
+  <property name="bdb.je.version" value="3.2.23"/>
+  <property name="mina.version" value="1.1"/>
+  <property name="slf4j.version" value="1.4.0"/>
+
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.assertions" value="-enableassertions"/>
-  <property name="test.jvm.args" value="${test.assertions}"/>
+  <property name="test.assertions" value="-ea:com.sun.sgs..."/>
+  <property name="test.max.heap" value="-Xmx1g"/>
+  <property name="test.jvm.args" value="${test.assertions} ${test.max.heap}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
+  <!-- Set test.use.je to true to test with BDB Java Edition -->
+  <condition
+     property="test.bdb.env"
+     value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+     else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+    <istrue value="${test.use.je}"/>
+  </condition>
+  <!-- System properties to pass down -->
+  <propertyset id="test.extra.properties">
+    <propertyref prefix="com.sun.sgs."/>
+    <propertyref prefix="java.rmi."/>
+    <propertyref prefix="je."/>
+    <propertyref prefix="test."/>
+  </propertyset>
+
+  <!-- Values for analysis -->
+  <property name="analysis.jvm.args"
+	    value="-server
+		   -XX:+UseParallelGC
+		   -XX:+UseFastAccessorMethods
+		   -XX:+AggressiveOpts
+		   -XX:+MaxFDLimit
+		   -XX:NewSize=512m
+		   -Xms700m
+		   -Xmx2g"/>
+  <property name="analysis.tasks"
+	    value="com.sun.sgs.analysis.task.ScheduleMapPutsTask"/>
+  <!-- Set analysis.use.data.store.server to perform analysis using the
+       networked data store -->
+  <condition
+     property="analysis.data.store.class"
+     value="com.sun.sgs.impl.service.data.store.net.DataStoreClient"
+     else="com.sun.sgs.impl.service.data.store.DataStoreImpl">
+    <istrue value="${analysis.use.data.store.server}"/>
+  </condition>
+  <property name="analysis.data.store.server.start" value="true"/>
+  <property name="analysis.data.store.server.host" value="localhost"/>
+  <property name="analysis.data.store.server.port" value="44530"/>
 
   <!-- Properties for Berkeley DB libraries -->
   <!-- The caller should set the bdb.lib.dir property to a directory
@@ -65,25 +112,25 @@
   <!-- The caller should set the bdb.builds.dir property to a directory
        containing builds of Berkeley DB for all platforms if building
        the server binary distribution -->
+  <property name="bdb.je.jar" location="lib/je-${bdb.je.version}.jar"/>
 
-  <!-- Versions of referenced software, for creating subdirectories in
-       the server binary distribution -->
-  <property name="bdb.version" value="4.5.20"/>
-  <property name="mina.version" value="1.1"/>
-  <property name="slf4j.version" value="1.4.0"/>
+  <!-- Mina class path -->
+  <path id="mina.classpath">
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
+  </path>
 
   <!-- Shared code class path -->
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
-    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
-    <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
   </path>
 
   <!-- Server class path -->
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${bdb.je.jar}"/>
     <path refid="shared.classpath"/>
   </path>
 
@@ -91,6 +138,19 @@
   <path id="client.classpath">
     <pathelement location="${build.dir}/classes/client"/>
     <path refid="shared.classpath"/>
+    <path refid="mina.classpath"/>
+  </path>
+
+  <!-- Server example class path -->
+  <path id="example.server.classpath">
+    <pathelement location="${build.dir}/example/classes"/>
+    <path refid="server.classpath"/>
+  </path>
+
+  <!-- Client example class path -->
+  <path id="example.client.classpath">
+    <pathelement location="${build.dir}/example/classes"/>
+    <path refid="client.classpath"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -112,8 +172,12 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/shared/j2se" destdir="${build.dir}/classes/shared"
-           classpathref="shared.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+        <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
+      </classpath>
     </javac>
   </target>
 
@@ -129,8 +193,9 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpathref="server.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           classpathref="server.classpath"
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -144,8 +209,9 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
-           classpathref="client.classpath" source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
+           classpathref="client.classpath"
+           source="${javac.source}" target="${javac.target}">
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -168,7 +234,10 @@
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal JavaDoc -->
-  <target name="javadoc-internal" depends="build, project-version"
+  <target name="javadoc-internal"
+	  depends="build, -test-shared.classes, -test-server.classes,
+		   -test-client.classes, analysis-classes,
+		   project-version"
           description="Builds internal (full) javadoc">
     <javadoc destdir="${build.dir}/javadoc/internal"
              packagenames="com.sun.*"
@@ -181,6 +250,7 @@
         <pathelement location="${build.dir}/test/classes/client"/>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <pathelement location="${build.dir}/example/classes"/>
+	<pathelement location="${build.dir}/analysis/classes"/>
         <path refid="server.classpath"/>
         <path refid="client.classpath"/>
         <pathelement location="lib/junit-4.1.jar"/>
@@ -189,6 +259,7 @@
         <dirset dir="src" includes="*/j2se"/>
         <dirset dir="test" includes="*/j2se"/>
         <dirset dir="example" includes="*/src"/>
+	<dirset dir="analysis" includes="*/j2se"/>
       </sourcepath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
@@ -201,7 +272,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -229,7 +300,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -260,7 +331,7 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright &copy; 2007-2008 Sun Microsystems,
         Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
@@ -575,7 +646,7 @@
     <exec outputproperty="project.revision"
 	  executable="svnversion"
 	  logError="true">
-      <arg line="-c"/>
+      <arg value="-c"/>
       <redirector>
 	<outputfilterchain>
 	  <tokenfilter>
@@ -634,6 +705,21 @@
     </checkstyle>
   </target>
 
+  <!-- Checks example Java coding style -->
+  <target name="checkstyle-example"
+	  depends="example-classes,-checkstyle.init"
+	  description="Checks example Java coding style">
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml">
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+        <pathelement location="${build.dir}/example/classes"/>
+      </classpath>
+      <fileset dir="example"/>
+    </checkstyle>
+  </target>
+
   <!-- Verify checkstyle.jar is set, build local checkstyle classes,
        and define the checkstyle task. -->
   <target name="-checkstyle.init">
@@ -645,7 +731,7 @@
       <javac srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
 	     classpath="${checkstyle.jar}" includeAntRuntime="no"
 	     debug="${build.debug}" debuglevel="${build.debug.level}"
-	     source="${javac.source}">
+	     source="${javac.source}" target="${javac.target}">
 	<compilerarg line="${javac.compilerargs}"/>
       </javac>
       <taskdef resource="checkstyletask.properties"
@@ -661,7 +747,8 @@
   <target name="findbugs-client" depends="build-client, -findbugs.init"
 	  description="Checks for bugs in the client">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/client/j2se"/>
       <class location="${build.dir}/classes/client"/>
       <auxClasspath>
@@ -674,12 +761,14 @@
   <target name="findbugs-server" depends="build-server, -findbugs.init"
 	  description="Checks for bugs in the server">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/server/j2se"/>
       <class location="${build.dir}/classes/server"/>
       <auxClasspath>
 	<path refid="shared.classpath"/>
 	<pathelement location="${bdb.lib.dir}/db.jar"/>
+	<pathelement location="${bdb.je.jar}"/>
       </auxClasspath>
     </findbugs>
   </target>
@@ -688,7 +777,8 @@
   <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
 	  description="Checks for bugs in shared code">
     <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
-	      reportLevel="low" output="emacs">
+	      reportLevel="low" sort="true" output="emacs"
+	      excludeFilter="etc/findbugs-exclude.xml">
       <sourcePath path="src/shared/j2se"/>
       <class location="${build.dir}/classes/shared"/>
       <auxClasspath>
@@ -725,18 +815,15 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
       </classpath>
-      <syspropertyset>
-	<propertyref prefix="test."/>
-	<propertyref prefix="com.sun.sgs."/>
-      </syspropertyset>
+      <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
 	   either. -tjb@sun.com (01/13/2006) -->
       <!-- <assertions>
@@ -767,17 +854,18 @@
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/test/classes/server"/>
         <path refid="server.classpath"/>
+        <path refid="mina.classpath"/>
       </classpath>
-      <syspropertyset>
-	<propertyref prefix="test."/>
-	<propertyref prefix="com.sun.sgs."/>
-      </syspropertyset>
+      <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
 	   either. -tjb@sun.com (01/13/2006) -->
       <!-- <assertions>
@@ -792,7 +880,7 @@
     <fail if="tests.failed" message="Some tests failed"/>
   </target>
 
-  <!-- Compile and run shared tests -->
+  <!-- Compiles and runs client tests -->
   <target name="test-client" depends="-test-client.classes"
 	  description="Compiles and runs client tests">
     <mkdir dir="${build.dir}/test"/>
@@ -807,7 +895,6 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
@@ -815,10 +902,7 @@
         <pathelement location="${build.dir}/test/classes/client"/>
         <path refid="client.classpath"/>
       </classpath>
-      <syspropertyset>
-	<propertyref prefix="test."/>
-	<propertyref prefix="com.sun.sgs."/>
-      </syspropertyset>
+      <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
 	   either. -tjb@sun.com (01/13/2006) -->
       <!-- <assertions>
@@ -845,9 +929,13 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpathref="shared.classpath"
+	   target="${javac.target}"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+        <path refid="shared.classpath"/>
+        <path refid="mina.classpath"/>
+      </classpath>
     </javac>
   </target>
 
@@ -862,9 +950,10 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
+	   target="${javac.target}"
 	   classpathref="server.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -879,9 +968,10 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
+	   target="${javac.target}"
 	   classpathref="client.classpath"
 	   includes="**/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -891,7 +981,6 @@
     <java classname="com.sun.sgs.test.impl.io.ServerTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -907,12 +996,62 @@
     <java classname="com.sun.sgs.test.impl.io.ClientTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
         <pathelement location="${build.dir}/test/classes/shared"/>
         <path refid="shared.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Async IO test server -->
+  <target name="aio-test-server" depends="-test-shared.classes"
+          description="Runs the Async IO test server">
+    <java classname="com.sun.sgs.test.impl.nio.EchoServer" fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="java.net.preferIPv4Stack" value="true"/>
+      <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
+                   value="com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider"/>
+      <sysproperty key="com.sun.sgs.nio.async.reactive.reactors" value="1"/>
+      <sysproperty key="java.util.logging.config.file" file="${test.logging}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="port" value="38502"/>
+      <sysproperty key="buffer_size" value="32"/>
+      <sysproperty key="threads" value="4"/>
+      <sysproperty key="maxthreads" value="4"/>
+      <sysproperty key="tcp_nodelay" value="true"/>
+      <sysproperty key="backlog" value="5"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Async IO test client -->
+  <target name="aio-test-client" depends="-test-shared.classes"
+          description="Runs the Async IO test client">
+    <java classname="com.sun.sgs.test.impl.nio.EchoClient" fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.awt.headless" value="true"/>
+      <sysproperty key="java.net.preferIPv4Stack" value="true"/>
+      <sysproperty key="com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider"
+                   value="com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider"/>
+      <sysproperty key="com.sun.sgs.nio.async.reactive.reactors" value="1"/>
+      <sysproperty key="java.util.logging.config.file" file="${test.logging}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="port" value="38502"/>
+      <sysproperty key="buffer_size" value="32"/>
+      <sysproperty key="threads" value="4"/>
+      <sysproperty key="maxthreads" value="4"/>
+      <sysproperty key="tcp_nodelay" value="true"/>
+      <sysproperty key="clients" value="200"/>
+      <sysproperty key="messages" value="1000"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <pathelement location="${build.dir}/classes/shared"/>
       </classpath>
     </java>
   </target>
@@ -923,7 +1062,6 @@
     <java classname="com.sun.sgs.test.client.simple.SimpleServer"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -939,7 +1077,6 @@
     <java classname="com.sun.sgs.test.client.simple.ClientTest"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -955,7 +1092,6 @@
     <java classname="com.sun.sgs.test.client.simple.SimpleClientTestUI"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
@@ -975,7 +1111,8 @@
 	    closure="true"/>
     <javac destdir="${build.dir}/example/classes"
 	   debug="on"
-	   source="${javac.source}">
+	   source="${javac.source}"
+	   target="${javac.target}">
       <src>
         <dirset dir="example" includes="*/src"/>
       </src>
@@ -984,25 +1121,120 @@
         <pathelement location="${build.dir}/classes/client"/>
         <pathelement location="${build.dir}/classes/shared"/>
       </classpath>
-      <compilerarg value="${javac.compilerargs}"/>
+      <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>
 
-  <!-- Runs the example ChatApp (server) -->
-  <target name="example-chat-app" depends="example-classes"
-          description="Runs the example ChatApp (server)">
-    <mkdir dir="/tmp/ChatApp/dsdb"/>
+  <!-- Builds the analysis code -->
+  <target name="analysis-classes" depends="build-server"
+          description="Builds the analysis code">
+    <mkdir dir="${build.dir}/analysis/classes"/>
+    <depend srcdir="analysis"
+            destdir="${build.dir}/analysis/classes"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac srcdir="analysis/server/j2se"
+	   destdir="${build.dir}/analysis/classes"
+	   includeAntRuntime="no"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="server.classpath"
+	   includes="**/*.java">
+      <compilerarg line="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Runs an example app in single node mode -->
+  <target name="example-app-single-node"
+	  depends="example-classes, -maybe-delete-example-datastore"
+	  description="Runs an example app in single node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
+    <!-- Set the application properties for the example to run -->
+    <property name="app.properties"
+	      location="example/chat/ChatApp.properties"/>
+    <property name="app.dir" location="${build.dir}/example"/>
+    <mkdir dir="${app.dir}"/>
+    <mkdir dir="${app.dir}/dsdb"/>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
-          fork="true">
+	  classpathref="example.server.classpath"
+	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${test.logging}"/>
-      <classpath>
-        <pathelement location="${build.dir}/example/classes"/>
-        <path refid="server.classpath"/>
-      </classpath>
-      <arg value="example/chat/ChatApp.properties"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root" file="${app.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <syspropertyset refid="test.extra.properties"/>
+      <arg file="${app.properties}"/>
+    </java>
+  </target>
+
+  <!-- Deletes the example data store files unless the
+       example.retain.datastore property is set. -->
+  <target name="-maybe-delete-example-datastore"
+	  unless="example.retain.datastore">
+    <delete dir="${build.dir}/example/dsdb"/>
+  </target>
+
+  <!-- Runs an example app in multi-node mode -->
+  <target name="example-app-multi-node" depends="example-classes"
+          description="Runs an example app in multi-node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
+    <!-- Set the application properties for the example to run -->
+    <property name="app.properties"
+	      location="example/chat/ChatApp.properties"/>
+    <!-- Set the host name of the server -->
+    <property name="server.host" value="localhost"/>
+    <property name="app.dir" location="${build.dir}/example"/>
+    <mkdir dir="${app.dir}"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  classpathref="example.server.classpath"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root" file="${app.dir}"/>
+      <sysproperty key="com.sun.sgs.server.host" value="${server.host}"/>
+      <sysproperty key="com.sun.sgs.server.start" value="false"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <syspropertyset refid="test.extra.properties"/>
+      <arg file="${app.properties}"/>
+    </java>
+  </target>
+
+  <!-- Runs the server for use with multi-node mode -->
+  <target name="example-server"
+	  depends="build-server, -maybe-delete-example-datastore"
+	  description="Runs the server for use with multi-node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
+    <!-- Set the application properties for the example to run -->
+    <property name="app.properties"
+	      location="example/chat/ChatAppServer.properties"/>
+    <property name="server.dir" location="${build.dir}/example"/>
+    <mkdir dir="${server.dir}"/>
+    <mkdir dir="${server.dir}/dsdb"/>
+    <concat destfile="${server.dir}/server.properties">
+      <fileset file="${app.properties}"/>
+      <fileset file="example/server.properties"/>
+    </concat>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  classpathref="server.classpath"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root" file="${server.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <syspropertyset refid="test.extra.properties"/>
+      <arg file="${server.dir}/server.properties"/>
     </java>
   </target>
 
@@ -1010,56 +1242,142 @@
   <target name="example-chat-client" depends="example-classes"
           description="Runs the example ChatClient">
     <java classname="com.sun.sgs.example.chat.client.ChatClient"
-          fork="true">
+          classpathref="example.client.classpath"
+	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
+      <syspropertyset refid="test.extra.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the example WandererClient -->
+  <target name="example-wanderer-client" depends="example-classes"
+	  description="Runs the example WandererClient">
+    <!-- Set the host name of the application -->
+    <property name="app.host" value="localhost"/>
+    <!-- Set the logging properties -->
+    <property name="client.logging" location="example/logging.properties"/>
+    <java classname="com.sun.sgs.example.request.client.WandererClient"
+	  classpathref="example.client.classpath"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${client.logging}"/>
+      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
+		   value="${app.host}"/>
+      <syspropertyset refid="test.extra.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the task timing analysis -->
+  <target name="analysis" depends="analysis-classes"
+          description="Runs the task timing analysis">
+    <mkdir dir="${build.dir}/analysis"/>
+    <delete dir="${build.dir}/analysis/logs"/>
+    <delete dir="${build.dir}/analysis/data"/>
+    <delete dir="${build.dir}/analysis/dsdb"/>
+    <mkdir dir="${build.dir}/analysis/logs"/>
+    <mkdir dir="${build.dir}/analysis/data"/>
+    <mkdir dir="${build.dir}/analysis/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  fork="true">
+      <jvmarg line="${analysis.jvm.args}"/>
+      <sysproperty key="java.library.path" 
+		   file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root"
+		   file="${build.dir}/analysis"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"
+	 value="${analysis.data.store.class}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.start"
+		   value="${analysis.data.store.server.start}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.host"
+		   value="${analysis.data.store.server.host}"/>
+      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
+		   value="${analysis.data.store.server.port}"/>
+      <sysproperty key="com.sun.sgs.analysis.tasks"
+		   value="${analysis.tasks}"/>
+      <syspropertyset refid="test.extra.properties"/>
       <classpath>
-        <pathelement location="${build.dir}/example/classes"/>
-        <path refid="client.classpath"/>
+        <pathelement location="${build.dir}/analysis/classes"/>
+        <path refid="server.classpath"/>
       </classpath>
+      <arg value="analysis/AnalysisApplication.properties"/>
     </java>
   </target>
 
   <!-- Runs the example HackApp (server) -->
-  <target name="example-hack-app" depends="example-classes"
+  <target name="example-hack-app"
+	  depends="example-classes, -maybe-delete-hack-app-datastore"
           description="Runs the example HackApp (server)">
-    <mkdir dir="/tmp/HackApp/dsdb"/>
-    <copy todir="/tmp/HackApp/gameData">
+    <mkdir dir="${build.dir}/example"/>
+    <mkdir dir="${build.dir}/example/HackApp/data"/>
+    <mkdir dir="${build.dir}/example/HackApp/dsdb"/>
+    <copy todir="${build.dir}/example/HackApp/gameData">
       <fileset dir="example/hack/gameData"/>
     </copy>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
-          fork="true">
+	  classpathref="example.server.classpath"
+	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg line="-server"/>
       <!--<sysproperty key="com.sun.management.jmxremote" value=""/>-->
-      <sysproperty key="com.sun.sgs.config.file"
-           file="example/hack/System.properties"/>
+      <sysproperty key="com.sun.sgs.app.root"
+		   file="${build.dir}/example/HackApp"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
-      <classpath>
-        <pathelement location="${build.dir}/example/classes"/>
-        <path refid="server.classpath"/>
-      </classpath>
+      <syspropertyset refid="test.extra.properties"/>
       <arg value="example/hack/HackApp.properties"/>
     </java>
+  </target>
+
+  <!-- Deletes the Hack example data store files unless the
+       hack.server.retain.datastore property is set. -->
+  <target name="-maybe-delete-hack-app-datastore"
+	  unless="hack.server.retain.datastore">
+    <delete dir="${build.dir}/example/HackApp"/>
   </target>
 
   <!-- Runs the example HackClient (GUI client) -->
   <target name="example-hack-client" depends="example-classes"
           description="Runs the example HackClient">
     <java classname="com.sun.sgs.example.hack.client.Client"
-          fork="true">
+	  classpathref="example.client.classpath"
+	  fork="true">
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="host" value="localhost"/>
       <sysproperty key="port" value="4458"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
-      <classpath>
-        <pathelement location="${build.dir}/example/classes"/>
-        <path refid="client.classpath"/>
-      </classpath>
+      <syspropertyset refid="test.extra.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the Hack example AIClient -->
+  <target name="example-hack-ai-client" depends="example-classes"
+          description="Runs the example HackClient (AI client)">
+    <property name="hack.server.host" value="localhost"/>
+    <property name="hack.client.count" value="10"/>
+    <java classname="com.sun.sgs.example.hack.client.ai.AIClient"
+	  classpathref="example.client.classpath"
+	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="host" value="${hack.server.host}"/>
+      <sysproperty key="port" value="4458"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <syspropertyset refid="test.extra.properties"/>
+      <arg value="${hack.client.count}"/>
     </java>
   </target>
 
@@ -1102,52 +1420,6 @@
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
     <!-- TODO: generate and package javadoc -->
-  </target>
-
-  <!-- Runs the data store network server -->
-  <target name="test-data-store-network-server" depends="build-server"
-	  description="Runs the data store network server">
-    <property name="test.server.dir"
-	      location="${build.dir}/test/data-store-network-server"/>
-    <property name="test.server.level" value="INFO"/>
-    <delete dir="${test.server.dir}"/>
-    <mkdir dir="${test.server.dir}"/>
-    <mkdir dir="${test.server.dir}/dsdb"/>
-    <echo file="${test.server.dir}/app.config">
-      com.sun.sgs.app.name = DataStoreServerImpl
-      com.sun.sgs.app.root = ${build.dir}/test/data-store-network-server
-      com.sun.sgs.app.port = 0
-      com.sun.sgs.app.listener = NONE
-      com.sun.sgs.app.finalService = DataService
-      com.sun.sgs.impl.service.data.store.net.server.host = localhost
-      com.sun.sgs.impl.service.data.store.net.server.run = true
-      com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class = \
-        com.sun.sgs.impl.service.data.store.net.DataStoreClient
-    </echo>
-    <echo file="${test.server.dir}/logging.config">
-      .level = ${test.server.level}
-      sun.rmi.level = WARNING
-      handlers = java.util.logging.ConsoleHandler
-      java.util.logging.ConsoleHandler.formatter = \
-        java.util.logging.SimpleFormatter
-      java.util.logging.ConsoleHandler.level = ${test.server.level}
-    </echo>
-    <java classname="com.sun.sgs.impl.kernel.Kernel"
-	  classpathref="server.classpath"
-	  fork="true">
-      <jvmarg line="${test.jvm.args}"/>
-      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
-      <sysproperty key="java.util.logging.config.file"
-		   file="${test.server.dir}/logging.config"/>
-      <!-- Set the java.rmi.server.hostname property to use a
-	   non-standard network interface on the server -->
-      <arg file="${test.server.dir}/app.config"/>
-      <syspropertyset>
-	<propertyref prefix="test."/>
-	<propertyref prefix="com.sun.sgs."/>
-	<propertyref prefix="java.rmi."/>
-      </syspropertyset>
-    </java>
   </target>
 
 </project>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -47,7 +47,7 @@ public class SwordWorld
         Logger.getLogger(SwordWorld.class.getName());
 
     /** A reference to the one-and-only {@linkplain SwordWorldRoom room}. */
-    private ManagedReference roomRef = null;
+    private ManagedReference<SwordWorldRoom> roomRef = null;
 
     /**
      * {@inheritDoc}
@@ -83,7 +83,7 @@ public class SwordWorld
         if (roomRef == null)
             return null;
 
-        return roomRef.get(SwordWorldRoom.class);
+        return roomRef.get();
     }
 
     /**

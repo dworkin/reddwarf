@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,9 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Interface representing a single, connected login session between a
@@ -28,25 +30,22 @@ import java.io.Serializable;
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
- * invoked with a new {@code ClientSession} instance which
- * represents the current connection between that client and the
- * server.  The application should register a {@link
- * ClientSessionListener} for each session logged in, so that it can
- * receive notification when a client session sends a message, is
- * disconnected, or logs out.
+ * invoked with a new {@code ClientSession} instance which represents the
+ * current connection between that client and the server.  By returning a
+ * unique {@link ClientSessionListener} from the {@code loggedIn} method
+ * for each given client session, the application will receive notification
+ * when a client session sends a message, is disconnected, or logs out.
  *
  * <p>A {@code ClientSession} is used to identify a client that is
- * logged in, to send messages to that client, to register a listener
- * to receive messages sent by that client, and to forcibly disconnect
+ * logged in, to send messages to that client, and to forcibly disconnect
  * that client from the server.
  *
  * <p>A session is considered disconnected if one of the following occurs:
  * <ul>
  * <li> the client logs out
- * <li> the client is forcibly disconnected by the server by invoking
- * its session's {@link #disconnect disconnect} method
  * <li> the client becomes disconnected due to a network failure, and
  * a connection to the client cannot be re-established in a timely manner
+ * <li> the {@code ClientSession} object is removed from the data manager
  * </ul>
  *
  * <p>If a client associated with a {@code ClientSession} becomes
@@ -58,57 +57,46 @@ import java.io.Serializable;
  *
  * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that
- * client.  When that client logs back in again, a new session is
- * established with the server.
+ * client and should be removed from the data manager. When that client
+ * logs back in again, a new session is established with the server.
  */
-public interface ClientSession {
+public interface ClientSession extends ManagedObject {
 
     /**
      * Returns the login name used to authenticate this session.
      *
      * @return	the name used to authenticate this session
      *
+     * @throws	IllegalStateException if this session is disconnected
      * @throws 	TransactionException if the operation failed because of
      * 		a problem with the current transaction
      */
     String getName();
-
+    
     /**
-     * Returns a {@code ClientSessionId} containing the representation
-     * of the session identifier for this session.  The session
-     * identifier is constant for the life of this session.
+     * Sends a message contained in the specified {@link ByteBuffer}
+     * to this session's client.
+     * <p>
+     * The specified buffer may be reused immediately, but changes
+     * to the buffer will have no effect on the message sent to the
+     * client by this invocation.
      *
-     * @return 	the {@code ClientSessionId} for this session
-     *
-     * @throws	TransactionException if the operation failed because of
-     * 		a problem with the current transaction
-     */
-    ClientSessionId getSessionId();
-
-    /**
-     * Sends a message contained in the specified byte array to this
-     * session's client.
-     *
-     * <p>The specified byte array must not be modified after invoking
-     * this method; if the byte array is modified, then this method
-     * may have unpredictable results.
-     
      * @param	message a message
      *
+     * @return	this client session
+     *
      * @throws	IllegalStateException if this session is disconnected
+     * @throws	IllegalArgumentException if the message exceeds the allowed
+     *		payload length defined by the constant {@link
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		whose value is {@value
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH} 
+     * @throws	MessageRejectedException if there are not enough resources
+     *		to send the specified message
      * @throws	TransactionException if the operation failed because of
      *		 a problem with the current transaction
      */
-    void send(byte[] message);
-
-    /**
-     * Forcibly disconnects this client session.  If this session is
-     * already disconnected, then no action is taken.
-     *
-     * @throws	TransactionException if the operation failed because of
-     *		a problem with the current transaction
-     */
-    void disconnect();
+    ClientSession send(ByteBuffer message);
 
     /**
      * Returns {@code true} if the client is connected,

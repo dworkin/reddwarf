@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -25,7 +25,7 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import java.io.InvalidObjectException;
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -39,8 +39,9 @@ import java.util.logging.Logger;
  * canonicalized: only a single instance appears for a given object ID or
  * object.
  */
-final class ManagedReferenceImpl implements ManagedReference, Serializable {
-
+final class ManagedReferenceImpl<T>
+    implements ManagedReference<T>, Serializable
+{
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
@@ -156,11 +157,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * the reference is not found.  Throws ObjectNotFoundException if the
      * object has been removed.
      */
-    static ManagedReferenceImpl findReference(
-	Context context, ManagedObject object)
+    static <T> ManagedReferenceImpl<T> findReference(
+	Context context, T object)
     {
 	assert object != null : "Object is null";
-	ManagedReferenceImpl ref = context.refs.find(object);
+	assert object instanceof ManagedObject
+	    : "Object is not a managed object";
+	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
+	    context.refs.find(object));
 	if (ref != null && ref.isRemoved()) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
@@ -171,20 +175,26 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * Returns the reference associated with a context and object, creating a
      * NEW reference if none is found.
      */
-    static ManagedReferenceImpl getReference(
-	Context context, ManagedObject object)
+    static <T> ManagedReferenceImpl<T> getReference(
+	Context context, T object)
     {
 	assert object != null : "Object is null";
-	ManagedReferenceImpl ref = context.refs.find(object);
+	assert object instanceof ManagedObject
+	    : "Object is not a managed object";
+	ManagedReferenceImpl<T> ref = Objects.uncheckedCast(
+	    context.refs.find(object));
 	if (ref == null) {
-	    ref = new ManagedReferenceImpl(context, object);
+	    ref = new ManagedReferenceImpl<T>(context, object);
 	    context.refs.add(ref);
 	} else if (ref.isRemoved()) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getReference object:{0} returns {1}",
-		       object, ref);
+	    logger.log(Level.FINEST,
+		       "getReference tid:{0,number,#}, object:{1}" +
+		       " returns oid:{2,number,#}",
+		       context.getTxnId(), Objects.fastToString(object),
+		       ref.getId());
 	}
 	return ref;
     }
@@ -193,26 +203,30 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * Returns the reference associated with a context and object ID, creating
      * an EMPTY reference if none is found.
      */
-    static ManagedReferenceImpl getReference(Context context, long oid) {
-	ManagedReferenceImpl ref = context.refs.find(oid);
+    static ManagedReferenceImpl<?> getReference(
+	Context context, long oid)
+    {
+	ManagedReferenceImpl<?> ref = context.refs.find(oid);
 	if (ref == null) {
-	    ref = new ManagedReferenceImpl(context, oid);
+	    ref = new ManagedReferenceImpl<ManagedObject>(context, oid);
 	    context.refs.add(ref);
 	} else if (ref.isRemoved()) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getReference oid:{0} returns {1}",
-		       oid, ref);
+	    logger.log(
+		Level.FINEST,
+		"getReference tid:{0,number,#}, oid:{1,number,#} returns",
+		context.getTxnId(), oid);
 	}
 	return ref;
     }
 
     /** Creates a NEW reference to an object. */
-    private ManagedReferenceImpl(Context context, ManagedObject object) {
+    private ManagedReferenceImpl(Context context, T object) {
 	this.context = context;
 	oid = context.store.createObject(context.txn);
-	this.object = object;
+	this.object = (ManagedObject) object;
 	state = State.NEW;
 	validate();
     }
@@ -296,8 +310,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
-    public <T> T get(Class<T> type) {
-	return get(type, true);
+    /** {@inheritDoc} */
+    public T get() {
+	return get(true);
     }
 
     /**
@@ -305,11 +320,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * if the reference was just obtained from the context.
      */
     @SuppressWarnings("fallthrough")
-    <T> T get(Class<T> type, boolean checkContext) {
-	if (type == null) {
-	    throw new NullPointerException(
-		"The type argument must not be null");
-	}
+    T get(boolean checkContext) {
 	try {
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
@@ -344,26 +355,31 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		throw new AssertionError();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "get {0} returns {1}", this, object);
+		logger.log(
+		    Level.FINEST,
+		    "get tid:{0,number,#}, oid:{1,number,#} returns {2}",
+		    context.getTxnId(), oid, Objects.fastToString(object));
 	    }
-	    return type.cast(object);
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    return result;
 	} catch (TransactionNotActiveException e) {
 	    throw new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
 		"reference that was created in another transaction",
 		e);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "get {0} throws", this);
+	    logger.logThrow(Level.FINEST, e,
+			    "get tid:{0,number,#}, oid:{1,number,#} throws",
+			    context.getTxnId(), oid);
 	    throw e;
 	}
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
-    public <T> T getForUpdate(Class<T> type) {
-	if (type == null) {
-	    throw new NullPointerException(
-		"The type argument must not be null");
-	}
+    public T getForUpdate() {
+	RuntimeException exception;
 	try {
 	    DataServiceImpl.checkContext(context);
 	    switch (state) {
@@ -395,26 +411,66 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		throw new AssertionError();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "getForUpdate {0} returns {1}",
-			   this, object);
+		logger.log(Level.FINEST,
+			   "getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
+			   " returns {2}",
+			   context.getTxnId(), oid,
+			   Objects.fastToString(object));
 	    }
-	    return type.cast(object);
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    return result;
 	} catch (TransactionNotActiveException e) {
-	    throw new TransactionNotActiveException(
+	    exception = new TransactionNotActiveException(
 		"Attempt to obtain the object associated with a managed " +
 		"reference that was created in another transaction",
 		e);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "getForUpdate {0} throws", this);
-	    throw e;
+	    exception = e;
 	}
+	logger.logThrow(
+	    Level.FINEST, exception,
+	    "getForUpdate tid:{0,number,#}, oid:{1,number,#} throws",
+	    context.getTxnId(), oid);
+	throw exception;
     }
 
+    /** {@inheritDoc} */
     public BigInteger getId() {
 	if (id == null) {
 	    id = BigInteger.valueOf(oid);
 	}
 	return id;
+    }
+
+    /** {@inheritDoc} */
+    public boolean equals(Object object) {
+	if (object == this) {
+	    return true;
+	} else if (object instanceof ManagedReferenceImpl) {
+	    /*
+	     * This implementation depends on the fact that references are
+	     * associated with the current data service, which is true since
+	     * the data service is obtained from the current context rather
+	     * than being represented explicitly within the reference.  If it
+	     * were possible to compare references associated with different
+	     * data services, that would produce false equality for references
+	     * to objects in the different data services that happened to have
+	     * the same object IDs.  -tjb@sun.com (11/09/2007)
+	     */
+	    return oid == (((ManagedReferenceImpl) object).oid);
+	} else {
+	    return false;
+	}
+    }
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	/*
+	 * Follow the suggestions in Effective Java to XOR the upper and lower
+	 * 32 bits of a long field, and add a non-zero constant.
+	 */
+	return (int) (oid ^ (oid >>> 32)) + 6883;
     }
 
     /* -- Implement Serializable -- */
@@ -511,6 +567,31 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     }
 
     /**
+     * Returns the next object ID, or -1 if there are no more objects.  Does
+     * not return IDs for removed objects.  Specifying -1 requests the first
+     * ID.
+     */
+    static long nextObjectId(Context context, long oid) {
+	/*
+	 * Find the next newly created object, but only return it if there are
+	 * no existing objects with a lower ID.
+	 */
+	long nextNew = context.refs.nextNewObjectId(oid);
+	long last = oid;
+	while (true) {
+	    long nextOld = context.store.nextObjectId(context.txn, last);
+	    if (nextOld == -1 || (nextNew != -1 && nextOld > nextNew)) {
+		return nextNew;
+	    }
+	    ManagedReferenceImpl ref = context.refs.find(nextOld);
+	    if (ref == null || !ref.isRemoved()) {
+		return nextOld;
+	    }
+	    last = nextOld;
+	}
+    }
+
+    /**
      * Returns any modifications that need to be stored to the data store, or
      * null if there are none, and changes the state to FLUSHED.
      */
@@ -531,9 +612,12 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		SerialUtil.serialize(object, context.classSerial);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
-		debugDetectLogger.log(
-		    Level.FINEST,
-		    "Modified object was not marked for update: {0}", object);
+		if (debugDetectLogger.isLoggable(Level.FINEST)) {
+		    debugDetectLogger.log(
+			Level.FINEST,
+			"Modified object was not marked for update: {0}",
+			Objects.fastToString(object));
+		}
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
@@ -559,6 +643,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	return state == State.REMOVED_EMPTY || state == State.REMOVED_FETCHED;
     }
 
+    /**
+     * Checks if the object has been created in the current transaction and not
+     * removed.
+     */
+    boolean isNew() {
+	return state == State.NEW;
+    }
+
     /** Returns the object currently associated with this reference or null. */
     ManagedObject getObject() {
 	return object;
@@ -579,7 +671,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object obj =  SerialUtil.deserialize(data, context.classSerial);
+	Object obj = SerialUtil.deserialize(data, context.classSerial);
 	if (obj == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);

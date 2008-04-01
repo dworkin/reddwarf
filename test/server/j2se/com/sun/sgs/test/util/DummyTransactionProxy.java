@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,10 +19,8 @@
 
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.kernel.KernelAppContext;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -38,7 +36,7 @@ public class DummyTransactionProxy implements TransactionProxy {
 	new ThreadLocal<DummyTransaction>();
 
     /** The task owner. */
-    private final DummyTaskOwner taskOwner = new DummyTaskOwner();
+    private final Identity taskOwner = new DummyIdentity();
 
     /** Mapping from type to service. */
     private final Map<Class<? extends Service>, Service> services =
@@ -49,29 +47,17 @@ public class DummyTransactionProxy implements TransactionProxy {
 
     /* -- Implement TransactionProxy -- */
 
-    /**
-     * Note that this implementation also aborts the transaction if it has
-     * timed out.  This behavior roughly simulates the way that tasks
-     * automatically abort timed out transactions, even though it is not the
-     * transaction proxy that is responsible for this behavior in the product.
-     * -tjb@sun.com (06/14/2007)
-     */
     public Transaction getCurrentTransaction() {
 	Transaction txn = threadTxn.get();
 	if (txn == null) {
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
-	try {
-	    txn.checkTimeout();
-	} catch (TransactionTimeoutException e) {
-	    txn.abort(e);
-	    throw e;
-	}
+	txn.checkTimeout();
 	return txn;
     }
 
-    public TaskOwner getCurrentOwner() {
+    public Identity getCurrentOwner() {
 	return taskOwner;
     }
 
@@ -111,8 +97,5 @@ public class DummyTransactionProxy implements TransactionProxy {
 	}
 	services.put(type, service);
     }
-    
-    public void setContext(KernelAppContext ctx) {
-        taskOwner.setContext(ctx);
-    }
+
 }

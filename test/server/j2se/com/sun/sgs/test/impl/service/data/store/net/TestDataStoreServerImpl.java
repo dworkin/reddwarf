@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -24,6 +24,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -106,7 +107,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	    DataStoreNetPackage + ".server.port", "0");
 	server = getDataStoreServer();
 	tid = server.createTransaction(1000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
     }
 
     /** Sets passed if the test passes. */
@@ -227,7 +228,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	for (int i = 0; i < 5; i++) {
 	    threads.add(new TestReaperConcurrencyThread(server, i));
 	}
-	Thread.sleep(10000);
+	Thread.sleep(5000);
 	TestReaperConcurrencyThread.setDone();
 	for (TestReaperConcurrencyThread thread : threads) {
 	    Throwable t = thread.getResult();
@@ -270,12 +271,12 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
 	public void run() {
 	    try {
-		long tid = server.createTransaction(1000);
+		long tid = server.createTransaction(2);
 		int succeeds = 0;
 		int aborted = 0;
 		int notActive = 0;
 		while (!getDone()) {
-		    long wait = 1 + random.nextInt(4);
+		    long wait = 1 + random.nextInt(3);
 		    try {
 			Thread.sleep(wait);
 		    } catch (InterruptedException e) {
@@ -287,6 +288,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			    server.abort(tid);
 			} else {
 			    server.getBinding(tid, "dummy");
+			    server.prepareAndCommit(tid);
 			}
 			succeeds++;
 		    } catch (TransactionAbortedException e) {
@@ -296,9 +298,7 @@ public class TestDataStoreServerImpl extends TestCase {
 			abort = true;
 			notActive++;
 		    }
-		    if (abort) {
-			tid = server.createTransaction(1000);
-		    }
+		    tid = server.createTransaction(2);
 		}
 		System.err.println(getName() +
 				   ": succeeds:" + succeeds +
@@ -315,6 +315,64 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
+    /**
+     * Test specifying negative transaction IDs to all server methods with
+     * transaction ID parameters.
+     */
+    public void testNegativeTxnIds() {
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.createObject(Long.MIN_VALUE); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.markForUpdate(-1, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getObject(-2, oid, true); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObject(-3, oid, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setObjects(
+		-4, new long[] { oid }, new byte[][] { new byte[0] }); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeObject(-5, oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getBinding(-6, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.setBinding(-7, "foo", oid); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.removeBinding(-8, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextBoundName(-9, "foo"); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.getClassId(-10, new byte[0]); } };
+	new AssertThrowsIllegalArgumentException() {
+	    void run() throws Exception {
+		server.getClassInfo(-11, 3); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.nextObjectId(-12, 4); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepare(-13); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.commit(-14); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.prepareAndCommit(-15); } };
+	new AssertThrowsIllegalArgumentException() { void run() {
+	    server.abort(-16); } };
+     }
+
+    /** Run the action and check that it throws IllegalArgumentException. */
+    private abstract static class AssertThrowsIllegalArgumentException {
+	abstract void run() throws Exception;
+	AssertThrowsIllegalArgumentException() {
+	    try {
+		run();
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(e);
+	    } catch (Exception e) {
+		fail("Expected IllegalArgumentException: " + e);
+	    }
+	}
+    }
+
     /* -- Other tests -- */
 
     /**
@@ -326,7 +384,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	props.setProperty(DataStoreNetPackage + ".max.txn.timeout", "50");
 	server = getDataStoreServer();
 	tid = server.createTransaction(2000);
-	oid = server.allocateObjects(tid, 1);
+	oid = server.createObject(tid);
 	Thread.sleep(1000);
 	try {
 	    server.getObject(tid, oid, false);
@@ -440,18 +498,6 @@ public class TestDataStoreServerImpl extends TestCase {
 	System.err.println("Cleaned directory");
     }
 
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
     /** Use this thread to control a call to shutdown that may block. */
     protected class ShutdownAction extends Thread {
 	private boolean done;
@@ -548,16 +594,22 @@ public class TestDataStoreServerImpl extends TestCase {
 		try {
 		    flag.release();
 		    server.getObject(tid, oid, false);
-		    flag.release();
+		} catch (TransactionAbortedException e) {
+		    System.err.println(e);
+		    tid = -1;
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
+		} finally {
+		    flag.release();
 		}
 	    }
 	};
 	thread.start();
-	/* Wait for thread to block */
-	assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
-	Thread.sleep(10);
+	/* Wait for thread to start */
+	assertTrue("Blocking thread did not start",
+		   flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	/* Wait for the operation to block */
+	Thread.sleep(100);
 	/* Concurrent access */
 	try {
 	    action.run();
@@ -567,7 +619,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	} finally {
 	    /* Clean up */
 	    server.abort(tid2);
-	    assertTrue(flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	    assertTrue("Blocking thread didn't complete",
+		       flag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	}
     }
 }

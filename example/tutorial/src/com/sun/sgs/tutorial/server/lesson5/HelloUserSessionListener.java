@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,11 +20,14 @@
 package com.sun.sgs.tutorial.server.lesson5;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.ManagedReference;
 
 /**
  * Simple example {@link ClientSessionListener} for the Project Darkstar
@@ -43,7 +46,7 @@ class HelloUserSessionListener
         Logger.getLogger(HelloUserSessionListener.class.getName());
 
     /** The session this {@code ClientSessionListener} is listening to. */
-    private final ClientSession session;
+    private final ManagedReference<ClientSession> sessionRef;
 
     /**
      * Creates a new {@code HelloUserSessionListener} for the given session.
@@ -51,7 +54,20 @@ class HelloUserSessionListener
      * @param session the session this listener is associated with
      */
     public HelloUserSessionListener(ClientSession session) {
-        this.session = session;
+        if (session == null)
+            throw new NullPointerException("null session");
+
+        sessionRef = AppContext.getDataManager().createReference(session);
+    }
+
+    /**
+     * Returns the session for this listener.
+     * 
+     * @return the session for this listener
+     */
+    protected ClientSession getSession() {
+        // We created the ref with a non-null session, so no need to check it.
+        return sessionRef.get();
     }
 
     /**
@@ -59,8 +75,8 @@ class HelloUserSessionListener
      * <p>
      * Logs when data arrives from the client.
      */
-    public void receivedMessage(byte[] message) {
-        logger.log(Level.INFO, "Direct message from {0}", session.getName());
+    public void receivedMessage(ByteBuffer message) {
+        logger.log(Level.INFO, "Message from {0}", getSession().getName());
     }
 
     /**
@@ -71,8 +87,8 @@ class HelloUserSessionListener
     public void disconnected(boolean graceful) {
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO,
-            "User {0} has logged out {1}",
-            new Object[] { session.getName(), grace }
+                   "User {0} has logged out {1}",
+                   new Object[] { getSession().getName(), grace }
         );
     }
 }

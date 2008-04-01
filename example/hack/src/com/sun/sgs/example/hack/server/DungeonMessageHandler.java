@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -40,7 +40,7 @@ public class DungeonMessageHandler implements MessageHandler, Serializable {
     private static final long serialVersionUID = 1;
 
     // reference to the associated dungeon
-    private ManagedReference dungeonRef;
+    private ManagedReference<Dungeon> dungeonRef;
 
     /**
      * Creates a new <code>DungeonMessageHandler</code>.

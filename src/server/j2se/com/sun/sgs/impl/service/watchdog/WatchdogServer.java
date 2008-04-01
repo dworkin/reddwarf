@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -28,7 +28,7 @@ import java.rmi.Remote;
 public interface WatchdogServer extends Remote {
 
     /**
-     * Registers a node with the corresponding {@code hostname} and
+     * Registers a node with the corresponding {@code host}, {@code port}, and
      * {@code client}, and returns and array containing two {@code
      * long} values consisting of:
      *
@@ -47,7 +47,8 @@ public interface WatchdogServer extends Remote {
      * client} will be notified of these status changes via its {@link
      * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *
-     * @param	hostname  a hostname
+     * @param	host  a host name
+     * @param   port  a port number
      * @param	client a watchdog client
      *
      * @return 	an array containing two {@code long} values consisting of
@@ -58,7 +59,7 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String hostname, WatchdogClient client)
+    long[] registerNode(String host, int port, WatchdogClient client)
 	throws NodeRegistrationFailedException, IOException;
 
     /**
@@ -83,18 +84,14 @@ public interface WatchdogServer extends Remote {
     boolean renewNode(long nodeId) throws IOException;
 
     /**
-     * Returns {@code true} if this watchdog considers the node with
-     * the specified {@code nodeId} to be alive, otherwise returns
-     * {@code false}.
+     * Notifies this watchdog that the node with the specified {@code
+     * nodeId} has been recovered by the node with the specified
+     * {@code backupId}.
      *
-     * @param	nodeId	a node ID
-     *
-     * @return	{@code true} if the node is considered alive,
-     *		{@code false} otherwise
-     *
+     * @param	nodeId the recovered node's ID
+     * @param	backupId the backup node's ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    boolean isAlive(long nodeId) throws IOException;
-
+    void recoveredNode(long nodeId, long backupId) throws IOException;
 }

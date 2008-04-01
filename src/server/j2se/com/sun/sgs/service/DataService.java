@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -49,24 +49,21 @@ public interface DataService extends DataManager, Service {
      * markForUpdate} or {@link ManagedReference#getForUpdate
      * ManagedReference.getForUpdate} before making the modifications.
      *
-     * @param	<T> the type of the object
      * @param	name the name
-     * @param	type a class representing the type of the object
      * @return	the object associated with the service binding of the name
-     * @throws	ClassCastException if the object bound to the name is not of
-     *		the specified type
      * @throws	NameNotBoundException if no object is bound to the name
      * @throws	ObjectNotFoundException if the object bound to the name is not
      *		found
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T> T getServiceBinding(String name, Class<T> type);
+    ManagedObject getServiceBinding(String name);
 
     /**
      * Specifies an object for the service binding of a name, replacing any
-     * previous binding.  The object, as well as any objects it refers to, must
-     * implement {@link Serializable}.  Note that this method will throw {@link
+     * previous binding.  The object must implement {@link ManagedObject}, and
+     * both the object and any objects it refers to must implement {@link
+     * Serializable}.  Note that this method will throw {@link
      * IllegalArgumentException} if <code>object</code> does not implement
      * <code>Serializable</code>, but is not guaranteed to check that all
      * referred to objects implement <code>Serializable</code>.  Any instances
@@ -78,12 +75,12 @@ public interface DataService extends DataManager, Service {
      * @param	object the object associated with the service binding of the
      *		name
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement {@link Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setServiceBinding(String name, ManagedObject object);
+    void setServiceBinding(String name, Object object);
 
     /**
      * Removes the service binding for a name.  Note that the object previously
@@ -138,5 +135,35 @@ public interface DataService extends DataManager, Service {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    ManagedReference createReferenceForId(BigInteger id);
+    ManagedReference<?> createReferenceForId(BigInteger id);
+
+    /**
+     * Returns a unique identifier for the next object after the object with
+     * the specified identifier, or {@code null} if there are no more objects.
+     * If {@code objectId} is {@code null}, then returns the identifier of the
+     * first object.  This method will not return identifiers for objects that
+     * have already been removed, and may not include identifiers for newly
+     * created objects.  It is not an error for the object associated with
+     * {@code objectId} to have already been removed. <p>
+     *
+     * The object identifiers accepted and returned by this method are the same
+     * as those returned by the {@link ManagedReference#getId
+     * ManagedReference.getId} method. <p>
+     *
+     * Callers should not assume that objects associated with the identifiers
+     * returned by this method, but which cannot be reached by traversing
+     * object field references starting with an object associated with a name
+     * binding, will continue to be retained by the data service.
+     *
+     * @param	objectId the identifier of the object to search after, or
+     *		{@code null} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code objectId}, or {@code null} if there are no
+     *		more objects
+     * @throws	IllegalArgumentException if the implementation can determine
+     *		that {@code objectId} is not a valid object identifier
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    BigInteger nextObjectId(BigInteger objectId);
 }

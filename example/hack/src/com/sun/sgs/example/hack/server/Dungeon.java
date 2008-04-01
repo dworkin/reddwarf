@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,10 +21,11 @@ package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.example.hack.server.util.UtilChannel;
+import com.sun.sgs.example.hack.server.util.UtilChannelManager;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
@@ -45,7 +46,7 @@ public class Dungeon implements Game, Serializable {
     private static final long serialVersionUID = 1;
 
     // the channel used for all players currently in this dungeon
-    private Channel channel;
+    private ManagedReference<UtilChannel> channelRef;
 
     // the name of this particular dungeon
     private String name;
@@ -54,13 +55,17 @@ public class Dungeon implements Game, Serializable {
     private int spriteMapId;
 
     // a reference to the game change manager
-    private ManagedReference gcmRef;
+    private ManagedReference<GameChangeManager> gcmRef;
 
     // the connection into the dungeon
-    private ManagedReference connectorRef;
+    private ManagedReference<GameConnector> connectorRef;
 
     // the set of players in the lobby, mapping from uid to account name
     private HashMap<ClientSession,String> playerMap;
+
+    private UtilChannel channel() {
+        return channelRef.get();
+    }
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
@@ -79,17 +84,18 @@ public class Dungeon implements Game, Serializable {
 
         // create a channel for all clients in this dungeon, but lock it so
         // that we control who can enter and leave the channel
-        channel = AppContext.getChannelManager().
+        UtilChannel channel = UtilChannelManager.instance().
             createChannel(NAME_PREFIX + name, null, Delivery.RELIABLE);
+
+        channelRef = dataManager.createReference(channel);
 
         // initialize the player list
         playerMap = new HashMap<ClientSession,String>();
 
         // get a reference to the membership change manager
-        gcmRef = dataManager.
-            createReference(dataManager.
-                            getBinding(GameChangeManager.IDENTIFIER,
-                                       GameChangeManager.class));
+        gcmRef = dataManager.createReference(
+	    (GameChangeManager) dataManager.getBinding(
+		GameChangeManager.IDENTIFIER));
     }
 
     /**
@@ -106,38 +112,36 @@ public class Dungeon implements Game, Serializable {
         String playerName = player.getName();
         ClientSession [] users = playerMap.keySet().
             toArray(new ClientSession[playerMap.size()]);
-        Messages.sendUidMap(session, playerName, channel, users);
+        Messages.sendUidMap(session, playerName, channel(), users);
 
         // add the player to the dungeon channel and the local map
-        channel.join(session, null);
+        channel().join(session, null);
         playerMap.put(session, playerName);
 
         // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(playerMap, channel, session);
+        Messages.sendUidMap(playerMap, channel(), session);
 
         // notify the manager that our membership count changed
         sendCountChanged();
 
         // notify the client of the sprites we're using
-        SpriteMap spriteMap =
-            dataManager.getBinding(SpriteMap.NAME_PREFIX + spriteMapId,
-                                   SpriteMap.class);
-        Messages.sendSpriteMap(spriteMap, channel, session);
+        SpriteMap spriteMap = (SpriteMap) dataManager.getBinding(
+	    SpriteMap.NAME_PREFIX + spriteMapId);
+        Messages.sendSpriteMap(spriteMap, channel(), session);
 
-        Messages.sendPlayerJoined(player.getCurrentSession(), channel);
+        Messages.sendPlayerJoined(player.getCurrentSession(), channel());
 
         // finally, throw the player into the game through the starting
         // connection point ... the only problem is that the channel info
         // won't be there when we try to send a board (because we still have
         // the lock on the Player, so its userJoinedChannel method can't
         // have been called yet), so set the channel directly
-        player.userJoinedChannel(channel);
+        player.userJoinedChannel(channel());
         PlayerCharacter pc =
             (PlayerCharacter)(player.getCharacterManager().
                               getCurrentCharacter());
         player.sendCharacter(pc);
-        connectorRef.get(GameConnector.class).
-            enteredConnection(player.getCharacterManager());
+        connectorRef.get().enteredConnection(player.getCharacterManager());
     }
 
     /**
@@ -148,11 +152,11 @@ public class Dungeon implements Game, Serializable {
     public void leave(Player player) {
         AppContext.getDataManager().markForUpdate(this);
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channel);
+        Messages.sendPlayerLeft(player.getCurrentSession(), channel());
 
         // remove the player from the dungeon channel and the player map
         ClientSession session = player.getCurrentSession();
-        channel.leave(player.getCurrentSession());
+        channel().leave(player.getCurrentSession());
         playerMap.remove(session);
 
         // just to be paranoid, we should make sure that they're out of
@@ -171,7 +175,7 @@ public class Dungeon implements Game, Serializable {
     private void sendCountChanged() {
         GameMembershipDetail detail =
                 new GameMembershipDetail(getName(), numPlayers());
-        gcmRef.get(GameChangeManager.class).notifyMembershipChanged(detail);
+        gcmRef.get().notifyMembershipChanged(detail);
 
         // FIXME: we used to do the following, but the classloader bug got
         // tripped...now that classloading is fixed, should we go back

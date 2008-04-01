@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -91,7 +91,7 @@ public class PropertiesWrapper {
      * Returns the value of an <code>int</code> property.
      *
      * @param	name the property name
-     * @param	defaultValue the default value
+     * @param   defaultValue the default value
      * @return	the value
      * @throws	NumberFormatException if the value does not contain a parsable
      *		<code>int</code>
@@ -99,7 +99,7 @@ public class PropertiesWrapper {
     public int getIntProperty(String name, int defaultValue) {
 	String value = properties.getProperty(name);
 	if (value == null) {
-	    return defaultValue;
+            return defaultValue;
 	}
 	try {
 	    return Integer.parseInt(value);
@@ -108,6 +108,30 @@ public class PropertiesWrapper {
 		"The value of the " + name + " property must be a valid " +
 		"int: \"" + value + "\"").initCause(e);
 	}
+    }
+
+    /**
+     * Returns the value of a required <code>int</code> property.
+     *
+     * @param   name the property name
+     * @return  the value
+     * @throws  IllegalArgumentException if the value is not set
+     * @throws  NumberFormatException if the value does not contain a parsable
+     *          <code>int</code>
+     */
+    public int getRequiredIntProperty(String name) {
+        String value = properties.getProperty(name);
+        if (value == null) {
+            throw new IllegalArgumentException(
+                "The " + name + " property must be specified");
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw (NumberFormatException) new NumberFormatException(
+                "The value of the " + name + " property must be a valid " +
+                "int: \"" + value + "\"").initCause(e);
+        }
     }
 
     /**
@@ -146,6 +170,40 @@ public class PropertiesWrapper {
 		"than " + max + ": " + result);
 	}
 	return result;
+    }
+
+    /**
+     * Returns the value of a required {@code int} property within a bound
+     * range of values.
+     *
+     * @param   name the property name
+     * @param   min the minimum value to allow
+     * @param   max the maximum value to allow
+     * @return  the value
+     * @throws  IllegalArgumentException if the value or {@code defaultValue}
+     *          is less than {@code min} or greater than {@code max}, or if
+     *          {@code min} is greater than {@code max}, or if the value
+     *          is not set
+     * @throws  NumberFormatException if the value does not contain a parsable
+     *          <code>int</code>
+     */
+    public int getRequiredIntProperty(String name, int min, int max)
+    {
+        if (min > max) {
+            throw new IllegalArgumentException(
+                "The min must not be greater than the max");
+        }
+        int result = getRequiredIntProperty(name);
+        if (min > result) {
+            throw new IllegalArgumentException(
+                "The value of the " + name + " property must not be less " +
+                "than " + min + ": " + result);
+        } else if (result > max) {
+            throw new IllegalArgumentException(
+                "The value of the " + name + " property must not be greater " +
+                "than " + max + ": " + result);
+        }
+        return result;
     }
 
     /**
@@ -223,7 +281,8 @@ public class PropertiesWrapper {
      * @return	the new instance or <code>null</code> if the property is not
      *		found
      * @throws	IllegalArgumentException if the property is found and a problem
-     *		occurs creating the instance
+     *		occurs creating the instance, or if the constructor throws a
+     *		checked exception
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)
@@ -265,11 +324,17 @@ public class PropertiesWrapper {
 		e);
 	} catch (InvocationTargetException e) {
 	    Throwable cause = e.getCause();
-	    throw new IllegalArgumentException(
-		"Problem calling the constructor for the class " +
-		"specified by the " + name + " property: " +
-		className + ": " + cause,
-		cause);
+	    if (cause instanceof RuntimeException) {
+		throw (RuntimeException) cause;
+	    } else if (cause instanceof Error) {
+		throw (Error) cause;
+	    } else {
+		throw new IllegalArgumentException(
+		    "Problem calling the constructor for the class " +
+		    "specified by the " + name + " property: " +
+		    className + ": " + cause,
+		    cause);
+	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
 		"Problem creating an instance of the class specified by the " +

@@ -1,3 +1,9 @@
+Version 0.9.5:
+- Improve I/O throttling in the Client Session and Channel services
+- Add scalable map and set implementations
+- Add ManagedObjectRemoval interface
+- Modify Transaction.checkTimeout to abort timed-out transactions
+
 Version 0.9.4:
 - Fix a bug that caused timeout exceptions that occurred when
   deserializing managed references to not be retried

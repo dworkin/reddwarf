@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -57,7 +57,7 @@ public class SimpleLevel implements Level, Serializable {
     private String game;
 
     // the characters currently in this level
-    private HashSet<ManagedReference> characterRefs;
+    private HashSet<ManagedReference<CharacterManager>> characterRefs;
 
     // the dimentsion of this level
     private int levelWidth;
@@ -77,7 +77,7 @@ public class SimpleLevel implements Level, Serializable {
         this.game = gameName;
 
         // create a new set for our characters
-        characterRefs = new HashSet<ManagedReference>();
+        characterRefs = new HashSet<ManagedReference<CharacterManager>>();
     }
 
     /**
@@ -341,8 +341,8 @@ public class SimpleLevel implements Level, Serializable {
      * @param updates the spaces being updated
      */
     private void sendUpdates(Set<BoardSpace> updates) {
-        for (ManagedReference mgrRef : characterRefs)
-            mgrRef.get(CharacterManager.class).sendUpdate(updates);
+        for (ManagedReference<CharacterManager> mgrRef : characterRefs)
+            mgrRef.get().sendUpdate(updates);
     }
 
     /**

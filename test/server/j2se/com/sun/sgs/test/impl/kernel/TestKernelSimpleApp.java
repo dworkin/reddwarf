@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -39,13 +39,11 @@ public class TestKernelSimpleApp extends KernelSimpleAppTestCase {
     public void testRunSimpleApp() throws Exception {
 	new RunProcess(createProcessBuilder(), RUN_PROCESS_MILLIS) {
 	    void handleInput(String line) {
-		System.out.println("stdout: " + line);
 		if (line.equals("count=3")) {
 		    done();
 		}
 	    }
 	    void handleError(String line) {
-		System.err.println("stderr: " + line);
 		failed(
 		    new RuntimeException(
 			"Unexpected error input: " + line));

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,6 +22,7 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.Serializable;
 
 /**
@@ -56,7 +57,7 @@ public final class WrappedSerializable<T> implements Serializable {
 
     /** The managed reference for the object or wrapper.
      */
-    private ManagedReference ref = null;
+    private ManagedReference<?> ref = null;
 
     /**
      * Constructs an instance of this class with the specified object.
@@ -77,28 +78,30 @@ public final class WrappedSerializable<T> implements Serializable {
 	ManagedObject managedObj =
 	    (object instanceof ManagedObject) ?
 	    (ManagedObject) object :
-	    new Wrapper((Serializable) object);
+	    new Wrapper<T>(object);
 	    
 	ref = AppContext.getDataManager().createReference(managedObj);
     }
 
     /**
-     * Returns the object in this wrapper, cast to the specified
-     * {@code type}.
+     * Returns the object in this wrapper.
      *
-     * @param type the expected class of the object
      * @return T the object in this wrapper
      *
-     * @throws ClassCastException if the object in this wrapper is not
-     * 	an instance of the specified type
      * @throws IllegalStateException if {@link #remove remove} has
      * been invoked on this instance
      */
-    public T get(Class<T> type) {
+    public T get() {
 	checkRemoved();
-	ManagedObject obj = ref.get(ManagedObject.class);
-	return
-	    type.cast((obj instanceof Wrapper) ? ((Wrapper) obj).get() : obj);
+	ManagedObject obj = (ManagedObject) ref.get();
+	if (obj instanceof Wrapper) {
+	    Wrapper<T> wrapper = Objects.uncheckedCast(obj);
+	    return wrapper.get();
+	} else {
+	    @SuppressWarnings("unchecked")
+	    T result = (T) obj;
+	    return result;
+	}
     }
 
     /**
@@ -111,7 +114,7 @@ public final class WrappedSerializable<T> implements Serializable {
      */
     public void remove() {
 	checkRemoved();
-	ManagedObject obj = ref.get(ManagedObject.class);
+	Object obj = ref.get();
 	if (obj instanceof Wrapper) {
 	    AppContext.getDataManager().removeObject(obj);
 	}
@@ -131,17 +134,17 @@ public final class WrappedSerializable<T> implements Serializable {
     /**
      * Managed object wrapper for a serializable object.
      */
-    private static class Wrapper implements ManagedObject, Serializable {
+    private static class Wrapper<T> implements ManagedObject, Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	private final Serializable obj;
+	private final T obj;
 
-	Wrapper(Serializable obj) {
+	Wrapper(T obj) {
 	    this.obj = obj;
 	}
 
-	Serializable get() {
+	T get() {
 	    return obj;
 	}
     }

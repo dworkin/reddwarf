@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,9 +22,7 @@ package com.sun.sgs.service;
 
 /**
  * This is the base interface used for all services. Services support
- * specific funcationality and work in a transactional context. Each
- * service instance works on behalf of a single application, and can only
- * interact with other services working in the same application context.
+ * specific funcationality and work in a transactional context. 
  * See {@code TransactionParticipant} for details on when interaction
  * between {@code Service}s is allowed.
  * <p>
@@ -44,15 +42,15 @@ package com.sun.sgs.service;
  * on startup. The {@code Properties} parameter provides application and
  * service-specific properties. The {@code ComponentRegistry} provides
  * access to non-transactional kernel and system components like the
- * {@code TaskScheduler}. The {@code TransactionProxy} provides access to
- * transactional state (when active) and the other available {@code Service}s.
- * If any error occurs in creating a {@code Service}, the constructor may
- * throw any {@code Exception}, causing the application to shutdown.
+ * {@code TransactionScheduler}. The {@code TransactionProxy} provides
+ * access to transactional state (when active) and the other available
+ * {@code Service}s. If any error occurs in creating a {@code Service},
+ * the constructor may throw any {@code Exception}, causing the application
+ * to shutdown.
  * <p>
  * Note that {@code Service}s are not created in the context of a
  * transaction. If a given constructor needs to do any work transactionally,
- * it should do so by calling {@code TaskScheduler.runTask} with an instance
- * of {@code TransactionRunner}.
+ * it may do so by calling {@code TransactionScheduler.runTask}.
  */
 public interface Service {
 
@@ -64,21 +62,11 @@ public interface Service {
     public String getName();
 
     /**
-     * Notifies this {@code Service} that the application context is fully
+     * Notifies this {@code Service} that the application is fully
      * configured and ready to start running. This means that all other {@code
      * Service}s associated with this application have been successfully
      * created. If the method throws an exception, then the application will be
      * shutdown.
-     * <p>
-     * Note that before this point, the available application context (provided
-     * by {@code TransactionProxy.getCurrentOwner}) will be incomplete.
-     * Specifically, {@code Manager}s and other facilities provided by the
-     * {@code AppContext} will be unavailable. If you need to use these aspects
-     * of the application context (e.g., for scheduling tasks that run
-     * application level code), or store it for future use, you should do so
-     * once {@code ready} is called, but not before. When your {@code Service}
-     * is constructed, the available context will only provide access to those
-     * services that have already been created.
      *
      * @throws Exception if an error occurs
      */

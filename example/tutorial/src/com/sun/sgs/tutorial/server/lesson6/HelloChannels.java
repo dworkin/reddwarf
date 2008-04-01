@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -27,17 +27,17 @@ import java.util.logging.Logger;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 
 /**
  * Simple example of channel operations in the Project Darkstar Server.
  * <p>
  * Extends the {@code HelloEcho} example by joining clients to two
- * channels, one of which has a {@link ChannelListener} set.
+ * channels.
  */
 public class HelloChannels
     implements Serializable, AppListener
@@ -49,20 +49,15 @@ public class HelloChannels
     private static final Logger logger =
         Logger.getLogger(HelloChannels.class.getName());
 
-    /** The total number of login events. */
-    private int loginCount = 0;
-
-    /** The name of the first channel: {@value #CHANNEL_1_NAME} */
-    public static final String CHANNEL_1_NAME = "Foo";
-
-    /** The name of the second channel: {@value #CHANNEL_2_NAME} */
-    public static final String CHANNEL_2_NAME = "Bar";
-
     /**
-     * The first {@link Channel}.
-     * (The second channel is looked up by name only.)
+     * Channel names for this example.
+     * 
+     * <b>Note:</b> these must correspond to the channel names used
+     * by the lesson 2 client tutorial.
      */
-    private Channel channel1 = null;
+    public static final String[] channelNames = new String[] {
+        "Foo", "Bar"
+    };
 
     /**
      * {@inheritDoc}
@@ -71,15 +66,14 @@ public class HelloChannels
      * so they only need to be created here in {@code initialize}.
      */
     public void initialize(Properties props) {
-        ChannelManager channelManager = AppContext.getChannelManager();
+        ChannelManager channelMgr = AppContext.getChannelManager();
+        DataManager dataMgr = AppContext.getDataManager();
 
-        // Create and keep a reference to the first channel.
-        channel1 = channelManager.createChannel(CHANNEL_1_NAME, null,
-                                                Delivery.RELIABLE);
-
-        // We don't keep the second channel object around, to demonstrate
-        // looking it up by name when needed.
-        channelManager.createChannel(CHANNEL_2_NAME, null, Delivery.RELIABLE);
+        for (String channelName : channelNames) {
+            // Create a channel and bind it to a name in the data store.
+            Channel channel = channelMgr.createChannel(Delivery.RELIABLE);
+            dataMgr.setBinding(channelName, channel);
+        }
     }
 
     /**
@@ -89,8 +83,7 @@ public class HelloChannels
      * logged-in session.
      */
     public ClientSessionListener loggedIn(ClientSession session) {
-        loginCount++;
         logger.log(Level.INFO, "User {0} has logged in", session.getName());
-        return new HelloChannelsSessionListener(session, channel1, loginCount);
+        return new HelloChannelsSessionListener(session);
     }
 }

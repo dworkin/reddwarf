@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -38,7 +38,7 @@ public class PlayerCharacter implements Character, Serializable {
     private static final long serialVersionUID = 1;
 
     // a reference to the player that owns this character
-    private ManagedReference playerRef;
+    private ManagedReference<Player> playerRef;
 
     // the id of this character
     private int id;
@@ -94,7 +94,7 @@ public class PlayerCharacter implements Character, Serializable {
      */
     public void notifyStatsChanged() {
         // send the player our updated stats...
-        Player player = playerRef.get(Player.class);
+        Player player = playerRef.get();
         player.sendCharacter(this);
 
         // ...and check to see if we're still alive
@@ -113,8 +113,8 @@ public class PlayerCharacter implements Character, Serializable {
             // NOTE: we could add some message screen here, if we wanted
 
             // finally, throw the players into the lobby
-            Game lobby = AppContext.getDataManager().
-                getBinding(Lobby.IDENTIFIER, Lobby.class);
+            Game lobby = (Lobby) AppContext.getDataManager().
+                getBinding(Lobby.IDENTIFIER);
             AppContext.getTaskManager().
                 scheduleTask(new MoveGameTask(player, lobby));
         }
@@ -140,7 +140,7 @@ public class PlayerCharacter implements Character, Serializable {
         int previousHP = stats.getHitPoints();
         if (character.collidedInto(this)) {
             // our stats were effected, so see if we lost any hit points
-            Player player = playerRef.get(Player.class);
+            Player player = playerRef.get();
             int lostHP = previousHP - stats.getHitPoints();
             if (lostHP > 0)
                 player.sendTextMessage(character.getName() + " hit you for " +
@@ -178,7 +178,7 @@ public class PlayerCharacter implements Character, Serializable {
      * @param message the message to send
      */
     public void sendMessage(String message) {
-        playerRef.get(Player.class).sendTextMessage(message);
+        playerRef.get().sendTextMessage(message);
     }
 
 }

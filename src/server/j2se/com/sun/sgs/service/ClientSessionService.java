@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,40 +19,44 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
+
 /**
  * The client session service manages client sessions.
  */
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified protocol message listener for the
-     * specified service ID.
+     * Registers the specified disconnect listener with this service.
+     * This method is non-transactional and
+     * should be called outside of a transaction.
+     * 
+     * TBD: This approach may be replaced with a scheme for registering
+     * interest in notification of a ClientSession's managed object removal.
      *
-     * <p>When a client session receives a protocol message with the
-     * specified service ID, the specified listener's {@link
-     * ProtocolMessageListener#receivedMessage receivedMessage} method is
-     * invoked with the {@link SgsClientSession client session} and
-     * the complete protocol message.
-     *
-     * <p>The reserved service IDs are 0-127.  The current ones in use are:
-     * <ul>
-     * <li> <code>0x01</code>, application service
-     * <li> <code>0x02</code>, channel service
-     * </ul>
-     *
-     * @param serviceId a service ID
-     * @param listener a protocol message listener
+     * @param   listener a listener to notify when a session disconnects
      */
-    void registerProtocolMessageListener(
-	byte serviceId, ProtocolMessageListener listener);
+    void registerSessionDisconnectListener(
+        ClientSessionDisconnectListener listener);
 
     /**
-     * Returns the client session corresponding to the specified
-     * session ID, or <code>null</code> if there is no existing client
-     * session for the specified ID.
+     * Sends the specified protocol {@code message} to the <i>local</i>
+     * client session with the specified {@code sessionRefId}. If the
+     * specified client session is not connected to the local node, the
+     * message is dropped.  This method is non-transactional, and therefore
+     * this message send cannot be aborted.
      *
-     * @param sessionId a session ID
-     * @return a client session, or <code>null</code>
+     * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
+     * ManagedReference#getId getId} on a {@link ManagedReference} to the
+     * associated {@code ClientSession}.
+     *
+     * @param	sessionRefId a client session ID, as a {@code BigInteger}
+     * @param	message a complete protocol message
+     * @param	delivery a delivery requirement
      */
-    SgsClientSession getClientSession(byte[] sessionId);
+    void sendProtocolMessageNonTransactional(
+	BigInteger sessionRefId, ByteBuffer message, Delivery delivery);
 }

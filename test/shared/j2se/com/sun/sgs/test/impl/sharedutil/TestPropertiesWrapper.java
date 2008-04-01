@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -115,6 +115,39 @@ public class TestPropertiesWrapper extends TestCase {
 	}
     }
 
+    public void testGetRequiredIntFailures() {
+        try {
+            wrapper.getRequiredIntProperty("p");
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+        props.setProperty("p", "50");
+        /* min > max */
+        try {
+            wrapper.getRequiredIntProperty("p", 100, 99);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+        /* result > max */
+        props.setProperty("p", "100");
+        try {
+            wrapper.getRequiredIntProperty("p", 0, 99);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+        /* min > result */
+        props.setProperty("p", "-1");
+        try {
+            wrapper.getRequiredIntProperty("p", 0, 99);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+    }
+
     public void testGetIntSuccess() {
 	assertEquals(10, wrapper.getIntProperty("p", 10));
 	assertEquals(0, wrapper.getIntProperty("p", 0, 0, 100));
@@ -125,6 +158,7 @@ public class TestPropertiesWrapper extends TestCase {
 	assertEquals(100, wrapper.getIntProperty("p", 10, 0, 100));
 	assertEquals(100, wrapper.getIntProperty("p", 199, 100, 200));
 	assertEquals(100, wrapper.getIntProperty("p", 100, 100, 100));
+        assertEquals(100, wrapper.getRequiredIntProperty("p"));
     }
 
     /* -- Test getLongProperty -- */

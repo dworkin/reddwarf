@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -41,7 +41,7 @@ public abstract class BasicCharacterManager
     private static final long serialVersionUID = 1;
 
     // a reference to the current level
-    private ManagedReference levelRef;
+    private ManagedReference<Level> levelRef;
 
     // the position on the current level
     private int xPos;
@@ -70,7 +70,7 @@ public abstract class BasicCharacterManager
     public Level getCurrentLevel() {
         if (levelRef == null)
             return null;
-        return levelRef.get(Level.class);
+        return levelRef.get();
     }
 
     /**

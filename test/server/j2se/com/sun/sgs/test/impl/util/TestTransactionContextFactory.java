@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -42,8 +42,10 @@ public class TestTransactionContextFactory extends TestCase {
      */
     public void testIsPreparedFailsDuringCommit() throws Exception {
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-	TransactionContextFactory contextFactory =
-	    new TransactionContextFactory(txnProxy) {
+	TransactionContextFactory<TransactionContext> contextFactory =
+	    new TransactionContextFactory<TransactionContext>(txnProxy, 
+                                          "TestTransactionContextFactory") 
+            {
 	        protected TransactionContext createContext(Transaction txn) {
 		    return new TransactionContext(txn) {
 			public boolean isPrepared() {

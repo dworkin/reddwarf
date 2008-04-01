@@ -1,0 +1,291 @@
+<!-- This file specifies a findbugs filter for excluding reports that
+     should not be considered errors.
+
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+
+     When possible, please specify the full names of the bug codes,
+     using the pattern attribute, to make it clearer what reports are
+     being suppressed.  You can find a listing of codes at:
+
+       http://findbugs.sourceforge.net/bugDescriptions.html
+  -->
+
+<FindBugsFilter>
+
+  <!-- Package com.sun.sgs.app.util -->
+
+  <!-- Testing methods to call via reflection. -->
+  <Match>
+    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+    <Or>
+      <Method name="getAvgTreeDepth"/>
+      <Method name="getMaxTreeDepth"/>
+      <Method name="getMinTreeDepth"/>
+    </Or>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
+  <!-- OK if version fields are not currently being read, they should
+       still be instance fields. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
+    </Or>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+  <!-- The root fields of these classes are initialized the the default
+       value (null) and set lazily. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
+    </Or>
+    <Field name="root"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.kernel -->
+
+  <!-- Currently unused fields. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.IdentityCoordinatorImpl"/>
+    <Field name="authenticatorSet"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+  <!-- Return value can be ignored, since it always true. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.TransactionSchedulerImpl$TaskQueueImpl"/>
+    <Method name="addTask"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.kernel.schedule -->
+
+  <!-- Currently unused fields. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.schedule.WindowSchedulerQueue$QueueUser"/>
+    <Field name="lastScheduled"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+  <!-- Synchronization is OK.  Task reads/writes are protected by the cancelled 
+       field and synchronization on the handle itself. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.schedule.RecurringTaskHandleImpl"/>
+    <Field name="task"/>
+    <Bug pattern="IS2_INCONSISTENT_SYNC"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.nio -->
+
+  <!-- It is OK to pass null to FutureTask.set to mark the future as
+       done; the parameter is not dereferenced -->
+  <Match>
+    <Class name="com.sun.sgs.impl.nio.DelegatingCompletionHandler"/>
+    <Or>
+      <Method name="completed"/>
+      <Method name="start"/>
+    </Or>
+    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data -->
+
+  <!-- OK if version field is not currently being read, it should still
+       be an instance field. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceHeader"/>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+  <!-- Not worth making an inner class static. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$DelegatingScheduler$Handle"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"/>
+  </Match>
+
+  <!-- Intentionally falling through switch cases. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.ManagedReferenceImpl"/>
+    <Or>
+      <Method name="flush"/>
+      <Method name="removeObject"/>
+    </Or>
+    <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data.store -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Packages com.sun.sgs.impl.service.data.store.{bdb,je} -->
+
+  <!-- Cursor methods that are supposed to return null. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbCursor"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeCursor"/>
+    </Or>
+    <Or>
+      <Method name="getKey"/>
+      <Method name="getValue"/>
+    </Or>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Database methods that are supposed to return null. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbDatabase"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeDatabase"/>
+    </Or>
+    <Method name="get"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Testing methods to call via reflection -->  
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment"/>
+      <Class name="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"/>
+    </Or>
+    <Method name="getLockTimeoutMicros"/>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
+  <!-- JeTransaction.SimpleXid.getBranchQualifier can return null. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.db.je.JeTransaction$SimpleXid"/>
+    <Method name="getBranchQualifier"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.data.store.net -->
+
+  <!-- OK to ignore exceptions for optional socket settings. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreClientRemote"/>
+      <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreServerRemote$Handler"/>
+    </Or>
+    <Method name="setSocketOptions"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
+  </Match>
+
+  <!-- OK to catch reflection bugs with an Exception catch-all. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.net.DataStoreProtocol"/>
+    <Method name="checkResult"/>
+    <Bug pattern="REC_CATCH_EXCEPTION"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.channel -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- OK to declare serializable field as non-serializable interface. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServerWrapper"/>
+    <Field name="server"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- Thread is not created with a default empty run method. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$TaskHandlerThread"/>
+    <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.session -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$ClientSessionServiceRecoveryListener$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$SessionServerImpl$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- OK to declare serializable field as non-serializable interface. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionImpl"/>
+    <Field name="sessionServer"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- OK to declare serializable field as non-serializable interface. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionImpl$ListenerWrapper"/>
+    <Field name="listener"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- Thread is not created with a default empty run method. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$FlushContextsThread"/>
+    <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- Package com.sun.sgs.impl.service.watchdog -->
+
+  <!-- Thread is not created with a default empty run method. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RenewThread"/>
+      <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServerImpl$NotifyClientsThread"/>
+      <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServerImpl$CheckExpirationThread"/>
+    </Or>
+    <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- OK to declare serializable field as non-serializable interface. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.NodeImpl"/>
+    <Field name="client"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- Currently unused fields. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompleteFutureImpl"/>
+    <Field name="listener"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+</FindBugsFilter>

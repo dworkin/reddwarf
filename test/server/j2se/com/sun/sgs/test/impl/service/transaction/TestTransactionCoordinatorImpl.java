@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.transaction;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -30,6 +31,7 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
@@ -39,15 +41,34 @@ import junit.framework.TestCase;
 @SuppressWarnings("hiding")
 public class TestTransactionCoordinatorImpl extends TestCase {
 
+    /** The default transaction timeout. */
+    private static final long TIMEOUT =
+	Long.getLong(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+		     TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
+
+    /** Long enough for a transaction to timeout. */
+    private static final long TIMED_OUT = TIMEOUT + 5;
+
+    /** Transaction coordinator properties. */
+    private static final Properties coordinatorProps = new Properties();
+    static {
+	coordinatorProps.setProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+	    String.valueOf(TIMEOUT));
+    }
+
     /** The instance to test. */
     private final TransactionCoordinator coordinator =
-	new TransactionCoordinatorImpl(new Properties(), null);
+	new TransactionCoordinatorImpl(coordinatorProps, null);
     
     /** The handle to test. */
     private TransactionHandle handle;
 
     /** The transaction associated with the handle. */
     private Transaction txn;
+
+    /** A common exception to throw when aborting. */
+    private final RuntimeException abortXcp = new RuntimeException("abort");
 
     /** Creates the test. */
     public TestTransactionCoordinatorImpl(String name) {
@@ -57,7 +78,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /** Prints the test case, sets handle and txn */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	handle = coordinator.createTransaction(true);
+	handle = coordinator.createTransaction(false);
 	txn = handle.getTransaction();
     }
 
@@ -150,7 +171,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	for (TransactionParticipant participant : participants) {
 	    txn.join(participant);
 	}
-	txn.abort(null);
+	txn.abort(abortXcp);
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(participant == participants[2]
@@ -158,19 +179,19 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitAborted() throws Exception {
 	txn.join(new DummyTransactionParticipant());
-	txn.abort(null);
+	txn.abort(abortXcp);
 	try {
 	    handle.commit();
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitPreparing() throws Exception {
@@ -379,7 +400,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    new DummyNonDurableTransactionParticipant() {
 		public boolean prepare(Transaction txn) {
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -405,7 +426,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitPrepareAbortsLast() throws Exception {
@@ -417,7 +438,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    new DummyTransactionParticipant() {
 		public void prepareAndCommit(Transaction txn) {
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -438,7 +459,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitPrepareAbortsAndFailsMiddle() throws Exception {
@@ -450,7 +471,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    new DummyNonDurableTransactionParticipant() {
 		public boolean prepare(Transaction txn) throws Exception {
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -476,7 +497,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitPrepareAbortsAndFailsLast() throws Exception {
@@ -490,7 +511,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		    throws Exception
 		{
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -512,7 +533,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testCommitFails() throws Exception {
@@ -576,7 +597,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     }
 
     public void testCommitAbortedWithNoCause() throws Exception {
-	txn.abort(null);
+	txn.abort(abortXcp);
 	try {
 	    handle.commit();
 	    fail("Expected TransactionNotActiveException");
@@ -612,12 +633,12 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		}
 	    };
 	txn.join(participant);
-	txn.abort(null);
+	txn.abort(abortXcp);
     }
 
     public void testGetTransactionAborted() {
 	txn.join(new DummyTransactionParticipant());
-	txn.abort(null);
+	txn.abort(abortXcp);
 	handle.getTransaction();
     }
 
@@ -642,8 +663,8 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /* -- Test Transaction.getId -- */
 
     public void testGetId() {
-	txn.abort(null);
-	Transaction txn2 = coordinator.createTransaction(true).
+	txn.abort(abortXcp);
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertNotNull(txn.getId());
 	assertNotNull(txn2.getId());
@@ -655,10 +676,10 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     public void testGetCreationTime() throws Exception {
 	long now = System.currentTimeMillis();
 	Thread.sleep(50);
-	Transaction txn1 = coordinator.createTransaction(true).
+	Transaction txn1 = coordinator.createTransaction(false).
 	    getTransaction();
 	Thread.sleep(50);
-	Transaction txn2 = coordinator.createTransaction(true).
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertTrue("Transaction creation time is too early: " +
             txn1.getCreationTime(),
@@ -735,7 +756,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	for (TransactionParticipant participant : participants) {
 	    txn.join(participant);
 	}
-	txn.abort(null);
+	txn.abort(abortXcp);
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(participant == participants[2]
@@ -743,7 +764,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testJoinPreparing() throws Exception {
@@ -910,21 +931,6 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertAborted(abortCause);
     }
 
-    public void testJoinAbortedWithNoCause() throws Exception {
-	DummyTransactionParticipant participant =
-	    new DummyTransactionParticipant();
-	txn.abort(null);
-	try {
-	    txn.join(participant);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	    assertFalse(retryable(e));
-	    assertEquals(null, e.getCause());
-	}
-	assertAborted(null);
-    }
-
     /* -- Test Transaction.abort -- */
 
     public void testAbortActive() throws Exception {
@@ -939,13 +945,13 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    txn.join(participant);
 	}
 	assertNotAborted();
-	txn.abort(null);
+	txn.abort(abortXcp);
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testAbortSupplyCause() throws Exception {
@@ -961,7 +967,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	}
 	assertAborted(abortCause);
 	try {
-	    txn.abort(null);
+	    txn.abort(abortXcp);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -979,9 +985,18 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertAborted(abortCause);
     }
 
+    public void testAbortNoCause() throws Exception {
+	try {
+	    txn.abort(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testAbortActiveEmpty() throws Exception {
-	txn.abort(null);
-	assertAborted(null);
+	txn.abort(abortXcp);
+	assertAborted(abortXcp);
     }
 
     public void testAbortAborting() {
@@ -1004,7 +1019,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void abort(Transaction txn) {
 		    assertAborted(abortCause);
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1056,7 +1071,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public boolean prepare(Transaction txn) throws Exception {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1082,7 +1097,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testAbortPreparingLast() throws Exception {
@@ -1095,7 +1110,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void prepareAndCommit(Transaction txn) {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1116,7 +1131,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testAbortPreparingLastNonDurable() throws Exception {
@@ -1125,7 +1140,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void prepareAndCommit(Transaction txn) {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1136,7 +1151,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void prepareAndCommit(Transaction txn) {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1146,7 +1161,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void prepareAndCommit(Transaction txn) {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 		    } catch (RuntimeException e) {
 			fail("Unexpected exception: " + e);
 		    }
@@ -1168,7 +1183,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertAborted(null);
+	assertAborted(abortXcp);
     }
 
     public void testAbortPrepareAndCommitting() throws Exception {
@@ -1217,7 +1232,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		public void commit(Transaction txn) {
 		    assertNotAborted();
 		    try {
-			txn.abort(null);
+			txn.abort(abortXcp);
 			fail("Expected IllegalStateException");
 		    } catch (IllegalStateException e) {
 			System.err.println(e);
@@ -1250,7 +1265,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	handle.commit();
 	assertCommitted();
 	try {
-	    txn.abort(null);
+	    txn.abort(abortXcp);
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
@@ -1313,23 +1328,234 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertAborted(abortCause);
     }
 
-    public void testAbortAbortedWithNoCause() throws Exception {
-	txn.abort(null);
+    /* -- Test checkTimeout -- */
+
+    public void testCheckTimeoutActive() throws Exception {
+	txn.checkTimeout();
+	Thread.sleep(TIMED_OUT);
 	try {
-	    txn.abort(new TransactionAbortedException("Aborted"));
+	    txn.checkTimeout();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertTrue(txn.isAborted());
+	}
+    }
+
+    public void testCheckTimeoutAborting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	txn.abort(abortXcp);
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutAbortingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	txn.abort(abortXcp);
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutAborted() throws Exception {
+	txn.abort(abortXcp);
+	try {
+	    txn.checkTimeout();
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
-	    assertFalse(retryable(e));
-	    assertEquals(null, e.getCause());
 	}
-	assertAborted(null);
+	handle = coordinator.createTransaction(false);
+	txn = handle.getTransaction();
+	Thread.sleep(TIMED_OUT);
+	txn.abort(abortXcp);
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCheckTimeoutPreparing() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			txn.checkTimeout();
+			return super.prepare(txn);
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (DummyTransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutPreparingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			txn.checkTimeout();
+			return super.prepare(txn);
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (DummyTransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	Thread.sleep(TIMED_OUT);
+	try {
+	    handle.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
+	}
+    }
+
+    public void testCheckTimeoutPrepareAndCommitting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void prepareAndCommit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutPrepareAndCommittingTimedOut()
+	throws Exception
+    {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void prepareAndCommit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	try {
+	    handle.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	    assertEquals(e, checkTimeoutException[0]);
+	}
+    }
+
+    public void testCheckTimeoutCommitting() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void commit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutCommittingTimedOut() throws Exception {
+	final Exception[] checkTimeoutException = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void commit(Transaction txn) {
+		    try {
+			txn.checkTimeout();
+		    } catch (RuntimeException e) {
+			checkTimeoutException[0] = e;
+			throw e;
+		    }
+		}
+	    };
+	txn.join(participant);
+	Thread.sleep(TIMED_OUT);
+	handle.commit();
+	assertNull(checkTimeoutException[0]);
+    }
+
+    public void testCheckTimeoutCommitted() throws Exception {
+	handle.commit();
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	handle = coordinator.createTransaction(false);
+	txn = handle.getTransaction();
+	Thread.sleep(TIMED_OUT);
+	handle.commit();
+	try {
+	    txn.checkTimeout();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
     }
 
     /* -- Test equals -- */
 
     public void testEquals() throws Exception {
-	Transaction txn2 = coordinator.createTransaction(true).
+	Transaction txn2 = coordinator.createTransaction(false).
 	    getTransaction();
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
@@ -1364,17 +1590,5 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     private static boolean retryable(Throwable t) {
 	return t instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 }

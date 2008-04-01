@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -59,6 +59,13 @@ class DataStoreClientRemote implements DataStoreServer {
 	    return h;
 	}
 	Socket socket = new Socket(host, port);
+	setSocketOptions(socket);
+	return new DataStoreProtocol(
+	    socket.getInputStream(), socket.getOutputStream());
+    }
+
+    /** Sets TcpNoDelay and KeepAlive options, if possible. */
+    private void setSocketOptions(Socket socket) {
 	try {
 	    socket.setTcpNoDelay(true);
 	} catch (Exception e) {
@@ -67,21 +74,20 @@ class DataStoreClientRemote implements DataStoreServer {
 	    socket.setKeepAlive(true);
 	} catch (Exception e) {
 	}
-	return new DataStoreProtocol(
-	    socket.getInputStream(), socket.getOutputStream());
     }
 
     /** Returns a handler that is no longer in use. */
     private void returnHandler(DataStoreProtocol h) {
-	handlers.offer(h);
+	boolean ok = handlers.offer(h);
+	assert ok;
     }
 
     /* -- Implement DataStoreServer -- */
 
-    public long allocateObjects(long tid, int count) throws IOException {
+    public long createObject(long tid) throws IOException {
 	DataStoreProtocol h = getHandler();
 	try {
-	    return h.allocateObjects(tid, count);
+	    return h.createObject(tid);
 	} finally {
 	    returnHandler(h);
 	}
@@ -187,6 +193,15 @@ class DataStoreClientRemote implements DataStoreServer {
 	DataStoreProtocol h = getHandler();
 	try {
 	    return h.getClassInfo(tid, classId);
+	} finally {
+	    returnHandler(h);
+	}
+    }
+
+    public long nextObjectId(long tid, long oid) throws IOException {
+	DataStoreProtocol h = getHandler();
+	try {
+	    return h.nextObjectId(tid, oid);
 	} finally {
 	    returnHandler(h);
 	}

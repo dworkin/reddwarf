@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,17 +19,17 @@
 
 package com.sun.sgs.impl.profile.listener;
 
-import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.util.NetworkReporter;
 
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
 
@@ -37,6 +37,7 @@ import java.beans.PropertyChangeEvent;
 
 import java.io.IOException;
 
+import java.util.Formatter;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,10 +59,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * users may connect to that socket to watch the reports. The default
  * port used is 43007.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.SnapshotProfileListener.</code>
- * root is used for all properties in this class. The <code>reportPort</code>
+ * The <code>com.sun.sgs.impl.profile.listener.SnapshotProfileListener.</code>
+ * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
+ * data. The <code>report.period</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  *
  * @see AggregateTaskListener
@@ -93,27 +94,24 @@ public class SnapshotProfileListener implements ProfileListener {
         SnapshotProfileListener.class.getName();
 
     // the supported properties and their default values
-    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
+    private static final String PORT_PROPERTY = PROP_BASE + ".report.port";
     private static final int DEFAULT_PORT = 43007;
-    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
+    private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
     private static final long DEFAULT_PERIOD = 10000;
 
     /**
      * Creates an instance of <code>SnapshotProfileListener</code>.
      *
      * @param properties the <code>Properties</code> for this listener
-     * @param owner the <code>TaskOwner</code> to use for all tasks run by
+     * @param owner the <code>Identity</code> to use for all tasks run by
      *              this listener
-     * @param taskScheduler the <code>TaskScheduler</code> to use for
-     *                      running short-lived or recurring tasks
-     * @param resourceCoord the <code>ResourceCoordinator</code> used to
-     *                      run any long-lived tasks
+     * @param registry the {@code ComponentRegistry} containing the
+     *                 available system components
      *
      * @throws IOException if the server socket cannot be created
      */
-    public SnapshotProfileListener(Properties properties, TaskOwner owner,
-                                   TaskScheduler taskScheduler,
-                                   ResourceCoordinator resourceCoord)
+    public SnapshotProfileListener(Properties properties, Identity owner,
+                                   ComponentRegistry registry)
         throws IOException
     {
         flag = new AtomicBoolean(false);
@@ -121,11 +119,11 @@ public class SnapshotProfileListener implements ProfileListener {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
-        networkReporter = new NetworkReporter(port, resourceCoord);
+        networkReporter = new NetworkReporter(port);
 
         long reportPeriod =
             wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
-        handle = taskScheduler.
+        handle = registry.getComponent(TaskScheduler.class).
             scheduleRecurringTask(new SnapshotRunnable(reportPeriod), owner, 
                                   System.currentTimeMillis() + reportPeriod,
                                   reportPeriod);
@@ -178,12 +176,13 @@ public class SnapshotProfileListener implements ProfileListener {
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));
 
-            String reportStr = "Snapshot[period=" + reportPeriod + "ms]:\n";
+            Formatter reportStr = new Formatter();
+	    reportStr.format("Snapshot[period=%dms]:%n", reportPeriod);
             try {
-                reportStr += "  Threads=" + threadCount + "  Tasks=" +
-                    successCount + "/" + totalCount + "\n";
-                reportStr += "  AverageQueueSize=" +
-                    ((double)readyCount / (double)totalCount) + " tasks\n\n";
+                reportStr.format("  Threads=%d", threadCount);
+		reportStr.format("  Tasks=%d/%d%n", successCount, totalCount);
+                reportStr.format("  AverageQueueSize=%2.2f tasks%n%n",
+				 ((double)readyCount / (double)totalCount));
             } finally {
                 successCount = 0;
                 totalCount = 0;
@@ -191,7 +190,7 @@ public class SnapshotProfileListener implements ProfileListener {
                 flag.set(false);
             }
 
-            networkReporter.report(reportStr);
+            networkReporter.report(reportStr.toString());
         }
     }
 

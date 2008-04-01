@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,8 +22,8 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.MissingResourceException;
 import java.util.Set;
 
@@ -34,38 +34,20 @@ import java.util.Set;
  * can have any objects added to it, but components cannot be removed. This
  * implementation is not thread-safe.
  */
-class ComponentRegistryImpl implements ComponentRegistry, Iterable<Object> {
+class ComponentRegistryImpl implements ComponentRegistry {
 
     // the set of components
-    private HashSet<Object> componentSet;
+    private LinkedHashSet<Object> componentSet;
 
     /**
      * Creates an empty instance of <code>ComponentRegistryImpl</code>.
      */
     ComponentRegistryImpl() {
-        componentSet = new HashSet<Object>();
+        componentSet = new LinkedHashSet<Object>();
     }
 
     /**
-     * Creates an instance of <code>ComponentRegistryImpl</code> with the
-     * given components.
-     *
-     * @param components an initial <code>Set</code> of components
-     */
-    ComponentRegistryImpl(Set<Object> components) {
-        componentSet = new HashSet<Object>(components);
-    }
-
-    /**
-     * Returns a matching component if there is exactly one, otherwise
-     * throws an exception.
-     *
-     * @param <T> the type of the component
-     * @param type a <code>Class</code> representing the type of the component
-     *
-     * @return a single component, if there is exactly one match
-     *
-     * @throws MissingResourceException if there isn't exactly one match
+     * {@inheritDoc}
      */
     public <T> T getComponent(Class<T> type) {
         Object matchingComponent = null;
@@ -105,13 +87,6 @@ class ComponentRegistryImpl implements ComponentRegistry, Iterable<Object> {
      */
     public Iterator<Object> iterator() {
         return Collections.unmodifiableSet(componentSet).iterator();
-    }
-
-    /**
-     * Clears all components from the registry.
-     */
-    void clearComponents() {
-        componentSet.clear();
     }
 
 }

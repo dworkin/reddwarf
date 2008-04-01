@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -30,15 +30,16 @@ import java.rmi.Remote;
 public interface DataStoreServer extends Remote {
 
     /**
-     * Reserves a batch of object IDs for allocating new objects.  This
-     * operation is performed in its own transaction.
+     * Reserves an object ID for a new object.  Note that calling other
+     * operations using this ID are not required to find the objects until
+     * {@link #setObject setObject} is called.  Aborting a transaction is also
+     * not required to unassign any of the IDs so long as other operations
+     * treat them as non-existent objects.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
-     * @param	count the number of object IDs to reserve
-     * @return	the next available object ID
-     * @throws	IllegalArgumentException if {@code count} is less than
-     *		{@code 1}
+     * @return	the new object ID
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -46,7 +47,7 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    long allocateObjects(long tid, int count) throws IOException;
+    long createObject(long tid) throws IOException;
 
     /**
      * Notifies the server that an object is going to be modified.
@@ -54,7 +55,8 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	oid the object ID
-     * @throws	IllegalArgumentException if {@code oid} is negative
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -75,7 +77,8 @@ public interface DataStoreServer extends Remote {
      * @param	oid the object ID
      * @param	forUpdate whether the caller intends to modify the object
      * @return	the data associated with the object ID
-     * @throws	IllegalArgumentException if {@code oid} is negative
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -94,8 +97,8 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	oid the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if {@code oid} is negative, or if
-     *		{@code data} is empty
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative, or if {@code data} is empty
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -112,9 +115,9 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	oids the object IDs
      * @param	dataArray the associated data values
-     * @throws	IllegalArgumentException if {@code oids} and {@code data} are
-     *		not the same length, or if {@code oids} contains a value that
-     *		is negative
+     * @throws	IllegalArgumentException if {@code tid} is negative, if
+     *		{@code oids} and {@code data} are not the same length, or if
+     *		{@code oids} contains a value that is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -130,7 +133,8 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	oid the object ID
-     * @throws	IllegalArgumentException if {@code oid} is negative
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -148,6 +152,7 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	name the name
      * @return	the object ID
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -165,7 +170,8 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	name the name
      * @param	oid the object ID
-     * @throws	IllegalArgumentException if {@code oid} is negative
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -181,6 +187,7 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	name the name
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -202,6 +209,7 @@ public interface DataStoreServer extends Remote {
      *		beginning
      * @return	the next name with a binding following {@code name}, or
      *		{@code null} if there are no more bound names
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -224,6 +232,7 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	classInfo the class information
      * @return	the associated class ID
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -243,8 +252,8 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	classId the class ID
      * @return	the associated class information
-     * @throws	IllegalArgumentException if {@code classId} is not greater than
-     *		{@code 0}
+     * @throws	IllegalArgumentException if {@code tid} is negative, or if
+     *		{@code classId} is not greater than {@code 0}
      * @throws	ClassInfoNotFoundException if the ID is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -255,8 +264,36 @@ public interface DataStoreServer extends Remote {
     byte[] getClassInfo(long tid, int classId)
 	throws ClassInfoNotFoundException, IOException;
 
+    /**
+     * Returns the object ID for the next object after the object with the
+     * specified ID, or {@code -1} if there are no more objects.  If {@code
+     * objectId} is {@code -1}, then returns the ID of the first object.  The
+     * IDs returned by this method will not include ones for objects that have
+     * already been removed, and may not include identifiers for objects
+     * created after an iteration has begun.  It is not an error for the object
+     * associated with the specified identifier to have already been
+     * removed. <p>
+     *
+     * @param	tid the ID of the transaction
+     * @param	oid the identifier of the object to search after, or
+     *		{@code -1} to request the first object
+     * @return	the identifier of the next object following the object with
+     *		identifier {@code oid}, or {@code -1} if there are no more
+     *		objects
+     * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
+     *		negative
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @throws	IOException if a network problem occurs
+     */
+    long nextObjectId(long tid, long oid) throws IOException;
+
     /** 
-     * Creates a new transaction and returns the associated ID.
+     * Creates a new transaction, and returns the associated ID, which will not
+     * be negative.
      *
      * @param	timeout the number of milliseconds the resulting transaction
      *		should be allowed to run before it times out
@@ -275,6 +312,7 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction
      * @return	{@code true} if this participant is read-only, otherwise
      *		{@code false}
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	Exception if there are any failures in preparing
      * @throws	IllegalStateException if the transaction has been prepared,
      *		committed, or aborted, or if the transaction is not known
@@ -286,6 +324,7 @@ public interface DataStoreServer extends Remote {
      * Commits the transaction.
      *
      * @param	tid the ID of the transaction
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	IllegalStateException if the transaction has not been
      *		prepared, if it has been committed or aborted, or if the
      *		transaction is not known
@@ -297,6 +336,7 @@ public interface DataStoreServer extends Remote {
      * Prepares and commits the transaction.
      *
      * @param	tid the ID of the transaction
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	IllegalStateException if the transaction has been prepared,
      *		committed, or aborted, or if the transaction is not known
      * @throws	IOException if a network problem occurs
@@ -307,6 +347,7 @@ public interface DataStoreServer extends Remote {
      * Aborts the transaction.
      *
      * @param	tid the ID of the transaction
+     * @throws	IllegalArgumentException if {@code tid} is negative
      * @throws	IllegalStateException if the transaction has been committed or
      *		aborted, or if the transaction is not known
      * @throws	IOException if a network problem occurs

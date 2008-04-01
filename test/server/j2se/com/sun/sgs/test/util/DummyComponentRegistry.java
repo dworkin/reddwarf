@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,9 +19,9 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.kernel.ComponentRegistry;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.MissingResourceException;
 
@@ -61,11 +61,15 @@ public class DummyComponentRegistry implements ComponentRegistry {
 	components.put(type, component);
     }
 
+    /** Returns an iterator over the components */
+    public Iterator<Object> iterator() {
+        return components.values().iterator();
+    }
+
     /**
-     * Registers this component registry as the source of components supplied
-     * by the AppContext for the current thread.
+     * Clears all components from the registry.
      */
-    public void registerAppContext() {
-	new DummyAbstractKernelAppContext(this);
+    public void clearComponents() {
+	components.clear();
     }
 }

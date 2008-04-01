@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,173 +19,102 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 
 
 /**
- * This package-private class is a simple container class used to represent
- * the main aspects of a task that has been accepted by the scheduler for
- * running.
+ * This interface represents a single task that has been accepted by a
+ * scheduler. It is used by implementations of {@code SchedulerQueue}
+ * to manage the tasks in the queue.
  */
-class ScheduledTask {
+public interface ScheduledTask {
 
-    // the common aspects of a task
-    private final KernelRunnable task;
-    private final TaskOwner owner;
-    private final Priority priority;
-    private final long startTime;
-    private final long period;
-    private InternalRecurringTaskHandle recurringTaskHandle = null;
-
-    // identifier that represents a non-recurring task.
-    static final int NON_RECURRING = -1;
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code> with all the same
-     * values of an existing <code>ScheduledTask</code> except its starting
-     * time, which is set to the new value.
-     *
-     * @param task existing <code>ScheduledTask</code>
-     * @param newStartTime the new starting time for the task in milliseconds
-     *                     since January 1, 1970
-     */
-    ScheduledTask(ScheduledTask task, long newStartTime) {
-        this(task.task, task.owner, task.priority, newStartTime, task.period);
-        this.recurringTaskHandle = task.recurringTaskHandle;
-    }
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code> that does not
-     * represent a recurring task.
-     *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>TaskOwner</code> of the task
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
-     */
-    ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
-                  long startTime) {
-        this(task, owner, priority, startTime, NON_RECURRING);
-    }
-
-    /**
-     * Creates an instance of <code>ScheduledTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> to run
-     * @param owner the <code>TaskOwner</code> of the task
-     * @param priority the <code>Priority</code> of the task
-     * @param startTime the time at which to start in milliseconds since
-     *                  January 1, 1970
-     * @param period the delay between recurring executions, or
-     *               <code>NON_RECURRING</code>
-     */
-    ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
-                  long startTime, long period) {
-        if (task == null)
-            throw new NullPointerException("Task cannot be null");
-        if (owner == null)
-            throw new NullPointerException("Owner cannot be null");
-        if (priority == null)
-            throw new NullPointerException("Priority cannot be null");
-
-        this.task = task;
-        this.owner = owner;
-        this.priority = priority;
-        this.startTime = startTime;
-        this.period = period;
-    }
+    /** Identifier that represents a non-recurring task. */
+    public static final int NON_RECURRING = -1;
 
     /**
      * Returns the task.
      *
-     * @return the <code>KernelRunnable</code> to run
+     * @return the {@code KernelRunnable} to run
      */
-    KernelRunnable getTask() {
-        return task;
-    }
+    public KernelRunnable getTask();
 
     /**
      * Returns the owner.
      *
-     * @return the <code>TaskOwner</code>
+     * @return the {@code Identity} that owns the task
      */
-    TaskOwner getOwner() {
-        return owner;
-    }
+    public Identity getOwner();
 
     /**
      * Returns the priority.
      *
-     * @return the <code>Priority</code>
+     * @return the {@code Priority}
      */
-    Priority getPriority() {
-        return priority;
-    }
+    public Priority getPriority();
 
     /**
      * Returns the time at which this task is scheduled to start.
      *
      * @return the scheduled run time for the task
      */
-    long getStartTime() {
-        return startTime;
-    }
+    public long getStartTime();
 
     /**
      * Returns the period for the task if it's recurring, or
-     * <code>NON_RECURRING</code> if this is not a recurring task.
+     * {@code NON_RECURRING} if this is not a recurring task.
      *
      * @return the period between recurring executions.
      */
-    long getPeriod() {
-        return period;
-    }
+    public long getPeriod();
 
     /**
-     * Returns whether this is a recurring task.
+     * Returns whether this is a recurring task. If this is not a recurring
+     * task then {@code getPeriod} should always return {@code NON_RECURRING}.
      *
-     * @return <code>true</code> if this task is a recurring task,
-     * <code>false</code> otherwise.
+     * @return {@code true} if this task is a recurring task,
+     *         {@code false} otherwise.
      */
-    boolean isRecurring() {
-        return period != NON_RECURRING;
-    }
+    public boolean isRecurring();
 
     /**
-     * Sets the <code>InternalRecurringTaskHandle</code> for this task if
-     * the task is recurring and if the handle has not already been set.
+     * Returns the {@code RecurringTaskHandle} associated with this task if
+     * this task is recurring, or {@code null} if this is not recurring.
      *
-     * @return <code>true</code> if the task is recurring and the handle
-     *         has not already been set, <code>false</code> otherwise
+     * @return the associated {@code RecurringTaskHandle} or {@code null}
      */
-    boolean setRecurringTaskHandle(InternalRecurringTaskHandle handle) {
-        if ((! isRecurring()) || (recurringTaskHandle != null))
-            return false;
-        recurringTaskHandle = handle;
-        return true;
-    }
+    public RecurringTaskHandle getRecurringTaskHandle();
 
     /**
-     * Returns the <code>InternalRecurringTaskHandle</code> for this task, or
-     * <code>null</code> if this not a recurring task.
+     * Returns whether this task has been cancelled.
      *
-     * @return the task's <code>InternalRecurringTaskHandle</code> or
-     *         <code>null</code>
+     * @return {@code true} if this {@code ScheduledTask} has been cancelled,
+     *         {@code false} otherwise
      */
-    InternalRecurringTaskHandle getRecurringTaskHandle() {
-        return recurringTaskHandle;
-    }
+    public boolean isCancelled();
 
     /**
-     * Provides some diagnostic detail about this task.
+     * Cancel this {@code ScheduledTask}. Note that if the task is already
+     * running then calling this method may not have any affect.
      *
-     * @return a <code>String</code> representation of the task.
+     * @param allowInterrupt {@code true} if this call is allowed to throw
+     *                       {@code InterruptedException} if the calling
+     *                       thread is interrupted, {@code false} if the
+     *                       call should always block until the task is
+     *                       cancelled or has completed
+     *
+     * @return {@code true} if the task was cancelled, {@code false} if
+     *         the task was already cancelled or has completed
+     *
+     * @throws InterruptedException if the caller is interrupted while
+     *                              waiting to learn if the cancellation
+     *                              succeeded and {@code allowInterrupt}
+     *                              is {@code true}
      */
-    public String toString() {
-        return task.getBaseTaskType() + "[owner:" + owner.toString() + "]";
-    }
+    public boolean cancel(boolean allowInterrupt) throws InterruptedException;
 
 }

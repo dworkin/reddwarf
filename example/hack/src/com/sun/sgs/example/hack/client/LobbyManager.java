@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -92,11 +92,8 @@ public class LobbyManager implements LobbyListener
         bb.put(characterName.getBytes());
         bb.rewind();
 
-        byte [] bytes = new byte[5 + gameName.length() +
-                                 characterName.length()];
-        bb.get(bytes);
         try {
-            client.send(bytes);
+            client.send(bb);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,14 +19,14 @@
 
 package com.sun.sgs.impl.profile;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCounter;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileSample;
 
@@ -34,10 +34,9 @@ import java.beans.PropertyChangeEvent;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.EmptyStackException;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -73,40 +72,50 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
-    private ThreadLocal<ProfileReportImpl> profileReports =
-        new ThreadLocal<ProfileReportImpl>() {
-            protected ProfileReportImpl initialValue() {
-                return null;
+    private ThreadLocal<Stack<ProfileReportImpl>> profileReports =
+        new ThreadLocal<Stack<ProfileReportImpl>>() {
+            protected Stack<ProfileReportImpl> initialValue() {
+                return new Stack<ProfileReportImpl>();
             }
         };
 
     // the incoming report queue
     private LinkedBlockingQueue<ProfileReportImpl> queue;
 
+    // long-running thread to report data
+    private final Thread reporterThread;
     /**
      * Creates an instance of <code>ProfileCollectorImpl</code>.
-     *
-     * @param resourceCoordinator a <code>ResourceCoordinator</code> used
-     *                            to run collecting and reporting tasks
      */
-    public ProfileCollectorImpl(ResourceCoordinator resourceCoordinator) {
-
+    public ProfileCollectorImpl() {
         schedulerThreadCount = 0;
-	ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
+        ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
         listeners = new ArrayList<ProfileListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
-	opIdCounter = new AtomicInteger(0);
+        opIdCounter = new AtomicInteger(0);
 
-	aggregateSamples = new ConcurrentHashMap<String,ProfileSample>(); 
-	taskLocalSamples = new ConcurrentHashMap<String,ProfileSample>();
+        aggregateSamples = new ConcurrentHashMap<String,ProfileSample>(); 
+        taskLocalSamples = new ConcurrentHashMap<String,ProfileSample>();
 
-	aggregateCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
-	taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
+        aggregateCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
+        taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
 
         // start a long-lived task to consume the other end of the queue
-        resourceCoordinator.startTask(new CollectorRunnable(), null);
-    }
+        reporterThread = new Thread(new CollectorRunnable());
+        reporterThread.start();
+     }
 
+    /** {@inheritDoc} */
+    public void shutdown() {
+        // Shut down the reporterThread, waiting for it to finish what
+        // its doing
+        reporterThread.interrupt();
+	try {
+	    reporterThread.join();
+	} catch (InterruptedException e) {
+	    // do nothing
+	}
+    }
     /** {@inheritDoc} */
     public void addListener(ProfileListener listener) {
         listeners.add(listener);
@@ -147,31 +156,35 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void startTask(KernelRunnable task, TaskOwner owner,
+    public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount) {
-        if (profileReports.get() != null)
-            throw new IllegalStateException("A task is already being " +
-                                            "profiled in this thread");
-        profileReports.set(new ProfileReportImpl(task, owner,
-                                                 scheduledStartTime,
-                                                 readyCount));
+        profileReports.get().push(new ProfileReportImpl(task, owner,
+                                                        scheduledStartTime,
+                                                        readyCount));
     }
 
     /** {@inheritDoc} */
     public void noteTransactional() {
-        ProfileReportImpl profileReport = profileReports.get();
-        if (profileReport == null)
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
+        }
+
         profileReport.transactional = true;
     }
 
     /** {@inheritDoc} */
     public void addParticipant(ProfileParticipantDetail participantDetail) {
-        ProfileReportImpl profileReport = profileReports.get();
-        if (profileReport == null)
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
+        }
         if (! profileReport.transactional)
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
@@ -184,18 +197,27 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void finishTask(int tryCount, Exception exception) {
+    public void finishTask(int tryCount, Throwable t) {
         long stopTime = System.currentTimeMillis();
-        ProfileReportImpl profileReport = profileReports.get();
-        if (profileReport == null)
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().pop();
+        } catch (EmptyStackException ese) {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
-        profileReports.set(null);
+        }
 
+        // collect the final details about the report
         profileReport.runningTime = stopTime - profileReport.actualStartTime;
         profileReport.tryCount = tryCount;
-        profileReport.succeeded = exception == null;
-	profileReport.exception = exception;
+        profileReport.succeeded = t == null;
+        profileReport.throwable = t;
+        
+        // if this was a nested report, then merge all of the collected
+        // data into the parent
+        if (! profileReports.get().empty())
+            profileReports.get().peek().merge(profileReport);
+
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
     }
@@ -259,11 +281,13 @@ public class ProfileCollectorImpl implements ProfileCollector {
          * outside the scope of a started task.
          */
         public void report() {
-            ProfileReportImpl profileReport = profileReports.get();
-            if (profileReport == null)
+            try {
+                ProfileReportImpl profileReport = profileReports.get().peek();
+                profileReport.ops.add(this);
+            } catch (EmptyStackException ese) {
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
-            profileReport.ops.add(this);
+            }
         }
     }
 
@@ -326,11 +350,12 @@ public class ProfileCollectorImpl implements ProfileCollector {
             return taskLocal;
         }
         protected ProfileReportImpl getReport() {
-            ProfileReportImpl profileReport = profileReports.get();
-            if (profileReport == null)
+            try {
+                return profileReports.get().peek();
+            } catch (EmptyStackException ese) {
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
-            return profileReport;
+            }
         }
     }
 
@@ -440,11 +465,12 @@ public class ProfileCollectorImpl implements ProfileCollector {
         }
 
         protected ProfileReportImpl getReport() {
-            ProfileReportImpl profileReport = profileReports.get();
-            if (profileReport == null)
+            try {
+                return profileReports.get().peek();
+            } catch (EmptyStackException ese) {
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
-            return profileReport;
+            }
         }
 
     }

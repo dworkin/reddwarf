@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -49,14 +49,14 @@ final class TransactionProxyImpl implements TransactionProxy {
      * {@inheritDoc}
      */
     public Transaction getCurrentTransaction() {
-        return ThreadState.getCurrentTransaction();
+        return ContextResolver.getCurrentTransaction();
     }
 
     /**
      * {@inheritDoc}
      */
-    public TaskOwner getCurrentOwner() {
-        return ThreadState.getCurrentOwner();
+    public Identity getCurrentOwner() {
+        return ContextResolver.getCurrentOwner();
     }
 
     /**

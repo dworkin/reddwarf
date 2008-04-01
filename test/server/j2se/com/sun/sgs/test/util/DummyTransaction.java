@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -151,10 +152,23 @@ public class DummyTransaction implements Transaction {
     public long getTimeout() { return timeout; }
 
     public void checkTimeout() {
+	if (state == State.ABORTED ||
+	    state == State.COMMITTED)
+	{
+	    throw new TransactionNotActiveException(
+		"Transaction is not active: " + state);
+	} else if (state == State.ABORTING ||
+		   state == State.COMMITTING)
+	{
+	    return;
+	}
 	long runningTime = System.currentTimeMillis() - creationTime;
 	if (runningTime > timeout) {
-	    throw new TransactionTimeoutException(
-		"Transaction timed out after " + runningTime + " ms");
+	    TransactionTimeoutException exception =
+		new TransactionTimeoutException(
+		    "Transaction timed out after " + runningTime + " ms");
+	    abort(exception);
+	    throw exception;
 	}
     }
 
@@ -176,6 +190,8 @@ public class DummyTransaction implements Transaction {
     }
 
     public synchronized void abort(Throwable cause) {
+	if (cause == null)
+	    throw new NullPointerException("Cause cannot be null");
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "abort {0} cause:{1}", this, cause);
 	}

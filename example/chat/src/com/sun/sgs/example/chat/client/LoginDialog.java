@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -293,7 +293,7 @@ public class LoginDialog extends JDialog
          * Creates a new {@code CancelWindowListener} for the given
          * {@code LoginDialog}.
          *
-         * @param client the client to notify on windowClosing
+         * @param dialog the dialog to notify on windowClosing
          */
         CancelWindowListener(LoginDialog dialog) {
             this.dialog = dialog;

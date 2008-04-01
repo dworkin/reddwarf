@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -220,6 +220,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Whether the transaction has already started aborting. */
 	private boolean aborting;
 
+	/** Whether the transaction has been committed or aborted. */
+	private boolean inactive;
+
 	/**
 	 * The exception that caused the transaction to be aborted, or null if
 	 * no cause was provided or if no abort occurred.
@@ -276,6 +279,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    return success || state.get() == REAPING;
 	}
 
+	/** Returns true if this transaction is being reaped. */
+	boolean getReaping() {
+	    return state.get() == REAPING;
+	}
+
 	/**
 	 * Marks the transaction as prepared.  This method should only be
 	 * called when the transaction is in use and has not already been
@@ -284,6 +292,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	void setPrepared() {
 	    boolean success = state.compareAndSet(IN_USE, IN_USE_PREPARED);
 	    assert success;
+	}
+
+	/**
+	 * Marks the transaction as inactive.  This method should only be
+	 * called when the transaction is in use.
+	 */
+	void setInactive() {
+	    assert (state.get() & IN_USE) != 0;
+	    inactive = true;
 	}
 
 	/* -- Implement Transaction -- */
@@ -301,6 +318,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void checkTimeout() {
+	    if (inactive) {
+		throw new TransactionNotActiveException(
+		    "The transaction is not active");
+	    } else if ((state.get() & PREPARED) != 0) {
+		return;
+	    }
 	    long runningTime = System.currentTimeMillis() - getCreationTime();
 	    if (runningTime > getTimeout()) {
 		throw new TransactionTimeoutException(
@@ -313,6 +336,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void abort(Throwable cause) {
+	    if (cause == null)
+	        throw new NullPointerException("Cause cannot be null");
 	    if (!aborting) {
 		aborting = true;
 		abortCause = cause;
@@ -371,7 +396,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Gets the transaction associated with the specified ID, and marks it
 	 * in use.  Checks if the transaction has timed out if checkTimeout is
-	 * true.
+	 * true, and considers transactions being reaped as not active.
 	 */
 	Txn get(long tid, boolean checkTimeout) {
 	    Txn txn = table.get(tid);
@@ -384,7 +409,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 			"Multiple simultaneous accesses to transaction: " +
 			txn);
 		}
-		return txn;
+		if (!txn.getReaping()) {
+		    return txn;
+		}
 	    }
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
@@ -580,7 +607,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    throws IOException
 	{
 	    remote = new DataStoreServerRemote(server, port);
-	    return remote.serverSocket.getLocalPort();
+	    return remote.getLocalPort();
 	}
 	public boolean unexport() {
 	    if (remote == null) {
@@ -651,10 +678,10 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Implement DataStoreServer -- */
 
     /** {@inheritDoc} */
-    public long allocateObjects(long tid, int count) {
+    public long createObject(long tid) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.allocateObjects(txn, count);
+	    return store.createObject(txn);
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -773,6 +800,16 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
+    public long nextObjectId(long tid, long oid) {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.nextObjectId(txn, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
     public long createTransaction(long timeout) {
 	if (timeout <= 0) {
 	    throw new IllegalArgumentException(
@@ -798,6 +835,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.commit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -808,6 +846,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid);
 	try {
 	    store.prepareAndCommit(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -818,6 +857,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid, false);
 	try {
 	    store.abort(txn);
+	    txn.setInactive();
 	} finally {
 	    txnTable.notInUse(txn);
 	}
@@ -911,10 +951,16 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * Returns the transaction for the specified ID, throwing
+     * IllegalArgumentException if the ID is negative, throwing
      * TransactionNotActiveException if the transaction is not active, and
-     * checking, if requested, whether the transaction has timed out.
+     * checking, if requested, whether the transaction has timed out.  Treats
+     * transactions that are being reaped as being not active.
      */
     private Txn getTxn(long tid, boolean checkTimeout) {
+	if (tid < 0) {
+	    throw new IllegalArgumentException(
+		"The transaction ID must not be negative: " + tid);
+	}
 	try {
 	    return txnTable.get(tid, checkTimeout);
 	} catch (RuntimeException e) {

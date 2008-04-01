@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -38,7 +38,7 @@ class DataStoreServerRemote implements Runnable {
     private static final int connectionReadTimeout = 2 * 3600 * 1000;
 
     /** The server socket, or null if closed. */
-    ServerSocket serverSocket;
+    private ServerSocket serverSocket;
 
     /** The data store server, for up calls. */
     private final DataStoreServer server;
@@ -60,17 +60,27 @@ class DataStoreServerRemote implements Runnable {
 	}
     }
 
-    /** Checks if the server is shut down. */
-    private synchronized boolean isShutdown() {
-	return serverSocket == null;
+    /** Returns the local port. */
+    synchronized int getLocalPort() throws IOException {
+	if (serverSocket == null) {
+	    throw new IOException("Server is shut down");
+	}
+	return serverSocket.getLocalPort();
     }
 
     /** Accepts and hands off new connections until shut down. */
     public void run() {
-	while (!isShutdown()) {
+	while (true) {
+	    ServerSocket ss;
+	    synchronized (this) {
+		ss = serverSocket;
+	    }
+	    if (ss == null) {
+		break;
+	    }
 	    try {
 		new Thread(
-		    new Handler(serverSocket.accept()), "Handler").start();
+		    new Handler(ss.accept()), "Handler").start();
 	    } catch (Throwable t) {
 	    }
 	}
@@ -90,20 +100,7 @@ class DataStoreServerRemote implements Runnable {
 	/** Handles requests until an exception occurs. */
 	public void run() {
 	    try {
-		try {
-		    socket.setTcpNoDelay(true);
-		} catch (Exception e) {
-		}
-		try {
-		    socket.setKeepAlive(true);
-		} catch (Exception e) {
-		}
-		if (connectionReadTimeout > 0) {
-		    try {
-			socket.setSoTimeout(connectionReadTimeout);
-		    } catch (Exception e) {
-		    }
-		}
+		setSocketOptions(socket);
 		DataStoreProtocol protocol =
 		    new DataStoreProtocol(
 			socket.getInputStream(), socket.getOutputStream());
@@ -115,6 +112,24 @@ class DataStoreServerRemote implements Runnable {
 		try {
 		    socket.close();
 		} catch (IOException e) {
+		}
+	    }
+	}
+
+	/** Sets TcpNoDelay, KeepAlive, and SoTimeout options, if possible. */
+	private void setSocketOptions(Socket socket) {
+	    try {
+		socket.setTcpNoDelay(true);
+	    } catch (Exception e) {
+	    }
+	    try {
+		socket.setKeepAlive(true);
+	    } catch (Exception e) {
+	    }
+	    if (connectionReadTimeout > 0) {
+		try {
+		    socket.setSoTimeout(connectionReadTimeout);
+		} catch (Exception e) {
 		}
 	    }
 	}
