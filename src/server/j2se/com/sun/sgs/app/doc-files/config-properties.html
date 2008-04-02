@@ -284,24 +284,8 @@ effect on application nodes.
 <h3>Kernel Properties</h3>
 
 These properties control the implementation of the <code>Kernel</code>,
-which is the part of the system that manages applications and the
-components that make up the system.
-
-<dl>
-
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
-<span class="default">off</span>
-<dd>Whether to perform profiling.  Profiling is enabled if the value is
-  <code>on</code>.
-
-</dl>
-
-<a name="Scheduler"></a>
-<h4>Scheduler Properties</h4>
-
-These properties control the implementation of
-the <code>Scheduler</code>, which is the part of
-the <code>Kernel</code> that schedules tasks.
+which manages core components of the system including identity management
+and task scheduling.
 
 <dl>
 <dt>com.sun.sgs.impl.kernel.TransactionConsumerThreads
@@ -331,13 +315,18 @@ typically useful for production deployments.
   this timeout is useful when attaching a debugger to a node, but can 
   increase game latency.
 
-<dt>com.sun.sgs.txn.timeout.unbounded
-<span class="default">Long.MAX_VALUE</span>
-<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
-  transaction will be permitted to run before it is a candidate for
-  being aborted.
-</dl>
+<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
+<span class="default">off</span>
+<dd>Whether to perform profiling.  Profiling is enabled if the value is
+  <code>on</code>.
 
+<dt>com.sun.sgs.impl.kernel.Kernel.profile.listeners
+<span class="default">
+    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<dd>A colon separated list of profile listeners, which consume profile output.
+The <code>AggregateProfileListener</code> reports its findings on a server
+socket with a default of <code>43005</code>.
+</dl>
 <hr>
 <font size="-1">
   Copyright &copy; 2007-2008 Sun Microsystems, Inc. All rights reserved
