@@ -184,7 +184,50 @@ public class StandardProperties {
      * an identity.
      */
     public static final String AUTHENTICATORS = NS + "app.authenticators";
-
+    
+    /**
+     *  An optional property that specifies the type of node being started.
+     *  It must be set to a value in {@link NodeType} and defaults to
+     *  {@code singleNode}.  The value of this property may cause other
+     *  property settings to be overridden.
+     *  <p>
+     *  In particular, setting this property to {@code coreServerNode} causes
+     *  the following properties to be set:
+     * <ul>
+     * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
+     *      is {@value #APP_LISTENER_NONE} to indicate that no application code
+     *      will run on the server node
+     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to indicate
+     *      the set of services to run on the server node
+     * <li> {@value #SERVER_START} set to {@code true} to indicate that the
+     *       services' servers should be started
+     * <li> {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
+     *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
+     *   to indicate the multi-node data service should be used
+     *
+     * </ul>
+     * <p>
+     * Setting this property to {@code appNode} causes the following to be
+     * set:
+     * <ul>
+     * <li> {@value #SERVER_START} set to {@code false} 
+     * </ul>
+     * <p>
+     * The unit tests rely on the default not modifying any other properties.
+     */
+    public static final String NODE_TYPE = NS + "node.type";
+    
+    /**
+     *  The valid choices for {@link #NODE_TYPE}.
+     */
+    public enum NodeType {
+        /** A single node configuration */
+        singleNode,
+        /** The core server for multi-node configurations */
+        coreServerNode,
+        /** An application node for multi-node configurations */
+        appNode,
+    }
     /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
