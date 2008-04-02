@@ -348,7 +348,9 @@ public class TestWatchdogServiceImpl extends TestCase {
 		    dataService.setServiceBinding(VERSION_KEY, version);
 		}}, taskOwner);
 
-	new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	WatchdogServiceImpl watchdog =
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	watchdog.shutdown();
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {

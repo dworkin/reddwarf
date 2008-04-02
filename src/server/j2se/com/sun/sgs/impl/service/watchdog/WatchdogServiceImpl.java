@@ -189,8 +189,8 @@ public final class WatchdogServiceImpl
     /** The exporter for this server or {@code null}. */
     private Exporter<WatchdogClient> exporter = null;
 
-    /** The watchdog server impl. */
-    final WatchdogServerImpl serverImpl;
+    /** The watchdog server impl, or {@code null}. */
+    private WatchdogServerImpl serverImpl = null;
 
     /** The watchdog server proxy, or {@code null}. */
     final WatchdogServer serverProxy;
@@ -325,7 +325,6 @@ public final class WatchdogServiceImpl
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
-		serverImpl = null;
 		host = wrappedProps.getProperty(
 		    HOST_PROPERTY,
 		    wrappedProps.getProperty(
@@ -367,6 +366,9 @@ public final class WatchdogServiceImpl
 		"Failed to create WatchdogServiceImpl");
 	    if (exporter != null) {
 		exporter.unexport();
+	    }
+	    if (serverImpl != null) {
+		serverImpl.shutdown();
 	    }
 	    throw e;
 	}
