@@ -132,7 +132,8 @@ import java.util.logging.Logger;
 public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** The name of this class. */
-    private static final String CLASSNAME = "com.sun.sgs.impl.service.data";
+    private static final String CLASSNAME = 
+            "com.sun.sgs.impl.service.data.DataServiceImpl";
 
     /**
      * The property that specifies the number of operations to skip between

@@ -53,19 +53,22 @@ configuration properties from previous releases will be noted in the
 release documentation.
 
 <p>
-By default, the Project Darkstar Server consistes of a single node, as described
+By default, the Project Darkstar Server consists of a single node, as described
 in <a href="#SingleNodeConfig">Configuring a Single Node System</a>.
 Alternatively, multiple nodes can be configured to work together, as
 described in <a href="#MultiNodeConfig">Configuring a Multi-Node System</a>.
 <p>
-The type of node being configured is specified by the 
-<a href="#node.type">com.sun.sgs.node.type</a> property, which
-has valid settings of 
+The type of node being configured is specified by the following property:
+<dl>
+<dt><a name="node.type">com.sun.sgs.node.type</a>
+<span class="default">singleNode</span>
+<dd> Indicates which type of node is being started, and has valid settings of
 <ul>
     <li><code>singleNode</code>
     <li><code>coreServerNode</code>
     <li><code>appNode</code>
 </ul>
+</dl>
 
 <p>
 For example configuration files of the different node types, see the
@@ -81,11 +84,6 @@ A single node systems consists of a Darkstar Server running in a single
 Java Virtual Machine.  This is the default server type for Project Darkstar.
 Note that the <a href="#RequiredProperties">Required Properties</a>
 will also need to be specified.
-<dl>
-<dt><a name="node.type">com.sun.sgs.node.type</a>
-<span class="default">singleNode</span>
-<dd> Starts a Darkstar Server in single-node mode.
-</dl>
 
 <a name="MultiNodeConfig"></a>
 <h2>Configuring a Multi-Node System</h2>
@@ -110,25 +108,18 @@ server node if a multi-node configuration is being used. Currently, there is
 only one core server per cluster of Project Darkstar nodes; if multiple core 
 servers are started, then each will be associated with its own independent 
 Project Darkstart cluster.
-
-<dl>
-    
-<dt>com.sun.sgs.node.type
-<span class="default">singleNode</span>
-<dd> Must be set to <code>coreServerNode</code> to start the core server.
-</dl>
-
+<p>
+The <a href="#node.type">node.type</a> property must be set to 
+<code>coreServerNode</code> to start the core server.
 
 <h3>Application Node Properties</h3>
 These properties control the configuration of the Project Darkstar application
 nodes if a multi-node configuration is being used.
+<p>
+The <a href="#node.type">node.type</a> property must be set to 
+<code>appNode</code> to start an application node.
 
 <dl>
-    
-<dt>com.sun.sgs.node.type
-<span class="default">singleNode</span>
-<dd> Must be set to <code>appNode</code> to start an application node.
-
 <dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
 <span class="required"> for application nodes</span>
 <dd> The name of the host the core Project Darkstar Server node is running on. 
@@ -280,17 +271,29 @@ effect on application nodes.
 
 </dl>
 
-<a name="Kernel"></a>
-<h3>Kernel Properties</h3>
+<a name="System"></a>
+<h3>System Properties</h3>
 
-These properties control the implementation of the <code>Kernel</code>,
-which manages core components of the system including identity management
-and task scheduling.
-
+These properties control the implementation of the core components of the 
+system including identity management, profiling, and task scheduling.
 <dl>
+<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
+<span class="default">off</span>
+<dd>Whether to perform profiling.  Profiling is enabled if the value is
+  <code>on</code>.
+
+<dt>com.sun.sgs.impl.kernel.Kernel.profile.listeners
+<span class="default">
+    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<dd>A colon separated list of profile listeners, which consume profile output.
+The <code>AggregateProfileListener</code> reports its findings on a server
+socket, by default on port <code>43005</code>.  To configure this and other
+available listeners, see the individual class javadoc for profile listener
+implementations.
+
 <dt>com.sun.sgs.impl.kernel.TransactionConsumerThreads
 <span class="default">4</span>
-<dd>The number of initial consumer threads used to processed transactional 
+<dd>The number of initial consumer threads used to process transactional 
 tasks, such as those started through the 
 <a href="../TaskManager.html"><code>TaskManager</code></a>.
 
@@ -315,17 +318,6 @@ typically useful for production deployments.
   this timeout is useful when attaching a debugger to a node, but can 
   increase game latency.
 
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
-<span class="default">off</span>
-<dd>Whether to perform profiling.  Profiling is enabled if the value is
-  <code>on</code>.
-
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.listeners
-<span class="default">
-    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
-<dd>A colon separated list of profile listeners, which consume profile output.
-The <code>AggregateProfileListener</code> reports its findings on a server
-socket with a default of <code>43005</code>.
 </dl>
 <hr>
 <font size="-1">
