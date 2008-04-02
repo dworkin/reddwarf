@@ -250,6 +250,24 @@ public class TestWatchdogServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructorAppButNoServerHost() throws Exception {
+        // Server start is false but we didn't specify a server host
+        int port = watchdogService.getServer().getPort();
+	Properties props = createProperties(
+	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
+            StandardProperties.APP_PORT, 
+                Integer.toString(SgsTestNode.getNextAppPort()),
+            WatchdogServerPropertyPrefix + ".start", "false",
+	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
+        try {
+            WatchdogServiceImpl watchdog =
+                new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+    }
+    
     public void testConstructorNegativePort() throws Exception {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
@@ -396,6 +414,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, 
                 Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -439,6 +458,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, 
                 Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -505,6 +525,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, 
                 Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
@@ -777,6 +798,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
 	try {
@@ -1223,6 +1245,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, 
                 Integer.toString(SgsTestNode.getNextAppPort()),
             WatchdogServerPropertyPrefix + ".start", "false",
+            WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
 	WatchdogServiceImpl watchdog = 
