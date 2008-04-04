@@ -80,7 +80,7 @@ import java.util.logging.Logger;
  *
  * <dt> <i>Property:</i> <code><b>{@value #DETECT_MODIFICATIONS_PROPERTY}
  *	</b></code> <br>
- *	<i>Default:</i><code>true</code>
+ *	<i>Default:</i> <code>true</code>
  *
  * <dd style="padding-top: .5em">Whether to automatically detect modifications
  *	to managed objects.  If set to something other than <code>true</code>,
