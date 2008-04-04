@@ -125,6 +125,8 @@ public class ManagedQueue<E>
     public E poll() {
 	E element = null;
 	if (headRef != null) {
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    Entry<E> head = getHeadForUpdate();
 	    element = head.getElement();
 	    headRef = head.nextEntryRef;
@@ -132,7 +134,6 @@ public class ManagedQueue<E>
 		// last element removed
 		tailRef = null;
 	    }
-	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.removeObject(head);
 	    dataManager.removeObject(element);
 	}
