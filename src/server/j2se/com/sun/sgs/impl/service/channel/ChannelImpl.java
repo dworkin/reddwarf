@@ -1350,6 +1350,7 @@ abstract class ChannelImpl implements Channel, Serializable {
                 logger.log(Level.FINEST, "processing event:{0}", event);
                 int cost = event.getCost();
 		if (cost > 0) {
+		    dataService.markForUpdate(this);
 		    writeBufferAvailable += cost;
 
 		    if (logger.isLoggable(Level.FINEST)) {
