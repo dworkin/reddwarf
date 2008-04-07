@@ -237,12 +237,14 @@ Setting these properties has no effect on application nodes.
 <span class="default">1000 (one second)</span>
 <dd>The time interval, in milliseconds, in which application nodes must
   contact the watchdog service's internal server in order to be considered
-  alive. The interval must be greater than or equal to <code>5</code> 
-  milliseconds and less than or equal to <code>10000</code> milliseconds (10 
-  seconds).  Using a renew interval that is too small may cause some application
-  nodes to be considered failed by the <code>WatchdogService</code> when they 
-  are very busy.  Using an interval that is too large will increase the amount
-  of time the system takes to respond to failed nodes.
+  alive. This time interval is sent to each application node during start up, 
+  when the application node registers with the watchdog's internal server. The 
+  interval must be greater than or equal to <code>5</code> milliseconds and 
+  less than or equal to <code>10000</code> milliseconds (10 seconds).  Using a 
+  renew interval that is too small may cause some application nodes to be 
+  considered failed by the <code>WatchdogService</code> when they are very busy.
+  Using an interval that is too large will increase the amount of time the 
+  system takes to respond to failed nodes.
 
 </dl>
 
