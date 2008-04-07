@@ -57,10 +57,17 @@ import java.util.logging.Logger;
  * <li> SetItem <i>itemName</i> <i>value</i>
  * </ul> <p>
  *
+ * This class supports the following properties:
+ * <ul>
+ * <li> {@code com.sun.sgs.example.request.server.report} - The number of
+ *	seconds between logging performance data, defaults to {@code 20}
+ * </ul>
+ *
  * This application uses the {@link Logger} named {@code
  * com.sun.sgs.example.request.server.RequestApp} to log at the following
  * levels:
  * <ul>
+ * <li> {@link Level#INFO Level.INFO} - Performance data
  * <li> {@link Level#CONFIG Level.CONFIG} - Initialize the application
  * <li> {@link Level#FINE Level.FINE} - Login, disconnect, or failure during
  *	processing received message
@@ -108,6 +115,27 @@ public class RequestApp implements AppListener, Serializable {
      * name, which should not contain spaces, followed by the new value.
      */
     private static final String SET_ITEM = "SetItem ";
+
+    /** The request for logging a comment.  Argument is the comment to log. */
+    private static final String COMMENT = "Comment ";
+
+    /** The number of seconds between logging performance data. */
+    private static final int REPORT =
+	Integer.getInteger("com.sun.sgs.example.request.server.report", 20);
+
+    /* -- Operation counters -- */
+
+    static volatile int receivedMessage;
+    static volatile int joinChannel;
+    static volatile int leaveChannel;
+    static volatile int sendChannel;
+    static volatile int getItem;
+    static volatile int setItem;
+
+    /* Log operations */
+    static {
+	new ReportThread().start();
+    }
 
     /** Creates an instance of this class. */
     public RequestApp() { }
@@ -175,6 +203,7 @@ public class RequestApp implements AppListener, Serializable {
 
 	/** {@inheritDoc} */
 	public void receivedMessage(ByteBuffer message) {
+	    receivedMessage++;
 	    String requests = bufferToString(message);
 	    for (String request : requests.split("\n")) {
 		request = request.trim();
@@ -196,6 +225,8 @@ public class RequestApp implements AppListener, Serializable {
 			getItem(request.substring(GET_ITEM.length()));
 		    } else if (request.startsWith(SET_ITEM)) {
 			setItem(request.substring(SET_ITEM.length()));
+		    } else if (request.startsWith(COMMENT)) {
+			logger.log(Level.INFO, "{0}", request);
 		    } else {
 			throw new RuntimeException("Unknown operation");
 		    }
@@ -223,6 +254,7 @@ public class RequestApp implements AppListener, Serializable {
 
 	/** Joins the specified channel. */
 	private void joinChannel(String channelName) {
+	    joinChannel++;
 	    Channel channel = getChannel(channelName);
 	    channel.join(session.get());
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -234,6 +266,7 @@ public class RequestApp implements AppListener, Serializable {
 
 	/** Leaves the specified channel. */
 	private void leaveChannel(String channelName) {
+	    leaveChannel++;
 	    Channel channel = getChannel(channelName);
 	    channel.leave(session.get());
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -248,6 +281,7 @@ public class RequestApp implements AppListener, Serializable {
 	 * specified in the arguments.
 	 */
 	private void sendChannel(String args) {
+	    sendChannel++;
 	    int space = args.indexOf(' ');
 	    String channelName = (space > 0) ? args.substring(0, space) : args;
 	    String message = (space > 0) ? args.substring(space + 1) : "";
@@ -265,6 +299,7 @@ public class RequestApp implements AppListener, Serializable {
 
 	/** Gets the value of the specified item and sends it to the client. */
 	private void getItem(String itemName) {
+	    getItem++;
 	    String binding = "Item-" + itemName;
 	    String value;
 	    try {
@@ -274,7 +309,7 @@ public class RequestApp implements AppListener, Serializable {
 	    } catch (NameNotBoundException e) {
 		value = "[Not found]";
 	    }
-	    send(binding + ": " + value);
+	    send(GET_ITEM + itemName + ": " + value);
 	}
 
 	/**
@@ -282,9 +317,10 @@ public class RequestApp implements AppListener, Serializable {
 	 * in the arguments.
 	 */
 	private void setItem(String args) {
+	    setItem++;
 	    int space = args.indexOf(' ');
-	    String itemName = (space > 0) ? args.substring(space) : args;
-	    String value = (space > 0) ? args.substring(0, space + 1) : "";
+	    String itemName = (space > 0) ? args.substring(0, space) : "";
+	    String value = (space > 0) ? args.substring(space + 1) : args;
 	    DataManager dataManager = AppContext.getDataManager();
 	    String binding = "Item-" + itemName;
 	    try {
@@ -352,6 +388,42 @@ public class RequestApp implements AppListener, Serializable {
 	void setString(String string) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    this.string = string;
+	}
+    }
+
+    /** A thread that logs operations. */
+    private static class ReportThread extends Thread {
+	ReportThread() { }
+	public void run() {
+	    long until = System.currentTimeMillis() + (REPORT * 1000);
+	    /* Round to a multiple of the report interval */
+	    until -= until % (REPORT * 1000);
+	    while (true) {
+		long now = System.currentTimeMillis();
+		if (now < until) {
+		    try {
+			Thread.sleep(until - now);
+		    } catch (InterruptedException e) {
+		    }
+		    continue;
+		}
+		if (logger.isLoggable(Level.INFO)) {
+		    logger.log(Level.INFO,
+			       "rcv/sec=" + (receivedMessage / REPORT) +
+			       " join/sec=" + (joinChannel / REPORT) +
+			       " leave/sec=" + (leaveChannel / REPORT) +
+			       " send/sec=" + (sendChannel / REPORT) +
+			       " get/sec=" + (getItem / REPORT) +
+			       " set/sec=" + (setItem / REPORT));
+		}
+		receivedMessage = 0;
+		joinChannel = 0;
+		leaveChannel = 0;
+		sendChannel = 0;
+		getItem = 0;
+		setItem = 0;
+		until += (REPORT * 1000);
+	    }
 	}
     }
 }
