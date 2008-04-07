@@ -90,10 +90,10 @@ class Kernel {
 
     // the property for setting profiling levels
     private static final String PROFILE_PROPERTY =
-        "com.sun.sgs.impl.kernel.Kernel.profile.level";
+        "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
     private static final String PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
+        "com.sun.sgs.impl.kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.profile.listener.AggregateProfileListener";

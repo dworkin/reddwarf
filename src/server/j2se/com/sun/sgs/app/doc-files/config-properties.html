@@ -259,14 +259,15 @@ system including identity management, profiling, and task scheduling.
 <span class="default">com.sun.sgs.impl.auth.NullAuthenticator</span>
 <dd>A colon separated list of <a href="../../auth/IdentityAuthenticator.html">
   <code>IdentityAuthenticator</code>s</a> to use for the application. The
-  order defines the precedence when authenticating an identity.
+  order defines the precedence when authenticating an identity. The default
+  authenticator simply accepts any name-password pair.
     
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
+<dt>com.sun.sgs.impl.kernel.profile.level
 <span class="default">off</span>
 <dd>Whether to perform profiling.  Profiling is enabled if the value is
   <code>on</code>.
 
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.listeners
+<dt>com.sun.sgs.impl.kernel.profile.listeners
 <span class="default">
     com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
 <dd>A colon separated list of profile listeners, which consume profile output.
