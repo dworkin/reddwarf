@@ -107,7 +107,7 @@ These properties control the configuration of the Project Darkstar core
 server node if a multi-node configuration is being used. Currently, there is 
 only one core server per cluster of Project Darkstar nodes; if multiple core 
 servers are started, then each will be associated with its own independent 
-Project Darkstart cluster.
+Project Darkstar cluster.
 <p>
 The <a href="#node.type">node.type</a> property must be set to 
 <code>coreServerNode</code> to start the core server.
@@ -197,8 +197,8 @@ effect on application nodes.
 
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
 <span class="default"><i>${com.sun.sgs.app.root}</i>/dsdb</span>
-<dd>The directory in which to store database files.  Each instance of
-  requires its own, unique directory.
+<dd>The directory in which to store database files.  Each single node or
+  core server node requires its own, unique directory.
 
 </dl>
 
@@ -224,6 +224,25 @@ effect on application nodes.
   longer needed.  Note that automatic log file removal is likely to make
   catastrophic recovery of the database impossible, because log files
   that may be needed will not have been backed up.
+
+</dl>
+
+<a name="Watchdog"></a>
+<h3>Watchdog Service Properties</h3>
+These properties control the implementation of the <code>WatchdogService</code>.
+Setting these properties has no effect on application nodes.
+<dl>
+
+<dt>com.sun.sgs.impl.service.watchdog.server.renew.interval
+<span class="default">1000 (one second)</span>
+<dd>The time interval, in milliseconds, in which application nodes must
+  contact the watchdog service's internal server in order to be considered
+  alive. The interval must be greater than or equal to <code>5</code> 
+  milliseconds and less than or equal to <code>10000</code> milliseconds (10 
+  seconds).  Using a renew interval that is too small may cause some application
+  nodes to be considered failed by the <code>WatchdogService</code> when they 
+  are very busy.  Using an interval that is too large will increase the amount
+  of time the system takes to respond to failed nodes.
 
 </dl>
 
