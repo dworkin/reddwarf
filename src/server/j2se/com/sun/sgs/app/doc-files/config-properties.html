@@ -185,24 +185,6 @@ they must be set to the same value on each application node.
 These properties control the implementation of the
 <code>DataService</code>.
 
-<dl>
-
-<dt>
-<a name="com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications">
-  com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications</a>
-<span class="default">true</span>
-<dd>Whether to automatically detect modifications to managed objects.
-  If set to something other than <code>true</code>, then applications
-  need to call <a
-  href="../DataManager.html#markForUpdate(com.sun.sgs.app.ManagedObject)">
-  <code>DataManager.markForUpdate</code></a> or
-  <a href="../ManagedReference.html#getForUpdate(java.lang.Class)">
-  <code>ManagedReference.getForUpdate</code></a> for any modified
-  objects to make sure that the modifications are recorded by
-  the <code>DataService</code>.
-  
-</dl>
-
 <a name="DataStore"></a>
 <h4>DataStore Properties</h4>
 
@@ -231,36 +213,10 @@ effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.cache.size
-<span class="default">1000000</span>
+<span class="default">128000000</span>
 <dd>The size in bytes of the Berkeley DB cache.  The value must not be
-  less than <code>20000</code>.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.interval
-<span class="default">60000</span>
-<dd>The interval in milliseconds between checkpoint operations that
-  flush changes from the database log to the database.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.size
-<span class="default">100000</span>
-<dd>The number of bytes that needs to have been written since the last
-  checkpoint operation was performed to require another checkpoint.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.flush.to.disk
-<span class="default">false</span>
-<dd>Whether to flush changes to disk when a transaction commits.  If
-  <code>false</code>, the modifications made in some of the most recent
-  transactions may be lost if the host crashes, although data integrity
-  will be maintained.  Flushing changes to disk avoids data loss but
-  introduces a significant reduction in performance.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.lock.timeout
-<span class="default" style="font-family: serif"><code>0.1</code> times
-  the value of the <code>com.sun.sgs.txn.timeout</code> property, if
-  specified, otherwise <code>10</code></span>
-<dd>The maximum amount of time in milliseconds that an attempt to obtain
-  a lock will be allowed to continue before being aborted.  The value
-  must be greater than <code>0</code>, and should be less than the
-  transaction timeout.
+  less than <code>20000</code>.  Using a cache that is too small
+  can introduce a significant reduction in performance.
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.remove.logs
 <span class="default">false</span>
