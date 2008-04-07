@@ -33,6 +33,8 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -652,6 +654,50 @@ class Kernel {
                 properties = new Properties(backingProperties);
             inputStream = new FileInputStream(filename);
             properties.load(inputStream);
+            
+            // Expand properties as needed.
+            String value = properties.getProperty(StandardProperties.NODE_TYPE);
+            if (value == null) {
+                // Default is single node
+                value = StandardProperties.NodeType.singleNode.name();
+            }
+
+            StandardProperties.NodeType type;
+            // Throws IllegalArgumentException if not one of the enum types
+            // but let's improve the error message
+            try {
+                type = StandardProperties.NodeType.valueOf(value);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Illegal value for " +
+                        StandardProperties.NODE_TYPE);
+            }
+            
+           
+            switch (type) {
+                case singleNode:
+                    break;    // do nothing, this is the default
+                case coreServerNode:
+                    // Don't start an application
+                    properties.setProperty(StandardProperties.APP_LISTENER,
+                                           StandardProperties.APP_LISTENER_NONE);
+                    // Only run basic services
+                    properties.setProperty(StandardProperties.FINAL_SERVICE,
+                                           "NodeMappingService");
+                    // Start servers for services
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "true");
+                    // Start the network server for the data store
+                    properties.setProperty(
+                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
+                        "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+                    break;
+                case appNode:
+                    // Don't start the servers
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "false");
+                    break;
+            }
+
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))

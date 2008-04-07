@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -66,8 +67,7 @@ import java.util.logging.Logger;
  *
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
+ * <dt> <i>Property:</i> <code><b>{@value #DATA_STORE_CLASS_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
@@ -78,8 +78,19 @@ import java.util.logging.Logger;
  *	DataStore}.  The class should be public, not abstract, and should
  *	provide a public constructor with a {@link Properties} parameter. <p>
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+ * <dt> <i>Property:</i> <code><b>{@value #DETECT_MODIFICATIONS_PROPERTY}
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>true</code>
+ *
+ * <dd style="padding-top: .5em">Whether to automatically detect modifications
+ *	to managed objects.  If set to something other than <code>true</code>,
+ *	then applications need to call {@link DataManager#markForUpdate
+ *	DataManager.markForUpdate} or {@link ManagedReference#getForUpdate
+ *	ManagedReference.getForUpdate} for any modified objects to make sure
+ *	that the modifications are recorded by the
+ *	<code>DataService</code>. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #DEBUG_CHECK_INTERVAL_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code>
  *
@@ -132,27 +143,28 @@ import java.util.logging.Logger;
 public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** The name of this class. */
-    private static final String CLASSNAME = DataServiceImpl.class.getName();
+    private static final String CLASSNAME = 
+            "com.sun.sgs.impl.service.data.DataServiceImpl";
 
     /**
      * The property that specifies the number of operations to skip between
      * checks of the consistency of the managed references table.
      */
-    private static final String DEBUG_CHECK_INTERVAL_PROPERTY =
+    public static final String DEBUG_CHECK_INTERVAL_PROPERTY =
 	CLASSNAME + ".debug.check.interval";
 
     /**
      * The property that specifies whether to automatically detect
      * modifications to objects.
      */
-    private static final String DETECT_MODIFICATIONS_PROPERTY =
+    public static final String DETECT_MODIFICATIONS_PROPERTY =
 	CLASSNAME + ".detect.modifications";
 
     /**
      * The property that specifies the name of the class that implements
      * DataStore.
      */
-    private static final String DATA_STORE_CLASS_PROPERTY =
+    public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
     /** The logger for this class. */
