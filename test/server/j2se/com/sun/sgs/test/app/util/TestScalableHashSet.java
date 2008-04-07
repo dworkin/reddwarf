@@ -383,6 +383,7 @@ public class TestScalableHashSet extends Assert {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
+		    dataService.markForUpdate(msIter);
 		    Iterator<Object> iter = msIter.get();
 		    int count = 0;
 		    while (iter.hasNext()) {
@@ -418,6 +419,7 @@ public class TestScalableHashSet extends Assert {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
+		    dataService.markForUpdate(msIter);
 		    Iterator<Object> iter = msIter.get();
 		    try {
 			iter.next();
@@ -466,6 +468,7 @@ public class TestScalableHashSet extends Assert {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
+		    dataService.markForUpdate(msIter);
 		    Iterator<Object> iter = msIter.get();
 		    int count = 0;
 		    while (iter.hasNext()) {
@@ -508,6 +511,7 @@ public class TestScalableHashSet extends Assert {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
+		    dataService.markForUpdate(msIter);
 		    Iterator<Object> iter = msIter.get();
 		    while (iter.hasNext()) {
 			Object next = iter.next();

@@ -74,7 +74,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.store.net.server.host
  *	</b></code><br>
  *	<i>Default</i> the value of the {@code com.sun.sgs.server.host}
- *	property, if present, else the local host name.
+ *	property, if present, or {@code localhost} if this node is starting the 
+ *      server.
  *
  * <dd style="padding-top: .5em">The name of the host running the {@code
  *	DataStoreServer}. <p>
@@ -229,15 +230,29 @@ public final class DataStoreClient
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	String localHost = InetAddress.getLocalHost().getHostName();
-	serverHost = wrappedProps.getProperty(
-	    SERVER_HOST_PROPERTY,
-	    wrappedProps.getProperty(
-		StandardProperties.SERVER_HOST, localHost));
 	boolean serverStart = wrappedProps.getBooleanProperty(
 	    SERVER_START_PROPERTY,
 	    wrappedProps.getBooleanProperty(
 		StandardProperties.SERVER_START, true));
+        if (serverStart) {
+            // we default to localHost;  this is useful for starting
+            // single node systems
+            String localHost = InetAddress.getLocalHost().getHostName();
+            serverHost = wrappedProps.getProperty(
+                SERVER_HOST_PROPERTY,
+                wrappedProps.getProperty(
+                    StandardProperties.SERVER_HOST, localHost));
+        } else {
+            // a server host most be specified
+            serverHost = wrappedProps.getProperty(
+                SERVER_HOST_PROPERTY,
+                wrappedProps.getProperty(
+                    StandardProperties.SERVER_HOST));
+            if (serverHost == null) {
+                throw new IllegalArgumentException(
+                                           "A server host must be specified");
+            }
+        }
 	int specifiedServerPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, serverStart ? 0 : 1,
 	    65535);

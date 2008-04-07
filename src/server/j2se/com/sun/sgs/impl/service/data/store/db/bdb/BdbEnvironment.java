@@ -68,7 +68,45 @@ import java.util.logging.Logger;
  *
  * The {@link #BdbEnvironment constructor} supports these public <a
  * href="../../../../../../app/doc-files/config-properties.html#Bdb">
- * properties</a>. <p>
+ * properties</a> and the following additional properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <b>{@value #CHECKPOINT_INTERVAL_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_CHECKPOINT_INTERVAL}
+ *
+ * <dd style="padding-top: .5em">The interval in milliseconds between
+ *	checkpoint operations that flush changes from the database log to the
+ *	database. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #CHECKPOINT_SIZE_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #DEFAULT_CHECKPOINT_SIZE}
+ *
+ * <dd style="padding-top: .5em">The number of bytes that needs to have been
+ *	written since the last checkpoint operation was performed to require
+ *	another checkpoint. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #FLUSH_TO_DISK_PROPERTY}</b> <br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to flush changes to disk when a
+ *	transaction commits.  If <code>false</code>, the modifications made in
+ *	some of the most recent transactions may be lost if the host crashes,
+ *	although data integrity will be maintained.  Flushing changes to disk
+ *	avoids data loss but introduces a significant reduction in
+ *	performance. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
+ *	<i>Default:</i> <code>0.1</code> times the value of the
+ *	<code>com.sun.sgs.txn.timeout</code> property, if specified, otherwise
+ *	<code>10</code>
+ *
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that an attempt to obtain a lock will be allowed to continue before
+ *	being aborted.  The value must be greater than <code>0</code>, and
+ *	should be less than the transaction timeout. <p>
+ *
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.db.bdb</code> to log information at
@@ -102,7 +140,7 @@ public class BdbEnvironment implements DbEnvironment {
     public static final long MIN_CACHE_SIZE = 20000;
 
     /** The default cache size. */
-    public static final long DEFAULT_CACHE_SIZE = 1000000L;
+    public static final long DEFAULT_CACHE_SIZE = 128000000L;
 
     /**
      * The property that specifies the time in milliseconds between
