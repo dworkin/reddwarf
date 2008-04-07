@@ -320,7 +320,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testCreateChannelNoTxn() throws Exception { 
 	try {
-	    channelService.createChannel(Delivery.RELIABLE);
+	    channelService.createChannel("x", null, Delivery.RELIABLE);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -347,7 +347,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
 		Channel savedChannel =
-		    channelService.createChannel(Delivery.RELIABLE);
+		    channelService.createChannel("x", null, Delivery.RELIABLE);
 		ByteArrayOutputStream bout = new ByteArrayOutputStream();
 		ObjectOutputStream out = new ObjectOutputStream(bout);
 		out.writeObject(savedChannel);
@@ -399,7 +399,8 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
-		    Channel channel = channelService.createChannel(delivery);
+		    Channel channel = channelService.createChannel(
+			delivery.toString(), null, delivery);
 		    if (!delivery.equals(channel.getDeliveryRequirement())) {
 			fail("Expected: " + delivery + ", got: " +
 			     channel.getDeliveryRequirement());
@@ -414,7 +415,8 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
-		    Channel channel = channelService.createChannel(delivery);
+		    Channel channel = channelService.createChannel(
+			delivery.toString(), null, delivery);
 		    dataService.removeObject(channel);
 		    try {
 			channel.getDeliveryRequirement();
@@ -455,7 +457,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Channel channel =
-			channelService.createChannel(Delivery.RELIABLE);
+			channelService.createChannel(
+			    "x", null, Delivery.RELIABLE);
 		    dataService.removeObject(channel);
 		    try {
 			channel.join(client.getSession());
@@ -477,7 +480,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
-		    channelService.createChannel(Delivery.RELIABLE);
+		    channelService.createChannel("x", null, Delivery.RELIABLE);
 		try {
 		    channel.join((ClientSession) null);
 		    fail("Expected NullPointerException");
@@ -628,7 +631,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
-		    channelService.createChannel(Delivery.RELIABLE);
+		    channelService.createChannel("x", null, Delivery.RELIABLE);
 		try {
 		    channel.leave((ClientSession) null);
 		    fail("Expected NullPointerException");
@@ -761,7 +764,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
-		    channelService.createChannel(Delivery.RELIABLE);
+		    channelService.createChannel("x", null, Delivery.RELIABLE);
 		dataService.removeObject(channel);
 		try {
 		    channel.leaveAll();
@@ -777,7 +780,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
-		    channelService.createChannel(Delivery.RELIABLE);
+		    channelService.createChannel("x", null, Delivery.RELIABLE);
 		channel.leaveAll();
 		System.err.println(
 		    "leaveAll succeeded with no sessions joined");
@@ -1331,7 +1334,8 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
 	public void run() throws Exception {
-	    channel = AppContext.getChannelManager().createChannel(Delivery.RELIABLE);
+	    channel = AppContext.getChannelManager().
+		createChannel(name, null, Delivery.RELIABLE);
 	    AppContext.getDataManager().setBinding(name, channel);
 	}
 

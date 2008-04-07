@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
@@ -310,7 +311,10 @@ public final class ChannelServiceImpl
     /* -- Implement ChannelManager -- */
 
     /** {@inheritDoc} */
-    public Channel createChannel(Delivery delivery) {
+    public Channel createChannel(String name,
+				 ChannelListener listener,
+				 Delivery delivery)
+    {
 	try {
 	    Channel channel =
 	        ChannelImpl.newInstance(delivery, writeBufferSize);
@@ -320,6 +324,11 @@ public final class ChannelServiceImpl
 	    logger.logThrow(Level.FINEST, e, "createChannel:{0} throws");
 	    throw e;
 	}
+    }
+
+    /** {@inheritDoc} */
+    public Channel getChannel(String name) {
+	throw new AssertionError("not implemented");
     }
 
     /* -- Implement ChannelServer -- */

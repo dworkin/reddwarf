@@ -28,6 +28,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -60,10 +61,25 @@ class ChannelWrapper
     }
 
     /* -- Implement Channel -- */
+
+    /** {@inheritDoc} */
+    public String getName() {
+	return getChannel().getName();
+    }
     
     /** {@inheritDoc} */
     public Delivery getDeliveryRequirement() {
 	return getChannel().getDeliveryRequirement();
+    }
+
+    /** {@inheritDoc} */
+    public boolean hasSessions() {
+	return getChannel().hasSessions();
+    }
+
+    /** {@inheritDoc} */
+    public Iterator<ClientSession> getSessions() {
+	return getChannel().getSessions();
     }
 
     /** {@inheritDoc} */
