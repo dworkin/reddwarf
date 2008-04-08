@@ -74,11 +74,11 @@ import java.util.logging.Logger;
  * applications configured to run in this system.
  * <p>
  * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.Kernel.profile.level</code> must
+ * property <code>com.sun.sgs.impl.kernel.profile.level</code> must
  * be given the value "on". If no profile listeners are specified, then the
  * default <code>AggregateProfileListener</code> is enabled. To specify that a
  * different set of <code>ProfileListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
+ * the <code>com.sun.sgs.impl.kernel.profile.listeners</code>
  * property must be specified with a colon-separated list of fully-qualified
  * classes, each of which implements <code>ProfileListener</code>.
  */
@@ -90,10 +90,10 @@ class Kernel {
 
     // the property for setting profiling levels
     private static final String PROFILE_PROPERTY =
-        "com.sun.sgs.impl.kernel.Kernel.profile.level";
+        "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
     private static final String PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
+        "com.sun.sgs.impl.kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
