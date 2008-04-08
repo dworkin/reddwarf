@@ -51,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -161,6 +162,12 @@ abstract class ChannelImpl implements Channel, Serializable {
     /* -- Implement Channel -- */
     
     /** {@inheritDoc} */
+    public String getName() {
+	checkContext();
+	throw new AssertionError("not implemented");
+    }
+    
+    /** {@inheritDoc} */
     public Delivery getDeliveryRequirement() {
 	checkContext();
 	if (logger.isLoggable(Level.FINEST)) {
@@ -168,6 +175,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 		       "getDeliveryRequirement returns {0}", delivery);
 	}
 	return delivery;
+    }
+
+    /** {@inheritDoc} */
+    public boolean hasSessions() {
+	checkClosed();
+	throw new AssertionError("not implemented");
+    }
+
+    /** {@inheritDoc} */
+    public Iterator<ClientSession> getSessions() {
+	checkClosed();
+	throw new AssertionError("not implemented");
     }
 
     /** {@inheritDoc} */

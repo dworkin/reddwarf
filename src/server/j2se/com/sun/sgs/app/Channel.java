@@ -21,6 +21,7 @@ package com.sun.sgs.app;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -62,6 +63,17 @@ import java.util.Set;
 public interface Channel extends ManagedObject {
 
     /**
+     * Returns the name bound to this channel.
+     *
+     * @return the name bound to this channel
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    String getName();
+    
+    /**
      * Returns the delivery requirement of this channel.
      *
      * @return the delivery requirement
@@ -71,6 +83,45 @@ public interface Channel extends ManagedObject {
      *	       a problem with the current transaction
      */
     Delivery getDeliveryRequirement();
+
+    /**
+     * Returns {@code true} if this channel has client sessions
+     * joined to it, otherwise returns {@code false}.
+     *
+     * <p>The returned result may not reflect changes to the membership
+     * that occurred in the current transaction.  Such membership changes
+     * may be handled asynchronously, after the task making the changes
+     * completes.
+     *
+     * @return {@code true} if this channel has sessions joined
+     * to it, otherwise returns {@code false}
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    boolean hasSessions();
+
+    /**
+     * Returns an iterator for the client sessions joined to
+     * this channel.  The returned iterator may only be used in the task
+     * that this method was invoked from.
+     *
+     * <p>The returned iterator may not reflect changes to the membership
+     * that occurred in the current transaction.  Such membership changes
+     * may be handled asynchronously, after the task makiing the changes
+     * completes.
+     *
+     * <p>Note: This operation may be expensive, so it should be used
+     * judiciously.
+     * 
+     * @return an iterator for the sessions joined to this channel
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    Iterator<ClientSession> getSessions();
 
     /**
      * Adds a client session to this channel.  If the specified

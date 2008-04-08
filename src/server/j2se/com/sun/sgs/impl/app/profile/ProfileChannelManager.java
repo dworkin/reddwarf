@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.app.profile;
 
 import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 
@@ -70,7 +71,17 @@ public class ProfileChannelManager implements ChannelManager, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public Channel createChannel(Delivery delivery) {
-        return backingManager.createChannel(delivery);
+    public Channel createChannel(String name,
+				 ChannelListener listener,
+				 Delivery delivery) {
+        return backingManager.createChannel(name, listener, delivery);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Channel getChannel(String name) {
+	return backingManager.getChannel(name);
+    }
+     
 }
