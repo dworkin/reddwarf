@@ -57,8 +57,8 @@ public interface SimpleSgsProtocol {
      */
     final int MAX_PAYLOAD_LENGTH = 65532;
 
-    /** The version number, currently {@code 0x03}. */
-    final byte VERSION = 0x03;
+    /** The version number, currently {@code 0x04}. */
+    final byte VERSION = 0x04;
 
     /**
      * Login request from a client to a server.
@@ -184,4 +184,46 @@ public interface SimpleSgsProtocol {
      */
     final byte LOGOUT_SUCCESS = 0x41;
 
+
+    /**
+     * Channel join.  Server notifying a client that it has joined a channel.
+     * <br>
+     * Opcode: {@code 0x50}
+     * <br>
+     * Payload:
+     * <ul>
+     * <li> (String) channel name
+     * <li> (ByteArray) channel ID
+     * </ul>
+     */
+    final byte CHANNEL_JOIN = 0x50;
+
+    /**
+     * Channel leave.  Server notifying a client that it has left a channel.
+     * <br>
+     * Opcode: {@code 0x51}
+     * <br>
+     * Payload:
+     * <ul>
+     * <li> (ByteArray) channel ID
+     * </ul>
+     */
+    final byte CHANNEL_LEAVE = 0x51;
+    
+    /**
+     * Channel message.  May be sent by the client or the server.
+     * Maximum length is {@value #MAX_PAYLOAD_LENGTH} bytes.
+     * Larger messages require fragmentation and reassembly above
+     * this protocol layer.
+     * <br>
+     * Opcode: {@code 0x52}
+     * <br>
+     * Payload:
+     * <ul>
+     * <li> (unsigned short) channel ID size
+     * <li> (ByteArray) channel ID
+     * <li> (ByteArray) message
+     * </ul>
+     */
+    final byte CHANNEL_MESSAGE = 0x52;
 }

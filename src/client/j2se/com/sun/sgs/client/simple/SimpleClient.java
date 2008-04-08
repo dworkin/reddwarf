@@ -33,12 +33,17 @@
 package com.sun.sgs.client.simple;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.impl.client.comm.ClientConnection;
@@ -105,6 +110,10 @@ public class SimpleClient implements ServerSession {
     /** Reconnection key.  TODO reconnect not implemented */
     @SuppressWarnings("unused")
     private byte[] reconnectKey;
+
+    /** The map of channels this client is a member of, keyed by channel ID */
+    private final ConcurrentHashMap<BigInteger, SimpleClientChannel> channels =
+        new ConcurrentHashMap<BigInteger, SimpleClientChannel>();
 
     /**
      * Creates an instance of this class with the specified listener. Once
@@ -369,7 +378,19 @@ public class SimpleClient implements ServerSession {
                 MessageBuffer msg = new MessageBuffer(message);
                 reason = msg.getString();
             }
-            
+
+            for (SimpleClientChannel channel : channels.values()) {
+                try {
+                    channel.left();
+                } catch (RuntimeException e) {
+                    logger.logThrow(Level.FINE, e,
+                        "During leftChannel ({0}) on disconnect:",
+                        channel.getName());
+                    // ignore the exception
+                }
+            }
+            channels.clear();
+
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting disconnect
             clientListener.disconnected(expectingDisconnect, reason);
@@ -507,6 +528,56 @@ public class SimpleClient implements ServerSession {
                 */
                 break;
 
+            case SimpleSgsProtocol.CHANNEL_JOIN: {
+                logger.log(Level.FINER, "Channel join");
+                checkLoggedIn();
+                String channelName = msg.getString();
+		BigInteger channelId = new BigInteger(1, msg.getByteArray());
+                SimpleClientChannel channel =
+                    new SimpleClientChannel(channelName, channelId);
+                if (channels.putIfAbsent(channelId, channel) == null) {
+                    channel.joined();
+                } else {
+                    logger.log(Level.WARNING,
+                        "Cannot join channel {0}: already a member",
+                        channelName);
+                }
+                break;
+            }
+
+            case SimpleSgsProtocol.CHANNEL_LEAVE: {
+                logger.log(Level.FINER, "Channel leave");
+                checkLoggedIn();
+                BigInteger channelId = new BigInteger(1, msg.getByteArray());
+                SimpleClientChannel channel = channels.remove(channelId);
+                if (channel != null) {
+                    channel.left();
+                } else {
+                    logger.log(Level.WARNING,
+                        "Cannot leave channel {0}: not a member",
+                        channelId);
+                }
+                break;
+            }
+
+            case SimpleSgsProtocol.CHANNEL_MESSAGE:
+                logger.log(Level.FINEST, "Channel recv");
+                checkLoggedIn();
+		int size = msg.getShort();
+                BigInteger channelId =
+		    new BigInteger(1, msg.getBytes(msg.getShort()));
+                SimpleClientChannel channel = channels.get(channelId);
+                if (channel == null) {
+                    logger.log(Level.WARNING,
+                        "Ignore message on channel {0}: not a member",
+                        channelId);
+                    return;
+                }
+		byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
+		ByteBuffer buf = ByteBuffer.wrap(msgBytes);
+                channel.receivedMessage(buf.asReadOnlyBuffer());
+                break;
+
             default:
                 throw new IOException(
                     String.format("Unknown session opcode: 0x%02X", command));
@@ -544,6 +615,101 @@ public class SimpleClient implements ServerSession {
                         "Not supported by SimpleClient");
             logger.logThrow(Level.WARNING, re, re.getMessage());
             throw re;
+        }
+    }
+
+    /**
+     * Simple ClientChannel implementation
+     */
+    final class SimpleClientChannel implements ClientChannel {
+
+        private final String channelName;
+	private final BigInteger channelId;
+        
+        /**
+         * The listener for this channel if the client is a member,
+         * or null if the client is no longer a member of this channel.
+         */
+        private volatile ClientChannelListener listener = null;
+
+        private final AtomicBoolean isJoined = new AtomicBoolean(false);
+
+        SimpleClientChannel(String name, BigInteger id) {
+            this.channelName = name;
+	    this.channelId = id;
+        }
+
+        // Implement ClientChannel
+
+        /**
+         * {@inheritDoc}
+         */
+        public String getName() {
+            return channelName;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public void send(ByteBuffer message) throws IOException {
+            if (! isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot send on unjoined channel " + channelName);
+            }
+	    byte[] idBytes = channelId.toByteArray();
+	    ByteBuffer msg =
+		ByteBuffer.allocate(3 + idBytes.length + message.remaining());
+	    msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
+	       .putShort((short) idBytes.length)
+	       .put(idBytes)
+	       .put(message)
+	       .flip();
+            sendRaw(msg);
+        }
+
+        // Implementation details
+
+        void joined() {
+            if (! isJoined.compareAndSet(false, true)) {
+                throw new IllegalStateException(
+                    "Already joined to channel " + channelName);
+            }
+
+            assert listener == null;
+
+            try {
+                listener = clientListener.joinedChannel(this);
+
+                if (listener == null) {
+		    // FIXME: print a warning?
+                    throw new NullPointerException(
+                        "The returned ClientChannelListener must not be null");
+                }
+            } catch (RuntimeException ex) {
+                isJoined.set(false);
+                throw ex;
+            }
+        }
+
+        void left() {
+            if (! isJoined.compareAndSet(true, false)) {
+                throw new IllegalStateException(
+                    "Cannot leave unjoined channel " + channelName);
+            }
+
+            final ClientChannelListener l = this.listener;
+            this.listener = null;
+
+            l.leftChannel(this);
+       }
+        
+        void receivedMessage(ByteBuffer message) {
+            if (!  isJoined.get()) {
+                throw new IllegalStateException(
+                    "Cannot receive on unjoined channel " + channelName);
+            }
+
+            listener.receivedMessage(this, message);
         }
     }
 }

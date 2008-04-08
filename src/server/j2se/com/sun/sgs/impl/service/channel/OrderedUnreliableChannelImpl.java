@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.Delivery;
 
 /**
@@ -35,7 +36,9 @@ class OrderedUnreliableChannelImpl extends ChannelImpl {
      * Constructs an instance with the specified {@code delivery}
      * requirement and write capacity.
      */
-    OrderedUnreliableChannelImpl(Delivery delivery, int writeBufferCapacity) {
-	super(delivery, writeBufferCapacity);
+    OrderedUnreliableChannelImpl(String name, ChannelListener listener,
+				 Delivery delivery, int writeBufferCapacity)
+    {
+	super(name, listener, delivery, writeBufferCapacity);
     }
 }
