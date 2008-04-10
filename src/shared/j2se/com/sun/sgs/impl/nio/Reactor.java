@@ -35,6 +35,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -179,14 +180,24 @@ class Reactor {
                 // maybe one that will interrupt the dispatching of
                 // existing keys. -JM
 
-                for (SelectionKey key : selector.keys()) {
-                    try {
-                        Closeable asyncKey =
-                            (Closeable) key.attachment();
-                        if (asyncKey != null)
-                            asyncKey.close();
-                    } catch (IOException ignore) { }
-                }
+		// This current fix is a total hack, but it works for
+		// now... ann (4/10/08)
+		
+		while (true) {
+		    try {
+			for (SelectionKey key : selector.keys()) {
+			    try {
+				Closeable asyncKey =
+				    (Closeable) key.attachment();
+				if (asyncKey != null)
+				    asyncKey.close();
+			    } catch (IOException ignore) { }
+			}
+		    } catch (ConcurrentModificationException e) {
+			continue;
+		    }
+		    break;
+		}
 
                 selector.wakeup();
             }
