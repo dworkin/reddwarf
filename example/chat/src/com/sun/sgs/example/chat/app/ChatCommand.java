@@ -49,6 +49,14 @@ public enum ChatCommand {
     PING,
 
     /**
+     * Send a private message to a member of the channel.
+     * <pre>
+     *    /pm target-member-id message
+     * </pre>
+     */
+    PM,
+    
+    /**
      * Forcibly disconnects this session.
      * <pre>
      *    /disconnect

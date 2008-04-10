@@ -19,14 +19,18 @@
 
 package com.sun.sgs.example.chat.app;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedReference;
+
+import java.math.BigInteger;
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionListener;
 
 /**
  * A simple chat application.  The application logic for this example
@@ -42,6 +46,10 @@ public class ChatApp
     private static final Logger logger =
         Logger.getLogger(ChatApp.class.getName());
 
+    /** The prefix for storing sessions by ID in the data store. */
+    private static final String SESSION_PREFIX =
+        "com.sun.sgs.example.chat.app.ChatApp.";
+    
     /**
      * The default constructor.
      */
@@ -68,6 +76,49 @@ public class ChatApp
      */
     public ClientSessionListener loggedIn(ClientSession session) {
         logger.log(Level.INFO, "ClientSession joined: {0}", session);
+        // Give the session a binding in the data store
+        DataManager dataMgr = AppContext.getDataManager();
+        ManagedReference<ClientSession> sessionRef =
+                dataMgr.createReference(session);
+        String key = sessionIdKey(sessionRef.getId());
+        dataMgr.setBinding(key, session);
+
         return new ChatClientSessionListener(session);
+    }
+    
+    /**
+     * Must be called in a transaction.
+     * @param id
+     * @return
+     */
+    static ClientSession getSessionFromIdString(String id) {
+        String key = sessionIdKey(id);
+        return (ClientSession) AppContext.getDataManager().getBinding(key);
+    }
+
+
+    /**
+     * Removes the data-store ID binding for the given session.
+     * 
+     * @param session a session
+     */
+    static void removeSessionBinding(ClientSession session) {
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.removeBinding(
+            sessionIdKey(dataMgr.createReference(session).getId()));
+    }
+
+    /**
+     * Returns the data store key for the session with the given id.
+     * 
+     * @param sessionRefId the id for the session
+     * @return the data store key for the session
+     */
+    private static String sessionIdKey(BigInteger sessionRefId) {
+        return sessionIdKey(sessionRefId.toString(16));
+    }
+    
+    private static String sessionIdKey(String sessionRefId) {
+        return SESSION_PREFIX + sessionRefId;
     }
 }
