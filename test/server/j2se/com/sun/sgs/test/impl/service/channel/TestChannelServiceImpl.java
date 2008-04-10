@@ -51,7 +51,6 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -59,6 +58,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -75,9 +75,28 @@ import java.util.Properties;
 import java.util.Set;
 
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
+
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 public class TestChannelServiceImpl extends TestCase {
     
+    /** If this property is set, then only run the single named test method. */
+    private static final String testMethod = System.getProperty("test.method");
+
+    /**
+     * Specify the test suite to include all tests, or just a single method if
+     * specified.
+     */
+    public static TestSuite suite() throws Exception {
+	if (testMethod == null) {
+	    return new TestSuite(TestChannelServiceImpl.class);
+	}
+	TestSuite suite = new TestSuite();
+	suite.addTest(new TestChannelServiceImpl(testMethod));
+	return suite;
+    }
+
     private static final String APP_NAME = "TestChannelServiceImpl";
     
     private static final int WAIT_TIME = 3000;
@@ -956,13 +975,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    String messageString = "message";
 
 	    for (int i = 0; i < numMessages; i++) {
-		final MessageBuffer buf =
-		    new MessageBuffer(MessageBuffer.getSize(messageString) +
-				      MessageBuffer.getSize(channelName) + 4);
-		buf.putString(messageString).
-		    putString(channelName).
-		    putInt(i);
-
+		final MessageBuffer buf = (new MessageBuffer(4)).putInt(i);
 		System.err.println("Sending message: " +
 				   HexDumper.format(buf.getBuffer()));
 
@@ -1190,12 +1203,14 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	boolean isDisconnectedGroup() {
+	    boolean allSessionsDisconnected = true;
 	    for (DummyClient client : clients.values()) {
 		if (client.isConnected()) {
-		    return false;
+		    System.err.println(client.name + " is still connected!");
+		    allSessionsDisconnected = false;
 		}
 	    }
-	    return true;
+	    return allSessionsDisconnected;
 	}
 
 	void checkMembership(final String name, final boolean isMember)
@@ -1352,6 +1367,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    // FIXME: use the ChannelManager instead...
     private Channel getChannel(String name) {
 	try {
 	    return (Channel) dataService.getBinding(name);
@@ -1391,6 +1407,10 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean leaveAck = false;
         private boolean awaitGraceful = false;
 	private Set<String> channelNames = new HashSet<String>();
+	private Map<BigInteger, String> channelIdToName =
+	    new HashMap<BigInteger, String>();
+	private Map<String, BigInteger> channelNameToId =
+	    new HashMap<String, BigInteger>();
 	private String reason;	
 	private String redirectHost;
         private int redirectPort;
@@ -1398,7 +1418,6 @@ public class TestChannelServiceImpl extends TestCase {
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
-
 	
 	DummyClient() {
 	}
@@ -1568,6 +1587,25 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
+	/**
+	 * Sends a CHANNEL_MESSAGE.
+	 */
+	void sendChannelMessage(String channelName, byte[] message) {
+	    checkLoggedIn();
+	    byte[] channelId = channelNameToId.get(channelName).toByteArray();
+	    MessageBuffer buf =
+		new MessageBuffer(3 + channelId.length + message.length);
+	    buf.putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
+		putShort(channelId.length).
+		putBytes(channelId).
+		putBytes(message);
+	    try {
+		connection.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	}
+	
 	MessageInfo nextChannelMessage() {
 	    synchronized (lock) {
 		if (channelMessages.isEmpty()) {
@@ -1614,7 +1652,7 @@ public class TestChannelServiceImpl extends TestCase {
 			    "DummyClient.join timed out: " + channelToJoin);
 		    }
 
-		    if (! channelNames.contains(channelToJoin)) {
+		    if (channelNameToId.get(channelToJoin) == null) {
 			fail("DummyClient.join not joined: " +
 			     channelToJoin);
 		    }
@@ -1644,7 +1682,7 @@ public class TestChannelServiceImpl extends TestCase {
 			    "DummyClient.leave timed out: " + channelToLeave);
 		    }
 
-		    if (channelNames.contains(channelToLeave)) {
+		    if (channelNameToId.get(channelToLeave) != null) {
 			fail("DummyClient.leave still joined: " +
 			     channelToLeave);
 		    }
@@ -1798,9 +1836,50 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 		}
 
+		case SimpleSgsProtocol.CHANNEL_JOIN: {
+		    String channelName = buf.getString();
+		    BigInteger channelId = new BigInteger(1,
+			buf.getBytes(buf.limit() - buf.position()));
+		    synchronized (lock) {
+			joinAck = true;
+			channelIdToName.put(channelId, channelName);
+			channelNameToId.put(channelName, channelId);
+			System.err.println("[" + name + "] join succeeded: " +
+					   channelName);
+			lock.notifyAll();
+		    }
+		    break;
+		}
+		    
+		case SimpleSgsProtocol.CHANNEL_LEAVE: {
+		    BigInteger channelId = new BigInteger(1,
+			buf.getBytes(buf.limit() - buf.position()));
+		    synchronized (lock) {
+			leaveAck = true;
+			String channelName = channelIdToName.remove(channelId);
+			System.err.println("[" + name + "] leave succeeded: " +
+					   channelName);
+			lock.notifyAll();
+		    }
+		    break;
+		    
+		}
+		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
+		    BigInteger channelId = new BigInteger(1,
+			buf.getBytes(buf.getShort()));
+		    int seq = buf.getInt();
+		    synchronized (lock) {
+			String channelName = channelIdToName.get(channelId);
+			channelMessages.add(new MessageInfo(channelName, seq));
+			lock.notifyAll();
+		    }
+		    break;
+		}
+
 		default:
 		    System.err.println(	
-			"[" + name + "] processAppProtocolMessage: unknown op code: " +
+			"[" + name + "] " +
+			"processAppProtocolMessage: unknown op code: " +
 			opcode);
 		    break;
 		}
@@ -1935,14 +2014,10 @@ public class TestChannelServiceImpl extends TestCase {
 		    (Channel) dataManager.getBinding(channelName);
 		channel.leave(session);
 		session.send(message.asReadOnlyBuffer());
-	    } else if (action.equals("message")) {
-		String channelName = buf.getString();
-		System.err.println("DummyClientSessionListener: send request, " +
-				   "channel name: " + channelName +
+	    } else {
+		System.err.println("DummyClientSessionListener: UNKNOWN request, " +
+				   "action: " +  action +
 				   ", user: " + name);
-		Channel channel =
-		    (Channel) dataManager.getBinding(channelName);
-		channel.send(message.asReadOnlyBuffer());
 	    }
 	}
     }
