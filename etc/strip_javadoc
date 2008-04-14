@@ -4,6 +4,13 @@
 # Strips both single- and multi-line Javadoc comments. End of line "//" and
 # non-Javadoc comments "/* ... */" are not stripped.
 #
+# WARNING: This script is not meant to be general purpose and has several
+# serious limitations:
+#   - It will strip the entire line of Javadoc even it there is code present
+#     on that line (either before or after the comment)
+#   - It will not properly handle the case of the characters '/**' appearing
+#     in a quoted string. Such a line will be treated as a start of a comment.
+#
 
 S_SEEK_COMMENT_START = 1
 S_SEEK_COMMENT_END   = 2
