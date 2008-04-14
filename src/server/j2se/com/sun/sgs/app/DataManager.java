@@ -47,6 +47,7 @@ import java.io.Serializable;
  * produce performance improvements regardless of whether modifications are
  * detected automatically.
  *
+ * @see         AppContext#getDataManager
  * @see		ManagedObject
  * @see		ManagedReference
  * @see		Serializable
