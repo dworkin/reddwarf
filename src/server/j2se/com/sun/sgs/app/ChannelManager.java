@@ -29,6 +29,8 @@ package com.sun.sgs.app;
  * requirement on a channel cannot be changed.  If different delivery
  * requirements are needed, then different channels should be used for
  * communication.
+ * 
+ * @see AppContext#getChannelManager
  */
 public interface ChannelManager {
 
