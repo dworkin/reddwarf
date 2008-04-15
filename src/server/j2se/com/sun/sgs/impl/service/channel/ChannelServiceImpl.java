@@ -407,9 +407,11 @@ public final class ChannelServiceImpl
 	 *
 	 * Reads the local membership list for the specified
 	 * {@code channelId}, and updates the local membership cache
-	 * for that channel.
+	 * for that channel.  If any join or leave notifications were
+	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
+	 * protocol message to the effected session(s).
 	 */
-	public void refresh(byte[] channelId) {
+	public void refresh(String name, byte[] channelId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
@@ -440,12 +442,60 @@ public final class ChannelServiceImpl
 			   HexDumper.toHexString(sessionRefId.toByteArray()));
 		    }
 		}
-		localChannelMembersMap.put(channelRefId, newLocalMembers);
 
+		/*
+		 * Determine which join and leave events were missed and
+		 * send protocol messages to clients accordingly.
+		 */
+		Set<BigInteger> oldLocalMembers =
+		    localChannelMembersMap.put(channelRefId, newLocalMembers);
+		Set<BigInteger> joiners = null;
+		Set<BigInteger> leavers = null;
+		if (oldLocalMembers == null) {
+		    joiners = newLocalMembers;
+		} else {
+		    for (BigInteger sessionRefId : newLocalMembers) {
+			if (oldLocalMembers.contains(sessionRefId)) {
+			    oldLocalMembers.remove(sessionRefId);
+			} else {
+			    if (joiners == null) {
+				joiners = new HashSet<BigInteger>();
+			    }
+			    joiners.add(sessionRefId);
+			}
+		    }
+		    if (! oldLocalMembers.isEmpty()) {
+			leavers = oldLocalMembers;
+		    }
+		}
+		if (joiners != null) {
+		    for (BigInteger sessionRefId : joiners) {
+			MessageBuffer msg =
+			    new MessageBuffer(1 +
+				MessageBuffer.getSize(name) +
+					      channelId.length);
+			msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
+			    putString(name).
+			    putBytes(channelId);
+			sessionService.sendProtocolMessageNonTransactional(
+ 		    	    sessionRefId,
+			    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
+			    Delivery.RELIABLE);
+		    }
+		}
+		if (leavers != null) {
+		    for (BigInteger sessionRefId : leavers) {
+			ByteBuffer msg =
+			    ByteBuffer.allocate(1 + channelId.length);
+			msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
+			    put(channelId).
+			    flip();
+			sessionService.sendProtocolMessageNonTransactional(
+			    sessionRefId, msg.asReadOnlyBuffer(),
+			    Delivery.RELIABLE);
+		    }
+		}
 
-		// FIXME: need to figure out which joins/leaves were missed and
-		// send protocol messages accordingly.
-		
 	    } finally {
 		callFinished();
 	    }

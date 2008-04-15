@@ -50,11 +50,12 @@ public interface ChannelServer extends Remote {
      * cached may be stale and needs to be reread before processing
      * any more events.
      *
+     * @param	name a channel name
      * @param	channelId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void refresh(byte[] channelId) throws IOException;
+    void refresh(String name, byte[] channelId) throws IOException;
 
     /**
      * Notifies this server that the locally-connected session with

@@ -42,8 +42,8 @@ public interface ChannelManager {
      * <p>If the specified {@code listener} is
      * non-{@code null}, then when any client session sends a
      * message on the returned channel, the specified listener's {@link
-     * ChannelListener#receivedMessage(ClientSession,ByteBuffer)
-     * receivedMessage} method is invoked with the client
+     * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
+     * receivedMessage} method is invoked with the channel, client
      * session and the message.  The specified listener is not
      * invoked for messages that the server sends on the channel via
      * the channel's {@link Channel#send send} method.  If the specified
@@ -55,7 +55,12 @@ public interface ChannelManager {
      * method provides an opportunity for an application to intervene when
      * a client sends a channel message, to perform access control,
      * filtering, or take other application-specific action on such channel
-     * messages.  
+     * messages.
+     *
+     * <p>If a non-{@code null} listener is provided, it is <i>strongly</i>
+     * suggested that a different listener instance be provided for each
+     * channel created, in order to reduce the possible contention of
+     * channel listeners.
      *
      * <p>Messages sent on the returned channel are delivered according to
      * the specified delivery requirement.

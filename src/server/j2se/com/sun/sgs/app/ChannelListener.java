@@ -52,10 +52,9 @@ public interface ChannelListener {
 
     /**
      * Previews the given {@code message} being sent by the specified
-     * {@code sender} on the channel associated with this listener, and
-     * returns {@code true} if the sender is allowed to send the message
-     * "as is" to the associated channel, and returns {@code false}
-     * otherwise.
+     * {@code sender} on the given {@code channel}, and returns {@code
+     * true} if the sender is allowed to send the message "as is" to the
+     * channel, and returns {@code false} otherwise.
      *
      * <p>If {@code true} is returned, then the message is forwarded
      * (unaltered) to the channel for delivery; otherwise, the caller
@@ -63,9 +62,15 @@ public interface ChannelListener {
      * action, such as sending one or more alternate messages, with or
      * without the specified message content.
      *
+     * <p>If the {@code sender} is not a member of the specified {@code
+     * channel}, then the message will not be forwarded to the channel for
+     * delivery, even if this method returns {@code true}.
+     *
+     * @param	channel a channel
      * @param	sender the sending client session
      * @param	message a message
      */
-    boolean receivedMessage(ClientSession sender, ByteBuffer message);
+    boolean receivedMessage(
+	Channel channel, ClientSession sender, ByteBuffer message);
     
 }

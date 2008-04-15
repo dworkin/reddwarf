@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -151,6 +152,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    throw new NullPointerException("null name");
 	}
 	this.name = name;
+	this.dataService = ChannelServiceImpl.getDataService();
 	if (listener != null) {
 	    if (! (listener instanceof Serializable)) {
 		throw new IllegalArgumentException("non-serializable listener");
@@ -164,7 +166,6 @@ abstract class ChannelImpl implements Channel, Serializable {
 	this.delivery = delivery;
 	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
-	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.wrappedChannelRef =
 	    dataService.createReference(new ChannelWrapper(ref));
@@ -231,13 +232,15 @@ abstract class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
-	throw new AssertionError("not implemented");
+	String prefix = getSessionPrefix();
+	String name = dataService.nextServiceBoundName(prefix);
+	return name != null && name.startsWith(prefix);
     }
 
     /** {@inheritDoc} */
     public Iterator<ClientSession> getSessions() {
 	checkClosed();
-	throw new AssertionError("not implemented");
+	return new ClientSessionIterator(dataService, getSessionPrefix());
     }
 
     /** {@inheritDoc} */
@@ -465,6 +468,31 @@ abstract class ChannelImpl implements Channel, Serializable {
      * this channel's coordinator to service the event.
      */
     public Channel send(ByteBuffer message) {
+	doSend(null, message);
+	return this;
+    }
+
+    /**
+     * If the specified {@code sender} is a member of this channel, and
+     * either, this channel has a null {@code ChannelListener} or has a
+     * non-null {@code ChannelListener} and invoking that listener's
+     * {@code receivedMessage} method with this channel, the specified
+     * {@code sender}, and {@code message} returns {@code true}, then
+     * this method forwards the {@code message} to the channel for
+     * delivery; otherwise, no action is taken.
+     */
+    private void send(ClientSession sender, ByteBuffer message) {
+	// TBD: exception handling?
+
+	if (listenerRef == null ||
+	    listenerRef.get().receivedMessage(getWrappedChannel(), sender,
+					      message.asReadOnlyBuffer()))
+	{
+	    doSend(sender, message);
+	}
+    }
+
+    private void doSend(ClientSession sender, ByteBuffer message) {
 	try {
 	    checkClosed();
 	    if (message == null) {
@@ -478,15 +506,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue send request.
 	     */
-            byte[] bytes = new byte[message.remaining()];
-            message.get(bytes);
-	    addEvent(new SendEvent(bytes));
+            byte[] msgBytes = new byte[message.remaining()];
+            message.get(msgBytes);
+	    byte[] senderIdBytes =
+		sender != null ?
+		getSessionIdBytes(unwrapSession(sender)) :
+		null;
+	    addEvent(new SendEvent(senderIdBytes, msgBytes));
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
-			   this, HexDumper.format(bytes, 0x50));
+			   this, HexDumper.format(msgBytes, 0x50));
 	    }
-	    return this;
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -495,23 +526,6 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
-	}
-    }
-
-    /**
-     * If this channel has a null {@code ChannelListener} or has a
-     * non-null {@code ChannelListener} and invoking that listener's
-     * {@code receivedMessage} method with the specified {@code
-     * sender} and {@code message} returns {@code true}, then this
-     * method forwards the {@code message} to the channel for
-     * delivery; otherwise, no action is taken.
-     */
-    private void send(ClientSession sender, ByteBuffer message) {
-	// TBD: exception handling?
-	if (listenerRef == null ||
-	    listenerRef.get().receivedMessage(sender, message))
-	{
-	    send(message);
 	}
     }
 
@@ -1201,6 +1215,71 @@ abstract class ChannelImpl implements Channel, Serializable {
     /* -- Other classes -- */
 
     /**
+     * An iterator for {@code ClientSessions} of a given channel.
+     */
+    private static class ClientSessionIterator
+	implements Iterator<ClientSession>
+    {
+	/** The data service. */
+	protected final DataService dataService;
+
+	/** The underlying iterator for service bound names. */
+	protected final Iterator<String> iterator;
+
+	/** The client session to be returned by {@code next}. */
+	private ClientSession nextSession = null;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code dataService} and {@code keyPrefix}.
+	 */
+	ClientSessionIterator(DataService dataService, String keyPrefix) {
+	    this.dataService = dataService;
+	    this.iterator =
+		BoundNamesUtil.getServiceBoundNamesIterator(
+		    dataService, keyPrefix);
+	}
+
+	/** {@inheritDoc} */
+	public boolean hasNext() {
+	    if (! iterator.hasNext()) {
+		return false;
+	    }
+	    if (nextSession != null) {
+		return true;
+	    }
+	    String key = iterator.next();
+	    ChannelImpl.ClientSessionInfo info =
+		(ChannelImpl.ClientSessionInfo)
+		    dataService.getServiceBinding(key);
+	    ClientSession session = info.getClientSession();
+	    if (session == null) {
+		return hasNext();
+	    } else {
+		nextSession = session;
+		return true;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public ClientSession next() {
+	    try {
+		if (nextSession == null && ! hasNext()) {
+		    throw new NoSuchElementException();
+		}
+		return nextSession;
+	    } finally {
+		nextSession = null;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void remove() {
+	    throw new UnsupportedOperationException("remove is not supported");
+	}
+    }
+    
+    /**
      * A wrapper for a {@code ChannelListener} that is serializable,
      * but not managed.
      */
@@ -1217,9 +1296,9 @@ abstract class ChannelImpl implements Channel, Serializable {
 
 	/** {@inheritDoc} */
 	public boolean receivedMessage(
-	    ClientSession sender, ByteBuffer message)
+	    Channel channel, ClientSession sender, ByteBuffer message)
 	{
-	    return get().receivedMessage(sender, message);
+	    return get().receivedMessage(channel, sender, message);
 	}
 	
     }
@@ -1447,6 +1526,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    channel.getChannelServers();
 		final BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
+		final String channelName = channel.name;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
@@ -1457,7 +1537,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 			public void run() {
 			    for (ChannelServer server : channelServers) {
 				try {
-				    server.refresh(channelIdBytes);
+				    server.refresh(channelName, channelIdBytes);
 				} catch (IOException e) {
 				    /*
 				     * It is possible that the channel server's
@@ -1707,25 +1787,48 @@ abstract class ChannelImpl implements Channel, Serializable {
 	private final static long serialVersionUID = 1L;
 
 	private final byte[] message;
+	/** The sender's session ID, or null. */
+	private final byte[] senderId;
+	
 	/**
-	 * Constructs a send event with the given {@code message}.
+	 * Constructs a send event with the given {@code senderId} and
+	 * {@code message}.
+	 *
+	 * @param senderId a sender's session ID, or {@code null}
+	 * @param message a message
 	 */
-	SendEvent(byte[] message) {
+	SendEvent(byte[] senderId, byte[] message) {
+	    this.senderId = senderId;
 	    this.message = message;
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: (optimization) this should handle sending
+	 * multiple messages to a given channel.  Here, we
+	 * could peek at the next event in the queue, and if
+	 * it is a send, that event could be batched with this
+	 * send event.  This could be repeated for multiple
+	 * send events appearing in the queue.
+	 */
 	public void serviceEvent(EventQueue eventQueue) {
 
 	    /*
-	     * TBD: (optimization) this should handle sending
-	     * multiple messages to a given channel.  Here, we
-	     * could peek at the next event in the queue, and if
-	     * it is a send, that event could be batched with this
-	     * send event.  This could be repeated for multiple
-	     * send events appearing in the queue.
+	     * Verfiy that the sending session (if any) is a member of this
+	     * channel.
 	     */
 	    final ChannelImpl channel = eventQueue.getChannel();
+	    if (senderId != null) {
+		ClientSession sender =
+		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
+		if (sender == null || ! channel.hasSession(sender)) {
+		    return;
+		}
+	    }
+	    /*
+	     * Enqueue a channel task to forward the message to the
+	     * channel's servers for delivery.
+	     */
 	    final Set<ChannelServer> servers = channel.getChannelServers();
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
