@@ -74,6 +74,14 @@
      else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
     <istrue value="${test.use.je}"/>
   </condition>
+
+  <!-- Enable profiling if property start.profile is set -->
+  <condition 
+     property="test.profile.jvm.args"
+     value="-d64 -agentpath:/home/jl34465/darkstar/profiler/lib/deployed/jdk15/solaris-amd64/libprofilerinterface.so=/home/jl34465/darkstar/profiler/lib,5140"
+     else=" ">
+    <istrue value="${start.profile}"/>
+  </condition>
   <!-- System properties to pass down -->
   <propertyset id="test.extra.properties">
     <propertyref prefix="com.sun.sgs."/>
@@ -1183,6 +1191,41 @@
     <java classname="com.sun.sgs.impl.kernel.Kernel"
 	  classpathref="example.server.classpath"
 	  fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <jvmarg line="${test.profile.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+      <sysproperty key="com.sun.sgs.app.root" file="${app.dir}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
+	 value="${test.bdb.env}"/>
+      <syspropertyset refid="test.extra.properties"/>
+      <arg file="${app.properties}"/>
+    </java>
+  </target>
+
+  <!-- Runs an example app in single node mode for local Netbeans profiling -->
+  <target name="nb-profile-example-app-single-node"
+	  depends="example-classes, -maybe-delete-example-datastore"
+	  description="Runs an example app in single node mode">
+    <!-- Set the logging properties -->
+    <property name="app.logging" location="example/logging.properties"/>
+    <!-- Set the application properties for the example to run -->
+    <property name="app.properties"
+	      location="example/request/RequestApp.properties"/>
+    <property name="app.dir" location="${build.dir}/example"/>
+    <mkdir dir="${app.dir}"/>
+    <mkdir dir="${app.dir}/dsdb"/>
+
+    <nbprofiledirect>
+        <classpath>
+            <path refid="example.server.classpath"/>
+        </classpath>
+    </nbprofiledirect>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+	  classpathref="example.server.classpath"
+	  fork="true">
+      <jvmarg value="${profiler.info.jvmargs.agent}"/>
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
