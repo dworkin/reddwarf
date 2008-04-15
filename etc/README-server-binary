@@ -48,14 +48,20 @@ It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
 1.5.0_07 on Mac OS X platforms.
 
+REQUIRED LIBRARIES
+
+The Project Darkstar server depends on several additional libraries,
+which must be installed.
+
 This distribution requires Berkeley DB version 4.5.20, which may be
 bundled with this distribution, or else can be obtained and compiled
 from:
 
   http://www.oracle.com/database/berkeley-db/db/index.html
 
-The bundled files should be copied to the lib/bdb subdirectory.  If
-using files compiled separately, the Berkeley DB JAR file should be
+The db.jar and the subdirectories containing the native libraries for
+the platforms of interest should be copied to the lib/bdb subdirectory.
+If using files compiled separately, the Berkeley DB JAR file should be
 copied to the lib/bdb subdirectory, and the natives libraries for the
 current platform should be copied to proper subdirectory as specified in
 the startup scripts.

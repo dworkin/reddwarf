@@ -105,12 +105,24 @@ case $os in
 	exit 1;
 esac
 
+# The directory containing the Berkeley DB native libraries
+native_dir="$sgshome/lib/bdb/$platform"
+
+# Check that the Berkeley DB libraries have been installed properly
+if [ ! -e "$sgshome/lib/bdb/db.jar" ]; then
+    echo The db.jar file needs to be installed in $sgshome/lib/bdb
+    exit 1;
+elif [ ! -e "$native_dir" ]; then
+    echo The Berkeley DB native library directory was not found: $native_dir
+    exit 1;
+fi
+
 set -x
 
 # Run the SGS server, specifying the library path, the logging
 # configuration file, the classpath, the main class, and
 # the application configuration file
-$java -Djava.library.path=$sgshome/lib/bdb/$platform \
+$java -Djava.library.path=$native_dir \
       -Djava.util.logging.config.file=$sgshome/sgs-logging.properties \
       -cp "$sgshome/lib/sgs.jar$pathsep$app_classpath" \
       com.sun.sgs.impl.kernel.Kernel \
