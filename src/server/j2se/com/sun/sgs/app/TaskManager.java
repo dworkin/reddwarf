@@ -45,6 +45,8 @@ import java.io.Serializable;
  * is no guarantee that the task scheduled in the previous transaction
  * will complete first. If any ordering or dependency is required, this
  * should be implemented within the tasks themselves.
+ * 
+ * @see AppContext#getTaskManager
  */
 public interface TaskManager {
 

@@ -2202,6 +2202,7 @@ public class TestScalableHashMap extends Assert {
 			}
 			ManagedSerializable<Iterator> ms = uncheckedCast(
 			    dataService.getBinding("valuesIter"));
+			dataService.markForUpdate(ms);
 			Iterator valuesIter = ms.get();
 			int count = 0;
 			while (valuesIter.hasNext()) {

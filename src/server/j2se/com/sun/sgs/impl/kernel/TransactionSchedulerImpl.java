@@ -91,7 +91,7 @@ final class TransactionSchedulerImpl
      * threads.
      */
     public static final String CONSUMER_THREADS_PROPERTY =
-        "com.sun.sgs.impl.kernel.TransactionConsumerThreads";
+        "com.sun.sgs.impl.kernel.transaction.threads";
 
     // the default number of initial consumer threads
     private static final String DEFAULT_CONSUMER_THREADS = "4";

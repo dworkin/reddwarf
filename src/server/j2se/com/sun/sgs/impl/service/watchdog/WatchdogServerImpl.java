@@ -694,7 +694,8 @@ public final class WatchdogServerImpl
                 values =
 		    aliveNodes.values().toArray(new NodeImpl[numAliveNodes]);
             }
-	    int random = backupChooser.nextInt(numAliveNodes);
+	    int random = numAliveNodes > 0
+		? backupChooser.nextInt(numAliveNodes) : 0;
 	    for (int i = 0; i < numAliveNodes; i++) {
 		// Choose one of the values[] elements randomly. If we
 		// chose the localNodeId, loop again, choosing the next

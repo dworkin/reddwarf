@@ -70,7 +70,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * threads.
      */
     public static final String CONSUMER_THREADS_PROPERTY =
-        "com.sun.sgs.impl.kernel.TaskConsumerThreads";
+        "com.sun.sgs.impl.kernel.task.threads";
 
     // the default number of initial consumer threads
     private static final String DEFAULT_CONSUMER_THREADS = "4";

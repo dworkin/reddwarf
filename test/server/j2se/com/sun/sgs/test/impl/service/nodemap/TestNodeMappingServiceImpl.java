@@ -21,9 +21,9 @@ package com.sun.sgs.test.impl.service.nodemap;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -229,7 +229,25 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
-        public void testConstructedVersion() throws Exception {
+    public void testConstructorAppButNoServerHost() throws Exception {
+        // Server start is false but we didn't specify a server host
+        Properties props = 
+                SgsTestNode.getDefaultProperties(
+                    "TestNodeMappingServiceImpl", 
+                    serverNode, 
+                    SgsTestNode.DummyAppListener.class);
+        props.remove(StandardProperties.SERVER_HOST);
+	
+        try {
+            NodeMappingService nmap =
+                new NodeMappingServiceImpl(props, systemRegistry, txnProxy);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            System.err.println(e);
+        }
+    }
+    
+    public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)

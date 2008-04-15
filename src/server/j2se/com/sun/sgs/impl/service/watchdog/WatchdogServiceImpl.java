@@ -80,7 +80,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
  *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
- *	property, if present, else the local host name <br>
+ *	property, if present, or {@code localhost} if this node is starting the 
+ *      server <br> <br>
  *
  * <dd style="padding-top: .5em">
  *	Specifies the host name for the watchdog server that this service
@@ -189,8 +190,8 @@ public final class WatchdogServiceImpl
     /** The exporter for this server or {@code null}. */
     private Exporter<WatchdogClient> exporter = null;
 
-    /** The watchdog server impl. */
-    final WatchdogServerImpl serverImpl;
+    /** The watchdog server impl, or {@code null}. */
+    private WatchdogServerImpl serverImpl = null;
 
     /** The watchdog server proxy, or {@code null}. */
     final WatchdogServer serverProxy;
@@ -325,11 +326,14 @@ public final class WatchdogServiceImpl
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
-		serverImpl = null;
 		host = wrappedProps.getProperty(
 		    HOST_PROPERTY,
 		    wrappedProps.getProperty(
-			StandardProperties.SERVER_HOST, localHost));
+			StandardProperties.SERVER_HOST));
+                if (host == null) {
+                    throw new IllegalArgumentException(
+                                           "A server host must be specified");
+                }
 		serverPort = wrappedProps.getIntProperty(
 		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
@@ -367,6 +371,9 @@ public final class WatchdogServiceImpl
 		"Failed to create WatchdogServiceImpl");
 	    if (exporter != null) {
 		exporter.unexport();
+	    }
+	    if (serverImpl != null) {
+		serverImpl.shutdown();
 	    }
 	    throw e;
 	}
