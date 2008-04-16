@@ -33,6 +33,8 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -72,11 +74,11 @@ import java.util.logging.Logger;
  * applications configured to run in this system.
  * <p>
  * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.Kernel.profile.level</code> must
+ * property <code>com.sun.sgs.impl.kernel.profile.level</code> must
  * be given the value "on". If no profile listeners are specified, then the
  * default <code>AggregateProfileListener</code> is enabled. To specify that a
  * different set of <code>ProfileListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
+ * the <code>com.sun.sgs.impl.kernel.profile.listeners</code>
  * property must be specified with a colon-separated list of fully-qualified
  * classes, each of which implements <code>ProfileListener</code>.
  */
@@ -88,10 +90,10 @@ class Kernel {
 
     // the property for setting profiling levels
     private static final String PROFILE_PROPERTY =
-        "com.sun.sgs.impl.kernel.Kernel.profile.level";
+        "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
     private static final String PROFILE_LISTENERS =
-        "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
+        "com.sun.sgs.impl.kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
@@ -652,6 +654,50 @@ class Kernel {
                 properties = new Properties(backingProperties);
             inputStream = new FileInputStream(filename);
             properties.load(inputStream);
+            
+            // Expand properties as needed.
+            String value = properties.getProperty(StandardProperties.NODE_TYPE);
+            if (value == null) {
+                // Default is single node
+                value = StandardProperties.NodeType.singleNode.name();
+            }
+
+            StandardProperties.NodeType type;
+            // Throws IllegalArgumentException if not one of the enum types
+            // but let's improve the error message
+            try {
+                type = StandardProperties.NodeType.valueOf(value);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Illegal value for " +
+                        StandardProperties.NODE_TYPE);
+            }
+            
+           
+            switch (type) {
+                case singleNode:
+                    break;    // do nothing, this is the default
+                case coreServerNode:
+                    // Don't start an application
+                    properties.setProperty(StandardProperties.APP_LISTENER,
+                                           StandardProperties.APP_LISTENER_NONE);
+                    // Only run basic services
+                    properties.setProperty(StandardProperties.FINAL_SERVICE,
+                                           "NodeMappingService");
+                    // Start servers for services
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "true");
+                    // Start the network server for the data store
+                    properties.setProperty(
+                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
+                        "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+                    break;
+                case appNode:
+                    // Don't start the servers
+                    properties.setProperty(StandardProperties.SERVER_START, 
+                                           "false");
+                    break;
+            }
+
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))

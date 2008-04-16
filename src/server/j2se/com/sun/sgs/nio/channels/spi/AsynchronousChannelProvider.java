@@ -88,8 +88,6 @@ public abstract class AsynchronousChannelProvider {
                 new RuntimePermission("asynchronousChannelProvider"));
     }
 
-    // Class loading code based on SelectorProvider implementation in Sun JDK
-
     /**
      * Loads the system-wide provider from a property.
      * 
@@ -158,9 +156,6 @@ public abstract class AsynchronousChannelProvider {
                     public AsynchronousChannelProvider run() {
                         if (loadProviderFromProperty())
                             return provider;
-// TODO service loading requires JDK 6 or higher -JM
-//                        if (loadProviderAsService())
-//                            return provider;
                         provider = com.sun.sgs.impl.nio.DefaultAsyncChannelProvider.create();
                         return provider;
                     }

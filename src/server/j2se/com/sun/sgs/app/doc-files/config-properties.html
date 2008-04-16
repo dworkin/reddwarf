@@ -44,129 +44,179 @@
 
 <h1>Project Darkstar Server Configuration Properties</h1>
 
-This page documents the configuration properties supported by the
-current implementation of the Project Darkstar Server.  Configuration
-properties may be specified by system properties
-(using <code>-D</code><i>property</i><code>=</code><i>value</i>) or in
-the application properties file named on the command line.
+This page documents the configuration properties supported by version @VERSION@
+of the Project Darkstar Server.  Configuration properties may be specified by
+system properties (using 
+<code>-D</code><i>property</i><code>=</code><i>value</i>)
+or in the application properties file named on the command line. Any changes to
+configuration properties from previous releases will be noted in the 
+release documentation.
 
-<h2>General Properties</h2>
+<p>
+By default, the Project Darkstar Server consists of a single node, as described
+in <a href="#SingleNodeConfig">Configuring a Single Node System</a>.
+Alternatively, multiple nodes can be configured to work together, as
+described in <a href="#MultiNodeConfig">Configuring a Multi-Node System</a>.
+<p>
+The type of node being configured is specified by the following property:
+<dl>
+<dt><a name="node.type">com.sun.sgs.node.type</a>
+<span class="default">singleNode</span>
+<dd> Indicates which type of node is being started, and has valid settings of
+<ul>
+    <li><code>singleNode</code>
+    <li><code>coreServerNode</code>
+    <li><code>appNode</code>
+</ul>
+</dl>
 
-These properties control various general facilities in the Project Darkstar
-Server.
+<p>
+For example configuration files of the different node types, see the
+<a href="single-node.properties">single-node.properties</a>,
+<a href="core-server.properties">core-server.properties</a>, and
+<a href="app-node.properties">app-node.properties</a> files.
+
+
+<a name="SingleNodeConfig"></a>
+<h2>Configuring a Single Node System</h2>
+
+A single node systems consists of a Darkstar Server running in a single
+Java Virtual Machine.  This is the default server type for Project Darkstar.
+Note that the <a href="#RequiredProperties">Required Properties</a>
+will also need to be specified.
+
+<a name="MultiNodeConfig"></a>
+<h2>Configuring a Multi-Node System</h2>
+The Project Darkstar Server can be run on multiple nodes configured to work 
+together in a cluster.  This multi-node configuration requires a special 
+<i>core server node</i> to run critical Project Darkstar operations, with the 
+remaining nodes, the <i>application nodes</i>, cooperating to run the 
+application.  Application nodes can be dynamically added or removed from the
+cluster.
+<p>
+The core server node <b>must</b> be running before starting the application 
+nodes.
+<p>
+Properties in this section specify which node is the core server node, which
+are the application nodes, and how the application nodes discover the
+core node.  Note that some <a href="#RequiredProperties">Required Properties</a>
+will also need to be specified.
+
+<h3>Core Server Node Properties</h3>
+These properties control the configuration of the Project Darkstar core
+server node if a multi-node configuration is being used. Currently, there is 
+only one core server per cluster of Project Darkstar nodes; if multiple core 
+servers are started, then each will be associated with its own independent 
+Project Darkstar cluster.
+<p>
+The <a href="#node.type">node.type</a> property must be set to 
+<code>coreServerNode</code> to start the core server.
+
+<h3>Application Node Properties</h3>
+These properties control the configuration of the Project Darkstar application
+nodes if a multi-node configuration is being used.
+<p>
+The <a href="#node.type">node.type</a> property must be set to 
+<code>appNode</code> to start an application node.
+
+<dl>
+<dt><a name="com.sun.sgs.server.host">com.sun.sgs.server.host</a>
+<span class="required"> for application nodes</span>
+<dd> The name of the host the core Project Darkstar Server node is running on. 
+
+</dl>
+
+<a name="RequiredProperties"></a>
+<h2>Required Properties</h2>
+
+These properties are required for some or all node types.
 
 <dl>
 
 <dt><a name="com.sun.sgs.app.name">com.sun.sgs.app.name</a>
 <span class="required"></span>
-<dd>The name of the application.
+<dd>The name of the application.  If running in a multi-node configuration, 
+this name must be the same for each node.
 
-<dt>com.sun.sgs.app.root
+<dt><a name="app.root">com.sun.sgs.app.root</a>
 <span class="required"></span>
-<dd>The root directory for the application.
+<dd>The root directory for the application, which specifies local file system 
+space available for Project Darkstar use.
 
-<dt>com.sun.sgs.app.listener
-<span class="required"></span>
+<dt><a name="app.listener">com.sun.sgs.app.listener</a>
+<span class="required"> for application and single nodes</span>
 <dd>The <a href="../AppListener.html"><code>AppListener</code></a> for
   the application, specified as a fully qualified class name.
 
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
-<span class="required"></span>
+<span class="required"> for application and single nodes</span>
 <dd>The TCP port on which to listen for client connections.
-
-<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
-<span class="default">100</span>
-<dd>The maximum amount of time in milliseconds that a transaction will
-  be permitted to run before it is a candidate for being aborted.
-
-<dt>com.sun.sgs.txn.timeout.unbounded
-<span class="default">Long.MAX_VALUE</span>
-<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
-  transaction will be permitted to run before it is a candidate for
-  being aborted.
 
 </dl>
 
+<a name="CommonProperties"></a>
+<h2>Other Common Properties</h2>
+
+These properties control various general facilities in the Project Darkstar
+Server, and can be used in any node configuration unless otherwise specified.
+
+<a name="CoreServerPorts"></a>
+<h3>Core Server Port Properties</h3>
+These properties can be used by either core server or application nodes in
+a multi-node configuration.  The core server node may be configured to specify 
+ports to be used on the core server machine.  If these properties are used, 
+they must be set to the same value on each application node.
+
+<dl>
+<dt>com.sun.sgs.impl.service.data.store.net.server.port
+<span class="default">44530</span>
+<dd>The TCP port for the data service's shared network server.  
+<dt>com.sun.sgs.impl.service.watchdog.server.port
+<span class="default">44533</span>
+<dd>The TCP port for the watchdog service's internal server.
+<dt>com.sun.sgs.impl.service.nodemap.server.port
+<span class="default">44535</span>
+<dd>The TCP port for the node mapping service's internal server.
+</dl>
+
 <a name="DataService"></a>
-<h2>DataService Properties</h2>
+<h3>DataService Properties</h3>
 
 These properties control the implementation of the
 <code>DataService</code>.
 
-<dl>
-
-<dt>
-<a name="com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications">
-  com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications</a>
-<span class="default">true</span>
-<dd>Whether to automatically detect modifications to managed objects.
-  If set to something other than <code>true</code>, then applications
-  need to call <a
-  href="../DataManager.html#markForUpdate(com.sun.sgs.app.ManagedObject)">
-  <code>DataManager.markForUpdate</code></a> or
-  <a href="../ManagedReference.html#getForUpdate(java.lang.Class)">
-  <code>ManagedReference.getForUpdate</code></a> for any modified
-  objects to make sure that the modifications are recorded by
-  the <code>DataService</code>.
-
-</dl>
-
 <a name="DataStore"></a>
-<h3>DataStore Properties</h3>
+<h4>DataStore Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying <code>DataStore</code>.
+underlying <code>DataStore</code>.  Setting these properties has no
+effect on application nodes.
 
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
 <span class="default"><i>${com.sun.sgs.app.root}</i>/dsdb</span>
-<dd>The directory in which to store database files.  Each instance of
-  requires its own, unique directory.
+<dd>The directory in which to store database files.  Each single node or
+  core server node requires its own, unique directory.
 
 </dl>
 
 <a name="Bdb"></a>
-<h3>Berkeley DB Properties</h3>
+<h4>Berkeley DB Properties</h4>
 
 These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying Berkeley DB database.
+underlying Berkeley DB database. Setting these properties has no
+effect on application nodes.
 
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.cache.size
-<span class="default">1000000</span>
+<span class="default">128000000</span>
 <dd>The size in bytes of the Berkeley DB cache.  The value must not be
-  less than <code>20000</code>.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.interval
-<span class="default">60000</span>
-<dd>The interval in milliseconds between checkpoint operations that
-  flush changes from the database log to the database.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.checkpoint.size
-<span class="default">100000</span>
-<dd>The number of bytes that needs to have been written since the last
-  checkpoint operation was performed to require another checkpoint.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.flush.to.disk
-<span class="default">false</span>
-<dd>Whether to flush changes to disk when a transaction commits.  If
-  <code>false</code>, the modifications made in some of the most recent
-  transactions may be lost if the host crashes, although data integrity
-  will be maintained.  Flushing changes to disk avoids data loss but
-  introduces a significant reduction in performance.
-
-<dt>com.sun.sgs.impl.service.data.store.db.bdb.lock.timeout
-<span class="default" style="font-family: serif"><code>0.1</code> times
-  the value of the <code>com.sun.sgs.txn.timeout</code> property, if
-  specified, otherwise <code>10</code></span>
-<dd>The maximum amount of time in milliseconds that an attempt to obtain
-  a lock will be allowed to continue before being aborted.  The value
-  must be greater than <code>0</code>, and should be less than the
-  transaction timeout.
+  less than <code>20000</code>.  Using a cache that is too small
+  can introduce a significant reduction in performance.
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.remove.logs
 <span class="default">false</span>
@@ -177,74 +227,85 @@ underlying Berkeley DB database.
 
 </dl>
 
-<a name="ClientSessionService"></a>
-<h2>ClientSessionService Properties</h2>
-
-These properties control the implementation of the
-<code>ClientSessionService</code>.
-
+<a name="Watchdog"></a>
+<h3>Watchdog Service Properties</h3>
+These properties control the implementation of the <code>WatchdogService</code>.
+Setting these properties has no effect on application nodes.
 <dl>
 
-<dt>com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size
-<span class="default">256</span>
-<dd>The block size to use when reserving session IDs.  The value must be
-  greater than <code>8</code>.
+<dt>com.sun.sgs.impl.service.watchdog.server.renew.interval
+<span class="default">1000 (one second)</span>
+<dd>The time interval, in milliseconds, in which application nodes must
+  contact the watchdog service's internal server in order to be considered
+  alive. This time interval is sent to each application node during start up, 
+  when the application node registers with the watchdog's internal server. The 
+  interval must be greater than or equal to <code>5</code> milliseconds and 
+  less than or equal to <code>10000</code> milliseconds (10 seconds).  Using a 
+  renew interval that is too small may cause some application nodes to be 
+  considered failed by the <code>WatchdogService</code> when they are very busy.
+  Using an interval that is too large will increase the amount of time the 
+  system takes to respond to failed nodes.
 
 </dl>
 
-<a name="Kernel"></a>
-<h2>Kernel Properties</h2>
+<a name="System"></a>
+<h3>System Properties</h3>
 
-These properties control the implementation of the <code>Kernel</code>,
-which is the part of the system that manages applications and the
-components that make up the system.
+These properties control the implementation of the core components of the 
+system including identity management, profiling, and task scheduling.
 
 <dl>
-
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.level
+<dt>com.sun.sgs.app.authenticators
+<span class="default">com.sun.sgs.impl.auth.NullAuthenticator</span>
+<dd>A colon separated list of <a href="../../auth/IdentityAuthenticator.html">
+  <code>IdentityAuthenticator</code>s</a> to use for the application. The
+  order defines the precedence when authenticating an identity. The default
+  authenticator simply accepts any name-password pair.
+    
+<dt>com.sun.sgs.impl.kernel.profile.level
 <span class="default">off</span>
 <dd>Whether to perform profiling.  Profiling is enabled if the value is
   <code>on</code>.
 
-</dl>
+<dt>com.sun.sgs.impl.kernel.profile.listeners
+<span class="default">
+    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<dd>A colon separated list of profile listeners, which consume profile output.
+  The <code>AggregateProfileListener</code> reports its findings on a server
+  socket, by default on port <code>43005</code>.  To configure this and other
+  available listeners, see the individual class javadoc for profile listener
+  implementations.
 
-<a name="ResourceCoordinator"></a>
-<h3>ResourceCoordinator Properties</h3>
-
-These properties control the implementation
-of <code>ResourceCoordinator</code>, which is the part of
-the <code>Kernel</code> that creates and manages threads.
-
-<dl>
-
-<dt>com.sun.sgs.kernel.CorePoolSize
-<span class="default">8</span>
-<dd>The initial thread pool size.
-
-<dt>com.sun.sgs.kernel.MaximumPoolSize
-<span class="default">16</span>
-<dd>The maximum thread pool size.
-
-</dl>
-
-<a name="TaskScheduler"></a>
-<h3>TaskScheduler Properties</h3>
-
-These properties control the implementation of
-the <code>TaskScheduler</code>, which is the part of
-the <code>Kernel</code> that schedules tasks.
-
-<dl>
-
-<dt>com.sun.sgs.impl.kernel.schedule.InitialConsumerThreads
+<dt>com.sun.sgs.impl.kernel.transaction.threads
 <span class="default">4</span>
-<dd>The number of initial consumer threads used to process tasks.
+<dd>The number of initial threads used to process transactional tasks, such as 
+  those started through the 
+  <a href="../TaskManager.html"><code>TaskManager</code></a>.
+
+<dt>com.sun.sgs.impl.kernel.task.threads
+<span class="default">4</span>
+<dd>The number of initial threads used to process non-transactional tasks.
 
 </dl>
 
+<a name="DebugProperties"></a>
+<h2>Debug and Test Properties</h2>
+
+These properties are most useful for debugging and testing, and are not
+typically useful for production deployments.
+
+<dl>
+<dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
+<span class="default">100</span>
+<dd>The maximum amount of time in milliseconds that a transaction will
+  be permitted to run before it is a candidate for being aborted.  Increasing
+  this timeout is useful when attaching a debugger to a node, but can 
+  increase game latency.
+
+</dl>
 <hr>
 <font size="-1">
-  Copyright &copy; 2007 Sun Microsystems, Inc. All rights reserved
+  Copyright &copy; 2007-2008 Sun Microsystems, Inc. All rights reserved
 </font>
 
 </body>

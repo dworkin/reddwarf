@@ -1659,6 +1659,7 @@ public class ScalableHashMap<K,V>
 	/** Creates an instance for the specified directory node. */
 	private RemoveNodesTask(ScalableHashMap<K,V> node) {
 	    assert !node.isLeafNode();
+	    DataManager dm = AppContext.getDataManager();
 	    ManagedReference<ScalableHashMap<K,V>> lastRef = null;
 	    for (int i = 0; i < node.nodeDirectory.length; i++) {
 		ManagedReference<ScalableHashMap<K,V>> ref =
@@ -1670,6 +1671,7 @@ public class ScalableHashMap<K,V>
 		     * Clear the parent reference so we don't walk up to the
 		     * root node, which is being reused.
 		     */
+		    dm.markForUpdate(child);
 		    child.parentRef = null;
 		    if (lastRef == null) {
 			currentNodeRef = ref;
@@ -1701,6 +1703,7 @@ public class ScalableHashMap<K,V>
 	/** Removes some entries, returning true if there is more to do. */
 	private boolean doWork() {
 	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    ScalableHashMap<K,V> node = currentNodeRef.get();
 	    /* Find the leaf node */
 	    if (!node.isLeafNode()) {
