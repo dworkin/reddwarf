@@ -288,7 +288,7 @@ public final class NodeMappingServerImpl
     
     /** 
      * {@inheritDoc} 
-     * Called from the instantiating service
+     * Called from the instantiating service.
      */
     protected void doShutdown() {
         exporter.unexport();
