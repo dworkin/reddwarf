@@ -458,7 +458,8 @@
     <copy todir="${build.dir}/sgs-src">
       <fileset dir="."
 	       excludes="**/.svn"
-	       includes="build.xml,
+	       includes="analysis/**,
+			 build.xml,
 			 doc/ServerAppTutorial.*,
 			 etc/jdk5.0_package_list/**,
 			 etc/mina1.1_package_list/**,
@@ -483,9 +484,6 @@
     <copy file="etc/README-server-source" tofile="${build.dir}/sgs-src/README">
       <filterset refid="versions"/>
     </copy>
-    <!-- Create the analysis directory to permit running the javadoc
-	 target on the source distribution -->
-    <mkdir dir="${build.dir}/sgs-src/analysis/server/j2se"/>
     <mkdir dir="${build.dir}/sgs-src/lib"/>
     <zip destfile="${build.dir}/sgs-src-${project.version}.zip">
       <zipfileset dir="${build.dir}/sgs-src"
