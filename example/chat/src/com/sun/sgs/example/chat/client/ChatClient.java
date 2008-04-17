@@ -20,7 +20,6 @@
 package com.sun.sgs.example.chat.client;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -35,7 +34,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -50,17 +48,14 @@ import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.ListCellRenderer;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.client.simple.SimpleClient;
-import java.math.BigInteger;
 
 /**
  * A simple GUI chat client that interacts with an SGS server-side app.
@@ -87,7 +82,7 @@ import java.math.BigInteger;
  * </ul>
  */
 public class ChatClient extends JFrame
-    implements ActionListener, ListCellRenderer,
+    implements ActionListener,
                SimpleClientListener, ClientChannelListener
 {
     /** The version of the serialized form of this class. */
@@ -95,7 +90,7 @@ public class ChatClient extends JFrame
 
     private final JButton loginButton;
     private final JButton openChannelButton;
-    private final JButton multiPmButton;
+    private final JButton pmButton;
     private final JButton serverSendButton;
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
@@ -122,11 +117,8 @@ public class ChatClient extends JFrame
     public static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The list of clients connected to the ChatApp on the server */
-    private final MultiList<BigInteger> userList;
+    private final MultiList<String> userList;
 
-    /** The global channel, also used to send a private message (PM)  JANE */
-    private ClientChannel globalChannel;
-    
     /** used for communication with the server */
     private SimpleClient client;
     
@@ -136,19 +128,15 @@ public class ChatClient extends JFrame
     /** How many times this client has tried to quit */
     private volatile int quitAttempts = 0;
 
-    /** The mapping between users and names */
-    private final Map<BigInteger, String> userNames =
-        new HashMap<BigInteger, String>();
-
-    /** A {@code JLabel} that is reused as our ListCellRendererComponent */
-    private final JLabel textLabel = new JLabel();
-
     /** The user name for this client's session */
     private String userName;
 
-    /** The client session's id, for communications with the server */
-    private BigInteger clientId;
-
+    /** A map of channel names to their channel frames, so we can update
+     *  membership lists.
+     */
+    private Map<String, ChatChannelFrame> channelMap = 
+            new HashMap<String, ChatChannelFrame>();
+    
     // Constructor
 
     /**
@@ -177,7 +165,7 @@ public class ChatClient extends JFrame
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        userList = new MultiList<BigInteger>(BigInteger.class, this);
+        userList = new MultiList<String>(String.class);
         userList.addMouseListener(getPMMouseListener());
         eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         c.add(eastPanel, BorderLayout.EAST);
@@ -186,27 +174,33 @@ public class ChatClient extends JFrame
         loginButton = new JButton("Login");
         loginButton.setActionCommand("login");
         loginButton.addActionListener(this);
+        loginButton.setToolTipText("Click to log in a new user");
 
         openChannelButton = new JButton("Open Channel");
         openChannelButton.setActionCommand("openChannel");
         openChannelButton.addActionListener(this);
         openChannelButton.setEnabled(false);
+        openChannelButton.setToolTipText("Click to join a channel");
 
-        // JANE this is really like a send to the global channel they've set up.
         serverSendButton = new JButton("Send to Server");
         serverSendButton.setActionCommand("directSend");
         serverSendButton.addActionListener(this);
         serverSendButton.setEnabled(false);
+        serverSendButton.setToolTipText(
+                "Click to send a message directly to the server");
 
-        multiPmButton = new JButton("Send Multi-PM");
-        multiPmButton.setActionCommand("multiPm");
-        multiPmButton.addActionListener(this);
-        multiPmButton.setEnabled(false);
+        pmButton = new JButton("Send PM");
+        pmButton.setActionCommand("sendPM");
+        pmButton.addActionListener(this);
+        pmButton.setEnabled(false);
+        pmButton.setToolTipText(
+                "Click to send a private message to the selected user " + "" +
+                "in main frame, or double-click on the user in the main frame");
 
         buttonPanel.add(loginButton);
         buttonPanel.add(openChannelButton);
         buttonPanel.add(serverSendButton);
-        buttonPanel.add(multiPmButton);
+        buttonPanel.add(pmButton);
 
         addWindowListener(new QuitWindowListener(this));
         setSize(1000, 720);
@@ -233,7 +227,7 @@ public class ChatClient extends JFrame
     
     private void setSessionButtonsEnabled(boolean enable) {
         openChannelButton.setEnabled(enable);
-        multiPmButton.setEnabled(enable);
+        pmButton.setEnabled(enable);
         serverSendButton.setEnabled(enable);
     }
 
@@ -246,17 +240,17 @@ public class ChatClient extends JFrame
 	}
     }
     
+    private void showMessage(String message) {
+        setButtonsEnabled(false);
+        try {
+            JOptionPane.showMessageDialog(this, message);
+        } finally {
+            setButtonsEnabled(true);
+        }
+    }
+    
     MouseListener getPMMouseListener() {
         return pmMouseListener;
-    }
-
-    /**
-     * Returns the id for this client's session.
-     *
-     * @return the id for this client's session
-     */
-    BigInteger getClientId() {
-        return clientId;
     }
 
     // Main window GUI actions
@@ -310,32 +304,31 @@ public class ChatClient extends JFrame
     }
 
     private void doServerMessage() {
-	String message = getUserInput("Enter server message:");
-
-        if (message == null)
-            return;
+	String message = "/ping " + getUserInput("Enter server message:");
 
         try {
-            globalChannel.send(toMessageBuffer(message));
+            client.send(toMessageBuffer(message));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     private void doSinglePrivateMessage() {
-        BigInteger target = userList.getSelected();
+        String target = userList.getSelected();
 	if (target == null) {
+            showMessage("Must select a user in main Chat Test panel");
 	    return;
 	}
-        String input = getUserInput("Enter private message:");
+        String input = getUserInput("Enter private message to " + target + " :");
 
         if ((input == null) || input.matches("^\\s*$")) {
             // Ignore empty message
+            showMessage("Empty message not sent to " + target);
             return;
         }
 
         String message = "/pm " + 
-                         target.toString(16) + " " +
+                         target + " " +
                          input;
         try {
             client.send(toMessageBuffer(message));
@@ -348,6 +341,7 @@ public class ChatClient extends JFrame
 
         if ((channelName == null) || channelName.matches("^\\s*$")) {
             // Ignore empty channel name
+            showMessage("Channel name must be provided.");
             return;
         }
 
@@ -368,79 +362,29 @@ public class ChatClient extends JFrame
         }
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * This implementation renders a {@link ChatUser} using a name
-     * mapping maintained by the client.
-     */
-    public Component getListCellRendererComponent(JList list, Object value,
-            int index, boolean isSelected, boolean cellHasFocus)
-    {
-        BigInteger member = (BigInteger) value;
-        String text = formatChatUser(member);
-        textLabel.setText(text);
-        return textLabel;
+    String getUserName() {
+        return userName;
     }
-
-    /**
-     * Nicely format a {@link ChatUser} for printed display.
-     *
-     * @param member the {@code ChatUser} to format
-     * @return the formatted string
-     */
-    private String formatChatUser(BigInteger member) {
-        String idString = member.toString(16);
-        String name = getSessionName(member);
-        if (name == null) {
-            return idString;
-        }
-        return name + "/" + idString;
-    }
-
-    /**
-     * Returns the user name associated with the given {@link ChatUser},
-     * if any.
-     *
-     * @param s the {@code SessionId} whose name to lookup
-     * @return the name associated with this session, or {@code null}
-     */
-    String getSessionName(BigInteger s) {
-        return userNames.get(s);
-    }
-
+    
     private void userLogin(String memberString) {
         System.err.println("userLogin: " + memberString);
         addUsers(Collections.singleton(memberString));
     }
 
     private void addUsers(Collection<String> members) {
-        List<BigInteger> sessions = new ArrayList<BigInteger>(members.size());
-        for (String member : members) {
-            String[] split = member.split(":", 2);
-            String idString = split[0];
-            BigInteger session = new BigInteger(idString, 16);
-            sessions.add(session);
-            if (split.length > 1) {
-                String memberName = split[1];
-                userNames.put(session, memberName);
-            }
-        }
-        userList.addAllItems(sessions);
+        userList.addAllItems(members);
         userList.invalidate();
         repaint();
     }
 
     private void userLogout(String idString) {
         System.err.println("userLogout: " + idString);
-        BigInteger userId = new BigInteger(idString, 16);
-        userList.removeItem(userId);
-        userNames.remove(userId);
+        userList.removeItem(idString);
 
         // Remove the user from all our ChatChannelFrames 
         for (JInternalFrame frame : desktop.getAllFrames()) {
             if (frame instanceof ChatChannelFrame) {
-                ((ChatChannelFrame) frame).memberLeft(userId);
+                ((ChatChannelFrame) frame).memberLeft(idString);
             }
         }
     }
@@ -452,8 +396,7 @@ public class ChatClient extends JFrame
      */
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        userNames.put(getClientId(), userName);
-        setTitle("Chat Test Client: " + formatChatUser(getClientId()));
+        setTitle("Chat Test Client: " + userName);
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
@@ -488,6 +431,8 @@ public class ChatClient extends JFrame
      * {@inheritDoc}
      */
     public void loginFailed(String reason) {
+        // This will be immediately followed by a disconnected message.
+        showMessage("Login failed (" + reason + ")");
         statusMessage.setText("Status: Login failed (" + reason + ")");
         loginButton.setText("Login");
         loginButton.setActionCommand("login");
@@ -518,9 +463,6 @@ public class ChatClient extends JFrame
             // Clear our member list
             userList.removeAllItems();
 
-            // Clear the session name map
-            userNames.clear();
-
             // Reset the login button
             loginButton.setText("Login");
             loginButton.setActionCommand("login");
@@ -550,11 +492,11 @@ public class ChatClient extends JFrame
     public ClientChannelListener joinedChannel(ClientChannel channel) {
         // ChatClient handles the global channel
         if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
-            globalChannel = channel;
             return this;
         }
         // Other channels are handled by a new ChatChannelFrame
         ChatChannelFrame cframe = new ChatChannelFrame(this, channel);
+        channelMap.put(channel.getName(), cframe);
         desktop.add(cframe);
         desktop.repaint();
         return cframe;
@@ -563,7 +505,7 @@ public class ChatClient extends JFrame
     /**
      * {@inheritDoc}
      * <p>
-     * Handles the direct {@code /pong} reply.
+     * Handles the direct messages.
      */
     public void receivedMessage(ByteBuffer message) {
         String messageString = fromMessageBuffer(message);
@@ -573,10 +515,24 @@ public class ChatClient extends JFrame
 
         if (command.equals("/pong")) {
             System.out.println(args[1]);
-        } else if (command.equals("/loggedIn")) {
-            clientId = new BigInteger(args[1], 16);
         } else if (command.equals("/pm")) {
             pmReceived(args[1]);
+        } else if (command.equals("/members")) {
+            args = args[1].split(" ", 2);
+            for (String a : args) {
+                System.out.println("args ... " + a);
+            }
+            if (args[0].equals(GLOBAL_CHANNEL_NAME)) {
+                List<String> members = Arrays.asList(args[1].split(" "));
+                if (! members.isEmpty()) {
+                    addUsers(members);
+                } 
+            } else {
+                ChatChannelFrame frame = channelMap.get(args[0]);
+                frame.updateMembers(args[1]);
+            }
+        } else if (command.equals("/loginFailed")) {
+            showMessage("Login failed: " + args[1]);
         } else {
             System.err.format("Unknown command: %s\n", messageString);
         }
@@ -613,7 +569,7 @@ public class ChatClient extends JFrame
             e.printStackTrace();
         }
     }
-
+    
     /**
      * Displays a private message from another client in a popup window.
      *
@@ -621,10 +577,9 @@ public class ChatClient extends JFrame
      */
     private void pmReceived(String message) {
         // The sender has been encoded in the msg by the server
-        String[] args = message.split(" ", 2);
-        BigInteger sender = new BigInteger(args[0], 16);
+        String[] args = message.split(" ", 3);
         JOptionPane.showMessageDialog(this,
-            message, "Message from " + formatChatUser(sender),
+            args[2], "Message from " + args[0],
             JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -651,6 +606,8 @@ public class ChatClient extends JFrame
             doOpenChannel();
         } else if (command.equals("directSend")) {
             doServerMessage();
+        } else if (command.equals("sendPM")) {
+            doSinglePrivateMessage();
         } else {
             System.err.format("ChatClient: Error, unknown GUI command [%s]\n",
                     command);

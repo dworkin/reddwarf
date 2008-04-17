@@ -24,9 +24,8 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameNotBoundException;
 
-import java.math.BigInteger;
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -75,24 +74,39 @@ public class ChatApp
      * for the given {@code session}.
      */
     public ClientSessionListener loggedIn(ClientSession session) {
-        logger.log(Level.INFO, "ClientSession joined: {0}", session);
+        logger.log(Level.INFO, "ClientSession logging in: {0}", session);
         // Give the session a binding in the data store
         DataManager dataMgr = AppContext.getDataManager();
-        ManagedReference<ClientSession> sessionRef =
-                dataMgr.createReference(session);
-        String key = sessionIdKey(sessionRef.getId());
-        dataMgr.setBinding(key, session);
+        
+        final String userName = session.getName();
+        String key = sessionIdKey(userName);
+//        dataMgr.setBinding(key, session);
+        try {
+            dataMgr.getBinding(key);
+            // If the name is already used, refuse log in.
+            String reply = "User " + userName + " already logged in";
+            logger.log(Level.WARNING, reply);
+            try {
+            session.send(ChatClientSessionListener.toMessageBuffer(
+                                                   "/loginFailed " + reply));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        } catch (NameNotBoundException e) {
+            dataMgr.setBinding(key, session);
+        }
 
         return new ChatClientSessionListener(session);
     }
     
     /**
-     * Must be called in a transaction.
-     * @param id
-     * @return
+     * Returns the ClientSession with the given name
+     * @param name the user name
+     * @return the ClientSession for the given user name
      */
-    static ClientSession getSessionFromIdString(String id) {
-        String key = sessionIdKey(id);
+    static ClientSession getSessionFromIdString(String name) {
+        String key = sessionIdKey(name);
         return (ClientSession) AppContext.getDataManager().getBinding(key);
     }
 
@@ -104,8 +118,7 @@ public class ChatApp
      */
     static void removeSessionBinding(ClientSession session) {
         DataManager dataMgr = AppContext.getDataManager();
-        dataMgr.removeBinding(
-            sessionIdKey(dataMgr.createReference(session).getId()));
+        dataMgr.removeBinding(sessionIdKey(session.getName()));
     }
 
     /**
@@ -114,11 +127,7 @@ public class ChatApp
      * @param sessionRefId the id for the session
      * @return the data store key for the session
      */
-    private static String sessionIdKey(BigInteger sessionRefId) {
-        return sessionIdKey(sessionRefId.toString(16));
-    }
-    
-    private static String sessionIdKey(String sessionRefId) {
-        return SESSION_PREFIX + sessionRefId;
+    private static String sessionIdKey(String name) {
+        return SESSION_PREFIX + name;
     }
 }

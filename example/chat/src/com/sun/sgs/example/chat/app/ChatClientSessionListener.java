@@ -33,7 +33,6 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
@@ -83,8 +82,6 @@ public class ChatClientSessionListener
      */
     public ChatClientSessionListener(ClientSession session) {
         sessionRef = AppContext.getDataManager().createReference(session);
-        // send a msg to the session to let it know their own id
-        session.send(toMessageBuffer("/loggedIn " + getSessionIdString()));
         addToChannel(GLOBAL_CHANNEL_NAME);
     }
 
@@ -167,24 +164,18 @@ public class ChatClientSessionListener
         }
     }
 
+    /** Returns our ClientSession. */
     private ClientSession session() {
         return sessionRef.get();
     }
 
+    /** Disconnect this session. */
     private void disconnect() {
 	try {
 	    AppContext.getDataManager().removeObject(session());
 	} catch (ObjectNotFoundException e) {
 	    // already disconnected
 	}
-    }
-
-    private String getSessionIdString() {
-        return getIdString(sessionRef);
-    }
-
-    private String getIdString(ManagedReference<?> ref) {
-        return ref.getId().toString(16);
     }
 
     /**
@@ -209,20 +200,14 @@ public class ChatClientSessionListener
             // Create the channel, and save a binding to it.
             channel = 
                 channelMgr.createChannel(channelName, 
-                                         new ChatChannelListener(channelName), 
+                                         new ChatChannelListener(), 
                                          Delivery.RELIABLE);
         }
 
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(channelName);
-        changeMsg.append(' ');
-        changeMsg.append(getSessionIdString());
-        if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
-            changeMsg.append(':');
-            changeMsg.append(session().getName());
-        }
+        changeMsg.append(session().getName());
         channel.send(toMessageBuffer(changeMsg.toString()));
 
         // Now add the joiner and tell it about all the members on
@@ -256,19 +241,13 @@ public class ChatClientSessionListener
             Channel channel = 
                     AppContext.getChannelManager().getChannel(channelName);
             
-	    DataManager dataMgr = AppContext.getDataManager();
             StringBuilder listMessage = new StringBuilder("/members ");
             listMessage.append(channelName);
             Iterator<ClientSession> iter = channel.getSessions();
             while (iter.hasNext()) {
                 ClientSession member = iter.next();
                 listMessage.append(' ');
-                listMessage.append(
-                        getIdString(dataMgr.createReference(member)));
-                if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
-                    listMessage.append(':');
-                    listMessage.append(member.getName());
-                }
+                listMessage.append(member.getName());
             }
             session().send(toMessageBuffer(listMessage.toString()));
 	}
@@ -311,10 +290,9 @@ public class ChatClientSessionListener
         }
 
         // Tell the rest of the channel about the session removal.
-        String changeMessage = "/left " + 
-            channelName + " " +
-            getSessionIdString();
-        channel.send(toMessageBuffer(changeMessage));
+        StringBuilder changeMessage = new StringBuilder("/left ");
+        changeMessage.append(session().getName());
+        channel.send(toMessageBuffer(changeMessage.toString()));
         
         // Schedule a task to check whether the channel is now empty, and if so,
         // close it.  This needs to be done in a separate task to ensure the 
@@ -323,11 +301,15 @@ public class ChatClientSessionListener
                                        new CleanupChannelTask(channelName));
     }
 
+    /**
+     *  A private task to check to see if a channel is empty;  if so,
+     *  remove it.
+     */
     private final class CleanupChannelTask implements Serializable, Task {
         /** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
-	/** The name of the channel who should have its members sent. */ 
+	/** The name of the channel that we'll check. */ 
 	private final String channelName;
 
 	CleanupChannelTask(String  channelName) {
@@ -383,7 +365,7 @@ public class ChatClientSessionListener
         // Need to look up the session from the id
         ClientSession target = ChatApp.getSessionFromIdString(targetId);
         StringBuilder newMsg = new StringBuilder("/pm ");
-        newMsg.append(getSessionIdString());
+        newMsg.append(session().getName());
         newMsg.append(' ');
         newMsg.append(message);
         target.send(toMessageBuffer(newMsg.toString()));
@@ -423,7 +405,9 @@ public class ChatClientSessionListener
     
     /**
      * A listener for the channels.  If this is a chat message (identified
-     * by not having a COMMAND_PREFIX), prepend the sender's id.
+     * by not having a COMMAND_PREFIX), prepend the sender's user name.
+     * While this could be done at the client (the client knows his own name),
+     * using this listener demonstrates how to use a ChannelListener.
      */
     private static class ChatChannelListener 
             implements ChannelListener, Serializable 
@@ -431,37 +415,23 @@ public class ChatClientSessionListener
          /** The version of the serialized form of this class. */
         private static final long serialVersionUID = 1L;
         
-        private final String channelName;
-        
-        public ChatChannelListener(String name) {
-            channelName = name;
-        }
-
         /** {@inheritDoc} */
-        public boolean receivedMessage(ClientSession session, ByteBuffer msg) {
+        public boolean receivedMessage(Channel channel,
+                                       ClientSession session,
+                                       ByteBuffer msg)
+        {
             String message = ChatClientSessionListener.fromMessageBuffer(msg);
             if (message.startsWith(COMMAND_PREFIX)) {      
                 // Just send it along
                 return true;
             }
             // This is a chat message sent on the channel - need to prepend
-            // the sender
-            String sessionId = 
-                AppContext.getDataManager().createReference(session).
-                    getId().toString(16);
+            // the sender.  The processing would typically be more complicated
+            // here - perhaps checking the content of the message, or 
+            // checking permissions of the user.
             ByteBuffer newMsg = ChatClientSessionListener.toMessageBuffer(
-                    sessionId + " " + message);
-            ChannelManager channelMgr = AppContext.getChannelManager();
-            try {
-                Channel channel = channelMgr.getChannel(channelName);
-                channel.send(newMsg);
-            } catch (NameNotBoundException e) {
-                // The channel has been closed, do nothing
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE, 
-                            "Channel {0} was not found", channelName);
-                }
-            }
+                    session.getName() + " " + message);
+            channel.send(newMsg);
             return false;
         }
     }

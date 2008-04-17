@@ -25,8 +25,9 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -60,7 +61,7 @@ public class ChatChannelFrame extends JInternalFrame
     private final ClientChannel myChannel;
 
     /** The {@code MultiList} containing this channel's members. */
-    private final MultiList<BigInteger> multiList;
+    private final MultiList<String> multiList;
 
     /** The input field. */
     private final JTextField inputField;
@@ -73,7 +74,7 @@ public class ChatChannelFrame extends JInternalFrame
      * channel.
      *
      * @param client the parent {@code ChatClient} of this frame.
-     * @param channelName the channel that this class will manage.
+     * @param channel the channel that this class will manage.
      */
     public ChatChannelFrame(ChatClient client, ClientChannel channel) {
         super("Channel: " + channel.getName());
@@ -85,7 +86,7 @@ public class ChatChannelFrame extends JInternalFrame
         eastPanel.setLayout(new BorderLayout());
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        multiList = new MultiList<BigInteger>(BigInteger.class, client);
+        multiList = new MultiList<String>(String.class);
         multiList.addMouseListener(myChatClient.getPMMouseListener());
         eastPanel.add(new JScrollPane(multiList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
@@ -116,23 +117,19 @@ public class ChatChannelFrame extends JInternalFrame
             String command = args[0];
 
             if (command.equals("/joined")) {
-                BigInteger memberId = new BigInteger(args[1], 16);
-                multiList.addItem(memberId);
+                multiList.addItem(args[1]);
             } else if (command.equals("/left")) {
-                BigInteger memberId = new BigInteger(args[1], 16);
-                memberLeft(memberId);
+                memberLeft(args[1]);
             } else if (command.equals("/members")) {
                 String[] members = args[1].split("\\s+");
                 for (String member : members) {
-                    BigInteger memberId = new BigInteger(member, 16);
-                    multiList.addItem(memberId);
+                    multiList.addItem(member);
                 }
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
             } else {
-                BigInteger memberId = new BigInteger(command, 16);
                 outputArea.append(String.format("%s: %s\n",
-                        myChatClient.getSessionName(memberId), args[1]));
+                        command, args[1]));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -152,11 +149,22 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
+     * Updates teh channel list with the initial members.
+     */
+    void updateMembers(String members) {
+        List<String> memberList = Arrays.asList(members.split("\\s+"));
+        if (! memberList.isEmpty()) {
+            multiList.addAllItems(memberList);
+            multiList.invalidate();
+            repaint();
+        } 
+    }
+    /**
      * Updates the channel list when a member leaves.
      *
      * @param member the member who left this channel
      */
-    void memberLeft(BigInteger member) {
+    void memberLeft(String member) {
         multiList.removeItem(member);        
     }
 
