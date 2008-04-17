@@ -51,9 +51,6 @@ public class HelloChannels
 
     /**
      * Channel names for this example.
-     * 
-     * <b>Note:</b> these must correspond to the channel names used
-     * by the lesson 2 client tutorial.
      */
     public static final String[] channelNames = new String[] {
         "Foo", "Bar"
@@ -67,12 +64,8 @@ public class HelloChannels
      */
     public void initialize(Properties props) {
         ChannelManager channelMgr = AppContext.getChannelManager();
-        DataManager dataMgr = AppContext.getDataManager();
-
         for (String channelName : channelNames) {
-            // Create a channel and bind it to a name in the data store.
-            Channel channel = channelMgr.createChannel(Delivery.RELIABLE);
-            dataMgr.setBinding(channelName, channel);
+            channelMgr.createChannel(channelName, null, Delivery.RELIABLE);
         }
     }
 

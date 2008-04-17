@@ -27,11 +27,11 @@ import java.util.logging.Logger;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameNotBoundException;
 
 /**
  * Simple example {@link ClientSessionListener} for the Project Darkstar
@@ -71,8 +71,9 @@ class HelloChannelsSessionListener
         sessionRef = dataMgr.createReference(session);
         
         // Join the session to all channels
+        ChannelManager channelMgr = AppContext.getChannelManager();
         for (String channelName : HelloChannels.channelNames) {
-            Channel channel = findChannel(channelName);
+            Channel channel = channelMgr.getChannel(channelName);
             channel.join(session);
         }
     }
@@ -99,72 +100,9 @@ class HelloChannelsSessionListener
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Message from {0}", sessionName);
         }
-
-        String text = decodeString(message);
-
-        if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER,
-                       "{0} sends: {1}",
-                       new Object[] { sessionName, text });
-        }
-
-        String[] args = text.split(" ", 2);
-        
-        if (args.length < 2) {
-            logger.log(Level.WARNING,
-                       "Malformed message from {0}",
-                       sessionName);
-            return;
-        }
-
-        String channelName = args[0];
-        String contents = args[1];
-        if (channelName.charAt(0) == '*') {
-            // Direct message; print it and echo back
-            logger.log(Level.FINE, "Server echo to {0}", sessionName);
-
-            // Echo original message back to sender
-            message.rewind();
-            session.send(message);
-        } else {
-            // Channel message; broadcast to the correct channel
-
-            try {
-                logger.log(Level.FINE,
-                           "Server broadcast on {0}", channelName);
-
-                // Find the channel
-                Channel channel = findChannel(channelName);
-
-                // Construct the outbound message with
-                // the sender and channel names prepended.
-                String reply = "[" + sessionName +
-                               "@" + channelName +
-                               "] " + contents;
-
-                // Broadcast the message
-                channel.send(encodeString(reply));
-
-            } catch (NameNotBoundException e) {
-                logger.log(Level.WARNING,
-                           "Channel '{0}' not found",
-                           channelName);
-            }
-        }
+        session.send(message);
     }
     
-    /**
-     * Return the channel with the given name.
-     * @param channelName the name of the channel
-     * 
-     * @return the channel with the given name
-     * @throws NameNotBoundException if the channel does not exist
-     */
-    private static Channel findChannel(String channelName) {
-        DataManager dataMgr = AppContext.getDataManager();
-        return (Channel) dataMgr.getBinding(channelName);
-    }
-
     /**
      * {@inheritDoc}
      * <p>
