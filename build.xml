@@ -473,7 +473,8 @@
     <copy todir="${build.dir}/sgs-src">
       <fileset dir="."
 	       excludes="**/.svn"
-	       includes="build.xml,
+	       includes="analysis/**,
+			 build.xml,
 			 doc/ServerAppTutorial.*,
 			 etc/jdk5.0_package_list/**,
 			 etc/mina1.1_package_list/**,
@@ -488,6 +489,12 @@
 			 test/shared/**,
 			 test/server/**"/>
     </copy>
+    <apply executable="${ruby}" logError="true">
+      <arg file="etc/strip_javadoc"/>
+      <fileset dir="${build.dir}/sgs-src"
+               includes="src/server/j2se/com/sun/sgs/nio/channels/*.java,
+                         src/server/j2se/com/sun/sgs/nio/channels/spi/*.java"/>
+    </apply>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
