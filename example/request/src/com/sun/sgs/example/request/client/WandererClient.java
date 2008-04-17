@@ -53,6 +53,9 @@ import java.util.logging.Logger;
  *	{@code RequestApp} application
  * <li> {@code com.sun.sgs.example.request.client.wanderer.clients} - The
  *	number of clients run by {@code main}, defaults to {@code 10}
+ * <li> {@code com.sun.sgs.example.request.client.wanderer.backlog} - The
+ *	maximum message backlog per client before the client throttles, or
+ *	{@code -1} to do no throttling.
  * <li> {@code com.sun.sgs.example.request.client.wanderer.sleep} - The number
  *	of milliseconds to wait between steps, defaults to {@code 200}
  * <li> {@code com.sun.sgs.example.request.client.wanderer.size} - The width
@@ -61,7 +64,7 @@ import java.util.logging.Logger;
  *	of the neighborhood to assign to a single channel for movement
  *	notifications, defaults to {@code 100}
  * <li> {@code com.sun.sgs.example.request.client.wanderer.report} - The number
- *	of seconds between logging performance data, defaults to {@code 5}
+ *	of seconds between logging performance data, defaults to {@code 20}
  * </ul> <p>
  *
  * This class uses the {@link Logger} named {@code
@@ -91,6 +94,13 @@ public class WandererClient implements Runnable, SimpleClientListener {
     private static final int CLIENTS =
 	Integer.getInteger(PREFIX + ".clients", 10);
 
+    /**
+     * The maximum message backlog per client before the client throttles, or
+     * -1 to do no throttling.
+     */
+    private static final int BACKLOG =
+	Integer.getInteger(PREFIX + ".backlog", 10);
+
     /** The number of milliseconds to sleep between steps. */
     private static final int SLEEP =
 	Integer.getInteger(PREFIX + ".sleep", 200);
@@ -112,7 +122,7 @@ public class WandererClient implements Runnable, SimpleClientListener {
 
     /** The number of seconds between logging performance data. */
     private static final int REPORT =
-	Integer.getInteger(PREFIX + ".report", 5);
+	Integer.getInteger(PREFIX + ".report", 20);
 
     /**
      * The minimum number of milliseconds to wait for a login attempt to
@@ -167,6 +177,21 @@ public class WandererClient implements Runnable, SimpleClientListener {
     /** True if this client is not logged in. */
     private boolean disconnected = true;
 
+    /** True if this client logged in. */
+    private boolean login = false;
+
+    /**
+     * The number of GetItem messages that have been sent and for which replies
+     * have not been received.
+     */
+    private int backlog = 0;
+
+    /**
+     * The number of times that the client has throttled itself because the
+     * backlog has gotten too large.
+     */
+    private int throttled = 0;
+
     /**
      * The name of the current sector or null if not a member of a sector
      * channel yet.
@@ -185,6 +210,7 @@ public class WandererClient implements Runnable, SimpleClientListener {
 		       "\n  host: " + HOST +
 		       "\n  port: " + PORT +
 		       "\n  clients: " + CLIENTS +
+		       "\n  backlog: " + BACKLOG +
 		       "\n  sleep: " + (SLEEP - RANDOM) + "-" +
 		       (SLEEP + RANDOM) + " ms" +
 		       "\n  size: " + SIZE +
@@ -195,12 +221,17 @@ public class WandererClient implements Runnable, SimpleClientListener {
 	for (int i = 0; i < CLIENTS; i++) {
 	    clients[i] = new WandererClient();
 	}
-	long interval = REPORT * 1000;
-	long start = System.currentTimeMillis();
+	long until = System.currentTimeMillis() + (REPORT * 1000);
+	/* Round to a multiple of the report interval */
+	until -= until % (REPORT * 1000);
 	while (true) {
-	    try {
-		Thread.sleep(interval);
-	    } catch (InterruptedException e) {
+	    long now = System.currentTimeMillis();
+	    if (now < until) {
+		try {
+		    Thread.sleep(until - now);
+		} catch (InterruptedException e) {
+		}
+		continue;
 	    }
 	    Stats stats = new Stats();
 	    for (WandererClient client : clients) {
@@ -209,6 +240,7 @@ public class WandererClient implements Runnable, SimpleClientListener {
 	    if (logger.isLoggable(Level.INFO)) {
 		logger.log(Level.INFO, stats.report());
 	    }
+	    until += (REPORT * 1000);
 	}
     }
 
@@ -232,8 +264,15 @@ public class WandererClient implements Runnable, SimpleClientListener {
 		login();
 	    }
 	    try {
+		boolean storePosition = (i % 5 == 0);
+		if (!storePosition) {
+		    synchronized (this) {
+			/* Note GetItem requests */
+			backlog++;
+		    }
+		}
 		send(move() + "\n" +
-		     ((i % 5 == 0) ? storePosition() : getPosition()));
+		     (storePosition ? storePosition() : getPosition()));
 		sleep();
 	    } catch (Exception e) {
 		noteFailing();
@@ -277,6 +316,7 @@ public class WandererClient implements Runnable, SimpleClientListener {
             logger.log(Level.FINE,
                        user + ": Login failed: " + reason);
         }
+	noteFailing();
     }
 
     /* -- Implement ServerSessionListener -- */
@@ -284,6 +324,14 @@ public class WandererClient implements Runnable, SimpleClientListener {
     /** {@inheritDoc} */
     public void receivedMessage(ByteBuffer message) {
         String string = bufferToString(message);
+	if (string.startsWith("GetItem ")) {
+	    synchronized (this) {
+		backlog--;
+		if (backlog < (BACKLOG / 2)) {
+		    notifyAll();
+		}
+	    }
+	}
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER, user + ": Received: " + string);
         }
@@ -423,6 +471,16 @@ public class WandererClient implements Runnable, SimpleClientListener {
     private void sleep() throws InterruptedException {
 	int n = SLEEP - RANDOM + random.nextInt(2 * RANDOM);
 	Thread.sleep(n);
+	if (BACKLOG >= 0) {
+	    synchronized (this) {
+		if (backlog > BACKLOG) {
+		    throttled++;
+		    do {
+			wait();
+		    } while (backlog > BACKLOG / 2);
+		}
+	    }
+	}
     }
 
     /** Sends a message to the server. */
@@ -449,6 +507,7 @@ public class WandererClient implements Runnable, SimpleClientListener {
 	active = true;
 	failing = false;
 	disconnected = false;
+	login = true;
 	notifyAll();
     }
 
@@ -483,6 +542,11 @@ public class WandererClient implements Runnable, SimpleClientListener {
 	if (failing) { stats.failing++; }
 	failing = false;
 	if (disconnected) { stats.disconnected++; }
+	if (login) { stats.logins++; }
+	login = false;
+	stats.backlog += backlog;
+	stats.throttled += throttled;
+	throttled = 0;
     }
 
     /** Converts a byte buffer into a string using UTF-8 encoding. */
@@ -525,16 +589,28 @@ public class WandererClient implements Runnable, SimpleClientListener {
 	/** Clients disconnected and in the processing of connecting. */
 	private int disconnected = 0;
 
+	/** Clients that logged in. */
+	private int logins = 0;
+
+	/** Number of GetItem messages that have not been acknowledged. */
+	private int backlog = 0;
+
+	/** Number of times clients have throttled. */
+	private int throttled = 0;
+
 	/** Creates an empty instance. */
 	Stats() { }
 
 	/** Returns a string that describes the client statistics. */
 	String report() {
 	    return "sent/sec=" + (sent / REPORT) +
-		" received/sec=" + (received / REPORT) +
+		" rcv/sec=" + (received / REPORT) +
 		" active=" + active +
-		" failing=" + failing +
-		" disconnected=" + disconnected;
+		(failing > 0 ? " failing=" + failing : "") +
+		(disconnected > 0 ? " disconnected=" + disconnected : "") +
+		(logins > 0 ? " login=" + logins : "") +
+		(backlog > 0 ? " backlog=" + backlog : "") +
+		(throttled > 0 ? " throttle=" + throttled : "");
 	}
     }
 }
