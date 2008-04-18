@@ -26,9 +26,9 @@ import java.util.logging.LogManager;
 import java.util.logging.LogRecord;
 
 /**
- * Defines a logging {@code Formatter} that supports a more compact time format
- * that includes milliseconds, permits the time format to be customized, and
- * allows not printing stack traces for exceptions. <p>
+ * Defines a logging {@code Formatter} that uses a compact date and time format
+ * that includes milliseconds, permits the date and time format to be
+ * customized, and allows suppressing stack traces for exceptions. <p>
  *
  * This class recognizes the following {@link LogManager} configuration
  * properties:
@@ -40,8 +40,8 @@ import java.util.logging.LogRecord;
  *
  * <dd style="padding-top: .5em">
  *	Specifies the format string that will be used in a call to {@link
- *	Formatter#format Formatter.format} to display the time of a logging
- *	call.  The argument to the format call will be a {@code long}
+ *	Formatter#format Formatter.format} to display the date and time of a
+ *	logging call.  The argument to the format call will be a {@code long}
  *	representing the current time in milliseconds.  The default prints the
  *	time in the format {@code 2008-02-14 11:52:59.679}. <p>
  *
@@ -49,20 +49,20 @@ import java.util.logging.LogRecord;
  *	<i>Default:</i> {@code true}
  *
  * <dd style="padding-top: .5em">
- *	Specifies whether to print stack traces when logging a thrown
- *	exception.
+ *	Specifies whether to print stack traces when formatting a log record
+ *	that contains an exception.
  *
  * </dl> <p>
  *
- * For example, to use this class to format logging output to the console to
- * print the time in milliseconds and not include stack traces, put the
- * following text in the logging configuration file:
+ * For example, to use this class to format logging output to the console so
+ * that it prints the time in milliseconds since the epoch and does not include
+ * stack traces, put the following text in the logging configuration file:
  *
  * <pre>
  *   .level = INFO
  *   handlers = java.util.logging.ConsoleHandler
  *   java.util.logging.ConsoleHandler.formatter = com.sun.sgs.impl.sharedutil.logging.LogFormatter
- *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.time.format = %ts
+ *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.time.format = %tQ
  *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.print.stack = false
  * </pre>
  */
@@ -94,7 +94,7 @@ public class LogFormatter extends java.util.logging.Formatter {
 	String value = logManager.getProperty(TIME_FORMAT_PROPERTY);
 	timeFormat = (value != null) ? value : DEFAULT_TIME_FORMAT;
 	value = logManager.getProperty(PRINT_STACK_PROPERTY);
-	printStack = (value != null) && Boolean.parseBoolean(value);
+	printStack = (value == null) || Boolean.parseBoolean(value);
     }
 
     /* -- Implement java.util.logging.Formatter -- */
@@ -102,14 +102,14 @@ public class LogFormatter extends java.util.logging.Formatter {
     /** {@inheritDoc} */
     public String format(LogRecord record) {
 	Formatter formatter = new Formatter();
-	formatter.format(timeFormat + ": ", record.getMillis());
+	formatter.format(timeFormat, record.getMillis());
 	if (record.getSourceClassName() != null) {	
-	    formatter.format("%s", record.getSourceClassName());
+	    formatter.format(": %s", record.getSourceClassName());
+	    if (record.getSourceMethodName() != null) {	
+		formatter.format(".%s", record.getSourceMethodName());
+	    }
 	} else {
-	    formatter.format("%s", record.getLoggerName());
-	}
-	if (record.getSourceMethodName() != null) {	
-	    formatter.format(".%s", record.getSourceMethodName());
+	    formatter.format(": %s", record.getLoggerName());
 	}
 	formatter.format("%n%s: %s%n",
 			 record.getLevel().getLocalizedName(),

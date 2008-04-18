@@ -22,6 +22,7 @@ package com.sun.sgs.impl.sharedutil.logging;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.logging.Level;
@@ -41,7 +42,10 @@ import java.util.logging.LogManager;
  *	<i>Default:</i> {@code
  *			file://localhost/${java.home}/lib/logging.properties}
  * <dd style="padding-top: .5em">
- *	Specifies the URL for the logging configuration. <p>
+ *	Specifies the URL for the logging configuration.  The URL is parsed
+ *	using the context {@code file://localhost/}, so the value will be
+ *	parsed correctly as a file on the local host if specified with forward
+ *	slashes. <p>
  *
  * <dt> <i>Property:</i> <b>{@value #RESAMPLE_INTERVAL_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #RESAMPLE_INTERVAL_DEFAULT}
@@ -52,18 +56,38 @@ import java.util.logging.LogManager;
  *
  * </dl> <p>
  *
- * You can use this class by specifying its class name as the value of the
- * {@code config} property, as documented by the {@link LogManager} class.  For
- * example, to use this class to obtain the logging configuration from a URL
- * and notice changes every 10 seconds, put the following text in the logging
- * configuration file:
+ * You can use this class by specifying its class name either as the value of
+ * the {@code config} logging property, or as the value of the {@code
+ * java.util.logging.config.class} system property, as documented by the {@link
+ * LogManager} class.  You need to specify the system property if you want to
+ * use a URL for the logging configuration file. <p>
+ *
+ * For example, to use this class to check for changes to the configuration
+ * every 10 seconds, put the following text in the logging configuration file:
  *
  * <pre>
  *   .level = INFO
  *   handlers = java.util.logging.ConsoleHandler
  *   config = com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration
  *   com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration.interval = 10000
+ * </pre> <p>
+ *
+ * To specify the location of the logging configuration file using the HTTP URL
+ * {@code http://myhost/logging.config}, put the following two system property
+ * settings on the command line:
+ *
+ * <pre>
+ *   -Djava.util.logging.config.class=com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration
+ *   -Djava.util.logging.config.file=http://myhost/logging.config
  * </pre>
+ *
+ * This class uses the {@link Logger} named {@code
+ * com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration} to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#INFO INFO} - Rereading the configuration file
+ * </ul>
  */
 public class ResamplingUrlLogConfiguration {
 
@@ -87,12 +111,22 @@ public class ResamplingUrlLogConfiguration {
     /** The default resample interval. */
     public static final long RESAMPLE_INTERVAL_DEFAULT = 30000;
 
+    /** The context for parsing the configuration file URL. */
+    private static final URL configFileContext;
+    static {
+	try {
+	    configFileContext = new URL("file://localhost/");
+	} catch (MalformedURLException e) {
+	    throw new ExceptionInInitializerError(e);
+	}
+    }
+
     /** Lock for setting the initialized field. */
     private static final Object lock = new Object();
 
     /**
-     * Set to true during initialization, to avoid recursion and to insure that
-     * only one thread is created to resample the configuration.
+     * Set to true by the constructor to insure that only one thread is created
+     * to resample the configuration.
      */
     private static boolean initialized;
 
@@ -108,11 +142,7 @@ public class ResamplingUrlLogConfiguration {
     /** The last exception printed, or null. */
     private static String lastException = null;
 
-    /**
-     * Creates an instance of this class, which reads the logging configuration
-     * and starts a thread to reread it periodically if the configuration
-     * changes.
-     */
+    /** * Creates an instance of this class. */
     public ResamplingUrlLogConfiguration() {
 	synchronized (lock) {
 	    if (initialized) {
@@ -134,7 +164,10 @@ public class ResamplingUrlLogConfiguration {
 	}
     }
 
-    /** Checks the configuration and rereads it if it changes. */
+    /**
+     * Runs a thread that checks the configuration and rereads it if it
+     * changes.
+     */
     private static void resampleLoop() {
 	Thread t = new Thread(
 	    new Runnable() {
@@ -167,7 +200,7 @@ public class ResamplingUrlLogConfiguration {
 	try {
 	    String configFile = System.getProperty(
 		CONFIG_FILE_PROPERTY, CONFIG_FILE_DEFAULT);
-	    URL url = new URL(new URL("file://localhost/"), configFile);
+	    URL url = new URL(configFileContext, configFile);
 	    URLConnection connection = url.openConnection();
 	    connection.setUseCaches(false);
 	    connection.connect();
