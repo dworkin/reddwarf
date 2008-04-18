@@ -1,0 +1,71 @@
+#!/usr/bin/ruby
+# Strips Javadoc from the Java files specified on the
+# command line. Javadoc comments are those bracketed by "/** ... */"
+# Strips both single- and multi-line Javadoc comments. End of line "//" and
+# non-Javadoc comments "/* ... */" are not stripped.
+#
+# WARNING: This script is not meant to be general purpose and has several
+# serious limitations:
+#   - It will strip the entire line of Javadoc even it there is code present
+#     on that line (either before or after the comment)
+#   - It will not properly handle the case of the characters '/**' appearing
+#     in a quoted string. Such a line will be treated as a start of a comment.
+#
+
+S_SEEK_COMMENT_START = 1
+S_SEEK_COMMENT_END   = 2
+
+def process(input, output)
+    changed = false
+    state = S_SEEK_COMMENT_START
+    input.each_line do |line|
+	if state == S_SEEK_COMMENT_START
+	    if line =~ /^.*\/\*\*.*\*\/.*$/
+		changed = true                   # single-line comment
+	    elsif line =~ /^.*\/\*\*.*$/
+		changed = true
+		state = S_SEEK_COMMENT_END
+	    else
+		output.puts line
+	    end
+	elsif state == S_SEEK_COMMENT_END
+	    if line =~ /.*\*\/.*$/
+		changed = true
+		state = S_SEEK_COMMENT_START
+	    else
+		changed = true
+		# Consume comment lines
+	    end
+	end
+    end
+    if state == S_SEEK_COMMENT_END
+        STDERR.puts "#{$ARG}: WARNING Bad input file, comment not closed"
+    end
+    return changed
+end
+
+def process_file(filename)
+    $ARG = filename
+    changed = false
+    backup_filename = filename + '~'
+    File.rename(filename, backup_filename)
+    File.open(filename, "w") do |outfile|
+	File.open(backup_filename, "r") do |infile|
+	    changed = process(infile, outfile)
+	end
+    end
+    File.unlink(backup_filename) unless changed
+end
+
+
+# main
+
+ARGV.each do |filename|
+    next if filename =~ /\/\.svn\//
+    unless File.readable?(filename)
+	STDERR.puts "Can't read #{filename}, skipping"
+	next
+    end
+
+    process_file(filename)
+end

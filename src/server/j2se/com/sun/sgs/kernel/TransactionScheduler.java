@@ -168,6 +168,9 @@ public interface TransactionScheduler {
      * is because the system does not support nested transactions, and so
      * the decision to commit or re-try is left to the active transaction.
      *
+     * @param task the {@code KernelRunnable} to execute
+     * @param owner the entity on who's behalf this task is run
+     *
      * @throws TaskRejectedException if the given task is not accepted
      * @throws InterruptedException if the calling thread is interrupted and
      *                              the associated task does not complete
