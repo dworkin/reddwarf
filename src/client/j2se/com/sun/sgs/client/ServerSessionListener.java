@@ -55,8 +55,8 @@ public interface ServerSessionListener {
 
     /**
      * Notifies this listener that its associated client has joined the
-     * specified {@code channel}, and returns a {@link ClientChannelListener}
-     * for that channel.
+     * specified {@code channel}, and returns a non-{@code null}
+     * {@link ClientChannelListener} for that channel.
      * <p>
      * When a message is received on the specified channel, the returned
      * listener's {@link ClientChannelListener#receivedMessage
@@ -71,7 +71,7 @@ public interface ServerSessionListener {
      * the specified channel.
      * 
      * @param channel a channel
-     * @return a listener for the specified channel
+     * @return a non-{@code null} listener for the specified channel
      */
     ClientChannelListener joinedChannel(ClientChannel channel);
     
@@ -105,11 +105,16 @@ public interface ServerSessionListener {
     /**
      * Notifies this listener that the associated server session is
      * disconnected.
-     * <p>
-     * If {@code graceful} is {@code true}, the disconnection
+     *
+     * <p>If {@code graceful} is {@code true}, the disconnection
      * was due to the associated client gracefully logging out; otherwise,
      * the disconnection was due to other circumstances, such as forced
      * disconnection.
+     *
+     * <p>Before this method is invoked, it is guaranteed that the listeners
+     * of all {@code ClientChannel}s with this session as a member will
+     * have their {@link ClientChannelListener#leftChannel leftChannel}
+     * methods invoked.
      *
      * @param graceful {@code true} if disconnection was due to the
      *        associated client gracefully logging out, and

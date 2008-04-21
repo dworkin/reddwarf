@@ -48,7 +48,7 @@ import java.nio.ByteBuffer;
  * {@link ClientChannelListener#receivedMessage receivedMessage} method is
  * invoked with the channel and the message.  The listener <i>is</i>
  * notified of messages that its client sends on its associated channel;
- * that is a sender receives its own broadcasts.</li>
+ * that is, a sender receives its own broadcasts.</li>
  * <li> When the associated client leaves a channel, the listener's
  * {@link ClientChannelListener#leftChannel leftChannel} method is invoked
  * with the channel. Once a client has been removed from a channel, that
@@ -76,7 +76,7 @@ public interface ClientChannelListener {
      * the specified {@code channel}. The associated client can no longer
      * send messages on the specified {@code channel}.
      * 
-     * @param channel a client chanel
+     * @param channel a client channel
      */
     void leftChannel(ClientChannel channel);
 }

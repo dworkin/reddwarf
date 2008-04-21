@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.channel;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -29,6 +30,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -39,6 +41,7 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -316,8 +319,8 @@ public final class ChannelServiceImpl
 				 Delivery delivery)
     {
 	try {
-	    Channel channel =
-	        ChannelImpl.newInstance(delivery, writeBufferSize);
+	    Channel channel = ChannelImpl.newInstance(
+		name, listener, delivery, writeBufferSize);
 	    return channel;
 	    
 	} catch (RuntimeException e) {
@@ -328,7 +331,32 @@ public final class ChannelServiceImpl
 
     /** {@inheritDoc} */
     public Channel getChannel(String name) {
-	throw new AssertionError("not implemented");
+	try {
+	    return ChannelImpl.getInstance(name);
+	    
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "getChannel:{0} throws");
+	    throw e;
+	}
+    }
+
+    /* -- Public methods -- */
+
+    /**
+     * Handles a channel {@code message} that the specified {@code session}
+     * is sending on the channel with the specified {@code channelRefId}.
+     * This method is invoked from the {@code ClientSessionHandler} of the
+     * given session, when it receives a {@code CHANNEL_MESSAGE} protocol
+     * message.  This method must be called from within a transaction. <p>
+     *
+     * @param	channelRefId the channel ID, as a {@code BigInteger}
+     * @param	session the client session sending the channel message
+     * @param	message the channel message
+     */
+    public void handleChannelMessage(
+	BigInteger channelRefId, ClientSession session, ByteBuffer message)
+    {
+	ChannelImpl.handleChannelMessage(channelRefId, session, message);
     }
 
     /* -- Implement ChannelServer -- */
@@ -377,9 +405,11 @@ public final class ChannelServiceImpl
 	 *
 	 * Reads the local membership list for the specified
 	 * {@code channelId}, and updates the local membership cache
-	 * for that channel.
+	 * for that channel.  If any join or leave notifications were
+	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
+	 * protocol message to the effected session(s).
 	 */
-	public void refresh(byte[] channelId) {
+	public void refresh(String name, byte[] channelId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
@@ -410,8 +440,60 @@ public final class ChannelServiceImpl
 			   HexDumper.toHexString(sessionRefId.toByteArray()));
 		    }
 		}
-		localChannelMembersMap.put(channelRefId, newLocalMembers);
-		
+
+		/*
+		 * Determine which join and leave events were missed and
+		 * send protocol messages to clients accordingly.
+		 */
+		Set<BigInteger> oldLocalMembers =
+		    localChannelMembersMap.put(channelRefId, newLocalMembers);
+		Set<BigInteger> joiners = null;
+		Set<BigInteger> leavers = null;
+		if (oldLocalMembers == null) {
+		    joiners = newLocalMembers;
+		} else {
+		    for (BigInteger sessionRefId : newLocalMembers) {
+			if (oldLocalMembers.contains(sessionRefId)) {
+			    oldLocalMembers.remove(sessionRefId);
+			} else {
+			    if (joiners == null) {
+				joiners = new HashSet<BigInteger>();
+			    }
+			    joiners.add(sessionRefId);
+			}
+		    }
+		    if (! oldLocalMembers.isEmpty()) {
+			leavers = oldLocalMembers;
+		    }
+		}
+		if (joiners != null) {
+		    for (BigInteger sessionRefId : joiners) {
+			MessageBuffer msg =
+			    new MessageBuffer(1 +
+				MessageBuffer.getSize(name) +
+					      channelId.length);
+			msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
+			    putString(name).
+			    putBytes(channelId);
+			sessionService.sendProtocolMessageNonTransactional(
+ 		    	    sessionRefId,
+			    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
+			    Delivery.RELIABLE);
+		    }
+		}
+		if (leavers != null) {
+		    for (BigInteger sessionRefId : leavers) {
+			ByteBuffer msg =
+			    ByteBuffer.allocate(1 + channelId.length);
+			msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
+			    put(channelId).
+			    flip();
+			sessionService.sendProtocolMessageNonTransactional(
+			    sessionRefId, msg.asReadOnlyBuffer(),
+			    Delivery.RELIABLE);
+		    }
+		}
+
 	    } finally {
 		callFinished();
 	    }
@@ -420,9 +502,11 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Adds the specified {@code sessionId} to the per-channel cache
-	 * for the given channel's local member sessions.
+	 * for the given channel's local member sessions, and sends a
+	 * CHANNEL_JOIN protocol message to the session with the corresponding
+	 * {@code sessionId}.
 	 */
-	public void join(byte[] channelId, byte[] sessionId) {
+	public void join(String name, byte[] channelId, byte[] sessionId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -442,7 +526,19 @@ public final class ChannelServiceImpl
 			localMembers = newLocalMembers;
 		    }
 		}
-		localMembers.add(new BigInteger(1, sessionId));
+		BigInteger sessionRefId = new BigInteger(1, sessionId);
+		localMembers.add(sessionRefId);
+		MessageBuffer msg =
+		    new MessageBuffer(1 +
+			MessageBuffer.getSize(name) +
+			channelId.length);
+		msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
+		    putString(name).
+		    putBytes(channelId);
+		sessionService.sendProtocolMessageNonTransactional(
+ 		    sessionRefId,
+		    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
+		    Delivery.RELIABLE);
 
 	    } finally {
 		callFinished();
@@ -452,7 +548,9 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Removes the specified {@code sessionId} from the per-channel
-	 * cache for the given channel's local member sessions.
+	 * cache for the given channel's local member sessions, and sends a
+	 * CHANNEL_LEAVE protocol message to the session with the corresponding
+	 * {@code sessionId}.
 	 */
 	public void leave(byte[] channelId, byte[] sessionId) {
 	    callStarted();
@@ -469,7 +567,14 @@ public final class ChannelServiceImpl
 		if (localMembers == null) {
 		    return;
 		}
-		localMembers.remove(new BigInteger(1, sessionId));
+		BigInteger sessionRefId = new BigInteger(1, sessionId);
+		localMembers.remove(sessionRefId);
+		ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
+		msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
+		    put(channelId).
+		    flip();
+		sessionService.sendProtocolMessageNonTransactional(
+		    sessionRefId, msg.asReadOnlyBuffer(), Delivery.RELIABLE);
 		
 	    } finally {
 		callFinished();
@@ -478,7 +583,8 @@ public final class ChannelServiceImpl
 
 	/** {@inheritDoc}
 	 *
-	 * Removes all session IDs from the per-channel cache for the given
+	 * Removes the channel from the per-channel cache of local member
+	 * sessions, and sends a CHANNEL_LEAVE protocol message to the
 	 * channel's local member sessions.
 	 */
 	public void leaveAll(byte[] channelId) {
@@ -490,12 +596,18 @@ public final class ChannelServiceImpl
 		}
 		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers;
-		localMembers = localChannelMembersMap.get(channelRefId);
-		if (localMembers == null) {
-		    return;
+		localMembers = localChannelMembersMap.remove(channelRefId);
+		if (localMembers != null) {
+		    ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
+		    msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
+			put(channelId).
+			flip();
+		    for (BigInteger sessionRefId : localMembers) {
+			sessionService.sendProtocolMessageNonTransactional(
+			    sessionRefId, msg.asReadOnlyBuffer(),
+			    Delivery.RELIABLE);
+		    }
 		}
-		// TBD: remove the entry instead of clearing the membership?
-		localMembers.clear();
 		
 	    } finally {
 		callFinished();
@@ -534,10 +646,17 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
-		ByteBuffer buf = ByteBuffer.wrap(message);
+		ByteBuffer msg =
+		    ByteBuffer.allocate(3 + channelId.length + message.length);
+		msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
+		   .putShort((short) channelId.length)
+		   .put(channelId)
+		   .put(message)
+		   .flip();
+		
 		for (BigInteger sessionRefId : localMembers) {
 		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, buf.asReadOnlyBuffer(),
+ 			sessionRefId, msg.asReadOnlyBuffer(),
 			Delivery.RELIABLE);
 		}
 
