@@ -519,9 +519,6 @@ public class ChatClient extends JFrame
             pmReceived(args[1]);
         } else if (command.equals("/members")) {
             args = args[1].split(" ", 2);
-            for (String a : args) {
-                System.out.println("args ... " + a);
-            }
             if (args[0].equals(GLOBAL_CHANNEL_NAME)) {
                 List<String> members = Arrays.asList(args[1].split(" "));
                 if (! members.isEmpty()) {

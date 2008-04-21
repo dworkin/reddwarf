@@ -30,8 +30,8 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
 
 /**
  * Simple example of channel operations in the Project Darkstar Server.
@@ -55,6 +55,12 @@ public class HelloChannels
     public static final String[] channelNames = new String[] {
         "Foo", "Bar"
     };
+    
+    /** 
+     * The first {@link Channel}.  The second channel is looked up
+     *  by name.
+     */
+    private ManagedReference<Channel> channel1 = null;
 
     /**
      * {@inheritDoc}
@@ -64,9 +70,19 @@ public class HelloChannels
      */
     public void initialize(Properties props) {
         ChannelManager channelMgr = AppContext.getChannelManager();
-        for (String channelName : channelNames) {
-            channelMgr.createChannel(channelName, null, Delivery.RELIABLE);
-        }
+        
+        // Create and keep a reference to the first channel.
+        Channel c1 = channelMgr.createChannel(channelNames[0], 
+                                              null, 
+                                              Delivery.RELIABLE);
+        channel1 = AppContext.getDataManager().createReference(c1);
+        
+        // We don't keep a reference to the second channel, to demonstrate
+        // looking it up by name when needed.  Also, this channel uses a
+        // {@link ChannelListener} to filter messages.
+        channelMgr.createChannel(channelNames[1], 
+                                 new HelloChannelsChannelListener(), 
+                                 Delivery.RELIABLE);
     }
 
     /**
@@ -77,6 +93,6 @@ public class HelloChannels
      */
     public ClientSessionListener loggedIn(ClientSession session) {
         logger.log(Level.INFO, "User {0} has logged in", session.getName());
-        return new HelloChannelsSessionListener(session);
+        return new HelloChannelsSessionListener(session, channel1);
     }
 }

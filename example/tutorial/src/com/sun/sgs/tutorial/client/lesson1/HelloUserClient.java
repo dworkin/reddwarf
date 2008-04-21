@@ -316,7 +316,7 @@ public class HelloUserClient extends JFrame
      * Decodes the message data and adds it to the display.
      */
     public void receivedMessage(ByteBuffer message) {
-        appendOutput(decodeString(message));
+        appendOutput("Server sent: " + decodeString(message));
     }
 
     /**

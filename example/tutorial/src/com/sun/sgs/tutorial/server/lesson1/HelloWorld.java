@@ -28,7 +28,7 @@ import com.sun.sgs.app.ClientSessionListener;
 
 /**
  * Hello World example for the Project Darkstar Server.
- * Prints {@code "Hello World!"} to the console the first time it's started.
+ * Prints {@code "Hello World!"} to the console the first time it is started.
  */
 public class HelloWorld
     implements AppListener, // to get called during application startup.

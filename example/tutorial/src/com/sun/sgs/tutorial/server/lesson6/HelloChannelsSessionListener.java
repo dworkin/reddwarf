@@ -20,7 +20,6 @@
 package com.sun.sgs.tutorial.server.lesson6;
 
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,8 +37,7 @@ import com.sun.sgs.app.ManagedReference;
  * Server.
  * <p>
  * Logs each time a session receives data or logs out, and echoes
- * any data received back to the sender or broadcasts it to the
- * requested channel.
+ * any data received back to the sender.
  */
 class HelloChannelsSessionListener
     implements Serializable, ClientSessionListener
@@ -51,9 +49,6 @@ class HelloChannelsSessionListener
     private static final Logger logger =
         Logger.getLogger(HelloChannelsSessionListener.class.getName());
 
-    /** The message encoding. */
-    public static final String MESSAGE_CHARSET = "UTF-8";
-
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference<ClientSession> sessionRef;
 
@@ -61,8 +56,10 @@ class HelloChannelsSessionListener
      * Creates a new {@code HelloChannelsSessionListener} for the session.
      *
      * @param session the session this listener is associated with
+     * @param channel1 a reference to a channel to join
      */
-    public HelloChannelsSessionListener(ClientSession session)
+    public HelloChannelsSessionListener(ClientSession session,
+                                        ManagedReference<Channel> channel1)
     {
         if (session == null)
             throw new NullPointerException("null session");
@@ -70,12 +67,16 @@ class HelloChannelsSessionListener
         DataManager dataMgr = AppContext.getDataManager();
         sessionRef = dataMgr.createReference(session);
         
-        // Join the session to all channels
+        // Join the session to all channels.  We obtain the channel
+        // in two different ways, by reference and by name.
         ChannelManager channelMgr = AppContext.getChannelManager();
-        for (String channelName : HelloChannels.channelNames) {
-            Channel channel = channelMgr.getChannel(channelName);
-            channel.join(session);
-        }
+        
+        // We were passed a reference to the first channel.
+        channel1.get().join(session);
+        
+        // We look up the second channel by name.
+        Channel channel = channelMgr.getChannel(HelloChannels.channelNames[1]);
+        channel.join(session);
     }
 
     /**
@@ -115,37 +116,5 @@ class HelloChannelsSessionListener
             "User {0} has logged out {1}",
             new Object[] { session.getName(), grace }
         );
-    }
-
-    /**
-     * Encodes a {@code String} into a {@link ByteBuffer}.
-     *
-     * @param s the string to encode
-     * @return the {@code ByteBuffer} which encodes the given string
-     */
-    protected static ByteBuffer encodeString(String s) {
-        try {
-            return ByteBuffer.wrap(s.getBytes(MESSAGE_CHARSET));
-        } catch (UnsupportedEncodingException e) {
-            throw new Error("Required character set " + MESSAGE_CHARSET +
-                " not found", e);
-        }
-    }
-
-    /**
-     * Decodes a {@link ByteBuffer} into a {@code String}.
-     *
-     * @param buf the {@code ByteBuffer} to decode
-     * @return the decoded string
-     */
-    protected static String decodeString(ByteBuffer buf) {
-        try {
-            byte[] bytes = new byte[buf.remaining()];
-            buf.get(bytes);
-            return new String(bytes, MESSAGE_CHARSET);
-        } catch (UnsupportedEncodingException e) {
-            throw new Error("Required character set " + MESSAGE_CHARSET +
-                " not found", e);
-        }
     }
 }
