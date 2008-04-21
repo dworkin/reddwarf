@@ -430,8 +430,9 @@ final class ManagedReferenceImpl<T>
 	}
 	logger.logThrow(
 	    Level.FINEST, exception,
-	    "getForUpdate tid:{0,number,#}, oid:{1,number,#} throws",
-	    context.getTxnId(), oid);
+	    "getForUpdate tid:{0,number,#}, object:{1}, oid:{2,number,#}" +
+	    " throws",
+	    context.getTxnId(), Objects.fastToString(object), oid);
 	throw exception;
     }
 
