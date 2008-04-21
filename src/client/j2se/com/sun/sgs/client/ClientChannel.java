@@ -41,15 +41,15 @@ import java.nio.ByteBuffer;
  * <p>
  * The server is solely responsible for creating channels and
  * adding and removing clients from channels.  If desired, a client
- * can request that a channel be created by sending an
- * application-specific message to the server (using its {@link
- * ServerSession}).
+ * can request that a channel be created or its session be joined to or
+ * removed from the channel by sending an application-specific message to
+ * the server (using its {@link ServerSession}).
  * <p>
  * When the server adds a client session to a channel, the client's
  * {@link ServerSessionListener}'s {@link
  * ServerSessionListener#joinedChannel joinedChannel} method is
  * invoked with that client channel, returning the client's
- * {@code ClientChannelListener} for the channel.  A
+ * {@link ClientChannelListener} for the channel.  A
  * {@code ClientChannelListener} for a client channel is notified
  * as follows:
  * <ul>
@@ -78,16 +78,18 @@ public interface ClientChannel {
 
     /**
      * Sends the message contained in the specified {@code ByteBuffer}
-     * (starting at the current position in the buffer) to all channel
-     * members, including the sender.  The server-side application
-     * associated with this client <i>may alter</i> the message being sent,
-     * or <i>may discard</i> the message for application-specific reasons.
-     * In the latter case, there will be no notification of the message
-     * being sent. <p>
+     * to all channel members, including the sender.  The message starts at
+     * the buffer's current position and ends at the buffer's limit.
+     * The buffer's position is not modified by this operation.
+     *
+     * <p>The server-side application associated with this client <i>may
+     * alter</i> the message being sent, or <i>may discard</i> the message
+     * for application-specific reasons.  In the latter case, there will be
+     * no notification of the message being sent. <p>
      *
      * The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
-     * have no effect on the message sent to the server by this invocation.
+     * have no effect on the message sent to the channel by this invocation.
      *
      * @param message a message to send
      *

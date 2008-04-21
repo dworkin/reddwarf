@@ -113,8 +113,8 @@ class ChannelWrapper
     }
 
     /** {@inheritDoc} */
-    public Channel send(ByteBuffer message) {
-	getChannel().send(message);
+    public Channel send(ClientSession sender, ByteBuffer message) {
+	getChannel().send(sender, message);
 	return this;
     }
 

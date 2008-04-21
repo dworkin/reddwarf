@@ -349,8 +349,6 @@ public final class ChannelServiceImpl
      * given session, when it receives a {@code CHANNEL_MESSAGE} protocol
      * message.  This method must be called from within a transaction. <p>
      *
-     * TBD:  more....
-     *
      * @param	channelRefId the channel ID, as a {@code BigInteger}
      * @param	session the client session sending the channel message
      * @param	message the channel message

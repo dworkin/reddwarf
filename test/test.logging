@@ -4,7 +4,7 @@ java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
 java.util.logging.ConsoleHandler.level = FINEST
 
 # Log objects that are found modified but not marked for update
-#com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications.level = FINEST
+com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications.level = FINEST
 #com.sun.sgs.impl.service.nodemap.level = FINEST
 #com.sun.sgs.impl.service.session.handler.level = FINEST
 #com.sun.sgs.impl.service.session.impl.level = FINEST

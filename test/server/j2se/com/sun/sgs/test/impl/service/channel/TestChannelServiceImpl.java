@@ -1124,7 +1124,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.send(ByteBuffer.wrap(testMessage));
+	    channel.send(null, ByteBuffer.wrap(testMessage));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -1139,7 +1139,7 @@ public class TestChannelServiceImpl extends TestCase {
 		Channel channel = getChannel(channelName);
 		dataService.removeObject(channel);
 		try {
-		    channel.send(ByteBuffer.wrap(testMessage));
+		    channel.send(null, ByteBuffer.wrap(testMessage));
 		    fail("Expected IllegalStateException");
 		} catch (IllegalStateException e) {
 		    System.err.println(e);
@@ -1417,7 +1417,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    new AbstractKernelRunnable() {
 			public void run() {
 			    Channel channel = getChannel(channelName);
-			    channel.send(ByteBuffer.wrap(buf.getBuffer()));
+			    channel.send(null, ByteBuffer.wrap(buf.getBuffer()));
 			}
 		    }, taskOwner);
 	    }
@@ -1631,6 +1631,7 @@ public class TestChannelServiceImpl extends TestCase {
 		if (host.equals(client.redirectHost)) {
 		    iter.remove();
 		    removedClients.put(user, client);
+		    client.disconnect();
 		}
 	    }
 	    return new ClientGroup(removedClients);
@@ -1838,10 +1839,9 @@ public class TestChannelServiceImpl extends TestCase {
 	NonSerializableChannelListener() {}
 	
         /** {@inheritDoc} */
-	public boolean receivedMessage(
+	public void receivedMessage(
 	    Channel channel, ClientSession session, ByteBuffer message)
 	{
-	    return true;
 	}
     }
 
@@ -1863,14 +1863,16 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
         /** {@inheritDoc} */
-	public boolean receivedMessage(
+	public void receivedMessage(
 	    Channel channel, ClientSession session, ByteBuffer message)
 	{
 	    if (name != null) {
 		assertEquals(channel,
 			     AppContext.getChannelManager().getChannel(name));
 	    }
-	    return allowMessages;
+	    if (allowMessages) {
+		channel.send(session, message);
+	    }
 	}
     }
     
@@ -1886,7 +1888,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
         /** {@inheritDoc} */
-	public boolean receivedMessage(
+	public void receivedMessage(
 	    Channel channel, ClientSession session, ByteBuffer message)
 	{
 	    if (name != null) {
@@ -1894,7 +1896,10 @@ public class TestChannelServiceImpl extends TestCase {
 			     AppContext.getChannelManager().getChannel(name));
 	    }
 
-	    return message.getInt() % 2 == 0;
+	    if (message.getInt() % 2 == 0) {
+		message.flip();
+		channel.send(session, message);
+	    }
 	}
     }
     

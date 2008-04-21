@@ -467,37 +467,13 @@ abstract class ChannelImpl implements Channel, Serializable {
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel send(ByteBuffer message) {
-	doSend(null, message);
-	return this;
-    }
-
-    /**
-     * If the specified {@code sender} is a member of this channel, and
-     * either, this channel has a null {@code ChannelListener} or has a
-     * non-null {@code ChannelListener} and invoking that listener's
-     * {@code receivedMessage} method with this channel, the specified
-     * {@code sender}, and {@code message} returns {@code true}, then
-     * this method forwards the {@code message} to the channel for
-     * delivery; otherwise, no action is taken.
-     */
-    private void send(ClientSession sender, ByteBuffer message) {
-	// TBD: exception handling?
-
-	if (listenerRef == null ||
-	    listenerRef.get().receivedMessage(getWrappedChannel(), sender,
-					      message.asReadOnlyBuffer()))
-	{
-	    doSend(sender, message);
-	}
-    }
-
-    private void doSend(ClientSession sender, ByteBuffer message) {
+    public Channel send(ClientSession sender, ByteBuffer message) {
 	try {
 	    checkClosed();
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
+	    message = message.asReadOnlyBuffer();
             if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
@@ -526,6 +502,27 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    this, HexDumper.format(message, 0x50));
 	    }
 	    throw e;
+	}
+
+	return this;
+    }
+
+    /**
+     * If this channel has a null {@code ChannelListener}, forwards the
+     * specified {@code message} to the channel by invoking this channel's
+     * {@code send} method with the specified {@code sender} and {@code
+     * message}; otherwise, invokes the {@code ChannelListener}'s {@code
+     * receivedMessage} method with this channel, the specified {@code sender},
+     * and {@code message}.
+     */
+    private void receivedMessage(ClientSession sender, ByteBuffer message) {
+
+	if (listenerRef == null) {
+	    send(sender, message);
+	} else {
+	    // TBD: exception handling?
+	    listenerRef.get().receivedMessage(
+		getWrappedChannel(), sender, message.asReadOnlyBuffer());
 	}
     }
 
@@ -1295,10 +1292,10 @@ abstract class ChannelImpl implements Channel, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public boolean receivedMessage(
+	public void receivedMessage(
 	    Channel channel, ClientSession sender, ByteBuffer message)
 	{
-	    return get().receivedMessage(channel, sender, message);
+	    get().receivedMessage(channel, sender, message);
 	}
 	
     }
@@ -1970,10 +1967,16 @@ abstract class ChannelImpl implements Channel, Serializable {
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
-	    channel.send(session, message);
+	    channel.receivedMessage(session, message);
 	} else {
-	    // message received for unknown channel
-	    // TBD: log at what level?
+	    // Ignore message received for unknown channel.
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(
+ 		    Level.FINE,
+		    "Dropping message:{0}: from:{1} for unknown channel: {2}",
+		    HexDumper.format(message), session,
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
 	}
     }
 

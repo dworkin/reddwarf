@@ -532,7 +532,9 @@ public class SimpleClient implements ServerSession {
                 logger.log(Level.FINER, "Channel join");
                 checkLoggedIn();
                 String channelName = msg.getString();
-		BigInteger channelId = new BigInteger(1, msg.getByteArray());
+		byte[] channelIdBytes =
+		    msg.getBytes(msg.limit() - msg.position());
+		BigInteger channelId = new BigInteger(1, channelIdBytes);
                 SimpleClientChannel channel =
                     new SimpleClientChannel(channelName, channelId);
                 if (channels.putIfAbsent(channelId, channel) == null) {
@@ -548,7 +550,9 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.CHANNEL_LEAVE: {
                 logger.log(Level.FINER, "Channel leave");
                 checkLoggedIn();
-                BigInteger channelId = new BigInteger(1, msg.getByteArray());
+		byte[] channelIdBytes =
+		    msg.getBytes(msg.limit() - msg.position());
+		BigInteger channelId = new BigInteger(1, channelIdBytes);
                 SimpleClientChannel channel = channels.remove(channelId);
                 if (channel != null) {
                     channel.left();
@@ -563,7 +567,6 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 logger.log(Level.FINEST, "Channel recv");
                 checkLoggedIn();
-		int size = msg.getShort();
                 BigInteger channelId =
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
                 SimpleClientChannel channel = channels.get(channelId);

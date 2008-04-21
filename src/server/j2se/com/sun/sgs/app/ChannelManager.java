@@ -61,7 +61,7 @@ public interface ChannelManager {
      *
      * <p>If a non-{@code null} listener is provided, it is <i>strongly</i>
      * suggested that a different listener instance be provided for each
-     * channel created, in order to reduce the possible contention of
+     * channel created, in order to reduce the possible contention on
      * channel listeners.
      *
      * <p>Messages sent on the returned channel are delivered according to
@@ -91,7 +91,7 @@ public interface ChannelManager {
      *
      * @param name a channel name
      *
-     * @return an exisiting channel bound to the specified name
+     * @return an existing channel bound to the specified name
      *
      * @throws NameNotBoundException if a channel is not bound to the
      * specified name
