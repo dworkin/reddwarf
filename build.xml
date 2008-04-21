@@ -473,7 +473,8 @@
     <copy todir="${build.dir}/sgs-src">
       <fileset dir="."
 	       excludes="**/.svn"
-	       includes="build.xml,
+	       includes="analysis/**,
+			 build.xml,
 			 doc/ServerAppTutorial.*,
 			 etc/jdk5.0_package_list/**,
 			 etc/mina1.1_package_list/**,
