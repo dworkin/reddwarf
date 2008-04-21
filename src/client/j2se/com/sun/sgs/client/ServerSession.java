@@ -40,25 +40,26 @@ import java.nio.ByteBuffer;
  * a client logs in, it will be assigned a different server session. A
  * client can use its {@code ServerSession} to send messages to the
  * server, to check if it is connected, or to log out.
- * <p>
- * A server session has an associated {@link ServerSessionListener} that is
- * notified of session communication events such as message receipt,
- * reconnection, or disconnection. Once a server session is
- * disconnected, it can no longer be used to send messages to the server. In
- * this case, a client must log in again to obtain a new server session to
- * communicate with the server.
+ *
+ * <p>A server session has an associated {@link ServerSessionListener} that
+ * is notified of session communication events such as message receipt,
+ * channel joins, reconnection, or disconnection. Once a server session is
+ * disconnected, it can no longer be used to send messages to the
+ * server. In this case, a client must log in again to obtain a new server
+ * session to communicate with the server.
  */
 public interface ServerSession {
 
     /**
      * Sends the message contained in the specified {@code ByteBuffer} to
-     * the server, starting at the current position of the buffer.
-     * The specified message is sent asynchronously to the server;
-     * therefore, a successful invocation of this method does not indicate
-     * that the given message was successfully sent. Messages that are
-     * received by the server are delivered in sending order.
-     * <p>
-     * The {@code ByteBuffer} may be reused immediately after this method
+     * the server.  The message starts at the buffer's current position and
+     * ends at the buffer's limit.  The buffer's position is not modified
+     * by this operation.  The specified message is sent asynchronously to
+     * the server; therefore, a successful invocation of this method does
+     * not indicate that the given message was successfully sent. Messages
+     * that are received by the server are delivered in sending order.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the server by this invocation.
      *
