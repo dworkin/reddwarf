@@ -52,12 +52,12 @@ public interface ServerSession {
 
     /**
      * Sends the message contained in the specified {@code ByteBuffer} to
-     * the server.  The message starts buffer's current position and ends
-     * at the buffer's limit.  The buffer's position is not modified by
-     * this operation.  The specified message is sent asynchronously to the
-     * server; therefore, a successful invocation of this method does not
-     * indicate that the given message was successfully sent. Messages that
-     * are received by the server are delivered in sending order.
+     * the server.  The message starts at the buffer's current position and
+     * ends at the buffer's limit.  The buffer's position is not modified
+     * by this operation.  The specified message is sent asynchronously to
+     * the server; therefore, a successful invocation of this method does
+     * not indicate that the given message was successfully sent. Messages
+     * that are received by the server are delivered in sending order.
      * 
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will

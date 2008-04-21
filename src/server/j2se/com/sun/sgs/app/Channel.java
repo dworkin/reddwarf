@@ -30,13 +30,13 @@ import java.util.Set;
  * {@code Channel} must also implement {@link Serializable}.
  *
  * <p>A channel is created by invoking the {@link
- * ChannelManager#createChannel ChannelManager.createChannel} method
- * with a {@link Delivery} requirement.  A {@link ClientSession} can
- * be added or removed from a channel using that {@code Channel}'s
- * {@link #join(ClientSession) join} and
- * {@link #leave(ClientSession) leave} methods respectively.
- * All client sessions can be removed from a channel by invoking
- * {@link #leaveAll leaveAll} on the channel.
+ * ChannelManager#createChannel ChannelManager.createChannel} method with a
+ * name, a {@code ChannelListener}, and a {@link Delivery} requirement.  A
+ * {@link ClientSession} can be added or removed from a channel using that
+ * {@code Channel}'s {@link #join(ClientSession) join} and {@link
+ * #leave(ClientSession) leave} methods respectively.  All client sessions
+ * can be removed from a channel by invoking {@link #leaveAll leaveAll} on
+ * the channel.
  *
  * <p>The server can send a message to all client sessions joined to a
  * channel by using the {@link #send send} method.  Note that the
@@ -109,7 +109,7 @@ public interface Channel extends ManagedObject {
      *
      * <p>The returned iterator may not reflect changes to the membership
      * that occurred in the current transaction.  Such membership changes
-     * may be handled asynchronously, after the task makiing the changes
+     * may be handled asynchronously, after the task making the changes
      * completes.  Therefore, the iterator <i>may not</i> include sessions
      * that have been recently joined to the channel, or <i>may</i> include
      * sessions that have recently left the channel (by being explicitly
