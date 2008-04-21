@@ -33,6 +33,15 @@ public enum ChatCommand {
     JOIN,
 
     /**
+     * Joins this session to the global channel.  Each session joins
+     * this channel at login.  The server maintains the global channel name.
+     * <pre>
+     *    /join_global
+     * </pre>
+     */
+    JOIN_GLOBAL,
+    
+    /**
      * Removes this session from the named channel.
      * <pre>
      *    /leave channelName

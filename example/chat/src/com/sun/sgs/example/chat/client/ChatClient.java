@@ -397,6 +397,14 @@ public class ChatClient extends JFrame
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
         setTitle("Chat Test Client: " + userName);
+        // Tell the server we're ready to join the global channel
+        String cmd = "/join_global ";
+        try {
+            client.send(toMessageBuffer(cmd));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);

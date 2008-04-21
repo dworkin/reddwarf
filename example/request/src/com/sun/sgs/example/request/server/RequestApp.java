@@ -287,7 +287,9 @@ public class RequestApp implements AppListener, Serializable {
 	    String channelName = (space > 0) ? args.substring(0, space) : args;
 	    String message = (space > 0) ? args.substring(space + 1) : "";
 	    Channel channel = getChannel(channelName);
+            // Send along as if the client had sent it via a ClientChannel
 	    channel.send(
+                session.get(),
 		stringToBuffer(
 		    "Message on channel " + channelName + ": " + message));
 	    if (logger.isLoggable(Level.FINEST)) {

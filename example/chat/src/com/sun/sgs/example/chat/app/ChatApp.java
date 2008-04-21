@@ -80,7 +80,6 @@ public class ChatApp
         
         final String userName = session.getName();
         String key = sessionIdKey(userName);
-//        dataMgr.setBinding(key, session);
         try {
             dataMgr.getBinding(key);
             // If the name is already used, refuse log in.

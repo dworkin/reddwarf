@@ -46,18 +46,18 @@ class HelloChannelsChannelListener
     /**
      * {@inheritDoc}
      * <p>
-     * Logs when data arrives on a channel and allows it to be sent on the
-     * channel.  A typical listener would examine the message and decide
-     * whether it should be discarded, modified, or sent unchanged.
+     * Logs when data arrives on a channel. A typical listener would 
+     * examine the message to decide whether it should be discarded, 
+     * modified, or sent unchanged.
      */
-    public boolean receivedMessage(Channel channel, 
-                                   ClientSession session, 
-                                   ByteBuffer message)
+    public void receivedMessage(Channel channel, 
+                                ClientSession session, 
+                                ByteBuffer message)
     {
         logger.log(Level.INFO,
             "Channel message from {0} on channel {2}",
             new Object[] { session.getName(), channel.getName() }
         );
-        return true;
+        channel.send(session, message);
     }
 }

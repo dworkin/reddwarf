@@ -82,7 +82,6 @@ public class ChatClientSessionListener
      */
     public ChatClientSessionListener(ClientSession session) {
         sessionRef = AppContext.getDataManager().createReference(session);
-        addToChannel(GLOBAL_CHANNEL_NAME);
     }
 
     /**
@@ -125,6 +124,10 @@ public class ChatClientSessionListener
                 addToChannel(args[1]);
                 break;
 
+            case JOIN_GLOBAL:
+                addToChannel(GLOBAL_CHANNEL_NAME);
+                break;
+
             case LEAVE:
                 removeFromChannel(args[1]);
                 break;
@@ -134,8 +137,8 @@ public class ChatClientSessionListener
                 break;
 
             case PM:
-                 pmReceived(args[1]);
-                 break;
+                pmReceived(args[1]);
+                break;
                  
             case DISCONNECT:
                 logger.log(Level.INFO,
@@ -208,7 +211,7 @@ public class ChatClientSessionListener
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
         changeMsg.append(session().getName());
-        channel.send(toMessageBuffer(changeMsg.toString()));
+        channel.send(null, toMessageBuffer(changeMsg.toString()));
 
         // Now add the joiner and tell it about all the members on
         // the channel, the joiner included.
@@ -292,7 +295,7 @@ public class ChatClientSessionListener
         // Tell the rest of the channel about the session removal.
         StringBuilder changeMessage = new StringBuilder("/left ");
         changeMessage.append(session().getName());
-        channel.send(toMessageBuffer(changeMessage.toString()));
+        channel.send(null, toMessageBuffer(changeMessage.toString()));
         
         // Schedule a task to check whether the channel is now empty, and if so,
         // close it.  This needs to be done in a separate task to ensure the 
@@ -416,14 +419,15 @@ public class ChatClientSessionListener
         private static final long serialVersionUID = 1L;
         
         /** {@inheritDoc} */
-        public boolean receivedMessage(Channel channel,
+        public void receivedMessage(Channel channel,
                                        ClientSession session,
                                        ByteBuffer msg)
         {
             String message = ChatClientSessionListener.fromMessageBuffer(msg);
             if (message.startsWith(COMMAND_PREFIX)) {      
                 // Just send it along
-                return true;
+                channel.send(session, msg);
+                return;
             }
             // This is a chat message sent on the channel - need to prepend
             // the sender.  The processing would typically be more complicated
@@ -431,8 +435,7 @@ public class ChatClientSessionListener
             // checking permissions of the user.
             ByteBuffer newMsg = ChatClientSessionListener.toMessageBuffer(
                     session.getName() + " " + message);
-            channel.send(newMsg);
-            return false;
+            channel.send(session, newMsg);
         }
     }
 }
