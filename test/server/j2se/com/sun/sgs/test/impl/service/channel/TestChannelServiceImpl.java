@@ -1,4 +1,4 @@
-/*
+M/*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -143,6 +143,9 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** The node ID for the local node. */
     private long serverNodeId;
+
+    /** If {@code true}, shuts off some printing during performance tests. */
+    private boolean isPerformanceTest = false;
     
     /** A list of users for test purposes. */
     private List<String> someUsers =
@@ -1391,6 +1394,40 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
     }
+
+    public void testJoinLeavePerformance() throws Exception {
+	final String channelName = "perf";
+	createChannel(channelName);
+	String user = "dummy";
+	DummyClient client =
+	    (new DummyClient()).connect(port).login(user, "password");
+
+	final String sessionKey = user + ".wrapped";
+	isPerformanceTest = true;
+	int numIterations = 100;
+	long startTime = System.currentTimeMillis();
+	for (int i = 0; i < numIterations; i++) {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Channel channel = channelService.getChannel(channelName);
+		    DataManager dataManager = AppContext.getDataManager();
+		    ClientSession session = (ClientSession)
+			dataManager.getBinding(sessionKey);
+		    channel.join(session);
+		    channel.leave(session);
+		}}, taskOwner);
+	}
+	long endTime = System.currentTimeMillis();
+	System.err.println("join/leave, iterations: " + numIterations +
+			   ", elapsed time: " + (endTime - startTime) +
+			   " ms.");
+    }
+
+    private void printIt(String line) {
+	if (! isPerformanceTest) {
+	    System.err.println(line);
+	}
+    }
     
     /**
      * Shuts down the node with the specified host.
@@ -2368,8 +2405,8 @@ public class TestChannelServiceImpl extends TestCase {
 			joinAck = true;
 			channelIdToName.put(channelId, channelName);
 			channelNameToId.put(channelName, channelId);
-			System.err.println("[" + name + "] join succeeded: " +
-					   channelName);
+			printIt("[" + name + "] join succeeded: " +
+				channelName);
 			lock.notifyAll();
 		    }
 		    break;
@@ -2381,7 +2418,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    synchronized (lock) {
 			leaveAck = true;
 			String channelName = channelIdToName.remove(channelId);
-			System.err.println("[" + name + "] leave succeeded: " +
+			printIt("[" + name + "] leave succeeded: " +
 					   channelName);
 			lock.notifyAll();
 		    }
@@ -2477,6 +2514,7 @@ public class TestChannelServiceImpl extends TestCase {
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.setBinding(session.getName(), unwrapSession(session));
+	    dataManager.setBinding(session.getName() + ".wrapped", session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}

@@ -1,16 +1,23 @@
-.level = WARNING
+.level = INFO
+sun.rmi.level = WARNING
 handlers = java.util.logging.ConsoleHandler
-java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
-java.util.logging.ConsoleHandler.level = FINEST
+config = com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration
 
-# Log objects that are found modified but not marked for update
-com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications.level = FINEST
-#com.sun.sgs.impl.service.nodemap.level = FINEST
-#com.sun.sgs.impl.service.session.handler.level = FINEST
-#com.sun.sgs.impl.service.session.impl.level = FINEST
-#com.sun.sgs.impl.service.session.level = CONFIG
-#com.sun.sgs.impl.service.watchdog.server.level = FINE
-#com.sun.sgs.impl.service.watchdog.service.level = INFO
-#com.sun.sgs.impl.service.session.level = FINE
-#com.sun.sgs.impl.service.channel.level = FINEST
-#com.sun.sgs.impl.service.channel.ChannelImpl.level = FINEST
+java.util.logging.ConsoleHandler.level = WARNING
+java.util.logging.ConsoleHandler.formatter = \
+    com.sun.sgs.impl.sharedutil.logging.LogFormatter
+
+com.sun.sgs.impl.service.data.DataServiceImpl.level = FINEST
+com.sun.sgs.impl.service.data.ManagedReferenceImpl.level = FINEST
+java.util.logging.ConsoleHandler.formatter = \
+    com.sun.sgs.impl.sharedutil.logging.LogFormatter
+java.util.logging.ConsoleHandler.filter = \
+    com.sun.sgs.impl.sharedutil.logging.ExceptionFilter
+
+com.sun.sgs.impl.sharedutil.logging.LogFormatter.time.format = %tT.%1$tL
+com.sun.sgs.impl.sharedutil.logging.LogFormatter.print.stack = false
+
+com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.exception = \
+    com.sun.sgs.app.TransactionAbortedException
+com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.level = INFO
+

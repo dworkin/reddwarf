@@ -318,13 +318,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Adds the specified channel {@code event} to this channel's event queue
-     * and notifies the coordinator that there is an event to service.
+     * and notifies the coordinator that there is an event to service.  As
+     * an optimization, if the local node is the coordinator for this channel
+     * and the event queue is empty, then service the event immediately
+     * without adding it to the event queue.
      */
     private void addEvent(ChannelEvent event) {
 
 	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
-	    
-	if (eventQueue.offer(event)) {
+
+	if (isCoordinator() && eventQueue.isEmpty()) {
+	    event.serviceEvent(eventQueue);
+	} else if (eventQueue.offer(event)) {
 	    notifyServiceEventQueue(eventQueue);
 	} else {
 	    throw new ResourceUnavailableException(
@@ -1461,6 +1466,13 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	ManagedQueue<ChannelEvent> getQueue() {
 	    return queueRef.get();
+	}
+
+	/**
+	 * Returns {@code true} if the event queue is empty.
+	 */
+	boolean isEmpty() {
+	    return getQueue().isEmpty();
 	}
 
 	/**
