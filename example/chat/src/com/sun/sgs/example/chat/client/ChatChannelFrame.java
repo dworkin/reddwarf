@@ -120,11 +120,6 @@ public class ChatChannelFrame extends JInternalFrame
                 multiList.addItem(args[1]);
             } else if (command.equals("/left")) {
                 memberLeft(args[1]);
-            } else if (command.equals("/members")) {
-                String[] members = args[1].split("\\s+");
-                for (String member : members) {
-                    multiList.addItem(member);
-                }
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
             } else {
@@ -149,7 +144,7 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * Updates teh channel list with the initial members.
+     * Updates the channel list with the initial members.
      */
     void updateMembers(String members) {
         List<String> memberList = Arrays.asList(members.split("\\s+"));

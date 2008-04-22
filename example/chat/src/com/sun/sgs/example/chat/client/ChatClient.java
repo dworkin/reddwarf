@@ -560,11 +560,6 @@ public class ChatClient extends JFrame
                 userLogin(args[1]);
             } else if (command.equals("/left")) {
                 userLogout(args[1]);
-            } else if (command.equals("/members")) {
-                List<String> members = Arrays.asList(args[1].split(" "));
-                if (! members.isEmpty()) {
-                    addUsers(members);
-                } 
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command: %s\n", command);
             } else {
