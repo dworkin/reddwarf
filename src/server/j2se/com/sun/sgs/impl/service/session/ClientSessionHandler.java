@@ -596,6 +596,40 @@ class ClientSessionHandler {
 
 		break;
 
+	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
+		if (identity == null) {
+		    logger.log(
+		    	Level.WARNING,
+			"session message received before login:{0}", this);
+		    break;
+		}
+		final BigInteger channelRefId =
+		    new BigInteger(1, msg.getBytes(msg.getShort()));
+		final ByteBuffer channelMessage =
+		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
+		taskQueue.addTask(new AbstractKernelRunnable() {
+		    public void run() {
+			ClientSessionImpl sessionImpl =
+			    ClientSessionImpl.getSession(
+				dataService, sessionRefId);
+			if (sessionImpl != null) {
+			    if (isConnected()) {
+				sessionService.getChannelService().
+				    handleChannelMessage(
+					channelRefId, sessionImpl,
+					channelMessage.asReadOnlyBuffer());
+			    }
+			} else {
+			    scheduleHandleDisconnect(false);
+			}
+		    }}, identity);
+
+		// Wait until processing is complete before resuming reading
+		enqueueReadResume();
+
+		break;
+
+
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.

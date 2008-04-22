@@ -49,6 +49,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -303,12 +305,18 @@ public class HelloUserClient extends JFrame
     }
 
     /**
+     *  {@inheritDoc}
+     */
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
+        return new NullClientChannelListener();
+    }
+    /**
      * {@inheritDoc}
      * <p>
      * Decodes the message data and adds it to the display.
      */
     public void receivedMessage(ByteBuffer message) {
-        appendOutput(decodeString(message));
+        appendOutput("Server sent: " + decodeString(message));
     }
 
     /**
@@ -355,6 +363,25 @@ public class HelloUserClient extends JFrame
             simpleClient.send(message);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+    
+    /**
+     *  A ClientChannelListener that does nothing at all (this basic
+     *  client does not support channels).
+     */
+    private static class NullClientChannelListener 
+            implements ClientChannelListener 
+    {
+        /** {@inheritDoc} */
+        public void leftChannel(ClientChannel channel) { 
+            System.out.println("Unexepected call to leftChannel");
+        }
+        /** {@inheritDoc} */
+        
+        public void receivedMessage(ClientChannel channel, ByteBuffer message) {
+            System.out.println("Unexepected call to receivedMessage");
+            
         }
     }
 }

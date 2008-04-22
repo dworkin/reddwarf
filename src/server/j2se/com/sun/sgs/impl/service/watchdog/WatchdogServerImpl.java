@@ -331,7 +331,8 @@ public final class WatchdogServerImpl
 	expirationSet.clear();
 	statusChangedNodes.clear();
 
-	// Mark all nodes failed and notify clients of failure.
+	// Mark all nodes failed and notify all clients (except local one)
+	// of failure.
 	final Collection<NodeImpl> failedNodes = aliveNodes.values();
 	try {
 	    transactionScheduler.runTask(new AbstractKernelRunnable() {
@@ -345,7 +346,12 @@ public final class WatchdogServerImpl
 		Level.WARNING, e,
 		"Failed to update failed nodes during shutdown, throws");
 	}
-	notifyClients(failedNodes, failedNodes);
+
+	Set<NodeImpl> failedNodesExceptMe =
+	    new HashSet<NodeImpl>(failedNodes);
+	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
+	notifyClients(failedNodesExceptMe, failedNodes);
+	aliveNodes.clear();
     }
 
     /* -- Implement WatchdogServer -- */

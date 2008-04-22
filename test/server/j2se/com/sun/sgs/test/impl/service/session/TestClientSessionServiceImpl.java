@@ -72,8 +72,9 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import junit.framework.TestCase;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import junit.framework.TestSuite;
+
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 public class TestClientSessionServiceImpl extends TestCase {
 
