@@ -63,7 +63,7 @@ public class HelloChannelClient extends HelloUserClient
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
-       /** Map that associates a channel name with a {@link ClientChannel}. */
+    /** Map that associates a channel name with a {@link ClientChannel}. */
     protected final Map<String, ClientChannel> channelsByName =
         new HashMap<String, ClientChannel>();
 

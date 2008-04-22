@@ -370,7 +370,9 @@ public class HelloUserClient extends JFrame
      *  A ClientChannelListener that does nothing at all (this basic
      *  client does not support channels).
      */
-    private class NullClientChannelListener implements ClientChannelListener {
+    private static class NullClientChannelListener 
+            implements ClientChannelListener 
+    {
         /** {@inheritDoc} */
         public void leftChannel(ClientChannel channel) { 
             System.out.println("Unexepected call to leftChannel");

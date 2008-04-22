@@ -86,7 +86,7 @@ public class ChatApp
             String reply = "User " + userName + " already logged in";
             logger.log(Level.WARNING, reply);
             try {
-            session.send(ChatClientSessionListener.toMessageBuffer(
+                session.send(ChatClientSessionListener.toMessageBuffer(
                                                    "/loginFailed " + reply));
             } catch (Exception e) {
                 e.printStackTrace();
@@ -121,9 +121,9 @@ public class ChatApp
     }
 
     /**
-     * Returns the data store key for the session with the given id.
+     * Returns the data store key for the session with the name.
      * 
-     * @param sessionRefId the id for the session
+     * @param name the name for the session
      * @return the data store key for the session
      */
     private static String sessionIdKey(String name) {

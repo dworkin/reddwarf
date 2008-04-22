@@ -19,6 +19,7 @@
 
 package com.sun.sgs.tutorial.server.lesson4;
 
+import com.sun.sgs.app.AppContext;
 import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -54,6 +55,8 @@ public class TrivialTimedTask
      * the delta from the timestamp of the previous run.
      */
     public void run() throws Exception {
+        // We will be modifying this object.
+        AppContext.getDataManager().markForUpdate(this);
         long timestamp = System.currentTimeMillis();
         long delta = timestamp - lastTimestamp;
 

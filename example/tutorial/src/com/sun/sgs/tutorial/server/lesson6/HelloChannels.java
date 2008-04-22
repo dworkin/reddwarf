@@ -49,16 +49,14 @@ public class HelloChannels
     private static final Logger logger =
         Logger.getLogger(HelloChannels.class.getName());
 
-    /**
-     * Channel names for this example.
-     */
-    public static final String[] channelNames = new String[] {
-        "Foo", "Bar"
-    };
+    /* The name of the first channel {@value #CHANNEL_1_NAME} */
+    static final String CHANNEL_1_NAME = "Foo";
+    /* The name of the second channel {@value #CHANNEL_2_NAME} */
+    static final String CHANNEL_2_NAME = "Bar";
     
     /** 
      * The first {@link Channel}.  The second channel is looked up
-     *  by name.
+     * by name.
      */
     private ManagedReference<Channel> channel1 = null;
 
@@ -72,7 +70,7 @@ public class HelloChannels
         ChannelManager channelMgr = AppContext.getChannelManager();
         
         // Create and keep a reference to the first channel.
-        Channel c1 = channelMgr.createChannel(channelNames[0], 
+        Channel c1 = channelMgr.createChannel(CHANNEL_1_NAME, 
                                               null, 
                                               Delivery.RELIABLE);
         channel1 = AppContext.getDataManager().createReference(c1);
@@ -80,7 +78,7 @@ public class HelloChannels
         // We don't keep a reference to the second channel, to demonstrate
         // looking it up by name when needed.  Also, this channel uses a
         // {@link ChannelListener} to filter messages.
-        channelMgr.createChannel(channelNames[1], 
+        channelMgr.createChannel(CHANNEL_2_NAME, 
                                  new HelloChannelsChannelListener(), 
                                  Delivery.RELIABLE);
     }

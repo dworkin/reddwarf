@@ -200,7 +200,7 @@ public class ChatClientSessionListener
         try {
             channel = channelMgr.getChannel(channelName);
         } catch (NameNotBoundException e) {
-            // Create the channel, and save a binding to it.
+            // Create the channel.
             channel = 
                 channelMgr.createChannel(channelName, 
                                          new ChatChannelListener(), 
@@ -208,7 +208,11 @@ public class ChatClientSessionListener
         }
 
         // Send the membership change first, so the new session doesn't
-        // receive its own join message.
+        // receive its own join message.  We specify a null sender because
+        // the server has initiated this channel send, rather than a client.
+        // Also, the server will not deliver channel messages to channel
+        // members if the sender is not a member of the channel at the time
+        // the delivery occurs.
         StringBuilder changeMsg = new StringBuilder("/joined ");
         changeMsg.append(session().getName());
         channel.send(null, toMessageBuffer(changeMsg.toString()));
@@ -233,7 +237,7 @@ public class ChatClientSessionListener
 	/** The name of the channel who should have its members sent. */ 
 	private final String channelName;
 
-	SendMembersTask(String  channelName) {
+	SendMembersTask(String channelName) {
 	    this.channelName = channelName;
 	}
 
@@ -293,9 +297,7 @@ public class ChatClientSessionListener
         }
 
         // Tell the rest of the channel about the session removal.
-        StringBuilder changeMessage = new StringBuilder("/left ");
-        changeMessage.append(session().getName());
-        channel.send(null, toMessageBuffer(changeMessage.toString()));
+        channel.send(null, toMessageBuffer("/left " + session().getName()));
         
         // Schedule a task to check whether the channel is now empty, and if so,
         // close it.  This needs to be done in a separate task to ensure the 

@@ -75,8 +75,8 @@ class HelloChannelsSessionListener
         channel1.get().join(session);
         
         // We look up the second channel by name.
-        Channel channel = channelMgr.getChannel(HelloChannels.channelNames[1]);
-        channel.join(session);
+        Channel channel2 = channelMgr.getChannel(HelloChannels.CHANNEL_2_NAME);
+        channel2.join(session);
     }
 
     /**
