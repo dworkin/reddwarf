@@ -22,6 +22,7 @@ package com.sun.sgs.example.request.server;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
@@ -286,7 +287,9 @@ public class RequestApp implements AppListener, Serializable {
 	    String channelName = (space > 0) ? args.substring(0, space) : args;
 	    String message = (space > 0) ? args.substring(space + 1) : "";
 	    Channel channel = getChannel(channelName);
+            // Send along as if the client had sent it via a ClientChannel
 	    channel.send(
+                session.get(),
 		stringToBuffer(
 		    "Message on channel " + channelName + ": " + message));
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -337,16 +340,13 @@ public class RequestApp implements AppListener, Serializable {
 	 * and storing it in a name binding as needed.
 	 */
 	private Channel getChannel(String channelName) {
-	    DataManager dataManager = AppContext.getDataManager();
-	    String binding = "Channel-" + channelName;
-	    try {
-		return (Channel) dataManager.getBinding(binding);
-	    } catch (NameNotBoundException e) {
-	    }
-	    Channel channel = AppContext.getChannelManager().createChannel(
-		Delivery.ORDERED_UNRELIABLE);
-	    dataManager.setBinding(binding, channel);
-	    return channel;
+            ChannelManager channelManager = AppContext.getChannelManager();
+            try {
+                return channelManager.getChannel(channelName);
+            } catch (NameNotBoundException e ) {
+                return channelManager.createChannel(
+                        channelName, null, Delivery.ORDERED_UNRELIABLE);
+            }
 	}
 
 	/** Sends the specified message to the client. */
