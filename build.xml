@@ -1139,7 +1139,9 @@
 	   source="${javac.source}"
 	   target="${javac.target}">
       <src>
-        <dirset dir="example" includes="*/src"/>
+        <dirset dir="example" includes="*/src">
+            <exclude name="hack/**"/>
+        </dirset>
       </src>
       <classpath>
         <pathelement location="${build.dir}/classes/server"/>

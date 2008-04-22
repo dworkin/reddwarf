@@ -19,6 +19,8 @@
 
 package com.sun.sgs.example.request.client;
 
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import java.io.IOException;
@@ -76,7 +78,9 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST Level.FINEST} - Exceptions
  * </ul>
  */
-public class WandererClient implements Runnable, SimpleClientListener {
+public class WandererClient 
+        implements Runnable, SimpleClientListener, ClientChannelListener
+{
 
     /** The prefix for properties. */
     private static final String PREFIX =
@@ -362,6 +366,31 @@ public class WandererClient implements Runnable, SimpleClientListener {
         noteDisconnected();
     }
 
+    /** {@inheritDoc} */
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
+        return this;
+    }
+    
+    /* -- Implement ClientChannelListener -- */
+    
+    /** {@inheritDoc} */
+    public void leftChannel(ClientChannel channel) {
+        if (logger.isLoggable(Level.FINE)) {
+            logger.log(Level.FINE, user + ": left channel " + 
+                                   channel.getName());
+        }
+    }
+    
+    /** {@inheritDoc} */
+    public void receivedMessage(ClientChannel channel, ByteBuffer message) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, user + ": Received: " + 
+                                    bufferToString(message));
+        }
+        noteReceived();
+    }
+    
+    
     /* -- Other methods -- */
 
     /** Performs a login to the current host, waiting as needed. */
