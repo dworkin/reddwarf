@@ -898,7 +898,7 @@ public class ClientSessionImpl
 	/** The prefix for client sessions on the failed node. */
 	private final String nodePrefix;
 
-	/** The last session key handled (initially the {@code nodePrefix}. */
+	/** The last session key handled, initially the {@code nodePrefix}. */
 	private String lastKey;
 
 	/**

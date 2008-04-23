@@ -35,11 +35,24 @@
 @set java=%java_home%\bin\java
 )
 
+@rem The directory containing the Berkeley DB native libraries
+@set native_dir="%sgshome%\lib\bdb\win32-x86"
+
+@rem Check that the Berkeley DB libraries have been installed properly
+@if not exist "%sgshome%\lib\bdb\db.jar" (
+@echo The db.jar file needs to be installed in %sgshome%\lib\bdb
+@goto end
+)
+@if not exist "%native_dir%" (
+@echo The Berkeley DB native library directory was not found: %native_dir%
+@goto end
+)
+
 @rem Run the SGS server, specifying the library path, the logging
 @rem configuration file, the classpath, the main class, and
 @rem the application configuration file
 :cmdline
-"%java%" -Djava.library.path="%sgshome%\lib\bdb\win32-x86" ^
+"%java%" -Djava.library.path="%native_dir%" ^
        	 -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
        	 -cp "%sgshome%\lib\sgs.jar";%app_classpath% ^
        	 com.sun.sgs.impl.kernel.Kernel ^

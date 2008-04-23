@@ -19,14 +19,17 @@
 
 package com.sun.sgs.example.chat.app;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.NameNotBoundException;
+
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionListener;
 
 /**
  * A simple chat application.  The application logic for this example
@@ -42,6 +45,10 @@ public class ChatApp
     private static final Logger logger =
         Logger.getLogger(ChatApp.class.getName());
 
+    /** The prefix for storing sessions by ID in the data store. */
+    private static final String SESSION_PREFIX =
+        "com.sun.sgs.example.chat.app.ChatApp.";
+    
     /**
      * The default constructor.
      */
@@ -67,7 +74,59 @@ public class ChatApp
      * for the given {@code session}.
      */
     public ClientSessionListener loggedIn(ClientSession session) {
-        logger.log(Level.INFO, "ClientSession joined: {0}", session);
+        logger.log(Level.INFO, "ClientSession logging in: {0}", session);
+        // Give the session a binding in the data store
+        DataManager dataMgr = AppContext.getDataManager();
+        
+        final String userName = session.getName();
+        String key = sessionIdKey(userName);
+        try {
+            dataMgr.getBinding(key);
+            // If the name is already used, refuse log in.
+            String reply = "User " + userName + " already logged in";
+            logger.log(Level.WARNING, reply);
+            try {
+                session.send(ChatClientSessionListener.toMessageBuffer(
+                                                   "/loginFailed " + reply));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        } catch (NameNotBoundException e) {
+            dataMgr.setBinding(key, session);
+        }
+
         return new ChatClientSessionListener(session);
+    }
+    
+    /**
+     * Returns the ClientSession with the given name
+     * @param name the user name
+     * @return the ClientSession for the given user name
+     */
+    static ClientSession getSessionFromIdString(String name) {
+        String key = sessionIdKey(name);
+        return (ClientSession) AppContext.getDataManager().getBinding(key);
+    }
+
+
+    /**
+     * Removes the data-store ID binding for the given session.
+     * 
+     * @param session a session
+     */
+    static void removeSessionBinding(ClientSession session) {
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.removeBinding(sessionIdKey(session.getName()));
+    }
+
+    /**
+     * Returns the data store key for the session with the name.
+     * 
+     * @param name the name for the session
+     * @return the data store key for the session
+     */
+    private static String sessionIdKey(String name) {
+        return SESSION_PREFIX + name;
     }
 }
