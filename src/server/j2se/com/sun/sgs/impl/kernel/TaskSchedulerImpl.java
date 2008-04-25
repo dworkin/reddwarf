@@ -26,12 +26,14 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 
+import java.util.LinkedList;
 import java.util.Properties;
 
 import java.util.concurrent.Executors;
@@ -196,6 +198,15 @@ final class TaskSchedulerImpl implements TaskScheduler {
                                                           startTime, period));
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public TaskQueue createTaskQueue() {
+        if (isShutdown)
+            throw new IllegalStateException("Scheduler is shutdown");
+        return new TaskQueueImpl();
+    }
+
     /*
      * Utility methods and classes.
      */
@@ -308,6 +319,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
         final Identity owner;
         volatile long startTime;
         final long period;
+        final TaskQueueImpl queue;
         /** Creates an instance of {@code TaskDetail}. */
         TaskDetail(KernelRunnable task, Identity owner, long startTime) {
             this(task, owner, startTime, 0);
@@ -324,6 +336,22 @@ final class TaskSchedulerImpl implements TaskScheduler {
             this.owner = owner;
             this.startTime = startTime;
             this.period = period;
+            this.queue = null;
+        }
+        /** Creates an instance of {@code TaskDetail} with dependency. */
+        TaskDetail(KernelRunnable task, Identity owner, TaskQueueImpl queue) {
+            if (task == null)
+                throw new NullPointerException("Task cannot be null");
+            if (owner == null)
+                throw new NullPointerException("Owner cannot be null");
+            if (queue == null)
+                throw new NullPointerException("TaskQueue cannot be null");
+
+            this.task = task;
+            this.owner = owner;
+            this.startTime = System.currentTimeMillis();
+            this.period = 0;
+            this.queue = queue;
         }
         /** Returns whether this task is recurring. */
         boolean isRecurring() {
@@ -376,6 +404,44 @@ final class TaskSchedulerImpl implements TaskScheduler {
             } finally {
                 // always restore the previous owner before leaving
                 ContextResolver.setTaskState(kernelContext, parent);
+                // schedule the next task, if any
+                if (taskDetail.queue != null)
+                    taskDetail.queue.scheduleNextTask();
+            }
+        }
+    }
+
+    /** Private implementation of {@code TaskQueue}. */
+    private final class TaskQueueImpl implements TaskQueue {
+        private final LinkedList<TaskDetail> queue =
+            new LinkedList<TaskDetail>();
+        private boolean inScheduler = false;
+        /** {@inheritDoc} */
+        public void addTask(KernelRunnable task, Identity owner) {
+            TaskDetail detail = new TaskDetail(task, owner, this);
+            synchronized (this) {
+                if (inScheduler) {
+                    waitingSize.incrementAndGet();
+                    queue.offer(detail);
+                } else {
+                    inScheduler = true;
+                    executor.submit(new TaskRunner(detail));
+                }
+            }
+        }
+        /** Private method to schedule the next task, if any. */
+        void scheduleNextTask() {
+            synchronized (this) {
+                if (queue.isEmpty()) {
+                    inScheduler = false;
+                } else {
+                    // create a new instance of TaskDetail so that the
+                    // start time is re-set
+                    TaskDetail detail = queue.poll();
+                    executor.submit(new TaskRunner(new TaskDetail(detail.task,
+                                                                  detail.owner,
+                                                                  this)));
+                }
             }
         }
     }
