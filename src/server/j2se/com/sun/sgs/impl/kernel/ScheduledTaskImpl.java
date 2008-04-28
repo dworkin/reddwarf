@@ -47,10 +47,10 @@ class ScheduledTaskImpl implements ScheduledTask {
     private final KernelRunnable task;
     private final Identity owner;
     private final Priority priority;
-    private final long startTime;
     private final long period;
 
     // the common, mutable aspects of a task
+    private volatile long startTime;
     private RecurringTaskHandle recurringTaskHandle = null;
     private int tryCount = 0;
     private TaskQueue queue = null;
@@ -193,6 +193,11 @@ class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /** Package-private utility methods. */
+
+    /** Re-sets the starting time to the now. */
+    void resetStartTime() {
+        startTime = System.currentTimeMillis();
+    }
 
     /**
      * Returns {@code null} if the task completed successfully, or the
