@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
@@ -37,6 +38,7 @@ import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.ManagedQueue;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -51,6 +53,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -72,6 +76,9 @@ abstract class ChannelImpl implements Channel, Serializable {
     /** The package name. */
     private final static String PKG_NAME = "com.sun.sgs.impl.service.channel.";
 
+    /** The channel name component prefix. */
+    private final static String NAME_COMPONENT = "name.";
+
     /** The channel set component prefix. */
     private final static String SET_COMPONENT = "set.";
 
@@ -83,12 +90,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /** The random number generator for choosing a new coordinator. */
     private final static Random random = new Random();
+
+    /** The channel name. */
+    protected final String name;
     
     /** The ID from a managed reference to this instance. */
     protected final byte[] channelId;
 
     /** The wrapped channel instance. */
     private final ManagedReference<ChannelWrapper> wrappedChannelRef;
+
+    /** The reference to this channel's listener. */
+    private final ManagedReference<ChannelListener> listenerRef;
 
     /** The delivery requirement for messages sent on this channel. */
     protected final Delivery delivery;
@@ -124,16 +137,35 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code delivery} requirement.
+     * {@code name}, {@code listener}, {@code delivery} requirement, 
+     * and write buffer capacity.
      *
+     * @param name a channel name
+     * @param listener a channel listener
      * @param delivery a delivery requirement
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
      */
-    protected ChannelImpl(Delivery delivery, int writeBufferCapacity) {
+    protected ChannelImpl(String name, ChannelListener listener,
+			  Delivery delivery, int writeBufferCapacity)
+    {
+	if (name == null) {
+	    throw new NullPointerException("null name");
+	}
+	this.name = name;
+	this.dataService = ChannelServiceImpl.getDataService();
+	if (listener != null) {
+	    if (! (listener instanceof Serializable)) {
+		throw new IllegalArgumentException("non-serializable listener");
+	    } else if (! (listener instanceof ManagedObject)) {
+		listener = new ManagedSerializableChannelListener(listener);
+	    }
+	    this.listenerRef = dataService.createReference(listener);
+	} else {
+	    this.listenerRef = null;
+	}
 	this.delivery = delivery;
 	this.writeBufferCapacity = writeBufferCapacity;
 	this.txn = ChannelServiceImpl.getTransaction();
-	this.dataService = ChannelServiceImpl.getDataService();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.wrappedChannelRef =
 	    dataService.createReference(new ChannelWrapper(ref));
@@ -143,22 +175,49 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
 		       HexDumper.toHexString(channelId));
 	}
+	dataService.setServiceBinding(getChannelKey(), this);
 	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
     }
 
     /* -- Factory methods -- */
 
     /**
-     * Constructs a new {@code Channel} with the given {@code delivery}
-     * requirement and write-buffer capacity.
+     * Constructs a new {@code Channel} with the given {@code name}, {@code
+     * listener}, {@code delivery} requirement and write-buffer capacity.
      */
-    static Channel newInstance(Delivery delivery, int writeBufferCapacity) {
+    static Channel newInstance(String name,
+			       ChannelListener listener,
+			       Delivery delivery,
+			       int writeBufferCapacity)
+    {
 	// TBD: create other channel types depending on delivery.
 	return new OrderedUnreliableChannelImpl(
-	    delivery, writeBufferCapacity).getWrappedChannel();
+	    name, listener, delivery, writeBufferCapacity).getWrappedChannel();
+    }
+
+    /**
+     * Returns a channel with the given {@code name}.
+     */
+    static Channel getInstance(String name) {
+	try {
+	    return ((ChannelImpl) ChannelServiceImpl.getDataService().
+		getServiceBinding(getChannelKey(name))).getWrappedChannel();
+	} catch (ObjectNotFoundException e) {
+	    // TBD: This shouldn't happen, so log at SEVERE?
+	    throw new NameNotBoundException("channel not found!", e);
+	}
     }
 
     /* -- Implement Channel -- */
+    
+    /** {@inheritDoc} */
+    public String getName() {
+	checkContext();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getName returns {0}", name);
+	}
+	return name;
+    }
     
     /** {@inheritDoc} */
     public Delivery getDeliveryRequirement() {
@@ -168,6 +227,20 @@ abstract class ChannelImpl implements Channel, Serializable {
 		       "getDeliveryRequirement returns {0}", delivery);
 	}
 	return delivery;
+    }
+
+    /** {@inheritDoc} */
+    public boolean hasSessions() {
+	checkClosed();
+	String prefix = getSessionPrefix();
+	String name = dataService.nextServiceBoundName(prefix);
+	return name != null && name.startsWith(prefix);
+    }
+
+    /** {@inheritDoc} */
+    public Iterator<ClientSession> getSessions() {
+	checkClosed();
+	return new ClientSessionIterator(dataService, getSessionPrefix());
     }
 
     /** {@inheritDoc} */
@@ -394,12 +467,13 @@ abstract class ChannelImpl implements Channel, Serializable {
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel send(ByteBuffer message) {
+    public Channel send(ClientSession sender, ByteBuffer message) {
 	try {
 	    checkClosed();
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
+	    message = message.asReadOnlyBuffer();
             if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
@@ -408,15 +482,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    /*
 	     * Enqueue send request.
 	     */
-            byte[] bytes = new byte[message.remaining()];
-            message.get(bytes);
-	    addEvent(new SendEvent(bytes));
+            byte[] msgBytes = new byte[message.remaining()];
+            message.get(msgBytes);
+	    byte[] senderIdBytes =
+		sender != null ?
+		getSessionIdBytes(unwrapSession(sender)) :
+		null;
+	    addEvent(new SendEvent(senderIdBytes, msgBytes));
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
-			   this, HexDumper.format(bytes, 0x50));
+			   this, HexDumper.format(msgBytes, 0x50));
 	    }
-	    return this;
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -426,11 +503,34 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    throw e;
 	}
+
+	return this;
+    }
+
+    /**
+     * If this channel has a null {@code ChannelListener}, forwards the
+     * specified {@code message} to the channel by invoking this channel's
+     * {@code send} method with the specified {@code sender} and {@code
+     * message}; otherwise, invokes the {@code ChannelListener}'s {@code
+     * receivedMessage} method with this channel, the specified {@code sender},
+     * and {@code message}.
+     */
+    private void receivedMessage(ClientSession sender, ByteBuffer message) {
+
+	if (listenerRef == null) {
+	    send(sender, message);
+	} else {
+	    // TBD: exception handling?
+	    listenerRef.get().receivedMessage(
+		getWrappedChannel(), sender, message.asReadOnlyBuffer());
+	}
     }
 
     /**
      * Enqueues a close event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.
+     * this channel's coordinator to service the event.  This method
+     * is invoked by this channel's {@code ChannelWrapper} when the
+     * application removes the wrapper object.
      */
     void close() {
 	checkContext();
@@ -484,6 +584,26 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /* -- Binding prefix/key methods -- */
+
+    /**
+     * Return a key for accessing the channel with the specified
+     * {@code name}.  The key has the following form:
+     *
+     * com.sun.sgs.impl.service.channel.name.<channelName>
+     */
+    private static String getChannelKey(String name) {
+	return PKG_NAME + NAME_COMPONENT + name;
+    }
+
+    /**
+     * Returns a key for accessing this channel.  The key has the
+     * following form:
+     *
+     * com.sun.sgs.impl.service.channel.name.<channelName>
+     */
+    private String getChannelKey() {
+	return getChannelKey(name);
+    }
 
     /**
      * Returns the prefix for accessing all client sessions on this
@@ -1021,14 +1141,22 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes all sessions from this channel, removes the channel object
-     * from the data store, and removes the event queue and associated
-     * binding from the data store.  This method should be called when the
-     * channel is closed.
+     * Removes all sessions from this channel, removes the channel
+     * object and its binding, the channel listener wrapper (if we
+     * created a wrapper for it), and the event queue and associated
+     * binding from the data store.  This method should be called when
+     * the channel is closed.
      */
     private void removeChannel() {
 	removeAllSessions();
+	dataService.removeServiceBinding(getChannelKey());
 	dataService.removeObject(this);
+	if (listenerRef != null) {
+	    ChannelListener maybeWrappedListener = listenerRef.get();
+	    if (maybeWrappedListener instanceof ManagedSerializable) {
+		dataService.removeObject(maybeWrappedListener);
+	    }
+	}
 	EventQueue eventQueue = getEventQueue(coordNodeId, channelId);
 	dataService.removeServiceBinding(getEventQueueKey());
 	dataService.removeObject(eventQueue);
@@ -1082,6 +1210,95 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /* -- Other classes -- */
+
+    /**
+     * An iterator for {@code ClientSessions} of a given channel.
+     */
+    private static class ClientSessionIterator
+	implements Iterator<ClientSession>
+    {
+	/** The data service. */
+	protected final DataService dataService;
+
+	/** The underlying iterator for service bound names. */
+	protected final Iterator<String> iterator;
+
+	/** The client session to be returned by {@code next}. */
+	private ClientSession nextSession = null;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code dataService} and {@code keyPrefix}.
+	 */
+	ClientSessionIterator(DataService dataService, String keyPrefix) {
+	    this.dataService = dataService;
+	    this.iterator =
+		BoundNamesUtil.getServiceBoundNamesIterator(
+		    dataService, keyPrefix);
+	}
+
+	/** {@inheritDoc} */
+	public boolean hasNext() {
+	    if (! iterator.hasNext()) {
+		return false;
+	    }
+	    if (nextSession != null) {
+		return true;
+	    }
+	    String key = iterator.next();
+	    ChannelImpl.ClientSessionInfo info =
+		(ChannelImpl.ClientSessionInfo)
+		    dataService.getServiceBinding(key);
+	    ClientSession session = info.getClientSession();
+	    if (session == null) {
+		return hasNext();
+	    } else {
+		nextSession = session;
+		return true;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public ClientSession next() {
+	    try {
+		if (nextSession == null && ! hasNext()) {
+		    throw new NoSuchElementException();
+		}
+		return nextSession;
+	    } finally {
+		nextSession = null;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void remove() {
+	    throw new UnsupportedOperationException("remove is not supported");
+	}
+    }
+    
+    /**
+     * A wrapper for a {@code ChannelListener} that is serializable,
+     * but not managed.
+     */
+    private static class ManagedSerializableChannelListener
+	extends ManagedSerializable<ChannelListener>
+	implements ChannelListener
+    {
+	private final static long serialVersionUID = 1L;
+	
+	/** Constructs an instance with the specified {@code listener}. */
+	ManagedSerializableChannelListener(ChannelListener listener) {
+	    super(listener);
+	}
+
+	/** {@inheritDoc} */
+	public void receivedMessage(
+	    Channel channel, ClientSession sender, ByteBuffer message)
+	{
+	    get().receivedMessage(channel, sender, message);
+	}
+	
+    }
     
     /**
      * A {@code ManagedObject} wrapper for a {@code ClientSession}'s
@@ -1306,6 +1523,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    channel.getChannelServers();
 		final BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
+		final String channelName = channel.name;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
@@ -1316,7 +1534,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 			public void run() {
 			    for (ChannelServer server : channelServers) {
 				try {
-				    server.refresh(channelIdBytes);
+				    server.refresh(channelName, channelIdBytes);
 				} catch (IOException e) {
 				    /*
 				     * It is possible that the channel server's
@@ -1442,7 +1660,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 		new Runnable() {
 		    public void run() {
 		        try {
-			    server.join(channel.channelId, sessionId);
+			    server.join(channel.name, channel.channelId,
+					sessionId);
 			} catch (IOException e) {
 			    /*
 			     * If the channel server can't be contacted, it
@@ -1565,34 +1784,56 @@ abstract class ChannelImpl implements Channel, Serializable {
 	private final static long serialVersionUID = 1L;
 
 	private final byte[] message;
+	/** The sender's session ID, or null. */
+	private final byte[] senderId;
+	
 	/**
-	 * Constructs a send event with the given {@code message}.
+	 * Constructs a send event with the given {@code senderId} and
+	 * {@code message}.
+	 *
+	 * @param senderId a sender's session ID, or {@code null}
+	 * @param message a message
 	 */
-	SendEvent(byte[] message) {
+	SendEvent(byte[] senderId, byte[] message) {
+	    this.senderId = senderId;
 	    this.message = message;
 	}
 
-	/** {@inheritDoc} */
+	/** {@inheritDoc}
+	 *
+	 * TBD: (optimization) this should handle sending
+	 * multiple messages to a given channel.  Here, we
+	 * could peek at the next event in the queue, and if
+	 * it is a send, that event could be batched with this
+	 * send event.  This could be repeated for multiple
+	 * send events appearing in the queue.
+	 */
 	public void serviceEvent(EventQueue eventQueue) {
 
 	    /*
-	     * TBD: (optimization) this should handle sending
-	     * multiple messages to a given channel.  Here, we
-	     * could peek at the next event in the queue, and if
-	     * it is a send, that event could be batched with this
-	     * send event.  This could be repeated for multiple
-	     * send events appearing in the queue.
+	     * Verfiy that the sending session (if any) is a member of this
+	     * channel.
 	     */
 	    final ChannelImpl channel = eventQueue.getChannel();
+	    if (senderId != null) {
+		ClientSession sender =
+		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
+		if (sender == null || ! channel.hasSession(sender)) {
+		    return;
+		}
+	    }
+	    /*
+	     * Enqueue a channel task to forward the message to the
+	     * channel's servers for delivery.
+	     */
 	    final Set<ChannelServer> servers = channel.getChannelServers();
-	    final byte[] channelMessage = channel.getChannelMessage(message);
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
 		new Runnable() {
 		    public void run() {
 			for (ChannelServer server : servers) {
 			    try {
-				server.send(channel.channelId, channelMessage);
+				server.send(channel.channelId, message);
 			    } catch (IOException e) {
 				/*
 				 * If a channel server can't be contacted, it
@@ -1635,19 +1876,6 @@ abstract class ChannelImpl implements Channel, Serializable {
      */
     int getWriteBufferCapacity() {
         return writeBufferCapacity;
-    }
-
-    /**
-     * Returns a SESSION_MESSAGE protocol message containing the specified
-     * channel {@code message}.
-     */
-    private byte[] getChannelMessage(byte[] message) {
-
-        MessageBuffer buf = new MessageBuffer(1 + message.length);
-        buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-	    putBytes(message);
-
-        return buf.getBuffer();
     }
 
     /**
@@ -1721,6 +1949,34 @@ abstract class ChannelImpl implements Channel, Serializable {
 		"Event queue binding:{0} exists, but object is removed",
 		eventQueueKey);
 	    throw e;
+	}
+    }
+
+    /* -- Static method invoked by ChannelServiceImpl -- */
+
+    /**
+     * Handles a channel {@code message} that the specified {@code session}
+     * is sending on the channel with the specified {@code channelRefId}.
+     *
+     * @param	channelRefId the channel ID, as a {@code BigInteger}
+     * @param	session the client session sending the channel message
+     * @param	message the channel message
+     */
+    static void handleChannelMessage(
+	BigInteger channelRefId, ClientSession session, ByteBuffer message)
+    {
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	if (channel != null) {
+	    channel.receivedMessage(session, message);
+	} else {
+	    // Ignore message received for unknown channel.
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(
+ 		    Level.FINE,
+		    "Dropping message:{0}: from:{1} for unknown channel: {2}",
+		    HexDumper.format(message), session,
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
 	}
     }
 

@@ -37,6 +37,8 @@ import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
@@ -132,6 +134,13 @@ public class ClientTest implements SimpleClientListener
      */
     public void reconnecting() {
         // TODO
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
+	return null;
     }
 
    /**

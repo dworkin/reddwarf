@@ -43,6 +43,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.impl.client.comm.ClientConnection;
@@ -188,6 +190,10 @@ public class TestSimpleClientListener
 
         public void disconnected(boolean graceful, String reason) { }
 
+	public ClientChannelListener joinedChannel(ClientChannel channel) {
+	    return null;
+	}
+	
         public void receivedMessage(ByteBuffer message) { }
 
         public void reconnected() { }
