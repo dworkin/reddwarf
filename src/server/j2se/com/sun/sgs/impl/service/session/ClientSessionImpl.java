@@ -616,10 +616,10 @@ public class ClientSessionImpl
 	 * a task to send a request to this session's client session server
 	 * to service this session's event queue.
 	 */
-	/*	if (isLocalSession && eventQueue.isEmpty()) {
+	if (isLocalSession && eventQueue.isEmpty()) {
 	    event.serviceEvent(eventQueue);
 	    
-	    } else */ if (! eventQueue.offer(event)) {
+	} else if (! eventQueue.offer(event)) {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add client session event");
 	    
