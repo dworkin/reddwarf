@@ -605,19 +605,25 @@ public class ClientSessionImpl
 	    throw new IllegalStateException(
 		"event queue removed; session is disconnected");
 	}
+
+	boolean isLocalSession = nodeId == sessionService.getLocalNodeId();
+
+	/*
+	 * If this session is connected to the local node and the event
+	 * queue is empty, service the event immediately; otherwise, add
+	 * the event to the event queue.  If the session is connected
+	 * locally, service the head of the event queue; otherwise schedule
+	 * a task to send a request to this session's client session server
+	 * to service this session's event queue.
+	 */
+	if (isLocalSession && eventQueue.isEmpty()) {
+	    event.serviceEvent(eventQueue);
 	    
-	if (! eventQueue.offer(event)) {
+	} else if (! eventQueue.offer(event)) {
 	    throw new ResourceUnavailableException(
 	   	"not enough resources to add client session event");
-	}
-	
-	/*
-	 * If this session is connected to the local node, service events
-	 * locally; otherwise schedule a task to send a request to this
-	 * session's client session server to service this session's event
-	 * queue. 
-	 */
-	if (nodeId == sessionService.getLocalNodeId()) {
+	    
+	} else if (isLocalSession) {
 	    eventQueue.serviceEvent();
 	    
 	} else {
@@ -832,6 +838,13 @@ public class ClientSessionImpl
 	 */
 	ManagedQueue<SessionEvent> getQueue() {
 	    return queueRef.get();
+	}
+
+	/**
+	 * Returns {@code true} if the event queue is empty.
+	 */
+	boolean isEmpty() {
+	    return getQueue().isEmpty();
 	}
 
 	/**
