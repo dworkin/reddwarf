@@ -435,12 +435,12 @@ final class TaskSchedulerImpl implements TaskScheduler {
                 if (queue.isEmpty()) {
                     inScheduler = false;
                 } else {
-                    // create a new instance of TaskDetail so that the
-                    // start time is re-set
+                    // re-set the start time before scheduling, since the
+                    // task isn't really requested to start until all
+                    // tasks ahead of it have run
                     TaskDetail detail = queue.poll();
-                    executor.submit(new TaskRunner(new TaskDetail(detail.task,
-                                                                  detail.owner,
-                                                                  this)));
+                    detail.startTime = System.currentTimeMillis();
+                    executor.submit(new TaskRunner(detail));
                 }
             }
         }
