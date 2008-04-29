@@ -1,3 +1,26 @@
+Version 0.9.6:
+- Support multi-node operation
+  - Add WatchdogService and NodeMappingService
+  - Modify the TaskService, ChannelService, and ClientSessionService to
+    use the new services
+- API changes:
+  - Use ByteBuffer for channel and session message parameters
+  - Remove subset channel sends
+  - Make ClientSession and Channel managed objects
+  - Add Channel message filtering
+  - Loosen consistency guarantees for obtaining channel sessions
+  - Add exceptions for resource failures
+  - Make miscellaneous channel convenience changes
+  - Add new Delivery constant
+  - Add type parameter to ManagedReference
+- Implement ManagedReferenceImpl.equals and hashCode
+- Remove support for running multiple applications
+- Detect managed objects with serialization readResolve or writeReplace
+  methods
+- Simplify scheduler and kernel interfaces
+- Simplify SGS protocol
+- Increase default BDB data store cache size
+
 Version 0.9.5:
 - Improve I/O throttling in the Client Session and Channel services
 - Add scalable map and set implementations

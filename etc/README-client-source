@@ -13,6 +13,9 @@ each other and with game servers implemented with the Project Darkstar
 Server.  The Project Darkstar Server is available as a separate
 download.
 
+See the CHANGELOG file for a summary of recent changes, and the
+API-CHANGES file for a detailed list of recent changes to the API.
+
 CONTENTS
 
 This distribution contains the following subdirectories:
@@ -64,8 +67,6 @@ MORE INFORMATION
 For more information, please see the tutorial in the doc directory.
 Also check the http://www.projectdarkstar.com website, which has links
 to more information and to the Project Darkstar forums.
-
-See the CHANGELOG file for a list of changes.
 
 If you cannot find an answer to your question in any of these places,
 please email the Darkstar team at:
