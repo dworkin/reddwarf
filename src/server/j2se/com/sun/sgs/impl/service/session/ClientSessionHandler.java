@@ -43,7 +43,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -59,6 +61,8 @@ class ClientSessionHandler {
     private static enum State {
         /** Session is connected */
         CONNECTED,
+	/** Session login ack (success, failure, redirect) has been sent */
+	LOGIN_HANDLED,
         /** Disconnection is in progress */
         DISCONNECTING, 
         /** Session is disconnected */
@@ -101,6 +105,16 @@ class ClientSessionHandler {
      * {@code state}, {@code disconnectHandled}, and {@code shutdown}.
      */
     private final Object lock = new Object();
+
+    /** The lock for accessing {@code ConnectedWriteHandler} fields {@code
+     * pendingWrites}, {@code isWriting}, and {@code ConnectedReadHandler}
+     * field {@code isReading}. The locks {@code lock} and {@code rwLock}
+     * should only be acquired in that specified order.
+     */
+    private final Object rwLock = new Object();
+
+    /** Messages enqueued to be sent after the login ack is sent. */
+    private final List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
     
     /** The connection state. */
     private State state = State.CONNECTED;
@@ -152,29 +166,73 @@ class ClientSessionHandler {
     boolean isConnected() {
 
 	State currentState = getCurrentState();
-
-	boolean connected = (currentState == State.CONNECTED);
-
-	return connected;
+	return
+	    currentState == State.CONNECTED ||
+	    currentState == State.LOGIN_HANDLED;
     }
 
     /**
-     * Immediately sends the specified protocol {@code message}
-     * according to the specified {@code delivery} requirement.
+     * Sends the specified login protocol {@code message}, followed by any
+     * enqueued messages, and sets the state to LOGIN_HANDLED.
+     */
+    void sendLoginProtocolMessage(byte[] message, Delivery delivery) {
+	synchronized (lock) {
+	    if (state != State.CONNECTED) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.log(
+		        Level.WARNING,
+			"unexpected state:{0} for login protocol message, " +
+			"session:{1}", state.toString(), this);
+		}
+		throw new IllegalStateException("unexpected state: " +
+						state.toString());
+	    }
+	    
+	    writeToWriteHandler(ByteBuffer.wrap(message));
+	    state = State.LOGIN_HANDLED;
+	    for (ByteBuffer nextMessage : messageQueue) {
+		writeToWriteHandler(nextMessage);
+	    }
+	    messageQueue.clear();
+	}
+    }
+
+    /**
+     * Immediately sends the specified protocol {@code message} according to
+     * the specified {@code delivery} requirement if the session has logged
+     * in; otherwise, enqueues the message until the login ack has been sent.
      */
     void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
-	try {
-	    if (isConnected()) {
-	        writeHandler.write(ByteBuffer.wrap(message));
-	    } else {
+	synchronized (lock) {
+	    switch (state) {
+	    case CONNECTED:
+		messageQueue.add(ByteBuffer.wrap(message));
+		return;
+		
+	    case LOGIN_HANDLED:
+		break;
+		
+	    default:
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
-		        Level.FINER,
-			"sendProtocolMessage session:{0} " +
-			"session is disconnected", this);
+			       Level.FINER,
+			       "sendProtocolMessage session:{0} " +
+			       "session is disconnected", this);
 		}
+		return;
 	    }
+	}
+
+	writeToWriteHandler(ByteBuffer.wrap(message));
+    }
+
+    /**
+     * Writes a message to the write handler.
+     */
+    private void writeToWriteHandler(ByteBuffer message) {
+	try {
+	    writeHandler.write(message);
 		    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
@@ -364,7 +422,7 @@ class ClientSessionHandler {
         @Override
         void write(ByteBuffer message) {
             boolean first;
-            synchronized (lock) {
+            synchronized (rwLock) {
                 first = pendingWrites.isEmpty();
                 pendingWrites.add(message);
             }
@@ -382,7 +440,7 @@ class ClientSessionHandler {
 	/** Start processing the first element of the queue, if present. */
         private void processQueue() {
             ByteBuffer message;
-            synchronized (lock) {
+            synchronized (rwLock) {
                 if (isWriting) {
                     return;
 		}
@@ -413,7 +471,7 @@ class ClientSessionHandler {
 	/** Done writing the first request in the queue. */
         public void completed(IoFuture<Void, Void> result) {
 	    ByteBuffer message;
-            synchronized (lock) {
+            synchronized (rwLock) {
                 message = pendingWrites.remove();
                 isWriting = false;
             }
@@ -480,7 +538,7 @@ class ClientSessionHandler {
 	/** Reads a message from the connection. */
         @Override
         void read() {
-            synchronized (lock) {
+            synchronized (rwLock) {
                 if (isReading)
                     throw new ReadPendingException();
                 isReading = true;
@@ -490,7 +548,7 @@ class ClientSessionHandler {
 
 	/** Handles the completed read operation. */
         public void completed(IoFuture<ByteBuffer, Void> result) {
-            synchronized (lock) {
+            synchronized (rwLock) {
                 isReading = false;
             }
             try {
@@ -750,7 +808,7 @@ class ClientSessionHandler {
 		// when scheduling the task.
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
-			sendProtocolMessage(
+			sendLoginProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
                         try {
                             // FIXME: this is a hack to make sure that 
@@ -774,7 +832,7 @@ class ClientSessionHandler {
 	    // when scheduling the task.
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
-		    sendProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
+		    sendLoginProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
 		    handleDisconnect(false);
 		}});
 	}
