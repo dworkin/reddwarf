@@ -25,13 +25,18 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+
+import com.sun.sgs.test.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
 
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 
 import java.util.Properties;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.JUnit4TestAdapter;
 
@@ -397,6 +402,31 @@ public class TestTaskSchedulerImpl {
                                                 100);
         handle.cancel();
         handle.start();
+    }
+
+    /**
+     * Test createTaskQueue.
+     */
+
+    @Test public void scheduleQueuedTasks() throws Exception {
+        TaskQueue queue = taskScheduler.createTaskQueue();
+        AtomicInteger runCount = new AtomicInteger(0);
+        for (int i = 0; i < 10; i++)
+            queue.addTask(new DependentTask(runCount), taskOwner);
+        Thread.sleep(500L);
+        assertEquals(10, runCount.get());
+    }
+
+    @Test (expected=NullPointerException.class)
+        public void scheduleQueuedTasksNull() throws Exception {
+        TaskQueue queue = taskScheduler.createTaskQueue();
+        queue.addTask(null, taskOwner);
+    }
+
+    @Test (expected=NullPointerException.class)
+        public void scheduleQueuedTasksOwnerNull() throws Exception {
+        TaskQueue queue = taskScheduler.createTaskQueue();
+        queue.addTask(new DependentTask(null), null);
     }
 
     /**

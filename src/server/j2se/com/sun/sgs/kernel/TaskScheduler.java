@@ -131,4 +131,13 @@ public interface TaskScheduler {
                                                      long startTime,
                                                      long period);
 
+    /**
+     * Creates a new {@code TaskQueue} to use in scheduling dependent tasks.
+     * Once a given task has completed the next task will be submitted to the
+     * scheduler to run.
+     *
+     * @return a new {@code TaskQueue}
+     */
+    public TaskQueue createTaskQueue();
+
 }

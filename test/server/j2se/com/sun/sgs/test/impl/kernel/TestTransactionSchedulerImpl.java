@@ -301,7 +301,7 @@ public class TestTransactionSchedulerImpl {
         }
     }
 
-    private static class DependentTask implements KernelRunnable {
+    public static class DependentTask implements KernelRunnable {
         private static final Object lock = new Object();
         private static boolean isRunning = false;
         private static int objNumberSequence = 0;
