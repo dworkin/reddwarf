@@ -101,17 +101,10 @@ class ClientSessionHandler {
     /** The identity for this session. */
     private volatile Identity identity;
 
-    /** The lock for accessing the following fields:
-     * {@code state}, {@code disconnectHandled}, and {@code shutdown}.
+    /** The lock for accessing the following fields: {@code state},
+     * {@code messageQueue}, {@code disconnectHandled}, and {@code shutdown}.
      */
     private final Object lock = new Object();
-
-    /** The lock for accessing {@code ConnectedWriteHandler} fields {@code
-     * pendingWrites}, {@code isWriting}, and {@code ConnectedReadHandler}
-     * field {@code isReading}. The locks {@code lock} and {@code rwLock}
-     * should only be acquired in that specified order.
-     */
-    private final Object rwLock = new Object();
 
     /** Messages enqueued to be sent after the login ack is sent. */
     private final List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
@@ -405,6 +398,12 @@ class ClientSessionHandler {
     /** A completion handler for writing to the session's channel. */
     private class ConnectedWriteHandler extends WriteHandler {
 
+	/** The lock for accessing the fields {@code pendingWrites} and
+	 * {@code isWriting}. The locks {@code lock} and {@code writeLock}
+	 * should only be acquired in that specified order.
+	 */
+	private final Object writeLock = new Object();
+	
 	/** An unbounded queue of messages waiting to be written. */
         private final LinkedList<ByteBuffer> pendingWrites =
             new LinkedList<ByteBuffer>();
@@ -422,7 +421,7 @@ class ClientSessionHandler {
         @Override
         void write(ByteBuffer message) {
             boolean first;
-            synchronized (rwLock) {
+            synchronized (writeLock) {
                 first = pendingWrites.isEmpty();
                 pendingWrites.add(message);
             }
@@ -440,7 +439,7 @@ class ClientSessionHandler {
 	/** Start processing the first element of the queue, if present. */
         private void processQueue() {
             ByteBuffer message;
-            synchronized (rwLock) {
+            synchronized (writeLock) {
                 if (isWriting) {
                     return;
 		}
@@ -471,7 +470,7 @@ class ClientSessionHandler {
 	/** Done writing the first request in the queue. */
         public void completed(IoFuture<Void, Void> result) {
 	    ByteBuffer message;
-            synchronized (rwLock) {
+            synchronized (writeLock) {
                 message = pendingWrites.remove();
                 isWriting = false;
             }
@@ -529,6 +528,12 @@ class ClientSessionHandler {
     /** A completion handler for reading from the session's channel. */
     private class ConnectedReadHandler extends ReadHandler {
 
+	/** The lock for accessing the {@code isReading} field. The locks
+	 * {@code lock} and {@code readLock} should only be acquired in
+	 * that specified order.
+	 */
+	private final Object readLock = new Object();
+
 	/** Whether a read is underway. */
         private boolean isReading = false;
 
@@ -538,7 +543,7 @@ class ClientSessionHandler {
 	/** Reads a message from the connection. */
         @Override
         void read() {
-            synchronized (rwLock) {
+            synchronized (readLock) {
                 if (isReading)
                     throw new ReadPendingException();
                 isReading = true;
@@ -548,7 +553,7 @@ class ClientSessionHandler {
 
 	/** Handles the completed read operation. */
         public void completed(IoFuture<ByteBuffer, Void> result) {
-            synchronized (rwLock) {
+            synchronized (readLock) {
                 isReading = false;
             }
             try {
@@ -832,7 +837,8 @@ class ClientSessionHandler {
 	    // when scheduling the task.
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
-		    sendLoginProtocolMessage(loginFailureMessage, Delivery.RELIABLE);
+		    sendLoginProtocolMessage(
+			loginFailureMessage, Delivery.RELIABLE);
 		    handleDisconnect(false);
 		}});
 	}

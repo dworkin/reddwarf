@@ -935,7 +935,8 @@ public final class ClientSessionServiceImpl
 	     */
 	    if (handler != null && handler.isConnected()) {
 		if (loginAck != null) {
-		    handler.sendLoginProtocolMessage(loginAck, Delivery.RELIABLE);
+		    handler.sendLoginProtocolMessage(
+			loginAck, Delivery.RELIABLE);
 		}
 		for (byte[] message : messages) {
 		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
