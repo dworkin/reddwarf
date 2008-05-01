@@ -74,12 +74,14 @@ public interface ClientSession extends ManagedObject {
     String getName();
     
     /**
-     * Sends a message contained in the specified {@link ByteBuffer}
-     * to this session's client.
-     * <p>
-     * The specified buffer may be reused immediately, but changes
-     * to the buffer will have no effect on the message sent to the
-     * client by this invocation.
+     * Sends a message contained in the specified {@link ByteBuffer} to
+     * this session's client. The message starts at the buffer's current
+     * position and ends at the buffer's limit.  The buffer's position is
+     * not modified by this operation.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the client by this invocation.
      *
      * @param	message a message
      *

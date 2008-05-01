@@ -27,6 +27,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -195,7 +196,7 @@ public final class ClientSessionServiceImpl
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
-    
+
     /** The watchdog service. */
     final WatchdogService watchdogService;
 
@@ -205,6 +206,9 @@ public final class ClientSessionServiceImpl
     /** The task service. */
     final TaskService taskService;
 
+    /** The channel service. */
+    private volatile ChannelServiceImpl channelService;
+    
     /** The identity manager. */
     final IdentityCoordinator identityManager;
 
@@ -384,6 +388,7 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     public void doReady() {
+	channelService = txnProxy.getService(ChannelServiceImpl.class);
         acceptFuture = acceptor.accept(new AcceptorListener());
         try {
             if (logger.isLoggable(Level.CONFIG)) {
@@ -869,6 +874,9 @@ public final class ClientSessionServiceImpl
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
+	/** The login ack protocol message, or null. */
+	private byte[] loginAck = null;
+
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -884,7 +892,7 @@ public final class ClientSessionServiceImpl
 
 	void addMessage(byte[] message, boolean isFirst) {
  	    if (isFirst) {
-		messages.add(0, message);
+		loginAck = message;
 	    } else {
 		messages.add(message);
 	    }
@@ -926,6 +934,10 @@ public final class ClientSessionServiceImpl
 	     * error message.
 	     */
 	    if (handler != null && handler.isConnected()) {
+		if (loginAck != null) {
+		    handler.sendLoginProtocolMessage(
+			loginAck, Delivery.RELIABLE);
+		}
 		for (byte[] message : messages) {
 		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
 		}
@@ -1185,6 +1197,13 @@ public final class ClientSessionServiceImpl
      */
     static TaskService getTaskService() {
 	return txnProxy.getService(TaskService.class);
+    }
+
+    /**
+     * Returns the channel service.
+     */
+    ChannelServiceImpl getChannelService() {
+	return channelService;
     }
 
     /**

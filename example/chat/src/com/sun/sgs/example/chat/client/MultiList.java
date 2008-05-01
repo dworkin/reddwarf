@@ -25,11 +25,10 @@ import java.util.List;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
-import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 
 /**
- * GUI component that handles multi-item selection lists.  Insertion order
+ * GUI component that handles selection lists.  Insertion order
  * is maintained, and items in the list must be unique.
  *
  * @param <T> the type of items in the list
@@ -47,12 +46,10 @@ public class MultiList<T> extends JList
      * and item renderer.
      *
      * @param type the type of items in the {@code MultiList}
-     * @param renderer the {@code ListCellRenderer} for items in the list
      */
-    public MultiList(Class<T> type, ListCellRenderer renderer) {
+    public MultiList(Class<T> type) {
 	super(new DefaultListModel());
-	setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-	setCellRenderer(renderer);
+	setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         this.type = type;
     }
 

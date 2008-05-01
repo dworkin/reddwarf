@@ -91,7 +91,7 @@ final class TransactionSchedulerImpl
      * threads.
      */
     public static final String CONSUMER_THREADS_PROPERTY =
-        "com.sun.sgs.impl.kernel.TransactionConsumerThreads";
+        "com.sun.sgs.impl.kernel.transaction.threads";
 
     // the default number of initial consumer threads
     private static final String DEFAULT_CONSUMER_THREADS = "4";
@@ -690,7 +690,12 @@ final class TransactionSchedulerImpl
                     inScheduler = false;
                 } else {
                     dependencyCount.decrementAndGet();
-                    backingQueue.addTask(queue.poll());
+                    // re-set the start time before scheduling, since the
+                    // task isn't really requested to start until all
+                    // tasks ahead of it have run
+                    ScheduledTaskImpl schedTask = queue.poll();
+                    schedTask.resetStartTime();
+                    backingQueue.addTask(schedTask);
                 }
             }
         }

@@ -19,9 +19,12 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
- * Manager for creating channels.  A {@link Channel} is a communication
- * group consisting of multiple client sessions and the server.
+ * Manager for creating and obtaining channels.  A {@link Channel} is a
+ * communication group consisting of multiple client sessions and the
+ * server.
  *
  * <p>A Channel is created with a {@link Delivery} requirement.
  * Messages sent on a channel are delivered according to the
@@ -29,23 +32,71 @@ package com.sun.sgs.app;
  * requirement on a channel cannot be changed.  If different delivery
  * requirements are needed, then different channels should be used for
  * communication.
+ * 
+ * @see AppContext#getChannelManager
  */
 public interface ChannelManager {
 
     /**
-     * Creates a new channel with the specified delivery requirement.
-     * The caller may want to associate the returned channel with a
-     * binding in the {@link DataManager} or store a {@link
-     * ManagedReference} to the returned channel.
+     * Creates a new channel with the specified listener and delivery
+     * requirement, binds it to the specified name, and returns it.
      *
+     * <p>If the specified {@code listener} is
+     * non-{@code null}, then when any client session sends a
+     * message on the returned channel, the specified listener's {@link
+     * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
+     * receivedMessage} method is invoked with the channel, client
+     * session and the message.  The specified listener is not
+     * invoked for messages that the server sends on the channel via
+     * the channel's {@link Channel#send send} method.  If the specified
+     * {@code listener} is non-{@code null}, then it must also
+     * be {@link Serializable}.
+     *
+     * <p>Supplying a non-{@code null} listener (although not required) is
+     * <i>strongly</i> suggested.  A listener's {@code receivedMessage}
+     * method provides an opportunity for an application to intervene when
+     * a client sends a channel message, to perform access control,
+     * filtering, or take other application-specific action on such channel
+     * messages.
+     *
+     * <p>If a non-{@code null} listener is provided, it is <i>strongly</i>
+     * suggested that a different listener instance be provided for each
+     * channel created, in order to reduce the possible contention on
+     * channel listeners.
+     *
+     * <p>Messages sent on the returned channel are delivered according to
+     * the specified delivery requirement.
+     *
+     * @param	name a name
+     * @param	listener a channel listener, or {@code null}
      * @param	delivery a delivery requirement
      *
-     * @return	a new channel
+     * @return	a new channel bound to the specified name
      *
+     * @throws	IllegalArgumentException if the specified listener is
+     *		non-{@code null} and is not serializable
      * @throws	ResourceUnavailableException if there are not enough
      *		resources to create the channel
+     * @throws	NameExistsException if a channel is already bound to
+     *		the specified name
      * @throws	TransactionException if the operation failed because of
-     *		a problem with the current transaction
+     * 		a problem with the current transaction
      */
-    Channel createChannel(Delivery delivery);
+    Channel createChannel(String name,
+			  ChannelListener listener,
+			  Delivery delivery);
+    
+    /**
+     * Returns an existing channel with the specified name.
+     *
+     * @param name a channel name
+     *
+     * @return an existing channel bound to the specified name
+     *
+     * @throws NameNotBoundException if a channel is not bound to the
+     * specified name
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    Channel getChannel(String name);
 }

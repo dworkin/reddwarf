@@ -1,0 +1,54 @@
+Project Darkstar Client API Changes
+
+Version 0.9.6:
+
+- Use ByteBuffer for message parameters
+
+  Methods for sending and receiving channel and session messages have
+  been modified to change the type of message parameters from byte array
+  to java.nio.ByteBuffer.  This change allows the implementation to be
+  more efficient by avoiding copying byte arrays.
+
+  Methods modified:
+
+  - ClientChannel.send
+  - ClientChannelListener.receivedMessage
+  - ServerSession.send
+  - ServerSessionListener.receivedMessage
+  - SimpleClient.send
+
+- Remove subset channel sends
+
+  Methods for sending channel messages to subsets of channel members
+  have been removed.  Channel messages sent by clients will now be
+  received by all channel members.  The subset methods were removed
+  because it was difficult to provide a multi-node implementations that
+  preserved ordering guarantees.  To replace the old methods,
+  applications should create additional, more specific, channels, or
+  arrange to send messages directly to the desired sessions.
+
+  Methods removed:
+
+  - ClientChannel.send(SessionId recipient, byte[] message)
+  - ClientChannel.send(Set<SessionId> recipients, byte[] message)
+
+- Remove SessionId
+
+  Support for session IDs has been removed.  Channel messages sent to
+  clients no longer identify the sender of the message.  This change was
+  made to simplify the client API and network protocol, and in
+  recognition of the fact that applications still needed to communicate
+  the names associated with sessions in order for session identification
+  to be useful.  Applications should replace these facilities with
+  application-specific for identifying users.
+
+  As part of this change, clients will now receive channel messages that
+  they sent themselves.
+
+  Changes:
+
+  - Removed the SessionId class
+  - Removed ServerSession.getSessionId
+  - Removed SimpleClient.getSessionId
+  - Removed the sender parameter from
+    ClientChannelListener.receivedMessage

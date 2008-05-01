@@ -72,8 +72,9 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import junit.framework.TestCase;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import junit.framework.TestSuite;
+
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 public class TestClientSessionServiceImpl extends TestCase {
 
@@ -139,6 +140,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     private final String VERSION_KEY;
     private final int MAJOR_VERSION;
     private final int MINOR_VERSION;
+    
+    /** If {@code true}, shuts off some printing during performance tests. */
+    private boolean isPerformanceTest = false;
     
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
@@ -937,6 +941,31 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    5, 4, new MaybeRetryException("non-retryable", false));
     }
 
+
+    public void testLocalSendPerformance() throws Exception {
+	final String user = "dummy";
+	DummyClient client = (new DummyClient(user)).connect(serverNode.getAppPort());
+	client.login();
+
+	isPerformanceTest = true;
+	int numIterations = 1000;
+	final ByteBuffer msg = ByteBuffer.allocate(0);
+	long startTime = System.currentTimeMillis();
+	for (int i = 0; i < numIterations; i++) {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    DataManager dataManager = AppContext.getDataManager();
+		    ClientSession session = (ClientSession)
+			dataManager.getBinding(user);
+		    session.send(msg);
+		}}, taskOwner);
+	}
+	long endTime = System.currentTimeMillis();
+	System.err.println("send, iterations: " + numIterations +
+			   ", elapsed time: " + (endTime - startTime) +
+			   " ms.");
+    }
+    
     private void sendMessagesAndCheck(
 	int numMessages, int expectedMessages, RuntimeException exception)
 	throws Exception
@@ -954,6 +983,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /* -- other methods -- */
 
+    private void printIt(String line) {
+	if (! isPerformanceTest) {
+	    System.err.println(line);
+	}
+    }
+    
     /** Find the app listener */
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
@@ -1303,9 +1338,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    byte[] message = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			messageList.add(message);
-			System.err.println("[" + name +
-					   "] received SESSION_MESSAGE: " +
-					   HexDumper.toHexString(message));
+			printIt("[" + name + "] received SESSION_MESSAGE: " +
+				HexDumper.toHexString(message));
 			lock.notifyAll();
 		    }
 		    break;

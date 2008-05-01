@@ -16,6 +16,9 @@ In addition to the documents, APIs and examples, this distribution
 contains a complete single-system version of the Project Darkstar
 Server.
 
+See the CHANGELOG file for a summary of recent changes, and the
+API-CHANGES file for a detailed list of recent changes to the API.
+
 CONTENTS
 
 This distribution contains the following subdirectories:
@@ -39,14 +42,19 @@ processors:
   processors
 - Windows XP SP2 on 32-bit processors
 - Redhat Linux EL4 on 32-bit processors
-- Mac OS X 10.4 on PowerPC and Intel processors
+- Mac OS X 10.5 on PowerPC and Intel processors
 
 This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
 greater.
 
-It has been tested with version 1.5.0_11 of the J2SE(TM) Runtime
+It has been tested with version 1.5.0_15 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
-1.5.0_07 on Mac OS X platforms.
+1.5.0_13 on Mac OS X platforms.
+
+REQUIRED LIBRARIES
+
+The Project Darkstar server depends on several additional libraries,
+which must be installed.
 
 This distribution requires Berkeley DB version 4.5.20, which may be
 bundled with this distribution, or else can be obtained and compiled
@@ -54,8 +62,9 @@ from:
 
   http://www.oracle.com/database/berkeley-db/db/index.html
 
-The bundled files should be copied to the lib/bdb subdirectory.  If
-using files compiled separately, the Berkeley DB JAR file should be
+The db.jar and the subdirectories containing the native libraries for
+the platforms of interest should be copied to the lib/bdb subdirectory.
+If using files compiled separately, the Berkeley DB JAR file should be
 copied to the lib/bdb subdirectory, and the natives libraries for the
 current platform should be copied to proper subdirectory as specified in
 the startup scripts.
@@ -112,7 +121,10 @@ KNOWN ISSUES
 This version of the Project Darkstar Server has the following
 limitations:
 
-- It only supports single node operation.
+- Multi-node operation is currently not scalable.  Depending on the
+  application, adding additional application nodes to a multi-node
+  cluster may reduce performance, not improve it.  We expect this
+  behavior to improve in future releases.
 
 - This release supports only limited I/O throttling, so it is possible
   for clients to overwhelm the server with network traffic and cause the
@@ -136,8 +148,6 @@ For more information, please see the tutorial in the tutorial directory
 and the documentation in the doc directory.  Also check the
 http://www.projectdarkstar.com website, which has links to more
 information and to the Project Darkstar forums.
-
-See the CHANGELOG file for a list of changes.
 
 If you cannot find an answer to your question in any of these places,
 please email the Darkstar team at:

@@ -17,26 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.example.chat.client;
-
-import java.math.BigInteger;
-
-public class ChatUser {
-
-    private final String name;
-    private final BigInteger id;
-
-    public ChatUser(String name, BigInteger id) {
-        this.name = name;
-        this.id = id;
-    }
-
-    public String getIdString() {
-        return id.toString(16);
-    }
-
-    @Override
-    public String toString() {
-        return name + " [" + getIdString() + "]";
-    }
-}
+/**
+ * Provides utility classes for customizing {@link java.util.logging logging}.
+ */
+package com.sun.sgs.impl.sharedutil.logging;

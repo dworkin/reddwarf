@@ -221,11 +221,11 @@ public class StandardProperties {
      *  The valid choices for {@link #NODE_TYPE}.
      */
     public enum NodeType {
-        /** A single node configuration */
+        /** A single node configuration. */
         singleNode,
-        /** The core server for multi-node configurations */
+        /** The core server for multi-node configurations. */
         coreServerNode,
-        /** An application node for multi-node configurations */
+        /** An application node for multi-node configurations. */
         appNode,
     }
     /**

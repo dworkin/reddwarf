@@ -388,7 +388,6 @@
       <fileset dir="."
 	       excludes="**/.svn"
 	       includes="doc/ClientTutorial.*,
-			 example/c-client/**,
 			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
 			 src/client/**,
 			 src/shared/**,
@@ -396,6 +395,8 @@
     </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-client"
+	  tofile="${build.dir}/sgs-client-src/API-CHANGES"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client-src"/>
@@ -447,6 +448,8 @@
     </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-client"
+	  tofile="${build.dir}/sgs-client/API-CHANGES"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client"/>
@@ -473,7 +476,8 @@
     <copy todir="${build.dir}/sgs-src">
       <fileset dir="."
 	       excludes="**/.svn"
-	       includes="build.xml,
+	       includes="analysis/**,
+			 build.xml,
 			 doc/ServerAppTutorial.*,
 			 etc/jdk5.0_package_list/**,
 			 etc/mina1.1_package_list/**,
@@ -488,7 +492,15 @@
 			 test/shared/**,
 			 test/server/**"/>
     </copy>
+    <apply executable="${ruby}" logError="true">
+      <arg file="etc/strip_javadoc"/>
+      <fileset dir="${build.dir}/sgs-src"
+               includes="src/server/j2se/com/sun/sgs/nio/channels/*.java,
+                         src/server/j2se/com/sun/sgs/nio/channels/spi/*.java"/>
+    </apply>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-server"
+	  tofile="${build.dir}/sgs-src/API-CHANGES"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
     <copy file="etc/NOTICE-server-gpl"
@@ -517,6 +529,7 @@
 			 sgs-*.properties"/>
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-server" tofile="${build.dir}/sgs/API-CHANGES"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs"/>
     <copy file="etc/NOTICE-server-gpl" tofile="${build.dir}/sgs/NOTICE-gpl"/>
@@ -872,6 +885,9 @@
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.db.environment.class"
 	 value="${test.bdb.env}"/>
+      <sysproperty
+	 key="com.sun.sgs.impl.service.data.store.db.bdb.cache.size"
+	 value="1000000"/>
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
@@ -1129,7 +1145,9 @@
 	   source="${javac.source}"
 	   target="${javac.target}">
       <src>
-        <dirset dir="example" includes="*/src"/>
+        <dirset dir="example" includes="*/src">
+            <exclude name="hack/**"/>
+        </dirset>
       </src>
       <classpath>
         <pathelement location="${build.dir}/classes/server"/>
