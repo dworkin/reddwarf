@@ -396,7 +396,6 @@
       <fileset dir="."
 	       excludes="**/.svn"
 	       includes="doc/ClientTutorial.*,
-			 example/c-client/**,
 			 example/tutorial/src/com/sun/sgs/tutorial/client/**,
 			 src/client/**,
 			 src/shared/**,
@@ -404,6 +403,8 @@
     </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client-src/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-client"
+	  tofile="${build.dir}/sgs-client-src/API-CHANGES"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client-src"/>
@@ -455,6 +456,8 @@
     </copy>
     <copy file="etc/CHANGELOG-client"
 	  tofile="${build.dir}/sgs-client/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-client"
+	  tofile="${build.dir}/sgs-client/API-CHANGES"/>
     <copy file="etc/LICENSE-client"
 	  tofile="${build.dir}/sgs-client/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-client"/>
@@ -504,6 +507,8 @@
                          src/server/j2se/com/sun/sgs/nio/channels/spi/*.java"/>
     </apply>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs-src/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-server"
+	  tofile="${build.dir}/sgs-src/API-CHANGES"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs-src/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs-src"/>
     <copy file="etc/NOTICE-server-gpl"
@@ -532,6 +537,7 @@
 			 sgs-*.properties"/>
     </copy>
     <copy file="etc/CHANGELOG-server" tofile="${build.dir}/sgs/CHANGELOG"/>
+    <copy file="etc/API-CHANGES-server" tofile="${build.dir}/sgs/API-CHANGES"/>
     <copy file="etc/LICENSE-server" tofile="${build.dir}/sgs/LICENSE"/>
     <copy file="etc/NOTICE.txt" todir="${build.dir}/sgs"/>
     <copy file="etc/NOTICE-server-gpl" tofile="${build.dir}/sgs/NOTICE-gpl"/>

@@ -1,3 +1,10 @@
+Version 0.9.6:
+- Use ByteBuffer for message parameters
+- Remove subset channel sends
+- Remove SessionId
+- Simplify SGS protocol
+- Remove C client, which has not yet been updated for recent changes
+
 Version 0.9.5:
 - Fix the channel membership logic to allow clients to send during
   channelJoined and not during channelLeft

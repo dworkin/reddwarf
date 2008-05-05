@@ -874,6 +874,9 @@ public final class ClientSessionServiceImpl
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
+	/** The login ack protocol message, or null. */
+	private byte[] loginAck = null;
+
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -889,7 +892,7 @@ public final class ClientSessionServiceImpl
 
 	void addMessage(byte[] message, boolean isFirst) {
  	    if (isFirst) {
-		messages.add(0, message);
+		loginAck = message;
 	    } else {
 		messages.add(message);
 	    }
@@ -931,6 +934,10 @@ public final class ClientSessionServiceImpl
 	     * error message.
 	     */
 	    if (handler != null && handler.isConnected()) {
+		if (loginAck != null) {
+		    handler.sendLoginProtocolMessage(
+			loginAck, Delivery.RELIABLE);
+		}
 		for (byte[] message : messages) {
 		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
 		}
