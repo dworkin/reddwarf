@@ -299,7 +299,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(800);
+        Thread.sleep(2000);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
 
         txnSchedulerZero.runTask(
@@ -314,7 +314,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 2);
 
-        Thread.sleep(800);
+        Thread.sleep(2000);
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
     }
 
