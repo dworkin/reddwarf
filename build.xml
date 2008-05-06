@@ -75,10 +75,13 @@
     <istrue value="${test.use.je}"/>
   </condition>
 
-  <!-- Enable profiling if property start.profile is set -->
+  <!-- Enable remote profiling if property start.profile is set -->
+<!--
+     value="-d64 -agentpath:/home/jl34465/darkstar/profiler/lib/deployed/jdk15/solaris-amd64/libprofilerinterface.so=/home/jl34465/darkstar/profiler/lib,5140"
+-->
   <condition 
      property="test.profile.jvm.args"
-     value="-d64 -agentpath:/home/jl34465/darkstar/profiler/lib/deployed/jdk15/solaris-amd64/libprofilerinterface.so=/home/jl34465/darkstar/profiler/lib,5140"
+     value="-agentpath:/home/jl34465/darkstar/profiler/lib/deployed/jdk15/solaris-i386/libprofilerinterface.so=/home/jl34465/darkstar/profiler/lib,5140"
      else=" ">
     <istrue value="${start.profile}"/>
   </condition>
