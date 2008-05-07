@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
+import java.util.Formatter;
 import java.util.Properties;
 import java.util.Random;
 import java.util.logging.Level;
@@ -148,6 +149,8 @@ public class WandererClient
     /** A random number generator used to random behavior. */
     private static final Random random = new Random();
 
+    private static final double EMA_SCALE_FACTOR = 0.25;
+
     /** The client used to communicate with the server. */
     private final SimpleClient simpleClient;
 
@@ -228,6 +231,7 @@ public class WandererClient
 	long until = System.currentTimeMillis() + (REPORT * 1000);
 	/* Round to a multiple of the report interval */
 	until -= until % (REPORT * 1000);
+	Stats stats = new Stats();
 	while (true) {
 	    long now = System.currentTimeMillis();
 	    if (now < until) {
@@ -237,13 +241,13 @@ public class WandererClient
 		}
 		continue;
 	    }
-	    Stats stats = new Stats();
 	    for (WandererClient client : clients) {
 		client.tally(stats);
 	    }
 	    if (logger.isLoggable(Level.INFO)) {
 		logger.log(Level.INFO, stats.report());
 	    }
+	    stats.reset();
 	    until += (REPORT * 1000);
 	}
     }
@@ -598,6 +602,19 @@ public class WandererClient
 	}
     }
 
+    /**
+     * Computes the exponential moving average of the value for the current
+     * period and the previous average.  If the previous value is 0, then uses
+     * the current period value.  Otherwise, creates a weighted average of the
+     * two values.
+     */
+    private static final double ema(double periodValue, double emaValue) {
+	return emaValue == 0
+	    ? periodValue
+	    : (EMA_SCALE_FACTOR * periodValue
+	       + (1 - EMA_SCALE_FACTOR) * emaValue);
+    }
+
     /* -- Nested classes -- */
 
     /** Records client statistics. */
@@ -627,19 +644,45 @@ public class WandererClient
 	/** Number of times clients have throttled. */
 	private int throttled = 0;
 
+	/** The moving average number of messages sent. */
+	private double emaSent = 0;
+
+	/** The moving average number of messages received. */
+	private double emaReceived = 0;
+
 	/** Creates an empty instance. */
 	Stats() { }
 
 	/** Returns a string that describes the client statistics. */
 	String report() {
-	    return "sent/sec=" + (sent / REPORT) +
-		" rcv/sec=" + (received / REPORT) +
-		" active=" + active +
+	    int meanSent = sent / REPORT;
+	    emaSent = ema(meanSent, emaSent);
+	    int meanReceived = received / REPORT;
+	    emaReceived = ema(meanReceived, emaReceived);
+	    Formatter formatter = new Formatter();
+	    formatter.format("sent/sec=%d (%.0f) " +
+			     "rcv/sec=%d (%.0f) " +
+			     "active=%d",
+			     meanSent, emaSent,
+			     meanReceived, emaReceived,
+			     active);
+	    return formatter +
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
 		(backlog > 0 ? " backlog=" + backlog : "") +
 		(throttled > 0 ? " throttle=" + throttled : "");
+	}
+
+	void reset() {
+	    sent = 0;
+	    received = 0;
+	    active = 0;
+	    failing = 0;
+	    disconnected = 0;
+	    logins = 0;
+	    backlog = 0;
+	    throttled = 0;
 	}
     }
 }

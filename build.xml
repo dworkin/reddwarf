@@ -1289,6 +1289,8 @@
 	  description="Runs the example WandererClient">
     <!-- Set the host name of the application -->
     <property name="app.host" value="localhost"/>
+    <!-- Set the number of clients -->
+    <property name="clients" value="10"/>
     <!-- Set the logging properties -->
     <property name="client.logging" location="example/logging.properties"/>
     <java classname="com.sun.sgs.example.request.client.WandererClient"
@@ -1299,6 +1301,8 @@
 		   file="${client.logging}"/>
       <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
 		   value="${app.host}"/>
+      <sysproperty key="com.sun.sgs.example.request.client.wanderer.clients"
+		   value="${clients}"/>
       <syspropertyset refid="test.extra.properties"/>
     </java>
   </target>

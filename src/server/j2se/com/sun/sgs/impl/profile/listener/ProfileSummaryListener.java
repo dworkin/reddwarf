@@ -42,14 +42,14 @@ import java.util.Properties;
  * Each report is structured like the following example:
  * <p><pre>
  * past 5000 tasks:
- *   mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
- *   mean ready count: 4.09,  mean lag time: 11.87ms, 
+ *   runtime mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
+ *   ready count: 4.09,  lag time: 11.87ms, 
  *   parallelism factor: 0.99
- *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
- * all 104302000 tasks:
- *   mean: 2.64ms,  max: 1010ms,  failed 1713 (0.62%),
- *   mean ready count: 3.98,  mean lag time: 9.75ms
- *   mean throughput: 88 txn/sec,  mean latency: 32.14 ms/txn
+ *   throughput: 88 txn/sec,  latency: 32.14 ms/txn
+ * all 104302000 tasks, moving averages:
+ *   runtime: 2.64ms,  failed: 0.62%,
+ *   ready count: 3.98,  lag time: 9.75ms
+ *   throughput: 88 txn/sec,  latency: 32.14 ms/txn
  * </pre>
  *
  * <p>
@@ -68,6 +68,14 @@ public class ProfileSummaryListener implements ProfileListener {
     private static final int DEFAULT_WINDOW_SIZE = 5000;
 
     /**
+     * The scaling factor for the current window when computing the exponential
+     * moving average.  The value represents the proportion of the value for
+     * the current period to include when creating the average, and should be
+     * between 0 and 1.
+     */
+    private static final double EMA_SCALE_FACTOR = 0.25;
+
+    /**
      * How many tasks are aggregated between status updates.  Note
      * that the update might not occur exactly on window crossing due
      * to concurrent updates.
@@ -78,21 +86,23 @@ public class ProfileSummaryListener implements ProfileListener {
     private long lastWindowStart;
 
     // statistics updated for the aggregate window
-     private long taskCount;
-     private long failedCount;
-     private long maxRunTime;
-     private long runTime;   
-     private long lagTimeSum;
-     private long readyCountSum;   
+    private long taskCount = 0;
+    private long failedCount = 0;
+    private long maxRunTime = 0;
+    private long runTime = 0;
+    private long lagTimeSum = 0;
+    private long readyCountSum = 0;   
 
     // statistics for the lifetime of the program
-     private long lifetimeCount;
-     private long lifetimeMax;
-     private long lifetimeFailed;
-     private long lifetimeRunTime;
-     private long lifetimeLagTime;
-     private long lifetimeReadyCountSum;
-     private long lifetimeWindowTime;
+    private long lifetimeCount = 0;
+
+    // Exponential moving averages (EMAs)
+    private double emaRunTime = 0;
+    private double emaFailed = 0;
+    private double emaReadyCount = 0;
+    private double emaLagTime = 0;
+    private double emaThroughput = 0;
+    private double emaLatency = 0;
 
     /**
      * Creates an instance of {@code ProfileSummaryListener}.
@@ -108,21 +118,6 @@ public class ProfileSummaryListener implements ProfileListener {
                                   ComponentRegistry registry) {
 
 	lastWindowStart = System.currentTimeMillis();
-
-	taskCount   = 0;
-	failedCount = 0;
-	runTime     = 0;
-	lagTimeSum     = 0;
-	maxRunTime  = 0;
-	readyCountSum = 0;
-
-	lifetimeCount   = 0;
-	lifetimeFailed  = 0;
-	lifetimeRunTime = 0;
-	lifetimeLagTime = 0;
-	lifetimeMax     = 0;
-	lifetimeReadyCountSum = 0;
-	lifetimeWindowTime = 0;
 
 	windowSize = new PropertiesWrapper(properties).
 	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
@@ -167,59 +162,58 @@ public class ProfileSummaryListener implements ProfileListener {
 	    long windowEndTime = System.currentTimeMillis();	    
 
 	    lifetimeCount += taskCount;
-	    lifetimeFailed += failedCount;
-	    lifetimeRunTime += runTime;
-	    lifetimeLagTime += lagTimeSum;
-	    lifetimeReadyCountSum += readyCountSum;
-	    lifetimeWindowTime += (windowEndTime - lastWindowStart);
-	    
-	    if (maxRunTime > lifetimeMax)
-		lifetimeMax = maxRunTime;
-	    
+
 	    double successful = taskCount - failedCount;
-	    double lifetimeSuccessful = lifetimeCount - lifetimeFailed;
+
+	    double meanRunTime = runTime / successful;
+	    double meanFailed = (failedCount * 100) / ((double) taskCount);
+	    double meanReadyCount = readyCountSum / ((double) taskCount);
+	    double meanLagTime = lagTimeSum / successful;
+	    double meanThroughput =
+		(successful*1000) / (double) (windowEndTime - lastWindowStart);
+	    double meanLatency = (runTime + lagTimeSum) / successful;
+
+	    emaRunTime = ema(meanRunTime, emaRunTime);
+	    emaFailed = ema(meanFailed, emaFailed);
+	    emaReadyCount = ema(meanReadyCount, emaReadyCount);
+	    emaLagTime = ema(meanLagTime, emaLagTime);
+	    emaThroughput = ema(meanThroughput, emaThroughput);
+	    emaLatency = ema(meanLatency, emaLatency);
 
 	    System.out.printf("past %d tasks:%n"
-			      + "  mean: %4.2fms,"
+			      + "  runtime mean: %4.2fms,"
 			      + "  max: %6dms,"
 			      + "  failed: %d (%2.2f%%)," 
-			      + "%n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms,"
+			      + "%n  ready count: %.2f,"
+			      + "  lag time: %.2fms,"
 			      + "%n  parallelism factor: %.2f"
-			      + "%n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn%n"
-			      + "all %d tasks:%n"
-			      + "  mean: %4.2fms,"
-			      + "  max: %6dms,"
-			      + "  failed: %d (%2.2f%%),"
-			      + "%n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms"
-			      + "%n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn%n",
+			      + "%n  throughput: %.2f txn/sec,"
+			      + "  latency: %.2f ms/txn%n",
 			      taskCount, 
-			      runTime/ successful,
+			      meanRunTime,
 			      maxRunTime, 
 			      failedCount, 
-			      (failedCount * 100) / (double)taskCount,
-			      readyCountSum / (double)taskCount,
-			      lagTimeSum / successful,
+			      meanFailed,
+			      meanReadyCount,
+			      meanLagTime,
 			      ((double)runTime / 
 			       (double)(windowEndTime - lastWindowStart)),	
-			      ((successful*1000) /
-			       (double)(windowEndTime - lastWindowStart)),
-			      (runTime + lagTimeSum) / successful,
+			      meanThroughput,
+			      meanLatency);
+	    System.out.printf("all %d tasks, moving averages:%n"
+			      + "  runtime: %4.2fms,"
+			      + "  failed: %2.2f%%,"
+			      + "%n  ready count: %.2f,"
+			      + "  lag time: %.2fms"
+			      + "%n  throughput: %.2f txn/sec,"
+			      + "  latency: %.2f ms/txn%n",
 			      lifetimeCount, 
-			      lifetimeRunTime / lifetimeSuccessful,
-			      lifetimeMax, 
-			      lifetimeFailed, 
-			      (lifetimeFailed*100) / (double)lifetimeCount,
-			      lifetimeReadyCountSum / (double)lifetimeCount,
-			      lifetimeLagTime / lifetimeSuccessful,
-			      ((lifetimeSuccessful*1000) /
-			       (double)lifetimeWindowTime),
-			      ((lifetimeRunTime + lifetimeLagTime) /
-			       lifetimeSuccessful)
-		);
+			      emaRunTime,
+			      emaFailed,
+			      emaReadyCount,
+			      emaLagTime,
+			      emaThroughput,
+			      emaLatency);
 
  	    maxRunTime = 0;
  	    failedCount = 0;
@@ -229,6 +223,19 @@ public class ProfileSummaryListener implements ProfileListener {
  	    readyCountSum = 0;	
 	    lastWindowStart = System.currentTimeMillis();
 	}       
+    }
+
+    /**
+     * Computes the exponential moving average of the value for the current
+     * period and the previous average.  If the previous value is 0, then uses
+     * the current period value.  Otherwise, creates a weighted average of the
+     * two values.
+     */
+    private static final double ema(double periodValue, double emaValue) {
+	return emaValue == 0
+	    ? periodValue
+	    : (EMA_SCALE_FACTOR * periodValue
+	       + (1 - EMA_SCALE_FACTOR) * emaValue);
     }
 
     /**
