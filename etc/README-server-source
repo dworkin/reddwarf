@@ -78,7 +78,9 @@ The binaries for Berkeley DB are also needed:
   http://www.oracle.com/database/berkeley-db/db/index.html
 
 These binaries need to be installed in a directory that you specify as
-the value of the bdb.lib.dir property when using Ant.
+the value of the bdb.lib.dir property when using Ant. For convenience,
+the property can be set in the file .build.properties in your home
+directory.
 
 The JAR file for the Junit project needs to be installed in the lib
 subdirectory in order to run the tests:

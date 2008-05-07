@@ -195,7 +195,7 @@
   <target name="build-server" depends="-build-shared"
       description="Builds server code">
     <fail unless="bdb.lib.dir"
-	  message="The bdb.lib.dir property must be set"/>
+	  message="The bdb.lib.dir property must be set to the directory containing Berkeley DB db.jar file and native libraries for your build platform"/>
     <mkdir dir="${build.dir}/classes/server"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/server"
