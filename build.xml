@@ -859,6 +859,7 @@
         <pathelement location="${build.dir}/test/classes/shared"/>
         <path refid="shared.classpath"/>
         <path refid="mina.classpath"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
       </classpath>
       <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
@@ -904,6 +905,7 @@
         <pathelement location="${build.dir}/test/classes/server"/>
         <path refid="server.classpath"/>
         <path refid="mina.classpath"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
       </classpath>
       <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
@@ -941,6 +943,7 @@
       <classpath>
         <pathelement location="${build.dir}/test/classes/client"/>
         <path refid="client.classpath"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
       </classpath>
       <syspropertyset refid="test.extra.properties"/>
       <!-- XXX: This doesn't work in Ant 1.6.1,
@@ -975,6 +978,7 @@
       <classpath>
         <path refid="shared.classpath"/>
         <path refid="mina.classpath"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
       </classpath>
     </javac>
   </target>
@@ -991,9 +995,12 @@
 	   debug="on"
 	   source="${javac.source}"
 	   target="${javac.target}"
-	   classpathref="server.classpath"
 	   includes="**/*.java">
       <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+          <path refid="server.classpath"/>
+          <pathelement location="${lib.dir}/junit-4.1.jar"/>
+      </classpath>
     </javac>
   </target>
 
@@ -1009,9 +1016,12 @@
 	   debug="on"
 	   source="${javac.source}"
 	   target="${javac.target}"
-	   classpathref="client.classpath"
 	   includes="**/*.java">
       <compilerarg line="${javac.compilerargs}"/>
+      <classpath>
+          <path refid="client.classpath"/>
+          <pathelement location="${lib.dir}/junit-4.1.jar"/>
+      </classpath>
     </javac>
   </target>
 
