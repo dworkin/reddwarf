@@ -797,9 +797,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    final String counterName = "counter";
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-	    addNodes("a", "b", "c", "d");
+	    addNodes("a", "b");
 	    
-	    int iterations = 4;
+	    int iterations = 3;
 	    final List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
