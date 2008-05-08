@@ -40,6 +40,7 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
@@ -134,7 +135,12 @@ public final class ChannelServiceImpl
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
     
-    /** List of contexts that have been prepared (non-readonly) or committed. */
+    /** List of contexts that have been prepared (non-readonly) or
+     * committed.  The {@code contextList} is locked when contexts are
+     * added (during prepare), removed (during abort or flushed during
+     * commit), and when adding or removing task queues from the {@code
+     * channelTaskQueues} map.
+     */
     private final List<Context> contextList = new LinkedList<Context>();
 
     /** The client session service. */
@@ -152,25 +158,33 @@ public final class ChannelServiceImpl
     /** The ID for the local node. */
     private final long localNodeId;
 
-    /** The lists of channel tasks, keyed by channel ID. */
-    private final Map<BigInteger, List<Runnable>> channelTasksMap =
-	Collections.synchronizedMap(new HashMap<BigInteger, List<Runnable>>());
-
-    /** The thread to process tasks in the {@code channelTasksMap}. */
-    private final Thread taskHandlerThread = new TaskHandlerThread();
-
-    /** The lock for notifying the {@code taskHandlerThread} . */
-    private final Object taskHandlerLock = new Object();
-
     /** The local channel membership lists, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
 	localChannelMembersMap =
 	    new ConcurrentHashMap<BigInteger, Set<BigInteger>>();
 
-    /** The map of channel coordinator task queues, keyed by channel ID. */
+    /** The map of channel coordinator task queues, keyed by channel ID.
+     * A coordinator task queue orders the delivery of incoming
+     * 'serviceEventQueue' requests so that a given coordinator is not
+     * overwhelmed by concurrent requests to service its event queue.
+     * The tasks in these queues execute within a transaction.
+     */
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	coordinatorTaskQueues =
 	    new ConcurrentHashMap<BigInteger, TaskQueue>();
+
+    /** The map of channel task queues, keyed by channel ID.  A
+     * channel's task queue orders the execution of tasks in which the
+     * channel's coordinator sends notifications (join, leave, send,
+     * refresh, etc.) to the channel servers for the channel.  The tasks
+     * in these queues execute outside of a transaction.  This map must
+     * be accessed while synchronized on {@code contextList}. A task
+     * queue is added when the first committed context having to do with
+     * the channel is flushed, and is removed when the channel is
+     * closed.
+     */
+    private final Map<BigInteger, TaskQueue> channelTaskQueues =
+	new HashMap<BigInteger, TaskQueue>();
 
     /** The maximum number of channel events to sevice per transaction. */
     final int eventsPerTxn;
@@ -271,8 +285,6 @@ public final class ChannelServiceImpl
             sessionService.registerSessionDisconnectListener(
                 new ChannelSessionDisconnectListener());
 
-            taskHandlerThread.start();
-
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -307,8 +319,6 @@ public final class ChannelServiceImpl
 	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
 	}
-
-	taskHandlerThread.interrupt();
     }
     
     /* -- Implement ChannelManager -- */
@@ -384,7 +394,8 @@ public final class ChannelServiceImpl
 		BigInteger channelIdRef = new BigInteger(1, channelId);
 		TaskQueue taskQueue = coordinatorTaskQueues.get(channelIdRef);
 		if (taskQueue == null) {
-		    TaskQueue newTaskQueue = createTaskQueue();
+		    TaskQueue newTaskQueue =
+			transactionScheduler.createTaskQueue();
 		    taskQueue = coordinatorTaskQueues.
 			putIfAbsent(channelIdRef, newTaskQueue);
 		    if (taskQueue == null) {
@@ -675,7 +686,6 @@ public final class ChannelServiceImpl
 	    try {
 		BigInteger channelRefId = new BigInteger(1, channelId);
 		localChannelMembersMap.remove(channelRefId);
-		coordinatorTaskQueues.remove(channelRefId);
 
 	    } finally {
 		callFinished();
@@ -772,7 +782,7 @@ public final class ChannelServiceImpl
      * Adds the specified {@code task} to the task list of the given {@code
      * channelId}.
      */
-    static void addChannelTask(BigInteger channelId, Runnable task) {
+    static void addChannelTask(BigInteger channelId, KernelRunnable task) {
 	Context context =
 	    getChannelService().contextFactory.joinTransaction();
 	context.addTask(channelId, task);
@@ -791,8 +801,8 @@ public final class ChannelServiceImpl
      */
     final class Context extends TransactionContext {
 
-	private final Map<BigInteger, List<Runnable>> internalTaskLists =
-	    new HashMap<BigInteger, List<Runnable>>();
+	private final Map<BigInteger, List<KernelRunnable>> internalTaskLists =
+	    new HashMap<BigInteger, List<KernelRunnable>>();
 
 	/**
 	 * Constructs a context with the specified transaction. 
@@ -804,18 +814,16 @@ public final class ChannelServiceImpl
 	/**
 	 * Adds the specified {@code task} to the task list of the given
 	 * {@code channelId}.  If the transaction commits, the task will be
-	 * added to the task handler's per-channel map of tasks to service.
-	 * The tasks are serviced by the TaskHandlerThread.
+	 * added to the channel's tasks queue.
 	 */
-	public void addTask(BigInteger channelId, Runnable task) {
-	    List<Runnable> taskList = internalTaskLists.get(channelId);
+	public void addTask(BigInteger channelId, KernelRunnable task) {
+	    List<KernelRunnable> taskList = internalTaskLists.get(channelId);
 	    if (taskList == null) {
-		taskList = new LinkedList<Runnable>();
+		taskList = new LinkedList<KernelRunnable>();
 		internalTaskLists.put(channelId, taskList);
 	    }
 	    taskList.add(task);
 	}
-	
 
 	/* -- transaction participant methods -- */
 
@@ -866,110 +874,49 @@ public final class ChannelServiceImpl
 	 * returns true; otherwise returns false.
 	 */
 	private boolean flush() {
+	    //assert Thread.holdsLock(contextList);
 	    if (isCommitted) {
 		for (BigInteger channelId : internalTaskLists.keySet()) {
 		    flushTasks(
 			channelId, internalTaskLists.get(channelId));
 		}
-		synchronized (taskHandlerLock) {
-		    taskHandlerLock.notifyAll();
-		}
-		return true;
-	    } else {
-		return false;
 	    }
+	    return isCommitted;
 	}
     }
 
     /**
-     * Adds the tasks in the specified {@code taskList} to the
-     * task handler's per-channel map of tasks to process.  The tasks will
-     * be serviced by the TaskHandlerThread.  This method is invoked when a
-     * context is flushed during transaction commit.
+     * Adds the tasks in the specified {@code taskList} to the specified
+     * channel's task queue. This method is invoked when a context is
+     * flushed during transaction commit.
      */
     private void flushTasks(
-	BigInteger channelId, List<Runnable> taskList)
+	BigInteger channelId, List<KernelRunnable> taskList)
 	
     {
-	synchronized (channelTasksMap) {
-	    List<Runnable> prevTaskList = channelTasksMap.get(channelId);
-	    if (prevTaskList != null) {
-		prevTaskList.addAll(taskList);
-	    } else {
-		channelTasksMap.put(channelId, taskList);
-	    }
+        //assert Thread.holdsLock(contextList);
+	TaskQueue taskQueue = channelTaskQueues.get(channelId);
+	if (taskQueue == null) {
+	    taskQueue = taskScheduler.createTaskQueue();
+	    channelTaskQueues.put(channelId, taskQueue);
+	}
+	for (KernelRunnable task : taskList) {
+	    // TBD: is the owner correct?
+	    taskQueue.addTask(task, taskOwner);
 	}
     }
-
-    /* -- Implement TaskHandlerThread -- */
 
     /**
-     * Thread for processing channel tasks. A channel task is enqueued
-     * when a channel processes a channel event.  A typical channel
-     * task sends a message to one or more channel servers to notify
-     * the server(s) of a channel state change or that a message needs
-     * to be sent to the channel members connected to that channel
-     * server's node.
-     *
-     * Currently, the table is serviced by a single thread, but in the
-     * future, it could be serviced by more than one thread.
+     * Notifies this service that the channel with the specified {@code
+     * channelRefId} is closed so that this service can clean up any
+     * per-channel data structures (relating to the channel coordinator).
      */
-    private final class TaskHandlerThread extends Thread {
-	
-	/** Constructs an instance of this class as a daemon thread. */
-	TaskHandlerThread() {
-	    super(CLASSNAME + "$TaskHandlerThread");
-	    setDaemon(true);
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
-
-	    while (! shuttingDown()) {
-		/*
-		 * Wait for channel tasks to show up.
-		 */
-		synchronized (taskHandlerLock) {
-		    while (channelTasksMap.isEmpty()) {
-			try {
-			    taskHandlerLock.wait();
-			} catch (InterruptedException e) {
-			    return;
-			}
-		    }
-		}
-
-		/*
-		 * Get snapshot of current channel IDs with tasks.
-		 */
-		Set<BigInteger> channelIds = new HashSet<BigInteger>();
-		synchronized (channelTasksMap) {
-		    channelIds.addAll(channelTasksMap.keySet());
-		}
-		
-		/*
-		 * Process tasks for each channel, removing task list
-		 * from the table before processing.
-		 */
-		for (BigInteger channelId : channelIds) {
-		    List<Runnable> taskList =
-			channelTasksMap.remove(channelId);
-		    if (taskList == null) continue;
-		    for (Runnable task : taskList) {
-			try {
-			    task.run();
-			} catch (Exception e) {
-			    logger.logThrow(
-				Level.WARNING, e, "processing task:{0} throws",
-				task);
-			    // TBD: abandon the rest of the tasks here?
-			}
-		    }
-		}
-	    }
+    void closedChannel(BigInteger channelRefId) {
+	coordinatorTaskQueues.remove(channelRefId);
+	synchronized (contextList) {
+	    channelTaskQueues.remove(channelRefId);
 	}
     }
-    
     /* -- Implement ClientSessionDisconnectListener -- */
 
     private final class ChannelSessionDisconnectListener

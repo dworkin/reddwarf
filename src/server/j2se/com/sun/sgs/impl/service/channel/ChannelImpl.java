@@ -34,7 +34,6 @@ import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.ManagedQueue;
@@ -917,7 +916,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	if (server != null) {
 	    ChannelServiceImpl.addChannelTask(
 		new BigInteger(1, channelId),
-		new Runnable() {
+		new AbstractKernelRunnable() {
 		    public void run() {
 			try {
 			    server.leave(channelId, sessionIdBytes);
@@ -1542,7 +1541,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		}
 		ChannelServiceImpl.addChannelTask(
 		    channelRefId,
-		    new Runnable() {
+		    new AbstractKernelRunnable() {
 			public void run() {
 			    for (ChannelServer server : channelServers) {
 				try {
@@ -1669,7 +1668,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
-		new Runnable() {
+		new AbstractKernelRunnable() {
 		    public void run() {
 		        try {
 			    server.join(channel.name, channel.channelId,
@@ -1759,7 +1758,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    final Set<ChannelServer> servers = channel.getChannelServers();
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
-		new Runnable() {
+		new AbstractKernelRunnable() {
 		    public void run() {
 			for (ChannelServer server : servers) {
 			    try {
@@ -1841,7 +1840,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    final Set<ChannelServer> servers = channel.getChannelServers();
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
-		new Runnable() {
+		new AbstractKernelRunnable() {
 		    public void run() {
 			for (ChannelServer server : servers) {
 			    try {
@@ -1908,10 +1907,11 @@ abstract class ChannelImpl implements Channel, Serializable {
 
 	    final ChannelImpl channel = eventQueue.getChannel();
 	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channel.removeChannel();
 	    ChannelServiceImpl.addChannelTask(
-		eventQueue.getChannelRefId(),
-		new Runnable() {
+		channelRefId,
+		new AbstractKernelRunnable() {
 		    public void run() {
 			for (ChannelServer server : servers) {
 			    try {
@@ -1930,6 +1930,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 				    "to handle event:{1}", server, this);
 			    }
 			}
+			ChannelServiceImpl.getChannelService().
+			    closedChannel(channelRefId);
 		    }});
 	}
 
