@@ -660,8 +660,8 @@ public class WandererClient
 	    int meanReceived = received / REPORT;
 	    emaReceived = ema(meanReceived, emaReceived);
 	    Formatter formatter = new Formatter();
-	    formatter.format("sent/sec=%d (%.0f) " +
-			     "rcv/sec=%d (%.0f) " +
+	    formatter.format("sent/sec=%d(%.0f) " +
+			     "rcv/sec=%d(%.0f) " +
 			     "active=%d",
 			     meanSent, emaSent,
 			     meanReceived, emaReceived,
@@ -670,7 +670,7 @@ public class WandererClient
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
-		(backlog > 0 ? " backlog=" + backlog : "") +
+		(backlog > 0 ? " backlog=" + (backlog / active) : "") +
 		(throttled > 0 ? " throttle=" + throttled : "");
 	}
 
