@@ -124,12 +124,9 @@ public class RequestApp implements AppListener, Serializable {
     private static final int REPORT =
 	Integer.getInteger("com.sun.sgs.example.request.server.report", 20);
 
-    private static final double EMA_SCALE_FACTOR = 0.25;
-
     /* -- Operation counters -- */
 
     static volatile int receivedMessage;
-    static double emaReceivedMessage;
     static volatile int joinChannel;
     static volatile int leaveChannel;
     static volatile int sendChannel;
@@ -394,13 +391,6 @@ public class RequestApp implements AppListener, Serializable {
 	}
     }
 
-    private static final double ema(double periodValue, double emaValue) {
-	return emaValue == 0
-	    ? periodValue
-	    : (EMA_SCALE_FACTOR * periodValue
-	       + (1 - EMA_SCALE_FACTOR) * emaValue);
-    }
-
     /** A thread that logs operations. */
     private static class ReportThread extends Thread {
 	ReportThread() { }
@@ -417,13 +407,9 @@ public class RequestApp implements AppListener, Serializable {
 		    }
 		    continue;
 		}
-		int meanReceivedMessage = receivedMessage / REPORT;
-		emaReceivedMessage =
-		    ema(meanReceivedMessage, emaReceivedMessage);
 		if (logger.isLoggable(Level.INFO)) {
 		    logger.log(Level.INFO,
-			       "rcv/sec=" + meanReceivedMessage +
-			       " (" + ((int) emaReceivedMessage) + ")" +
+			       "rcv/sec=" + (receivedMessage / REPORT) +
 			       " join/sec=" + (joinChannel / REPORT) +
 			       " leave/sec=" + (leaveChannel / REPORT) +
 			       " send/sec=" + (sendChannel / REPORT) +
