@@ -142,6 +142,10 @@ public class WandererClient
     private static final long LOGIN_MAX_RETRY =
 	Long.getLong(PREFIX + ".login.max.retry", 30000);
 
+    /** The number of values for computing averages. */
+    private static final int AVERAGE =
+	Integer.getInteger(PREFIX + ".average", 5);
+
     /** The logger for this class. */
     private static final Logger logger = Logger.getLogger(PREFIX);
 
@@ -629,10 +633,10 @@ public class WandererClient
 	private int throttled = 0;
 
 	/** The moving average number of messages sent. */
-	private final MovingAverage maSent = new MovingAverage();
+	private final MovingAverage maSent = new MovingAverage(AVERAGE);
 
 	/** The moving average number of messages received. */
-	private final MovingAverage maReceived = new MovingAverage();
+	private final MovingAverage maReceived = new MovingAverage(AVERAGE);
 
 	/** Creates an empty instance. */
 	Stats() { }
@@ -640,17 +644,19 @@ public class WandererClient
 	/** Returns a string that describes the client statistics. */
 	String report() {
 	    int meanSent = sent / REPORT;
-	    maSent.update(meanSent);
+	    maSent.add(meanSent);
 	    int meanReceived = received / REPORT;
-	    maReceived.update(meanReceived);
-	    return "sent/sec=" + meanSent + "(" + maSent + ")" +
-		" rcv/sec=" + meanReceived + "(" + maReceived + ")" +
+	    maReceived.add(meanReceived);
+	    return "sent/sec=" + meanSent +
+		"(" + maSent.average() + ")" +
+		" rcv/sec=" + meanReceived +
+		"(" + maReceived.average() + ")" +
 		" active=" + active +
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
 		(backlog > 0 ? " backlog=" + (backlog / active) : "") +
-		(throttled > 0 ? " throttle=" + throttled : "");
+		(throttled > 0 ? " throttle=" + (throttled /active) : "");
 	}
 
 	void reset() {
@@ -665,21 +671,38 @@ public class WandererClient
 	}
     }
 
+    /** Tracks a moving average of a specified maximum number of values. */
     private static class MovingAverage {
-	private static final int WINDOW = 5;
-	private final int[] values = new int[WINDOW];
+
+	/** Holds the values to average. */
+	private final int[] values;
+
+	/** The offset in values to store the next value. */
 	private int next = 0;
+
+	/** The number of values stored. */
 	private int count = 0;
-	MovingAverage() { }
-	void update(int value) {
+	
+	/**
+	 * Creates an instance for averaging the specified maximum number of
+	 * values.
+	 */
+	MovingAverage(int maxNumValues) {
+	    values = new int[maxNumValues];
+	}
+
+	/** Adds a value. */
+	void add(int value) {
 	    values[next++] = value;
-	    if (next >= WINDOW) {
+	    if (next >= values.length) {
 		next = 0;
 	    }
-	    if (count < WINDOW) {
+	    if (count < values.length) {
 		count++;
 	    }
 	}
+
+	/** Returns the average. */
 	int average() {
 	    if (count == 0) {
 		return 0;
@@ -694,10 +717,6 @@ public class WandererClient
 		sum += values[pos];
 	    }
 	    return sum / count;
-	}
-
-	public String toString() {
-	    return String.valueOf(average());
 	}
     }
 }

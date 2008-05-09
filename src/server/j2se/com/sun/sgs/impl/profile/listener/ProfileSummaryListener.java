@@ -42,20 +42,20 @@ import java.util.Properties;
  * Each report is structured like the following example:
  * <p><pre>
  * past 5000 tasks:
- *   runtime mean: 2.94ms,  max: 21ms,  failed 25 (0.50%),
- *   ready count: 4.09,  lag time: 11.87ms, 
- *   parallelism factor: 0.99
- *   throughput: 88 txn/sec,  latency: 32.14 ms/txn
- * all 104302000 tasks, moving averages:
- *   runtime: 2.64ms,  failed: 0.62%,
- *   ready count: 3.98,  lag time: 9.75ms
- *   throughput: 88 txn/sec,  latency: 32.14 ms/txn
+ *   mean runtime: 1.21ms,  max:    216ms,  failed: 33 (0.17%)
+ *   mean ready count: 1.64,  mean lag time: 0.18ms
+ *   parallelism factor: 1.05
+ *   mean throughput: 861.46 txn/sec,  mean latency: 1.39 ms/txn
+ * past 25000 tasks:
+ *   mean runtime: 1.24ms,  failed: 0.99%
+ *   mean ready count: 3.70,  mean lag time: 2.37ms
+ *   mean throughput: 804.74 txn/sec,  mean latency: 3.62 ms/txn
  * </pre>
  *
  * <p>
  *
- * Note that the mean, max, mean throughput, and mean latency reports only
- * apply to successful tasks.
+ * Note that the mean runtime, max, mean lag time, mean throughput, and mean
+ * latency reports only apply to successful tasks.
  *
  * @see ProfileProperties
  */
@@ -68,12 +68,16 @@ public class ProfileSummaryListener implements ProfileListener {
     private static final int DEFAULT_WINDOW_SIZE = 5000;
 
     /**
-     * The scaling factor for the current window when computing the exponential
-     * moving average.  The value represents the proportion of the value for
-     * the current period to include when creating the average, and should be
-     * between 0 and 1.
+     * The property for specifying the number of windows to combine for
+     * printing averages.
      */
-    private static final double EMA_SCALE_FACTOR = 0.25;
+    private static final String AVERAGE_PROPERTY =
+	"com.sun.sgs.impl.profile.listener.ProfileSummaryListener.average";
+
+    /**
+     * The default number of windows to combine for printing averages.
+     */
+    private static final int DEFAULT_AVERAGE = 5;
 
     /**
      * How many tasks are aggregated between status updates.  Note
@@ -81,6 +85,11 @@ public class ProfileSummaryListener implements ProfileListener {
      * to concurrent updates.
      */
     private final int windowSize;
+
+    /**
+     * How many windows to combine for printing averages.
+     */
+    private final int average;
 
     // long wall-clock time
     private long lastWindowStart;
@@ -93,16 +102,13 @@ public class ProfileSummaryListener implements ProfileListener {
     private long lagTimeSum = 0;
     private long readyCountSum = 0;   
 
-    // statistics for the lifetime of the program
-    private long lifetimeCount = 0;
-
-    // Exponential moving averages (EMAs)
-    private double emaRunTime = 0;
-    private double emaFailed = 0;
-    private double emaReadyCount = 0;
-    private double emaLagTime = 0;
-    private double emaThroughput = 0;
-    private double emaLatency = 0;
+    // Moving averages
+    private final MovingAverage maRunTime;
+    private final MovingAverage maFailed;
+    private final MovingAverage maReadyCount;
+    private final MovingAverage maLagTime;
+    private final MovingAverage maThroughput;
+    private final MovingAverage maLatency;
 
     /**
      * Creates an instance of {@code ProfileSummaryListener}.
@@ -119,8 +125,18 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	lastWindowStart = System.currentTimeMillis();
 
-	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	windowSize = wrappedProps.getIntProperty(
+	    ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+	average = wrappedProps.getIntProperty(
+	    AVERAGE_PROPERTY, DEFAULT_AVERAGE);
+
+	maRunTime = new MovingAverage(average);
+	maFailed = new MovingAverage(average);
+	maReadyCount = new MovingAverage(average);
+	maLagTime = new MovingAverage(average);
+	maThroughput = new MovingAverage(average);
+	maLatency = new MovingAverage(average);
     }
 
     /**
@@ -161,34 +177,32 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	    long windowEndTime = System.currentTimeMillis();	    
 
-	    lifetimeCount += taskCount;
-
 	    double successful = taskCount - failedCount;
 
 	    double meanRunTime = runTime / successful;
-	    double meanFailed = (failedCount * 100) / ((double) taskCount);
-	    double meanReadyCount = readyCountSum / ((double) taskCount);
+	    double meanFailed = (failedCount * 100) / (double) taskCount;
+	    double meanReadyCount = readyCountSum / (double) taskCount;
 	    double meanLagTime = lagTimeSum / successful;
 	    double meanThroughput =
 		(successful*1000) / (double) (windowEndTime - lastWindowStart);
 	    double meanLatency = (runTime + lagTimeSum) / successful;
 
-	    emaRunTime = ema(meanRunTime, emaRunTime);
-	    emaFailed = ema(meanFailed, emaFailed);
-	    emaReadyCount = ema(meanReadyCount, emaReadyCount);
-	    emaLagTime = ema(meanLagTime, emaLagTime);
-	    emaThroughput = ema(meanThroughput, emaThroughput);
-	    emaLatency = ema(meanLatency, emaLatency);
+	    maRunTime.add(meanRunTime);
+	    maFailed.add(meanFailed);
+	    maReadyCount.add(meanReadyCount);
+	    maLagTime.add(meanLagTime);
+	    maThroughput.add(meanThroughput);
+	    maLatency.add(meanLatency);
 
 	    System.out.printf("past %d tasks:%n"
-			      + "  runtime mean: %4.2fms,"
+			      + "  mean runtime: %4.2fms,"
 			      + "  max: %6dms,"
-			      + "  failed: %d (%2.2f%%)," 
-			      + "%n  ready count: %.2f,"
-			      + "  lag time: %.2fms,"
+			      + "  failed: %d (%2.2f%%)" 
+			      + "%n  mean ready count: %.2f,"
+			      + "  mean lag time: %.2fms"
 			      + "%n  parallelism factor: %.2f"
-			      + "%n  throughput: %.2f txn/sec,"
-			      + "  latency: %.2f ms/txn%n",
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n",
 			      taskCount, 
 			      meanRunTime,
 			      maxRunTime, 
@@ -199,21 +213,23 @@ public class ProfileSummaryListener implements ProfileListener {
 			      ((double)runTime / 
 			       (double)(windowEndTime - lastWindowStart)),	
 			      meanThroughput,
-			      meanLatency);
-	    System.out.printf("all %d tasks, moving averages:%n"
-			      + "  runtime: %4.2fms,"
-			      + "  failed: %2.2f%%,"
-			      + "%n  ready count: %.2f,"
-			      + "  lag time: %.2fms"
-			      + "%n  throughput: %.2f txn/sec,"
-			      + "  latency: %.2f ms/txn%n",
-			      lifetimeCount, 
-			      emaRunTime,
-			      emaFailed,
-			      emaReadyCount,
-			      emaLagTime,
-			      emaThroughput,
-			      emaLatency);
+			      meanLatency
+		);
+	    System.out.printf("past %d tasks:%n"
+			      + "  mean runtime: %4.2fms,"
+			      + "  failed: %2.2f%%"
+			      + "%n  mean ready count: %.2f,"
+			      + "  mean lag time: %.2fms"
+			      + "%n  mean throughput: %.2f txn/sec,"
+			      + "  mean latency: %.2f ms/txn%n",
+			      maRunTime.count() * taskCount, 
+			      maRunTime.average(),
+			      maFailed.average(),
+			      maReadyCount.average(),
+			      maLagTime.average(),
+			      maThroughput.average(),
+			      maLatency.average()
+		);
 
  	    maxRunTime = 0;
  	    failedCount = 0;
@@ -226,25 +242,63 @@ public class ProfileSummaryListener implements ProfileListener {
     }
 
     /**
-     * Computes the exponential moving average of the value for the current
-     * period and the previous average.  If the previous value is 0, then uses
-     * the current period value.  Otherwise, creates a weighted average of the
-     * two values.
-     */
-    private static final double ema(double periodValue, double emaValue) {
-	return emaValue == 0
-	    ? periodValue
-	    : (EMA_SCALE_FACTOR * periodValue
-	       + (1 - EMA_SCALE_FACTOR) * emaValue);
-    }
-
-    /**
      * {@inheritDoc}
      */
     public void shutdown() {
 	// unused
     }
     
-    
+    /** Tracks a moving average of a specified maximum number of values. */
+    private static class MovingAverage {
 
+	/** Holds the values to average. */
+	private final double[] values;
+
+	/** The offset in values to store the next value. */
+	private int next = 0;
+
+	/** The number of values stored. */
+	private int count = 0;
+	
+	/**
+	 * Creates an instance for averaging the specified maximum number of
+	 * values.
+	 */
+	MovingAverage(int maxNumValues) {
+	    values = new double[maxNumValues];
+	}
+
+	/** Returns the number of values added. */
+	int count() {
+	    return count;
+	}
+
+	/** Adds a value. */
+	void add(double value) {
+	    values[next++] = value;
+	    if (next >= values.length) {
+		next = 0;
+	    }
+	    if (count < values.length) {
+		count++;
+	    }
+	}
+
+	/** Returns the average. */
+	double average() {
+	    if (count == 0) {
+		return 0;
+	    }
+	    double sum = 0;
+	    int pos = next;
+	    for (int i = 0; i < count; i++) {
+		pos--;
+		if (pos < 0) {
+		    pos = count - 1;
+		}
+		sum += values[pos];
+	    }
+	    return sum / count;
+	}
+    }
 }
