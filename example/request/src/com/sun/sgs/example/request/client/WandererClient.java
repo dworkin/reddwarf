@@ -67,6 +67,9 @@ import java.util.logging.Logger;
  *	notifications, defaults to {@code 100}
  * <li> {@code com.sun.sgs.example.request.client.wanderer.report} - The number
  *	of seconds between logging performance data, defaults to {@code 20}
+ * <li> {@code com.sun.sgs.example.request.client.wanderer.average} - The
+ *	number of values to include when printing averages, defaults to {@code
+ *	5}
  * </ul> <p>
  *
  * This class uses the {@link Logger} named {@code
@@ -223,7 +226,8 @@ public class WandererClient
 		       (SLEEP + RANDOM) + " ms" +
 		       "\n  size: " + SIZE +
 		       "\n  sector: " + SECTOR +
-		       "\n  report interval: " + REPORT + " sec");
+		       "\n  report interval: " + REPORT + " sec" +
+		       "\n  average: " + AVERAGE);
 	}
 	WandererClient[] clients = new WandererClient[CLIENTS];
 	for (int i = 0; i < CLIENTS; i++) {
