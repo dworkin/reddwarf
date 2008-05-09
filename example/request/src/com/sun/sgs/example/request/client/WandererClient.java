@@ -659,6 +659,7 @@ public class WandererClient
 		(throttled > 0 ? " throttle=" + (throttled /active) : "");
 	}
 
+	/** Reset counts for the start of the next reporting period. */
 	void reset() {
 	    sent = 0;
 	    received = 0;
