@@ -67,6 +67,9 @@ import java.util.logging.Logger;
  *	notifications, defaults to {@code 100}
  * <li> {@code com.sun.sgs.example.request.client.wanderer.report} - The number
  *	of seconds between logging performance data, defaults to {@code 20}
+ * <li> {@code com.sun.sgs.example.request.client.wanderer.average} - The
+ *	number of values to include when printing averages, defaults to {@code
+ *	5}
  * </ul> <p>
  *
  * This class uses the {@link Logger} named {@code
@@ -141,6 +144,10 @@ public class WandererClient
      */
     private static final long LOGIN_MAX_RETRY =
 	Long.getLong(PREFIX + ".login.max.retry", 30000);
+
+    /** The number of values for computing averages. */
+    private static final int AVERAGE =
+	Integer.getInteger(PREFIX + ".average", 5);
 
     /** The logger for this class. */
     private static final Logger logger = Logger.getLogger(PREFIX);
@@ -219,7 +226,8 @@ public class WandererClient
 		       (SLEEP + RANDOM) + " ms" +
 		       "\n  size: " + SIZE +
 		       "\n  sector: " + SECTOR +
-		       "\n  report interval: " + REPORT + " sec");
+		       "\n  report interval: " + REPORT + " sec" +
+		       "\n  average: " + AVERAGE);
 	}
 	WandererClient[] clients = new WandererClient[CLIENTS];
 	for (int i = 0; i < CLIENTS; i++) {
@@ -228,6 +236,7 @@ public class WandererClient
 	long until = System.currentTimeMillis() + (REPORT * 1000);
 	/* Round to a multiple of the report interval */
 	until -= until % (REPORT * 1000);
+	Stats stats = new Stats();
 	while (true) {
 	    long now = System.currentTimeMillis();
 	    if (now < until) {
@@ -237,13 +246,13 @@ public class WandererClient
 		}
 		continue;
 	    }
-	    Stats stats = new Stats();
 	    for (WandererClient client : clients) {
 		client.tally(stats);
 	    }
 	    if (logger.isLoggable(Level.INFO)) {
 		logger.log(Level.INFO, stats.report());
 	    }
+	    stats.reset();
 	    until += (REPORT * 1000);
 	}
     }
@@ -627,19 +636,92 @@ public class WandererClient
 	/** Number of times clients have throttled. */
 	private int throttled = 0;
 
+	/** The moving average number of messages sent. */
+	private final MovingAverage maSent = new MovingAverage(AVERAGE);
+
+	/** The moving average number of messages received. */
+	private final MovingAverage maReceived = new MovingAverage(AVERAGE);
+
 	/** Creates an empty instance. */
 	Stats() { }
 
 	/** Returns a string that describes the client statistics. */
 	String report() {
-	    return "sent/sec=" + (sent / REPORT) +
-		" rcv/sec=" + (received / REPORT) +
+	    int meanSent = sent / REPORT;
+	    maSent.add(meanSent);
+	    int meanReceived = received / REPORT;
+	    maReceived.add(meanReceived);
+	    return "sent/sec=" + meanSent +
+		"(" + maSent.average() + ")" +
+		" rcv/sec=" + meanReceived +
+		"(" + maReceived.average() + ")" +
 		" active=" + active +
 		(failing > 0 ? " failing=" + failing : "") +
 		(disconnected > 0 ? " disconnected=" + disconnected : "") +
 		(logins > 0 ? " login=" + logins : "") +
-		(backlog > 0 ? " backlog=" + backlog : "") +
-		(throttled > 0 ? " throttle=" + throttled : "");
+		(backlog > 0 ? " backlog=" + (backlog / active) : "") +
+		(throttled > 0 ? " throttle=" + (throttled /active) : "");
+	}
+
+	/** Reset counts for the start of the next reporting period. */
+	void reset() {
+	    sent = 0;
+	    received = 0;
+	    active = 0;
+	    failing = 0;
+	    disconnected = 0;
+	    logins = 0;
+	    backlog = 0;
+	    throttled = 0;
+	}
+    }
+
+    /** Tracks a moving average of a specified maximum number of values. */
+    private static class MovingAverage {
+
+	/** Holds the values to average. */
+	private final int[] values;
+
+	/** The offset in values to store the next value. */
+	private int next = 0;
+
+	/** The number of values stored. */
+	private int count = 0;
+	
+	/**
+	 * Creates an instance for averaging the specified maximum number of
+	 * values.
+	 */
+	MovingAverage(int maxNumValues) {
+	    values = new int[maxNumValues];
+	}
+
+	/** Adds a value. */
+	void add(int value) {
+	    values[next++] = value;
+	    if (next >= values.length) {
+		next = 0;
+	    }
+	    if (count < values.length) {
+		count++;
+	    }
+	}
+
+	/** Returns the average. */
+	int average() {
+	    if (count == 0) {
+		return 0;
+	    }
+	    int sum = 0;
+	    int pos = next;
+	    for (int i = 0; i < count; i++) {
+		pos--;
+		if (pos < 0) {
+		    pos = count - 1;
+		}
+		sum += values[pos];
+	    }
+	    return sum / count;
 	}
     }
 }
