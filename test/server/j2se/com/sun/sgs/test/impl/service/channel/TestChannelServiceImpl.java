@@ -1404,7 +1404,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	final String sessionKey = user + ".wrapped";
 	isPerformanceTest = true;
-	int numIterations = 100;
+	int numIterations = 2000;
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
 	    txnScheduler.runTask(new AbstractKernelRunnable() {

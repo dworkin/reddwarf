@@ -419,9 +419,9 @@ final class TaskSchedulerImpl implements TaskScheduler {
         /** {@inheritDoc} */
         public void addTask(KernelRunnable task, Identity owner) {
             TaskDetail detail = new TaskDetail(task, owner, this);
+	    waitingSize.incrementAndGet();
             synchronized (this) {
                 if (inScheduler) {
-                    waitingSize.incrementAndGet();
                     queue.offer(detail);
                 } else {
                     inScheduler = true;
