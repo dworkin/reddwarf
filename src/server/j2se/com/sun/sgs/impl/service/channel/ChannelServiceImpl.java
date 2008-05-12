@@ -874,7 +874,7 @@ public final class ChannelServiceImpl
 	 * returns true; otherwise returns false.
 	 */
 	private boolean flush() {
-	    //assert Thread.holdsLock(contextList);
+	    assert Thread.holdsLock(contextList);
 	    if (isCommitted) {
 		for (BigInteger channelId : internalTaskLists.keySet()) {
 		    flushTasks(
@@ -894,14 +894,13 @@ public final class ChannelServiceImpl
 	BigInteger channelId, List<KernelRunnable> taskList)
 	
     {
-        //assert Thread.holdsLock(contextList);
+        assert Thread.holdsLock(contextList);
 	TaskQueue taskQueue = channelTaskQueues.get(channelId);
 	if (taskQueue == null) {
 	    taskQueue = taskScheduler.createTaskQueue();
 	    channelTaskQueues.put(channelId, taskQueue);
 	}
 	for (KernelRunnable task : taskList) {
-	    // TBD: is the owner correct?
 	    taskQueue.addTask(task, taskOwner);
 	}
     }
