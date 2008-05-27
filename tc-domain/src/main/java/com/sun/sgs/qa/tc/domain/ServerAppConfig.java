@@ -68,7 +68,7 @@ public class ServerAppConfig implements Serializable
     public void setAdditionalCommandLine(String additionalCommandLine) { this.additionalCommandLine = additionalCommandLine; }
     
     @ManyToOne
-    @JoinColumn(name="serverApp")
+    @JoinColumn(name="serverApp", nullable = false)
     public ServerApp getServerApp() { return serverApp; }
     public void setServerApp(ServerApp serverApp) { this.serverApp = serverApp; }
     

@@ -85,7 +85,7 @@ public class ServerApp implements Serializable
     public void setConfigs(SortedSet<ServerAppConfig> configs) { this.configs = configs; }
     
     @ManyToOne
-    @JoinColumn(name = "requiredPkg")
+    @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }
     public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
     

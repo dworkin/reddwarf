@@ -42,24 +42,23 @@ public class SystemProbe implements Serializable
 {
     private Long id;
     private String name;
-    private String family;
     private String className;
     private String classPath;
     private String metric;
     private String units;
     
+    private SortedSet<SystemProbeTag> tags;
+    
     private SortedSet<Property> properties;
     private PkgLibrary requiredPkg;
     
     public SystemProbe(String name,
-                       String family,
                        String className,
                        String classPath,
                        String metric,
                        String units)
     {
         this.setName(name);
-        this.setFamily(family);
         this.setClassName(className);
         this.setClassPath(classPath);
         this.setMetric(metric);
@@ -74,10 +73,6 @@ public class SystemProbe implements Serializable
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    
-    @Column(name = "family", nullable = false)
-    public String getFamily() { return family; }
-    public void setFamily(String family) { this.family = family; }
     
     @Column(name = "className", nullable = false)
     public String getClassName() { return className; }
@@ -96,6 +91,13 @@ public class SystemProbe implements Serializable
     public void setUnits(String units) { this.units = units; }
     
     @ManyToMany
+    @JoinTable(name = "systemProbeTags",
+               joinColumns = @JoinColumn(name = "systemProbeId"),
+               inverseJoinColumns = @JoinColumn(name = "systemProbeTagId"))
+    public SortedSet<SystemProbeTag> getTags() { return tags; }
+    public void setTags(SortedSet<SystemProbeTag> tags) { this.tags = tags; }
+    
+    @ManyToMany
     @JoinTable(name = "systemProbeProperties",
                joinColumns = @JoinColumn(name = "systemProbeId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
@@ -103,7 +105,7 @@ public class SystemProbe implements Serializable
     public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
     
     @ManyToOne
-    @JoinColumn(name = "requiredPkg")
+    @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }
     public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
 }

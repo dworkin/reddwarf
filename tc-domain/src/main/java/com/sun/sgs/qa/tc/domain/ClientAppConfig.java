@@ -42,19 +42,17 @@ import javax.persistence.JoinColumn;
 @Table(name = "ClientAppConfig")
 public class ClientAppConfig implements Serializable
 {
-    public static enum Type {PROPERTIES, CLI, ENV};
-    
     private Long id;
     private String name;
     private String path;
-    private Type propertyMethod;
+    private ClientAppConfigType propertyMethod;
     
     private ClientApp clientApp;
     private SortedSet<Property> properties;
     
     public ClientAppConfig(String name,
                            String path,
-                           Type propertyMethod)
+                           ClientAppConfigType propertyMethod)
     {
         this.setName(name);
         this.setPath(path);
@@ -76,11 +74,11 @@ public class ClientAppConfig implements Serializable
     
     @Column(name = "propertyMethod", nullable = false)
     @Enumerated(EnumType.STRING)
-    public Type getPropertyMethod() { return propertyMethod; }
-    public void setPropertyMethod(Type propertyMethod) { this.propertyMethod = propertyMethod; }
+    public ClientAppConfigType getPropertyMethod() { return propertyMethod; }
+    public void setPropertyMethod(ClientAppConfigType propertyMethod) { this.propertyMethod = propertyMethod; }
     
     @ManyToOne
-    @JoinColumn(name="clientApp")
+    @JoinColumn(name="clientApp", nullable = false)
     public ClientApp getClientApp() { return clientApp; }
     public void setClientApp(ClientApp clientApp) { this.clientApp = clientApp; }
     

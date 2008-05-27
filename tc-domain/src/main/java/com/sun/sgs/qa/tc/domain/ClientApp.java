@@ -71,7 +71,7 @@ public class ClientApp implements Serializable
     public void setConfigs(SortedSet<ClientAppConfig> configs) { this.configs = configs; }
     
     @ManyToOne
-    @JoinColumn(name = "requiredPkg")
+    @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }
     public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
 }

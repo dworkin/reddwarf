@@ -20,6 +20,7 @@
 package com.sun.sgs.qa.tc.domain;
 
 import java.sql.Date;
+import java.util.SortedSet;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -27,8 +28,11 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.ManyToMany;
+import javax.persistence.JoinTable;
 
 
 /**
@@ -43,20 +47,21 @@ public class HardwareResource implements Serializable
     private String hostname;
     private String lockedBy;
     private Date lockedAt;
+    private Boolean enabled;
     
-    private HardwareResourceFamily family;
+    private SortedSet<HardwareResourceFamily> families;
 
     public HardwareResource() {}
     
     public HardwareResource(String hostname,
                             String lockedBy,
                             Date lockedAt,
-                            HardwareResourceFamily family)
+                            Boolean enabled)
     {
         this.setHostname(hostname);
         this.setLockedBy(lockedBy);
         this.setLockedAt(lockedAt);
-        this.setFamily(family);
+        this.setEnabled(enabled);
     }
     
     @Id
@@ -72,12 +77,19 @@ public class HardwareResource implements Serializable
     public String getLockedBy() { return lockedBy; }
     public void setLockedBy(String lockedBy) { this.lockedBy = lockedBy; }
     
+    @Temporal(TemporalType.TIMESTAMP)
     @Column(name="lockedAt", nullable=true)
     public Date getLockedAt() { return lockedAt; }
     public void setLockedAt(Date lockedAt) { this.lockedAt = lockedAt; }
     
-    @ManyToOne
-    @JoinColumn(name="family")
-    public HardwareResourceFamily getFamily() { return family; }
-    public void setFamily(HardwareResourceFamily family) { this.family = family; }
+    @Column(name = "enabled", nullable = false)
+    public Boolean getEnabled() { return enabled; }
+    public void setEnabled(Boolean enabled) { this.enabled = enabled; }
+    
+    @ManyToMany
+    @JoinTable(name = "hardwareResourceFamilies",
+               joinColumns = @JoinColumn(name = "hardwareResourceId"),
+               inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
+    public SortedSet<HardwareResourceFamily> getFamilies() { return families; }
+    public void setFamilies(SortedSet<HardwareResourceFamily> families) { this.families = families; }
 }

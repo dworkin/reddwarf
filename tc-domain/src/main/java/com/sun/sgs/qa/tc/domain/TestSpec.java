@@ -104,7 +104,7 @@ public class TestSpec implements Serializable
     public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
     
     @ManyToOne
-    @JoinColumn(name = "serverAppConfig")
+    @JoinColumn(name = "serverAppConfig", nullable = false)
     public ServerAppConfig getServerAppConfig() { return serverAppConfig; }
     public void setServerAppConfig(ServerAppConfig serverAppConfig) { this.serverAppConfig = serverAppConfig; }
     

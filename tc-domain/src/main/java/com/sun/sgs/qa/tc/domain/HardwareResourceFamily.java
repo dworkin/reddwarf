@@ -27,8 +27,7 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.OneToMany;
-import javax.persistence.CascadeType;
+import javax.persistence.ManyToMany;
 
 /**
  *
@@ -85,7 +84,7 @@ public class HardwareResourceFamily implements Serializable
     public String getOs() { return os; }
     public void setOs(String os) { this.os = os; }
     
-    @OneToMany(mappedBy="family", cascade=CascadeType.REMOVE)
+    @ManyToMany(mappedBy="families")
     public SortedSet<HardwareResource> getMembers() { return members; }
     public void setMembers(SortedSet<HardwareResource> members) { this.members = members; }
     
