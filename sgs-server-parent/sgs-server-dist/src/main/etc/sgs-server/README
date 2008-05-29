@@ -1,5 +1,5 @@
 Project Darkstar Server, Binary Distribution
-Version @VERSION@
+Version ${sgs.version}
 
 INTRODUCTION
 
@@ -56,25 +56,26 @@ REQUIRED LIBRARIES
 The Project Darkstar server depends on several additional libraries,
 which must be installed.
 
-This distribution requires Berkeley DB version 4.5.20, which may be
+This distribution requires Berkeley DB version ${bdb.version}, which may be
 bundled with this distribution, or else can be obtained and compiled
 from:
 
   http://www.oracle.com/database/berkeley-db/db/index.html
 
-The db.jar and the subdirectories containing the native libraries for
+The db-${bdb.version}.jar JAR file should be copied to the lib subdirectory.
+The subdirectories containing the native libraries for
 the platforms of interest should be copied to the lib/bdb subdirectory.
 If using files compiled separately, the Berkeley DB JAR file should be
-copied to the lib/bdb subdirectory, and the natives libraries for the
-current platform should be copied to proper subdirectory as specified in
+copied to the lib subdirectory, and the natives libraries for the
+current platform should be copied to proper lib/bdb subdirectory as specified in
 the startup scripts.
 
-This distribution requires Apache MINA, version 1.1, which may be
+This distribution requires Apache MINA, version ${org.apache.mina.version}, which may be
 bundled with this distribution, or else can be obtained from:
 
   http://mina.apache.org/
 
-The mina-core-@MINA.VERSION@.jar JAR file should be copied to the lib
+The mina-core-${org.apache.mina.version}.jar JAR file should be copied to the lib
 subdirectory.
 
 MINA also requires Simple Logging Facade for Java (SLF4J), version 1.4,
@@ -83,7 +84,7 @@ from:
 
   http://www.slf4j.org/
 
-The slf4j-api-@SLF4J.VERSION@.jar and slf4j-jdk14-@SLF4J.VERSION@.jar
+The slf4j-api-${slf4j-api.version}.jar and slf4j-jdk14-${slf4j-jdk14.version}.jar
 JAR files should be copied to the lib subdirectory.
 
 DEVELOPING AND RUNNING
@@ -91,7 +92,7 @@ DEVELOPING AND RUNNING
 To develop server applications, include the following JAR file in your
 classpath:
 
-   lib/sgs.jar
+   lib/sgs-server.jar
 
 To run the Project Darkstar server:
 

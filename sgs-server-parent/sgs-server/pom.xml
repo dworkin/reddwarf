@@ -1,0 +1,308 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- The sgs-server module is a standard jar package of sgs classes
+       used exclusively by the server -->
+
+  <parent>
+    <groupId>com.projectdarkstar.server</groupId>
+    <artifactId>sgs-server-parent</artifactId>
+    <version>0.9.7-SNAPSHOT</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.server</groupId>
+  <artifactId>sgs-server</artifactId>
+  <name>sgs-server</name>
+  <packaging>jar</packaging>
+  <version>0.9.7-SNAPSHOT</version>
+
+
+  <!-- Profiles activated based on platform to set BDB properties
+       The profile that is activated sets the bdb.lib.dir to the directory
+       name of the bdb libraries in the bdb binary package for the
+       platform in use -->
+  <profiles>
+    <profile>
+      <id>macosx-ppc</id>
+      <properties>
+	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>ppc</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-x86</id>
+      <properties>
+	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>x86</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-sparc</id>
+      <properties>
+	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>sparc</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86</id>
+      <properties>
+	<bdb.lib.dir>linux-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86_64</id>
+      <properties>
+	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>x86_64</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>win32-x86</id>
+      <properties>
+	<bdb.lib.dir>win32-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>windows</family>
+	</os>
+      </activation>
+    </profile>
+
+
+
+    <!-- profile enabled to test with BDB Java edition -->
+    <profile>
+      <id>bdb-java</id>
+      <properties>
+	<test.bdb.env>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</test.bdb.env>
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>berkeleydb</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+      </dependencies>
+      <activation>
+	<property>
+	  <name>test.use.je</name>
+	  <value>true</value>
+	</property>
+      </activation>
+    </profile>
+  </profiles>
+  
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-shared</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>berkeleydb</groupId>
+      <artifactId>db</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>berkeleydb</groupId>
+      <artifactId>db-binaries</artifactId>
+      <type>zip</type>
+    </dependency>
+
+    <!-- Included as compile time dependency only unless
+	 BDB Java edition profile is activated above -->
+    <dependency>
+      <groupId>berkeleydb</groupId>
+      <artifactId>je</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+
+      <!-- Always attach a sources jar (with the assembly plugin)
+	   Normally the maven-source-plugin should be used for this.
+	   However, that plugin currently does not attach classifier
+	   artifacts that are consumable by other modules in the reactor
+	   (i.e. the javadoc module).  Using this as a workaround -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-assembly-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>package</phase>
+	    <goals>
+              <goal>attached</goal>
+	    </goals>
+	    <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/sources.xml</descriptor>
+              </descriptors>
+	      <attach>true</attach>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- The berkeleydb binary package must be retrieved and unpacked
+	   Before the test phase so that they are available during
+	   runtime of the unit tests -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-db-binaries</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>berkeleydb</groupId>
+                  <artifactId>db-binaries</artifactId>
+		  <type>zip</type>
+                  <overWrite>false</overWrite>
+                  <outputDirectory>${project.build.directory}/</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Configure the surefire plugin (which runs the unit tests)
+	   to feed the appropriate java.library.path which points to
+	   the extracted berkeleydb binary folder for the appropriate
+	   platform. -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+	  <systemProperties>
+	    <property>
+	      <name>java.library.path</name>
+	      <value>${test.javapath}</value>
+	    </property>
+	    <property>
+	      <name>com.sun.sgs.impl.service.data.store.db.environment.class</name>
+	      <value>${test.bdb.env}</value>
+	    </property>
+	    <property>
+	      <name>com.sun.sgs.impl.service.data.store.db.bdb.cache.size</name>
+	      <value>${test.bdb.cache.size}</value>
+	    </property>
+	  </systemProperties>
+	  <argLine>${test.jvm.args} -Djava.library.path=${test.javapath}</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Configure checkstyle to have custom dependency -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<dependencies>
+	  <dependency>
+	    <groupId>com.projectdarkstar.tools</groupId>
+	    <artifactId>sgs-build-utilities</artifactId>
+	    <version>${sgs-build-utilities.version}</version>
+	  </dependency>
+	</dependencies>
+      </plugin>
+
+    </plugins>
+  </build>
+
+
+  <reporting>
+    <plugins>
+
+      <!-- Configure checkstyle to run during site lifecycle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<configuration>
+	  <linkXRef>false</linkXRef>
+	  <consoleOutput>true</consoleOutput>
+	  <enableRulesSummary>false</enableRulesSummary>
+	  <configLocation>com/sun/sgs/tools/checkstyle/darkstar_checks.xml</configLocation>
+	  <headerLocation>com/sun/sgs/tools/checkstyle/GPL.txt</headerLocation>
+	  <packageNamesLocation>com/sun/sgs/tools/checkstyle/packageNames.xml</packageNamesLocation>
+        </configuration>
+      </plugin>
+
+      <!-- Configure findbugs to run during site lifecycle -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <excludeFilterFile>src/main/etc/findbugs-exclude.xml</excludeFilterFile>
+	</configuration>
+      </plugin>
+
+
+    </plugins>
+  </reporting>
+
+
+  <properties>
+    <test.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</test.javapath>
+    <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
+    <test.bdb.cache.size>1000000</test.bdb.cache.size>
+  </properties>
+
+
+</project>

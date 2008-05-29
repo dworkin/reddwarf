@@ -1,0 +1,65 @@
+<assembly>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the sgs-tutorial-server jar file -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-tutorial-server:jar</include>
+      </includes>
+      <outputDirectory>tutorial</outputDirectory>
+      <outputFileNameMapping>tutorial.jar</outputFileNameMapping>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+    <!-- Unpack the sources artifact of the sgs-tutorial-server
+	 module into the src directory -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-tutorial-server:jar:sources</include>
+      </includes>
+      <unpack>true</unpack>
+      <unpackOptions>
+	<excludes>
+	  <exclude>META-INF</exclude>
+	  <exclude>META-INF/*</exclude>
+	</excludes>
+      </unpackOptions>
+      <outputDirectory>tutorial/src</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+  </dependencySets>
+  
+  
+  <fileSets>
+
+    <!-- Include the example properties files used in
+	 the tutorial -->
+    <fileSet>
+      <directory>src/main/properties</directory>
+      <outputDirectory>tutorial</outputDirectory>
+    </fileSet>
+
+    <!-- Include the data directories used for the datastores
+	 in the tutorials -->
+    <fileSet>
+      <directory>src/main/data</directory>
+      <outputDirectory>tutorial/data</outputDirectory>
+    </fileSet>
+
+    <!-- Include the tutorial pdf file -->
+    <fileSet>
+      <directory>src/main/doc</directory>
+      <outputDirectory>tutorial</outputDirectory>
+      <includes>
+	<include>**/*.pdf</include>
+      </includes>
+    </fileSet>
+
+  </fileSets>
+  
+</assembly>
