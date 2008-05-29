@@ -1,0 +1,21 @@
+<!-- This file is included solely as a workaround to package
+     up the sources for this module.  When appropriate, this
+     should go away in favor of the maven-source-plugin -->
+<assembly>
+  <id>sources</id>
+
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <formats>
+    <format>jar</format>
+  </formats>
+  
+  <fileSets>
+    
+    <!-- Include the top level java source directory -->
+    <fileSet>
+      <directory>src/main/java</directory>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+
+  </fileSets>
+</assembly>

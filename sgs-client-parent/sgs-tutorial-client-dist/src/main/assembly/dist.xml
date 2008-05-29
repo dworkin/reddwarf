@@ -1,0 +1,50 @@
+<assembly>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the sgs-tutorial-client jar file -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-tutorial-client:jar</include>
+      </includes>
+      <outputDirectory>tutorial</outputDirectory>
+      <outputFileNameMapping>tutorial.jar</outputFileNameMapping>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+    <!-- Unpack the sources artifact of the sgs-tutorial-client module
+	 into the src directory -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-tutorial-client:jar:sources</include>
+      </includes>
+      <unpack>true</unpack>
+      <unpackOptions>
+	<excludes>
+	  <exclude>META-INF</exclude>
+	  <exclude>META-INF/*</exclude>
+	</excludes>
+      </unpackOptions>
+      <outputDirectory>tutorial/src</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+  </dependencySets>
+  
+  
+  <!-- Include the tutorial pdf file -->
+  <fileSets>
+    <fileSet>
+      <directory>src/main/doc</directory>
+      <outputDirectory>tutorial</outputDirectory>
+      <includes>
+	<include>**/*.pdf</include>
+      </includes>
+    </fileSet>
+
+  </fileSets>
+  
+</assembly>
