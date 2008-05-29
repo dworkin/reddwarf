@@ -1,0 +1,65 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- The chat-client module is a standard jar package of chat classes
+       used exclusively by the client -->
+
+  <parent>
+    <groupId>com.projectdarkstar.example</groupId>
+    <artifactId>chat</artifactId>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.example</groupId>
+  <artifactId>chat-client</artifactId>
+  <name>chat-client</name>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+
+  <dependencies>
+    <!-- Compile time dependencies -->
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client-api</artifactId>
+    </dependency>
+
+    <!-- Runtime dependencies -->
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client</artifactId>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+      
+      <!-- Configured so you can run the client out of band
+	   mvn exec:exec -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>exec-maven-plugin</artifactId>
+	<configuration>
+	  <executable>java</executable>
+	  <classpathScope>test</classpathScope>
+	  <arguments>
+	    <argument>-Djava.util.logging.config.file=${run.logging}</argument>
+	    <argument>-classpath</argument>
+	    <classpath/>
+	    <argument>com.sun.sgs.example.chat.client.ChatClient</argument>
+	  </arguments>
+	</configuration>
+      </plugin>
+    </plugins>
+
+  </build>
+
+  <properties>
+    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+  </properties>
+
+
+</project>
