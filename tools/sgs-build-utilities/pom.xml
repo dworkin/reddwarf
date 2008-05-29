@@ -1,0 +1,26 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.projectdarkstar.tools</groupId>
+  <artifactId>sgs-build-utilities</artifactId>
+  <name>sgs-build-utilities</name>
+  <packaging>jar</packaging>
+  <version>0.1</version>
+
+  <dependencies>
+    <dependency>
+      <groupId>checkstyle</groupId>
+      <artifactId>checkstyle</artifactId>
+      <version>${checkstyle.version}</version>
+    </dependency>
+  </dependencies>
+
+
+  <properties>
+    <checkstyle.version>4.1</checkstyle.version>
+  </properties>
+
+</project>
