@@ -1,0 +1,69 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- The request-client module is a standard jar package of request classes
+       used exclusively by the client -->
+
+  <parent>
+    <groupId>com.projectdarkstar.example</groupId>
+    <artifactId>request</artifactId>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.example</groupId>
+  <artifactId>request-client</artifactId>
+  <name>request-client</name>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+
+  <dependencies>
+    <!-- Compile time dependencies -->
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client-api</artifactId>
+    </dependency>
+
+    <!-- Runtime dependencies -->
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client</artifactId>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+      
+      <!-- Configured so you can run the client out of band
+	   mvn exec:exec -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>exec-maven-plugin</artifactId>
+	<configuration>
+	  <executable>java</executable>
+	  <classpathScope>test</classpathScope>
+	  <arguments>
+	    <argument>-Djava.util.logging.config.file=${run.logging}</argument>
+	    <argument>-Dcom.sun.sgs.example.request.client.wanderer.host=${wanderer.host}</argument>
+	    <argument>-Dcom.sun.sgs.example.request.client.wanderer.clients=${wanderer.clients}</argument>
+	    <argument>-classpath</argument>
+	    <classpath/>
+	    <argument>com.sun.sgs.example.request.client.WandererClient</argument>
+	  </arguments>
+	</configuration>
+      </plugin>
+    </plugins>
+
+  </build>
+
+  <properties>
+    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+    <wanderer.host>localhost</wanderer.host>
+    <wanderer.clients>10</wanderer.clients>
+  </properties>
+
+
+</project>

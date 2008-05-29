@@ -1,0 +1,149 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.projectdarkstar.example</groupId>
+  <artifactId>request</artifactId>
+  <name>request</name>
+  <packaging>pom</packaging>
+  <version>0.1-SNAPSHOT</version>
+
+  <modules>
+    <module>request-client</module>
+    <module>request-server</module>
+  </modules>
+
+  <build>
+
+    <plugins>
+
+      <!-- Global compiler configuration -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.5</source>
+	  <target>1.5</target>
+	</configuration>
+      </plugin>
+
+      <!-- Global manifest generation configuration -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>true</addClasspath>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Always attach a sources jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Always attach a javadoc jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-javadocs</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <quiet>true</quiet>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+
+
+    </plugins>
+
+  </build>
+
+
+
+  <!-- Library of dependencies used in any sub module of this project
+       Define versions of dependencies in this file only to maintain
+       consistency -->
+  <dependencyManagement>
+    <dependencies>
+
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client</artifactId>
+	<version>${sgs.version}</version>
+	<scope>runtime</scope>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server</artifactId>
+	<version>${sgs.version}</version>
+	<scope>runtime</scope>
+      </dependency>
+
+
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client-api</artifactId>
+	<version>${sgs.version}</version>
+	<scope>provided</scope>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-api</artifactId>
+	<version>${sgs.version}</version>
+	<scope>provided</scope>
+      </dependency>
+
+
+      <dependency>
+	<groupId>berkeleydb</groupId>
+	<artifactId>db-binaries</artifactId>
+	<version>${bdb.version}</version>
+	<type>zip</type>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+
+  <repositories>
+    <repository>
+      <id>sunlabs.maven</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>http://frizbee.east.sun.com/maven</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+
+
+
+  <properties>
+    <request.version>0.1-SNAPSHOT</request.version>
+
+    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <bdb.version>4.5.20</bdb.version>
+  </properties>
+
+</project>
